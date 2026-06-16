@@ -1,0 +1,25 @@
+# User-specific files
+*.rsuser
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# Build results
+[Dd]ebug/
+[Dd]ebugPublic/
+[Rr]elease/
+x64/
+x86/
+bld/
+[Bb]in/
+[Oo]bj/
+
+# Local Environment Logs & State
+transparent-process.json
+.vs/
+.idea/
+
+.specify
+/.specify
+*.specify

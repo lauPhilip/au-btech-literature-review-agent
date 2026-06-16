@@ -1,0 +1,31 @@
+﻿<!DOCTYPE html>
+<html lang="en" class="h-full w-full m-0 p-0 overflow-hidden">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <base href="/" />
+    <link rel="stylesheet" href="app.css" />
+    <link rel="icon" type="image/png" href="favicon.png" />
+    <HeadOutlet />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        auBlue: '#003B5C',
+                        auGrey: '#8A8D8F'
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+
+<body class="h-full w-full m-0 p-0 bg-gray-100 overflow-hidden text-gray-900 font-sans">
+    <Routes />
+    <script src="_framework/blazor.web.js"></script>
+</body>
+
+</html>

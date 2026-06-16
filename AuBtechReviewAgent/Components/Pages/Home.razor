@@ -1,0 +1,242 @@
+﻿@page "/"
+@rendermode InteractiveServer
+
+@using System.IO
+@using System.Text.Json
+@inject AuBtechReviewAgent.PrismaReviewEngine ReviewEngine
+@inject IJSRuntime JS
+
+<!-- TOP BANNER (Strictly constrained height) -->
+<header class="bg-[#003B5C] text-white flex-none shrink-0 z-50 shadow-md">
+    <div class="max-w-7xl mx-auto px-6 h-14 flex items-center justify-between">
+        <div class="flex items-center space-x-3">
+            <span class="font-bold tracking-tight text-sm">AARHUS UNIVERSITY</span>
+            <span class="text-white/40 font-light">|</span>
+            <span class="text-xs tracking-wider font-medium opacity-90 uppercase">au-btech-literature-review-agent</span>
+        </div>
+        <nav class="flex items-center space-x-6 text-xs font-semibold uppercase tracking-wider">
+            <a href="#" class="text-white border-b-2 border-white py-4">Dashboard</a>
+            <a href="#" class="text-white/70 hover:text-white transition-colors py-4">Spec Matrix</a>
+        </nav>
+    </div>
+</header>
+
+<!-- APPLICATION CONTAINER (Fills exact remaining viewport height) -->
+<div class="flex-1 flex flex-col min-h-0 overflow-hidden items-center justify-center max-w-7xl w-full mx-auto p-4 lg:p-6 space-y-4">
+    
+    <!-- HEADER SUMMARY TITLE -->
+    <div class="w-full text-center flex-none shrink-0 space-y-1">
+        <h1 class="text-2xl lg:text-3xl font-light text-gray-900 tracking-tight">
+            Literature Review Agent
+        </h1>
+        <p class="text-xs font-mono tracking-widest text-[#003B5C] uppercase font-bold">
+            Traceable PRISMA Reviews
+        </p>
+    </div>
+
+    <!-- MAIN TWO-COLUMN DASHBOARD GRID -->
+    <div class="w-full flex-1 grid grid-cols-1 lg:grid-cols-12 gap-4 min-h-0 overflow-hidden">
+        
+        <!-- LEFT: Control System & PRISMA Fields Matrix -->
+        <div class="lg:col-span-5 flex flex-col space-y-4 min-h-0">
+            
+            <!-- Parameters Frame -->
+            <div class="bg-white border border-gray-200 rounded-lg p-4 flex flex-col justify-between shadow-sm flex-1 min-h-0">
+                <span class="text-[10px] font-bold uppercase tracking-wider text-gray-400 block mb-2">Execution Configuration</span>
+                
+                <!-- Dense Inner Scroll Area for inputs to guarantee perfect viewport containment -->
+                <div class="space-y-3 overflow-y-auto pr-1 flex-1 text-left">
+                    <div>
+                        <label class="block text-[11px] font-bold uppercase text-gray-600 mb-1">Search Query / Intent</label>
+                        <input type="text" @bind="searchQuery" class="w-full p-2 bg-gray-50 border border-gray-300 rounded focus:outline-none focus:border-[#003B5C] text-xs shadow-inner transition-all" />
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-2">
+                        <div>
+                            <label class="block text-[11px] font-bold uppercase text-gray-600 mb-1">Date From</label>
+                            <input type="date" @bind="dateFrom" class="w-full p-2 bg-gray-50 border border-gray-300 rounded focus:outline-none focus:border-[#003B5C] text-xs shadow-inner transition-all" />
+                        </div>
+                        <div>
+                            <label class="block text-[11px] font-bold uppercase text-gray-600 mb-1">Date To</label>
+                            <input type="date" @bind="dateTo" class="w-full p-2 bg-gray-50 border border-gray-300 rounded focus:outline-none focus:border-[#003B5C] text-xs shadow-inner transition-all" />
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-[11px] font-bold uppercase text-gray-600 mb-1">Inclusion Criteria Matrix</label>
+                        <textarea @bind="inclusionCriteria" rows="2" class="w-full p-2 bg-gray-50 border border-gray-300 rounded focus:outline-none focus:border-[#003B5C] text-xs shadow-inner resize-none transition-all" placeholder="e.g., Must focus on loop architectures..."></textarea>
+                    </div>
+
+                    <div>
+                        <label class="block text-[11px] font-bold uppercase text-gray-600 mb-1">Exclusion Criteria Matrix</label>
+                        <textarea @bind="exclusionCriteria" rows="2" class="w-full p-2 bg-gray-50 border border-gray-300 rounded focus:outline-none focus:border-[#003B5C] text-xs shadow-inner resize-none transition-all" placeholder="e.g., Exclude short whitepapers under 3 pages..."></textarea>
+                    </div>
+
+                    <!-- Custom Peer Review Checkbox Filter element aligned to AU style -->
+                    <div class="pt-1 flex items-center">
+                        <label class="relative flex items-center cursor-pointer select-none text-xs text-gray-700 font-semibold gap-2">
+                            <input type="checkbox" @bind="requirePeerReview" class="w-4 h-4 text-[#003B5C] bg-gray-50 border-gray-300 rounded focus:ring-[#003B5C] focus:ring-2 transition-all accent-[#003B5C]" />
+                            <span>Peer-Reviewed</span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="pt-3 flex-none">
+                    <button @onclick="StartReviewProcess" disabled="@isSearching" class="w-full py-2.5 px-4 text-white text-xs font-bold uppercase tracking-wider rounded transition-all hover:bg-opacity-95 disabled:opacity-50 shadow-sm" style="background-color: #003B5C;">
+                        @if (isSearching)
+                        {
+                            <span class="flex items-center justify-center gap-2">
+                                <span class="animate-spin inline-block w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full"></span>
+                                <span>PARSING ENGINE...</span>
+                            </span>
+                        }
+                        else
+                        {
+                            <span>Execute Ralph Loop Agent</span>
+                        }
+                    </button>
+                </div>
+            </div>
+
+            <!-- PRISMA Progression Display Metrics -->
+            <div class="bg-white border border-gray-200 rounded-lg p-4 shadow-sm flex-none">
+                <span class="text-[10px] font-bold uppercase tracking-wider text-gray-400 block mb-3">PRISMA Funnel Tracking Fields</span>
+                <div class="grid grid-cols-2 gap-3">
+                    <div class="p-3 bg-gray-50 border border-gray-100 rounded text-left">
+                        <span class="block text-[9px] font-bold text-gray-400 uppercase tracking-wider">Identified</span>
+                        <span class="text-xl font-bold text-[#003B5C] font-mono">@totalIdentified</span>
+                    </div>
+                    <div class="p-3 bg-gray-50 border border-gray-100 rounded text-left">
+                        <span class="block text-[9px] font-bold text-gray-400 uppercase tracking-wider">Screened</span>
+                        <span class="text-xl font-bold text-gray-700 font-mono">@screenedCount</span>
+                    </div>
+                    <div class="p-3 bg-red-50/60 border border-red-100 rounded text-left">
+                        <span class="block text-[9px] font-bold text-red-500 uppercase tracking-wider">Excluded</span>
+                        <span class="text-xl font-bold text-red-600 font-mono">@excludedCount</span>
+                    </div>
+                    <div class="p-3 bg-green-50/60 border border-green-100 rounded text-left">
+                        <span class="block text-[9px] font-bold text-green-600 uppercase tracking-wider">Included</span>
+                        <span class="text-xl font-bold text-green-700 font-mono">@includedCount</span>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- RIGHT: Live Micro-Execution JSON Trace Log Area -->
+        <div class="lg:col-span-7 flex flex-col min-h-0 border border-gray-200 rounded-lg bg-white shadow-sm overflow-hidden">
+            <div class="bg-gray-800 text-white px-4 py-2.5 text-xs font-mono flex justify-between items-center flex-none">
+                <span class="flex items-center gap-2">
+                    <span class="h-1.5 w-1.5 rounded-full bg-green-400 @(isSearching ? "animate-pulse" : "")"></span>
+                    traceability-log.json output
+                </span>
+                <span class="text-[9px] opacity-50 uppercase tracking-widest font-bold">Mistral LLM</span>
+            </div>
+            <!-- Scrollable element configured perfectly for viewports -->
+            <div class="flex-1 bg-gray-950 p-4 font-mono text-xs text-green-400 overflow-y-auto whitespace-pre-wrap leading-relaxed selection:bg-green-800 selection:text-white">
+@rawJsonLogs
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<!-- FOOTER (Strictly fixed container height alignment) -->
+<footer class="bg-white border-t border-gray-200 flex-none shrink-0 py-3 px-6 text-[11px] text-gray-500">
+    <div class="max-w-7xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-2">
+        <div>
+            <span class="font-bold text-[#003B5C]">Department of Business Development and Technology</span> - Open Source Literature Agent
+        </div>
+        <div class="flex items-center space-x-3">
+            <span>OSSYM 2026 - 8th International Open Search Symposium</span>
+            <span class="text-gray-300">|</span>
+            <a href="#" class="hover:underline font-semibold text-[#003B5C]">GitHub Repository</a>
+        </div>
+    </div>
+</footer>
+
+@code {
+    private string searchQuery = "Agentic AI software frameworks";
+    private string inclusionCriteria = "Must focus on loop execution and agent architecture.";
+    private string exclusionCriteria = "Exclude agronomy or commercial marketing studies.";
+    private DateTime dateFrom = new DateTime(2020, 01, 01);
+    private DateTime dateTo = DateTime.Today;
+    private bool requirePeerReview = true;
+
+    private string rawJsonLogs = "{\n  \"status\": \"Awaiting execution...\",\n  \"loopState\": \"Idle\"\n}";
+    
+    private int totalIdentified = 0;
+    private int screenedCount = 0;
+    private int excludedCount = 0;
+    private int includedCount = 0;
+    
+    private bool isSearching = false;
+
+    private async Task StartReviewProcess()
+    {
+        totalIdentified = 0;
+        screenedCount = 0;
+        excludedCount = 0;
+        includedCount = 0;
+        isSearching = true;
+        rawJsonLogs = "{\n  \"status\": \"Initializing Ralph Loop framework...\"\n}";
+        
+        // Subscribe to real-time counter changes
+        ReviewEngine.OnProgressUpdated += HandleEngineProgress;
+        StateHasChanged();
+
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await ReviewEngine.RunReviewLoopAsync(searchQuery, inclusionCriteria, exclusionCriteria);
+            }
+            catch (Exception ex)
+            {
+                rawJsonLogs = $"{{\n  \"error\": \"{ex.Message}\"\n}}";
+            }
+            finally
+            {
+                // Ensure cleaning up hooks upon final thread completion
+                ReviewEngine.OnProgressUpdated -= HandleEngineProgress;
+                isSearching = false;
+                await InvokeAsync(StateHasChanged);
+            }
+        });
+
+        // This secondary file monitoring thread loop now strictly updates the live JSON log display view window
+        while (isSearching)
+        {
+            await Task.Delay(1000);
+            if (File.Exists("transparent-process.json"))
+            {
+                try
+                {
+                    rawJsonLogs = await File.ReadAllTextAsync("transparent-process.json");
+                }
+                catch { }
+                await InvokeAsync(StateHasChanged);
+            }
+        }
+    }
+
+    // Direct event handler updating your PRISMA card variables instantly 
+    private void HandleEngineProgress(ReviewStats updatedStats)
+    {
+        InvokeAsync(() =>
+        {
+            totalIdentified = updatedStats.TotalIdentified;
+            screenedCount = updatedStats.Screened;
+            excludedCount = updatedStats.Excluded;
+            includedCount = updatedStats.Included;
+            
+            // Hard stop flag check once evaluations match discoverable counts
+            if (screenedCount >= totalIdentified && totalIdentified > 0)
+            {
+                isSearching = false;
+            }
+            
+            StateHasChanged();
+        });
+    }
+}
