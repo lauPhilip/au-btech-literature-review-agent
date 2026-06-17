@@ -1,0 +1,144 @@
+@page "/spec-matrix"
+@rendermode InteractiveServer
+@using System.IO
+@using System.Text.Json
+
+<PageTitle>PRISMA 2020 Expanded Checklist Matrix</PageTitle>
+
+<!-- TOP BANNER -->
+<header class="bg-[#003B5C] text-white flex-none shrink-0 z-50 shadow-md">
+    <div class="max-w-7xl mx-auto px-6 h-14 flex items-center justify-between">
+        <div class="flex items-center space-x-3">
+            <span class="font-bold tracking-tight text-sm">AARHUS UNIVERSITY</span>
+            <span class="text-white/40 font-light">|</span>
+            <span class="text-xs tracking-wider font-medium opacity-90 uppercase">au-btech-literature-review-agent</span>
+        </div>
+        <nav class="flex items-center space-x-6 text-xs font-semibold uppercase tracking-wider">
+            <a href="/" class="text-white/70 hover:text-white transition-colors py-4">Dashboard</a>
+            <a href="/spec-matrix" class="text-white border-b-2 border-white py-4">Spec Matrix</a>
+        </nav>
+    </div>
+</header>
+
+<div class="flex-1 overflow-y-auto max-w-7xl w-full mx-auto p-6 space-y-6 font-sans">
+    
+    <!-- HEADER BOX -->
+    <div class="w-full border-b border-gray-200 pb-4 flex justify-between items-end">
+        <div>
+            <h1 class="text-2xl font-light text-gray-900 tracking-tight">PRISMA 2020 Expanded Checklist Report</h1>
+            <p class="text-xs text-gray-500 font-mono mt-1">Status: Verified Synthesis Matrix Target Output</p>
+        </div>
+        @if (!string.IsNullOrEmpty(report.GeneratedAt))
+        {
+            <span class="text-[10px] font-mono bg-gray-100 text-gray-600 px-2 py-1 rounded border border-gray-200">
+                Generated: @report.GeneratedAt
+            </span>
+        }
+    </div>
+
+    @if (report.TitleItem == "Pending...")
+    {
+        <!-- EMPTY RUN PLACEHOLDER STATE -->
+        <div class="bg-amber-50 border border-amber-200 text-amber-800 p-6 rounded-lg text-sm flex flex-col items-center justify-center space-y-2 text-center my-12">
+            <svg class="w-8 h-8 text-amber-500 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+            <div class="font-bold">No Generated PRISMA Report Available</div>
+            <p class="max-w-md text-xs text-amber-700 font-light">Go back to the Dashboard workspace tab, adjust your review criteria targets, and run the agent. Mistral will auto-compile this checklist upon loop validation completion.</p>
+        </div>
+    }
+    else
+    {
+        <!-- ACTIVE REPORT GRID VIEW MAPPED TO ITEMS -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            
+            <!-- Item 1 -->
+            <div class="bg-white p-5 border border-gray-200 rounded-lg shadow-sm space-y-2 text-left">
+                <div class="flex items-center space-x-2 text-xs font-bold text-[#003B5C] tracking-wide uppercase">
+                    <span class="bg-[#003B5C] text-white rounded-sm px-1.5 py-0.5 text-[9px]">Item 1</span>
+                    <span>Title Classification</span>
+                </div>
+                <p class="text-xs text-gray-700 leading-relaxed font-light">@report.TitleItem</p>
+            </div>
+
+            <!-- Item 3 -->
+            <div class="bg-white p-5 border border-gray-200 rounded-lg shadow-sm space-y-2 text-left">
+                <div class="flex items-center space-x-2 text-xs font-bold text-[#003B5C] tracking-wide uppercase">
+                    <span class="bg-[#003B5C] text-white rounded-sm px-1.5 py-0.5 text-[9px]">Item 3</span>
+                    <span>Rationale Synthesis</span>
+                </div>
+                <p class="text-xs text-gray-700 leading-relaxed font-light">@report.RationaleItem</p>
+            </div>
+
+            <!-- Item 4 -->
+            <div class="bg-white p-5 border border-gray-200 rounded-lg shadow-sm space-y-2 text-left">
+                <div class="flex items-center space-x-2 text-xs font-bold text-[#003B5C] tracking-wide uppercase">
+                    <span class="bg-[#003B5C] text-white rounded-sm px-1.5 py-0.5 text-[9px]">Item 4</span>
+                    <span>Target Objectives Matrix</span>
+                </div>
+                <p class="text-xs text-gray-700 leading-relaxed font-light">@report.ObjectivesItem</p>
+            </div>
+
+            <!-- Item 5 -->
+            <div class="bg-white p-5 border border-gray-200 rounded-lg shadow-sm space-y-2 text-left">
+                <div class="flex items-center space-x-2 text-xs font-bold text-[#003B5C] tracking-wide uppercase">
+                    <span class="bg-[#003B5C] text-white rounded-sm px-1.5 py-0.5 text-[9px]">Item 5</span>
+                    <span>Eligibility Boundaries</span>
+                </div>
+                <p class="text-xs text-gray-700 leading-relaxed font-light">@report.EligibilityItem</p>
+            </div>
+
+            <!-- Item 6 -->
+            <div class="bg-white p-5 border border-gray-200 rounded-lg shadow-sm space-y-2 text-left">
+                <div class="flex items-center space-x-2 text-xs font-bold text-[#003B5C] tracking-wide uppercase">
+                    <span class="bg-[#003B5C] text-white rounded-sm px-1.5 py-0.5 text-[9px]">Item 6</span>
+                    <span>Information Repositories</span>
+                </div>
+                <p class="text-xs text-gray-700 leading-relaxed font-light">@report.SourcesItem</p>
+            </div>
+
+            <!-- Item 8 -->
+            <div class="bg-white p-5 border border-gray-200 rounded-lg shadow-sm space-y-2 text-left">
+                <div class="flex items-center space-x-2 text-xs font-bold text-[#003B5C] tracking-wide uppercase">
+                    <span class="bg-[#003B5C] text-white rounded-sm px-1.5 py-0.5 text-[9px]">Item 8</span>
+                    <span>Selection Automation</span>
+                </div>
+                <p class="text-xs text-gray-700 leading-relaxed font-light">@report.SelectionProcessItem</p>
+            </div>
+
+        </div>
+    }
+</div>
+
+<footer class="bg-white border-t border-gray-200 flex-none shrink-0 py-3 px-6 text-[11px] text-gray-500">
+    <div class="max-w-7xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-2">
+        <div>
+            <span class="font-bold text-[#003B5C]">Department of Business Development and Technology</span> - Open Source Literature Agent
+        </div>
+        <div>OSSYM 2026 Berlin Presentation</div>
+    </div>
+</footer>
+
+@code {
+    private PrismaReport report = new PrismaReport();
+
+    // OnParametersSetAsync runs every time the route is navigated to, keeping data fresh
+    protected override async Task OnParametersSetAsync()
+    {
+        if (File.Exists("prisma-report.json"))
+        {
+            try
+            {
+                string content = await File.ReadAllTextAsync("prisma-report.json");
+                report = JsonSerializer.Deserialize<PrismaReport>(content) ?? new PrismaReport();
+            }
+            catch 
+            { 
+                // Catch typical file read conflicts gracefully if engine is finishing a write operation
+            }
+        }
+        else
+        {
+            // Reset to empty state if no report file exists on disk yet
+            report = new PrismaReport();
+        }
+    }
+}

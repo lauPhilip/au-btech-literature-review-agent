@@ -26,6 +26,7 @@ public class ReviewStats
     public int Screened { get; set; } = 0; 
     public int Excluded { get; set; } = 0; 
     public int Included { get; set; } = 0; 
+    public string ProcessingStage { get; set; } = "Screening";
 }
 
 public class ReviewPhases 
@@ -39,6 +40,16 @@ public record ScreeningLog(
     string Decision, 
     string Reasoning,
     string Citation, 
-    string Publication, 
-    string BriefSummary
+    string briefSummary
 );
+
+public class PrismaReport
+{
+    public string GeneratedAt { get; set; } = "";
+    public string TitleItem { get; set; } = "Pending...";            
+    public string RationaleItem { get; set; } = "Pending...";        
+    public string ObjectivesItem { get; set; } = "Pending...";       
+    public string EligibilityItem { get; set; } = "Pending...";      
+    public string SourcesItem { get; set; } = "Pending...";         
+    public string SelectionProcessItem { get; set; } = "Pending..."; 
+}

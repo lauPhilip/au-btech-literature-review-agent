@@ -16,7 +16,7 @@
         </div>
         <nav class="flex items-center space-x-6 text-xs font-semibold uppercase tracking-wider">
             <a href="#" class="text-white border-b-2 border-white py-4">Dashboard</a>
-            <a href="#" class="text-white/70 hover:text-white transition-colors py-4">Spec Matrix</a>
+            <a href="/spec-matrix" class="text-white/70 hover:text-white transition-colors py-4">Spec Matrix</a>
         </nav>
     </div>
 </header>
@@ -156,24 +156,40 @@
 </footer>
 
 @code {
-    private string searchQuery = "Agentic AI software frameworks";
-    private string inclusionCriteria = "Must focus on loop execution and agent architecture.";
-    private string exclusionCriteria = "Exclude agronomy or commercial marketing studies.";
-    private DateTime dateFrom = new DateTime(2020, 01, 01);
-    private DateTime dateTo = DateTime.Today;
-    private bool requirePeerReview = true;
+    [Inject] private UiStateContainer State { get; set; } = default!;
 
-    private string rawJsonLogs = "{\n  \"status\": \"Awaiting execution...\",\n  \"loopState\": \"Idle\"\n}";
-    
-    private int totalIdentified = 0;
-    private int screenedCount = 0;
-    private int excludedCount = 0;
-    private int includedCount = 0;
-    
-    private bool isSearching = false;
+    // Fixed Property Syntaxes mapping explicitly back to the Scoped Memory Container
+    private string searchQuery { get => State.SearchQuery; set => State.SearchQuery = value; }
+    private string inclusionCriteria { get => State.InclusionCriteria; set => State.InclusionCriteria = value; }
+    private string exclusionCriteria { get => State.ExclusionCriteria; set => State.ExclusionCriteria = value; }
+    private DateTime dateFrom { get => State.DateFrom; set => State.DateFrom = value; }
+    private DateTime dateTo { get => State.DateTo; set => State.DateTo = value; }
+    private bool requirePeerReview { get => State.RequirePeerReview; set => State.RequirePeerReview = value; }
 
-    private async Task StartReviewProcess()
+    private string rawJsonLogs { get => State.RawJsonLogs; set => State.RawJsonLogs = value; }
+    private int totalIdentified { get => State.TotalIdentified; set => State.TotalIdentified = value; }
+    private int screenedCount { get => State.ScreenedCount; set => State.ScreenedCount = value; }
+    private int excludedCount { get => State.ExcludedCount; set => State.ExcludedCount = value; }
+    private int includedCount { get => State.IncludedCount; set => State.IncludedCount = value; }
+    private bool isSearching { get => State.IsSearching; set => State.IsSearching = value; }
+
+    protected override void OnInitialized()
     {
+        if (isSearching)
+        {
+            ReviewEngine.OnProgressUpdated += HandleEngineProgress;
+        }
+    }
+
+private async Task StartReviewProcess()
+    {
+        // 1. Clear out any stale reports from previous runs immediately
+        if (File.Exists("prisma-report.json"))
+        {
+            try { File.Delete("prisma-report.json"); } catch { }
+        }
+
+        // 2. Initialize and lock the clean baseline states
         totalIdentified = 0;
         screenedCount = 0;
         excludedCount = 0;
@@ -181,10 +197,11 @@
         isSearching = true;
         rawJsonLogs = "{\n  \"status\": \"Initializing Ralph Loop framework...\"\n}";
         
-        // Subscribe to real-time counter changes
+        // 3. Subscribe the UI cards to receive direct updates from the engine thread hook
         ReviewEngine.OnProgressUpdated += HandleEngineProgress;
         StateHasChanged();
 
+        // 4. Fire and forget the background execution pipeline safely
         _ = Task.Run(async () =>
         {
             try
@@ -193,35 +210,47 @@
             }
             catch (Exception ex)
             {
-                rawJsonLogs = $"{{\n  \"error\": \"{ex.Message}\"\n}}";
+                // Capture failures safely within the scoped container state
+                State.RawJsonLogs = $"{{\n  \"error\": \"{ex.Message}\"\n}}";
             }
             finally
             {
-                // Ensure cleaning up hooks upon final thread completion
+                // Unsubscribe and detach thread context loops on engine finish
                 ReviewEngine.OnProgressUpdated -= HandleEngineProgress;
                 isSearching = false;
                 await InvokeAsync(StateHasChanged);
             }
         });
 
-        // This secondary file monitoring thread loop now strictly updates the live JSON log display view window
-        while (isSearching)
+        // 5. FIXED POLLING CONTAINER: Dedicated background loop for streaming the JSON text view box
+_ = Task.Run(async () =>
+    {
+        while (State.IsSearching)
         {
-            await Task.Delay(1000);
+            // Poll faster for more responsive real-time layout updates
+            await Task.Delay(200); 
+
             if (File.Exists("transparent-process.json"))
             {
                 try
                 {
-                    rawJsonLogs = await File.ReadAllTextAsync("transparent-process.json");
+                    using var fileStream = new FileStream("transparent-process.json", FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+                    using var reader = new StreamReader(fileStream);
+                    string updatedContent = await reader.ReadToEndAsync();
+
+                    await InvokeAsync(() =>
+                    {
+                        rawJsonLogs = updatedContent;
+                        StateHasChanged();
+                    });
                 }
                 catch { }
-                await InvokeAsync(StateHasChanged);
             }
         }
+    });
     }
 
-    // Direct event handler updating your PRISMA card variables instantly 
-    private void HandleEngineProgress(ReviewStats updatedStats)
+private void HandleEngineProgress(ReviewStats updatedStats)
     {
         InvokeAsync(() =>
         {
@@ -230,8 +259,8 @@
             excludedCount = updatedStats.Excluded;
             includedCount = updatedStats.Included;
             
-            // Hard stop flag check once evaluations match discoverable counts
-            if (screenedCount >= totalIdentified && totalIdentified > 0)
+     
+            if (updatedStats.ProcessingStage == "Complete")
             {
                 isSearching = false;
             }
