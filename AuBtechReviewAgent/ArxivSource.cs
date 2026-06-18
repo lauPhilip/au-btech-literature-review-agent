@@ -18,7 +18,7 @@ public class ArxivSource : IAcademicSource
         _httpClient.DefaultRequestHeaders.Add("User-Agent", "AU-BTech-Literature-Review-Agent/1.0");
     }
 
-    public async Task<List<AcademicPaper>> FetchPapersAsync(string query, int maxResults = 5)
+ public async Task<List<AcademicPaper>> FetchPapersAsync(string query, int maxResults = 5)
     {
         var papers = new List<AcademicPaper>();
         string encodedQuery = Uri.EscapeDataString(query);
@@ -27,8 +27,12 @@ public class ArxivSource : IAcademicSource
         try
         {
             string xmlContent = await _httpClient.GetStringAsync(url);
+            
+            // ─── ADD THIS LINE TO FIX THE COMPILATION ERROR ───
             XDocument doc = XDocument.Parse(xmlContent);
+            
             XNamespace ns = "http://www.w3.org/2005/Atom";
+            XNamespace arxivNs = "http://arxiv.org/schemas/atom"; 
 
             var entries = doc.Root?.Elements(ns + "entry") ?? Enumerable.Empty<XElement>();
 
@@ -38,19 +42,23 @@ public class ArxivSource : IAcademicSource
                 string title = entry.Element(ns + "title")?.Value?.Replace("\n", " ").Trim() ?? "Untitled";
                 string summary = entry.Element(ns + "summary")?.Value?.Replace("\n", " ").Trim() ?? "No abstract provided.";
                 
-                // Extract publication date string (e.g., 2026-03-24T15:30:00Z)
                 string rawDate = entry.Element(ns + "published")?.Value ?? "";
                 string publishedYear = !string.IsNullOrEmpty(rawDate) && rawDate.Length >= 4 
                     ? rawDate.Substring(0, 4) 
                     : "N/A";
 
-                // Gather all author sub-elements cleanly
                 var authors = entry.Elements(ns + "author")
                     .Select(a => a.Element(ns + "name")?.Value ?? "")
                     .Where(name => !string.IsNullOrEmpty(name))
                     .ToList();
 
-                papers.Add(new AcademicPaper(id, title, summary, $"Published: {publishedYear}", authors));
+                string journalRef = entry.Element(arxivNs + "journal_ref")?.Value?.Trim() ?? "";
+                if (string.IsNullOrEmpty(journalRef))
+                {
+                    journalRef = $"arXiv Preprint Repository (arXiv:{id.Split('/').Last()})";
+                }
+
+                papers.Add(new AcademicPaper(id, title, summary, $"Published: {publishedYear}", authors, journalRef));
             }
         }
         catch (Exception ex)

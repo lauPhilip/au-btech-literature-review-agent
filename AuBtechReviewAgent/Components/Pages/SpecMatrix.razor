@@ -2,11 +2,12 @@
 @rendermode InteractiveServer
 @using System.IO
 @using System.Text.Json
+@using System.Linq
+@using System.Collections.Generic
 
-<PageTitle>PRISMA 2020 Expanded Checklist Matrix</PageTitle>
+<PageTitle>PRISMA 2020 Checklist Manuscript Preview</PageTitle>
 
-<!-- TOP BANNER -->
-<header class="bg-[#003B5C] text-white flex-none shrink-0 z-50 shadow-md">
+<header class="bg-[#003B5C] text-white flex-none shrink-0 z-50 shadow-md print:hidden">
     <div class="max-w-7xl mx-auto px-6 h-14 flex items-center justify-between">
         <div class="flex items-center space-x-3">
             <span class="font-bold tracking-tight text-sm">AARHUS UNIVERSITY</span>
@@ -20,125 +21,400 @@
     </div>
 </header>
 
-<div class="flex-1 overflow-y-auto max-w-7xl w-full mx-auto p-6 space-y-6 font-sans">
+<div class="flex-1 overflow-y-auto bg-gray-600 p-4 md:p-8 flex justify-center items-start min-h-0 print:bg-white print:p-0">
     
-    <!-- HEADER BOX -->
-    <div class="w-full border-b border-gray-200 pb-4 flex justify-between items-end">
-        <div>
-            <h1 class="text-2xl font-light text-gray-900 tracking-tight">PRISMA 2020 Expanded Checklist Report</h1>
-            <p class="text-xs text-gray-500 font-mono mt-1">Status: Verified Synthesis Matrix Target Output</p>
-        </div>
-        @if (!string.IsNullOrEmpty(report.GeneratedAt))
-        {
-            <span class="text-[10px] font-mono bg-gray-100 text-gray-600 px-2 py-1 rounded border border-gray-200">
-                Generated: @report.GeneratedAt
-            </span>
-        }
-    </div>
-
     @if (report.TitleItem == "Pending...")
     {
-        <!-- EMPTY RUN PLACEHOLDER STATE -->
-        <div class="bg-amber-50 border border-amber-200 text-amber-800 p-6 rounded-lg text-sm flex flex-col items-center justify-center space-y-2 text-center my-12">
-            <svg class="w-8 h-8 text-amber-500 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
-            <div class="font-bold">No Generated PRISMA Report Available</div>
-            <p class="max-w-md text-xs text-amber-700 font-light">Go back to the Dashboard workspace tab, adjust your review criteria targets, and run the agent. Mistral will auto-compile this checklist upon loop validation completion.</p>
+        <div class="bg-amber-50 border border-amber-200 text-amber-800 p-6 rounded-lg text-sm max-w-xl text-center shadow-lg my-12">
+            <div class="font-bold mb-1">No Generated PRISMA Report Available</div>
+            <p class="text-xs text-amber-700 font-light">Go back to the Dashboard workspace tab, run the agent, and Mistral will auto-compile this layout upon loop completion.</p>
         </div>
     }
     else
     {
-        <!-- ACTIVE REPORT GRID VIEW MAPPED TO ITEMS -->
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <article class="w-full max-w-[8.5in] min-h-[11in] bg-white shadow-2xl p-[1in] text-gray-900 font-serif text-[11pt] leading-relaxed mx-auto overflow-hidden relative border border-gray-300 print:shadow-none print:border-none print:p-0">
             
-            <!-- Item 1 -->
-            <div class="bg-white p-5 border border-gray-200 rounded-lg shadow-sm space-y-2 text-left">
-                <div class="flex items-center space-x-2 text-xs font-bold text-[#003B5C] tracking-wide uppercase">
-                    <span class="bg-[#003B5C] text-white rounded-sm px-1.5 py-0.5 text-[9px]">Item 1</span>
-                    <span>Title Classification</span>
+            <div class="text-center space-y-3 mb-8 font-sans print:space-y-2">
+                <div class="text-[9px] tracking-widest text-gray-500 uppercase font-bold">AI-Generated Systematic Literature Review</div>
+                <h1 class="text-2xl font-bold tracking-tight font-serif text-gray-900 leading-tight">@ScrubAnchors(report.TitleItem)</h1>
+                
+                <div class="text-xs font-medium text-gray-600 font-sans">
+                    Department of Business Development and Technology, Aarhus University
                 </div>
-                <p class="text-xs text-gray-700 leading-relaxed font-light">@report.TitleItem</p>
+                <div class="text-[10px] text-gray-400 font-mono">
+                    Protocol Hash: cc584090 | Generated: @report.GeneratedAt
+                </div>
+                <hr class="border-gray-300 my-4" />
             </div>
 
-            <!-- Item 3 -->
-            <div class="bg-white p-5 border border-gray-200 rounded-lg shadow-sm space-y-2 text-left">
-                <div class="flex items-center space-x-2 text-xs font-bold text-[#003B5C] tracking-wide uppercase">
-                    <span class="bg-[#003B5C] text-white rounded-sm px-1.5 py-0.5 text-[9px]">Item 3</span>
-                    <span>Rationale Synthesis</span>
-                </div>
-                <p class="text-xs text-gray-700 leading-relaxed font-light">@report.RationaleItem</p>
+            <div class="mb-6 font-sans text-xs bg-gray-50 border border-gray-200 p-4 rounded-sm text-justify">
+                <span class="font-bold text-[#003B5C] block mb-1 uppercase tracking-wider text-[10px]">Abstract</span>
+                <p class="text-gray-700 font-light leading-normal">@ScrubAnchors(report.AbstractItem)</p>
             </div>
 
-            <!-- Item 4 -->
-            <div class="bg-white p-5 border border-gray-200 rounded-lg shadow-sm space-y-2 text-left">
-                <div class="flex items-center space-x-2 text-xs font-bold text-[#003B5C] tracking-wide uppercase">
-                    <span class="bg-[#003B5C] text-white rounded-sm px-1.5 py-0.5 text-[9px]">Item 4</span>
-                    <span>Target Objectives Matrix</span>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6 text-justify text-xs leading-relaxed">
+                
+                <div class="space-y-3 md:col-span-2 border-b border-gray-200 pb-1">
+                    <h2 class="font-sans font-bold text-sm text-[#003B5C] uppercase tracking-wide">1. Introduction</h2>
                 </div>
-                <p class="text-xs text-gray-700 leading-relaxed font-light">@report.ObjectivesItem</p>
+                
+                <div class="space-y-1">
+                    <span class="font-sans font-bold text-[10px] text-gray-500 uppercase block">1.1 Rationale (Item 3)</span>
+                    <p class="text-gray-800">@ScrubAnchors(report.RationaleItem)</p>
+                </div>
+                
+                <div class="space-y-1">
+                    <span class="font-sans font-bold text-[10px] text-gray-500 uppercase block">1.2 Objectives (Item 4)</span>
+                    <p class="text-gray-800">@ScrubAnchors(report.ObjectivesItem)</p>
+                </div>
+
+                <div class="space-y-3 md:col-span-2 border-b border-gray-200 pt-2 pb-1">
+                    <h2 class="font-sans font-bold text-sm text-[#003B5C] uppercase tracking-wide">2. Methodology</h2>
+                </div>
+
+                <div class="space-y-1">
+                    <span class="font-sans font-bold text-[10px] text-gray-500 uppercase block">2.1 Eligibility Criteria (Item 5)</span>
+                    <p class="text-gray-800">@ScrubAnchors(report.EligibilityItem)</p>
+                </div>
+
+                <div class="space-y-1">
+                    <span class="font-sans font-bold text-[10px] text-gray-500 uppercase block">2.2 Information Sources (Item 6)</span>
+                    <p class="text-gray-800">@ScrubAnchors(report.SourcesItem)</p>
+                </div>
+
+                <div class="space-y-1">
+                    <span class="font-sans font-bold text-[10px] text-gray-500 uppercase block">2.3 Search Execution (Item 7)</span>
+                    <p class="text-gray-800">@ScrubAnchors(report.SearchStrategyItem)</p>
+                </div>
+
+                <div class="space-y-1">
+                    <span class="font-sans font-bold text-[10px] text-gray-500 uppercase block">2.4 Selection Automation (Item 8)</span>
+                    <p class="text-gray-800">@ScrubAnchors(report.SelectionProcessItem)</p>
+                </div>
+
+                <div class="space-y-1 md:col-span-2">
+                    <span class="font-sans font-bold text-[10px] text-gray-500 uppercase block">2.5 Internal Risk of Bias Assessment (Item 11)</span>
+                    <p class="text-gray-800">@ScrubAnchors(report.BiasAssessmentItem)</p>
+                </div>
+
+                <div class="space-y-3 md:col-span-2 border-b border-gray-200 pt-2 pb-1">
+                    <h2 class="font-sans font-bold text-sm text-[#003B5C] uppercase tracking-wide">3. Data & Collection Metrics</h2>
+                </div>
+
+                <div class="md:col-span-2 space-y-4 font-sans bg-gray-50 p-4 border border-gray-200 rounded-sm">
+                    <span class="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">Empirical Metrics Distribution</span>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div class="space-y-2">
+                            <span class="text-[11px] font-semibold text-gray-700 block">Figure 3.1: Included Publications per Calendar Year</span>
+                            <div class="space-y-2 pt-1">
+                                @foreach (var kvp in publicationsByYear.OrderBy(x => x.Key))
+                                {
+                                    int maxCount = GetMaxPublicationCount();
+                                    int pct = maxCount > 0 ? (kvp.Value * 100 / maxCount) : 0;
+                                    <div class="flex items-center text-[11px]">
+                                        <span class="w-10 font-mono text-gray-600 font-bold">@kvp.Key</span>
+                                        <div class="flex-1 bg-gray-200 h-4 rounded-sm overflow-hidden mx-2">
+                                            <div class="bg-[#003B5C] h-full rounded-sm transition-all" style="width: @(pct)%"></div>
+                                        </div>
+                                        <span class="w-6 font-mono text-right text-gray-900 font-bold">@kvp.Value</span>
+                                    </div>
+                                }
+                            </div>
+                        </div>
+
+                        <div class="space-y-2 flex flex-col items-center justify-center">
+                            <span class="text-[11px] font-semibold text-gray-700 block w-full text-left">Figure 3.2: Distribution by Publishing Venue type</span>
+                            
+                            @{
+                                int total = journalCount + conferenceCount + transactionsCount + proceedingsCount + preprintCount;
+                                
+                                double journalPct = total > 0 ? ((double)journalCount / total) * 360 : 0;
+                                double confPct = total > 0 ? ((double)conferenceCount / total) * 360 : 0;
+                                double transPct = total > 0 ? ((double)transactionsCount / total) * 360 : 0;
+                                double procPct = total > 0 ? ((double)proceedingsCount / total) * 360 : 0;
+
+                                double a1 = journalPct;
+                                double a2 = a1 + confPct;
+                                double a3 = a2 + transPct;
+                                double a4 = a3 + procPct;
+                            }
+
+                            <div class="flex items-center justify-around w-full mt-2">
+                                <div class="w-24 h-24 rounded-full border border-gray-300 shadow-sm flex-none"
+                                     style="background: conic-gradient(
+                                         #0284c7 0deg @(a1)deg, 
+                                         #4f46e5 @(a1)deg @(a2)deg, 
+                                         #0d9488 @(a2)deg @(a3)deg, 
+                                         #b45309 @(a3)deg @(a4)deg, 
+                                         #dc2626 @(a4)deg 360deg);">
+                                </div>
+
+                                <div class="space-y-1 text-[10px] font-sans text-gray-700">
+                                    <div class="flex items-center gap-1.5">
+                                        <div class="w-2.5 h-2.5 bg-sky-600 rounded-sm"></div>
+                                        <span>Journals (@journalCount)</span>
+                                    </div>
+                                    <div class="flex items-center gap-1.5">
+                                        <div class="w-2.5 h-2.5 bg-indigo-600 rounded-sm"></div>
+                                        <span>Conferences (@conferenceCount)</span>
+                                    </div>
+                                    <div class="flex items-center gap-1.5">
+                                        <div class="w-2.5 h-2.5 bg-teal-600 rounded-sm"></div>
+                                        <span>Transactions (@transactionsCount)</span>
+                                    </div>
+                                    <div class="flex items-center gap-1.5">
+                                        <div class="w-2.5 h-2.5 bg-amber-700 rounded-sm"></div>
+                                        <span>Proceedings (@proceedingsCount)</span>
+                                    </div>
+                                    <div class="flex items-center gap-1.5">
+                                        <div class="w-2.5 h-2.5 bg-red-600 rounded-sm"></div>
+                                        <span>Preprints (@preprintCount)</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="space-y-3 md:col-span-2 border-b border-gray-200 pt-2 pb-1">
+                    <h2 class="font-sans font-bold text-sm text-[#003B5C] uppercase tracking-wide">4. Results & Synthesis</h2>
+                </div>
+
+                <div class="space-y-1 md:col-span-2">
+                    <span class="font-sans font-bold text-[10px] text-gray-500 uppercase block">4.1 Dataset Characteristics & Synthesis Outcomes (Item 20a)</span>
+                    <p class="text-gray-800">@ScrubAnchors(report.SynthesisResultsItem)</p>
+                </div>
+
+                <div class="space-y-3 md:col-span-2 border-b border-gray-200 pt-2 pb-1">
+                    <h2 class="font-sans font-bold text-sm text-[#003B5C] uppercase tracking-wide">5. Discussion</h2>
+                </div>
+
+                <div class="space-y-1 md:col-span-2">
+                    <span class="font-sans font-bold text-[10px] text-gray-500 uppercase block">5.1 General Interpretation & Architectural Analysis (Item 23a)</span>
+                    <p class="text-gray-800">@ScrubAnchors(report.DiscussionItem)</p>
+                </div>
+
+                <div class="space-y-3 md:col-span-2 border-b border-gray-200 pt-2 pb-1">
+                    <h2 class="font-sans font-bold text-sm text-[#003B5C] uppercase tracking-wide">6. Administrative Declarations</h2>
+                </div>
+
+                <div class="space-y-1">
+                    <span class="font-sans font-bold text-[10px] text-gray-500 uppercase block">6.1 Support & Funding (Item 25)</span>
+                    <p class="text-gray-800">@ScrubAnchors(report.SupportItem)</p>
+                </div>
+
+                <div class="space-y-1">
+                    <span class="font-sans font-bold text-[10px] text-gray-500 uppercase block">6.2 Open Science Code Availability (Item 27)</span>
+                    <p class="text-gray-800">@ScrubAnchors(report.AvailabilityItem)</p>
+                </div>
+
             </div>
 
-            <!-- Item 5 -->
-            <div class="bg-white p-5 border border-gray-200 rounded-lg shadow-sm space-y-2 text-left">
-                <div class="flex items-center space-x-2 text-xs font-bold text-[#003B5C] tracking-wide uppercase">
-                    <span class="bg-[#003B5C] text-white rounded-sm px-1.5 py-0.5 text-[9px]">Item 5</span>
-                    <span>Eligibility Boundaries</span>
-                </div>
-                <p class="text-xs text-gray-700 leading-relaxed font-light">@report.EligibilityItem</p>
+            <div class="mt-8 pt-4 border-t border-gray-200 text-left">
+                <h2 class="font-sans font-bold text-sm text-[#003B5C] uppercase tracking-wide mb-3">References</h2>
+                @if (includedCitations.Count == 0)
+                {
+                    <p class="text-xs italic text-gray-400 font-sans">No sources were included in this evaluation loop session.</p>
+                }
+                else
+                {
+                    <ol class="space-y-2 text-xs font-sans text-gray-800">
+                        @for (int i = 0; i < includedCitations.Count; i++)
+                        {
+                            <li class="pl-2 leading-relaxed">
+                                <span class="font-mono font-bold text-[#003B5C] mr-1">[@(i + 1)]</span> - @includedCitations[i]
+                            </li>
+                        }
+                    </ol>
+                }
             </div>
 
-            <!-- Item 6 -->
-            <div class="bg-white p-5 border border-gray-200 rounded-lg shadow-sm space-y-2 text-left">
-                <div class="flex items-center space-x-2 text-xs font-bold text-[#003B5C] tracking-wide uppercase">
-                    <span class="bg-[#003B5C] text-white rounded-sm px-1.5 py-0.5 text-[9px]">Item 6</span>
-                    <span>Information Repositories</span>
-                </div>
-                <p class="text-xs text-gray-700 leading-relaxed font-light">@report.SourcesItem</p>
+            <div class="mt-12 pt-4 border-t border-gray-200 text-center font-sans text-[9px] text-gray-400 uppercase tracking-widest">
+                OSSYM 2026 - 8th International Open Search Symposium
             </div>
 
-            <!-- Item 8 -->
-            <div class="bg-white p-5 border border-gray-200 rounded-lg shadow-sm space-y-2 text-left">
-                <div class="flex items-center space-x-2 text-xs font-bold text-[#003B5C] tracking-wide uppercase">
-                    <span class="bg-[#003B5C] text-white rounded-sm px-1.5 py-0.5 text-[9px]">Item 8</span>
-                    <span>Selection Automation</span>
-                </div>
-                <p class="text-xs text-gray-700 leading-relaxed font-light">@report.SelectionProcessItem</p>
-            </div>
-
-        </div>
+        </article>
     }
 </div>
 
-<footer class="bg-white border-t border-gray-200 flex-none shrink-0 py-3 px-6 text-[11px] text-gray-500">
-    <div class="max-w-7xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-2">
-        <div>
-            <span class="font-bold text-[#003B5C]">Department of Business Development and Technology</span> - Open Source Literature Agent
-        </div>
-        <div>OSSYM 2026 Berlin Presentation</div>
-    </div>
-</footer>
-
 @code {
     private PrismaReport report = new PrismaReport();
+    private List<string> includedCitations = new();
+    
+    private Dictionary<string, int> publicationsByYear = new();
+    
+    // Individual Metric Counters
+    private int journalCount = 0;
+    private int conferenceCount = 0;
+    private int transactionsCount = 0;
+    private int proceedingsCount = 0;
+    private int preprintCount = 0;
 
-    // OnParametersSetAsync runs every time the route is navigated to, keeping data fresh
+    private string ScrubAnchors(string rawText)
+    {
+        if (string.IsNullOrWhiteSpace(rawText)) return "";
+        return System.Text.RegularExpressions.Regex.Replace(rawText, @"\[Source Context Anchor \d+.*?\]", "").Trim();
+    }
+
+    private int GetMaxPublicationCount()
+    {
+        if (publicationsByYear == null || publicationsByYear.Count == 0) return 0;
+        return publicationsByYear.Values.Max();
+    }
+
     protected override async Task OnParametersSetAsync()
     {
+        report = new PrismaReport();
+        includedCitations = new List<string>();
+        publicationsByYear = new Dictionary<string, int> { { "2024", 0 }, { "2025", 0 }, { "2026", 0 } };
+        
+        journalCount = 0;
+        conferenceCount = 0;
+        transactionsCount = 0;
+        proceedingsCount = 0;
+        preprintCount = 0;
+
         if (File.Exists("prisma-report.json"))
         {
             try
             {
                 string content = await File.ReadAllTextAsync("prisma-report.json");
-                report = JsonSerializer.Deserialize<PrismaReport>(content) ?? new PrismaReport();
+                var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+                report = JsonSerializer.Deserialize<PrismaReport>(content, options) ?? new PrismaReport();
             }
             catch 
-            { 
-                // Catch typical file read conflicts gracefully if engine is finishing a write operation
+            {
+                if (report == null) report = new PrismaReport();
             }
         }
-        else
+
+        if (File.Exists("transparent-process.json"))
         {
-            // Reset to empty state if no report file exists on disk yet
-            report = new PrismaReport();
+            try
+            {
+                using var fileStream = new FileStream("transparent-process.json", FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+                using var reader = new StreamReader(fileStream);
+                string jsonString = await reader.ReadToEndAsync();
+
+                if (string.IsNullOrWhiteSpace(jsonString)) return;
+
+                using JsonDocument doc = JsonDocument.Parse(jsonString);
+                
+                JsonElement phasesEl = default;
+                foreach (var prop in doc.RootElement.EnumerateObject())
+                {
+                    if (prop.Name.Equals("Phases", StringComparison.OrdinalIgnoreCase))
+                    {
+                        phasesEl = prop.Value;
+                        break;
+                    }
+                }
+
+                if (phasesEl.ValueKind == JsonValueKind.Object)
+                {
+                    JsonElement screeningArray = default;
+                    foreach (var prop in phasesEl.EnumerateObject())
+                    {
+                        if (prop.Name.Equals("Screening", StringComparison.OrdinalIgnoreCase))
+                        {
+                            screeningArray = prop.Value;
+                            break;
+                        }
+                    }
+
+                    if (screeningArray.ValueKind == JsonValueKind.Array)
+                    {
+                        var citations = new List<string>();
+                        var tempYears = new Dictionary<string, int>();
+
+                        foreach (var element in screeningArray.EnumerateArray())
+                        {
+                            string decision = "Excluded";
+                            string citation = "";
+
+                            foreach (var prop in element.EnumerateObject())
+                            {
+                                if (prop.Name.Equals("decision", StringComparison.OrdinalIgnoreCase))
+                                {
+                                    decision = prop.Value.GetString() ?? "Excluded";
+                                }
+                                if (prop.Name.Equals("citation", StringComparison.OrdinalIgnoreCase) || 
+                                    prop.Name.Equals("apaCitation", StringComparison.OrdinalIgnoreCase))
+                                {
+                                    citation = prop.Value.GetString() ?? "";
+                                }
+                            }
+
+                            if (decision.Equals("Included", StringComparison.OrdinalIgnoreCase) && !string.IsNullOrWhiteSpace(citation))
+                            {
+                                citation = citation.Trim().TrimEnd('.');
+                                if (citation.Contains("https://doi.org/xxxx", StringComparison.OrdinalIgnoreCase))
+                                {
+                                    citation = citation.Replace(" https://doi.org/xxxx", "")
+                                                       .Replace(" https://doi.org/XXXX-XXXX", "")
+                                                       .Replace(" https://doi.org/XXXX", "");
+                                }
+                                if (citation.Contains("arXiv", StringComparison.OrdinalIgnoreCase) && 
+                                    citation.Contains("https://doi.org/10.48550/", StringComparison.OrdinalIgnoreCase))
+                                {
+                                    int doiIndex = citation.IndexOf("https://doi.org/10.48550/", StringComparison.OrdinalIgnoreCase);
+                                    if (doiIndex > 0) citation = citation.Substring(0, doiIndex).Trim();
+                                }
+                                
+                                citation = citation.Replace(". *Journal Name*, *Volume*(Issue), Page range", "")
+                                                   .Replace(", *Journal Name*", "")
+                                                   .Replace(", *Preprint*", "");
+
+                                if (!citation.EndsWith(".")) citation += ".";
+                                citations.Add(citation);
+
+                                // Parse Year
+                                System.Text.RegularExpressions.Match match = System.Text.RegularExpressions.Regex.Match(citation, @"\((20\d\d)\)");
+                                if (match.Success)
+                                {
+                                    string year = match.Groups[1].Value;
+                                    if (tempYears.ContainsKey(year)) tempYears[year]++;
+                                    else tempYears[year] = 1;
+                                }
+
+                                // ─── GRANULAR MULTI-VENUE SEPARATION LOGIC ───────────────────
+                                if (citation.Contains("Journal", StringComparison.OrdinalIgnoreCase))
+                                {
+                                    journalCount++;
+                                }
+                                else if (citation.Contains("Transactions", StringComparison.OrdinalIgnoreCase))
+                                {
+                                    transactionsCount++;
+                                }
+                                else if (citation.Contains("Proceedings", StringComparison.OrdinalIgnoreCase))
+                                {
+                                    proceedingsCount++;
+                                }
+                                else if (citation.Contains("Conference", StringComparison.OrdinalIgnoreCase))
+                                {
+                                    conferenceCount++;
+                                }
+                                else
+                                {
+                                    preprintCount++;
+                                }
+                                // ─────────────────────────────────────────────────────────────
+                            }
+                        }
+
+                        includedCitations = citations.OrderBy(c => c).ToList();
+                        
+                        if (tempYears.Count > 0)
+                        {
+                            publicationsByYear = tempYears;
+                        }
+                    }
+                }
+            }
+            catch 
+            {
+            }
         }
     }
 }

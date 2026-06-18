@@ -6,7 +6,6 @@
 @inject AuBtechReviewAgent.PrismaReviewEngine ReviewEngine
 @inject IJSRuntime JS
 
-<!-- TOP BANNER (Strictly constrained height) -->
 <header class="bg-[#003B5C] text-white flex-none shrink-0 z-50 shadow-md">
     <div class="max-w-7xl mx-auto px-6 h-14 flex items-center justify-between">
         <div class="flex items-center space-x-3">
@@ -15,40 +14,34 @@
             <span class="text-xs tracking-wider font-medium opacity-90 uppercase">au-btech-literature-review-agent</span>
         </div>
         <nav class="flex items-center space-x-6 text-xs font-semibold uppercase tracking-wider">
-            <a href="#" class="text-white border-b-2 border-white py-4">Dashboard</a>
+            <a href="/" class="text-white border-b-2 border-white py-4">Dashboard</a>
             <a href="/spec-matrix" class="text-white/70 hover:text-white transition-colors py-4">Spec Matrix</a>
         </nav>
     </div>
 </header>
 
-<!-- APPLICATION CONTAINER (Fills exact remaining viewport height) -->
 <div class="flex-1 flex flex-col min-h-0 overflow-hidden items-center justify-center max-w-7xl w-full mx-auto p-4 lg:p-6 space-y-4">
     
-    <!-- HEADER SUMMARY TITLE -->
     <div class="w-full text-center flex-none shrink-0 space-y-1">
-        <h1 class="text-2xl lg:text-3xl font-light text-gray-900 tracking-tight">
-            Literature Review Agent
-        </h1>
-        <p class="text-xs font-mono tracking-widest text-[#003B5C] uppercase font-bold">
-            Traceable PRISMA Reviews
-        </p>
+        <h1 class="text-2xl lg:text-3xl font-light text-gray-900 tracking-tight">Literature Review Agent</h1>
+        <p class="text-xs font-mono tracking-widest text-[#003B5C] uppercase font-bold">Traceable PRISMA Reviews</p>
     </div>
 
-    <!-- MAIN TWO-COLUMN DASHBOARD GRID -->
     <div class="w-full flex-1 grid grid-cols-1 lg:grid-cols-12 gap-4 min-h-0 overflow-hidden">
         
-        <!-- LEFT: Control System & PRISMA Fields Matrix -->
         <div class="lg:col-span-5 flex flex-col space-y-4 min-h-0">
-            
-            <!-- Parameters Frame -->
             <div class="bg-white border border-gray-200 rounded-lg p-4 flex flex-col justify-between shadow-sm flex-1 min-h-0">
                 <span class="text-[10px] font-bold uppercase tracking-wider text-gray-400 block mb-2">Execution Configuration</span>
                 
-                <!-- Dense Inner Scroll Area for inputs to guarantee perfect viewport containment -->
                 <div class="space-y-3 overflow-y-auto pr-1 flex-1 text-left">
                     <div>
-                        <label class="block text-[11px] font-bold uppercase text-gray-600 mb-1">Search Query / Intent</label>
+                        <label class="block text-[11px] font-bold uppercase text-gray-600 mb-1">Search Query</label>
                         <input type="text" @bind="searchQuery" class="w-full p-2 bg-gray-50 border border-gray-300 rounded focus:outline-none focus:border-[#003B5C] text-xs shadow-inner transition-all" />
+                    </div>
+
+                    <div>
+                        <label class="block text-[11px] font-bold uppercase text-gray-600 mb-1">Review Objective</label>
+                        <textarea @bind="reviewObjective" rows="2" class="w-full p-2 bg-gray-50 border border-gray-300 rounded focus:outline-none focus:border-[#003B5C] text-xs shadow-inner resize-none transition-all"></textarea>
                     </div>
 
                     <div class="grid grid-cols-2 gap-2">
@@ -64,19 +57,18 @@
 
                     <div>
                         <label class="block text-[11px] font-bold uppercase text-gray-600 mb-1">Inclusion Criteria Matrix</label>
-                        <textarea @bind="inclusionCriteria" rows="2" class="w-full p-2 bg-gray-50 border border-gray-300 rounded focus:outline-none focus:border-[#003B5C] text-xs shadow-inner resize-none transition-all" placeholder="e.g., Must focus on loop architectures..."></textarea>
+                        <textarea @bind="inclusionCriteria" rows="2" class="w-full p-2 bg-gray-50 border border-gray-300 rounded focus:outline-none focus:border-[#003B5C] text-xs shadow-inner resize-none transition-all"></textarea>
                     </div>
 
                     <div>
                         <label class="block text-[11px] font-bold uppercase text-gray-600 mb-1">Exclusion Criteria Matrix</label>
-                        <textarea @bind="exclusionCriteria" rows="2" class="w-full p-2 bg-gray-50 border border-gray-300 rounded focus:outline-none focus:border-[#003B5C] text-xs shadow-inner resize-none transition-all" placeholder="e.g., Exclude short whitepapers under 3 pages..."></textarea>
+                        <textarea @bind="exclusionCriteria" rows="2" class="w-full p-2 bg-gray-50 border border-gray-300 rounded focus:outline-none focus:border-[#003B5C] text-xs shadow-inner resize-none transition-all"></textarea>
                     </div>
 
-                    <!-- Custom Peer Review Checkbox Filter element aligned to AU style -->
                     <div class="pt-1 flex items-center">
                         <label class="relative flex items-center cursor-pointer select-none text-xs text-gray-700 font-semibold gap-2">
                             <input type="checkbox" @bind="requirePeerReview" class="w-4 h-4 text-[#003B5C] bg-gray-50 border-gray-300 rounded focus:ring-[#003B5C] focus:ring-2 transition-all accent-[#003B5C]" />
-                            <span>Peer-Reviewed</span>
+                            <span>Peer-Reviewed Only</span>
                         </label>
                     </div>
                 </div>
@@ -98,7 +90,6 @@
                 </div>
             </div>
 
-            <!-- PRISMA Progression Display Metrics -->
             <div class="bg-white border border-gray-200 rounded-lg p-4 shadow-sm flex-none">
                 <span class="text-[10px] font-bold uppercase tracking-wider text-gray-400 block mb-3">PRISMA Funnel Tracking Fields</span>
                 <div class="grid grid-cols-2 gap-3">
@@ -120,20 +111,14 @@
                     </div>
                 </div>
             </div>
-
         </div>
 
-        <!-- RIGHT: Live Micro-Execution JSON Trace Log Area -->
         <div class="lg:col-span-7 flex flex-col min-h-0 border border-gray-200 rounded-lg bg-white shadow-sm overflow-hidden">
             <div class="bg-gray-800 text-white px-4 py-2.5 text-xs font-mono flex justify-between items-center flex-none">
-                <span class="flex items-center gap-2">
-                    <span class="h-1.5 w-1.5 rounded-full bg-green-400 @(isSearching ? "animate-pulse" : "")"></span>
-                    traceability-log.json output
-                </span>
+                <span>traceability-log.json output</span>
                 <span class="text-[9px] opacity-50 uppercase tracking-widest font-bold">Mistral LLM</span>
             </div>
-            <!-- Scrollable element configured perfectly for viewports -->
-            <div class="flex-1 bg-gray-950 p-4 font-mono text-xs text-green-400 overflow-y-auto whitespace-pre-wrap leading-relaxed selection:bg-green-800 selection:text-white">
+            <div class="flex-1 bg-gray-950 p-4 font-mono text-xs text-green-400 overflow-y-auto whitespace-pre-wrap leading-relaxed">
 @rawJsonLogs
             </div>
         </div>
@@ -141,25 +126,11 @@
     </div>
 </div>
 
-<!-- FOOTER (Strictly fixed container height alignment) -->
-<footer class="bg-white border-t border-gray-200 flex-none shrink-0 py-3 px-6 text-[11px] text-gray-500">
-    <div class="max-w-7xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-2">
-        <div>
-            <span class="font-bold text-[#003B5C]">Department of Business Development and Technology</span> - Open Source Literature Agent
-        </div>
-        <div class="flex items-center space-x-3">
-            <span>OSSYM 2026 - 8th International Open Search Symposium</span>
-            <span class="text-gray-300">|</span>
-            <a href="#" class="hover:underline font-semibold text-[#003B5C]">GitHub Repository</a>
-        </div>
-    </div>
-</footer>
-
 @code {
     [Inject] private UiStateContainer State { get; set; } = default!;
 
-    // Fixed Property Syntaxes mapping explicitly back to the Scoped Memory Container
     private string searchQuery { get => State.SearchQuery; set => State.SearchQuery = value; }
+    private string reviewObjective { get => State.ReviewObjective; set => State.ReviewObjective = value; }
     private string inclusionCriteria { get => State.InclusionCriteria; set => State.InclusionCriteria = value; }
     private string exclusionCriteria { get => State.ExclusionCriteria; set => State.ExclusionCriteria = value; }
     private DateTime dateFrom { get => State.DateFrom; set => State.DateFrom = value; }
@@ -183,74 +154,84 @@
 
 private async Task StartReviewProcess()
     {
-        // 1. Clear out any stale reports from previous runs immediately
+        // 1. CLEAR STALE GENERATED PRISMA REPORTS
         if (File.Exists("prisma-report.json"))
         {
             try { File.Delete("prisma-report.json"); } catch { }
         }
 
-        // 2. Initialize and lock the clean baseline states
+        // 2. CLEAR STALE DOWNLOADED MANUSCRIPT PDFs
+        string papersDir = Path.Combine(Directory.GetCurrentDirectory(), "PapersWorkspace");
+        if (Directory.Exists(papersDir))
+        {
+            try
+            {
+                foreach (string file in Directory.GetFiles(papersDir))
+                {
+                    File.Delete(file);
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Workspace folder purge warning: {ex.Message}");
+            }
+        }
+
+        // 3. RESET BASELINE RUN CONFIGURATIONS
         totalIdentified = 0;
         screenedCount = 0;
         excludedCount = 0;
         includedCount = 0;
         isSearching = true;
-        rawJsonLogs = "{\n  \"status\": \"Initializing Ralph Loop framework...\"\n}";
+        rawJsonLogs = "{\n  \"status\": \"Initializing Ralph Loop framework and purging workspace folders...\"\n}";
         
-        // 3. Subscribe the UI cards to receive direct updates from the engine thread hook
         ReviewEngine.OnProgressUpdated += HandleEngineProgress;
         StateHasChanged();
 
-        // 4. Fire and forget the background execution pipeline safely
         _ = Task.Run(async () =>
         {
             try
             {
-                await ReviewEngine.RunReviewLoopAsync(searchQuery, inclusionCriteria, exclusionCriteria);
+                await ReviewEngine.RunReviewLoopAsync(searchQuery, reviewObjective, inclusionCriteria, exclusionCriteria);
             }
             catch (Exception ex)
             {
-                // Capture failures safely within the scoped container state
-                State.RawJsonLogs = $"{{\n  \"error\": \"{ex.Message}\"\n}}";
+                rawJsonLogs = $"{{\n  \"error\": \"{ex.Message}\"\n}}";
             }
             finally
             {
-                // Unsubscribe and detach thread context loops on engine finish
                 ReviewEngine.OnProgressUpdated -= HandleEngineProgress;
                 isSearching = false;
                 await InvokeAsync(StateHasChanged);
             }
         });
 
-        // 5. FIXED POLLING CONTAINER: Dedicated background loop for streaming the JSON text view box
-_ = Task.Run(async () =>
-    {
-        while (State.IsSearching)
+        _ = Task.Run(async () =>
         {
-            // Poll faster for more responsive real-time layout updates
-            await Task.Delay(200); 
-
-            if (File.Exists("transparent-process.json"))
+            while (isSearching)
             {
-                try
+                await Task.Delay(200); 
+                if (File.Exists("transparent-process.json"))
                 {
-                    using var fileStream = new FileStream("transparent-process.json", FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
-                    using var reader = new StreamReader(fileStream);
-                    string updatedContent = await reader.ReadToEndAsync();
-
-                    await InvokeAsync(() =>
+                    try
                     {
-                        rawJsonLogs = updatedContent;
-                        StateHasChanged();
-                    });
+                        using var fileStream = new FileStream("transparent-process.json", FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+                        using var reader = new StreamReader(fileStream);
+                        string updatedContent = await reader.ReadToEndAsync();
+
+                        await InvokeAsync(() =>
+                        {
+                            rawJsonLogs = updatedContent;
+                            StateHasChanged();
+                        });
+                    }
+                    catch { }
                 }
-                catch { }
             }
-        }
-    });
+        });
     }
 
-private void HandleEngineProgress(ReviewStats updatedStats)
+    private void HandleEngineProgress(ReviewStats updatedStats)
     {
         InvokeAsync(() =>
         {
@@ -259,7 +240,6 @@ private void HandleEngineProgress(ReviewStats updatedStats)
             excludedCount = updatedStats.Excluded;
             includedCount = updatedStats.Included;
             
-     
             if (updatedStats.ProcessingStage == "Complete")
             {
                 isSearching = false;

@@ -8,6 +8,7 @@ public class UiStateContainer
     public string SearchQuery { get; set; } = "Agentic AI software frameworks";
     public string InclusionCriteria { get; set; } = "Must focus on loop execution and agent architecture.";
     public string ExclusionCriteria { get; set; } = "Exclude agronomy or commercial marketing studies.";
+    public string ReviewObjective { get; set; } = "To evaluate the current state of agentic orchestration loops and identify common design patterns regarding fault-tolerance and system safety.";
     public DateTime DateFrom { get; set; } = new DateTime(2020, 01, 01);
     public DateTime DateTo { get; set; } = DateTime.Today;
     public bool RequirePeerReview { get; set; } = true;
