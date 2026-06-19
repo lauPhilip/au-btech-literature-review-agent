@@ -19,6 +19,9 @@ public class ReviewState
     public DateTime Timestamp { get; set; } = DateTime.UtcNow;
     public ReviewStats Stats { get; set; } = new();
     public ReviewPhases Phases { get; set; } = new();
+    
+    // ─── PLATFORM TARGET LOG INTEGRATION ────────────────────────────
+    public List<PlatformSearchLog> SearchLogs { get; set; } = new();
 }
 
 public class ReviewStats 
@@ -44,30 +47,41 @@ public record ScreeningLog(
     string BriefSummary
 );
 
+// ─── PLATFORM SEARCH METRIC DATA CONTAINER ──────────────────────────
+public class PlatformSearchLog
+{
+    public string SourceName { get; set; } = string.Empty;
+    public string Timestamp { get; set; } = string.Empty;
+    public string TargetUrl { get; set; } = string.Empty;
+    public string Status { get; set; } = string.Empty;
+    public int PapersFound { get; set; }
+    public string ErrorMessage { get; set; } = "None";
+}
+
 public class PrismaReport
 {
     public string GeneratedAt { get; set; } = "";
     
     // SECTION 1: TITLE & ABSTRACT
-    public string TitleItem { get; set; } = "Pending...";            // Item 1 [cite: 7]
-    public string AbstractItem { get; set; } = "Pending...";         // Item 2 [cite: 7]
+    public string TitleItem { get; set; } = "Pending...";            // Item 1
+    public string AbstractItem { get; set; } = "Pending...";         // Item 2
     
     // SECTION 2: INTRODUCTION
-    public string RationaleItem { get; set; } = "Pending...";        // Item 3 [cite: 7]
-    public string ObjectivesItem { get; set; } = "Pending...";       // Item 4 [cite: 7]
+    public string RationaleItem { get; set; } = "Pending...";        // Item 3
+    public string ObjectivesItem { get; set; } = "Pending...";       // Item 4
     
     // SECTION 3: METHODS
-    public string EligibilityItem { get; set; } = "Pending...";      // Item 5 [cite: 7]
-    public string SourcesItem { get; set; } = "Pending...";          // Item 6 [cite: 8]
-    public string SearchStrategyItem { get; set; } = "Pending...";   // Item 7 [cite: 8]
-    public string SelectionProcessItem { get; set; } = "Pending..."; // Item 8 [cite: 9]
-    public string BiasAssessmentItem { get; set; } = "Pending...";   // Item 11 [cite: 10]
+    public string EligibilityItem { get; set; } = "Pending...";      // Item 5
+    public string SourcesItem { get; set; } = "Pending...";          // Item 6
+    public string SearchStrategyItem { get; set; } = "Pending...";   // Item 7
+    public string SelectionProcessItem { get; set; } = "Pending..."; // Item 8
+    public string BiasAssessmentItem { get; set; } = "Pending...";   // Item 11
     
     // SECTION 4: RESULTS & DISCUSSION
-    public string SynthesisResultsItem { get; set; } = "Pending..."; // Item 20a [cite: 13]
-    public string DiscussionItem { get; set; } = "Pending...";       // Item 23a [cite: 16]
+    public string SynthesisResultsItem { get; set; } = "Pending..."; // Item 20a
+    public string DiscussionItem { get; set; } = "Pending...";       // Item 23a
     
     // SECTION 5: OTHER INFORMATION
-    public string SupportItem { get; set; } = "Pending...";          // Item 25 [cite: 18]
-    public string AvailabilityItem { get; set; } = "Pending...";     // Item 27 [cite: 18]
+    public string SupportItem { get; set; } = "Pending...";          // Item 25
+    public string AvailabilityItem { get; set; } = "Pending...";     // Item 27
 }

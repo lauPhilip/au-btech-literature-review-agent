@@ -3,5 +3,5 @@ namespace AuBtechReviewAgent;
 public interface IAcademicSource
 {
     string SourceName { get; }
-    Task<List<AcademicPaper>> FetchPapersAsync(string query, int maxResults);
+    Task<List<AcademicPaper>> FetchPapersAsync(string query, int maxResults = 5);
 }

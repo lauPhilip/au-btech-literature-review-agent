@@ -349,57 +349,59 @@
                             if (decision.Equals("Included", StringComparison.OrdinalIgnoreCase) && !string.IsNullOrWhiteSpace(citation))
                             {
                                 citation = citation.Trim().TrimEnd('.');
-                                if (citation.Contains("https://doi.org/xxxx", StringComparison.OrdinalIgnoreCase))
+
+                                // ─── STRIP INCOMPLETE DOI STRINGS AND PLACEHOLDERS ─────────────────
+                                if (citation.Contains("https://doi.org/", StringComparison.OrdinalIgnoreCase))
                                 {
+                                    // Strip generic xxxx patterns
                                     citation = citation.Replace(" https://doi.org/xxxx", "")
                                                        .Replace(" https://doi.org/XXXX-XXXX", "")
                                                        .Replace(" https://doi.org/XXXX", "");
+
+                                    // Strip empty broken prefix masks (e.g., https://doi.org/XX.XXXX/XXXXXXX)
+                                    citation = System.Text.RegularExpressions.Regex.Replace(
+                                        citation, 
+                                        @"https://doi\.org/[XxXx0-9\.]+/?[XxYyZz0-9\./]*", 
+                                        ""
+                                    ).Trim();
                                 }
-                                if (citation.Contains("arXiv", StringComparison.OrdinalIgnoreCase) && 
-                                    citation.Contains("https://doi.org/10.48550/", StringComparison.OrdinalIgnoreCase))
-                                {
-                                    int doiIndex = citation.IndexOf("https://doi.org/10.48550/", StringComparison.OrdinalIgnoreCase);
-                                    if (doiIndex > 0) citation = citation.Substring(0, doiIndex).Trim();
-                                }
-                                
-                                citation = citation.Replace(". *Journal Name*, *Volume*(Issue), Page range", "")
+
+                                // ─── STRIP INCOMPLETE PAGES AND CONFERENCES STRINGS ───────────────
+                                citation = citation.Replace(" (pp. XXX-XXX)", "")
+                                                   .Replace(" (pp. xxx-xxx)", "")
+                                                   .Replace(" (pp. )", "")
+                                                   .Replace(" pp. XXX-XXX", "")
+                                                   .Replace(" pp. ", "")
+                                                   .Replace(". *Journal Name*, *Volume*(Issue), Page range", "")
                                                    .Replace(", *Journal Name*", "")
                                                    .Replace(", *Preprint*", "");
 
+                                // Strip hanging punctuation caused by inline text removals
+                                citation = citation.Replace("().", "").Replace("()", "");
+                                citation = System.Text.RegularExpressions.Regex.Replace(citation, @",\s*,", ",");
+                                citation = System.Text.RegularExpressions.Regex.Replace(citation, @",\s*\.", ".");
+
+                                citation = citation.Trim().TrimEnd(',');
                                 if (!citation.EndsWith(".")) citation += ".";
                                 citations.Add(citation);
 
-                                // Parse Year
-                                System.Text.RegularExpressions.Match match = System.Text.RegularExpressions.Regex.Match(citation, @"\((20\d\d)\)");
-                                if (match.Success)
-                                {
-                                    string year = match.Groups[1].Value;
-                                    if (tempYears.ContainsKey(year)) tempYears[year]++;
-                                    else tempYears[year] = 1;
-                                }
-
                                 // ─── GRANULAR MULTI-VENUE SEPARATION LOGIC ───────────────────
-                                if (citation.Contains("Journal", StringComparison.OrdinalIgnoreCase))
+                                if (citation.Contains("Journal", StringComparison.OrdinalIgnoreCase) || 
+                                    citation.Contains("Transactions", StringComparison.OrdinalIgnoreCase))
                                 {
-                                    journalCount++;
+                                    if (citation.Contains("Transactions", StringComparison.OrdinalIgnoreCase)) transactionsCount++;
+                                    else journalCount++;
                                 }
-                                else if (citation.Contains("Transactions", StringComparison.OrdinalIgnoreCase))
+                                else if (citation.Contains("Proceedings", StringComparison.OrdinalIgnoreCase) || 
+                                         citation.Contains("Conference", StringComparison.OrdinalIgnoreCase))
                                 {
-                                    transactionsCount++;
-                                }
-                                else if (citation.Contains("Proceedings", StringComparison.OrdinalIgnoreCase))
-                                {
-                                    proceedingsCount++;
-                                }
-                                else if (citation.Contains("Conference", StringComparison.OrdinalIgnoreCase))
-                                {
-                                    conferenceCount++;
+                                    if (citation.Contains("Proceedings", StringComparison.OrdinalIgnoreCase)) proceedingsCount++;
+                                    else conferenceCount++;
                                 }
                                 else
                                 {
                                     preprintCount++;
                                 }
-                                // ─────────────────────────────────────────────────────────────
                             }
                         }
 

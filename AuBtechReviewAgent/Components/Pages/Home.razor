@@ -65,11 +65,16 @@
                         <textarea @bind="exclusionCriteria" rows="2" class="w-full p-2 bg-gray-50 border border-gray-300 rounded focus:outline-none focus:border-[#003B5C] text-xs shadow-inner resize-none transition-all"></textarea>
                     </div>
 
-                    <div class="pt-1 flex items-center">
+                    <div class="pt-1 grid grid-cols-2 gap-2 items-center">
                         <label class="relative flex items-center cursor-pointer select-none text-xs text-gray-700 font-semibold gap-2">
                             <input type="checkbox" @bind="requirePeerReview" class="w-4 h-4 text-[#003B5C] bg-gray-50 border-gray-300 rounded focus:ring-[#003B5C] focus:ring-2 transition-all accent-[#003B5C]" />
                             <span>Peer-Reviewed Only</span>
                         </label>
+                        
+                        <div>
+                            <label class="block text-[10px] font-bold uppercase text-gray-500 mb-0.5">Max Source Results</label>
+                            <input type="number" min="1" max="50" @bind="maxResults" class="w-full p-1 bg-gray-50 border border-gray-300 rounded text-xs text-center font-mono focus:outline-none focus:border-[#003B5C]" />
+                        </div>
                     </div>
                 </div>
 
@@ -80,7 +85,7 @@
                             <span class="flex items-center justify-center gap-2">
                                 <span class="animate-spin inline-block w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full"></span>
                                 <span>PARSING ENGINE...</span>
-                            </span>
+                            </span >
                         }
                         else
                         {
@@ -144,6 +149,9 @@
     private int includedCount { get => State.IncludedCount; set => State.IncludedCount = value; }
     private bool isSearching { get => State.IsSearching; set => State.IsSearching = value; }
 
+    // Backup local variable defaulting to 5 if state container doesn't expose it yet
+    private int maxResults { get; set; } = 5;
+
     protected override void OnInitialized()
     {
         if (isSearching)
@@ -152,15 +160,13 @@
         }
     }
 
-private async Task StartReviewProcess()
+    private async Task StartReviewProcess()
     {
-        // 1. CLEAR STALE GENERATED PRISMA REPORTS
         if (File.Exists("prisma-report.json"))
         {
             try { File.Delete("prisma-report.json"); } catch { }
         }
 
-        // 2. CLEAR STALE DOWNLOADED MANUSCRIPT PDFs
         string papersDir = Path.Combine(Directory.GetCurrentDirectory(), "PapersWorkspace");
         if (Directory.Exists(papersDir))
         {
@@ -177,7 +183,6 @@ private async Task StartReviewProcess()
             }
         }
 
-        // 3. RESET BASELINE RUN CONFIGURATIONS
         totalIdentified = 0;
         screenedCount = 0;
         excludedCount = 0;
@@ -192,7 +197,8 @@ private async Task StartReviewProcess()
         {
             try
             {
-                await ReviewEngine.RunReviewLoopAsync(searchQuery, reviewObjective, inclusionCriteria, exclusionCriteria);
+                // ─── FORWARD MAX RESULTS SELECTION INTO PIPELINE LOOP ─────────────
+                await ReviewEngine.RunReviewLoopAsync(searchQuery, reviewObjective, inclusionCriteria, exclusionCriteria, maxResults);
             }
             catch (Exception ex)
             {

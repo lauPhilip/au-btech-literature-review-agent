@@ -9,10 +9,11 @@ builder.Services.AddRazorComponents()
     // Register the UI memory cache container as Scoped (per user connection session)
 builder.Services.AddScoped<AuBtechReviewAgent.UiStateContainer>();
 
-// ─── PLUG YOUR SERVICE REGISTRATION HERE ──────────────────────────────────
-string mistralApiKey = builder.Configuration["MISTRAL_API_KEY"] ?? throw new InvalidOperationException("Mistral API Key is missing from configuration setup.");
-builder.Services.AddSingleton(new AuBtechReviewAgent.PrismaReviewEngine(mistralApiKey));
-// ──────────────────────────────────────────────────────────────────────────
+string mistralApiKey = builder.Configuration["MISTRAL_API_KEY"] ?? throw new InvalidOperationException("Mistral Key missing.");
+string elsevierApiKey = builder.Configuration["ELSEVIER_API_KEY"] ?? "";
+
+// Simplified dependency injection registration
+builder.Services.AddSingleton(new AuBtechReviewAgent.PrismaReviewEngine(mistralApiKey, elsevierApiKey));
 
 var app = builder.Build(); 
 
