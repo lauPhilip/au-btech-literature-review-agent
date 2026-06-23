@@ -56,12 +56,12 @@
                     </div>
 
                     <div>
-                        <label class="block text-[11px] font-bold uppercase text-gray-600 mb-1">Inclusion Criteria Matrix</label>
+                        <label class="block text-[11px] font-bold uppercase text-gray-600 mb-1">Inclusion Criteria</label>
                         <textarea @bind="inclusionCriteria" rows="2" class="w-full p-2 bg-gray-50 border border-gray-300 rounded focus:outline-none focus:border-[#003B5C] text-xs shadow-inner resize-none transition-all"></textarea>
                     </div>
 
                     <div>
-                        <label class="block text-[11px] font-bold uppercase text-gray-600 mb-1">Exclusion Criteria Matrix</label>
+                        <label class="block text-[11px] font-bold uppercase text-gray-600 mb-1">Exclusion Criteria</label>
                         <textarea @bind="exclusionCriteria" rows="2" class="w-full p-2 bg-gray-50 border border-gray-300 rounded focus:outline-none focus:border-[#003B5C] text-xs shadow-inner resize-none transition-all"></textarea>
                     </div>
 
@@ -72,7 +72,7 @@
                         </label>
                         
                         <div>
-                            <label class="block text-[10px] font-bold uppercase text-gray-500 mb-0.5">Max Source Results</label>
+                            <label class="block text-[10px] font-bold uppercase text-gray-500 mb-0.5">Max Results of Each Source</label>
                             <input type="number" min="1" max="50" @bind="maxResults" class="w-full p-1 bg-gray-50 border border-gray-300 rounded text-xs text-center font-mono focus:outline-none focus:border-[#003B5C]" />
                         </div>
                     </div>
@@ -89,7 +89,7 @@
                         }
                         else
                         {
-                            <span>Execute Ralph Loop Agent</span>
+                            <span>Execute Search</span>
                         }
                     </button>
                 </div>
@@ -120,7 +120,7 @@
 
         <div class="lg:col-span-7 flex flex-col min-h-0 border border-gray-200 rounded-lg bg-white shadow-sm overflow-hidden">
             <div class="bg-gray-800 text-white px-4 py-2.5 text-xs font-mono flex justify-between items-center flex-none">
-                <span>traceability-log.json output</span>
+                <span>JSON output</span>
                 <span class="text-[9px] opacity-50 uppercase tracking-widest font-bold">Mistral LLM</span>
             </div>
             <div class="flex-1 bg-gray-950 p-4 font-mono text-xs text-green-400 overflow-y-auto whitespace-pre-wrap leading-relaxed">
@@ -188,7 +188,7 @@
         excludedCount = 0;
         includedCount = 0;
         isSearching = true;
-        rawJsonLogs = "{\n  \"status\": \"Initializing Ralph Loop framework and purging workspace folders...\"\n}";
+        rawJsonLogs = "{\n  \"status\": \"Initializing TraceableAI framework and purging workspace folders...\"\n}";
         
         ReviewEngine.OnProgressUpdated += HandleEngineProgress;
         StateHasChanged();

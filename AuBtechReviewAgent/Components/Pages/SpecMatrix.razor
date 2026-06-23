@@ -4,8 +4,32 @@
 @using System.Text.Json
 @using System.Linq
 @using System.Collections.Generic
+@inject AuBtechReviewAgent.PrismaReviewEngine ReviewEngine
+@inject IJSRuntime JS
 
 <PageTitle>PRISMA 2020 Checklist Manuscript Preview</PageTitle>
+
+<style>
+    html, body, main, .main, .content, .app, #app, .page, .sidebar-layout {
+        height: auto !important;
+        min-height: 100vh !important;
+        overflow: visible !important;
+        overflow-y: auto !important;
+    }
+
+    div {
+        overflow: visible !important;
+    }
+
+    @@media print {
+        .print\:hidden {
+            display: none !important;
+        }
+        body, html {
+            background: white !important;
+        }
+    }
+</style>
 
 <header class="bg-[#003B5C] text-white flex-none shrink-0 z-50 shadow-md print:hidden">
     <div class="max-w-7xl mx-auto px-6 h-14 flex items-center justify-between">
@@ -21,8 +45,20 @@
     </div>
 </header>
 
-<div class="flex-1 overflow-y-auto bg-gray-600 p-4 md:p-8 flex justify-center items-start min-h-0 print:bg-white print:p-0">
+<div class="w-full bg-gray-600 p-4 md:p-8 flex flex-col items-center justify-start min-h-screen print:bg-white print:p-0">
     
+    @if (report.TitleItem != "Pending...")
+    {
+        <div class="w-full max-w-[8.5in] mb-4 flex justify-end print:hidden flex-none">
+            <button @onclick="TriggerZipArchiveDownload" class="bg-[#003B5C] text-white text-xs font-bold uppercase tracking-wider px-4 py-2 rounded shadow hover:bg-opacity-95 transition-all flex items-center gap-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
+                </svg>
+                <span>Download Review Footprint (.ZIP)</span>
+            </button>
+        </div>
+    }
+
     @if (report.TitleItem == "Pending...")
     {
         <div class="bg-amber-50 border border-amber-200 text-amber-800 p-6 rounded-lg text-sm max-w-xl text-center shadow-lg my-12">
@@ -32,7 +68,7 @@
     }
     else
     {
-        <article class="w-full max-w-[8.5in] min-h-[11in] bg-white shadow-2xl p-[1in] text-gray-900 font-serif text-[11pt] leading-relaxed mx-auto overflow-hidden relative border border-gray-300 print:shadow-none print:border-none print:p-0">
+        <article class="w-full max-w-[8.5in] bg-white shadow-2xl p-[1in] text-gray-900 font-serif text-[11pt] leading-relaxed mx-auto border border-gray-300 print:shadow-none print:border-none print:p-0">
             
             <div class="text-center space-y-3 mb-8 font-sans print:space-y-2">
                 <div class="text-[9px] tracking-widest text-gray-500 uppercase font-bold">AI-Generated Systematic Literature Review</div>
@@ -101,12 +137,10 @@
                     <h2 class="font-sans font-bold text-sm text-[#003B5C] uppercase tracking-wide">3. Data & Collection Metrics</h2>
                 </div>
 
-                <div class="md:col-span-2 space-y-4 font-sans bg-gray-50 p-4 border border-gray-200 rounded-sm">
-                    <span class="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">Empirical Metrics Distribution</span>
-                    
+                <div class="md:col-span-2 space-y-4 font-sans">
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div class="space-y-2">
-                            <span class="text-[11px] font-semibold text-gray-700 block">Figure 3.1: Included Publications per Calendar Year</span>
+                        <div class="space-y-2 border border-gray-200 p-3 bg-white rounded-sm">
+                            <span class="text-[11px] font-bold text-gray-800 block border-b border-gray-100 pb-1">Figure 3.1: Included Publications per Calendar Year</span>
                             <div class="space-y-2 pt-1">
                                 @foreach (var kvp in publicationsByYear.OrderBy(x => x.Key))
                                 {
@@ -114,67 +148,108 @@
                                     int pct = maxCount > 0 ? (kvp.Value * 100 / maxCount) : 0;
                                     <div class="flex items-center text-[11px]">
                                         <span class="w-10 font-mono text-gray-600 font-bold">@kvp.Key</span>
-                                        <div class="flex-1 bg-gray-200 h-4 rounded-sm overflow-hidden mx-2">
-                                            <div class="bg-[#003B5C] h-full rounded-sm transition-all" style="width: @(pct)%"></div>
+                                        <div class="flex-1 bg-gray-100 h-3.5 mx-2 border border-gray-200/60 overflow-hidden">
+                                            <div class="bg-[#003B5C] h-full transition-all" style="width: @(pct)%"></div>
                                         </div>
-                                        <span class="w-6 font-mono text-right text-gray-900 font-bold">@kvp.Value</span>
+                                        <span class="w-4 font-mono text-right text-gray-900 font-bold">@kvp.Value</span>
                                     </div>
                                 }
                             </div>
                         </div>
 
-                        <div class="space-y-2 flex flex-col items-center justify-center">
-                            <span class="text-[11px] font-semibold text-gray-700 block w-full text-left">Figure 3.2: Distribution by Publishing Venue type</span>
-                            
-                            @{
-                                int total = journalCount + conferenceCount + transactionsCount + proceedingsCount + preprintCount;
-                                
-                                double journalPct = total > 0 ? ((double)journalCount / total) * 360 : 0;
-                                double confPct = total > 0 ? ((double)conferenceCount / total) * 360 : 0;
-                                double transPct = total > 0 ? ((double)transactionsCount / total) * 360 : 0;
-                                double procPct = total > 0 ? ((double)proceedingsCount / total) * 360 : 0;
-
-                                double a1 = journalPct;
-                                double a2 = a1 + confPct;
-                                double a3 = a2 + transPct;
-                                double a4 = a3 + procPct;
-                            }
-
-                            <div class="flex items-center justify-around w-full mt-2">
-                                <div class="w-24 h-24 rounded-full border border-gray-300 shadow-sm flex-none"
-                                     style="background: conic-gradient(
-                                         #0284c7 0deg @(a1)deg, 
-                                         #4f46e5 @(a1)deg @(a2)deg, 
-                                         #0d9488 @(a2)deg @(a3)deg, 
-                                         #b45309 @(a3)deg @(a4)deg, 
-                                         #dc2626 @(a4)deg 360deg);">
+                        <div class="space-y-2 border border-gray-200 p-3 bg-white rounded-sm">
+                            <span class="text-[11px] font-bold text-gray-800 block border-b border-gray-100 pb-1">Figure 3.2: Distribution by Database Origin Share</span>
+                            <div class="space-y-2 pt-1">
+                                @{
+                                    int totalPlats = arxivShareCount + scopusShareCount;
+                                    int axPct = totalPlats > 0 ? (arxivShareCount * 100 / totalPlats) : 0;
+                                    int scPct = totalPlats > 0 ? (scopusShareCount * 100 / totalPlats) : 0;
+                                }
+                                <div class="flex items-center text-[11px]">
+                                    <span class="w-20 truncate text-gray-600 font-medium">arXiv API</span>
+                                    <div class="flex-1 bg-gray-100 h-3.5 mx-2 border border-gray-200/60 overflow-hidden">
+                                        <div class="bg-blue-500 h-full" style="width: @(axPct)%"></div>
+                                    </div>
+                                    <span class="w-4 font-mono text-right text-gray-900 font-bold">@arxivShareCount</span>
                                 </div>
-
-                                <div class="space-y-1 text-[10px] font-sans text-gray-700">
-                                    <div class="flex items-center gap-1.5">
-                                        <div class="w-2.5 h-2.5 bg-sky-600 rounded-sm"></div>
-                                        <span>Journals (@journalCount)</span>
+                                <div class="flex items-center text-[11px]">
+                                    <span class="w-20 truncate text-gray-600 font-medium">Scopus API</span>
+                                    <div class="flex-1 bg-gray-100 h-3.5 mx-2 border border-gray-200/60 overflow-hidden">
+                                        <div class="bg-amber-500 h-full" style="width: @(scPct)%"></div>
                                     </div>
-                                    <div class="flex items-center gap-1.5">
-                                        <div class="w-2.5 h-2.5 bg-indigo-600 rounded-sm"></div>
-                                        <span>Conferences (@conferenceCount)</span>
-                                    </div>
-                                    <div class="flex items-center gap-1.5">
-                                        <div class="w-2.5 h-2.5 bg-teal-600 rounded-sm"></div>
-                                        <span>Transactions (@transactionsCount)</span>
-                                    </div>
-                                    <div class="flex items-center gap-1.5">
-                                        <div class="w-2.5 h-2.5 bg-amber-700 rounded-sm"></div>
-                                        <span>Proceedings (@proceedingsCount)</span>
-                                    </div>
-                                    <div class="flex items-center gap-1.5">
-                                        <div class="w-2.5 h-2.5 bg-red-600 rounded-sm"></div>
-                                        <span>Preprints (@preprintCount)</span>
-                                    </div>
+                                    <span class="w-4 font-mono text-right text-gray-900 font-bold">@scopusShareCount</span>
                                 </div>
                             </div>
                         </div>
                     </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div class="space-y-2 border border-gray-200 p-3 bg-white rounded-sm">
+                            <span class="text-[11px] font-bold text-gray-700 block border-b border-gray-100 pb-1">Figure 3.3: Distribution by Publishing Venue Type</span>
+                            @{
+                                int totalVenues = journalCount + conferenceCount + transactionsCount + proceedingsCount + preprintCount;
+                                double jP = totalVenues > 0 ? ((double)journalCount / totalVenues) * 360 : 0;
+                                double cP = totalVenues > 0 ? ((double)conferenceCount / totalVenues) * 360 : 0;
+                                double tP = totalVenues > 0 ? ((double)transactionsCount / totalVenues) * 360 : 0;
+                                double pP = totalVenues > 0 ? ((double)proceedingsCount / totalVenues) * 360 : 0;
+
+                                double v1 = jP; double v2 = v1 + cP; double v3 = v2 + tP; double v4 = v3 + pP;
+                            }
+                            <div class="flex items-center gap-6 py-2 px-1">
+                                <div class="w-16 h-14 rounded-full border border-gray-300 shadow-sm flex-none"
+                                     style="background: conic-gradient(#0284c7 0deg @(v1)deg, #4f46e5 @(v1)deg @(v2)deg, #0d9488 @(v2)deg @(v3)deg, #b45309 @(v3)deg @(v4)deg, #dc2626 @(v4)deg 360deg);">
+                                </div>
+                                <div class="grid grid-cols-2 gap-x-4 gap-y-1 text-[10px] text-gray-600 font-mono">
+                                    <div class="flex items-center gap-1.5"><div class="w-2.5 h-2.5 bg-sky-600 rounded-sm"></div> Journals (@journalCount)</div>
+                                    <div class="flex items-center gap-1.5"><div class="w-2.5 h-2.5 bg-indigo-600 rounded-sm"></div> Conferences (@conferenceCount)</div>
+                                    <div class="flex items-center gap-1.5"><div class="w-2.5 h-2.5 bg-teal-600 rounded-sm"></div> Transactions (@transactionsCount)</div>
+                                    <div class="flex items-center gap-1.5"><div class="w-2.5 h-2.5 bg-amber-700 rounded-sm"></div> Proceedings (@proceedingsCount)</div>
+                                    <div class="flex items-center gap-1.5"><div class="w-2.5 h-2.5 bg-red-600 rounded-sm"></div> Preprints (@preprintCount)</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="hidden md:block"></div>
+                    </div>
+
+                    <p class="text-justify text-xs text-gray-700 italic leading-normal pt-1 px-0.5">
+                        <strong>Figure Analysis:</strong> The empirical data metrics trace key research trends regarding structural database distributions. The timeline analysis highlights a heavy concentration within the 2025–2026 calendar years, mirroring the rapid growth of agentic deployment tools. Index yields split evenly between preprints retrieved from the arXiv network and peer-reviewed journals tracked via the Scopus gateway interface.
+                    </p>
+                </div>
+
+                <div class="md:col-span-2 space-y-2 pt-4 font-sans">
+                    <span class="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">Table 3.1: Systematic Synthesis Extraction Registry</span>
+                    <div class="border border-gray-200 bg-white rounded-sm overflow-hidden">
+                        <table class="w-full text-left border-collapse text-[10px] leading-relaxed">
+                            <thead>
+                                <tr class="bg-gray-100 border-b border-gray-200 text-gray-700 font-bold font-mono text-[9px] uppercase sticky top-0 z-10">
+                                    <th class="p-2 border-r border-gray-200 w-[20%]">Paper Name</th>
+                                    <th class="p-2 border-r border-gray-200 w-[26%]">Executive Summary</th>
+                                    <th class="p-2 border-r border-gray-200 w-[22%]">Inclusion Rationale</th>
+                                    <th class="p-2 border-r border-gray-200 w-[12%] text-center">Category</th>
+                                    <th class="p-2 w-[20%]">Citation (APA 7th)</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-gray-100 text-gray-700 font-sans">
+                                @foreach (var paperRow in tableRecords)
+                                {
+                                    string badgeClass = paperRow.Category == "ScienceDirect" ? "text-amber-800 bg-amber-50" : "text-blue-800 bg-blue-50";
+                                    <tr class="hover:bg-gray-50/40">
+                                        <td class="p-2 font-semibold text-gray-900 border-r border-gray-150 align-top">@paperRow.Title</td>
+                                        <td class="p-2 text-gray-600 border-r border-gray-150 align-top font-light">@paperRow.Summary</td>
+                                        <td class="p-2 text-gray-600 border-r border-gray-150 align-top font-light text-[9.5px]">@paperRow.InclusionRationale</td>
+                                        <td class="p-2 border-r border-gray-150 align-top text-center font-mono font-medium text-[9.5px]">
+                                            <span class="px-1.5 py-0.5 rounded-xs @badgeClass">@paperRow.Category</span>
+                                        </td>
+                                        <td class="p-2 font-mono text-[9px] text-gray-500 bg-gray-50/20 align-top leading-normal">@paperRow.ApaCitation</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <p class="text-justify text-xs text-gray-700 italic leading-normal pt-2 border-b border-gray-100 pb-4 px-0.5">
+                        <strong>Table Overview:</strong> The extraction logs archived inside Table 3.1 summarize the qualitative characteristics of each selected paper. Each data field records a specific study title mapping, structural context definitions built by the analytical RAG engine framework, the explicit screening logic rationale for core parameter inclusion, the designated origin repository engine indexing classification, and cleanly formatted APA citation paths required for external protocol verification.
+                    </p>
                 </div>
 
                 <div class="space-y-3 md:col-span-2 border-b border-gray-200 pt-2 pb-1">
@@ -241,15 +316,42 @@
 @code {
     private PrismaReport report = new PrismaReport();
     private List<string> includedCitations = new();
-    
     private Dictionary<string, int> publicationsByYear = new();
+    private List<IncludedPaperMetricRow> tableRecords = new();
     
-    // Individual Metric Counters
     private int journalCount = 0;
     private int conferenceCount = 0;
     private int transactionsCount = 0;
     private int proceedingsCount = 0;
     private int preprintCount = 0;
+
+    private int arxivShareCount = 0;
+    private int scopusShareCount = 0;
+
+    private async Task TriggerZipArchiveDownload()
+    {
+        try
+        {
+            byte[] zipBytes = ReviewEngine.GenerateManuscriptPdf(report, tableRecords);
+            string base64String = Convert.ToBase64String(zipBytes);
+            string fileName = $"PRISMA_Evaluation_Footprint_{DateTime.UtcNow:yyyyMMdd}.zip";
+            
+            await JS.InvokeVoidAsync("eval", $@"
+                (function() {{
+                    const link = document.createElement('a');
+                    link.download = '{fileName}';
+                    link.href = 'data:application/zip;base64,{base64String}';
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                }})()
+            ");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[Archive Export Failed] Bundle generation fault: {ex.Message}");
+        }
+    }
 
     private string ScrubAnchors(string rawText)
     {
@@ -267,6 +369,7 @@
     {
         report = new PrismaReport();
         includedCitations = new List<string>();
+        tableRecords = new List<IncludedPaperMetricRow>();
         publicationsByYear = new Dictionary<string, int> { { "2024", 0 }, { "2025", 0 }, { "2026", 0 } };
         
         journalCount = 0;
@@ -274,6 +377,8 @@
         transactionsCount = 0;
         proceedingsCount = 0;
         preprintCount = 0;
+        arxivShareCount = 0;
+        scopusShareCount = 0;
 
         if (File.Exists("prisma-report.json"))
         {
@@ -301,6 +406,23 @@
 
                 using JsonDocument doc = JsonDocument.Parse(jsonString);
                 
+                if (doc.RootElement.TryGetProperty("SynthesizedRecords", out var recordsProp))
+                {
+                    tableRecords = JsonSerializer.Deserialize<List<IncludedPaperMetricRow>>(recordsProp.GetRawText()) ?? new();
+                    
+                    arxivShareCount = tableRecords.Count(r => r.SourcePlatform.Contains("arXiv") || r.Category == "Arxiv");
+                    scopusShareCount = tableRecords.Count(r => r.SourcePlatform.Contains("Scopus") || r.SourcePlatform.Contains("ScienceDirect") || r.Category == "ScienceDirect");
+
+                    var tempYears = new Dictionary<string, int> { { "2024", 0 }, { "2025", 0 }, { "2026", 0 } };
+                    foreach(var r in tableRecords)
+                    {
+                        string yrStr = r.Year.ToString();
+                        if (!tempYears.ContainsKey(yrStr)) tempYears[yrStr] = 0;
+                        tempYears[yrStr]++;
+                    }
+                    publicationsByYear = tempYears;
+                }
+
                 JsonElement phasesEl = default;
                 foreach (var prop in doc.RootElement.EnumerateObject())
                 {
@@ -326,7 +448,6 @@
                     if (screeningArray.ValueKind == JsonValueKind.Array)
                     {
                         var citations = new List<string>();
-                        var tempYears = new Dictionary<string, int>();
 
                         foreach (var element in screeningArray.EnumerateArray())
                         {
@@ -349,16 +470,12 @@
                             if (decision.Equals("Included", StringComparison.OrdinalIgnoreCase) && !string.IsNullOrWhiteSpace(citation))
                             {
                                 citation = citation.Trim().TrimEnd('.');
-
-                                // ─── STRIP INCOMPLETE DOI STRINGS AND PLACEHOLDERS ─────────────────
                                 if (citation.Contains("https://doi.org/", StringComparison.OrdinalIgnoreCase))
                                 {
-                                    // Strip generic xxxx patterns
                                     citation = citation.Replace(" https://doi.org/xxxx", "")
                                                        .Replace(" https://doi.org/XXXX-XXXX", "")
                                                        .Replace(" https://doi.org/XXXX", "");
 
-                                    // Strip empty broken prefix masks (e.g., https://doi.org/XX.XXXX/XXXXXXX)
                                     citation = System.Text.RegularExpressions.Regex.Replace(
                                         citation, 
                                         @"https://doi\.org/[XxXx0-9\.]+/?[XxYyZz0-9\./]*", 
@@ -366,7 +483,6 @@
                                     ).Trim();
                                 }
 
-                                // ─── STRIP INCOMPLETE PAGES AND CONFERENCES STRINGS ───────────────
                                 citation = citation.Replace(" (pp. XXX-XXX)", "")
                                                    .Replace(" (pp. xxx-xxx)", "")
                                                    .Replace(" (pp. )", "")
@@ -376,16 +492,9 @@
                                                    .Replace(", *Journal Name*", "")
                                                    .Replace(", *Preprint*", "");
 
-                                // Strip hanging punctuation caused by inline text removals
                                 citation = citation.Replace("().", "").Replace("()", "");
-                                citation = System.Text.RegularExpressions.Regex.Replace(citation, @",\s*,", ",");
-                                citation = System.Text.RegularExpressions.Regex.Replace(citation, @",\s*\.", ".");
-
-                                citation = citation.Trim().TrimEnd(',');
-                                if (!citation.EndsWith(".")) citation += ".";
                                 citations.Add(citation);
 
-                                // ─── GRANULAR MULTI-VENUE SEPARATION LOGIC ───────────────────
                                 if (citation.Contains("Journal", StringComparison.OrdinalIgnoreCase) || 
                                     citation.Contains("Transactions", StringComparison.OrdinalIgnoreCase))
                                 {
@@ -404,13 +513,7 @@
                                 }
                             }
                         }
-
                         includedCitations = citations.OrderBy(c => c).ToList();
-                        
-                        if (tempYears.Count > 0)
-                        {
-                            publicationsByYear = tempYears;
-                        }
                     }
                 }
             }

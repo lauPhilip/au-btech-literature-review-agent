@@ -19,11 +19,21 @@ public class ReviewState
     public DateTime Timestamp { get; set; } = DateTime.UtcNow;
     public ReviewStats Stats { get; set; } = new();
     public ReviewPhases Phases { get; set; } = new();
-    
-    // ─── PLATFORM TARGET LOG INTEGRATION ────────────────────────────
     public List<PlatformSearchLog> SearchLogs { get; set; } = new();
+    public List<IncludedPaperMetricRow> SynthesizedRecords { get; set; } = new();
+    }
+    
+public class IncludedPaperMetricRow
+{
+    public string Title { get; set; } = string.Empty;
+    public string Summary { get; set; } = string.Empty;
+    public string ApaCitation { get; set; } = string.Empty;
+    public string SourcePlatform { get; set; } = string.Empty; // "arXiv API" or "ScienceDirect API"
+    public int Year { get; set; } = 2026;
+    public string VenueType { get; set; } = "Other"; // "Journals", "Conferences", "Preprints", etc.
+    public string InclusionRationale { get; set; } = string.Empty;
+    public string Category { get; set; } = string.Empty;
 }
-
 public class ReviewStats 
 { 
     public int TotalIdentified { get; set; } = 0; 

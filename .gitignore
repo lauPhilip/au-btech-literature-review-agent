@@ -24,3 +24,9 @@ transparent-process.json
 /.specify
 *.specify
 AuBtechReviewAgent/PapersWorkspace/
+
+# Ignore temporary LaTeX manuscript build artifacts
+manuscript_*.tex
+manuscript_*.pdf
+manuscript_*.log
+manuscript_*.aux
