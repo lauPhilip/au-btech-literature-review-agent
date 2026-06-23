@@ -23,7 +23,7 @@ public class ElsevierSource : IAcademicSource
         _httpClient.DefaultRequestHeaders.Add("Accept", "application/json");
     }
 
-public async Task<List<AcademicPaper>> FetchPapersAsync(string query, int maxResults = 5)
+    public async Task<List<AcademicPaper>> FetchPapersAsync(string query, int maxResults = 5)
     {
         var papers = new List<AcademicPaper>();
         

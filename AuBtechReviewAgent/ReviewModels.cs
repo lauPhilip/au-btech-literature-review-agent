@@ -16,11 +16,13 @@ public class ReviewState
 {
     public string ReviewId { get; set; } = Guid.NewGuid().ToString();
     public string SearchQuery { get; set; } = "";
+    public bool PeerReviewOnlyToggle { get; set; } 
     public DateTime Timestamp { get; set; } = DateTime.UtcNow;
     public ReviewStats Stats { get; set; } = new();
     public ReviewPhases Phases { get; set; } = new();
     public List<PlatformSearchLog> SearchLogs { get; set; } = new();
     public List<IncludedPaperMetricRow> SynthesizedRecords { get; set; } = new();
+    
     }
     
 public class IncludedPaperMetricRow
@@ -40,7 +42,9 @@ public class ReviewStats
     public int Screened { get; set; } = 0; 
     public int Excluded { get; set; } = 0; 
     public int Included { get; set; } = 0; 
-    public string ProcessingStage { get; set; } = "Screening";
+    public string ProcessingStage { get; set; } = "Idle";
+    public int PassedPeerReviewCheck { get; set; }  // Exactly X papers
+    public int FailedPeerReviewCheck { get; set; }  // Exactly Y papers
 }
 
 public class ReviewPhases 

@@ -22,7 +22,7 @@
     }
 
     @@media print {
-        .print\:hidden {
+        .print:hidden {
             display: none !important;
         }
         body, html {
@@ -137,7 +137,25 @@
                     <h2 class="font-sans font-bold text-sm text-[#003B5C] uppercase tracking-wide">3. Data & Collection Metrics</h2>
                 </div>
 
-                <div class="md:col-span-2 space-y-4 font-sans">
+                <div class="md:col-span-2 space-y-2">
+                    <p class="text-gray-800 text-xs">
+                        The empirical data metrics trace key research trends regarding structural database distributions. Chronological yields highlight a heavy concentration within the 2025–2026 calendar years, mirroring the rapid growth of agentic deployment tools. Index yields split with @arxivShareCount entries retrieved from the arXiv preprint network and @scopusShareCount entries tracked via the ScienceDirect database interface.
+                    </p>
+                    
+                    <p class="text-gray-800 text-xs pt-1">
+                        @if (peerReviewOnlyToggle)
+                        {
+                            <span>For this systematic review, the <strong>Peer-Reviewed Only</strong> filtering threshold was explicitly enabled. Post-retrieval pipeline parsing resulted in @passedPeerReviewCheck papers passing verified peer-review checks, while @failedPeerReviewCheck items were excluded from candidate screening because they were classified as un-reviewed preprints or working papers. </span>
+                        }
+                        else
+                        {
+                            <span>In this review, it was decided to search for and ingest literature resources regardless of whether they had undergone formal peer-review checks, prioritizing maximum technical depth across preprint servers alongside legacy databases. </span>
+                        }
+                        <span>Among the curated, high-quality inclusions, a total of @tableRecords.Count papers were finalized for extraction. A total of [X amount of Q1 or Q2 journals and Core-rated conference papers] constitute the core metadata quality sample pool, ensuring robust credibility and empirical validity for subsequent architectural synthesis.</span>
+                    </p>
+                </div>
+
+                <div class="md:col-span-2 space-y-4 font-sans pt-2">
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div class="space-y-2 border border-gray-200 p-3 bg-white rounded-sm">
                             <span class="text-[11px] font-bold text-gray-800 block border-b border-gray-100 pb-1">Figure 3.1: Included Publications per Calendar Year</span>
@@ -210,10 +228,6 @@
                         </div>
                         <div class="hidden md:block"></div>
                     </div>
-
-                    <p class="text-justify text-xs text-gray-700 italic leading-normal pt-1 px-0.5">
-                        <strong>Figure Analysis:</strong> The empirical data metrics trace key research trends regarding structural database distributions. The timeline analysis highlights a heavy concentration within the 2025–2026 calendar years, mirroring the rapid growth of agentic deployment tools. Index yields split evenly between preprints retrieved from the arXiv network and peer-reviewed journals tracked via the Scopus gateway interface.
-                    </p>
                 </div>
 
                 <div class="md:col-span-2 space-y-2 pt-4 font-sans">
@@ -328,6 +342,11 @@
     private int arxivShareCount = 0;
     private int scopusShareCount = 0;
 
+    // NEW: Local tracking variables to display peer review numbers in preview fields
+    private bool peerReviewOnlyToggle = false;
+    private int passedPeerReviewCheck = 0;
+    private int failedPeerReviewCheck = 0;
+
     private async Task TriggerZipArchiveDownload()
     {
         try
@@ -379,6 +398,10 @@
         preprintCount = 0;
         arxivShareCount = 0;
         scopusShareCount = 0;
+        
+        peerReviewOnlyToggle = false;
+        passedPeerReviewCheck = 0;
+        failedPeerReviewCheck = 0;
 
         if (File.Exists("prisma-report.json"))
         {
@@ -406,6 +429,16 @@
 
                 using JsonDocument doc = JsonDocument.Parse(jsonString);
                 
+                // NEW: Ingest peer-review state tokens out of tracking files for dynamic template routing
+                if (doc.RootElement.TryGetProperty("PeerReviewOnlyToggle", out var toggleProp))
+                    peerReviewOnlyToggle = toggleProp.GetBoolean();
+
+                if (doc.RootElement.TryGetProperty("Stats", out var statsProp))
+                {
+                    if (statsProp.TryGetProperty("PassedPeerReviewCheck", out var pCheck)) passedPeerReviewCheck = pCheck.GetInt32();
+                    if (statsProp.TryGetProperty("FailedPeerReviewCheck", out var fCheck)) failedPeerReviewCheck = fCheck.GetInt32();
+                }
+
                 if (doc.RootElement.TryGetProperty("SynthesizedRecords", out var recordsProp))
                 {
                     tableRecords = JsonSerializer.Deserialize<List<IncludedPaperMetricRow>>(recordsProp.GetRawText()) ?? new();

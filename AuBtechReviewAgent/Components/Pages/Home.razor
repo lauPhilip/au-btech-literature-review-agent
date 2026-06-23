@@ -85,7 +85,7 @@
                             <span class="flex items-center justify-center gap-2">
                                 <span class="animate-spin inline-block w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full"></span>
                                 <span>PARSING ENGINE...</span>
-                            </span >
+                            </span>
                         }
                         else
                         {
@@ -149,7 +149,6 @@
     private int includedCount { get => State.IncludedCount; set => State.IncludedCount = value; }
     private bool isSearching { get => State.IsSearching; set => State.IsSearching = value; }
 
-    // Backup local variable defaulting to 5 if state container doesn't expose it yet
     private int maxResults { get; set; } = 5;
 
     protected override void OnInitialized()
@@ -187,6 +186,8 @@
         screenedCount = 0;
         excludedCount = 0;
         includedCount = 0;
+        State.PassedPeerReviewCount = 0;
+        State.FailedPeerReviewCount = 0;
         isSearching = true;
         rawJsonLogs = "{\n  \"status\": \"Initializing TraceableAI framework and purging workspace folders...\"\n}";
         
@@ -197,8 +198,8 @@
         {
             try
             {
-                // ─── FORWARD MAX RESULTS SELECTION INTO PIPELINE LOOP ─────────────
-                await ReviewEngine.RunReviewLoopAsync(searchQuery, reviewObjective, inclusionCriteria, exclusionCriteria, maxResults);
+                // FIXED: Passed the requirePeerReview value directly into the execution signature
+                await ReviewEngine.RunReviewLoopAsync(searchQuery, reviewObjective, inclusionCriteria, exclusionCriteria, maxResults, requirePeerReview);
             }
             catch (Exception ex)
             {
@@ -245,6 +246,10 @@
             screenedCount = updatedStats.Screened;
             excludedCount = updatedStats.Excluded;
             includedCount = updatedStats.Included;
+            
+            // Map metrics back into the persistent UI storage containers
+            State.PassedPeerReviewCount = updatedStats.PassedPeerReviewCheck;
+            State.FailedPeerReviewCount = updatedStats.FailedPeerReviewCheck;
             
             if (updatedStats.ProcessingStage == "Complete")
             {

@@ -39,11 +39,15 @@ public class PrismaReviewEngine
         }
     }
 
-    public async Task RunReviewLoopAsync(string initialQuery, string explicitObjective, string inclusionCriteria, string exclusionCriteria, int maxResults)
+    public async Task RunReviewLoopAsync(string initialQuery, string explicitObjective, string inclusionCriteria, string exclusionCriteria, int maxResults, bool requirePeerReview = false)
     {
         var chatService = _kernel.GetRequiredService<IChatCompletionService>();
         
-        var reviewState = new ReviewState { SearchQuery = initialQuery };
+        var reviewState = new ReviewState 
+        { 
+            SearchQuery = initialQuery,
+            PeerReviewOnlyToggle = requirePeerReview 
+        };
         reviewState.Stats.ProcessingStage = "Screening";
         await SaveStateAsync(reviewState);
 
@@ -78,7 +82,57 @@ public class PrismaReviewEngine
             OnProgressUpdated?.Invoke(reviewState.Stats);
             await SaveStateAsync(reviewState);
 
+            // ─── POST-RETRIEVAL PEER REVIEW FILTERING PIPELINE STEP ───
+            var filteredCandidates = new List<AcademicPaper>();
             foreach (var paper in candidates)
+            {
+                if (reviewState.PeerReviewOnlyToggle)
+                {
+                    bool isPeerReviewed = false;
+
+                    if (paper.Id.StartsWith("SCOPUS_ID:") || source.SourceName.Contains("ScienceDirect", StringComparison.OrdinalIgnoreCase))
+                    {
+                        if (!string.IsNullOrEmpty(paper.JournalSource) && 
+                            !paper.JournalSource.Contains("Preprint", StringComparison.OrdinalIgnoreCase))
+                        {
+                            isPeerReviewed = true;
+                        }
+                    }
+                    else if (paper.Id.Contains("arxiv.org", StringComparison.OrdinalIgnoreCase) || source.SourceName.Contains("arXiv", StringComparison.OrdinalIgnoreCase))
+                    {
+                        string combinedMetadata = $"{paper.Title} {paper.JournalSource} {paper.Abstract}";
+                        bool hasHintOfPublication = combinedMetadata.Contains("Proceedings of", StringComparison.OrdinalIgnoreCase) || 
+                                                    combinedMetadata.Contains("Journal of", StringComparison.OrdinalIgnoreCase) || 
+                                                    combinedMetadata.Contains("Transactions on", StringComparison.OrdinalIgnoreCase) ||
+                                                    combinedMetadata.Contains("Published in", StringComparison.OrdinalIgnoreCase);
+
+                        if (hasHintOfPublication)
+                        {
+                            isPeerReviewed = await VerifyPeerReviewStatusViaLLMAsync(chatService, paper);
+                        }
+                        else
+                        {
+                            isPeerReviewed = false; 
+                        }
+                    }
+                    else
+                    {
+                        isPeerReviewed = await VerifyPeerReviewStatusViaLLMAsync(chatService, paper);
+                    }
+
+                    if (!isPeerReviewed)
+                    {
+                        reviewState.Stats.FailedPeerReviewCheck++;
+                        continue;
+                    }
+
+                    reviewState.Stats.PassedPeerReviewCheck++;
+                }
+
+                filteredCandidates.Add(paper);
+            }
+
+            foreach (var paper in filteredCandidates)
             {
                 string authorList = string.Join(", ", paper.Authors);
 
@@ -212,6 +266,39 @@ public class PrismaReviewEngine
         reviewState.Stats.ProcessingStage = "Complete";
         OnProgressUpdated?.Invoke(reviewState.Stats);
         await SaveStateAsync(reviewState);
+    }
+
+    private async Task<bool> VerifyPeerReviewStatusViaLLMAsync(IChatCompletionService chatService, AcademicPaper paper)
+    {
+        var prompt = $$"""
+            Analyze the following document metadata and determine if it has undergone formal peer review (e.g., published in an academic journal, peer-reviewed conference proceedings, or transactional series) or if it remains an un-reviewed preprint/working paper.
+
+            Document Context:
+            - Title: {{paper.Title}}
+            - Venue/Source: {{paper.JournalSource}}
+            - Metadata Abstract Segment: {{paper.Abstract}}
+
+            Respond ONLY with a valid minified JSON object matching this structure exactly:
+            { "isPeerReviewed": true } or { "isPeerReviewed": false }
+            """;
+
+        try
+        {
+            var response = await chatService.GetChatMessageContentAsync(prompt);
+            string cleanResponse = response.ToString().Replace("```json", "").Replace("```", "").Trim();
+            
+            using var doc = JsonDocument.Parse(cleanResponse);
+            if (doc.RootElement.TryGetProperty("isPeerReviewed", out var prop))
+            {
+                return prop.GetBoolean();
+            }
+        }
+        catch
+        {
+            if ((paper.JournalSource ?? "").Contains("arXiv", StringComparison.OrdinalIgnoreCase)) return false;
+        }
+
+        return false;
     }
 
     private async Task GeneratePrismaChecklistReportWithRAGAsync(IChatCompletionService chat, string query, string explicitObjective, string inc, string exc, string groundedChunksText, string referenceListMapping, ReviewState finalState)
@@ -354,13 +441,12 @@ public class PrismaReviewEngine
     {
         if (string.IsNullOrEmpty(input)) return string.Empty;
 
-        // FIXED: Explicitly sanitize data payload strings to erase dynamic DOI placeholder mutations across builds
         string cleanInput = input.Replace("https://doi.org/XXXX-XXXXXX", "")
                                  .Replace("https://doi.org/XXXXXXX.XXXXXXX", "")
                                  .Replace("https://doi.org/XX.XXXX/", "")
                                  .Replace("https://doi.org/XXXX", "")
                                  .Replace("https://doi.org/XXX", "")
-                                 .Replace("XXXXXX.XXXXX","")
+                                 .Replace("XXXXXX.XXXXX", "")
                                  .TrimEnd(' ', ',', '.', '/');
 
         return cleanInput.Replace(@"\", @"\textbackwards ")
@@ -403,6 +489,28 @@ public class PrismaReviewEngine
             if (publicationsByYear.ContainsKey(yrStr)) publicationsByYear[yrStr]++;
         }
 
+        int passedCheck = 0;
+        int failedCheck = 0;
+        bool peerReviewToggled = false;
+
+        if (File.Exists(_stateFilePath))
+        {
+            try
+            {
+                string stateContent = File.ReadAllText(_stateFilePath);
+                using JsonDocument stateDoc = JsonDocument.Parse(stateContent);
+                if (stateDoc.RootElement.TryGetProperty("PeerReviewOnlyToggle", out var toggleProp))
+                    peerReviewToggled = toggleProp.GetBoolean();
+
+                if (stateDoc.RootElement.TryGetProperty("Stats", out var statsEl))
+                {
+                    if (statsEl.TryGetProperty("PassedPeerReviewCheck", out var pCheck)) passedCheck = pCheck.GetInt32();
+                    if (statsEl.TryGetProperty("FailedPeerReviewCheck", out var fCheck)) failedCheck = fCheck.GetInt32();
+                }
+            }
+            catch { }
+        }
+
         string sanitizedTitleItem = EscapeLatexText((report.TitleItem ?? "Systematic Review Manuscript").Replace("[Source Context Anchor 1]", "").Trim());
         string sanitizedAbstractItem = EscapeLatexText(report.AbstractItem ?? "");
         string sanitizedRationaleItem = EscapeLatexText(report.RationaleItem ?? "");
@@ -425,8 +533,6 @@ public class PrismaReviewEngine
         sb.AppendLine(@"\usepackage{ltablex}"); 
         sb.AppendLine(@"\usepackage{xcolor}");
         sb.AppendLine(@"\usepackage{fancyhdr}");
-        
-        // FIXED: Imported the float package to enable strict, bulletproof object pinning properties
         sb.AppendLine(@"\usepackage{float}");
         
         sb.AppendLine(@"\usepackage{pgfplots}");
@@ -489,10 +595,20 @@ public class PrismaReviewEngine
         sb.AppendLine(@"\end{multicols}");
         sb.AppendLine(@"\section{Data \& Collection Metrics}");
         sb.AppendLine(@"The empirical data metrics trace key research trends regarding structural database distributions. ");
-        sb.AppendLine($"Chronological yields highlight a heavy concentration within the 2025--2026 calendar years, mirroring the rapid growth of agentic deployment tools. Index yields split with {arxivCount} entries retrieved from the arXiv preprint network and {scopusCount} entries tracked via the ScienceDirect database interface.");
-        sb.AppendLine(@"\vspace{15pt}");
+        
+        // FIXED: Shifted narrative text block right above the figure environment box for logical flow
+        if (peerReviewToggled)
+        {
+            sb.AppendLine($"For this systematic review, the \\textbf{{Peer-Reviewed Only}} filtering threshold was explicitly enabled. Post-retrieval pipeline parsing resulted in {passedCheck} papers passing verified peer-review checks, while {failedCheck} items were excluded from candidate screening because they were classified as un-reviewed preprints or working papers. ");
+        }
+        else
+        {
+            sb.AppendLine(@"In this review, it was decided to search for and ingest literature resources regardless of whether they had undergone formal peer-review checks, prioritizing maximum technical depth across preprint servers alongside legacy databases. ");
+        }
 
-        // FIXED: Shifted structural float attributes to exact 'H' configuration to bind figure cards rigidly inside Section 3
+        sb.AppendLine($"Among the curated, high-quality inclusions, a total of {records.Count} papers were finalized for extraction. A total of [X amount of Q1 or Q2 journals and Core-rated conference papers] constitute the core metadata quality sample pool, ensuring robust credibility and empirical validity for subsequent architectural synthesis.");
+        sb.AppendLine(@"\vspace{10pt}");
+
         sb.AppendLine(@"\begin{figure}[H]");
         sb.AppendLine(@"\centering");
         
