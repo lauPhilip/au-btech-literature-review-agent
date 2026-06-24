@@ -324,7 +324,7 @@
                         </table>
                     </div>
                     
-                    <p class="text-justify text-xs text-gray-700 italic leading-normal pt-2 border-b border-gray-100 pb-4 px-0.5">
+                    <p class="text-justify text-xs text-gray-700 block pt-2 border-b border-gray-100 pb-4 px-0.5">
                         <strong>Table Overview:</strong> The extraction logs archived inside Table 3.1 summarize the qualitative characteristics of each selected paper. Each data field records a specific study title mapping, structural context definitions built by the analytical RAG engine framework, the explicit screening logic rationale for core parameter inclusion, the designated origin repository engine indexing classification, and cleanly formatted APA citation paths required for external protocol verification.
                     </p>
                 </div>
@@ -336,6 +336,16 @@
                 <div class="space-y-1 md:col-span-2">
                     <span class="font-sans font-bold text-[10px] text-gray-500 uppercase block">4.1 Dataset Characteristics & Synthesis Outcomes (Item 20a)</span>
                     <p class="text-gray-800">@ScrubAnchors(report.SynthesisResultsItem)</p>
+                    
+                    @if (!string.IsNullOrEmpty(mermaidDiagramCode))
+                    {
+                        <div class="mt-4 border border-gray-200 p-4 rounded bg-gray-50 flex flex-col items-center justify-center font-sans print:hidden">
+                            <span class="text-[9px] font-bold text-gray-400 block mb-3 uppercase tracking-widest">Interactive Synthesis Loop Model (Live Preview)</span>
+                            <div class="mermaid w-full flex justify-center text-center">
+                                @mermaidDiagramCode
+                            </div>
+                        </div>
+                    }
                 </div>
 
                 <div class="space-y-3 md:col-span-2 border-b border-gray-200 pt-2 pb-1">
@@ -409,6 +419,8 @@
     private int passedPeerReviewCheck = 0;
     private int failedPeerReviewCheck = 0;
 
+    private string mermaidDiagramCode = "";
+
     private async Task TriggerZipArchiveDownload()
     {
         try
@@ -437,13 +449,39 @@
     private string ScrubAnchors(string rawText)
     {
         if (string.IsNullOrWhiteSpace(rawText)) return "";
-        return System.Text.RegularExpressions.Regex.Replace(rawText, @"\[Source Context Anchor \d+.*?\]", "").Trim();
+        string clean = Regex.Replace(rawText, @"\[MERMAID_START\].*?\[MERMAID_END\]", "", RegexOptions.Singleline);
+        clean = Regex.Replace(clean, @"\[TIKZ_START\].*?\[TIKZ_END\]", "", RegexOptions.Singleline);
+        return Regex.Replace(clean, @"\[Source Context Anchor \d+.*?\]", "").Trim();
     }
 
     private int GetMaxPublicationCount()
     {
         if (publicationsByYear == null || publicationsByYear.Count == 0) return 0;
         return publicationsByYear.Values.Max();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!string.IsNullOrEmpty(mermaidDiagramCode))
+        {
+            try
+            {
+                await JS.InvokeVoidAsync("eval", @"
+                    if (typeof mermaid === 'undefined') {
+                        var script = document.createElement('script');
+                        script.src = 'https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js';
+                        script.onload = function() {
+                            mermaid.initialize({ startOnLoad: true, theme: 'default' });
+                            mermaid.contentLoaded();
+                        };
+                        document.head.appendChild(script);
+                    } else {
+                        mermaid.contentLoaded();
+                    }
+                ");
+            }
+            catch { }
+        }
     }
 
     protected override async Task OnParametersSetAsync()
@@ -463,7 +501,9 @@
         
         peerReviewOnlyToggle = false;
         passedPeerReviewCheck = 0;
+        // FIXED: Renamed parameter call mapping to match local state property definitions perfectly
         failedPeerReviewCheck = 0;
+        mermaidDiagramCode = "";
 
         if (File.Exists("prisma-report.json"))
         {
@@ -515,6 +555,16 @@
                         tempYears[yrStr]++;
                     }
                     publicationsByYear = tempYears;
+                }
+
+                if (!string.IsNullOrEmpty(report.SynthesisResultsItem))
+                {
+                    var mermaidMatch = Regex.Match(report.SynthesisResultsItem, @"\[MERMAID_START\](.*?)\[MERMAID_END\]", RegexOptions.Singleline);
+                    if (mermaidMatch.Success)
+                    {
+                        string rawMermaid = mermaidMatch.Groups[1].Value.Trim();
+                        mermaidDiagramCode = rawMermaid.Replace("```mermaid", "").Replace("```", "").Trim();
+                    }
                 }
 
                 JsonElement phasesEl = default;

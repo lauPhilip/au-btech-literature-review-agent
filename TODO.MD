@@ -8,10 +8,10 @@
     * [X] Update the `ReviewState` and `ReviewStats` structures to display these specific metrics on the frontend progress bars.
 
 ## 2. Journal Quartile (Q1/Q2) & Conference Ranking Metrics
-* **Data Enrichment:** Integrate a lookup mechanism (via Scimago API, CORE rankings, or a local database mapping) into the ingestion pipeline.
-* **Data Model Updates:** Add ranking properties (`Quartile`, `ConferenceRating`) to `IncludedPaperMetricRow` and `ReviewState`.
-* **LaTeX Manuscript Integration:** * Add a new sub-section under **Section 3: Data & Collection Metrics** titled `Study Quality & Tier Distribution`.
-    * Write text blocks explaining the overall quality and distribution layout of the selected material (e.g., *“Of the included data assets, 70% originate from Q1 indexed sources...”*).
+* [X] **Data Enrichment:** Integrate a lookup mechanism (via Scimago API, CORE rankings, or a local database mapping) into the ingestion pipeline.
+* [X] **Data Model Updates:** Add ranking properties (`Quartile`, `ConferenceRating`) to `IncludedPaperMetricRow` and `ReviewState`.
+* [X] **LaTeX Manuscript Integration:** * Add a new sub-section under **Section 3: Data & Collection Metrics** titled `Study Quality & Tier Distribution`.
+  [X]  * Write text blocks explaining the overall quality and distribution layout of the selected material (e.g., *“Of the included data assets, 70% originate from Q1 indexed sources...”*).
 
 ## 3. Expand Academic Source Gateways
 Implement dedicated API client adapters implementing the `IAcademicSource` interface for the following platforms:

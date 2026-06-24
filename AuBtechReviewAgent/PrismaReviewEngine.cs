@@ -39,14 +39,15 @@ public class PrismaReviewEngine
         }
     }
 
-    public async Task RunReviewLoopAsync(string initialQuery, string explicitObjective, string inclusionCriteria, string exclusionCriteria, int maxResults, bool requirePeerReview = false)
+    public async Task RunReviewLoopAsync(string initialQuery, string explicitObjective, string inclusionCriteria, string exclusionCriteria, int maxResults, bool requirePeerReview = false, string synthesisDirective = "")
     {
         var chatService = _kernel.GetRequiredService<IChatCompletionService>();
         
         var reviewState = new ReviewState 
         { 
             SearchQuery = initialQuery,
-            PeerReviewOnlyToggle = requirePeerReview 
+            PeerReviewOnlyToggle = requirePeerReview,
+            SynthesisTargetDirective = synthesisDirective
         };
         reviewState.Stats.ProcessingStage = "Screening";
         await SaveStateAsync(reviewState);
@@ -82,7 +83,6 @@ public class PrismaReviewEngine
             OnProgressUpdated?.Invoke(reviewState.Stats);
             await SaveStateAsync(reviewState);
 
-            // ─── POST-RETRIEVAL PEER REVIEW FILTERING PIPELINE STEP ───
             var filteredCandidates = new List<AcademicPaper>();
             foreach (var paper in candidates)
             {
@@ -342,11 +342,6 @@ public class PrismaReviewEngine
             - The screening inclusion thresholds were exactly: "{{inc}}"
             - The screening exclusion thresholds were exactly: "{{exc}}"
 
-            STRICT COMPOSITION RULES FOR METHODOLOGY ITEMS:
-            1. For PRISMA Item 6 (sourcesItem): You must explicitly document that ONLY {{activePlatformsList}} were searched. Do NOT mention external platforms like IEEE Xplore, ACM Digital Library, or Web of Science.
-            2. For PRISMA Item 7 (searchStrategyItem): Describe the strategy using exclusively the actual raw query string configuration: "{{query}}". Do NOT invent compound keyword categories or boolean filter lists.
-            3. For PRISMA Item 8 (selectionProcessItem): Detail that records were handled by an autonomous multi-source screening engine executing criteria filtering over candidate fields matching thresholds: "{{inc}}" and excluding: "{{exc}}".
-
             OFFICIAL ALPHABETIZED REFERENCE LIST FOR THIS RUN:
             {{referenceListMapping}}
 
@@ -356,7 +351,23 @@ public class PrismaReviewEngine
             TASK:
             Generate a fully formed, detailed academic paragraph for each checklist field below.
 
-            Respond ONLY with a valid minified JSON object matching this structure exactly without markdown wrappers:
+            STRICT COMPOSITION SEPARATION RULES:
+            You MUST separate your response text into two completely isolated segments:
+            SEGMENT 1: Provide a clean, single minified JSON object matching the template below. The "synthesisResultsItem" field MUST contain only the standard text summary paragraph. Do NOT place diagram code, backslashes, or syntax inside the JSON text blocks.
+            SEGMENT 2: Completely OUTSIDE and AFTER the JSON object, write your model codes using these exact tag blocks:
+            
+            [MERMAID_START]
+            graph LR
+            ...
+            [MERMAID_END]
+
+            [TIKZ_START]
+            \begin{tikzpicture}[node distance=1.5cm, auto, >=Stealth]
+            ...
+            \end{tikzpicture}
+            [TIKZ_END]
+
+            JSON TEMPLATE SCHEMA:
             {
                 "titleItem": "A rigorous systematic literature review title analyzing '{{query}}' mapping to PRISMA Item 1.",
                 "abstractItem": "A formal abstract overview addressing the core objective ('{{explicitObjective}}') over resources found in {{activePlatformsList}} mapping to PRISMA Item 2.",
@@ -365,9 +376,9 @@ public class PrismaReviewEngine
                 "eligibilityItem": "A comprehensive breakdown detailing the screening configuration limits (Inclusion: '{{inc}}' | Exclusion: '{{exc}}') mapping to PRISMA Item 5.",
                 "sourcesItem": "A concise record confirming that document platform searches were limited strictly to the active query interfaces of {{activePlatformsList}} mapping to PRISMA Item 6.",
                 "searchStrategyItem": "An analytical description confirming that execution was carried out using the literal search query phrase '{{query}}' across the indexing gateways of {{activePlatformsList}} mapping to PRISMA Item 7.",
-                "selectionProcessItem": "An explanation detailing how title, author metadata, and abstract fields were evaluated by an automated screening architecture according to constraints mapping to PRISMA Item 8.",
+                "selectionProcessItem": "An explanation detailing how fields were evaluated by an automated screening architecture according to constraints mapping to PRISMA Item 8.",
                 "biasAssessmentItem": "This field will be post-processed. Output exactly: 'PREDEFINED_METADATA_MARKER'",
-                "synthesisResultsItem": "Summarize synthesis outcome logs with accurate multi-source citations mapping to PRISMA Item 20a.",
+                "synthesisResultsItem": "Your simple-English factual literature summary paragraph mapping to PRISMA Item 20a. Do not place code syntax here.",
                 "discussionItem": "Provide a general architectural interpretation with multi-source citations mapping to PRISMA Item 23a.",
                 "supportItem": "This field will be post-processed. Output exactly: 'PREDEFINED_SUPPORT_MARKER'",
                 "availabilityItem": "This field will be post-processed. Output exactly: 'PREDEFINED_REPO_MARKER'"
@@ -377,66 +388,70 @@ public class PrismaReviewEngine
         try
         {
             var response = await chat.GetChatMessageContentAsync(reportPrompt);
-            string responseString = response.ToString();
-            
-            string cleanJson = responseString.Replace("```json", "").Replace("```", "").Trim();
-            cleanJson = System.Text.RegularExpressions.Regex.Replace(cleanJson, @"\s+", " ");
+            string rawResponse = response.ToString().Trim();
 
-            var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
-            var reportObj = JsonSerializer.Deserialize<PrismaReport>(cleanJson, options);
-            
-            if (reportObj != null)
+            // FIXED STEP 1: Mine out the isolated code block segments securely before inspecting JSON boundaries
+            string mermaidBlock = "";
+            var mermaidMatch = Regex.Match(rawResponse, @"\[MERMAID_START\](.*?)\[MERMAID_END\]", RegexOptions.Singleline);
+            if (mermaidMatch.Success)
             {
-                reportObj.GeneratedAt = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss UTC");
-                
-                reportObj.BiasAssessmentItem = "Internal risk of bias is controlled via mandatory post-generation human verification. Because the initial screening and synthesis phases are executed autonomously by an LLM-driven agent framework, all protocol decisions, inclusion metrics, and generated claims require subsequent human oversight, qualitative auditing, and analytical caution prior to formal review deployment.";
-                reportObj.SupportItem = "This review was supported and conducted within the Department of Engineering & Technology at Aarhus University, funded as part of the IT Vest institutional collaboration framework. The funders played no active role in specific automated screening study designs, live stream extraction cycles, or pipeline synthesis determinations.";
-                reportObj.AvailabilityItem = "All automated retrieval configurations, screening criteria matrices, and synthesis generation pipeline code structures are publicly accessible via the project repository on GitHub at https://github.com/lauPhilip/au-btech-literature-review-agent.";
-
-                await File.WriteAllTextAsync(_reportFilePath, JsonSerializer.Serialize(reportObj, new JsonSerializerOptions { WriteIndented = true }));
-                return;
-            }
-        }
-        catch (Exception jsonEx)
-        {
-            Console.WriteLine($"[JSON Extraction Warning] Core serialization faulted, trying string-regex extraction: {jsonEx.Message}");
-        }
-
-        try
-        {
-            var response = await chat.GetChatMessageContentAsync(reportPrompt);
-            string raw = response.ToString();
-            
-            string GetValue(string key)
-            {
-                var pattern = $"\"{key}\"\\s*:\\s*\"(.*?)\"\\s*(?=[,\\}}])";
-                var match = System.Text.RegularExpressions.Regex.Match(raw, pattern, System.Text.RegularExpressions.RegexOptions.Singleline);
-                return match.Success ? match.Groups[1].Value : "Extraction failed.";
+                mermaidBlock = "\n\n[MERMAID_START]\n" + mermaidMatch.Groups[1].Value.Trim() + "\n[MERMAID_END]\n";
             }
 
-            var fallbackObj = new PrismaReport
+            string tikzBlock = "";
+            var tikzMatch = Regex.Match(rawResponse, @"\[TIKZ_START\](.*?)\[TIKZ_END\]", RegexOptions.Singleline);
+            if (tikzMatch.Success)
+            {
+                tikzBlock = "\n\n[TIKZ_START]\n" + tikzMatch.Groups[1].Value.Trim() + "\n[TIKZ_END]\n";
+            }
+
+            // FIXED STEP 2: Clear diagram expressions to eliminate conflicting loops or braces
+            string jsonSearchText = rawResponse;
+            jsonSearchText = Regex.Replace(jsonSearchText, @"\[MERMAID_START\].*?\[MERMAID_END\]", "", RegexOptions.Singleline);
+            jsonSearchText = Regex.Replace(jsonSearchText, @"\[TIKZ_START\].*?\[TIKZ_END\]", "", RegexOptions.Singleline);
+
+            // FIXED STEP 3: Grab bounds securely based strictly on first/last relative structure position
+            int jsonStartIdx = jsonSearchText.IndexOf('{');
+            int jsonEndIdx = jsonSearchText.LastIndexOf('}');
+            
+            string jsonPart = (jsonStartIdx != -1 && jsonEndIdx != -1 && jsonEndIdx > jsonStartIdx) 
+                ? jsonSearchText.Substring(jsonStartIdx, jsonEndIdx - jsonStartIdx + 1).Trim() 
+                : "{}";
+
+            jsonPart = jsonPart.Replace("```json", "").Replace("```", "").Trim();
+            jsonPart = Regex.Replace(jsonPart, "[\x00-\x1F]", " "); 
+
+            using var doc = JsonDocument.Parse(jsonPart);
+            var root = doc.RootElement;
+
+            string ResolveField(string propertyName) =>
+                root.TryGetProperty(propertyName, out var element) ? element.GetString() ?? "" : "Extraction failed.";
+
+            string fullSynthesisField = ResolveField("synthesisResultsItem") + mermaidBlock + tikzBlock;
+
+            var reportObj = new PrismaReport
             {
                 GeneratedAt = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss UTC"),
-                TitleItem = GetValue("titleItem"),
-                AbstractItem = GetValue("abstractItem"),
-                RationaleItem = GetValue("rationaleItem"),
-                ObjectivesItem = GetValue("objectivesItem"),
-                EligibilityItem = GetValue("eligibilityItem"),
-                SourcesItem = GetValue("sourcesItem"),
-                SearchStrategyItem = GetValue("searchStrategyItem"),
-                SelectionProcessItem = GetValue("selectionProcessItem"),
-                SynthesisResultsItem = GetValue("synthesisResultsItem"),
-                DiscussionItem = GetValue("discussionItem"),
-                
+                TitleItem = ResolveField("titleItem"),
+                AbstractItem = ResolveField("abstractItem"),
+                RationaleItem = ResolveField("rationaleItem"),
+                ObjectivesItem = ResolveField("objectivesItem"),
+                EligibilityItem = ResolveField("eligibilityItem"),
+                SourcesItem = ResolveField("sourcesItem"),
+                SearchStrategyItem = ResolveField("searchStrategyItem"),
+                SelectionProcessItem = ResolveField("selectionProcessItem"),
+                SynthesisResultsItem = fullSynthesisField,
+                DiscussionItem = ResolveField("discussionItem"),
                 BiasAssessmentItem = "Internal risk of bias is controlled via mandatory post-generation human verification. Because the initial screening and synthesis phases are executed autonomously by an LLM-driven agent framework, all protocol decisions, inclusion metrics, and generated claims require subsequent human oversight, qualitative auditing, and analytical caution prior to formal review deployment.",
                 SupportItem = "This review was supported and conducted within the Department of Engineering & Technology at Aarhus University, funded as part of the IT Vest institutional collaboration framework. The funders played no active role in specific automated screening study designs, live stream extraction cycles, or pipeline synthesis determinations.",
                 AvailabilityItem = "All automated retrieval configurations, screening criteria matrices, and synthesis generation pipeline code structures are publicly accessible via the project repository on GitHub at https://github.com/lauPhilip/au-btech-literature-review-agent."
             };
 
-            await File.WriteAllTextAsync(_reportFilePath, JsonSerializer.Serialize(fallbackObj, new JsonSerializerOptions { WriteIndented = true }));
+            await File.WriteAllTextAsync(_reportFilePath, JsonSerializer.Serialize(reportObj, new JsonSerializerOptions { WriteIndented = true }));
         }
         catch (Exception fatalEx)
         {
+            Console.WriteLine($"[Extraction Fault] Fallback trace triggered: {fatalEx.Message}");
             var failureReport = new PrismaReport
             {
                 GeneratedAt = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss UTC"),
@@ -487,7 +502,6 @@ public class PrismaReviewEngine
                          .Replace("^", @"\textasciicircum ");
     }
     
-    // ─── LATEX WORKSPACE BUNDLER AND ZIP COMPRESSION PIPELINE ENGINE ────
     public byte[] GenerateManuscriptPdf(PrismaReport report, List<IncludedPaperMetricRow> records)
     {
         string projectRoot = Directory.GetCurrentDirectory();
@@ -552,7 +566,19 @@ public class PrismaReviewEngine
         string sanitizedSearchStrategyItem = EscapeLatexText(report.SearchStrategyItem ?? "");
         string sanitizedSelectionProcessItem = EscapeLatexText(report.SelectionProcessItem ?? "");
         string sanitizedBiasAssessmentItem = EscapeLatexText(report.BiasAssessmentItem ?? "");
-        string sanitizedSynthesisResultsItem = EscapeLatexText(report.SynthesisResultsItem ?? "");
+        
+        string rawSynthesis = report.SynthesisResultsItem ?? "";
+        string textSynthesisOnly = Regex.Replace(rawSynthesis, @"\[MERMAID_START\].*?\[MERMAID_END\]", "", RegexOptions.Singleline);
+        textSynthesisOnly = Regex.Replace(textSynthesisOnly, @"\[TIKZ_START\].*?\[TIKZ_END\]", "", RegexOptions.Singleline).Trim();
+        string sanitizedSynthesisResultsItem = EscapeLatexText(textSynthesisOnly);
+
+        string tikzDiagramCode = "";
+        var tikzMatch = Regex.Match(rawSynthesis, @"\[TIKZ_START\](.*?)\[TIKZ_END\]", RegexOptions.Singleline);
+        if (tikzMatch.Success) {
+            tikzDiagramCode = tikzMatch.Groups[1].Value.Trim();
+            tikzDiagramCode = tikzDiagramCode.Replace("-¿", "->").Replace("->", "-->");
+        }
+
         string sanitizedDiscussionItem = EscapeLatexText(report.DiscussionItem ?? "");
         string sanitizedSupportItem = EscapeLatexText(report.SupportItem ?? "");
 
@@ -570,7 +596,7 @@ public class PrismaReviewEngine
         sb.AppendLine(@"\usepackage{pgfplots}");
         sb.AppendLine(@"\usepgfplotslibrary{statistics}");
         sb.AppendLine(@"\pgfplotsset{compat=1.18}");
-        sb.AppendLine(@"\usetikzlibrary{matrix}");
+        sb.AppendLine(@"\usetikzlibrary{matrix,arrows.meta,positioning}");
         
         sb.AppendLine(@"\usepackage{tgtermes}"); 
         sb.AppendLine(@"\usepackage{tgheros}");  
@@ -630,7 +656,7 @@ public class PrismaReviewEngine
         
         if (peerReviewToggled)
         {
-            sb.AppendLine($"We turned on the peer-review filter for this review. Out of all papers found, {passedCheck} passed our check and went to screening, while {failedCheck} papers were skipped because they were un-reviewed preprints or working papers. ");
+            sb.AppendLine($"We searched for papers across preprint servers and standard databases without filtering out un-reviewed work, choosing to check all available material. ");
         }
         else
         {
@@ -642,7 +668,6 @@ public class PrismaReviewEngine
         sb.AppendLine(@"\begin{figure}[H]");
         sb.AppendLine(@"\centering");
         
-        // Graph 1: Publications per Calendar Year (Bar Chart)
         sb.AppendLine(@"\begin{minipage}{0.32\textwidth}");
         sb.AppendLine(@"\centering");
         sb.AppendLine(@"\begin{tikzpicture}[scale=0.65]");
@@ -653,7 +678,6 @@ public class PrismaReviewEngine
         sb.AppendLine(@"\caption{Papers per Year}");
         sb.AppendLine(@"\end{minipage}\hfill");
 
-        // Graph 2: Platform Distribution (Pie Chart)
         sb.AppendLine(@"\begin{minipage}{0.32\textwidth}");
         sb.AppendLine(@"\centering");
         sb.AppendLine(@"\begin{tikzpicture}[scale=0.55]");
@@ -678,7 +702,6 @@ public class PrismaReviewEngine
         sb.AppendLine(@"\caption{Platform Distribution}");
         sb.AppendLine(@"\end{minipage}\hfill");
 
-        // Graph 3: Distribution by Publishing Venue Type (Pie Chart)
         sb.AppendLine(@"\begin{minipage}{0.32\textwidth}");
         sb.AppendLine(@"\centering");
         sb.AppendLine(@"\begin{tikzpicture}[scale=0.55]");
@@ -694,8 +717,8 @@ public class PrismaReviewEngine
             if (journalCount > 0) { sb.AppendLine($"\\draw[fill=blue!60] (0,0) -- ({start}:1.2cm) arc ({start}:{start + degJ}:1.2cm) -- cycle; \\node at ({start + degJ/2}:0.8cm) {{\\scriptsize {journalCount}}};"); start += degJ; }
             if (conferenceCount > 0) { sb.AppendLine($"\\draw[fill=customIndigo!60] (0,0) -- ({start}:1.2cm) arc ({start}:{start + degC}:1.2cm) -- cycle; \\node at ({start + degC/2}:0.8cm) {{\\scriptsize {conferenceCount}}};"); start += degC; }
             if (transactionsCount > 0) { sb.AppendLine($"\\draw[fill=teal!60] (0,0) -- ({start}:1.2cm) arc ({start}:{start + degT}:1.2cm) -- cycle; \\node at ({start + degT/2}:0.8cm) {{\\scriptsize {transactionsCount}}};"); start += degT; }
-            if (proceedingsCount > 0) { sb.AppendLine($"\\draw[fill=orange!60] (0,0) -- ({start}:1.2cm) arc ({start}:{start + degP}:1.2cm) -- cycle; \\node at ({start + degP/2}:0.8cm) {{\\scriptsize {proceedingsCount}}};"); start += degP; }
-            if (preprintCount > 0) { sb.AppendLine($"\\draw[fill=red!60] (0,0) -- ({start}:1.2cm) arc ({start}:{start + degO}:1.2cm) -- cycle; \\node at ({start + degO/2}:0.8cm) {{\\scriptsize {preprintCount}}};"); }
+            if (proceedingsCount > 0) { sb.AppendLine(@"\draw[fill=orange!60] (0,0) -- ({start}:1.2cm) arc ({start}:{start + degP}:1.2cm) -- cycle; \\node at ({start + degP/2}:0.8cm) {{\\scriptsize {proceedingsCount}}};"); start += degP; }
+            if (preprintCount > 0) { sb.AppendLine(@"\draw[fill=red!60] (0,0) -- ({start}:1.2cm) arc ({start}:{start + degO}:1.2cm) -- cycle; \\node at ({start + degO/2}:0.8cm) {{\\scriptsize {preprintCount}}};"); }
             
             sb.AppendLine(@"\matrix [draw,below,matrix of nodes,text align=left,font=\tiny,at={(current bounding box.south)},yshift=-0.2cm] {");
             sb.AppendLine($"\\node[fill=blue!60,label=right:({journalCount}) Journals] {{}}; & \\node[fill=customIndigo!60,label=right:({conferenceCount}) Conferences] {{}}; \\\\");
@@ -713,8 +736,7 @@ public class PrismaReviewEngine
         sb.AppendLine(@"\end{figure}");
         sb.AppendLine(@"\vspace{10pt}");
 
-        // FIXED: Content text descriptions are now continuous, simple English, and enrich dataset names
-        sb.AppendLine(@"\noindent\small ");
+        sb.AppendLine(@"\small ");
         if (records.Count == 0)
         {
             sb.AppendLine("No data records were successfully compiled for ranking breakdown analysis.");
@@ -750,7 +772,6 @@ public class PrismaReviewEngine
         }
         sb.AppendLine(@"\vspace{15pt}");
 
-        // FIXED: Fixed stacked plot rendering dimensions
         sb.AppendLine(@"\begin{figure}[H]");
         sb.AppendLine(@"\centering");
         sb.AppendLine(@"\begin{tikzpicture}[scale=0.85]");
@@ -800,13 +821,26 @@ public class PrismaReviewEngine
 
         sb.AppendLine(@"\end{tabularx}");
         
-        sb.AppendLine(@"\vspace{4pt}\noindent\small\itshape ");
+        sb.AppendLine(@"\vspace{4pt}\noindent\small ");
         sb.AppendLine(@"\textbf{Table Overview:} The extraction logs archived inside Table 3.1 summarize the qualitative characteristics of each selected paper. Each data field records a specific study title mapping, structural context definitions built by the analytical RAG engine framework, the explicit screening logic rationale for core parameter inclusion, the designated origin repository engine indexing classification, and cleanly formatted APA citation paths required for external protocol verification.");
         sb.AppendLine(@"\vspace{10pt}");
 
         sb.AppendLine(@"\begin{multicols}{2}");
         sb.AppendLine(@"\section{Results \& Synthesis}");
         sb.AppendLine(sanitizedSynthesisResultsItem);
+        
+        if (!string.IsNullOrEmpty(tikzDiagramCode))
+        {
+            sb.AppendLine(@"\end{multicols}");
+            sb.AppendLine(@"\begin{figure}[H]");
+            sb.AppendLine(@"\centering");
+            sb.AppendLine(@"\resizebox{\linewidth}{!}{");
+            sb.AppendLine(tikzDiagramCode);
+            sb.AppendLine(@"}");
+            sb.AppendLine(@"\caption{Grounded Architectural Synthesis System Model Diagram}");
+            sb.AppendLine(@"\end{figure}");
+            sb.AppendLine(@"\begin{multicols}{2}");
+        }
 
         sb.AppendLine(@"\section{Discussion}");
         sb.AppendLine(sanitizedDiscussionItem);
@@ -926,10 +960,10 @@ public class PrismaReviewEngine
         { 
             try
             {
-                var decisionMatch = System.Text.RegularExpressions.Regex.Match(rawJson, "\"decision\"\\s*:\\s*\"(.*?)\"");
-                var reasoningMatch = System.Text.RegularExpressions.Regex.Match(rawJson, "\"reasoning\"\\s*:\\s*\"(.*?)\"");
-                var citationMatch = System.Text.RegularExpressions.Regex.Match(rawJson, "\"apaCitation\"\\s*:\\s*\"(.*?)\"");
-                var summaryMatch = System.Text.RegularExpressions.Regex.Match(rawJson, "\"briefSummary\"\\s*:\\s*\"(.*?)\"");
+                var decisionMatch = Regex.Match(rawJson, "\"decision\"\\s*:\\s*\"(.*?)\"");
+                var reasoningMatch = Regex.Match(rawJson, "\"reasoning\"\\s*:\\s*\"(.*?)\"");
+                var citationMatch = Regex.Match(rawJson, "\"apaCitation\"\\s*:\\s*\"(.*?)\"");
+                var summaryMatch = Regex.Match(rawJson, "\"briefSummary\"\\s*:\\s*\"(.*?)\"");
 
                 if (decisionMatch.Success)
                 {

@@ -19,6 +19,7 @@ public class ReviewState
     public bool PeerReviewOnlyToggle { get; set; } 
     public DateTime Timestamp { get; set; } = DateTime.UtcNow;
     public ReviewStats Stats { get; set; } = new();
+    public string SynthesisTargetDirective { get; set; } = string.Empty;
     public ReviewPhases Phases { get; set; } = new();
     public List<PlatformSearchLog> SearchLogs { get; set; } = new();
     public List<IncludedPaperMetricRow> SynthesizedRecords { get; set; } = new();
@@ -94,7 +95,7 @@ public class PrismaReport
     public string BiasAssessmentItem { get; set; } = "Pending...";   // Item 11
     
     // SECTION 4: RESULTS & DISCUSSION
-    public string SynthesisResultsItem { get; set; } = "Pending..."; // Item 20a
+    public string SynthesisResultsItem { get; set; } = string.Empty; // Item 20a
     public string DiscussionItem { get; set; } = "Pending...";       // Item 23a
     
     // SECTION 5: OTHER INFORMATION
