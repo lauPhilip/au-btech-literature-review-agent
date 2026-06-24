@@ -5,7 +5,7 @@
 * **Post-Retrieval Filtering Pipeline:** * Create a distinct evaluation step immediately following the raw API search.
     * [X] Parse the metadata (e.g., ScienceDirect content types) or use an intermediate LLM check to verify peer-review status.
     * [X] Track and log strict validation metrics: Record exactly **X** papers passed as peer-reviewed and **Y** papers excluded for failing the threshold.
-    * Update the `ReviewState` and `ReviewStats` structures to display these specific metrics on the frontend progress bars.
+    * [X] Update the `ReviewState` and `ReviewStats` structures to display these specific metrics on the frontend progress bars.
 
 ## 2. Journal Quartile (Q1/Q2) & Conference Ranking Metrics
 * **Data Enrichment:** Integrate a lookup mechanism (via Scimago API, CORE rankings, or a local database mapping) into the ingestion pipeline.

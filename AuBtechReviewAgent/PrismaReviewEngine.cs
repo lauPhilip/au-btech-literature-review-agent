@@ -123,6 +123,20 @@ public class PrismaReviewEngine
                     if (!isPeerReviewed)
                     {
                         reviewState.Stats.FailedPeerReviewCheck++;
+                        reviewState.Stats.Screened++;
+
+                        // FIXED: Logs the peer-review failure directly into the Screening track of transparent-process.json
+                        reviewState.Phases.Screening.Add(new ScreeningLog(
+                            paper.Id, 
+                            paper.Title, 
+                            "Excluded", 
+                            "Excluded during post-retrieval pre-screening: Document was classified as an un-reviewed preprint or working paper, violating the active Peer-Reviewed Only configuration threshold.",
+                            "N/A",
+                            "N/A"
+                        ));
+                        
+                        OnProgressUpdated?.Invoke(reviewState.Stats);
+                        await SaveStateAsync(reviewState);
                         continue;
                     }
 
@@ -596,7 +610,6 @@ public class PrismaReviewEngine
         sb.AppendLine(@"\section{Data \& Collection Metrics}");
         sb.AppendLine(@"The empirical data metrics trace key research trends regarding structural database distributions. ");
         
-        // FIXED: Shifted narrative text block right above the figure environment box for logical flow
         if (peerReviewToggled)
         {
             sb.AppendLine($"For this systematic review, the \\textbf{{Peer-Reviewed Only}} filtering threshold was explicitly enabled. Post-retrieval pipeline parsing resulted in {passedCheck} papers passing verified peer-review checks, while {failedCheck} items were excluded from candidate screening because they were classified as un-reviewed preprints or working papers. ");
@@ -688,6 +701,7 @@ public class PrismaReviewEngine
         sb.AppendLine(@"\multicolumn{5}{l}{\textbf{Table 3.1: Systematic Synthesis Extraction Registry}} \\\\");
         sb.AppendLine(@"\toprule");
         sb.AppendLine(@"\textbf{Paper Name} & \textbf{Executive Summary} & \textbf{Inclusion Rationale} & \textbf{Category} & \textbf{Citation (APA 7th)} \\");
+        sb.AppendLine(@"\text}{}");
         sb.AppendLine(@"\midrule");
 
         foreach (var row in records)
