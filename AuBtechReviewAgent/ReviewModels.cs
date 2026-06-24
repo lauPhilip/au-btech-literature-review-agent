@@ -35,6 +35,8 @@ public class IncludedPaperMetricRow
     public string VenueType { get; set; } = "Other"; // "Journals", "Conferences", "Preprints", etc.
     public string InclusionRationale { get; set; } = string.Empty;
     public string Category { get; set; } = string.Empty;
+    public string Quartile { get; set; } = "N/A";          // e.g., "Q1", "Q2", "Q3", "Q4"
+    public string ConferenceRating { get; set; } = "N/A";  // e.g., "A*", "A", "B"
 }
 public class ReviewStats 
 { 
