@@ -66,7 +66,7 @@
                     </div>
 
                     <div>
-                        <label class="block text-[11px] font-bold uppercase text-gray-600 mb-1">Synthesis Artifact Target Blueprint</label>
+                        <label class="block text-[11px] font-bold uppercase text-gray-600 mb-1">Artifact Target</label>
                         <select @onchange="HandlePresetArtifactSelection" class="w-full p-2 bg-gray-50 border border-gray-300 rounded focus:outline-none focus:border-[#003B5C] text-xs shadow-inner transition-all mb-1.5 font-sans">
                             <option value="Custom">Custom Target Directive...</option>
                             <option value="LoopModel" selected>Conceptual Architectural Loop Diagram (Mermaid / TikZ)</option>
@@ -163,11 +163,45 @@
 
     private int maxResults { get; set; } = 5;
 
-    protected override void OnInitialized()
+    // ADDED: Rehydrates execution state containers from the file pool if the session drops or resets
+    protected override async Task OnInitializedAsync()
     {
         if (isSearching)
         {
             ReviewEngine.OnProgressUpdated += HandleEngineProgress;
+        }
+        else if (File.Exists("transparent-process.json"))
+        {
+            try
+            {
+                using var fileStream = new FileStream("transparent-process.json", FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+                using var reader = new StreamReader(fileStream);
+                string currentContent = await reader.ReadToEndAsync();
+
+                if (!string.IsNullOrWhiteSpace(currentContent))
+                {
+                    rawJsonLogs = currentContent;
+                    using var doc = JsonDocument.Parse(currentContent);
+                    var root = doc.RootElement;
+
+                    if (root.TryGetProperty("Stats", out var statsProp))
+                    {
+                        totalIdentified = statsProp.TryGetProperty("TotalIdentified", out var id) ? id.GetInt32() : 0;
+                        screenedCount = statsProp.TryGetProperty("Screened", out var sc) ? sc.GetInt32() : 0;
+                        excludedCount = statsProp.TryGetProperty("Excluded", out var ex) ? ex.GetInt32() : 0;
+                        includedCount = statsProp.TryGetProperty("Included", out var inc) ? inc.GetInt32() : 0;
+
+                        State.TotalIdentified = totalIdentified;
+                        State.ScreenedCount = screenedCount;
+                        State.ExcludedCount = excludedCount;
+                        State.IncludedCount = includedCount;
+
+                        State.PassedPeerReviewCount = statsProp.TryGetProperty("PassedPeerReviewCheck", out var pp) ? pp.GetInt32() : 0;
+                        State.FailedPeerReviewCount = statsProp.TryGetProperty("FailedPeerReviewCheck", out var fp) ? fp.GetInt32() : 0;
+                    }
+                }
+            }
+            catch { }
         }
     }
 
@@ -222,7 +256,6 @@
         {
             try
             {
-                // FIXED: Forwarded the bound synthesisTargetDirective directly to the running backend execution task context
                 await ReviewEngine.RunReviewLoopAsync(searchQuery, reviewObjective, inclusionCriteria, exclusionCriteria, maxResults, requirePeerReview, synthesisTargetDirective);
             }
             catch (Exception ex)

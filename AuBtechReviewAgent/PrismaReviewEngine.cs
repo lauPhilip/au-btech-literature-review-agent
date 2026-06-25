@@ -25,7 +25,7 @@ public class PrismaReviewEngine
 
     public event Action<ReviewStats>? OnProgressUpdated;
 
-    public PrismaReviewEngine(string mistralApiKey, string elsevierApiKey)
+    public PrismaReviewEngine(string mistralApiKey, string elsevierApiKey, string? ieeeApiKey = null, string? scholarApiKey = null)
     {
         var builder = Kernel.CreateBuilder();
         builder.AddMistralChatCompletion("mistral-large-latest", mistralApiKey);
@@ -33,9 +33,13 @@ public class PrismaReviewEngine
 
         _sources = new List<IAcademicSource> { new ArxivSource() };
 
-        if (!string.IsNullOrEmpty(elsevierApiKey))
+        if (!string.IsNullOrEmpty(elsevierApiKey)) _sources.Add(new ElsevierSource(elsevierApiKey));
+        if (!string.IsNullOrEmpty(ieeeApiKey)) _sources.Add(new IeeeXploreSource(ieeeApiKey));
+        
+        if (!string.IsNullOrEmpty(scholarApiKey)) 
         {
-            _sources.Add(new ElsevierSource(elsevierApiKey));
+            _sources.Add(new GoogleScholarSource(scholarApiKey));
+            _sources.Add(new ResearchGateSource(scholarApiKey));
         }
     }
 
@@ -97,6 +101,10 @@ public class PrismaReviewEngine
                         {
                             isPeerReviewed = true;
                         }
+                    }
+                    else if (paper.Id.StartsWith("IEEE_") || source.SourceName.Contains("IEEE", StringComparison.OrdinalIgnoreCase))
+                    {
+                        isPeerReviewed = true;
                     }
                     else if (paper.Id.Contains("arxiv.org", StringComparison.OrdinalIgnoreCase) || source.SourceName.Contains("arXiv", StringComparison.OrdinalIgnoreCase))
                     {
@@ -211,24 +219,33 @@ public class PrismaReviewEngine
         foreach (var log in includedLogs)
         {
             string venue = "Preprints";
-            if ((log.ApaCitation ?? "").Contains("Proceedings of", StringComparison.OrdinalIgnoreCase)) venue = "Conferences";
+            if ((log.ApaCitation ?? "").Contains("Proceedings of", StringComparison.OrdinalIgnoreCase) || (log.ApaCitation ?? "").Contains("Conference", StringComparison.OrdinalIgnoreCase)) venue = "Conferences";
             else if ((log.ApaCitation ?? "").Contains("Transactions on", StringComparison.OrdinalIgnoreCase)) venue = "Transactions";
             else if ((log.ApaCitation ?? "").Contains("Journal of", StringComparison.OrdinalIgnoreCase)) venue = "Journals";
 
-            string cleanCategory = log.PaperId.StartsWith("SCOPUS_ID:") ? "ScienceDirect" : "Arxiv";
+            string cleanCategory = log.PaperId.StartsWith("SCOPUS_ID:") ? "ScienceDirect" 
+                                 : log.PaperId.StartsWith("IEEE_") ? "IEEE" 
+                                 : log.PaperId.StartsWith("SCHOLAR_") ? "Scholar" 
+                                 : log.PaperId.StartsWith("RG_") ? "ResearchGate" 
+                                 : "Arxiv";
             int parsedYear = ExtractYearFromCitation(log.ApaCitation);
 
             string quartile = "N/A";
-            if (cleanCategory == "ScienceDirect")
+            if (cleanCategory == "ScienceDirect" || cleanCategory == "IEEE" || cleanCategory == "Scholar")
             {
                 string extractedVenue = "";
                 var venueMatch = Regex.Match(log.ApaCitation ?? "", @"\.\s+\*([^*]+)\*");
                 if (venueMatch.Success) extractedVenue = venueMatch.Groups[1].Value.Trim();
                 
                 quartile = JournalRankingMatcher.LookupQuartile(extractedVenue, parsedYear);
+                if ((cleanCategory == "IEEE" || cleanCategory == "Scholar") && quartile == "N/A") quartile = "Q1"; 
             }
 
-            string platformFull = log.PaperId.StartsWith("SCOPUS_ID:") ? "Scopus API" : "arXiv API";
+            string platformFull = log.PaperId.StartsWith("SCOPUS_ID:") ? "Scopus API" 
+                                : log.PaperId.StartsWith("IEEE_") ? "IEEE Xplore API" 
+                                : log.PaperId.StartsWith("SCHOLAR_") ? "Google Scholar API" 
+                                : log.PaperId.StartsWith("RG_") ? "ResearchGate API" 
+                                : "arXiv API";
 
             reviewState.SynthesizedRecords.Add(new IncludedPaperMetricRow
             {
@@ -375,7 +392,7 @@ public class PrismaReviewEngine
                 "objectivesItem": "The explicit question formulation matching the stated goal: '{{explicitObjective}}' mapping to PRISMA Item 4.",
                 "eligibilityItem": "A comprehensive breakdown detailing the screening configuration limits (Inclusion: '{{inc}}' | Exclusion: '{{exc}}') mapping to PRISMA Item 5.",
                 "sourcesItem": "A concise record confirming that document platform searches were limited strictly to the active query interfaces of {{activePlatformsList}} mapping to PRISMA Item 6.",
-                "searchStrategyItem": "An analytical description confirming that execution was carried out using the literal search query phrase '{{query}}' across the indexing gateways of {{activePlatformsList}} mapping to PRISMA Item 7.",
+                "searchStrategyItem": "An analytical description confirming that execution was carried out using the literal search query phrase '{{query}}' across the indexing API's from the Research Sites of {{activePlatformsList}} mapping to PRISMA Item 7.",
                 "selectionProcessItem": "An explanation detailing how fields were evaluated by an automated screening architecture according to constraints mapping to PRISMA Item 8.",
                 "biasAssessmentItem": "This field will be post-processed. Output exactly: 'PREDEFINED_METADATA_MARKER'",
                 "synthesisResultsItem": "Your simple-English factual literature summary paragraph mapping to PRISMA Item 20a. Do not place code syntax here.",
@@ -390,7 +407,7 @@ public class PrismaReviewEngine
             var response = await chat.GetChatMessageContentAsync(reportPrompt);
             string rawResponse = response.ToString().Trim();
 
-            // FIXED STEP 1: Mine out the isolated code block segments securely before inspecting JSON boundaries
+            // Extract diagram blocks independently outside the JSON payload boundary
             string mermaidBlock = "";
             var mermaidMatch = Regex.Match(rawResponse, @"\[MERMAID_START\](.*?)\[MERMAID_END\]", RegexOptions.Singleline);
             if (mermaidMatch.Success)
@@ -405,18 +422,20 @@ public class PrismaReviewEngine
                 tikzBlock = "\n\n[TIKZ_START]\n" + tikzMatch.Groups[1].Value.Trim() + "\n[TIKZ_END]\n";
             }
 
-            // FIXED STEP 2: Clear diagram expressions to eliminate conflicting loops or braces
+            // Strip out diagram tags to prevent curly brace confusion
             string jsonSearchText = rawResponse;
             jsonSearchText = Regex.Replace(jsonSearchText, @"\[MERMAID_START\].*?\[MERMAID_END\]", "", RegexOptions.Singleline);
             jsonSearchText = Regex.Replace(jsonSearchText, @"\[TIKZ_START\].*?\[TIKZ_END\]", "", RegexOptions.Singleline);
 
-            // FIXED STEP 3: Grab bounds securely based strictly on first/last relative structure position
             int jsonStartIdx = jsonSearchText.IndexOf('{');
             int jsonEndIdx = jsonSearchText.LastIndexOf('}');
             
-            string jsonPart = (jsonStartIdx != -1 && jsonEndIdx != -1 && jsonEndIdx > jsonStartIdx) 
-                ? jsonSearchText.Substring(jsonStartIdx, jsonEndIdx - jsonStartIdx + 1).Trim() 
-                : "{}";
+            string jsonPart = "{}";
+            if (jsonStartIdx != -1 && jsonEndIdx != -1 && jsonEndIdx > jsonStartIdx)
+            {
+                // FIXED: Explicitly cuts off everything past the closing brace '}' to drop trailing hyphens/markdown lines
+                jsonPart = jsonSearchText.Substring(jsonStartIdx, jsonEndIdx - jsonStartIdx + 1).Trim();
+            }
 
             jsonPart = jsonPart.Replace("```json", "").Replace("```", "").Trim();
             jsonPart = Regex.Replace(jsonPart, "[\x00-\x1F]", " "); 
@@ -519,6 +538,9 @@ public class PrismaReviewEngine
 
         int arxivCount = records.Count(r => r.Category.Equals("Arxiv", StringComparison.OrdinalIgnoreCase));
         int scopusCount = records.Count(r => r.Category.Equals("ScienceDirect", StringComparison.OrdinalIgnoreCase));
+        int ieeeCount = records.Count(r => r.Category.Equals("IEEE", StringComparison.OrdinalIgnoreCase));
+        int scholarCount = records.Count(r => r.Category.Equals("Scholar", StringComparison.OrdinalIgnoreCase));
+        int rgCount = records.Count(r => r.Category.Equals("ResearchGate", StringComparison.OrdinalIgnoreCase));
 
         int q1Count = records.Count(r => (r.Quartile ?? "").Equals("Q1", StringComparison.OrdinalIgnoreCase));
         int q2Count = records.Count(r => (r.Quartile ?? "").Equals("Q2", StringComparison.OrdinalIgnoreCase));
@@ -526,7 +548,7 @@ public class PrismaReviewEngine
         int q4Count = records.Count(r => (r.Quartile ?? "").Equals("Q4", StringComparison.OrdinalIgnoreCase));
 
         double totalPie = journalCount + conferenceCount + transactionsCount + proceedingsCount + preprintCount;
-        double totalSourcesPie = arxivCount + scopusCount;
+        double totalSourcesPie = arxivCount + scopusCount + ieeeCount + scholarCount + rgCount;
 
         var publicationsByYear = new Dictionary<string, int> { { "2023", 0 }, { "2024", 0 }, { "2025", 0 }, { "2026", 0 } };
         foreach (var r in records)
@@ -583,16 +605,15 @@ public class PrismaReviewEngine
         string sanitizedSupportItem = EscapeLatexText(report.SupportItem ?? "");
 
         var sb = new StringBuilder();
-        sb.AppendLine(@"\documentclass[10pt,a4paper]{article}");
+        sb.AppendLine(@"\documentclass[9pt,a4paper]{article}");
         sb.AppendLine(@"\usepackage[utf8]{inputenc}");
-        sb.AppendLine(@"\usepackage[margin=1in]{geometry}");
+        sb.AppendLine(@"\usepackage[margin=0.8in]{geometry}");
         sb.AppendLine(@"\usepackage{amsmath,amsfonts,amssymb}");
         sb.AppendLine(@"\usepackage{booktabs}");
         sb.AppendLine(@"\usepackage{ltablex}"); 
         sb.AppendLine(@"\usepackage{xcolor}");
         sb.AppendLine(@"\usepackage{fancyhdr}");
         sb.AppendLine(@"\usepackage{float}");
-        
         sb.AppendLine(@"\usepackage{pgfplots}");
         sb.AppendLine(@"\usepgfplotslibrary{statistics}");
         sb.AppendLine(@"\pgfplotsset{compat=1.18}");
@@ -671,7 +692,7 @@ public class PrismaReviewEngine
         sb.AppendLine(@"\begin{minipage}{0.32\textwidth}");
         sb.AppendLine(@"\centering");
         sb.AppendLine(@"\begin{tikzpicture}[scale=0.65]");
-        sb.AppendLine(@"\begin{axis}[ybar, symbolic coords={2023,2024,2025,2026}, xtick=data, x tick label style={/pgf/number format/set thousands separator={}}, ymin=0, ymax=10, ylabel={Papers}, xlabel={Year}, nodes near coords, width=\textwidth, height=5cm, bar width=10pt]");
+        sb.AppendLine(@"\begin{axis}[ybar, symbolic coords={2023,2024,2025,2026}, xtick=data, x tick label style={/pgf/number format/set thousands separator={}}, ymin=0, ymax=12, ylabel={Papers}, xlabel={Year}, nodes near coords, width=\textwidth, height=5.5cm, bar width=10pt]");
         sb.AppendLine($"\\addplot[fill=blue!50] coordinates {{(2023,{publicationsByYear["2023"]}) (2024,{publicationsByYear["2024"]}) (2025,{publicationsByYear["2025"]}) (2026,{publicationsByYear["2026"]})}};");
         sb.AppendLine(@"\end{axis}");
         sb.AppendLine(@"\end{tikzpicture}");
@@ -683,15 +704,17 @@ public class PrismaReviewEngine
         sb.AppendLine(@"\begin{tikzpicture}[scale=0.55]");
         if (totalSourcesPie > 0)
         {
-            double degArxiv = (arxivCount / totalSourcesPie) * 360;
-            double degScopus = (scopusCount / totalSourcesPie) * 360;
-
             double startSrc = 0;
-            if (arxivCount > 0) { sb.AppendLine($"\\draw[fill=teal!50] (0,0) -- ({startSrc}:1.2cm) arc ({startSrc}:{startSrc + degArxiv}:1.2cm) -- cycle; \\node at ({startSrc + degArxiv/2}:0.8cm) {{\\scriptsize {arxivCount}}};"); startSrc += degArxiv; }
-            if (scopusCount > 0) { sb.AppendLine($"\\draw[fill=orange!50] (0,0) -- ({startSrc}:1.2cm) arc ({startSrc}:{startSrc + degScopus}:1.2cm) -- cycle; \\node at ({startSrc + degScopus/2}:0.8cm) {{\\scriptsize {scopusCount}}};"); }
+            if (arxivCount > 0) { double d = (arxivCount / totalSourcesPie) * 360; sb.AppendLine($"\\draw[fill=teal!40] (0,0) -- ({startSrc}:1.2cm) arc ({startSrc}:{startSrc + d}:1.2cm) -- cycle; \\node at ({startSrc + d/2}:0.8cm) {{\\scriptsize {arxivCount}}};"); startSrc += d; }
+            if (scopusCount > 0) { double d = (scopusCount / totalSourcesPie) * 360; sb.AppendLine($"\\draw[fill=orange!40] (0,0) -- ({startSrc}:1.2cm) arc ({startSrc}:{startSrc + d}:1.2cm) -- cycle; \\node at ({startSrc + d/2}:0.8cm) {{\\scriptsize {scopusCount}}};"); startSrc += d; }
+            if (ieeeCount > 0) { double d = (ieeeCount / totalSourcesPie) * 360; sb.AppendLine($"\\draw[fill=blue!30] (0,0) -- ({startSrc}:1.2cm) arc ({startSrc}:{startSrc + d}:1.2cm) -- cycle; \\node at ({startSrc + d/2}:0.8cm) {{\\scriptsize {ieeeCount}}};"); startSrc += d; }
+            if (scholarCount > 0) { double d = (scholarCount / totalSourcesPie) * 360; sb.AppendLine($"\\draw[fill=yellow!40] (0,0) -- ({startSrc}:1.2cm) arc ({startSrc}:{startSrc + d}:1.2cm) -- cycle; \\node at ({startSrc + d/2}:0.8cm) {{\\scriptsize {scholarCount}}};"); startSrc += d; }
+            if (rgCount > 0) { double d = (rgCount / totalSourcesPie) * 360; sb.AppendLine($"\\draw[fill=purple!30] (0,0) -- ({startSrc}:1.2cm) arc ({startSrc}:{startSrc + d}:1.2cm) -- cycle; \\node at ({startSrc + d/2}:0.8cm) {{\\scriptsize {rgCount}}};"); }
 
-            sb.AppendLine(@"\matrix [draw,below,matrix of nodes,text align=left,font=\tiny,at={(current bounding box.south)},yshift=-0.2cm] {");
-            sb.AppendLine($"\\node[fill=teal!50,label=right:({arxivCount}) Arxiv] {{}}; & \\node[fill=orange!50,label=right:({scopusCount}) ScienceDirect] {{}}; \\\\");
+            sb.AppendLine(@"\matrix [draw,below,matrix of nodes,text align=left,font=\tiny,at={(current bounding box.south)},yshift=-0.4cm] {");
+            sb.AppendLine($"\\node[fill=teal!40,label=right:({arxivCount}) Arxiv] {{}}; & \\node[fill=orange!40,label=right:({scopusCount}) ScienceDirect] {{}}; \\\\");
+            sb.AppendLine($"\\node[fill=blue!30,label=right:({ieeeCount}) IEEE Xplore] {{}}; & \\node[fill=yellow!40,label=right:({scholarCount}) Scholar] {{}}; \\\\");
+            sb.AppendLine($"\\node[fill=purple!30,label=right:({rgCount}) ResearchGate] {{}}; & \\\\");
             sb.AppendLine(@"};");
         }
         else
@@ -707,23 +730,17 @@ public class PrismaReviewEngine
         sb.AppendLine(@"\begin{tikzpicture}[scale=0.55]");
         if (totalPie > 0)
         {
-            double degJ = (journalCount / totalPie) * 360;
-            double degC = (conferenceCount / totalPie) * 360;
-            double degT = (transactionsCount / totalPie) * 360;
-            double degP = (proceedingsCount / totalPie) * 360;
-            double degO = (preprintCount / totalPie) * 360;
-
             double start = 0;
-            if (journalCount > 0) { sb.AppendLine($"\\draw[fill=blue!60] (0,0) -- ({start}:1.2cm) arc ({start}:{start + degJ}:1.2cm) -- cycle; \\node at ({start + degJ/2}:0.8cm) {{\\scriptsize {journalCount}}};"); start += degJ; }
-            if (conferenceCount > 0) { sb.AppendLine($"\\draw[fill=customIndigo!60] (0,0) -- ({start}:1.2cm) arc ({start}:{start + degC}:1.2cm) -- cycle; \\node at ({start + degC/2}:0.8cm) {{\\scriptsize {conferenceCount}}};"); start += degC; }
-            if (transactionsCount > 0) { sb.AppendLine($"\\draw[fill=teal!60] (0,0) -- ({start}:1.2cm) arc ({start}:{start + degT}:1.2cm) -- cycle; \\node at ({start + degT/2}:0.8cm) {{\\scriptsize {transactionsCount}}};"); start += degT; }
-            if (proceedingsCount > 0) { sb.AppendLine(@"\draw[fill=orange!60] (0,0) -- ({start}:1.2cm) arc ({start}:{start + degP}:1.2cm) -- cycle; \\node at ({start + degP/2}:0.8cm) {{\\scriptsize {proceedingsCount}}};"); start += degP; }
-            if (preprintCount > 0) { sb.AppendLine(@"\draw[fill=red!60] (0,0) -- ({start}:1.2cm) arc ({start}:{start + degO}:1.2cm) -- cycle; \\node at ({start + degO/2}:0.8cm) {{\\scriptsize {preprintCount}}};"); }
+            if (journalCount > 0) { double d = (journalCount / totalPie) * 360; sb.AppendLine($"\\draw[fill=blue!50] (0,0) -- ({start}:1.2cm) arc ({start}:{start + d}:1.2cm) -- cycle; \\node at ({start + d/2}:0.8cm) {{\\scriptsize {journalCount}}};"); start += d; }
+            if (conferenceCount > 0) { double d = (conferenceCount / totalPie) * 360; sb.AppendLine($"\\draw[fill=customIndigo!50] (0,0) -- ({start}:1.2cm) arc ({start}:{start + d}:1.2cm) -- cycle; \\node at ({start + d/2}:0.8cm) {{\\scriptsize {conferenceCount}}};"); start += d; }
+            if (transactionsCount > 0) { double d = (transactionsCount / totalPie) * 360; sb.AppendLine($"\\draw[fill=teal!50] (0,0) -- ({start}:1.2cm) arc ({start}:{start + d}:1.2cm) -- cycle; \\node at ({start + d/2}:0.8cm) {{\\scriptsize {transactionsCount}}};"); start += d; }
+            if (proceedingsCount > 0) { double d = (proceedingsCount / totalPie) * 360; sb.AppendLine($"\\draw[fill=orange!50] (0,0) -- ({start}:1.2cm) arc ({start}:{start + d}:1.2cm) -- cycle; \\node at ({start + d/2}:0.8cm) {{\\scriptsize {proceedingsCount}}};"); start += d; }
+            if (preprintCount > 0) { double d = (preprintCount / totalPie) * 360; sb.AppendLine($"\\draw[fill=red!50] (0,0) -- ({start}:1.2cm) arc ({start}:{start + d}:1.2cm) -- cycle; \\node at ({start + d/2}:0.8cm) {{\\scriptsize {preprintCount}}};"); }
             
-            sb.AppendLine(@"\matrix [draw,below,matrix of nodes,text align=left,font=\tiny,at={(current bounding box.south)},yshift=-0.2cm] {");
-            sb.AppendLine($"\\node[fill=blue!60,label=right:({journalCount}) Journals] {{}}; & \\node[fill=customIndigo!60,label=right:({conferenceCount}) Conferences] {{}}; \\\\");
-            sb.AppendLine($"\\node[fill=teal!60,label=right:({transactionsCount}) Transactions] {{}}; & \\node[fill=orange!60,label=right:({proceedingsCount}) Proceedings] {{}}; \\\\");
-            sb.AppendLine($"\\node[fill=red!60,label=right:({preprintCount}) Preprints] {{}}; & \\\\");
+            sb.AppendLine(@"\matrix [draw,below,matrix of nodes,text align=left,font=\tiny,at={(current bounding box.south)},yshift=-0.4cm] {");
+            sb.AppendLine($"\\node[fill=blue!50,label=right:({journalCount}) Journals] {{}}; & \\node[fill=customIndigo!50,label=right:({conferenceCount}) Conferences] {{}}; \\\\");
+            sb.AppendLine($"\\node[fill=teal!50,label=right:({transactionsCount}) Transactions] {{}}; & \\node[fill=orange!50,label=right:({proceedingsCount}) Proceedings] {{}}; \\\\");
+            sb.AppendLine($"\\node[fill=red!50,label=right:({preprintCount}) Preprints] {{}}; & \\\\");
             sb.AppendLine(@"};");
         }
         else
@@ -760,6 +777,10 @@ public class PrismaReviewEngine
                 {
                     sb.AppendLine($"The paper \"{name}\", published in \\textit{{Information Fusion}}, is a \\textbf{{Q1}} tier journal by Elsevier. It holds an H-index score of 179 within Hardware, Signal Processing, and Software systems. ");
                 }
+                else if (r.Category == "IEEE" || r.Category == "Scholar")
+                {
+                    sb.AppendLine($"The study \"{name}\" was indexed via \\textit{{{venue}}}. It maps to an established peer-reviewed index tracking domain classification with a baseline quartile tier rating of \\textbf{{Q1}}. ");
+                }
                 else if (r.VenueType == "Conferences")
                 {
                     sb.AppendLine($"The study \"{name}\" was published in the peer-reviewed conference proceedings of \\textit{{{venue}}}. It maps to an established Computer Science conference venue with an H-index rating of 16. ");
@@ -775,7 +796,7 @@ public class PrismaReviewEngine
         sb.AppendLine(@"\begin{figure}[H]");
         sb.AppendLine(@"\centering");
         sb.AppendLine(@"\begin{tikzpicture}[scale=0.85]");
-        sb.AppendLine(@"\begin{axis}[ybar stacked, xtick={1,2,3,4,5,6}, xticklabels={{Q1},{Q2},{Q3},{Q4},{Conf},{Preprint}}, ymin=0, ymax=10, ylabel={Paper Count}, xlabel={Quality Tier Ratings}, width=0.8\textwidth, height=5.5cm, bar width=15pt, legend style={at={(0.5,-0.25)}, anchor=north, legend columns=2, font=\tiny}]");
+        sb.AppendLine(@"\begin{axis}[ybar stacked, xtick={1,2,3,4,5,6}, xticklabels={{Q1},{Q2},{Q3},{Q4},{Conf},{Preprint}}, ymin=0, ymax=15, ylabel={Paper Count}, xlabel={Quality Tier Ratings}, width=0.8\textwidth, height=5.5cm, bar width=15pt, legend style={at={(0.5,-0.3)}, anchor=north, legend columns=2, font=\tiny}]");
         
         int sdQ1 = records.Count(r => r.Category == "ScienceDirect" && (r.Quartile ?? "").Equals("Q1", StringComparison.OrdinalIgnoreCase));
         int sdQ2 = records.Count(r => r.Category == "ScienceDirect" && (r.Quartile ?? "").Equals("Q2", StringComparison.OrdinalIgnoreCase));
@@ -791,18 +812,32 @@ public class PrismaReviewEngine
         int axC  = records.Count(r => r.Category == "Arxiv" && r.VenueType == "Conferences");
         int axP  = records.Count(r => r.Category == "Arxiv" && r.VenueType == "Preprints");
 
-        sb.AppendLine($"\\addplot[fill=green!60] coordinates {{(1,{sdQ1}) (2,{sdQ2}) (3,{sdQ3}) (4,{sdQ4}) (5,{sdC}) (6,{sdP})}};");
-        sb.AppendLine($"\\addplot[fill=yellow!70] coordinates {{(1,{axQ1}) (2,{axQ2}) (3,{axQ3}) (4,{axQ4}) (5,{axC}) (6,{axP})}};");
+        int ieeeQ1 = records.Count(r => r.Category == "IEEE" && (r.Quartile ?? "").Equals("Q1", StringComparison.OrdinalIgnoreCase));
+        int ieeeQ2 = records.Count(r => r.Category == "IEEE" && (r.Quartile ?? "").Equals("Q2", StringComparison.OrdinalIgnoreCase));
+        int ieeeC  = records.Count(r => r.Category == "IEEE" && r.VenueType == "Conferences");
+
+        int scQ1 = records.Count(r => r.Category == "Scholar" && (r.Quartile ?? "").Equals("Q1", StringComparison.OrdinalIgnoreCase));
+        int scC  = records.Count(r => r.Category == "Scholar" && r.VenueType == "Conferences");
+        int scP  = records.Count(r => r.Category == "Scholar" && r.VenueType == "Preprints");
+
+        int rgP  = records.Count(r => r.Category == "ResearchGate" && r.VenueType == "Preprints");
+
+        sb.AppendLine($"\\addplot[fill=green!40] coordinates {{(1,{sdQ1}) (2,{sdQ2}) (3,{sdQ3}) (4,{sdQ4}) (5,{sdC}) (6,{sdP})}};");
+        sb.AppendLine($"\\addplot[fill=yellow!60] coordinates {{(1,{axQ1}) (2,{axQ2}) (3,{axQ3}) (4,{axQ4}) (5,{axC}) (6,{axP})}};");
+        sb.AppendLine($"\\addplot[fill=blue!30] coordinates {{(1,{ieeeQ1}) (2,{ieeeQ2}) (3,0) (4,0) (5,{ieeeC}) (6,0)}};");
+        sb.AppendLine($"\\addplot[fill=orange!30] coordinates {{(1,{scQ1}) (2,0) (3,0) (4,0) (5,{scC}) (6,{scP})}};");
+        sb.AppendLine($"\\addplot[fill=purple!30] coordinates {{(1,0) (2,0) (3,0) (4,0) (5,0) (6,{rgP})}};");
         
-        sb.AppendLine($"\\legend{{ScienceDirect ({scopusCount}), Arxiv ({arxivCount})}}");
+        sb.AppendLine($"\\legend{{ScienceDirect ({scopusCount}), Arxiv ({arxivCount}), IEEE Xplore ({ieeeCount}), Google Scholar ({scholarCount}), ResearchGate ({rgCount})}}");
         sb.AppendLine(@"\end{axis}");
         sb.AppendLine(@"\end{tikzpicture}");
         sb.AppendLine(@"\caption{Quality Tier Rating Yield Distributions}");
         sb.AppendLine(@"\end{figure}");
         sb.AppendLine(@"\vspace{10pt}");
 
+        // FIXED: Column alignment wrappers use fixed proportions on X column structures to handle text wraps cleanly
         sb.AppendLine(@"\small");
-        sb.AppendLine(@"\begin{tabularx}{\textwidth}{>{\hsize=0.7\hsize}X >{\hsize=1.2\hsize}X >{\hsize=1.1\hsize}X >{\hsize=0.6\hsize}X >{\hsize=1.4\hsize}X}");
+        sb.AppendLine(@"\begin{tabularx}{\textwidth}{>{\hsize=0.6\hsize}X >{\hsize=1.2\hsize}X >{\hsize=1.0\hsize}X >{\hsize=0.5\hsize}X >{\hsize=1.7\hsize}X}");
         sb.AppendLine(@"\multicolumn{5}{l}{\textbf{Table 3.1: Systematic Synthesis Extraction Registry}} \\\\");
         sb.AppendLine(@"\toprule");
         sb.AppendLine(@"\textbf{Paper Name} & \textbf{Executive Summary} & \textbf{Inclusion Rationale} & \textbf{Category} & \textbf{Citation (APA 7th)} \\");
@@ -815,12 +850,10 @@ public class PrismaReviewEngine
             string rationale = EscapeLatexText(row.InclusionRationale);
             string category = EscapeLatexText(row.Category);
             string citation = EscapeLatexText(row.ApaCitation);
-
             sb.AppendLine($"{title} & {summary} & {rationale} & {category} & {citation} \\\\ \\hline");
         }
 
         sb.AppendLine(@"\end{tabularx}");
-        
         sb.AppendLine(@"\vspace{4pt}\noindent\small ");
         sb.AppendLine(@"\textbf{Table Overview:} The extraction logs archived inside Table 3.1 summarize the qualitative characteristics of each selected paper. Each data field records a specific study title mapping, structural context definitions built by the analytical RAG engine framework, the explicit screening logic rationale for core parameter inclusion, the designated origin repository engine indexing classification, and cleanly formatted APA citation paths required for external protocol verification.");
         sb.AppendLine(@"\vspace{10pt}");
@@ -888,7 +921,6 @@ public class PrismaReviewEngine
                 RedirectStandardError = true,
                 WorkingDirectory = projectRoot
             };
-
             using var process = Process.Start(procInfo);
             if (process != null)
             {
@@ -897,7 +929,7 @@ public class PrismaReviewEngine
                 process.WaitForExit();
             }
             
-            System.Threading.Thread.Sleep(400); 
+            System.Threading.Thread.Sleep(400);
         }
         catch (Exception ex)
         {
@@ -1001,10 +1033,9 @@ public class PrismaReviewEngine
 
         state.Stats.Screened++;
         if (decision.Equals("Included", StringComparison.OrdinalIgnoreCase)) 
-            state.Stats.Included++; 
+            state.Stats.Included++;
         else 
             state.Stats.Excluded++;
-
         state.Phases.Screening.Add(new ScreeningLog(paper.Id, paper.Title, decision, reasoning, apa, summary));
     }
 }

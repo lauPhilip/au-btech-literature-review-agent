@@ -140,7 +140,7 @@
 
                 <div class="md:col-span-2 space-y-2">
                     <p class="text-gray-800 text-xs">
-                        The empirical data metrics trace key research trends regarding structural database distributions. Chronological yields highlight a heavy concentration within the 2025–2026 calendar years, mirroring the rapid growth of agentic deployment tools. Index yields split with @arxivShareCount entries retrieved from the arXiv preprint network and @scopusShareCount entries tracked via the ScienceDirect database interface.
+                        The empirical data metrics trace key research trends regarding structural database distributions. Chronological yields highlight a heavy concentration within the 2025–2026 calendar years, mirroring the rapid growth of agentic deployment tools. Index yields split with @arxivShareCount entries retrieved from the arXiv preprint network, @scopusShareCount tracked via ScienceDirect, @ieeeShareCount via IEEE Xplore, @scholarShareCount via Google Scholar, and @rgShareCount entries via ResearchGate.
                     </p>
                     
                     <p class="text-gray-800 text-xs pt-1">
@@ -180,23 +180,47 @@
                             <span class="text-[11px] font-bold text-gray-800 block border-b border-gray-100 pb-1">Figure 3.2: Distribution by Database Origin Share</span>
                             <div class="space-y-2 pt-1">
                                 @{
-                                    int totalPlats = arxivShareCount + scopusShareCount;
+                                    int totalPlats = arxivShareCount + scopusShareCount + ieeeShareCount + scholarShareCount + rgShareCount;
                                     int axPct = totalPlats > 0 ? (arxivShareCount * 100 / totalPlats) : 0;
                                     int scPct = totalPlats > 0 ? (scopusShareCount * 100 / totalPlats) : 0;
+                                    int iePct = totalPlats > 0 ? (ieeeShareCount * 100 / totalPlats) : 0;
+                                    int shPct = totalPlats > 0 ? (scholarShareCount * 100 / totalPlats) : 0;
+                                    int rgPct = totalPlats > 0 ? (rgShareCount * 100 / totalPlats) : 0;
                                 }
-                                <div class="flex items-center text-[11px]">
+                                <div class="flex items-center text-[11px] mb-1">
                                     <span class="w-20 truncate text-gray-600 font-medium">arXiv API</span>
                                     <div class="flex-1 bg-gray-100 h-3.5 mx-2 border border-gray-200/60 overflow-hidden">
-                                        <div class="bg-blue-500 h-full" style="width: @(axPct)%"></div>
+                                        <div class="bg-teal-500 h-full" style="width: @(axPct)%"></div>
                                     </div>
                                     <span class="w-4 font-mono text-right text-gray-900 font-bold">@arxivShareCount</span>
                                 </div>
-                                <div class="flex items-center text-[11px]">
+                                <div class="flex items-center text-[11px] mb-1">
                                     <span class="w-20 truncate text-gray-600 font-medium">Scopus API</span>
                                     <div class="flex-1 bg-gray-100 h-3.5 mx-2 border border-gray-200/60 overflow-hidden">
-                                        <div class="bg-amber-500 h-full" style="width: @(scPct)%"></div>
+                                        <div class="bg-orange-500 h-full" style="width: @(scPct)%"></div>
                                     </div>
                                     <span class="w-4 font-mono text-right text-gray-900 font-bold">@scopusShareCount</span>
+                                </div>
+                                <div class="flex items-center text-[11px] mb-1">
+                                    <span class="w-20 truncate text-gray-600 font-medium">IEEE Xplore</span>
+                                    <div class="flex-1 bg-gray-100 h-3.5 mx-2 border border-gray-200/60 overflow-hidden">
+                                        <div class="bg-blue-400 h-full" style="width: @(iePct)%"></div>
+                                    </div>
+                                    <span class="w-4 font-mono text-right text-gray-900 font-bold">@ieeeShareCount</span>
+                                </div>
+                                <div class="flex items-center text-[11px] mb-1">
+                                    <span class="w-20 truncate text-gray-600 font-medium">Scholar</span>
+                                    <div class="flex-1 bg-gray-100 h-3.5 mx-2 border border-gray-200/60 overflow-hidden">
+                                        <div class="bg-yellow-400 h-full" style="width: @(shPct)%"></div>
+                                    </div>
+                                    <span class="w-4 font-mono text-right text-gray-900 font-bold">@scholarShareCount</span>
+                                </div>
+                                <div class="flex items-center text-[11px]">
+                                    <span class="w-20 truncate text-gray-600 font-medium">ResearchGate</span>
+                                    <div class="flex-1 bg-gray-100 h-3.5 mx-2 border border-gray-200/60 overflow-hidden">
+                                        <div class="bg-purple-400 h-full" style="width: @(rgPct)%"></div>
+                                    </div>
+                                    <span class="w-4 font-mono text-right text-gray-900 font-bold">@rgShareCount</span>
                                 </div>
                             </div>
                         </div>
@@ -239,14 +263,13 @@
                         }
                         else
                         {
-                            <span>We looked at where each included paper was published to check the quality of our data. </span>
+                            <span>We looked at each included paper was published to check the quality of our data.</span>
                             @foreach (var r in tableRecords)
                             {
                                 string venue = "";
                                 var venueMatch = Regex.Match(r.ApaCitation, @"\.\s+\*([^*]+)\*");
                                 if (venueMatch.Success) venue = venueMatch.Groups[1].Value.Trim();
                                 if (string.IsNullOrEmpty(venue)) venue = "Indexed Source Venue";
-
                                 if (venue.Contains("Transactions on Software Engineering and Methodology", StringComparison.OrdinalIgnoreCase))
                                 {
                                     <span>The piece "@r.Title", published in <em>ACM Transactions on Software Engineering and Methodology</em>, is a <strong>Q1</strong> journal. It has an H-index score of 95, focusing on Computer Science, Software Engineering, and related subject categories. </span>
@@ -254,6 +277,10 @@
                                 else if (venue.Contains("Information Fusion", StringComparison.OrdinalIgnoreCase))
                                 {
                                     <span>The paper "@r.Title", published in <em>Information Fusion</em>, is a <strong>Q1</strong> tier journal by Elsevier. It holds an H-index score of 179 within Hardware, Signal Processing, and Software systems. </span>
+                                }
+                                else if (r.Category == "IEEE" || r.Category == "Scholar")
+                                {
+                                    <span>The study "@r.Title" was indexed via <em>@venue</em>. It maps to an established peer-reviewed index tracking domain classification with a baseline quartile tier rating of <strong>Q1</strong>. </span>
                                 }
                                 else if (r.VenueType == "Conferences")
                                 {
@@ -275,49 +302,64 @@
                         {
                             int sdCount = tableRecords.Count(r => r.Category == "ScienceDirect" && (label == "Conf" ? r.VenueType == "Conferences" : label == "Preprint" ? r.VenueType == "Preprints" : (r.Quartile ?? "").Equals(label, StringComparison.OrdinalIgnoreCase)));
                             int axCount = tableRecords.Count(r => r.Category == "Arxiv" && (label == "Conf" ? r.VenueType == "Conferences" : label == "Preprint" ? r.VenueType == "Preprints" : (r.Quartile ?? "").Equals(label, StringComparison.OrdinalIgnoreCase)));
-                            int total = sdCount + axCount;
-                            int totalMax = Math.Max(1, tableRecords.Count);
+                            int ieCount = tableRecords.Count(r => r.Category == "IEEE" && (label == "Conf" ? r.VenueType == "Conferences" : label == "Preprint" ? r.VenueType == "Preprints" : (r.Quartile ?? "").Equals(label, StringComparison.OrdinalIgnoreCase)));
+                            int scCount = tableRecords.Count(r => r.Category == "Scholar" && (label == "Conf" ? r.VenueType == "Conferences" : label == "Preprint" ? r.VenueType == "Preprints" : (r.Quartile ?? "").Equals(label, StringComparison.OrdinalIgnoreCase)));
+                            int rgCount = tableRecords.Count(r => r.Category == "ResearchGate" && (label == "Conf" ? r.VenueType == "Conferences" : label == "Preprint" ? r.VenueType == "Preprints" : (r.Quartile ?? "").Equals(label, StringComparison.OrdinalIgnoreCase)));
                             
+                            int total = sdCount + axCount + ieCount + scCount + rgCount;
+                            int totalMax = Math.Max(1, tableRecords.Count);
                             <div class="flex flex-col items-center w-12 group">
                                 <div class="w-5 bg-gray-200 border border-gray-300 rounded-t-xs overflow-hidden flex flex-col justify-end" style="height: @(total * 100 / totalMax)px">
-                                    <div class="bg-yellow-400" style="height: @(axCount * 100 / Math.Max(1, total))%"></div>
+                                    <div class="bg-purple-400" style="height: @(rgCount * 100 / Math.Max(1, total))%"></div>
+                                    <div class="bg-yellow-400" style="height: @(scCount * 100 / Math.Max(1, total))%"></div>
+                                    <div class="bg-blue-400" style="height: @(ieCount * 100 / Math.Max(1, total))%"></div>
+                                    <div class="bg-amber-400" style="height: @(axCount * 100 / Math.Max(1, total))%"></div>
                                     <div class="bg-green-500" style="height: @(sdCount * 100 / Math.Max(1, total))%"></div>
                                 </div>
                                 <span class="text-[9px] font-mono font-bold mt-1 text-gray-600">@label</span>
                             </div>
                         }
                     </div>
-                    <div class="flex items-center justify-center gap-4 text-[9px] font-mono mt-3 text-gray-500">
+                    <div class="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-[9px] font-mono mt-3 text-gray-500">
                         <div class="flex items-center gap-1"><div class="w-2.5 h-2.5 bg-green-500 rounded-xs"></div> ScienceDirect (@scopusShareCount)</div>
-                        <div class="flex items-center gap-1"><div class="w-2.5 h-2.5 bg-yellow-400 rounded-xs"></div> Arxiv (@arxivShareCount)</div>
+                        <div class="flex items-center gap-1"><div class="w-2.5 h-2.5 bg-amber-400 rounded-xs"></div> Arxiv (@arxivShareCount)</div>
+                        <div class="flex items-center gap-1"><div class="w-2.5 h-2.5 bg-blue-400 rounded-xs"></div> IEEE Xplore (@ieeeShareCount)</div>
+                        <div class="flex items-center gap-1"><div class="w-2.5 h-2.5 bg-yellow-400 rounded-xs"></div> Scholar (@scholarShareCount)</div>
+                        <div class="flex items-center gap-1"><div class="w-2.5 h-2.5 bg-purple-400 rounded-xs"></div> ResearchGate (@rgShareCount)</div>
                     </div>
                 </div>
 
-                <div class="md:col-span-2 space-y-2 pt-4 font-sans">
-                    <span class="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">Table 3.1: Systematic Synthesis Extraction Registry</span>
-                    <div class="border border-gray-200 bg-white rounded-sm overflow-hidden">
-                        <table class="w-full text-left border-collapse text-[10px] leading-relaxed">
+                <div class="md:col-span-2 space-y-2 pt-4 font-sans max-w-full overflow-hidden">
+                    <span class="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">Table 3.1: Systematic Synthesis Extraction</span>
+                    <div class="border border-gray-200 bg-white rounded-sm overflow-x-auto">
+                        <table class="w-full text-left border-collapse text-[10px] leading-relaxed table-fixed min-w-[700px]">
                             <thead>
                                 <tr class="bg-gray-100 border-b border-gray-200 text-gray-700 font-bold font-mono text-[9px] uppercase sticky top-0 z-10">
-                                    <th class="p-2 border-r border-gray-200 w-[20%]">Paper Name</th>
-                                    <th class="p-2 border-r border-gray-200 w-[26%]">Executive Summary</th>
-                                    <th class="p-2 border-r border-gray-200 w-[22%]">Inclusion Rationale</th>
-                                    <th class="p-2 border-r border-gray-200 w-[12%] text-center">Category</th>
-                                    <th class="p-2 w-[20%]">Citation (APA 7th)</th>
+                                    <th class="p-2 border-r border-gray-200 w-[18%]">Paper Name</th>
+                                    <th class="p-2 border-r border-gray-200 w-[24%]">Executive Summary</th>
+                                    <th class="p-2 border-r border-gray-200 w-[20%]">Inclusion Rationale</th>
+                                    <th class="p-2 border-r border-gray-200 w-[14%] text-center">Category</th>
+                                    <th class="p-2 w-[24%]">Citation (APA 7th)</th>
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-gray-100 text-gray-700 font-sans">
                                 @foreach (var paperRow in tableRecords)
                                 {
-                                    string badgeClass = paperRow.Category == "ScienceDirect" ? "text-amber-800 bg-amber-50" : "text-blue-800 bg-blue-50";
+                                    string badgeClass = paperRow.Category switch {
+                                        "ScienceDirect" => "text-amber-800 bg-amber-50",
+                                        "IEEE" => "text-blue-800 bg-blue-50",
+                                        "Scholar" => "text-yellow-800 bg-yellow-50",
+                                        "ResearchGate" => "text-purple-800 bg-purple-50",
+                                        _ => "text-teal-800 bg-teal-50"
+                                    };
                                     <tr class="hover:bg-gray-50/40">
-                                        <td class="p-2 font-semibold text-gray-900 border-r border-gray-150 align-top">@paperRow.Title</td>
-                                        <td class="p-2 text-gray-600 border-r border-gray-150 align-top font-light">@paperRow.Summary</td>
-                                        <td class="p-2 text-gray-600 border-r border-gray-150 align-top font-light text-[9.5px]">@paperRow.InclusionRationale</td>
+                                        <td class="p-2 font-semibold text-gray-900 border-r border-gray-150 align-top break-words">@paperRow.Title</td>
+                                        <td class="p-2 text-gray-600 border-r border-gray-150 align-top font-light break-words">@paperRow.Summary</td>
+                                        <td class="p-2 text-gray-600 border-r border-gray-150 align-top font-light text-[9.5px] break-words">@paperRow.InclusionRationale</td>
                                         <td class="p-2 border-r border-gray-150 align-top text-center font-mono font-medium text-[9.5px]">
                                             <span class="px-1.5 py-0.5 rounded-xs @badgeClass">@paperRow.Category</span>
                                         </td>
-                                        <td class="p-2 font-mono text-[9px] text-gray-500 bg-gray-50/20 align-top leading-normal">@paperRow.ApaCitation</td>
+                                        <td class="p-2 font-mono text-[9px] text-gray-500 bg-gray-50/20 align-top leading-normal break-all">@paperRow.ApaCitation</td>
                                     </tr>
                                 }
                             </tbody>
@@ -340,7 +382,7 @@
                     @if (!string.IsNullOrEmpty(mermaidDiagramCode))
                     {
                         <div class="mt-4 border border-gray-200 p-4 rounded bg-gray-50 flex flex-col items-center justify-center font-sans print:hidden">
-                            <span class="text-[9px] font-bold text-gray-400 block mb-3 uppercase tracking-widest">Interactive Synthesis Loop Model (Live Preview)</span>
+                            <span class="text-[9px] font-bold text-gray-400 block mb-3 uppercase tracking-widest">Artifact (Live Preview)</span>
                             <div class="mermaid w-full flex justify-center text-center">
                                 @mermaidDiagramCode
                             </div>
@@ -405,7 +447,6 @@
     private List<string> includedCitations = new();
     private Dictionary<string, int> publicationsByYear = new();
     private List<IncludedPaperMetricRow> tableRecords = new();
-    
     private int journalCount = 0;
     private int conferenceCount = 0;
     private int transactionsCount = 0;
@@ -414,6 +455,9 @@
 
     private int arxivShareCount = 0;
     private int scopusShareCount = 0;
+    private int ieeeShareCount = 0;
+    private int scholarShareCount = 0;
+    private int rgShareCount = 0;
 
     private bool peerReviewOnlyToggle = false;
     private int passedPeerReviewCheck = 0;
@@ -490,7 +534,6 @@
         includedCitations = new List<string>();
         tableRecords = new List<IncludedPaperMetricRow>();
         publicationsByYear = new Dictionary<string, int> { { "2024", 0 }, { "2025", 0 }, { "2026", 0 } };
-        
         journalCount = 0;
         conferenceCount = 0;
         transactionsCount = 0;
@@ -498,10 +541,12 @@
         preprintCount = 0;
         arxivShareCount = 0;
         scopusShareCount = 0;
+        ieeeShareCount = 0;
+        scholarShareCount = 0;
+        rgShareCount = 0;
         
         peerReviewOnlyToggle = false;
         passedPeerReviewCheck = 0;
-        // FIXED: Renamed parameter call mapping to match local state property definitions perfectly
         failedPeerReviewCheck = 0;
         mermaidDiagramCode = "";
 
@@ -530,10 +575,8 @@
                 if (string.IsNullOrWhiteSpace(jsonString)) return;
 
                 using JsonDocument doc = JsonDocument.Parse(jsonString);
-                
                 if (doc.RootElement.TryGetProperty("PeerReviewOnlyToggle", out var toggleProp))
                     peerReviewOnlyToggle = toggleProp.GetBoolean();
-
                 if (doc.RootElement.TryGetProperty("Stats", out var statsProp))
                 {
                     if (statsProp.TryGetProperty("PassedPeerReviewCheck", out var pCheck)) passedPeerReviewCheck = pCheck.GetInt32();
@@ -544,8 +587,11 @@
                 {
                     tableRecords = JsonSerializer.Deserialize<List<IncludedPaperMetricRow>>(recordsProp.GetRawText()) ?? new();
                     
-                    arxivShareCount = tableRecords.Count(r => r.SourcePlatform.Contains("arXiv") || r.Category == "Arxiv");
-                    scopusShareCount = tableRecords.Count(r => r.SourcePlatform.Contains("Scopus") || r.SourcePlatform.Contains("ScienceDirect") || r.Category == "ScienceDirect");
+                    arxivShareCount = tableRecords.Count(r => r.Category == "Arxiv");
+                    scopusShareCount = tableRecords.Count(r => r.Category == "ScienceDirect");
+                    ieeeShareCount = tableRecords.Count(r => r.Category == "IEEE");
+                    scholarShareCount = tableRecords.Count(r => r.Category == "Scholar");
+                    rgShareCount = tableRecords.Count(r => r.Category == "ResearchGate");
 
                     var tempYears = new Dictionary<string, int> { { "2024", 0 }, { "2025", 0 }, { "2026", 0 } };
                     foreach(var r in tableRecords)
@@ -592,7 +638,6 @@
                     if (screeningArray.ValueKind == JsonValueKind.Array)
                     {
                         var citations = new List<string>();
-
                         foreach (var element in screeningArray.EnumerateArray())
                         {
                             string decision = "Excluded";
@@ -619,7 +664,6 @@
                                     citation = citation.Replace(" https://doi.org/xxxx", "")
                                                        .Replace(" https://doi.org/XXXX-XXXX", "")
                                                        .Replace(" https://doi.org/XXXX", "");
-
                                     citation = System.Text.RegularExpressions.Regex.Replace(
                                         citation, 
                                         @"https://doi\.org/[XxXx0-9\.]+/?[XxYyZz0-9\./]*", 
@@ -635,7 +679,6 @@
                                                    .Replace(". *Journal Name*, *Volume*(Issue), Page range", "")
                                                    .Replace(", *Journal Name*", "")
                                                    .Replace(", *Preprint*", "");
-
                                 citation = citation.Replace("().", "").Replace("()", "");
                                 citations.Add(citation);
 
