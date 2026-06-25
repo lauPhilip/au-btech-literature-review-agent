@@ -15,9 +15,9 @@
 
 ## 3. Expand Academic Source Gateways
 Implement dedicated API client adapters implementing the `IAcademicSource` interface for the following platforms:
-* [ ] **IEEE Xplore API:** For structured engineering and core framework papers.
-* [ ] **Google Scholar Gateway:** To catch wider indexing gaps.
-* [ ] **ResearchGate Scraping/API Wrapper:** To capture specialized institutional research prints.
+* [-] **IEEE Xplore API:** For structured engineering and core framework papers.
+* [X] **Google Scholar Gateway:** To catch wider indexing gaps.
+* [X] **ResearchGate Scraping/API Wrapper:** To capture specialized institutional research prints.
 * [ ] **Enhanced arXiv Adapter:** Deepen the current parser to handle clean category filter hooks more robustly.
 
 ## 4. Future Backlog Features
