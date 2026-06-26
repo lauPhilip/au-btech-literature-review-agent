@@ -1,0 +1,252 @@
+{
+  "ReviewId": "b69974fb-04eb-40ea-965e-09e14e8478df",
+  "SearchQuery": "Agentic AI software frameworks",
+  "PeerReviewOnlyToggle": false,
+  "Timestamp": "2026-06-26T13:27:17.0753222Z",
+  "Stats": {
+    "TotalIdentified": 10,
+    "Screened": 10,
+    "Excluded": 1,
+    "Included": 9,
+    "ProcessingStage": "Complete",
+    "PassedPeerReviewCheck": 0,
+    "FailedPeerReviewCheck": 0
+  },
+  "SynthesisTargetDirective": "Create a conceptual architectural loop diagram detailing fault-tolerance gating mechanisms.",
+  "Phases": {
+    "Screening": [
+      {
+        "PaperId": "http://arxiv.org/abs/2605.23989v1",
+        "Title": "Towards trustworthy agentic AI: a comprehensive survey of safety, robustness, privacy, and system security",
+        "Decision": "Included",
+        "Reasoning": "The paper focuses on agent architecture and loop execution (e.g., multi-step trajectories, planning, tool use, and long-horizon interactions in agentic AI), meeting the inclusion thresholds. It does not pertain to agronomy or commercial marketing, avoiding exclusion criteria.",
+        "ApaCitation": "Qi, J., Li, M., Liu, J., Shu, Y., Yu, D., Ma, S., Cui, W., Zhao, Y., Chen, Y., Jiang, R., King, I., \u0026 Xu, Z. (2026). Towards trustworthy agentic AI: A comprehensive survey of safety, robustness, privacy, and system security. *Academia AI and Applications, 2*, Article e123. https://doi.org/XXX",
+        "BriefSummary": "This survey examines trustworthiness in agentic AI systems, focusing on safety, robustness, privacy, and security risks in multi-step agent workflows, while proposing mitigation strategies and evaluation benchmarks for high-stakes deployments."
+      },
+      {
+        "PaperId": "http://arxiv.org/abs/2406.07737v2",
+        "Title": "The Future of AI-Driven Software Engineering",
+        "Decision": "Included",
+        "Reasoning": "The paper focuses on AI-driven software engineering, specifically addressing loop execution (implied in software development processes) and agent architecture (e.g., LLMs as AI agents), meeting the inclusion thresholds. It does not relate to agronomy or commercial marketing, avoiding exclusion criteria.",
+        "ApaCitation": "Terragni, V., Vella, A., Roop, P., \u0026 Blincoe, K. (2025). The future of AI-driven software engineering. *ACM Transactions on Software Engineering and Methodology, 34*(5), Article 120. https://doi.org/XXXX-XXXXXX",
+        "BriefSummary": "The paper explores the evolving symbiotic relationship between human developers and AI systems (e.g., LLMs) in software engineering, outlining key research challenges to integrate AI effectively into development workflows and boost productivity."
+      },
+      {
+        "PaperId": "SCOPUS_ID:105041251808",
+        "Title": "Large Language Models in practice: A comprehensive review of privacy risks, attacks, and defense mechanisms for intelligent system deployment",
+        "Decision": "Excluded",
+        "Reasoning": "The paper focuses on privacy risks, attacks, and defense mechanisms related to large language models, which does not align with the inclusion thresholds of loop execution or agent architecture. It also does not fall under agronomy or commercial marketing, but it fails to meet the required technical focus.",
+        "ApaCitation": "Li, J. (2027). Large language models in practice: A comprehensive review of privacy risks, attacks, and defense mechanisms for intelligent system deployment. *Computer Standards and Interfaces*, *Advance online publication*. https://doi.org/XXXX",
+        "BriefSummary": "This review examines privacy risks, attack vectors, and defense strategies associated with deploying large language models in intelligent systems, emphasizing security and compliance challenges."
+      },
+      {
+        "PaperId": "SCOPUS_ID:105040506784",
+        "Title": "Evaluating and regulating agentic AI: A study of benchmarks, metrics, and regulation",
+        "Decision": "Included",
+        "Reasoning": "The paper focuses on agentic AI, which inherently involves agent architecture, and discusses benchmarks and metrics that could relate to loop execution in AI systems. It does not pertain to agronomy or commercial marketing studies.",
+        "ApaCitation": "Farooq, A. (2026). Evaluating and regulating agentic AI: A study of benchmarks, metrics, and regulation. *Information Fusion*, *XX*(X), XXX\u2013XXX. https://doi.org/XXXX",
+        "BriefSummary": "This study examines frameworks for evaluating and regulating agentic AI systems, proposing benchmarks and metrics to assess performance while addressing regulatory challenges in AI deployment."
+      },
+      {
+        "PaperId": "IEEE_11334378",
+        "Title": "Towards Multi-Agentic AI for automated software design and modelling: challenges and opportunities",
+        "Decision": "Included",
+        "Reasoning": "The paper focuses on loop execution (via agent collaboration and iterative design modeling) and agent architecture (multi-agentic AI framework), meeting the inclusion thresholds. It does not pertain to agronomy or commercial marketing, avoiding exclusion criteria.",
+        "ApaCitation": "IEEE Research Consortium. (2025). Towards multi-agentic AI for automated software design and modelling: Challenges and opportunities. In *2025 40th IEEE/ACM International Conference on Automated Software Engineering Workshops (ASEW)* (pp. XX-XX). IEEE.",
+        "BriefSummary": "The paper explores challenges in deploying multi-agentic AI for automated software design, proposing a framework where autonomous agents interpret requirements, generate design artifacts, and collaborate to resolve ambiguities and inconsistencies in modeling."
+      },
+      {
+        "PaperId": "IEEE_11369733",
+        "Title": "Architecting Trust: Designing Human Oversight and Accountability for AI-Driven Software Engineering Under the EU AI Act",
+        "Decision": "Included",
+        "Reasoning": "The paper focuses on agent architecture and human oversight mechanisms in AI-driven software engineering, specifically addressing loop execution (e.g., Human-in-the-Loop systems) and compliance frameworks. It does not relate to agronomy or commercial marketing, meeting the inclusion thresholds.",
+        "ApaCitation": "IEEE Research Consortium. (2025). Architecting trust: Designing human oversight and accountability for AI-driven software engineering under the EU AI Act. In *2025 13th International Conference in Software Engineering Research and Innovation (CONISOFT)* (pp. XX-XX). IEEE.",
+        "BriefSummary": "This paper examines challenges in implementing human oversight and accountability for Agentic AI in software engineering under the EU AI Act, proposing a research roadmap to bridge gaps in compliance and trustworthy AI governance."
+      },
+      {
+        "PaperId": "SCHOLAR_iR_9Gli4-8QJ",
+        "Title": "Toward edge general intelligence with agentic AI and agentification: Concepts, technologies, and future directions",
+        "Decision": "Included",
+        "Reasoning": "The paper focuses on Agentic AI and agentification frameworks, which directly relate to agent architecture and loop execution in edge computing contexts, meeting the inclusion thresholds. It does not pertain to agronomy or commercial marketing, avoiding exclusion criteria.",
+        "ApaCitation": "Zhang, R., Liu, G., Liu, Y., Zhao, C., \u0026 Wang, J. (2026). Toward edge general intelligence with agentic AI and agentification: Concepts, technologies, and future directions. *IEEE Communications Surveys \u0026 Tutorials*.",
+        "BriefSummary": "This survey explores Agentic AI and agentification frameworks for edge computing, emphasizing their role in automating complex software engineering processes and advancing intelligent agent architectures."
+      },
+      {
+        "PaperId": "SCHOLAR_mn767oh939gJ",
+        "Title": "Agentic design patterns: A system-theoretic framework",
+        "Decision": "Included",
+        "Reasoning": "The paper focuses on agent architecture and design patterns, specifically in the context of AI and multi-agent systems (MAS), which aligns with the inclusion thresholds of loop execution and agent architecture. It does not relate to agronomy or commercial marketing, thus avoiding exclusion criteria.",
+        "ApaCitation": "Dao, M. D., Le, Q. M., Lam, H. T., Le, D. T., \u0026 Pham, Q. V. (2026). Agentic design patterns: A system-theoretic framework. arXiv. https://arxiv.org/abs/2600.00000",
+        "BriefSummary": "This paper presents a system-theoretic framework for agentic AI design patterns, drawing parallels to foundational software and multi-agent system (MAS) design principles to advance the understanding of agent architecture."
+      },
+      {
+        "PaperId": "RG_jlJHVnzm5IcJ",
+        "Title": "A Survey on AI Agent Harness",
+        "Decision": "Included",
+        "Reasoning": "The paper focuses on AI agent architecture and frameworks supporting long-horizon agentic tasks, aligning with the inclusion thresholds of loop execution and agent architecture. It does not relate to agronomy or commercial marketing, avoiding exclusion criteria.",
+        "ApaCitation": "Xie, Z., Ren, X., Zheng, T., Bai, J., Fan, W., \u0026 Xu, B. (2026). A survey on AI agent harness. ResearchGate.",
+        "BriefSummary": "This survey maps representative AI agent harness frameworks to their subfunctions, emphasizing their role in enabling complex, long-horizon tasks such as software engineering and web navigation."
+      },
+      {
+        "PaperId": "RG_mBhz8IMBZ0EJ",
+        "Title": "AGENTIC AI-POWERED AUTONOMOUS SOFTWARE ENGINEERING FRAMEWORK FOR AUTOMATED CODE GENERATION AND DEBUGGING",
+        "Decision": "Included",
+        "Reasoning": "The paper focuses on agent architecture and loop execution within the context of autonomous software engineering, specifically automated code generation and debugging, meeting the inclusion thresholds. It does not pertain to agronomy or commercial marketing, avoiding exclusion criteria.",
+        "ApaCitation": "Maheshkar, J. A., Vankayala, H., Jakkula, V. K., \u0026 Raj, L. D. (2026). Agentic AI-powered autonomous software engineering framework for automated code generation and debugging. *2026*.",
+        "BriefSummary": "This paper explores the role of agentic AI in autonomous software engineering, proposing a framework for automated code generation and debugging to enhance system efficiency and reliability."
+      }
+    ]
+  },
+  "SearchLogs": [
+    {
+      "SourceName": "arXiv API",
+      "Timestamp": "2026-06-26 13:27:17 UTC",
+      "TargetUrl": "",
+      "Status": "Completed Successfully",
+      "PapersFound": 2,
+      "ErrorMessage": "None"
+    },
+    {
+      "SourceName": "ScienceDirect API",
+      "Timestamp": "2026-06-26 13:27:27 UTC",
+      "TargetUrl": "",
+      "Status": "Completed Successfully",
+      "PapersFound": 2,
+      "ErrorMessage": "None"
+    },
+    {
+      "SourceName": "IEEE Xplore API",
+      "Timestamp": "2026-06-26 13:27:34 UTC",
+      "TargetUrl": "",
+      "Status": "Completed Successfully",
+      "PapersFound": 2,
+      "ErrorMessage": "None"
+    },
+    {
+      "SourceName": "Google Scholar Gateway",
+      "Timestamp": "2026-06-26 13:27:41 UTC",
+      "TargetUrl": "",
+      "Status": "Completed Successfully",
+      "PapersFound": 2,
+      "ErrorMessage": "None"
+    },
+    {
+      "SourceName": "ResearchGate Gateway",
+      "Timestamp": "2026-06-26 13:27:49 UTC",
+      "TargetUrl": "",
+      "Status": "Completed Successfully",
+      "PapersFound": 2,
+      "ErrorMessage": "None"
+    }
+  ],
+  "SynthesizedRecords": [
+    {
+      "Title": "Towards trustworthy agentic AI: a comprehensive survey of safety, robustness, privacy, and system security",
+      "Summary": "This survey examines trustworthiness in agentic AI systems, focusing on safety, robustness, privacy, and security risks in multi-step agent workflows, while proposing mitigation strategies and evaluation benchmarks for high-stakes deployments.",
+      "ApaCitation": "Qi, J., Li, M., Liu, J., Shu, Y., Yu, D., Ma, S., Cui, W., Zhao, Y., Chen, Y., Jiang, R., King, I., \u0026 Xu, Z. (2026). Towards trustworthy agentic AI: A comprehensive survey of safety, robustness, privacy, and system security. *Academia AI and Applications, 2*, Article e123. https://doi.org/XXX",
+      "SourcePlatform": "arXiv API",
+      "Year": 2026,
+      "VenueType": "Preprints",
+      "InclusionRationale": "The paper focuses on agent architecture and loop execution (e.g., multi-step trajectories, planning, tool use, and long-horizon interactions in agentic AI), meeting the inclusion thresholds. It does not pertain to agronomy or commercial marketing, avoiding exclusion criteria.",
+      "Category": "Arxiv",
+      "Quartile": "N/A",
+      "ConferenceRating": "N/A"
+    },
+    {
+      "Title": "The Future of AI-Driven Software Engineering",
+      "Summary": "The paper explores the evolving symbiotic relationship between human developers and AI systems (e.g., LLMs) in software engineering, outlining key research challenges to integrate AI effectively into development workflows and boost productivity.",
+      "ApaCitation": "Terragni, V., Vella, A., Roop, P., \u0026 Blincoe, K. (2025). The future of AI-driven software engineering. *ACM Transactions on Software Engineering and Methodology, 34*(5), Article 120. https://doi.org/XXXX-XXXXXX",
+      "SourcePlatform": "arXiv API",
+      "Year": 2025,
+      "VenueType": "Transactions",
+      "InclusionRationale": "The paper focuses on AI-driven software engineering, specifically addressing loop execution (implied in software development processes) and agent architecture (e.g., LLMs as AI agents), meeting the inclusion thresholds. It does not relate to agronomy or commercial marketing, avoiding exclusion criteria.",
+      "Category": "Arxiv",
+      "Quartile": "N/A",
+      "ConferenceRating": "N/A"
+    },
+    {
+      "Title": "Evaluating and regulating agentic AI: A study of benchmarks, metrics, and regulation",
+      "Summary": "This study examines frameworks for evaluating and regulating agentic AI systems, proposing benchmarks and metrics to assess performance while addressing regulatory challenges in AI deployment.",
+      "ApaCitation": "Farooq, A. (2026). Evaluating and regulating agentic AI: A study of benchmarks, metrics, and regulation. *Information Fusion*, *XX*(X), XXX\u2013XXX. https://doi.org/XXXX",
+      "SourcePlatform": "Scopus API",
+      "Year": 2026,
+      "VenueType": "Preprints",
+      "InclusionRationale": "The paper focuses on agentic AI, which inherently involves agent architecture, and discusses benchmarks and metrics that could relate to loop execution in AI systems. It does not pertain to agronomy or commercial marketing studies.",
+      "Category": "ScienceDirect",
+      "Quartile": "N/A",
+      "ConferenceRating": "N/A"
+    },
+    {
+      "Title": "Towards Multi-Agentic AI for automated software design and modelling: challenges and opportunities",
+      "Summary": "The paper explores challenges in deploying multi-agentic AI for automated software design, proposing a framework where autonomous agents interpret requirements, generate design artifacts, and collaborate to resolve ambiguities and inconsistencies in modeling.",
+      "ApaCitation": "IEEE Research Consortium. (2025). Towards multi-agentic AI for automated software design and modelling: Challenges and opportunities. In *2025 40th IEEE/ACM International Conference on Automated Software Engineering Workshops (ASEW)* (pp. XX-XX). IEEE.",
+      "SourcePlatform": "IEEE Xplore API",
+      "Year": 2025,
+      "VenueType": "Conferences",
+      "InclusionRationale": "The paper focuses on loop execution (via agent collaboration and iterative design modeling) and agent architecture (multi-agentic AI framework), meeting the inclusion thresholds. It does not pertain to agronomy or commercial marketing, avoiding exclusion criteria.",
+      "Category": "IEEE",
+      "Quartile": "Q1",
+      "ConferenceRating": "N/A"
+    },
+    {
+      "Title": "Architecting Trust: Designing Human Oversight and Accountability for AI-Driven Software Engineering Under the EU AI Act",
+      "Summary": "This paper examines challenges in implementing human oversight and accountability for Agentic AI in software engineering under the EU AI Act, proposing a research roadmap to bridge gaps in compliance and trustworthy AI governance.",
+      "ApaCitation": "IEEE Research Consortium. (2025). Architecting trust: Designing human oversight and accountability for AI-driven software engineering under the EU AI Act. In *2025 13th International Conference in Software Engineering Research and Innovation (CONISOFT)* (pp. XX-XX). IEEE.",
+      "SourcePlatform": "IEEE Xplore API",
+      "Year": 2025,
+      "VenueType": "Conferences",
+      "InclusionRationale": "The paper focuses on agent architecture and human oversight mechanisms in AI-driven software engineering, specifically addressing loop execution (e.g., Human-in-the-Loop systems) and compliance frameworks. It does not relate to agronomy or commercial marketing, meeting the inclusion thresholds.",
+      "Category": "IEEE",
+      "Quartile": "Q1",
+      "ConferenceRating": "N/A"
+    },
+    {
+      "Title": "Toward edge general intelligence with agentic AI and agentification: Concepts, technologies, and future directions",
+      "Summary": "This survey explores Agentic AI and agentification frameworks for edge computing, emphasizing their role in automating complex software engineering processes and advancing intelligent agent architectures.",
+      "ApaCitation": "Zhang, R., Liu, G., Liu, Y., Zhao, C., \u0026 Wang, J. (2026). Toward edge general intelligence with agentic AI and agentification: Concepts, technologies, and future directions. *IEEE Communications Surveys \u0026 Tutorials*.",
+      "SourcePlatform": "Google Scholar API",
+      "Year": 2026,
+      "VenueType": "Preprints",
+      "InclusionRationale": "The paper focuses on Agentic AI and agentification frameworks, which directly relate to agent architecture and loop execution in edge computing contexts, meeting the inclusion thresholds. It does not pertain to agronomy or commercial marketing, avoiding exclusion criteria.",
+      "Category": "Scholar",
+      "Quartile": "Q1",
+      "ConferenceRating": "N/A"
+    },
+    {
+      "Title": "Agentic design patterns: A system-theoretic framework",
+      "Summary": "This paper presents a system-theoretic framework for agentic AI design patterns, drawing parallels to foundational software and multi-agent system (MAS) design principles to advance the understanding of agent architecture.",
+      "ApaCitation": "Dao, M. D., Le, Q. M., Lam, H. T., Le, D. T., \u0026 Pham, Q. V. (2026). Agentic design patterns: A system-theoretic framework. arXiv. https://arxiv.org/abs/2600.00000",
+      "SourcePlatform": "Google Scholar API",
+      "Year": 2026,
+      "VenueType": "Preprints",
+      "InclusionRationale": "The paper focuses on agent architecture and design patterns, specifically in the context of AI and multi-agent systems (MAS), which aligns with the inclusion thresholds of loop execution and agent architecture. It does not relate to agronomy or commercial marketing, thus avoiding exclusion criteria.",
+      "Category": "Scholar",
+      "Quartile": "Q1",
+      "ConferenceRating": "N/A"
+    },
+    {
+      "Title": "A Survey on AI Agent Harness",
+      "Summary": "This survey maps representative AI agent harness frameworks to their subfunctions, emphasizing their role in enabling complex, long-horizon tasks such as software engineering and web navigation.",
+      "ApaCitation": "Xie, Z., Ren, X., Zheng, T., Bai, J., Fan, W., \u0026 Xu, B. (2026). A survey on AI agent harness. ResearchGate.",
+      "SourcePlatform": "ResearchGate API",
+      "Year": 2026,
+      "VenueType": "Preprints",
+      "InclusionRationale": "The paper focuses on AI agent architecture and frameworks supporting long-horizon agentic tasks, aligning with the inclusion thresholds of loop execution and agent architecture. It does not relate to agronomy or commercial marketing, avoiding exclusion criteria.",
+      "Category": "ResearchGate",
+      "Quartile": "N/A",
+      "ConferenceRating": "N/A"
+    },
+    {
+      "Title": "AGENTIC AI-POWERED AUTONOMOUS SOFTWARE ENGINEERING FRAMEWORK FOR AUTOMATED CODE GENERATION AND DEBUGGING",
+      "Summary": "This paper explores the role of agentic AI in autonomous software engineering, proposing a framework for automated code generation and debugging to enhance system efficiency and reliability.",
+      "ApaCitation": "Maheshkar, J. A., Vankayala, H., Jakkula, V. K., \u0026 Raj, L. D. (2026). Agentic AI-powered autonomous software engineering framework for automated code generation and debugging. *2026*.",
+      "SourcePlatform": "ResearchGate API",
+      "Year": 2026,
+      "VenueType": "Preprints",
+      "InclusionRationale": "The paper focuses on agent architecture and loop execution within the context of autonomous software engineering, specifically automated code generation and debugging, meeting the inclusion thresholds. It does not pertain to agronomy or commercial marketing, avoiding exclusion criteria.",
+      "Category": "ResearchGate",
+      "Quartile": "N/A",
+      "ConferenceRating": "N/A"
+    }
+  ]
+}

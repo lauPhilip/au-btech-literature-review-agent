@@ -4,6 +4,9 @@ namespace AuBtechReviewAgent;
 
 public class UiStateContainer
 {
+    // Tracks the current multi-user isolated session ID across component navigation switches
+    public Guid CurrentSessionId { get; set; } = Guid.Empty;
+
     // Holds the UI dashboard variables across tab switches
     public string SearchQuery { get; set; } = "Agentic AI software frameworks";
     public string InclusionCriteria { get; set; } = "Must focus on loop execution and agent architecture.";

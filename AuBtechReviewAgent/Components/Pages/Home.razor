@@ -3,7 +3,9 @@
 
 @using System.IO
 @using System.Text.Json
+@using Microsoft.AspNetCore.Components.Server.ProtectedBrowserStorage
 @inject AuBtechReviewAgent.PrismaReviewEngine ReviewEngine
+@inject ProtectedSessionStorage SessionStorage
 @inject IJSRuntime JS
 
 <header class="bg-[#003B5C] text-white flex-none shrink-0 z-50 shadow-md">
@@ -31,7 +33,36 @@
         
         <div class="lg:col-span-5 flex flex-col space-y-4 min-h-0">
             <div class="bg-white border border-gray-200 rounded-lg p-4 flex flex-col justify-between shadow-sm flex-1 min-h-0">
-                <span class="text-[10px] font-bold uppercase tracking-wider text-gray-400 block mb-2">Execution Configuration</span>
+                <div class="flex justify-between items-center mb-2 flex-none">
+                    <span class="text-[10px] font-bold uppercase tracking-wider text-gray-400 block">Execution Configuration</span>
+                    <button @onclick="OpenKeyModal" class="text-[10px] bg-gray-100 hover:bg-gray-200 border border-gray-300 text-gray-700 px-2 py-0.5 rounded transition-all flex items-center gap-1">
+                        <svg class="w-3 h-3 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/></svg>
+                        <span>API Credentials</span>
+                    </button>
+                </div>
+
+                <div class="mb-3 flex-none">
+                    @if (isUsingByok)
+                    {
+                        <div class="bg-green-50 border border-green-200 rounded p-2 text-[11px] text-green-800 flex items-center justify-between font-sans">
+                            <span class="font-medium flex items-center gap-1">
+                                <span class="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span>
+                                Active Mode: Bring Your Own Key Tier
+                            </span>
+                            <span class="font-mono text-[10px] bg-green-100 text-green-800 px-1 rounded">3 req / min</span>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="bg-amber-50 border border-amber-200 rounded p-2 text-[11px] text-amber-800 flex items-center justify-between font-sans">
+                            <span class="font-medium flex items-center gap-1">
+                                <span class="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
+                                Active Mode: Shared Server Default Tier
+                            </span>
+                            <span class="font-mono text-[10px] bg-amber-100 text-amber-800 px-1 rounded">1 req / day</span>
+                        </div>
+                    }
+                </div>
                 
                 <div class="space-y-3 overflow-y-auto pr-1 flex-1 text-left">
                     <div>
@@ -135,12 +166,54 @@
                 <span class="text-[9px] opacity-50 uppercase tracking-widest font-bold">Mistral LLM</span>
             </div>
             <div class="flex-1 bg-gray-950 p-4 font-mono text-xs text-green-400 overflow-y-auto whitespace-pre-wrap leading-relaxed">
-@rawJsonLogs
+                @rawJsonLogs
             </div>
         </div>
 
     </div>
 </div>
+
+@if (showKeyModal)
+{
+    <div class="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-[100] p-4 font-sans animate-fadeIn">
+        <div class="bg-white border border-gray-200 w-full max-w-md rounded-lg shadow-2xl overflow-hidden flex flex-col text-left">
+            <div class="bg-[#003B5C] text-white p-4 flex justify-between items-center">
+                <div>
+                    <h3 class="text-sm font-bold tracking-tight uppercase">Credential Vault Config</h3>
+                    <p class="text-[10px] opacity-70 font-mono mt-0.5">Isolate Custom Session Keys via SignalR Enclave</p>
+                </div>
+                <button @onclick="CloseKeyModal" class="text-white/60 hover:text-white transition-colors">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+            </div>
+            <div class="p-4 space-y-3 overflow-y-auto text-xs text-gray-700">
+                <div class="bg-blue-50 border border-blue-100 text-blue-800 p-2.5 rounded text-[11px] leading-normal font-light">
+                    <strong>Browser Encryption Notice:</strong> Keys entered here are encrypted and stored purely inside your browser's local tab session. They never touch public logs, are never saved on server disks, and vanish completely when the tab is closed.
+                </div>
+                <div>
+                    <label class="block font-bold text-gray-600 mb-1 uppercase text-[10px]">Mistral AI Large API Key</label>
+                    <input type="password" placeholder="Defaults to server standard key if blank..." @bind="modalMistral" class="w-full p-2 border border-gray-300 rounded font-mono focus:outline-none focus:border-[#003B5C]" />
+                </div>
+                <div>
+                    <label class="block font-bold text-gray-600 mb-1 uppercase text-[10px]">Elsevier / Scopus Scopus Key</label>
+                    <input type="password" placeholder="Defaults to server standard key if blank..." @bind="modalElsevier" class="w-full p-2 border border-gray-300 rounded font-mono focus:outline-none focus:border-[#003B5C]" />
+                </div>
+                <div>
+                    <label class="block font-bold text-gray-600 mb-1 uppercase text-[10px]">IEEE Xplore Gateway Key</label>
+                    <input type="password" placeholder="Optional..." @bind="modalIeee" class="w-full p-2 border border-gray-300 rounded font-mono focus:outline-none focus:border-[#003B5C]" />
+                </div>
+                <div>
+                    <label class="block font-bold text-gray-600 mb-1 uppercase text-[10px]">SerpApi Key (Google Scholar / ResearchGate)</label>
+                    <input type="password" placeholder="Optional..." @bind="modalScholar" class="w-full p-2 border border-gray-300 rounded font-mono focus:outline-none focus:border-[#003B5C]" />
+                </div>
+            </div>
+            <div class="bg-gray-50 px-4 py-3 border-t border-gray-200 flex justify-end gap-2">
+                <button @onclick="ClearVault" class="px-3 py-1.5 text-xs text-red-600 hover:text-red-800 transition-colors uppercase font-semibold">Clear Session</button>
+                <button @onclick="SaveSessionKeys" class="px-4 py-1.5 text-xs text-white font-bold bg-[#003B5C] rounded shadow hover:bg-opacity-95 uppercase tracking-wide transition-all">Apply to Session</button>
+            </div>
+        </div>
+    </div>
+}
 
 @code {
     [Inject] private UiStateContainer State { get; set; } = default!;
@@ -163,46 +236,100 @@
 
     private int maxResults { get; set; } = 5;
 
-    // ADDED: Rehydrates execution state containers from the file pool if the session drops or resets
+    private bool showKeyModal = false;
+    private bool isUsingByok = false;
+    private AuBtechReviewAgent.UserApiKeys? sessionKeys = null;
+
+    private string modalMistral = "";
+    private string modalElsevier = "";
+    private string modalIeee = "";
+    private string modalScholar = "";
+
+    // FIXED: Added a session fallback property accessor to the scoped container state
+    private Guid currentSessionId 
+    { 
+        get => State.CurrentSessionId == Guid.Empty ? (State.CurrentSessionId = Guid.NewGuid()) : State.CurrentSessionId;
+        set => State.CurrentSessionId = value; 
+    }
+
     protected override async Task OnInitializedAsync()
     {
         if (isSearching)
         {
             ReviewEngine.OnProgressUpdated += HandleEngineProgress;
+            StartLogMonitoringLoop(); // Resume background log updates if navigating back mid-run
         }
-        else if (File.Exists("transparent-process.json"))
+        else 
+        {
+            // Rehydrate past search session text logs if navigating back to home after run completion
+            string dynamicStatePath = $"transparent-process-{currentSessionId:N}.json";
+            if (File.Exists(dynamicStatePath))
+            {
+                try
+                {
+                    using var fileStream = new FileStream(dynamicStatePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+                    using var reader = new StreamReader(fileStream);
+                    rawJsonLogs = await reader.ReadToEndAsync();
+                }
+                catch { }
+            }
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
         {
             try
             {
-                using var fileStream = new FileStream("transparent-process.json", FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
-                using var reader = new StreamReader(fileStream);
-                string currentContent = await reader.ReadToEndAsync();
-
-                if (!string.IsNullOrWhiteSpace(currentContent))
+                var result = await SessionStorage.GetAsync<string>("encrypted_byok_payload");
+                if (result.Success && !string.IsNullOrWhiteSpace(result.Value))
                 {
-                    rawJsonLogs = currentContent;
-                    using var doc = JsonDocument.Parse(currentContent);
-                    var root = doc.RootElement;
-
-                    if (root.TryGetProperty("Stats", out var statsProp))
+                    sessionKeys = JsonSerializer.Deserialize<AuBtechReviewAgent.UserApiKeys>(result.Value);
+                    isUsingByok = sessionKeys != null && (!string.IsNullOrWhiteSpace(sessionKeys.MistralApiKey) || !string.IsNullOrWhiteSpace(sessionKeys.ElsevierApiKey));
+                    
+                    if (sessionKeys != null)
                     {
-                        totalIdentified = statsProp.TryGetProperty("TotalIdentified", out var id) ? id.GetInt32() : 0;
-                        screenedCount = statsProp.TryGetProperty("Screened", out var sc) ? sc.GetInt32() : 0;
-                        excludedCount = statsProp.TryGetProperty("Excluded", out var ex) ? ex.GetInt32() : 0;
-                        includedCount = statsProp.TryGetProperty("Included", out var inc) ? inc.GetInt32() : 0;
-
-                        State.TotalIdentified = totalIdentified;
-                        State.ScreenedCount = screenedCount;
-                        State.ExcludedCount = excludedCount;
-                        State.IncludedCount = includedCount;
-
-                        State.PassedPeerReviewCount = statsProp.TryGetProperty("PassedPeerReviewCheck", out var pp) ? pp.GetInt32() : 0;
-                        State.FailedPeerReviewCount = statsProp.TryGetProperty("FailedPeerReviewCheck", out var fp) ? fp.GetInt32() : 0;
+                        modalMistral = sessionKeys.MistralApiKey ?? "";
+                        modalElsevier = sessionKeys.ElsevierApiKey ?? "";
+                        modalIeee = sessionKeys.IeeeApiKey ?? "";
+                        modalScholar = sessionKeys.ScholarApiKey ?? "";
                     }
+                    await InvokeAsync(StateHasChanged);
                 }
             }
             catch { }
         }
+    }
+
+    private void OpenKeyModal() => showKeyModal = true;
+    private void CloseKeyModal() => showKeyModal = false;
+
+    private async Task SaveSessionKeys()
+    {
+        string sMistral = AuBtechReviewAgent.SecurityUtility.SanitizeInput(modalMistral);
+        string sElsevier = AuBtechReviewAgent.SecurityUtility.SanitizeInput(modalElsevier);
+        string sIeee = AuBtechReviewAgent.SecurityUtility.SanitizeInput(modalIeee);
+        string sScholar = AuBtechReviewAgent.SecurityUtility.SanitizeInput(modalScholar);
+
+        sessionKeys = new AuBtechReviewAgent.UserApiKeys(sMistral, sElsevier, sIeee, sScholar);
+        isUsingByok = !string.IsNullOrWhiteSpace(sMistral) || !string.IsNullOrWhiteSpace(sElsevier);
+
+        string jsonPayload = JsonSerializer.Serialize(sessionKeys);
+        await SessionStorage.SetAsync("encrypted_byok_payload", jsonPayload);
+        
+        showKeyModal = false;
+        StateHasChanged();
+    }
+
+    private async Task ClearVault()
+    {
+        modalMistral = modalElsevier = modalIeee = modalScholar = "";
+        sessionKeys = null;
+        isUsingByok = false;
+        await SessionStorage.DeleteAsync("encrypted_byok_payload");
+        showKeyModal = false;
+        StateHasChanged();
     }
 
     private void HandlePresetArtifactSelection(ChangeEventArgs e)
@@ -210,7 +337,7 @@
         string chosen = e.Value?.ToString() ?? "Custom";
         synthesisTargetDirective = chosen switch
         {
-            "LoopModel" => "Create a conceptual architectural loop diagram detailing fault-tolerance gating mechanisms.",
+            "LoopModel" => "Conceptual Architectural Loop Diagram detailing fault-tolerance gating mechanisms.",
             "Patterns" => "Create a complete numbered layout list of software design patterns for runtime safeguards and error containment.",
             "Matrix" => "Create a detailed text table matrix comparing the specific tool-use security trade-offs of the reviewed engines.",
             _ => synthesisTargetDirective
@@ -219,26 +346,11 @@
 
     private async Task StartReviewProcess()
     {
-        if (File.Exists("prisma-report.json"))
-        {
-            try { File.Delete("prisma-report.json"); } catch { }
-        }
-
-        string papersDir = Path.Combine(Directory.GetCurrentDirectory(), "PapersWorkspace");
-        if (Directory.Exists(papersDir))
-        {
-            try
-            {
-                foreach (string file in Directory.GetFiles(papersDir))
-                {
-                    File.Delete(file);
-                }
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Workspace folder purge warning: {ex.Message}");
-            }
-        }
+        string cleanQuery = AuBtechReviewAgent.SecurityUtility.SanitizeInput(searchQuery);
+        string cleanObjective = AuBtechReviewAgent.SecurityUtility.SanitizeInput(reviewObjective);
+        string cleanInclusion = AuBtechReviewAgent.SecurityUtility.SanitizeInput(inclusionCriteria);
+        string cleanExclusion = AuBtechReviewAgent.SecurityUtility.SanitizeInput(exclusionCriteria);
+        string cleanDirective = AuBtechReviewAgent.SecurityUtility.SanitizeInput(synthesisTargetDirective);
 
         totalIdentified = 0;
         screenedCount = 0;
@@ -247,8 +359,11 @@
         State.PassedPeerReviewCount = 0;
         State.FailedPeerReviewCount = 0;
         isSearching = true;
-        rawJsonLogs = "{\n  \"status\": \"Initializing TraceableAI framework and purging workspace folders...\"\n}";
+        rawJsonLogs = "{\n  \"status\": \"Initializing secure user session isolation container...\"\n}";
         
+        // Refresh session key token on fresh user click loops
+        currentSessionId = Guid.NewGuid();
+
         ReviewEngine.OnProgressUpdated += HandleEngineProgress;
         StateHasChanged();
 
@@ -256,7 +371,17 @@
         {
             try
             {
-                await ReviewEngine.RunReviewLoopAsync(searchQuery, reviewObjective, inclusionCriteria, exclusionCriteria, maxResults, requirePeerReview, synthesisTargetDirective);
+                await ReviewEngine.RunReviewLoopAsync(
+                    currentSessionId, 
+                    cleanQuery, 
+                    cleanObjective, 
+                    cleanInclusion, 
+                    cleanExclusion, 
+                    maxResults, 
+                    requirePeerReview, 
+                    cleanDirective,
+                    sessionKeys
+                );
             }
             catch (Exception ex)
             {
@@ -270,16 +395,22 @@
             }
         });
 
+        StartLogMonitoringLoop();
+    }
+
+    private void StartLogMonitoringLoop()
+    {
+        string dynamicStatePath = $"transparent-process-{currentSessionId:N}.json";
         _ = Task.Run(async () =>
         {
             while (isSearching)
             {
-                await Task.Delay(200); 
-                if (File.Exists("transparent-process.json"))
+                await Task.Delay(250); 
+                if (File.Exists(dynamicStatePath))
                 {
                     try
                     {
-                        using var fileStream = new FileStream("transparent-process.json", FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+                        using var fileStream = new FileStream(dynamicStatePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
                         using var reader = new StreamReader(fileStream);
                         string updatedContent = await reader.ReadToEndAsync();
 

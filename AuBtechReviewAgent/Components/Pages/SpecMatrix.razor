@@ -469,7 +469,20 @@
     {
         try
         {
-            byte[] zipBytes = ReviewEngine.GenerateManuscriptPdf(report, tableRecords);
+            Guid activeSessionId = Guid.Empty;
+            if (File.Exists("transparent-process.json"))
+            {
+                try {
+                    string txt = await File.ReadAllTextAsync("transparent-process.json");
+                    using var d = JsonDocument.Parse(txt);
+                    if (d.RootElement.TryGetProperty("ReviewId", out var idProp)) {
+                        Guid.TryParse(idProp.GetString(), out activeSessionId);
+                    }
+                } catch {}
+            }
+
+            // FIXED: Provided tableRecords as Argument 3 to fulfill the backend signature requirement
+            byte[] zipBytes = ReviewEngine.GenerateManuscriptPdf(activeSessionId, report, tableRecords);
             string base64String = Convert.ToBase64String(zipBytes);
             string fileName = $"PRISMA_Evaluation_Footprint_{DateTime.UtcNow:yyyyMMdd}.zip";
             

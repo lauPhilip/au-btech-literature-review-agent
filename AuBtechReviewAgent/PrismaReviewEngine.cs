@@ -18,35 +18,53 @@ namespace AuBtechReviewAgent;
 
 public class PrismaReviewEngine
 {
-    private readonly Kernel _kernel;
-    private readonly string _stateFilePath = "transparent-process.json";
-    private readonly string _reportFilePath = "prisma-report.json";
-    private readonly List<IAcademicSource> _sources;
+    private readonly string _globalMistralKey;
+    private readonly string _globalElsevierKey;
+    private readonly string? _globalIeeeKey;
+    private readonly string? _globalScholarKey;
 
     public event Action<ReviewStats>? OnProgressUpdated;
 
+    private string GetStateFilePath(Guid sessionId) => $"transparent-process-{sessionId:N}.json";
+    private string GetReportFilePath(Guid sessionId) => $"prisma-report-{sessionId:N}.json";
+    private string GetWorkspaceFolderPath(Guid sessionId) => Path.Combine(Directory.GetCurrentDirectory(), "WorkspaceStore", sessionId.ToString("N"));
+
     public PrismaReviewEngine(string mistralApiKey, string elsevierApiKey, string? ieeeApiKey = null, string? scholarApiKey = null)
     {
-        var builder = Kernel.CreateBuilder();
-        builder.AddMistralChatCompletion("mistral-large-latest", mistralApiKey);
-        _kernel = builder.Build();
-
-        _sources = new List<IAcademicSource> { new ArxivSource() };
-
-        if (!string.IsNullOrEmpty(elsevierApiKey)) _sources.Add(new ElsevierSource(elsevierApiKey));
-        if (!string.IsNullOrEmpty(ieeeApiKey)) _sources.Add(new IeeeXploreSource(ieeeApiKey));
-        
-        if (!string.IsNullOrEmpty(scholarApiKey)) 
-        {
-            _sources.Add(new GoogleScholarSource(scholarApiKey));
-            _sources.Add(new ResearchGateSource(scholarApiKey));
-        }
+        // Store global keys securely as fallbacks rather than freezing them inside a static Kernel instance
+        _globalMistralKey = mistralApiKey;
+        _globalElsevierKey = elsevierApiKey;
+        _globalIeeeKey = ieeeApiKey;
+        _globalScholarKey = scholarApiKey;
     }
 
-    public async Task RunReviewLoopAsync(string initialQuery, string explicitObjective, string inclusionCriteria, string exclusionCriteria, int maxResults, bool requirePeerReview = false, string synthesisDirective = "")
+    public async Task RunReviewLoopAsync(Guid sessionId, string initialQuery, string explicitObjective, string inclusionCriteria, string exclusionCriteria, int maxResults, bool requirePeerReview = false, string synthesisDirective = "", UserApiKeys? userKeys = null)
     {
-        var chatService = _kernel.GetRequiredService<IChatCompletionService>();
-        
+        // 1. Resolve runtime credentials (BYOK fallback chain)
+        string activeMistral = !string.IsNullOrWhiteSpace(userKeys?.MistralApiKey) ? userKeys.MistralApiKey : _globalMistralKey;
+        string activeElsevier = !string.IsNullOrWhiteSpace(userKeys?.ElsevierApiKey) ? userKeys.ElsevierApiKey : _globalElsevierKey;
+        string? activeIeee = !string.IsNullOrWhiteSpace(userKeys?.IeeeApiKey) ? userKeys.IeeeApiKey : _globalIeeeKey;
+        string? activeScholar = !string.IsNullOrWhiteSpace(userKeys?.ScholarApiKey) ? userKeys.ScholarApiKey : _globalScholarKey;
+
+        // 2. Build isolated kernel for this specific thread pass
+        var builder = Kernel.CreateBuilder();
+        builder.AddMistralChatCompletion("mistral-large-latest", activeMistral);
+        var kernel = builder.Build();
+        var chatService = kernel.GetRequiredService<IChatCompletionService>();
+
+        // 3. Assemble transient source gateway adapters for this session run
+        var activeSources = new List<IAcademicSource> { new ArxivSource() };
+        if (!string.IsNullOrEmpty(activeElsevier)) activeSources.Add(new ElsevierSource(activeElsevier));
+        if (!string.IsNullOrEmpty(activeIeee)) activeSources.Add(new IeeeXploreSource(activeIeee));
+        if (!string.IsNullOrEmpty(activeScholar))
+        {
+            activeSources.Add(new GoogleScholarSource(activeScholar));
+            activeSources.Add(new ResearchGateSource(activeScholar));
+        }
+
+        string userWorkspace = GetWorkspaceFolderPath(sessionId);
+        Directory.CreateDirectory(userWorkspace);
+
         var reviewState = new ReviewState 
         { 
             SearchQuery = initialQuery,
@@ -54,11 +72,11 @@ public class PrismaReviewEngine
             SynthesisTargetDirective = synthesisDirective
         };
         reviewState.Stats.ProcessingStage = "Screening";
-        await SaveStateAsync(reviewState);
+        await SaveStateAsync(sessionId, reviewState);
 
         var allGroundedChunks = new List<DocumentChunk>();
 
-        foreach (var source in _sources)
+        foreach (var source in activeSources)
         {
             var currentLog = new PlatformSearchLog
             {
@@ -67,7 +85,7 @@ public class PrismaReviewEngine
                 Status = "Running"
             };
             reviewState.SearchLogs.Add(currentLog);
-            await SaveStateAsync(reviewState);
+            await SaveStateAsync(sessionId, reviewState);
 
             List<AcademicPaper> candidates = new();
             try
@@ -79,13 +97,14 @@ public class PrismaReviewEngine
             catch (Exception ex)
             {
                 currentLog.Status = "Faulted / Refused Connection";
-                currentLog.ErrorMessage = ex.Message;
-                Console.WriteLine($"[Source Exception Logging] {source.SourceName} faulted: {ex.Message}");
+                // SECURITY PASS: Sanitize the exception log trace string to strip mirrored key traces out
+                currentLog.ErrorMessage = SanitizeLogMessage(ex.Message);
+                Console.WriteLine($"[Source Exception Logging] {source.SourceName} faulted: {currentLog.ErrorMessage}");
             }
 
             reviewState.Stats.TotalIdentified += candidates.Count;
             OnProgressUpdated?.Invoke(reviewState.Stats);
-            await SaveStateAsync(reviewState);
+            await SaveStateAsync(sessionId, reviewState);
 
             var filteredCandidates = new List<AcademicPaper>();
             foreach (var paper in candidates)
@@ -96,8 +115,7 @@ public class PrismaReviewEngine
 
                     if (paper.Id.StartsWith("SCOPUS_ID:") || source.SourceName.Contains("ScienceDirect", StringComparison.OrdinalIgnoreCase))
                     {
-                        if (!string.IsNullOrEmpty(paper.JournalSource) && 
-                            !paper.JournalSource.Contains("Preprint", StringComparison.OrdinalIgnoreCase))
+                        if (!string.IsNullOrEmpty(paper.JournalSource) && !paper.JournalSource.Contains("Preprint", StringComparison.OrdinalIgnoreCase))
                         {
                             isPeerReviewed = true;
                         }
@@ -114,14 +132,7 @@ public class PrismaReviewEngine
                                                     combinedMetadata.Contains("Transactions on", StringComparison.OrdinalIgnoreCase) ||
                                                     combinedMetadata.Contains("Published in", StringComparison.OrdinalIgnoreCase);
 
-                        if (hasHintOfPublication)
-                        {
-                            isPeerReviewed = await VerifyPeerReviewStatusViaLLMAsync(chatService, paper);
-                        }
-                        else
-                        {
-                            isPeerReviewed = false; 
-                        }
+                        if (hasHintOfPublication) isPeerReviewed = await VerifyPeerReviewStatusViaLLMAsync(chatService, paper);
                     }
                     else
                     {
@@ -134,16 +145,13 @@ public class PrismaReviewEngine
                         reviewState.Stats.Screened++;
 
                         reviewState.Phases.Screening.Add(new ScreeningLog(
-                            paper.Id, 
-                            paper.Title, 
-                            "Excluded", 
+                            paper.Id, paper.Title, "Excluded", 
                             "Excluded during post-retrieval pre-screening: Document was classified as an un-reviewed preprint or working paper, violating the active Peer-Reviewed Only configuration threshold.",
-                            "N/A",
-                            "N/A"
+                            "N/A", "N/A"
                         ));
                         
                         OnProgressUpdated?.Invoke(reviewState.Stats);
-                        await SaveStateAsync(reviewState);
+                        await SaveStateAsync(sessionId, reviewState);
                         continue;
                     }
 
@@ -156,7 +164,6 @@ public class PrismaReviewEngine
             foreach (var paper in filteredCandidates)
             {
                 string authorList = string.Join(", ", paper.Authors);
-
                 var prompt = $$"""
                     Evaluate the following academic paper against the provided systematically structured PRISMA parameters.
                     
@@ -192,7 +199,7 @@ public class PrismaReviewEngine
 
                     UpdateReviewState(reviewState, paper, decisionData);
                     OnProgressUpdated?.Invoke(reviewState.Stats);
-                    await SaveStateAsync(reviewState);
+                    await SaveStateAsync(sessionId, reviewState);
 
                     string decision = decisionData.TryGetProperty("decision", out var d) ? d.GetString() ?? "Excluded" : "Excluded";
                     if (decision.Equals("Included", StringComparison.OrdinalIgnoreCase))
@@ -203,7 +210,7 @@ public class PrismaReviewEngine
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"[Screening Exception] Problem processing paper '{paper.Title}': {ex.Message}");
+                    Console.WriteLine($"[Screening Exception] Problem processing paper '{paper.Title}': {SanitizeLogMessage(ex.Message)}");
                 }
             }
         }
@@ -261,10 +268,9 @@ public class PrismaReviewEngine
                 ConferenceRating = cleanCategory == "ScienceDirect" && venue == "Conferences" ? "A" : "N/A"
             });
         }
-        await SaveStateAsync(reviewState);
+        await SaveStateAsync(sessionId, reviewState);
 
         var includedPapers = includedLogs.OrderBy(p => p.ApaCitation).ToList();
-
         var sbReferences = new StringBuilder();
         for (int i = 0; i < includedPapers.Count; i++)
         {
@@ -297,12 +303,19 @@ public class PrismaReviewEngine
             }
         }
 
-        await GeneratePrismaChecklistReportWithRAGAsync(chatService, initialQuery, explicitObjective, 
+        await GeneratePrismaChecklistReportWithRAGAsync(sessionId, activeSources.Count, chatService, initialQuery, explicitObjective, 
             inc: inclusionCriteria, exc: exclusionCriteria, sbContext.ToString(), exactReferenceListForLLM, reviewState);
 
         reviewState.Stats.ProcessingStage = "Complete";
         OnProgressUpdated?.Invoke(reviewState.Stats);
-        await SaveStateAsync(reviewState);
+        await SaveStateAsync(sessionId, reviewState);
+    }
+
+    private string SanitizeLogMessage(string message)
+    {
+        if (string.IsNullOrEmpty(message)) return string.Empty;
+        // Regex pattern to look for common 32-character hex strings or alphanumeric secret structures and drop them
+        return Regex.Replace(message, @"([a-zA-Z0-9]{24,64})", "[REDACTED_API_CREDENTIAL]");
     }
 
     private int ExtractYearFromCitation(string? citation)
@@ -330,7 +343,6 @@ public class PrismaReviewEngine
         {
             var response = await chatService.GetChatMessageContentAsync(prompt);
             string cleanResponse = response.ToString().Replace("```json", "").Replace("```", "").Trim();
-            
             using var doc = JsonDocument.Parse(cleanResponse);
             if (doc.RootElement.TryGetProperty("isPeerReviewed", out var prop))
             {
@@ -341,20 +353,16 @@ public class PrismaReviewEngine
         {
             if ((paper.JournalSource ?? "").Contains("arXiv", StringComparison.OrdinalIgnoreCase)) return false;
         }
-
         return false;
     }
 
-    private async Task GeneratePrismaChecklistReportWithRAGAsync(IChatCompletionService chat, string query, string explicitObjective, string inc, string exc, string groundedChunksText, string referenceListMapping, ReviewState finalState)
+    private async Task GeneratePrismaChecklistReportWithRAGAsync(Guid sessionId, int sourceCount, IChatCompletionService chat, string query, string explicitObjective, string inc, string exc, string groundedChunksText, string referenceListMapping, ReviewState finalState)
     {
-        string activePlatformsList = string.Join(", ", _sources.Select(s => s.SourceName));
-
         var reportPrompt = $$"""
             You are an elite academic meta-analyst preparing an evaluation report mapped to the PRISMA 2020 Expanded Checklist.
 
             CRITICAL LIVE RUN CONSTRAINTS (ZERO HALLUCINATION DIRECTIVE):
             - The ONLY search term/string used in this run was exactly: "{{query}}"
-            - The ONLY databases searched were exactly: {{activePlatformsList}}
             - The review objective specified by the user was exactly: "{{explicitObjective}}"
             - The screening inclusion thresholds were exactly: "{{inc}}"
             - The screening exclusion thresholds were exactly: "{{exc}}"
@@ -387,12 +395,12 @@ public class PrismaReviewEngine
             JSON TEMPLATE SCHEMA:
             {
                 "titleItem": "A rigorous systematic literature review title analyzing '{{query}}' mapping to PRISMA Item 1.",
-                "abstractItem": "A formal abstract overview addressing the core objective ('{{explicitObjective}}') over resources found in {{activePlatformsList}} mapping to PRISMA Item 2.",
+                "abstractItem": "A formal abstract overview addressing the core objective ('{{explicitObjective}}') mapping to PRISMA Item 2.",
                 "rationaleItem": "A rigorous context justification detailing the current state of software frameworks regarding '{{query}}' mapping to PRISMA Item 3.",
                 "objectivesItem": "The explicit question formulation matching the stated goal: '{{explicitObjective}}' mapping to PRISMA Item 4.",
                 "eligibilityItem": "A comprehensive breakdown detailing the screening configuration limits (Inclusion: '{{inc}}' | Exclusion: '{{exc}}') mapping to PRISMA Item 5.",
-                "sourcesItem": "A concise record confirming that document platform searches were limited strictly to the active query interfaces of {{activePlatformsList}} mapping to PRISMA Item 6.",
-                "searchStrategyItem": "An analytical description confirming that execution was carried out using the literal search query phrase '{{query}}' across the indexing API's from the Research Sites of {{activePlatformsList}} mapping to PRISMA Item 7.",
+                "sourcesItem": "A concise record confirming that document platform searches were limited strictly to the active query interfaces mapping to PRISMA Item 6.",
+                "searchStrategyItem": "An analytical description confirming that execution was carried out using the literal search query phrase '{{query}}' mapping to PRISMA Item 7.",
                 "selectionProcessItem": "An explanation detailing how fields were evaluated by an automated screening architecture according to constraints mapping to PRISMA Item 8.",
                 "biasAssessmentItem": "This field will be post-processed. Output exactly: 'PREDEFINED_METADATA_MARKER'",
                 "synthesisResultsItem": "Your simple-English factual literature summary paragraph mapping to PRISMA Item 20a. Do not place code syntax here.",
@@ -407,7 +415,6 @@ public class PrismaReviewEngine
             var response = await chat.GetChatMessageContentAsync(reportPrompt);
             string rawResponse = response.ToString().Trim();
 
-            // Extract diagram blocks independently outside the JSON payload boundary
             string mermaidBlock = "";
             var mermaidMatch = Regex.Match(rawResponse, @"\[MERMAID_START\](.*?)\[MERMAID_END\]", RegexOptions.Singleline);
             if (mermaidMatch.Success)
@@ -422,18 +429,15 @@ public class PrismaReviewEngine
                 tikzBlock = "\n\n[TIKZ_START]\n" + tikzMatch.Groups[1].Value.Trim() + "\n[TIKZ_END]\n";
             }
 
-            // Strip out diagram tags to prevent curly brace confusion
             string jsonSearchText = rawResponse;
             jsonSearchText = Regex.Replace(jsonSearchText, @"\[MERMAID_START\].*?\[MERMAID_END\]", "", RegexOptions.Singleline);
             jsonSearchText = Regex.Replace(jsonSearchText, @"\[TIKZ_START\].*?\[TIKZ_END\]", "", RegexOptions.Singleline);
 
             int jsonStartIdx = jsonSearchText.IndexOf('{');
             int jsonEndIdx = jsonSearchText.LastIndexOf('}');
-            
             string jsonPart = "{}";
             if (jsonStartIdx != -1 && jsonEndIdx != -1 && jsonEndIdx > jsonStartIdx)
             {
-                // FIXED: Explicitly cuts off everything past the closing brace '}' to drop trailing hyphens/markdown lines
                 jsonPart = jsonSearchText.Substring(jsonStartIdx, jsonEndIdx - jsonStartIdx + 1).Trim();
             }
 
@@ -447,7 +451,6 @@ public class PrismaReviewEngine
                 root.TryGetProperty(propertyName, out var element) ? element.GetString() ?? "" : "Extraction failed.";
 
             string fullSynthesisField = ResolveField("synthesisResultsItem") + mermaidBlock + tikzBlock;
-
             var reportObj = new PrismaReport
             {
                 GeneratedAt = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss UTC"),
@@ -466,17 +469,17 @@ public class PrismaReviewEngine
                 AvailabilityItem = "All automated retrieval configurations, screening criteria matrices, and synthesis generation pipeline code structures are publicly accessible via the project repository on GitHub at https://github.com/lauPhilip/au-btech-literature-review-agent."
             };
 
-            await File.WriteAllTextAsync(_reportFilePath, JsonSerializer.Serialize(reportObj, new JsonSerializerOptions { WriteIndented = true }));
+            await File.WriteAllTextAsync(GetReportFilePath(sessionId), JsonSerializer.Serialize(reportObj, new JsonSerializerOptions { WriteIndented = true }));
         }
         catch (Exception fatalEx)
         {
-            Console.WriteLine($"[Extraction Fault] Fallback trace triggered: {fatalEx.Message}");
+            Console.WriteLine($"[Extraction Fault] Fallback trace triggered: {SanitizeLogMessage(fatalEx.Message)}");
             var failureReport = new PrismaReport
             {
                 GeneratedAt = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss UTC"),
-                TitleItem = $"Checklist Synthesis generation completely faulted: {fatalEx.Message}"
+                TitleItem = $"Checklist Synthesis generation completely faulted: {SanitizeLogMessage(fatalEx.Message)}"
             };
-            await File.WriteAllTextAsync(_reportFilePath, JsonSerializer.Serialize(failureReport, new JsonSerializerOptions { WriteIndented = true }));
+            await File.WriteAllTextAsync(GetReportFilePath(sessionId), JsonSerializer.Serialize(failureReport, new JsonSerializerOptions { WriteIndented = true }));
         }
     }
 
@@ -501,7 +504,6 @@ public class PrismaReviewEngine
     private string EscapeLatexText(string input)
     {
         if (string.IsNullOrEmpty(input)) return string.Empty;
-
         string cleanInput = input.Replace("https://doi.org/XXXX-XXXXXX", "")
                                  .Replace("https://doi.org/XXXXXXX.XXXXXXX", "")
                                  .Replace("https://doi.org/XX.XXXX/", "")
@@ -521,7 +523,7 @@ public class PrismaReviewEngine
                          .Replace("^", @"\textasciicircum ");
     }
     
-    public byte[] GenerateManuscriptPdf(PrismaReport report, List<IncludedPaperMetricRow> records)
+    public byte[] GenerateManuscriptPdf(Guid sessionId, PrismaReport report, List<IncludedPaperMetricRow> records)
     {
         string projectRoot = Directory.GetCurrentDirectory();
         CleanOldManuscriptArtifacts(projectRoot);
@@ -542,11 +544,6 @@ public class PrismaReviewEngine
         int scholarCount = records.Count(r => r.Category.Equals("Scholar", StringComparison.OrdinalIgnoreCase));
         int rgCount = records.Count(r => r.Category.Equals("ResearchGate", StringComparison.OrdinalIgnoreCase));
 
-        int q1Count = records.Count(r => (r.Quartile ?? "").Equals("Q1", StringComparison.OrdinalIgnoreCase));
-        int q2Count = records.Count(r => (r.Quartile ?? "").Equals("Q2", StringComparison.OrdinalIgnoreCase));
-        int q3Count = records.Count(r => (r.Quartile ?? "").Equals("Q3", StringComparison.OrdinalIgnoreCase));
-        int q4Count = records.Count(r => (r.Quartile ?? "").Equals("Q4", StringComparison.OrdinalIgnoreCase));
-
         double totalPie = journalCount + conferenceCount + transactionsCount + proceedingsCount + preprintCount;
         double totalSourcesPie = arxivCount + scopusCount + ieeeCount + scholarCount + rgCount;
 
@@ -555,28 +552,6 @@ public class PrismaReviewEngine
         {
             string yrStr = r.Year.ToString();
             if (publicationsByYear.ContainsKey(yrStr)) publicationsByYear[yrStr]++;
-        }
-
-        int passedCheck = 0;
-        int failedCheck = 0;
-        bool peerReviewToggled = false;
-
-        if (File.Exists(_stateFilePath))
-        {
-            try
-            {
-                string stateContent = File.ReadAllText(_stateFilePath);
-                using JsonDocument stateDoc = JsonDocument.Parse(stateContent);
-                if (stateDoc.RootElement.TryGetProperty("PeerReviewOnlyToggle", out var toggleProp))
-                    peerReviewToggled = toggleProp.GetBoolean();
-
-                if (stateDoc.RootElement.TryGetProperty("Stats", out var statsEl))
-                {
-                    if (statsEl.TryGetProperty("PassedPeerReviewCheck", out var pCheck)) passedCheck = pCheck.GetInt32();
-                    if (statsEl.TryGetProperty("FailedPeerReviewCheck", out var fCheck)) failedCheck = fCheck.GetInt32();
-                }
-            }
-            catch { }
         }
 
         string sanitizedTitleItem = EscapeLatexText((report.TitleItem ?? "Systematic Review Manuscript").Replace("[Source Context Anchor 1]", "").Trim());
@@ -639,13 +614,13 @@ public class PrismaReviewEngine
         sb.AppendLine(@"    {\sffamily\bfseries\scriptsize\color{gray} AI-GENERATED SYSTEMATIC LITERATURE REVIEW  \\ \vspace{4pt}}");
         sb.AppendLine("    {\\rmfamily\\LARGE\\bfseries " + sanitizedTitleItem + " \\\\ \\vspace{10pt}}");
         sb.AppendLine(@"    {\sffamily\small\color{greyText} Department of Business Development and Technology, Aarhus University \\ \vspace{4pt}}");
-        sb.AppendLine("    {\\ttfamily\\scriptsize\\color{gray} Protocol Hash: cc584090 | Generated: " + (report.GeneratedAt ?? DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss UTC")) + " \\\\ \\vspace{15pt}}");
+        sb.AppendLine("    {\\\ttfamily\\scriptsize\\color{gray} Protocol Hash: cc584090 | Generated: " + (report.GeneratedAt ?? DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss UTC")) + " \\\\ \\vspace{15pt}}");
         sb.AppendLine(@"    \color{lightgray}\hrule\vspace{15pt}");
         sb.AppendLine(@"    \color{black}");
         sb.AppendLine(@"\end{center}");
 
         sb.AppendLine(@"\noindent\colorbox{black!4}{");
-        sb.AppendLine(@"\parbox{\dimexpr\linewidth-2\fboxsep\relax}{"); 
+        sb.AppendLine(@"\parbox{\dimexpr\linewidth-2\fboxsep\relax}{");
         sb.AppendLine(@"    \small\sffamily\bfseries\color{auBlue} ABSTRACT \\ \vspace{4pt}");
         sb.AppendLine("    \\itshape\\rmfamily\\color{black} " + sanitizedAbstractItem);
         sb.AppendLine(@"}}");
@@ -674,15 +649,6 @@ public class PrismaReviewEngine
         sb.AppendLine(@"\end{multicols}");
         sb.AppendLine(@"\section{Data \& Collection Metrics}");
         sb.AppendLine(@"The empirical data metrics trace key research trends regarding structural database distributions. ");
-        
-        if (peerReviewToggled)
-        {
-            sb.AppendLine($"We searched for papers across preprint servers and standard databases without filtering out un-reviewed work, choosing to check all available material. ");
-        }
-        else
-        {
-            sb.AppendLine(@"We searched for papers across preprint servers and standard databases without filtering out un-reviewed work, choosing to check all available material. ");
-        }
         sb.AppendLine($"In total, {records.Count} papers were chosen for final data extraction.");
         sb.AppendLine(@"\vspace{10pt}");
 
@@ -753,96 +719,12 @@ public class PrismaReviewEngine
         sb.AppendLine(@"\end{figure}");
         sb.AppendLine(@"\vspace{10pt}");
 
-        sb.AppendLine(@"\small ");
-        if (records.Count == 0)
-        {
-            sb.AppendLine("No data records were successfully compiled for ranking breakdown analysis.");
-        }
-        else
-        {
-            sb.AppendLine("We looked at where each included paper was published to check the quality of our data. ");
-            foreach (var r in records)
-            {
-                string name = EscapeLatexText(r.Title);
-                string venue = "";
-                var venueMatch = Regex.Match(r.ApaCitation, @"\.\s+\*([^*]+)\*");
-                if (venueMatch.Success) venue = EscapeLatexText(venueMatch.Groups[1].Value.Trim());
-                if (string.IsNullOrEmpty(venue)) venue = "Indexed Source Venue";
-
-                if (venue.Contains("Transactions on Software Engineering and Methodology", StringComparison.OrdinalIgnoreCase))
-                {
-                    sb.AppendLine($"The piece \"{name}\", published in \\textit{{ACM Transactions on Software Engineering and Methodology}}, is a \\textbf{{Q1}} journal. It has an H-index score of 95, focusing on Computer Science, Software Engineering, and related subject categories. ");
-                }
-                else if (venue.Contains("Information Fusion", StringComparison.OrdinalIgnoreCase))
-                {
-                    sb.AppendLine($"The paper \"{name}\", published in \\textit{{Information Fusion}}, is a \\textbf{{Q1}} tier journal by Elsevier. It holds an H-index score of 179 within Hardware, Signal Processing, and Software systems. ");
-                }
-                else if (r.Category == "IEEE" || r.Category == "Scholar")
-                {
-                    sb.AppendLine($"The study \"{name}\" was indexed via \\textit{{{venue}}}. It maps to an established peer-reviewed index tracking domain classification with a baseline quartile tier rating of \\textbf{{Q1}}. ");
-                }
-                else if (r.VenueType == "Conferences")
-                {
-                    sb.AppendLine($"The study \"{name}\" was published in the peer-reviewed conference proceedings of \\textit{{{venue}}}. It maps to an established Computer Science conference venue with an H-index rating of 16. ");
-                }
-                else
-                {
-                    sb.AppendLine($"The research paper \"{name}\" was pulled from the un-reviewed preprint repository archive \\textit{{{venue}}}, keeping a preprint source status. ");
-                }
-            }
-        }
-        sb.AppendLine(@"\vspace{15pt}");
-
-        sb.AppendLine(@"\begin{figure}[H]");
-        sb.AppendLine(@"\centering");
-        sb.AppendLine(@"\begin{tikzpicture}[scale=0.85]");
-        sb.AppendLine(@"\begin{axis}[ybar stacked, xtick={1,2,3,4,5,6}, xticklabels={{Q1},{Q2},{Q3},{Q4},{Conf},{Preprint}}, ymin=0, ymax=15, ylabel={Paper Count}, xlabel={Quality Tier Ratings}, width=0.8\textwidth, height=5.5cm, bar width=15pt, legend style={at={(0.5,-0.3)}, anchor=north, legend columns=2, font=\tiny}]");
-        
-        int sdQ1 = records.Count(r => r.Category == "ScienceDirect" && (r.Quartile ?? "").Equals("Q1", StringComparison.OrdinalIgnoreCase));
-        int sdQ2 = records.Count(r => r.Category == "ScienceDirect" && (r.Quartile ?? "").Equals("Q2", StringComparison.OrdinalIgnoreCase));
-        int sdQ3 = records.Count(r => r.Category == "ScienceDirect" && (r.Quartile ?? "").Equals("Q3", StringComparison.OrdinalIgnoreCase));
-        int sdQ4 = records.Count(r => r.Category == "ScienceDirect" && (r.Quartile ?? "").Equals("Q4", StringComparison.OrdinalIgnoreCase));
-        int sdC  = records.Count(r => r.Category == "ScienceDirect" && r.VenueType == "Conferences");
-        int sdP  = records.Count(r => r.Category == "ScienceDirect" && r.VenueType == "Preprints");
-
-        int axQ1 = records.Count(r => r.Category == "Arxiv" && (r.Quartile ?? "").Equals("Q1", StringComparison.OrdinalIgnoreCase));
-        int axQ2 = records.Count(r => r.Category == "Arxiv" && (r.Quartile ?? "").Equals("Q2", StringComparison.OrdinalIgnoreCase));
-        int axQ3 = records.Count(r => r.Category == "Arxiv" && (r.Quartile ?? "").Equals("Q3", StringComparison.OrdinalIgnoreCase));
-        int axQ4 = records.Count(r => r.Category == "Arxiv" && (r.Quartile ?? "").Equals("Q4", StringComparison.OrdinalIgnoreCase));
-        int axC  = records.Count(r => r.Category == "Arxiv" && r.VenueType == "Conferences");
-        int axP  = records.Count(r => r.Category == "Arxiv" && r.VenueType == "Preprints");
-
-        int ieeeQ1 = records.Count(r => r.Category == "IEEE" && (r.Quartile ?? "").Equals("Q1", StringComparison.OrdinalIgnoreCase));
-        int ieeeQ2 = records.Count(r => r.Category == "IEEE" && (r.Quartile ?? "").Equals("Q2", StringComparison.OrdinalIgnoreCase));
-        int ieeeC  = records.Count(r => r.Category == "IEEE" && r.VenueType == "Conferences");
-
-        int scQ1 = records.Count(r => r.Category == "Scholar" && (r.Quartile ?? "").Equals("Q1", StringComparison.OrdinalIgnoreCase));
-        int scC  = records.Count(r => r.Category == "Scholar" && r.VenueType == "Conferences");
-        int scP  = records.Count(r => r.Category == "Scholar" && r.VenueType == "Preprints");
-
-        int rgP  = records.Count(r => r.Category == "ResearchGate" && r.VenueType == "Preprints");
-
-        sb.AppendLine($"\\addplot[fill=green!40] coordinates {{(1,{sdQ1}) (2,{sdQ2}) (3,{sdQ3}) (4,{sdQ4}) (5,{sdC}) (6,{sdP})}};");
-        sb.AppendLine($"\\addplot[fill=yellow!60] coordinates {{(1,{axQ1}) (2,{axQ2}) (3,{axQ3}) (4,{axQ4}) (5,{axC}) (6,{axP})}};");
-        sb.AppendLine($"\\addplot[fill=blue!30] coordinates {{(1,{ieeeQ1}) (2,{ieeeQ2}) (3,0) (4,0) (5,{ieeeC}) (6,0)}};");
-        sb.AppendLine($"\\addplot[fill=orange!30] coordinates {{(1,{scQ1}) (2,0) (3,0) (4,0) (5,{scC}) (6,{scP})}};");
-        sb.AppendLine($"\\addplot[fill=purple!30] coordinates {{(1,0) (2,0) (3,0) (4,0) (5,0) (6,{rgP})}};");
-        
-        sb.AppendLine($"\\legend{{ScienceDirect ({scopusCount}), Arxiv ({arxivCount}), IEEE Xplore ({ieeeCount}), Google Scholar ({scholarCount}), ResearchGate ({rgCount})}}");
-        sb.AppendLine(@"\end{axis}");
-        sb.AppendLine(@"\end{tikzpicture}");
-        sb.AppendLine(@"\caption{Quality Tier Rating Yield Distributions}");
-        sb.AppendLine(@"\end{figure}");
-        sb.AppendLine(@"\vspace{10pt}");
-
-        // FIXED: Column alignment wrappers use fixed proportions on X column structures to handle text wraps cleanly
         sb.AppendLine(@"\small");
         sb.AppendLine(@"\begin{tabularx}{\textwidth}{>{\hsize=0.6\hsize}X >{\hsize=1.2\hsize}X >{\hsize=1.0\hsize}X >{\hsize=0.5\hsize}X >{\hsize=1.7\hsize}X}");
         sb.AppendLine(@"\multicolumn{5}{l}{\textbf{Table 3.1: Systematic Synthesis Extraction Registry}} \\\\");
         sb.AppendLine(@"\toprule");
         sb.AppendLine(@"\textbf{Paper Name} & \textbf{Executive Summary} & \textbf{Inclusion Rationale} & \textbf{Category} & \textbf{Citation (APA 7th)} \\");
         sb.AppendLine(@"\midrule");
-
         foreach (var row in records)
         {
             string title = EscapeLatexText(row.Title);
@@ -903,59 +785,42 @@ public class PrismaReviewEngine
 
         string executableName = "pdflatex";
         string localMiKTeXPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), @"Programs\MiKTeX\miktex\bin\x64\pdflatex.exe");
-        
-        if (File.Exists(localMiKTeXPath))
-        {
-            executableName = localMiKTeXPath;
-        }
+        if (File.Exists(localMiKTeXPath)) executableName = localMiKTeXPath;
 
+        bool pdfCompiled = false;
         try
         {
             var procInfo = new ProcessStartInfo
             {
                 FileName = "cmd.exe",
                 Arguments = $"/c \"\"{executableName}\" -interaction=nonstopmode -output-directory=\"{projectRoot}\" \"{texFilePath}\"\"",
-                CreateNoWindow = true,
-                UseShellExecute = false,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                WorkingDirectory = projectRoot
+                CreateNoWindow = true, UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true, WorkingDirectory = projectRoot
             };
             using var process = Process.Start(procInfo);
             if (process != null)
             {
-                string stdout = process.StandardOutput.ReadToEnd();
-                string stderr = process.StandardError.ReadToEnd();
                 process.WaitForExit();
+                pdfCompiled = true;
             }
-            
             System.Threading.Thread.Sleep(400);
         }
-        catch (Exception ex)
+        catch 
         {
-            Console.WriteLine($"[LaTeX Engine Compilation Fault] {ex.Message}");
+            Console.WriteLine("[LaTeX Engine Notification] Local binary compiler skipped.");
         }
 
         using var memoryStream = new MemoryStream();
         using (var archive = new ZipArchive(memoryStream, ZipArchiveMode.Create, true))
         {
-            if (File.Exists(pdfOutputPath))
-            {
-                archive.CreateEntryFromFile(pdfOutputPath, "PRISMA_Manuscript_Report.pdf");
-            }
-            if (File.Exists(_reportFilePath))
-            {
-                archive.CreateEntryFromFile(_reportFilePath, _reportFilePath);
-            }
-            if (File.Exists(_stateFilePath))
-            {
-                archive.CreateEntryFromFile(_stateFilePath, _stateFilePath);
-            }
+            if (pdfCompiled && File.Exists(pdfOutputPath)) archive.CreateEntryFromFile(pdfOutputPath, "PRISMA_Manuscript_Report.pdf");
+            if (File.Exists(texFilePath)) archive.CreateEntryFromFile(texFilePath, "PRISMA_Manuscript_Source.tex");
+            if (File.Exists(GetReportFilePath(sessionId))) archive.CreateEntryFromFile(GetReportFilePath(sessionId), "prisma-report.json");
+            if (File.Exists(GetStateFilePath(sessionId))) archive.CreateEntryFromFile(GetStateFilePath(sessionId), "transparent-process.json");
 
-            string paperWorkspacePath = Path.Combine(projectRoot, "PapersWorkspace");
-            if (Directory.Exists(paperWorkspacePath))
+            string userWorkspace = GetWorkspaceFolderPath(sessionId);
+            if (Directory.Exists(userWorkspace))
             {
-                var files = Directory.GetFiles(paperWorkspacePath);
+                var files = Directory.GetFiles(userWorkspace);
                 foreach (var file in files)
                 {
                     string filename = Path.GetFileName(file);
@@ -964,20 +829,14 @@ public class PrismaReviewEngine
             }
         }
 
-        try
-        {
-            File.Delete(texFilePath);
-            File.Delete(pdfOutputPath);
-        }
-        catch { }
-
+        try { File.Delete(texFilePath); File.Delete(pdfOutputPath); } catch { }
         return memoryStream.ToArray();
     }
 
-    private async Task SaveStateAsync(ReviewState state)
+    private async Task SaveStateAsync(Guid sessionId, ReviewState state)
     {
         var options = new JsonSerializerOptions { WriteIndented = true };
-        await File.WriteAllTextAsync(_stateFilePath, JsonSerializer.Serialize(state, options));
+        await File.WriteAllTextAsync(GetStateFilePath(sessionId), JsonSerializer.Serialize(state, options));
     }
 
     private JsonElement DeserializeDecision(string rawJson)
@@ -996,7 +855,6 @@ public class PrismaReviewEngine
                 var reasoningMatch = Regex.Match(rawJson, "\"reasoning\"\\s*:\\s*\"(.*?)\"");
                 var citationMatch = Regex.Match(rawJson, "\"apaCitation\"\\s*:\\s*\"(.*?)\"");
                 var summaryMatch = Regex.Match(rawJson, "\"briefSummary\"\\s*:\\s*\"(.*?)\"");
-
                 if (decisionMatch.Success)
                 {
                     string rescuedJson = $"{{\"decision\":\"{decisionMatch.Groups[1].Value}\",\"reasoning\":\"{reasoningMatch.Groups[1].Value}\",\"apaCitation\":\"{citationMatch.Groups[1].Value}\",\"briefSummary\":\"{summaryMatch.Groups[1].Value}\"}}";
