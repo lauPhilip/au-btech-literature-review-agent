@@ -16,17 +16,17 @@ public static class DocumentRAGUtility
 {
     private static readonly HttpClient _client = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
 
-    public static async Task<List<DocumentChunk>> IngestAndChunkPaperAsync(string paperUrl, string paperTitle)
+    public static async Task<List<DocumentChunk>> IngestAndChunkPaperAsync(string paperUrl, string paperTitle, string targetDir)
     {
         var chunks = new List<DocumentChunk>();
         
-        if (string.IsNullOrWhiteSpace(paperUrl)) return chunks;
+        if (string.IsNullOrWhiteSpace(paperUrl) || string.IsNullOrWhiteSpace(targetDir)) return chunks;
 
         // 1. Establish clean directory targets and handle title scrubbing
         string sanitizedName = Regex.Replace(paperTitle, @"[^a-zA-Z0-9]", "_");
         if (sanitizedName.Length > 50) sanitizedName = sanitizedName.Substring(0, 50);
         
-        string targetDir = Path.Combine(Directory.GetCurrentDirectory(), "PapersWorkspace");
+        // FIXED: Using the dynamic multi-user workspace path passed from the review engine loop
         if (!Directory.Exists(targetDir)) Directory.CreateDirectory(targetDir);
         
         string pdfPath = Path.Combine(targetDir, $"{sanitizedName}.pdf");

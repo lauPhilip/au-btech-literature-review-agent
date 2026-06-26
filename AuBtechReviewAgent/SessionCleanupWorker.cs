@@ -39,44 +39,31 @@ public class SessionCleanupWorker : BackgroundService
     }
 
     private void PurgeExpiredSessions()
+{
+    string workspaceStore = Path.Combine(Directory.GetCurrentDirectory(), "WorkspaceStore");
+    DateTime cutoffTime = DateTime.UtcNow - _sessionExpiration;
+
+    if (!Directory.Exists(workspaceStore)) return;
+
+    // Scan through active session subfolders
+    var sessionDirs = Directory.GetDirectories(workspaceStore);
+    foreach (var dir in sessionDirs)
     {
-        string rootDir = Directory.GetCurrentDirectory();
-        DateTime cutoffTime = DateTime.UtcNow - _sessionExpiration;
-
-        // 1. Purge expired JSON state ledgers
-        var stateFiles = Directory.GetFiles(rootDir, "transparent-process-*.json");
-        foreach (var file in stateFiles)
+        // If the folder has remained untouched past the expiration threshold, drop the whole container
+        if (Directory.GetLastWriteTimeUtc(dir) < cutoffTime)
         {
-            if (File.GetLastWriteTimeUtc(file) < cutoffTime)
+            try
             {
-                TryDeleteFile(file);
+                Directory.Delete(dir, true);
+                _logger.LogInformation("Purged expired user session store container: {DirName}", Path.GetFileName(dir));
             }
-        }
-
-        // 2. Purge expired JSON checklist reports
-        var reportFiles = Directory.GetFiles(rootDir, "prisma-report-*.json");
-        foreach (var file in reportFiles)
-        {
-            if (File.GetLastWriteTimeUtc(file) < cutoffTime)
+            catch (Exception ex)
             {
-                TryDeleteFile(file);
-            }
-        }
-
-        // 3. Purge expired workspace folders containing downloaded PDFs
-        string workspaceStore = Path.Combine(rootDir, "WorkspaceStore");
-        if (Directory.Exists(workspaceStore))
-        {
-            var sessionDirs = Directory.GetDirectories(workspaceStore);
-            foreach (var dir in sessionDirs)
-            {
-                if (Directory.GetLastWriteTimeUtc(dir) < cutoffTime)
-                {
-                    TryDeleteDirectory(dir);
-                }
+                _logger.LogWarning("Skipped folder purge (files locked or streaming): {Message}", ex.Message);
             }
         }
     }
+}
 
     private void TryDeleteFile(string path)
     {

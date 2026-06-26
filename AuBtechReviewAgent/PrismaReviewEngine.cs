@@ -25,9 +25,14 @@ public class PrismaReviewEngine
 
     public event Action<ReviewStats>? OnProgressUpdated;
 
-    private string GetStateFilePath(Guid sessionId) => $"transparent-process-{sessionId:N}.json";
-    private string GetReportFilePath(Guid sessionId) => $"prisma-report-{sessionId:N}.json";
-    private string GetWorkspaceFolderPath(Guid sessionId) => Path.Combine(Directory.GetCurrentDirectory(), "WorkspaceStore", sessionId.ToString("N"));
+    private string GetWorkspaceFolderPath(Guid sessionId) => 
+        Path.Combine(Directory.GetCurrentDirectory(), "WorkspaceStore", sessionId.ToString("N"));
+
+    private string GetStateFilePath(Guid sessionId) => 
+        Path.Combine(GetWorkspaceFolderPath(sessionId), "transparent-process.json");
+
+    private string GetReportFilePath(Guid sessionId) => 
+        Path.Combine(GetWorkspaceFolderPath(sessionId), "prisma-report.json");
 
     public PrismaReviewEngine(string mistralApiKey, string elsevierApiKey, string? ieeeApiKey = null, string? scholarApiKey = null)
     {
@@ -200,13 +205,13 @@ public class PrismaReviewEngine
                     UpdateReviewState(reviewState, paper, decisionData);
                     OnProgressUpdated?.Invoke(reviewState.Stats);
                     await SaveStateAsync(sessionId, reviewState);
-
-                    string decision = decisionData.TryGetProperty("decision", out var d) ? d.GetString() ?? "Excluded" : "Excluded";
-                    if (decision.Equals("Included", StringComparison.OrdinalIgnoreCase))
-                    {
-                        var paperChunks = await DocumentRAGUtility.IngestAndChunkPaperAsync(paper.Id, paper.Title);
-                        allGroundedChunks.AddRange(paperChunks);
-                    }
+                string decision = decisionData.TryGetProperty("decision", out var d) ? d.GetString() ?? "Excluded" : "Excluded";
+                if (decision.Equals("Included", StringComparison.OrdinalIgnoreCase))
+                {
+                    // FIXED: Now feeding the userWorkspace string token so downloads drop cleanly into WorkspaceStore/{SessionId}
+                    var paperChunks = await DocumentRAGUtility.IngestAndChunkPaperAsync(paper.Id, paper.Title, userWorkspace);
+                    allGroundedChunks.AddRange(paperChunks);
+                }
                 }
                 catch (Exception ex)
                 {
@@ -809,30 +814,47 @@ public class PrismaReviewEngine
             Console.WriteLine("[LaTeX Engine Notification] Local binary compiler skipped.");
         }
 
-        using var memoryStream = new MemoryStream();
+    using (var memoryStream = new MemoryStream())
+    {
         using (var archive = new ZipArchive(memoryStream, ZipArchiveMode.Create, true))
         {
-            if (pdfCompiled && File.Exists(pdfOutputPath)) archive.CreateEntryFromFile(pdfOutputPath, "PRISMA_Manuscript_Report.pdf");
-            if (File.Exists(texFilePath)) archive.CreateEntryFromFile(texFilePath, "PRISMA_Manuscript_Source.tex");
-            if (File.Exists(GetReportFilePath(sessionId))) archive.CreateEntryFromFile(GetReportFilePath(sessionId), "prisma-report.json");
-            if (File.Exists(GetStateFilePath(sessionId))) archive.CreateEntryFromFile(GetStateFilePath(sessionId), "transparent-process.json");
+            if (pdfCompiled && File.Exists(pdfOutputPath)) 
+                archive.CreateEntryFromFile(pdfOutputPath, "PRISMA_Manuscript_Report.pdf");
+            
+            if (File.Exists(texFilePath)) 
+                archive.CreateEntryFromFile(texFilePath, "PRISMA_Manuscript_Source.tex");
 
-            string userWorkspace = GetWorkspaceFolderPath(sessionId);
-            if (Directory.Exists(userWorkspace))
+            // Clean path resolutions mapping inside the isolated container
+            string statePath = GetStateFilePath(sessionId);
+            string reportPath = GetReportFilePath(sessionId);
+            string isolatedFolder = GetWorkspaceFolderPath(sessionId);
+
+            if (File.Exists(reportPath)) archive.CreateEntryFromFile(reportPath, "prisma-report.json");
+            if (File.Exists(statePath)) archive.CreateEntryFromFile(statePath, "transparent-process.json");
+
+            if (Directory.Exists(isolatedFolder))
             {
-                var files = Directory.GetFiles(userWorkspace);
+                var files = Directory.GetFiles(isolatedFolder);
                 foreach (var file in files)
                 {
+                    // Prevent loose session JSONs from duplicating into the source papers zip block
+                    if (file.EndsWith(".json")) continue;
+
                     string filename = Path.GetFileName(file);
                     archive.CreateEntryFromFile(file, $"SourcePapers/{filename}");
                 }
             }
         }
 
-        try { File.Delete(texFilePath); File.Delete(pdfOutputPath); } catch { }
-        return memoryStream.ToArray();
-    }
+        try
+        {
+            File.Delete(texFilePath);
+            File.Delete(pdfOutputPath);
+        }
+        catch { }
 
+        return memoryStream.ToArray();
+    }}
     private async Task SaveStateAsync(Guid sessionId, ReviewState state)
     {
         var options = new JsonSerializerOptions { WriteIndented = true };

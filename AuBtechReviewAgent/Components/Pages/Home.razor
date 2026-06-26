@@ -262,7 +262,7 @@
         else 
         {
             // Rehydrate past search session text logs if navigating back to home after run completion
-            string dynamicStatePath = $"transparent-process-{currentSessionId:N}.json";
+            string dynamicStatePath = Path.Combine(Directory.GetCurrentDirectory(), "WorkspaceStore", currentSessionId.ToString("N"), "transparent-process.json");
             if (File.Exists(dynamicStatePath))
             {
                 try
