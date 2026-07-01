@@ -359,7 +359,7 @@ public class PrismaReviewEngine
         return false;
     }
 
-    private async Task GeneratePrismaChecklistReportWithRAGAsync(Guid sessionId, int sourceCount, IChatCompletionService chat, string query, string explicitObjective, string inc, string exc, string groundedChunksText, string referenceListMapping, ReviewState finalState)
+private async Task GeneratePrismaChecklistReportWithRAGAsync(Guid sessionId, int sourceCount, IChatCompletionService chat, string query, string explicitObjective, string inc, string exc, string groundedChunksText, string referenceListMapping, ReviewState finalState)
     {
         var reportPrompt = $$"""
             You are an elite academic meta-analyst preparing an evaluation report mapped to the PRISMA 2020 Expanded Checklist.
@@ -466,25 +466,58 @@ public class PrismaReviewEngine
             string ResolveField(string propertyName) =>
                 root.TryGetProperty(propertyName, out var element) ? element.GetString() ?? "" : "Extraction failed.";
 
-            string fullSynthesisField = ResolveField("synthesisResultsItem") + mermaidBlock + tikzBlock;
+            // 1. EXTRACT RAW BASELINE DATA FIELDS
+            string rawTitle = ResolveField("titleItem");
+            string rawAbstract = ResolveField("abstractItem");
+            string rawRationale = ResolveField("rationaleItem");
+            string rawObjectives = ResolveField("objectivesItem");
+            string rawEligibility = ResolveField("eligibilityItem");
+            string rawSources = ResolveField("sourcesItem");
+            string rawSearch = ResolveField("searchStrategyItem");
+            string rawSelection = ResolveField("selectionProcessItem");
+            string rawDiscussion = ResolveField("discussionItem");
+            string rawSynthesisText = ResolveField("synthesisResultsItem");
+
+            var deltas = new List<StyleDeltaLog>();
+
+            // 2. PASS EACH ACADEMIC FIELD THROUGH THE HUMAN STYLISTIC REFINE SYSTEM
+            var (cleanTitle, dTitle) = await StylisticRefinerUtility.RefineAcademicProseAsync(chat, "Title", rawTitle); deltas.Add(dTitle);
+            var (cleanAbstract, dAbstract) = await StylisticRefinerUtility.RefineAcademicProseAsync(chat, "Abstract", rawAbstract); deltas.Add(dAbstract);
+            var (cleanRationale, dRationale) = await StylisticRefinerUtility.RefineAcademicProseAsync(chat, "Rationale", rawRationale); deltas.Add(dRationale);
+            var (cleanObjectives, dObjectives) = await StylisticRefinerUtility.RefineAcademicProseAsync(chat, "Objectives", rawObjectives); deltas.Add(dObjectives);
+            var (cleanEligibility, dEligibility) = await StylisticRefinerUtility.RefineAcademicProseAsync(chat, "Eligibility", rawEligibility); deltas.Add(cleanEligibility != "Extraction failed." ? dEligibility : dEligibility with { RefinedText = rawEligibility });
+            var (cleanSources, dSources) = await StylisticRefinerUtility.RefineAcademicProseAsync(chat, "Sources", rawSources); deltas.Add(dSources);
+            var (cleanSearch, dSearch) = await StylisticRefinerUtility.RefineAcademicProseAsync(chat, "Search Strategy", rawSearch); deltas.Add(dSearch);
+            var (cleanSelection, dSelection) = await StylisticRefinerUtility.RefineAcademicProseAsync(chat, "Selection Automation", rawSelection); deltas.Add(dSelection);
+            var (cleanDiscussion, dDiscussion) = await StylisticRefinerUtility.RefineAcademicProseAsync(chat, "Discussion", rawDiscussion); deltas.Add(dDiscussion);
+            var (cleanSynthesis, dSynthesis) = await StylisticRefinerUtility.RefineAcademicProseAsync(chat, "Synthesis Results", rawSynthesisText); deltas.Add(dSynthesis);
+
+            // Re-append the isolated architectural diagram strings back onto the humanized synthesis field
+            string fullSynthesisField = (string.IsNullOrWhiteSpace(cleanSynthesis) ? rawSynthesisText : cleanSynthesis) + mermaidBlock + tikzBlock;
+
             var reportObj = new PrismaReport
             {
                 GeneratedAt = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss UTC"),
-                TitleItem = ResolveField("titleItem"),
-                AbstractItem = ResolveField("abstractItem"),
-                RationaleItem = ResolveField("rationaleItem"),
-                ObjectivesItem = ResolveField("objectivesItem"),
-                EligibilityItem = ResolveField("eligibilityItem"),
-                SourcesItem = ResolveField("sourcesItem"),
-                SearchStrategyItem = ResolveField("searchStrategyItem"),
-                SelectionProcessItem = ResolveField("selectionProcessItem"),
+                TitleItem = !string.IsNullOrWhiteSpace(cleanTitle) ? cleanTitle : rawTitle,
+                AbstractItem = !string.IsNullOrWhiteSpace(cleanAbstract) ? cleanAbstract : rawAbstract,
+                RationaleItem = !string.IsNullOrWhiteSpace(cleanRationale) ? cleanRationale : rawRationale,
+                ObjectivesItem = !string.IsNullOrWhiteSpace(cleanObjectives) ? cleanObjectives : rawObjectives,
+                EligibilityItem = !string.IsNullOrWhiteSpace(cleanEligibility) ? cleanEligibility : rawEligibility,
+                SourcesItem = !string.IsNullOrWhiteSpace(cleanSources) ? cleanSources : rawSources,
+                SearchStrategyItem = !string.IsNullOrWhiteSpace(cleanSearch) ? cleanSearch : rawSearch,
+                SelectionProcessItem = !string.IsNullOrWhiteSpace(cleanSelection) ? cleanSelection : rawSelection,
                 SynthesisResultsItem = fullSynthesisField,
-                DiscussionItem = ResolveField("discussionItem"),
+                DiscussionItem = !string.IsNullOrWhiteSpace(cleanDiscussion) ? cleanDiscussion : rawDiscussion,
                 BiasAssessmentItem = "Internal risk of bias is controlled via mandatory post-generation human verification. Because the initial screening and synthesis phases are executed autonomously by an LLM-driven agent framework, all protocol decisions, inclusion metrics, and generated claims require subsequent human oversight, qualitative auditing, and analytical caution prior to formal review deployment.",
                 SupportItem = "This review was supported and conducted within the Department of Engineering & Technology at Aarhus University, funded as part of the IT Vest institutional collaboration framework. The funders played no active role in specific automated screening study designs, live stream extraction cycles, or pipeline synthesis determinations.",
                 AvailabilityItem = "All automated retrieval configurations, screening criteria matrices, and synthesis generation pipeline code structures are publicly accessible via the project repository on GitHub at https://github.com/lauPhilip/au-btech-literature-review-agent."
             };
 
+            // 3. ARCHIVE THE AUDIT DELTA LEDGER DIRECTLY INTO THE ACTIVE WORKSPACE STORE SUBFOLDER
+            string ledgerPath = Path.Combine(GetWorkspaceFolderPath(sessionId), "stylistic-transformation-ledger.json");
+            await File.WriteAllTextAsync(ledgerPath, JsonSerializer.Serialize(deltas, new JsonSerializerOptions { WriteIndented = true }));
+
+            // 4. WRITE THE MAIN CONSOLIDATED REPORT
             await File.WriteAllTextAsync(GetReportFilePath(sessionId), JsonSerializer.Serialize(reportObj, new JsonSerializerOptions { WriteIndented = true }));
         }
         catch (Exception fatalEx)
@@ -804,9 +837,11 @@ public class PrismaReviewEngine
             string statePath = GetStateFilePath(sessionId);
             string reportPath = GetReportFilePath(sessionId);
             string isolatedFolder = GetWorkspaceFolderPath(sessionId);
+            string ledgerPath = Path.Combine(isolatedFolder, "stylistic-transformation-ledger.json");
 
             if (File.Exists(reportPath)) archive.CreateEntryFromFile(reportPath, "prisma-report.json");
             if (File.Exists(statePath)) archive.CreateEntryFromFile(statePath, "transparent-process.json");
+            if (File.Exists(ledgerPath)) archive.CreateEntryFromFile(ledgerPath, "stylistic-transformation-ledger.json");
 
             if (Directory.Exists(isolatedFolder))
             {

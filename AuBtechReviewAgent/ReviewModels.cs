@@ -75,6 +75,8 @@ public class PlatformSearchLog
     public string ErrorMessage { get; set; } = "None";
 }
 
+public record StyleDeltaLog(string FieldName, string OriginalText, string RefinedText);
+
 public class PrismaReport
 {
     public string GeneratedAt { get; set; } = "";
