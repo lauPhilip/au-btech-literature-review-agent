@@ -398,9 +398,11 @@
         StartLogMonitoringLoop();
     }
 
-    private void StartLogMonitoringLoop()
+private void StartLogMonitoringLoop()
     {
-        string dynamicStatePath = $"transparent-process-{currentSessionId:N}.json";
+        // FIXED: Explicitly look inside the sandboxed workspace folder instead of checking the application root
+        string dynamicStatePath = Path.Combine(Directory.GetCurrentDirectory(), "WorkspaceStore", currentSessionId.ToString("N"), "transparent-process.json");
+
         _ = Task.Run(async () =>
         {
             while (isSearching)

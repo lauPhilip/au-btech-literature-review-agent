@@ -25,6 +25,7 @@ public class PrismaReviewEngine
 
     public event Action<ReviewStats>? OnProgressUpdated;
 
+    // SECURE ENCAPSULATED ROUTING PATHS
     private string GetWorkspaceFolderPath(Guid sessionId) => 
         Path.Combine(Directory.GetCurrentDirectory(), "WorkspaceStore", sessionId.ToString("N"));
 
@@ -36,7 +37,6 @@ public class PrismaReviewEngine
 
     public PrismaReviewEngine(string mistralApiKey, string elsevierApiKey, string? ieeeApiKey = null, string? scholarApiKey = null)
     {
-        // Store global keys securely as fallbacks rather than freezing them inside a static Kernel instance
         _globalMistralKey = mistralApiKey;
         _globalElsevierKey = elsevierApiKey;
         _globalIeeeKey = ieeeApiKey;
@@ -102,7 +102,6 @@ public class PrismaReviewEngine
             catch (Exception ex)
             {
                 currentLog.Status = "Faulted / Refused Connection";
-                // SECURITY PASS: Sanitize the exception log trace string to strip mirrored key traces out
                 currentLog.ErrorMessage = SanitizeLogMessage(ex.Message);
                 Console.WriteLine($"[Source Exception Logging] {source.SourceName} faulted: {currentLog.ErrorMessage}");
             }
@@ -205,13 +204,13 @@ public class PrismaReviewEngine
                     UpdateReviewState(reviewState, paper, decisionData);
                     OnProgressUpdated?.Invoke(reviewState.Stats);
                     await SaveStateAsync(sessionId, reviewState);
-                string decision = decisionData.TryGetProperty("decision", out var d) ? d.GetString() ?? "Excluded" : "Excluded";
-                if (decision.Equals("Included", StringComparison.OrdinalIgnoreCase))
-                {
-                    // FIXED: Now feeding the userWorkspace string token so downloads drop cleanly into WorkspaceStore/{SessionId}
-                    var paperChunks = await DocumentRAGUtility.IngestAndChunkPaperAsync(paper.Id, paper.Title, userWorkspace);
-                    allGroundedChunks.AddRange(paperChunks);
-                }
+
+                    string decision = decisionData.TryGetProperty("decision", out var d) ? d.GetString() ?? "Excluded" : "Excluded";
+                    if (decision.Equals("Included", StringComparison.OrdinalIgnoreCase))
+                    {
+                        var paperChunks = await DocumentRAGUtility.IngestAndChunkPaperAsync(paper.Id, paper.Title, userWorkspace);
+                        allGroundedChunks.AddRange(paperChunks);
+                    }
                 }
                 catch (Exception ex)
                 {
@@ -319,7 +318,6 @@ public class PrismaReviewEngine
     private string SanitizeLogMessage(string message)
     {
         if (string.IsNullOrEmpty(message)) return string.Empty;
-        // Regex pattern to look for common 32-character hex strings or alphanumeric secret structures and drop them
         return Regex.Replace(message, @"([a-zA-Z0-9]{24,64})", "[REDACTED_API_CREDENTIAL]");
     }
 
@@ -417,7 +415,17 @@ public class PrismaReviewEngine
 
         try
         {
-            var response = await chat.GetChatMessageContentAsync(reportPrompt);
+            // FORCE JSON MODE: Configure Mistral to guarantee mathematically valid JSON token structures
+            var structuralSettings = new MistralAIPromptExecutionSettings
+            {
+                Temperature = 0.2
+            };
+
+            // Universally force JSON mode via the underlying extension dictionary properties
+            structuralSettings.ExtensionData ??= new Dictionary<string, object>();
+            structuralSettings.ExtensionData["response_format"] = new { type = "json_object" };
+
+            var response = await chat.GetChatMessageContentAsync(reportPrompt, structuralSettings);
             string rawResponse = response.ToString().Trim();
 
             string mermaidBlock = "";
@@ -447,7 +455,10 @@ public class PrismaReviewEngine
             }
 
             jsonPart = jsonPart.Replace("```json", "").Replace("```", "").Trim();
+            
+            // CLEANING PASS: Clean hidden ASCII control characters and wrap unescaped path backslashes
             jsonPart = Regex.Replace(jsonPart, "[\x00-\x1F]", " "); 
+            jsonPart = Regex.Replace(jsonPart, @"\\(?![""\\/bfnrtu])", @"\\");
 
             using var doc = JsonDocument.Parse(jsonPart);
             var root = doc.RootElement;
@@ -535,7 +546,6 @@ public class PrismaReviewEngine
 
         string uniqueId = Guid.NewGuid().ToString("N").Substring(0, 8);
         string texFilePath = Path.Combine(projectRoot, $"manuscript_{uniqueId}.tex");
-        string pdfOutputPath = Path.Combine(projectRoot, $"manuscript_{uniqueId}.pdf");
 
         int journalCount = records.Count(r => r.VenueType.Equals("Journals", StringComparison.OrdinalIgnoreCase));
         int conferenceCount = records.Count(r => r.VenueType.Equals("Conferences", StringComparison.OrdinalIgnoreCase));
@@ -619,7 +629,7 @@ public class PrismaReviewEngine
         sb.AppendLine(@"    {\sffamily\bfseries\scriptsize\color{gray} AI-GENERATED SYSTEMATIC LITERATURE REVIEW  \\ \vspace{4pt}}");
         sb.AppendLine("    {\\rmfamily\\LARGE\\bfseries " + sanitizedTitleItem + " \\\\ \\vspace{10pt}}");
         sb.AppendLine(@"    {\sffamily\small\color{greyText} Department of Business Development and Technology, Aarhus University \\ \vspace{4pt}}");
-        sb.AppendLine("    {\\\ttfamily\\scriptsize\\color{gray} Protocol Hash: cc584090 | Generated: " + (report.GeneratedAt ?? DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss UTC")) + " \\\\ \\vspace{15pt}}");
+        sb.AppendLine("    {\\ttfamily\\scriptsize\\color{gray} Protocol Hash: cc584090 | Generated: " + (report.GeneratedAt ?? DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss UTC")) + " \\\\ \\vspace{15pt}}");
         sb.AppendLine(@"    \color{lightgray}\hrule\vspace{15pt}");
         sb.AppendLine(@"    \color{black}");
         sb.AppendLine(@"\end{center}");
@@ -739,10 +749,9 @@ public class PrismaReviewEngine
             string citation = EscapeLatexText(row.ApaCitation);
             sb.AppendLine($"{title} & {summary} & {rationale} & {category} & {citation} \\\\ \\hline");
         }
-
         sb.AppendLine(@"\end{tabularx}");
         sb.AppendLine(@"\vspace{4pt}\noindent\small ");
-        sb.AppendLine(@"\textbf{Table Overview:} The extraction logs archived inside Table 3.1 summarize the qualitative characteristics of each selected paper. Each data field records a specific study title mapping, structural context definitions built by the analytical RAG engine framework, the explicit screening logic rationale for core parameter inclusion, the designated origin repository engine indexing classification, and cleanly formatted APA citation paths required for external protocol verification.");
+        sb.AppendLine(@"\textbf{Table Overview:} The extraction logs archived inside Table 3.1 summarize the qualitative characteristics of each selected paper.");
         sb.AppendLine(@"\vspace{10pt}");
 
         sb.AppendLine(@"\begin{multicols}{2}");
@@ -770,7 +779,6 @@ public class PrismaReviewEngine
         sb.AppendLine(sanitizedSupportItem);
         sb.AppendLine(@"\subsection{Open Science Code Availability}");
         sb.AppendLine((report.AvailabilityItem ?? "").Replace("_", @"\_"));
-
         sb.AppendLine(@"\end{multicols}");
 
         sb.AppendLine(@"\clearpage");
@@ -783,48 +791,16 @@ public class PrismaReviewEngine
             refIdx++;
         }
         sb.AppendLine(@"\end{thebibliography}");
-
         sb.AppendLine(@"\end{document}");
 
         File.WriteAllText(texFilePath, sb.ToString());
 
-        string executableName = "pdflatex";
-        string localMiKTeXPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), @"Programs\MiKTeX\miktex\bin\x64\pdflatex.exe");
-        if (File.Exists(localMiKTeXPath)) executableName = localMiKTeXPath;
-
-        bool pdfCompiled = false;
-        try
-        {
-            var procInfo = new ProcessStartInfo
-            {
-                FileName = "cmd.exe",
-                Arguments = $"/c \"\"{executableName}\" -interaction=nonstopmode -output-directory=\"{projectRoot}\" \"{texFilePath}\"\"",
-                CreateNoWindow = true, UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true, WorkingDirectory = projectRoot
-            };
-            using var process = Process.Start(procInfo);
-            if (process != null)
-            {
-                process.WaitForExit();
-                pdfCompiled = true;
-            }
-            System.Threading.Thread.Sleep(400);
-        }
-        catch 
-        {
-            Console.WriteLine("[LaTeX Engine Notification] Local binary compiler skipped.");
-        }
-
-    using (var memoryStream = new MemoryStream())
-    {
+        using var memoryStream = new MemoryStream();
         using (var archive = new ZipArchive(memoryStream, ZipArchiveMode.Create, true))
         {
-            if (pdfCompiled && File.Exists(pdfOutputPath)) 
-                archive.CreateEntryFromFile(pdfOutputPath, "PRISMA_Manuscript_Report.pdf");
-            
             if (File.Exists(texFilePath)) 
-                archive.CreateEntryFromFile(texFilePath, "PRISMA_Manuscript_Source.tex");
+                archive.CreateEntryFromFile(texFilePath, "main.tex");
 
-            // Clean path resolutions mapping inside the isolated container
             string statePath = GetStateFilePath(sessionId);
             string reportPath = GetReportFilePath(sessionId);
             string isolatedFolder = GetWorkspaceFolderPath(sessionId);
@@ -837,24 +813,17 @@ public class PrismaReviewEngine
                 var files = Directory.GetFiles(isolatedFolder);
                 foreach (var file in files)
                 {
-                    // Prevent loose session JSONs from duplicating into the source papers zip block
                     if (file.EndsWith(".json")) continue;
-
                     string filename = Path.GetFileName(file);
                     archive.CreateEntryFromFile(file, $"SourcePapers/{filename}");
                 }
             }
         }
 
-        try
-        {
-            File.Delete(texFilePath);
-            File.Delete(pdfOutputPath);
-        }
-        catch { }
-
+        try { File.Delete(texFilePath); } catch { }
         return memoryStream.ToArray();
-    }}
+    }
+
     private async Task SaveStateAsync(Guid sessionId, ReviewState state)
     {
         var options = new JsonSerializerOptions { WriteIndented = true };

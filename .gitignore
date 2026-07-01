@@ -30,3 +30,5 @@ manuscript_*.tex
 manuscript_*.pdf
 manuscript_*.log
 manuscript_*.aux
+
+AuBtechReviewAgent/WorkspaceStore/

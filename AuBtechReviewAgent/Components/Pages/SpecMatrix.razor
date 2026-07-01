@@ -1,9 +1,8 @@
 @page "/spec-matrix"
 @rendermode InteractiveServer
+
 @using System.IO
 @using System.Text.Json
-@using System.Linq
-@using System.Collections.Generic
 @using System.Text.RegularExpressions
 @inject AuBtechReviewAgent.PrismaReviewEngine ReviewEngine
 @inject IJSRuntime JS
@@ -11,23 +10,15 @@
 <PageTitle>PRISMA 2020 Checklist Manuscript Preview</PageTitle>
 
 <style>
-    html, body, main, .main, .content, .app, #app, .page, .sidebar-layout {
-        height: auto !important;
-        min-height: 100vh !important;
-        overflow: visible !important;
+    html, body {
+        background-color: #4b5563 !important;
+        min-height: 100vh;
         overflow-y: auto !important;
     }
-
-    div {
-        overflow: visible !important;
-    }
-
     @@media print {
-        .print:hidden {
-            display: none !important;
-        }
         body, html {
             background: white !important;
+            overflow-y: visible !important;
         }
     }
 </style>
@@ -46,9 +37,9 @@
     </div>
 </header>
 
-<div class="w-full bg-gray-600 p-4 md:p-8 flex flex-col items-center justify-start min-h-screen print:bg-white print:p-0">
+<div class="w-full bg-gray-600 p-4 md:p-8 flex flex-col items-center justify-start min-h-screen overflow-y-auto print:bg-white print:p-0 pb-16">
     
-    @if (report.TitleItem != "Pending...")
+    @if (report != null && !string.IsNullOrEmpty(report.TitleItem) && report.TitleItem != "Pending...")
     {
         <div class="w-full max-w-[8.5in] mb-4 flex justify-end print:hidden flex-none">
             <button @onclick="TriggerZipArchiveDownload" class="bg-[#003B5C] text-white text-xs font-bold uppercase tracking-wider px-4 py-2 rounded shadow hover:bg-opacity-95 transition-all flex items-center gap-2">
@@ -60,7 +51,7 @@
         </div>
     }
 
-    @if (report.TitleItem == "Pending...")
+    @if (report == null || string.IsNullOrEmpty(report.TitleItem) || report.TitleItem == "Pending...")
     {
         <div class="bg-amber-50 border border-amber-200 text-amber-800 p-6 rounded-lg text-sm max-w-xl text-center shadow-lg my-12">
             <div class="font-bold mb-1">No Generated PRISMA Report Available</div>
@@ -69,7 +60,7 @@
     }
     else
     {
-        <article class="w-full max-w-[8.5in] bg-white shadow-2xl p-[1in] text-gray-900 font-serif text-[11pt] leading-relaxed mx-auto border border-gray-300 print:shadow-none print:border-none print:p-0">
+        <article class="w-full max-w-[8.5in] bg-white shadow-2xl p-[1in] text-gray-900 font-serif text-[11pt] leading-relaxed mx-auto border border-gray-300 print:shadow-none print:border-none print:p-0 overflow-visible">
             
             <div class="text-center space-y-3 mb-8 font-sans print:space-y-2">
                 <div class="text-[9px] tracking-widest text-gray-500 uppercase font-bold">AI-Generated Systematic Literature Review</div>
@@ -89,7 +80,7 @@
                 <p class="text-gray-700 font-light leading-normal">@ScrubAnchors(report.AbstractItem)</p>
             </div>
 
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6 text-justify text-xs leading-relaxed">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6 text-justify text-xs leading-relaxed overflow-visible">
                 
                 <div class="space-y-3 md:col-span-2 border-b border-gray-200 pb-1">
                     <h2 class="font-sans font-bold text-sm text-[#003B5C] uppercase tracking-wide">1. Introduction</h2>
@@ -156,7 +147,7 @@
                     </p>
                 </div>
 
-                <div class="md:col-span-2 space-y-4 font-sans pt-2">
+                <div class="md:col-span-2 space-y-4 font-sans pt-2 overflow-visible">
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div class="space-y-2 border border-gray-200 p-3 bg-white rounded-sm">
                             <span class="text-[11px] font-bold text-gray-800 block border-b border-gray-100 pb-1">Figure 3.1: Included Publications per Calendar Year</span>
@@ -255,7 +246,7 @@
                     </div>
                 </div>
 
-                <div class="md:col-span-2 pt-2 border-t border-gray-100">
+                <div class="md:col-span-2 pt-2 border-t border-gray-100 overflow-visible">
                     <p class="text-gray-800 text-xs">
                         @if (tableRecords.Count == 0)
                         {
@@ -415,7 +406,7 @@
 
             </div>
 
-            <div class="mt-8 pt-4 border-t border-gray-200 text-left">
+            <div class="mt-8 pt-4 border-t border-gray-200 text-left overflow-visible">
                 <h2 class="font-sans font-bold text-sm text-[#003B5C] uppercase tracking-wide mb-3">References</h2>
                 @if (includedCitations.Count == 0)
                 {
@@ -443,10 +434,12 @@
 </div>
 
 @code {
+    [Inject] private UiStateContainer State { get; set; } = default!;
+
     private PrismaReport report = new PrismaReport();
-    private List<string> includedCitations = new();
-    private Dictionary<string, int> publicationsByYear = new();
-    private List<IncludedPaperMetricRow> tableRecords = new();
+    private List<string> includedCitations = new List<string>();
+    private Dictionary<string, int> publicationsByYear = new Dictionary<string, int> { { "2024", 0 }, { "2025", 0 }, { "2026", 0 } };
+    private List<IncludedPaperMetricRow> tableRecords = new List<IncludedPaperMetricRow>();
     private int journalCount = 0;
     private int conferenceCount = 0;
     private int transactionsCount = 0;
@@ -469,20 +462,7 @@
     {
         try
         {
-            Guid activeSessionId = Guid.Empty;
-            if (File.Exists("transparent-process.json"))
-            {
-                try {
-                    string txt = await File.ReadAllTextAsync("transparent-process.json");
-                    using var d = JsonDocument.Parse(txt);
-                    if (d.RootElement.TryGetProperty("ReviewId", out var idProp)) {
-                        Guid.TryParse(idProp.GetString(), out activeSessionId);
-                    }
-                } catch {}
-            }
-
-            // FIXED: Provided tableRecords as Argument 3 to fulfill the backend signature requirement
-            byte[] zipBytes = ReviewEngine.GenerateManuscriptPdf(activeSessionId, report, tableRecords);
+            byte[] zipBytes = ReviewEngine.GenerateManuscriptPdf(State.CurrentSessionId, report, tableRecords);
             string base64String = Convert.ToBase64String(zipBytes);
             string fileName = $"PRISMA_Evaluation_Footprint_{DateTime.UtcNow:yyyyMMdd}.zip";
             
@@ -563,11 +543,15 @@
         failedPeerReviewCheck = 0;
         mermaidDiagramCode = "";
 
-        if (File.Exists("prisma-report.json"))
+        string userWorkspaceFolder = Path.Combine(Directory.GetCurrentDirectory(), "WorkspaceStore", State.CurrentSessionId.ToString("N"));
+        string reportPath = Path.Combine(userWorkspaceFolder, "prisma-report.json");
+        string statePath = Path.Combine(userWorkspaceFolder, "transparent-process.json");
+
+        if (File.Exists(reportPath))
         {
             try
             {
-                string content = await File.ReadAllTextAsync("prisma-report.json");
+                string content = await File.ReadAllTextAsync(reportPath);
                 var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
                 report = JsonSerializer.Deserialize<PrismaReport>(content, options) ?? new PrismaReport();
             }
@@ -577,11 +561,11 @@
             }
         }
 
-        if (File.Exists("transparent-process.json"))
+        if (File.Exists(statePath))
         {
             try
             {
-                using var fileStream = new FileStream("transparent-process.json", FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+                using var fileStream = new FileStream(statePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
                 using var reader = new StreamReader(fileStream);
                 string jsonString = await reader.ReadToEndAsync();
 
