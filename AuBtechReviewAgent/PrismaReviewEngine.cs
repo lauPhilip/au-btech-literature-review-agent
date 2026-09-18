@@ -706,32 +706,18 @@ private async Task GeneratePrismaChecklistReportWithRAGAsync(Guid sessionId, int
             // miscounts numbers (e.g. citing [56] against a 53-entry list); strip those instead of shipping
             // a report whose citations don't trace back to a real source, and log every removal to an
             // on-disk audit artifact so the discrepancy itself stays visible rather than silently vanishing.
-            var citationAudit = new List<object>();
-            string ValidateAndStripInvalidCitations(string fieldName, string text)
-            {
-                if (string.IsNullOrWhiteSpace(text) || referenceCount <= 0) return text;
-                return Regex.Replace(text, @"\[(\d+(?:\s*,\s*\d+)*)\]", match =>
-                {
-                    var numbers = match.Groups[1].Value.Split(',').Select(n => n.Trim());
-                    var validNumbers = new List<string>();
-                    foreach (var numStr in numbers)
-                    {
-                        if (int.TryParse(numStr, out int num) && num >= 1 && num <= referenceCount)
-                        {
-                            validNumbers.Add(numStr);
-                        }
-                        else
-                        {
-                            finalState.Stats.InvalidCitationsStripped++;
-                            citationAudit.Add(new { Field = fieldName, InvalidMarker = numStr, ReferenceListSize = referenceCount, Action = "Stripped - out of range of the run's reference list" });
-                        }
-                    }
-                    return validNumbers.Count > 0 ? $"[{string.Join(", ", validNumbers)}]" : "";
-                });
-            }
+            // The stripping logic lives in CitationValidator so it can be unit-tested in isolation.
+            var citationStrips = new List<StrippedCitation>();
 
-            fullSynthesisField = ValidateAndStripInvalidCitations("synthesisResultsItem", fullSynthesisField);
-            string cleanDiscussionValidated = ValidateAndStripInvalidCitations("discussionItem", preValidationDiscussion);
+            var synthesisValidation = CitationValidator.ValidateAndStrip(fullSynthesisField, referenceCount, "synthesisResultsItem");
+            fullSynthesisField = synthesisValidation.CleanedText;
+            citationStrips.AddRange(synthesisValidation.Stripped);
+
+            var discussionValidation = CitationValidator.ValidateAndStrip(preValidationDiscussion, referenceCount, "discussionItem");
+            string cleanDiscussionValidated = discussionValidation.CleanedText;
+            citationStrips.AddRange(discussionValidation.Stripped);
+
+            finalState.Stats.InvalidCitationsStripped += citationStrips.Count;
 
             try
             {
@@ -739,8 +725,8 @@ private async Task GeneratePrismaChecklistReportWithRAGAsync(Guid sessionId, int
                 var auditPayload = new
                 {
                     ReferenceListSize = referenceCount,
-                    InvalidMarkersStripped = citationAudit.Count,
-                    Details = citationAudit
+                    InvalidMarkersStripped = citationStrips.Count,
+                    Details = citationStrips
                 };
                 await File.WriteAllTextAsync(auditPath, JsonSerializer.Serialize(auditPayload, new JsonSerializerOptions { WriteIndented = true }));
             }
