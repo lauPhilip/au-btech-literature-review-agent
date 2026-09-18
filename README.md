@@ -4,6 +4,7 @@ A tool for running systematic literature reviews (SLRs) that you can check after
 
 Built at the Department of Business Development and Technology (BTECH), Aarhus University.
 
+[![CI/CD](https://github.com/lauPhilip/au-btech-literature-review-agent/actions/workflows/ci.yml/badge.svg)](https://github.com/lauPhilip/au-btech-literature-review-agent/actions/workflows/ci.yml)
 [![.NET](https://img.shields.io/badge/.NET-10.0-blue.svg)](https://dotnet.microsoft.com/en-us/download/dotnet/10.0)
 [![LLM Engine](https://img.shields.io/badge/Engine-Mistral%20Large-purple.svg)](https://mistral.ai/)
 [![Reporting](https://img.shields.io/badge/Reporting-PRISMA%202020-green.svg)](https://prisma-statement.org/)
@@ -52,6 +53,18 @@ Each run clears out the previous one and leaves a clean set of files you can dow
 ├── citation-audit.json         # Any invalid citation numbers that were removed
 └── grounded-outline.txt         # The claim-to-source outline used to write the review
 ```
+
+## Tests and continuous integration
+
+The project has a test suite (xUnit) covering the citation-validation logic, input sanitizing, and the journal-ranking lookup. Run it locally with:
+
+```bash
+dotnet test
+```
+
+On every push and pull request, GitHub Actions builds the project and runs the tests automatically (see the CI/CD badge above).
+
+Deployment to the Simply server is also set up in the same workflow, but it stays switched off until you enable it: set a repository variable `DEPLOY_ENABLED` to `true` and add the server connection details as repository secrets. Until then, the deploy step is skipped and only the build-and-test step runs. The workflow file (`.github/workflows/ci.yml`) explains exactly which secrets to add and where to fill in the deploy command for your setup.
 
 ## Contributing
 

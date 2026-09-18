@@ -52,10 +52,12 @@ Optional keys use the same pattern: `dotnet user-secrets set "ELSEVIER_API_KEY" 
 
 1. Create a branch for your work: `git checkout -b short-description-of-change`
 2. Make your change. Try to keep each pull request focused on one thing — it's much easier to review a small, clear change than a large mixed one.
-3. Build the project before submitting to make sure it still compiles:
+3. Build the project and run the tests before submitting, to make sure it still compiles and nothing broke:
    ```bash
    dotnet build
+   dotnet test
    ```
+   If you're changing or adding behaviour, please add or update a test for it where it makes sense. The same tests run automatically on your pull request.
 4. Commit with a short, clear message that says what the change does and why.
 
 ## Submitting a pull request
