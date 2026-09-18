@@ -80,13 +80,16 @@ public class ResearchGateSource : IAcademicSource
                     if (authorsList.Count == 0) authorsList.Add("ResearchGate Independent Researcher");
 
                     // Map fields directly into your strict constructor signature
+                    // AcademicPaper order is (Id, Title, Abstract, PublishedDate, Authors, JournalSource) -
+                    // PublishedDate and JournalSource were previously swapped here, corrupting every
+                    // downstream citation/date field for ResearchGate results.
                     papers.Add(new AcademicPaper(
                         paperId,
                         title,
                         snippet,
-                        venue,
+                        $"Published: {dateText}",
                         authorsList,
-                        dateText
+                        venue
                     ));
                 }
             }

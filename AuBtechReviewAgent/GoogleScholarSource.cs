@@ -85,13 +85,16 @@ public class GoogleScholarSource : IAcademicSource
                     if (authorsList.Count == 0) authorsList.Add("Scholar Indexed Authors");
 
                     // Map fields straight into your strict positional constructor contract
+                    // AcademicPaper order is (Id, Title, Abstract, PublishedDate, Authors, JournalSource) -
+                    // PublishedDate and JournalSource were previously swapped here, corrupting every
+                    // downstream citation/date field for Scholar results.
                     papers.Add(new AcademicPaper(
                         paperId,
                         title,
                         snippet,
-                        venue,
+                        $"Published: {dateText}",
                         authorsList,
-                        dateText
+                        venue
                     ));
                 }
             }
