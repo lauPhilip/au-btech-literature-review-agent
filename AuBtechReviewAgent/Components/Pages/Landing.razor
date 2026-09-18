@@ -1,0 +1,183 @@
+@page "/"
+
+<PageTitle>TraceableAI — Traceable PRISMA Literature Reviews</PageTitle>
+
+<header class="bg-[#003B5C] text-white flex-none shrink-0 z-50 shadow-md">
+    <div class="max-w-7xl mx-auto px-6 h-14 flex items-center justify-between">
+        <a href="/" class="flex items-center space-x-3 hover:opacity-90 transition-opacity">
+            <span class="font-bold tracking-tight text-sm">AARHUS UNIVERSITY</span>
+            <span class="text-white/40 font-light">|</span>
+            <span class="text-xs tracking-wider font-medium opacity-90 uppercase">au-btech-literature-review-agent</span>
+        </a>
+        <nav class="flex items-center space-x-6 text-xs font-semibold uppercase tracking-wider">
+            <a href="/" class="text-white border-b-2 border-white py-4">Overview</a>
+            <a href="/review" class="text-white/70 hover:text-white transition-colors py-4">Dashboard</a>
+            <a href="/spec-matrix" class="text-white/70 hover:text-white transition-colors py-4">Review Output</a>
+        </nav>
+    </div>
+</header>
+
+<main class="flex-1 min-h-0 overflow-y-auto bg-white text-gray-900">
+
+    <!-- Hero -->
+    <section class="border-b border-gray-200">
+        <div class="max-w-5xl mx-auto px-6 py-16 lg:py-24">
+            <p class="text-[11px] font-bold uppercase tracking-widest text-[#003B5C] mb-5">
+                Aarhus University &middot; Department of Business Development and Technology
+            </p>
+            <h1 class="font-serif text-4xl lg:text-5xl font-bold tracking-tight text-gray-900">
+                TraceableAI
+            </h1>
+            <p class="font-serif text-xl lg:text-2xl text-gray-700 mt-4 max-w-3xl leading-snug">
+                Systematic literature reviews you can check afterwards.
+            </p>
+            <p class="text-sm lg:text-base text-gray-600 mt-6 max-w-2xl leading-relaxed">
+                An open-source agent that runs PRISMA 2020&ndash;compliant literature reviews and keeps a
+                record of every step, so every statement in the final report can be traced back to the paper
+                it came from.
+            </p>
+
+            <div class="mt-9 flex flex-wrap items-center gap-4">
+                <a href="/review"
+                   class="bg-[#003B5C] text-white px-7 py-3 text-xs font-bold uppercase tracking-wider hover:bg-[#00293f] transition-colors">
+                    Get Started
+                </a>
+                <a href="https://github.com/lauPhilip/au-btech-literature-review-agent"
+                   class="border border-gray-300 text-gray-800 px-7 py-3 text-xs font-bold uppercase tracking-wider hover:border-[#003B5C] hover:text-[#003B5C] transition-colors">
+                    View on GitHub
+                </a>
+            </div>
+
+            <p class="text-xs text-gray-500 mt-6">
+                Requires a Mistral API key. Free and open source under the Apache 2.0 license.
+            </p>
+        </div>
+    </section>
+
+    <!-- What it does -->
+    <section class="border-b border-gray-200">
+        <div class="max-w-5xl mx-auto px-6 py-16">
+            <h2 class="text-[11px] font-bold uppercase tracking-widest text-gray-400 mb-8">What it does</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-px bg-gray-200 border border-gray-200">
+                <div class="bg-white p-7">
+                    <h3 class="font-serif text-lg text-gray-900 mb-2">Claims tied to sources</h3>
+                    <p class="text-sm text-gray-600 leading-relaxed">
+                        Before writing, it maps each point to the papers that support it, then writes against
+                        that outline instead of filling in placeholders.
+                    </p>
+                </div>
+                <div class="bg-white p-7">
+                    <h3 class="font-serif text-lg text-gray-900 mb-2">Citations that check out</h3>
+                    <p class="text-sm text-gray-600 leading-relaxed">
+                        Every reference number in the generated text is checked against the actual reference
+                        list. Invalid numbers are removed and logged, so nothing is cited that isn&rsquo;t
+                        really there.
+                    </p>
+                </div>
+                <div class="bg-white p-7">
+                    <h3 class="font-serif text-lg text-gray-900 mb-2">Searches from several angles</h3>
+                    <p class="text-sm text-gray-600 leading-relaxed">
+                        Each source is queried a few different ways to surface papers a single phrasing would
+                        miss, with duplicates removed. You can cap the results per source for quick test runs.
+                    </p>
+                </div>
+                <div class="bg-white p-7">
+                    <h3 class="font-serif text-lg text-gray-900 mb-2">A complete, downloadable record</h3>
+                    <p class="text-sm text-gray-600 leading-relaxed">
+                        Every run produces a single archive with the report, a log of every screening decision,
+                        the source PDFs, and the citation audit.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- How it works -->
+    <section class="border-b border-gray-200">
+        <div class="max-w-5xl mx-auto px-6 py-16">
+            <h2 class="text-[11px] font-bold uppercase tracking-widest text-gray-400 mb-8">How it works</h2>
+            <ol class="space-y-6">
+                <li class="flex gap-5">
+                    <span class="flex-none w-8 h-8 bg-[#003B5C] text-white flex items-center justify-center text-sm font-bold">1</span>
+                    <div>
+                        <h3 class="font-serif text-lg text-gray-900">Search</h3>
+                        <p class="text-sm text-gray-600 leading-relaxed mt-1">
+                            Queries academic and open sources &mdash; arXiv, ScienceDirect/Scopus, IEEE Xplore,
+                            Google Scholar, and ResearchGate &mdash; using a few phrasings of your query.
+                        </p>
+                    </div>
+                </li>
+                <li class="flex gap-5">
+                    <span class="flex-none w-8 h-8 bg-[#003B5C] text-white flex items-center justify-center text-sm font-bold">2</span>
+                    <div>
+                        <h3 class="font-serif text-lg text-gray-900">Screen</h3>
+                        <p class="text-sm text-gray-600 leading-relaxed mt-1">
+                            Each candidate is checked against your inclusion and exclusion rules, with an
+                            optional peer-review-only filter.
+                        </p>
+                    </div>
+                </li>
+                <li class="flex gap-5">
+                    <span class="flex-none w-8 h-8 bg-[#003B5C] text-white flex items-center justify-center text-sm font-bold">3</span>
+                    <div>
+                        <h3 class="font-serif text-lg text-gray-900">Download</h3>
+                        <p class="text-sm text-gray-600 leading-relaxed mt-1">
+                            The PDFs of the papers that pass are saved into a working folder for the run.
+                        </p>
+                    </div>
+                </li>
+                <li class="flex gap-5">
+                    <span class="flex-none w-8 h-8 bg-[#003B5C] text-white flex items-center justify-center text-sm font-bold">4</span>
+                    <div>
+                        <h3 class="font-serif text-lg text-gray-900">Read the PDFs</h3>
+                        <p class="text-sm text-gray-600 leading-relaxed mt-1">
+                            The text is extracted page by page and split into short chunks, each tagged with the
+                            paper it came from.
+                        </p>
+                    </div>
+                </li>
+                <li class="flex gap-5">
+                    <span class="flex-none w-8 h-8 bg-[#003B5C] text-white flex items-center justify-center text-sm font-bold">5</span>
+                    <div>
+                        <h3 class="font-serif text-lg text-gray-900">Write the report</h3>
+                        <p class="text-sm text-gray-600 leading-relaxed mt-1">
+                            Those chunks are used to produce the PRISMA checklist items, with the citation check
+                            applied to the text.
+                        </p>
+                    </div>
+                </li>
+            </ol>
+        </div>
+    </section>
+
+    <!-- Why traceability -->
+    <section class="border-b border-gray-200">
+        <div class="max-w-5xl mx-auto px-6 py-16">
+            <h2 class="text-[11px] font-bold uppercase tracking-widest text-gray-400 mb-8">Why traceability</h2>
+            <div class="border-l-2 border-[#003B5C] pl-6 max-w-3xl">
+                <p class="font-serif text-lg lg:text-xl text-gray-800 leading-relaxed">
+                    Automated review tools tend to produce fluent text with citations that are broken or
+                    invented. That makes them hard to trust, and unsuitable for standards like PRISMA 2020,
+                    where you are expected to show how you reached your conclusions. TraceableAI is built
+                    around keeping that trail intact.
+                </p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer>
+        <div class="max-w-5xl mx-auto px-6 py-10 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <div class="text-xs text-gray-500 leading-relaxed">
+                <span class="font-semibold text-gray-700">TraceableAI</span> &middot; Aarhus University, BTECH<br />
+                Presented at OSSYM 2026
+            </div>
+            <div class="flex flex-wrap items-center gap-x-6 gap-y-2 text-xs font-semibold uppercase tracking-wider text-gray-600">
+                <a href="https://github.com/lauPhilip/au-btech-literature-review-agent" class="hover:text-[#003B5C] transition-colors">GitHub</a>
+                <a href="https://github.com/lauPhilip/au-btech-literature-review-agent/blob/master/CONTRIBUTING.md" class="hover:text-[#003B5C] transition-colors">Contributing</a>
+                <a href="https://github.com/lauPhilip/au-btech-literature-review-agent/blob/master/LICENSE" class="hover:text-[#003B5C] transition-colors">Apache 2.0 License</a>
+            </div>
+        </div>
+    </footer>
+
+</main>
