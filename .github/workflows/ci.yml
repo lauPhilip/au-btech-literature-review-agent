@@ -1,0 +1,88 @@
+name: CI/CD
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  build-and-test:
+    name: Build & Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore
+        run: dotnet restore AuBtechReviewAgent.sln
+
+      - name: Build
+        run: dotnet build AuBtechReviewAgent.sln --configuration Release --no-restore
+
+      - name: Test
+        run: dotnet test AuBtechReviewAgent.sln --configuration Release --no-build --verbosity normal
+
+  deploy:
+    name: Deploy to Simply
+    needs: build-and-test
+    # This job only runs on a push to master, AND only once you switch it on by
+    # adding a repository variable DEPLOY_ENABLED = true
+    # (Settings -> Secrets and variables -> Actions -> Variables).
+    # Until then it is skipped, so tests run on every push/PR without anything
+    # failing because the deploy isn't configured yet.
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master' && vars.DEPLOY_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Publish
+        run: dotnet publish AuBtechReviewAgent/AuBtechReviewAgent.csproj --configuration Release -o ./publish
+
+      # ------------------------------------------------------------------
+      # DEPLOY STEP — TEMPLATE. Fill this in once you confirm how the app
+      # reaches your Simply server. The example below copies the published
+      # output over SSH and restarts the service. Add these as repository
+      # secrets (Settings -> Secrets and variables -> Actions -> Secrets):
+      #   SIMPLY_SSH_HOST    - server hostname or IP
+      #   SIMPLY_SSH_PORT    - SSH port (often 22)
+      #   SIMPLY_SSH_USER    - SSH username
+      #   SIMPLY_SSH_KEY     - private SSH key (its public key installed on the server)
+      #   SIMPLY_DEPLOY_PATH - folder on the server to deploy into
+      # and change the restart command to however the app is run there.
+      #
+      # If Simply uses FTP/SFTP instead of SSH, replace these two steps with an
+      # FTP upload action (for example SamKirkland/FTP-Deploy-Action) using
+      # equivalent secrets. Nothing here runs until DEPLOY_ENABLED is set.
+      # ------------------------------------------------------------------
+      - name: Copy published files to Simply over SSH
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SIMPLY_SSH_HOST }}
+          port: ${{ secrets.SIMPLY_SSH_PORT }}
+          username: ${{ secrets.SIMPLY_SSH_USER }}
+          key: ${{ secrets.SIMPLY_SSH_KEY }}
+          source: "publish/*"
+          target: ${{ secrets.SIMPLY_DEPLOY_PATH }}
+          strip_components: 1
+
+      - name: Restart the app on Simply
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SIMPLY_SSH_HOST }}
+          port: ${{ secrets.SIMPLY_SSH_PORT }}
+          username: ${{ secrets.SIMPLY_SSH_USER }}
+          key: ${{ secrets.SIMPLY_SSH_KEY }}
+          script: |
+            # Change this to however your app is managed on the server, e.g.:
+            #   sudo systemctl restart au-btech-review-agent
+            echo "TODO: add the command that restarts the app on your Simply server"
