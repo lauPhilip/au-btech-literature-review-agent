@@ -53,6 +53,8 @@ public class ReviewStats
     public int PassedPeerReviewCheck { get; set; }  // Exactly X papers
     public int FailedPeerReviewCheck { get; set; }  // Exactly Y papers
     public int DuplicatesRemoved { get; set; }      // Cross-perspective duplicate hits collapsed before screening
+    public int CappedBeyondMaxResults { get; set; } // Candidates discarded by the hard per-source maxResults cap
+    public int InvalidCitationsStripped { get; set; } // Out-of-range [n] markers removed from generated prose for traceability
 }
 
 public class ReviewPhases 
