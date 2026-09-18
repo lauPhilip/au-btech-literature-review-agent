@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Question or general help
+    url: https://github.com/lauPhilip/au-btech-literature-review-agent/blob/master/CONTRIBUTING.md
+    about: Not sure if it's a bug or a feature? Read the contributing guide or open a blank issue and ask.

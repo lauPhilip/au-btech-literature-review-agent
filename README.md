@@ -7,6 +7,7 @@ Built at the Department of Business Development and Technology (BTECH), Aarhus U
 [![.NET](https://img.shields.io/badge/.NET-10.0-blue.svg)](https://dotnet.microsoft.com/en-us/download/dotnet/10.0)
 [![LLM Engine](https://img.shields.io/badge/Engine-Mistral%20Large-purple.svg)](https://mistral.ai/)
 [![Reporting](https://img.shields.io/badge/Reporting-PRISMA%202020-green.svg)](https://prisma-statement.org/)
+[![License](https://img.shields.io/badge/License-Apache%202.0-yellowgreen.svg)](LICENSE)
 [![OSSYM](https://img.shields.io/badge/OSSYM-2026-003B5C.svg)](https://opensearchfoundation.org/)
 
 ## What it's for
@@ -51,3 +52,15 @@ Each run clears out the previous one and leaves a clean set of files you can dow
 ├── citation-audit.json         # Any invalid citation numbers that were removed
 └── grounded-outline.txt         # The claim-to-source outline used to write the review
 ```
+
+## Contributing
+
+This is an open-source project and contributions are welcome — whether that's reporting a bug, suggesting a feature, fixing a typo, or writing code.
+
+Have a look at [CONTRIBUTING.md](CONTRIBUTING.md) for how to set the project up locally and how to send changes. By taking part, you agree to follow our [Code of Conduct](CODE_OF_CONDUCT.md).
+
+If you're not sure where to start, open an issue and ask — we're happy to help.
+
+## License
+
+TraceableAI is released under the [Apache License 2.0](LICENSE). In short, you're free to use, change, and redistribute it, including for your own projects, as long as you keep the license and copyright notice. See the [LICENSE](LICENSE) and [NOTICE](NOTICE) files for the full terms.
