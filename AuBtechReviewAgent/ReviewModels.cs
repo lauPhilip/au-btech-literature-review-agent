@@ -53,8 +53,6 @@ public class ReviewStats
     public int PassedPeerReviewCheck { get; set; }  // Exactly X papers
     public int FailedPeerReviewCheck { get; set; }  // Exactly Y papers
     public int DuplicatesRemoved { get; set; }      // Cross-perspective duplicate hits collapsed before screening
-    public int CappedBeyondMaxResults { get; set; } // Candidates discarded by the hard per-source maxResults cap
-    public int InvalidCitationsStripped { get; set; } // Out-of-range [n] markers removed from generated prose for traceability
 }
 
 public class ReviewPhases 
@@ -84,6 +82,24 @@ public class PlatformSearchLog
 }
 
 public record StyleDeltaLog(string FieldName, string OriginalText, string RefinedText);
+
+// ─── LLM PEER-REVIEW AUDIT TRAIL ────────────────────────────────────
+// One issue raised by the automated peer reviewer against a generated section.
+public record PeerReviewComment(string Section, string Severity, string Issue, string Suggestion);
+
+// The full, transparent record of the peer-review pass over the synthesis and discussion
+// sections: what the reviewer flagged, and the text before and after the revision. Written
+// to peer-review-feedback.json in the run's workspace so the improvement is auditable.
+public class PeerReviewLog
+{
+    public string GeneratedAt { get; set; } = "";
+    public string Verdict { get; set; } = "";
+    public List<PeerReviewComment> Comments { get; set; } = new();
+    public string SynthesisBefore { get; set; } = "";
+    public string SynthesisAfter { get; set; } = "";
+    public string DiscussionBefore { get; set; } = "";
+    public string DiscussionAfter { get; set; } = "";
+}
 
 public class PrismaReport
 {

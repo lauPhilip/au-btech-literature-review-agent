@@ -537,6 +537,213 @@ public class PrismaReviewEngine
         }
     }
 
+    // Dedicated, citation-mandatory generation of the two sections that must carry inline citations:
+    // Results & Synthesis (Item 20a) and Discussion (Item 23a). Generating them on their own - instead of
+    // as two fields buried in the big multi-field JSON call, and without the generic stylistic refiner that
+    // drops [n] markers - is what keeps the citations present and correct. The grounded claim-to-source
+    // outline is fed in so every specific claim can be tied to a real reference number.
+    private async Task<(string Synthesis, string Discussion)> GenerateCitedSectionsAsync(
+        IChatCompletionService chat, string query, string explicitObjective,
+        string groundedOutline, string referenceListMapping, string groundedChunksText)
+    {
+        var prompt = $$"""
+            You are an expert systematic-review author writing two sections of a PRISMA 2020 review:
+            the Results & Synthesis section (Item 20a) and the Discussion section (Item 23a).
+
+            REVIEW OBJECTIVE: "{{explicitObjective}}"
+            PRIMARY TOPIC: "{{query}}"
+
+            OFFICIAL ALPHABETIZED REFERENCE LIST (cite ONLY these numbers):
+            {{referenceListMapping}}
+
+            PRE-CHECKED CLAIM-TO-SOURCE OUTLINE (each claim already mapped to supporting reference numbers):
+            {{(string.IsNullOrWhiteSpace(groundedOutline) ? "(No outline available - ground your writing directly on the source context chunks below.)" : groundedOutline)}}
+
+            GROUNDED SOURCE CONTEXT CHUNKS:
+            {{groundedChunksText}}
+
+            REQUIREMENTS:
+            1. Depth. For the synthesis, write 2 to 4 substantial paragraphs that group findings by theme,
+               compare and contrast what different sources report, and name agreements, tensions, and gaps.
+               For the discussion, write 2 to 3 paragraphs interpreting what the findings mean, their
+               limitations, and their implications - grounded in the same sources, not new claims.
+            2. MANDATORY INLINE CITATIONS. Every sentence that states a specific finding, comparison, or claim
+               drawn from the literature MUST end with an inline citation marker in square brackets that
+               references the reference list by number, for example "...separating inference from governance [3]."
+               or "...reported in both [2] and [5]." Use ONLY numbers that appear in the reference list above;
+               never invent a number. Purely general framing sentences need no marker, but most sentences in
+               these two sections should carry at least one citation.
+            3. No placeholder venue names, no fabricated statistics. Ground every claim in the outline and
+               context above.
+
+            Respond ONLY with a valid minified JSON object matching this structure exactly:
+            { "synthesis": "the full Results and Synthesis text with inline [n] citations", "discussion": "the full Discussion text with inline [n] citations" }
+            """;
+
+        try
+        {
+            var settings = new MistralAIPromptExecutionSettings { Temperature = 0.3 };
+            settings.ExtensionData ??= new Dictionary<string, object>();
+            settings.ExtensionData["response_format"] = new { type = "json_object" };
+
+            var response = await chat.GetChatMessageContentAsync(prompt, settings);
+            string raw = response.ToString().Replace("```json", "").Replace("```", "").Trim();
+            int start = raw.IndexOf('{');
+            int end = raw.LastIndexOf('}');
+            if (start >= 0 && end > start) raw = raw.Substring(start, end - start + 1);
+
+            using var doc = JsonDocument.Parse(raw);
+            var root = doc.RootElement;
+            string synthesis = root.TryGetProperty("synthesis", out var s) ? s.GetString() ?? "" : "";
+            string discussion = root.TryGetProperty("discussion", out var d) ? d.GetString() ?? "" : "";
+            return (synthesis, discussion);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[Cited Sections] Falling back to base draft: {SanitizeLogMessage(ex.Message)}");
+            return (string.Empty, string.Empty);
+        }
+    }
+
+    // Documented "peer reviewer" pass. An LLM reviews the synthesis and discussion for depth, citation
+    // coverage, grounding, coherence, and over-claiming, then a second pass revises the two sections in
+    // response to that feedback. Both the comments and the before/after text are returned so the whole
+    // exchange can be written to peer-review-feedback.json for transparency. A single round keeps the
+    // cost and latency bounded.
+    private async Task<PeerReviewLog> PeerReviewAndReviseAsync(
+        IChatCompletionService chat, string synthesis, string discussion,
+        string referenceListMapping, string groundedOutline)
+    {
+        var log = new PeerReviewLog
+        {
+            GeneratedAt = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss UTC"),
+            SynthesisBefore = synthesis,
+            SynthesisAfter = synthesis,
+            DiscussionBefore = discussion,
+            DiscussionAfter = discussion,
+            Verdict = "No changes applied"
+        };
+
+        if (string.IsNullOrWhiteSpace(synthesis) && string.IsNullOrWhiteSpace(discussion))
+            return log;
+
+        // 1. CRITIQUE
+        var critiquePrompt = $$"""
+            You are a strict but constructive peer reviewer for a systematic literature review. Review the
+            two sections below for: (a) depth and specificity, (b) whether each specific claim carries an
+            inline [n] citation, (c) whether cited numbers stay within the reference list, (d) coherence and
+            logical flow, and (e) over-claiming beyond what the sources support.
+
+            REFERENCE LIST (valid citation numbers):
+            {{referenceListMapping}}
+
+            CLAIM-TO-SOURCE OUTLINE:
+            {{(string.IsNullOrWhiteSpace(groundedOutline) ? "(not available)" : groundedOutline)}}
+
+            RESULTS AND SYNTHESIS (Item 20a):
+            {{synthesis}}
+
+            DISCUSSION (Item 23a):
+            {{discussion}}
+
+            Respond ONLY with a valid minified JSON object:
+            { "comments": [ { "section": "synthesis or discussion", "severity": "high, medium, or low", "issue": "what is wrong or weak", "suggestion": "how to fix it" } ] }
+            If a section is already strong, return few or no comments for it.
+            """;
+
+        var comments = new List<PeerReviewComment>();
+        try
+        {
+            var settings = new MistralAIPromptExecutionSettings { Temperature = 0.2 };
+            settings.ExtensionData ??= new Dictionary<string, object>();
+            settings.ExtensionData["response_format"] = new { type = "json_object" };
+
+            var response = await chat.GetChatMessageContentAsync(critiquePrompt, settings);
+            string raw = response.ToString().Replace("```json", "").Replace("```", "").Trim();
+            int st = raw.IndexOf('{');
+            int en = raw.LastIndexOf('}');
+            if (st >= 0 && en > st) raw = raw.Substring(st, en - st + 1);
+
+            using var doc = JsonDocument.Parse(raw);
+            if (doc.RootElement.TryGetProperty("comments", out var arr) && arr.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var c in arr.EnumerateArray())
+                {
+                    comments.Add(new PeerReviewComment(
+                        c.TryGetProperty("section", out var se) ? se.GetString() ?? "" : "",
+                        c.TryGetProperty("severity", out var sv) ? sv.GetString() ?? "" : "",
+                        c.TryGetProperty("issue", out var iss) ? iss.GetString() ?? "" : "",
+                        c.TryGetProperty("suggestion", out var sug) ? sug.GetString() ?? "" : ""
+                    ));
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[Peer Review Critique] Skipped: {SanitizeLogMessage(ex.Message)}");
+        }
+
+        log.Comments = comments;
+
+        if (comments.Count == 0)
+        {
+            log.Verdict = "No revisions needed - reviewer found no actionable issues";
+            return log;
+        }
+
+        // 2. REVISE in response to the feedback
+        string feedbackText = string.Join("\n", comments.Select(c => $"- [{c.Severity}] ({c.Section}) {c.Issue} -> {c.Suggestion}"));
+        var revisePrompt = $$"""
+            You are the author revising two sections of a systematic review in response to peer-review
+            feedback. Apply the feedback to improve depth and citation coverage. Keep every valid inline [n]
+            citation, add the citations the feedback asks for using ONLY numbers from the reference list, and
+            do not invent numbers or fabricate claims.
+
+            REFERENCE LIST (valid citation numbers):
+            {{referenceListMapping}}
+
+            PEER-REVIEW FEEDBACK:
+            {{feedbackText}}
+
+            CURRENT RESULTS AND SYNTHESIS:
+            {{synthesis}}
+
+            CURRENT DISCUSSION:
+            {{discussion}}
+
+            Respond ONLY with a valid minified JSON object:
+            { "synthesis": "the revised synthesis with inline [n] citations", "discussion": "the revised discussion with inline [n] citations" }
+            """;
+
+        try
+        {
+            var settings = new MistralAIPromptExecutionSettings { Temperature = 0.3 };
+            settings.ExtensionData ??= new Dictionary<string, object>();
+            settings.ExtensionData["response_format"] = new { type = "json_object" };
+
+            var response = await chat.GetChatMessageContentAsync(revisePrompt, settings);
+            string raw = response.ToString().Replace("```json", "").Replace("```", "").Trim();
+            int st = raw.IndexOf('{');
+            int en = raw.LastIndexOf('}');
+            if (st >= 0 && en > st) raw = raw.Substring(st, en - st + 1);
+
+            using var doc = JsonDocument.Parse(raw);
+            var root = doc.RootElement;
+            string revSynth = root.TryGetProperty("synthesis", out var s) ? s.GetString() ?? "" : "";
+            string revDisc = root.TryGetProperty("discussion", out var d) ? d.GetString() ?? "" : "";
+            if (!string.IsNullOrWhiteSpace(revSynth)) log.SynthesisAfter = revSynth;
+            if (!string.IsNullOrWhiteSpace(revDisc)) log.DiscussionAfter = revDisc;
+            log.Verdict = $"Revisions applied in response to {comments.Count} reviewer comment(s)";
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[Peer Review Revision] Skipped: {SanitizeLogMessage(ex.Message)}");
+            log.Verdict = "Reviewer produced comments but the revision step failed; original text retained";
+        }
+
+        return log;
+    }
+
 private async Task GeneratePrismaChecklistReportWithRAGAsync(Guid sessionId, int sourceCount, IChatCompletionService chat, string query, string explicitObjective, string inc, string exc, string groundedChunksText, string referenceListMapping, ReviewState finalState, List<string>? searchPerspectives = null, int referenceCount = 0)
     {
         var effectivePerspectives = searchPerspectives ?? new List<string> { query };
@@ -694,12 +901,30 @@ private async Task GeneratePrismaChecklistReportWithRAGAsync(Guid sessionId, int
             var (cleanSources, dSources) = await StylisticRefinerUtility.RefineAcademicProseAsync(chat, "Sources", rawSources); deltas.Add(dSources);
             var (cleanSearch, dSearch) = await StylisticRefinerUtility.RefineAcademicProseAsync(chat, "Search Strategy", rawSearch); deltas.Add(dSearch);
             var (cleanSelection, dSelection) = await StylisticRefinerUtility.RefineAcademicProseAsync(chat, "Selection Automation", rawSelection); deltas.Add(dSelection);
-            var (cleanDiscussion, dDiscussion) = await StylisticRefinerUtility.RefineAcademicProseAsync(chat, "Discussion", rawDiscussion); deltas.Add(dDiscussion);
-            var (cleanSynthesis, dSynthesis) = await StylisticRefinerUtility.RefineAcademicProseAsync(chat, "Synthesis Results", rawSynthesisText); deltas.Add(dSynthesis);
+            // The Results & Synthesis (20a) and Discussion (23a) sections are NOT run through the generic
+            // stylistic refiner - that rewrite step tends to drop the inline [n] citation markers. They are
+            // instead produced by a dedicated citation-mandatory pass and then improved by a documented
+            // peer-review pass, so the shipped text keeps its traceable citations and gains depth.
+            var (citedSynthesis, citedDiscussion) = await GenerateCitedSectionsAsync(
+                chat, query, explicitObjective, groundedOutline, referenceListMapping, groundedChunksText);
 
-            // Re-append the isolated architectural diagram strings back onto the humanized synthesis field
-            string fullSynthesisField = (string.IsNullOrWhiteSpace(cleanSynthesis) ? rawSynthesisText : cleanSynthesis) + mermaidBlock + tikzBlock;
-            string preValidationDiscussion = !string.IsNullOrWhiteSpace(cleanDiscussion) ? cleanDiscussion : rawDiscussion;
+            // Fall back to the base multi-field draft only if the dedicated pass returned nothing.
+            if (string.IsNullOrWhiteSpace(citedSynthesis)) citedSynthesis = rawSynthesisText;
+            if (string.IsNullOrWhiteSpace(citedDiscussion)) citedDiscussion = rawDiscussion;
+
+            // Documented "peer reviewer" pass: an LLM critiques the two sections and revises them, and the
+            // whole exchange is written to peer-review-feedback.json in the workspace for transparency.
+            var peerReview = await PeerReviewAndReviseAsync(chat, citedSynthesis, citedDiscussion, referenceListMapping, groundedOutline);
+            try
+            {
+                string peerReviewPath = Path.Combine(GetWorkspaceFolderPath(sessionId), "peer-review-feedback.json");
+                await File.WriteAllTextAsync(peerReviewPath, JsonSerializer.Serialize(peerReview, new JsonSerializerOptions { WriteIndented = true }));
+            }
+            catch { }
+
+            // Re-append the isolated architectural diagram strings back onto the reviewed synthesis field
+            string fullSynthesisField = peerReview.SynthesisAfter + mermaidBlock + tikzBlock;
+            string preValidationDiscussion = peerReview.DiscussionAfter;
 
             // STORM-style traceability guardrail: every [n] citation marker the model writes must resolve to
             // an entry that actually exists in the run's reference list. The model occasionally invents or
@@ -1117,11 +1342,13 @@ private async Task GeneratePrismaChecklistReportWithRAGAsync(Guid sessionId, int
             string isolatedFolder = GetWorkspaceFolderPath(sessionId);
             string ledgerPath = Path.Combine(isolatedFolder, "stylistic-transformation-ledger.json");
             string citationAuditPath = Path.Combine(isolatedFolder, "citation-audit.json");
+            string peerReviewPath = Path.Combine(isolatedFolder, "peer-review-feedback.json");
 
             if (File.Exists(reportPath)) archive.CreateEntryFromFile(reportPath, "prisma-report.json");
             if (File.Exists(statePath)) archive.CreateEntryFromFile(statePath, "transparent-process.json");
             if (File.Exists(ledgerPath)) archive.CreateEntryFromFile(ledgerPath, "stylistic-transformation-ledger.json");
             if (File.Exists(citationAuditPath)) archive.CreateEntryFromFile(citationAuditPath, "citation-audit.json");
+            if (File.Exists(peerReviewPath)) archive.CreateEntryFromFile(peerReviewPath, "peer-review-feedback.json");
 
             if (Directory.Exists(isolatedFolder))
             {
