@@ -90,6 +90,21 @@ app.MapStaticAssets();
 // Apply the rate limiter policies to the application pipeline routing channel
 app.UseRateLimiter();
 
+// Serve the workspace footprint (.zip) as a real HTTP download instead of streaming it through the
+// Blazor Server SignalR connection: that connection has a small default max message size, so pushing a
+// base64-encoded zip through JS interop silently fails once a run has real downloaded source PDFs in it.
+app.MapGet("/api/workspace/{sessionId:guid}/archive", (Guid sessionId, AuBtechReviewAgent.PrismaReviewEngine engine) =>
+{
+    byte[] zipBytes = engine.GenerateWorkspaceArchiveFromDisk(sessionId);
+    if (zipBytes.Length == 0)
+    {
+        return Results.NotFound();
+    }
+
+    string fileName = $"PRISMA_Evaluation_Footprint_{DateTime.UtcNow:yyyyMMdd}.zip";
+    return Results.File(zipBytes, "application/zip", fileName);
+});
+
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
 

@@ -23,6 +23,10 @@ public class ReviewState
     public ReviewPhases Phases { get; set; } = new();
     public List<PlatformSearchLog> SearchLogs { get; set; } = new();
     public List<IncludedPaperMetricRow> SynthesizedRecords { get; set; } = new();
+
+    // STORM-style multi-perspective search: the primary query plus LLM-generated variant phrasings
+    // actually issued against every source, kept here so the run is auditable end-to-end.
+    public List<string> SearchPerspectives { get; set; } = new();
     
     }
     
@@ -48,6 +52,9 @@ public class ReviewStats
     public string ProcessingStage { get; set; } = "Idle";
     public int PassedPeerReviewCheck { get; set; }  // Exactly X papers
     public int FailedPeerReviewCheck { get; set; }  // Exactly Y papers
+    public int DuplicatesRemoved { get; set; }      // Cross-perspective duplicate hits collapsed before screening
+    public int CappedBeyondMaxResults { get; set; } // Candidates discarded by the hard per-source maxResults cap
+    public int InvalidCitationsStripped { get; set; } // Out-of-range [n] markers removed from generated prose for traceability
 }
 
 public class ReviewPhases 
@@ -73,6 +80,7 @@ public class PlatformSearchLog
     public string Status { get; set; } = string.Empty;
     public int PapersFound { get; set; }
     public string ErrorMessage { get; set; } = "None";
+    public string QueryUsed { get; set; } = string.Empty; // Which search-perspective phrasing produced this pass
 }
 
 public record StyleDeltaLog(string FieldName, string OriginalText, string RefinedText);

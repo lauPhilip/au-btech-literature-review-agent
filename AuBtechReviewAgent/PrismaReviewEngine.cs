@@ -70,8 +70,8 @@ public class PrismaReviewEngine
         string userWorkspace = GetWorkspaceFolderPath(sessionId);
         Directory.CreateDirectory(userWorkspace);
 
-        var reviewState = new ReviewState 
-        { 
+        var reviewState = new ReviewState
+        {
             SearchQuery = initialQuery,
             PeerReviewOnlyToggle = requirePeerReview,
             SynthesisTargetDirective = synthesisDirective
@@ -79,36 +79,86 @@ public class PrismaReviewEngine
         reviewState.Stats.ProcessingStage = "Screening";
         await SaveStateAsync(sessionId, reviewState);
 
+        // STORM-style multi-perspective search: survey the topic from a few distinct angles before
+        // querying each source, instead of relying on the single literal query phrase alone.
+        var searchPerspectives = await GenerateSearchPerspectivesAsync(chatService, initialQuery, explicitObjective, inclusionCriteria);
+        reviewState.SearchPerspectives = searchPerspectives;
+        await SaveStateAsync(sessionId, reviewState);
+
         var allGroundedChunks = new List<DocumentChunk>();
 
         foreach (var source in activeSources)
         {
-            var currentLog = new PlatformSearchLog
-            {
-                SourceName = source.SourceName,
-                Timestamp = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss UTC"),
-                Status = "Running"
-            };
-            reviewState.SearchLogs.Add(currentLog);
-            await SaveStateAsync(sessionId, reviewState);
+            var sourceCandidates = new List<AcademicPaper>();
+            var seenIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var seenTitles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-            List<AcademicPaper> candidates = new();
-            try
+            // maxResults is a hard per-source cap, not a per-query cap: split the budget across the
+            // perspective phrasings so a source never contributes more than maxResults papers overall,
+            // regardless of how many perspectives were generated. Keeps testing with a small maxResults
+            // cheap and predictable instead of silently multiplying by the perspective count.
+            int perPerspectiveCap = Math.Max(1, (int)Math.Ceiling(maxResults / (double)searchPerspectives.Count));
+
+            foreach (var perspectiveQuery in searchPerspectives)
             {
-                candidates = await source.FetchPapersAsync(reviewState.SearchQuery, maxResults: maxResults);
-                currentLog.Status = "Completed Successfully";
-                currentLog.PapersFound = candidates.Count;
-            }
-            catch (Exception ex)
-            {
-                currentLog.Status = "Faulted / Refused Connection";
-                currentLog.ErrorMessage = SanitizeLogMessage(ex.Message);
-                Console.WriteLine($"[Source Exception Logging] {source.SourceName} faulted: {currentLog.ErrorMessage}");
+                if (sourceCandidates.Count >= maxResults) break; // per-source cap already met - skip remaining perspectives entirely
+
+                var currentLog = new PlatformSearchLog
+                {
+                    SourceName = source.SourceName,
+                    Timestamp = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss UTC"),
+                    Status = "Running",
+                    QueryUsed = perspectiveQuery
+                };
+                reviewState.SearchLogs.Add(currentLog);
+                await SaveStateAsync(sessionId, reviewState);
+
+                List<AcademicPaper> perspectiveResults = new();
+                try
+                {
+                    perspectiveResults = await source.FetchPapersAsync(perspectiveQuery, maxResults: perPerspectiveCap);
+                    currentLog.Status = "Completed Successfully";
+                    currentLog.PapersFound = perspectiveResults.Count;
+                }
+                catch (Exception ex)
+                {
+                    currentLog.Status = "Faulted / Refused Connection";
+                    currentLog.ErrorMessage = SanitizeLogMessage(ex.Message);
+                    Console.WriteLine($"[Source Exception Logging] {source.SourceName} faulted on perspective \"{perspectiveQuery}\": {currentLog.ErrorMessage}");
+                }
+
+                reviewState.Stats.TotalIdentified += perspectiveResults.Count;
+
+                foreach (var candidate in perspectiveResults)
+                {
+                    string normalizedTitle = Regex.Replace((candidate.Title ?? "").ToLowerInvariant(), @"\s+", " ").Trim();
+                    bool isDuplicate = seenIds.Contains(candidate.Id) || (normalizedTitle.Length > 0 && seenTitles.Contains(normalizedTitle));
+                    if (isDuplicate)
+                    {
+                        reviewState.Stats.DuplicatesRemoved++;
+                        continue;
+                    }
+                    seenIds.Add(candidate.Id);
+                    if (normalizedTitle.Length > 0) seenTitles.Add(normalizedTitle);
+                    sourceCandidates.Add(candidate);
+
+                    if (sourceCandidates.Count >= maxResults) break; // stop absorbing more candidates once the per-source cap is hit
+                }
+
+                OnProgressUpdated?.Invoke(reviewState.Stats);
+                await SaveStateAsync(sessionId, reviewState);
             }
 
-            reviewState.Stats.TotalIdentified += candidates.Count;
-            OnProgressUpdated?.Invoke(reviewState.Stats);
-            await SaveStateAsync(sessionId, reviewState);
+            // Hard safety net: never let more than maxResults candidates per source reach screening, even if
+            // a source adapter under-respects the requested cap.
+            int overCap = Math.Max(0, sourceCandidates.Count - maxResults);
+            if (overCap > 0)
+            {
+                reviewState.Stats.CappedBeyondMaxResults += overCap;
+                sourceCandidates = sourceCandidates.Take(maxResults).ToList();
+            }
+
+            var candidates = sourceCandidates;
 
             var filteredCandidates = new List<AcademicPaper>();
             foreach (var paper in candidates)
@@ -245,7 +295,9 @@ public class PrismaReviewEngine
             if (cleanCategory == "ScienceDirect" || cleanCategory == "IEEE" || cleanCategory == "Scholar")
             {
                 string extractedVenue = "";
-                var venueMatch = Regex.Match(log.ApaCitation ?? "", @"\.\s+\*([^*]+)\*");
+                // Matches both journal-style italicized venues (". *Journal Name*") and proceedings-style
+                // citations that introduce the venue with "In *Conference Name*" instead of a leading period.
+                var venueMatch = Regex.Match(log.ApaCitation ?? "", @"(?:\.\s+|In\s+)\*([^*]+)\*");
                 if (venueMatch.Success) extractedVenue = venueMatch.Groups[1].Value.Trim();
                 
                 quartile = JournalRankingMatcher.LookupQuartile(extractedVenue, parsedYear);
@@ -307,8 +359,8 @@ public class PrismaReviewEngine
             }
         }
 
-        await GeneratePrismaChecklistReportWithRAGAsync(sessionId, activeSources.Count, chatService, initialQuery, explicitObjective, 
-            inc: inclusionCriteria, exc: exclusionCriteria, sbContext.ToString(), exactReferenceListForLLM, reviewState);
+        await GeneratePrismaChecklistReportWithRAGAsync(sessionId, activeSources.Count, chatService, initialQuery, explicitObjective,
+            inc: inclusionCriteria, exc: exclusionCriteria, sbContext.ToString(), exactReferenceListForLLM, reviewState, searchPerspectives, referenceCount: includedPapers.Count);
 
         reviewState.Stats.ProcessingStage = "Complete";
         OnProgressUpdated?.Invoke(reviewState.Stats);
@@ -326,6 +378,55 @@ public class PrismaReviewEngine
         if (string.IsNullOrEmpty(citation)) return 2026;
         var yearMatch = Regex.Match(citation, @"\((20\d{2})\)");
         return yearMatch.Success && int.TryParse(yearMatch.Groups[1].Value, out int yr) ? yr : 2026;
+    }
+
+    /// <summary>
+    /// STORM-style perspective-guided question asking, scaled down for search-query expansion: instead of
+    /// hitting every source with only the single literal query phrase, ask the model to survey the topic
+    /// from a few distinct angles first (terminology variants, sub-topics, methodology/evaluation framing)
+    /// so the retrieval pass has a real chance of finding papers the primary phrase alone would miss.
+    /// Falls back to the primary query alone on any failure, so a flaky LLM call never blocks the run.
+    /// </summary>
+    private async Task<List<string>> GenerateSearchPerspectivesAsync(IChatCompletionService chatService, string initialQuery, string explicitObjective, string inclusionCriteria)
+    {
+        var perspectives = new List<string> { initialQuery };
+
+        var prompt = $$"""
+            You are assisting a systematic literature review search strategy. Following a "survey the topic from multiple perspectives before searching" approach, propose additional search-query phrasings that would surface relevant papers the primary query alone would miss.
+
+            PRIMARY SEARCH QUERY: "{{initialQuery}}"
+            REVIEW OBJECTIVE: "{{explicitObjective}}"
+            INCLUSION THRESHOLDS: "{{inclusionCriteria}}"
+
+            TASK: Propose exactly 3 additional, distinct search-query phrasings - for example a synonym/terminology variant, a narrower sub-topic or application-domain variant, and a methodology- or evaluation-focused variant. Each must stay tightly scoped to the same review objective; do not drift into unrelated topics. Keep each phrasing short enough to work as a literal database search string (roughly 3-8 words).
+
+            Respond ONLY with a valid minified JSON object matching this structure exactly:
+            { "perspectives": ["query variant 1", "query variant 2", "query variant 3"] }
+            """;
+
+        try
+        {
+            var response = await chatService.GetChatMessageContentAsync(prompt);
+            string cleanResponse = response.ToString().Replace("```json", "").Replace("```", "").Trim();
+            using var doc = JsonDocument.Parse(cleanResponse);
+            if (doc.RootElement.TryGetProperty("perspectives", out var arr) && arr.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var item in arr.EnumerateArray())
+                {
+                    string? variant = item.ValueKind == JsonValueKind.String ? item.GetString() : null;
+                    if (!string.IsNullOrWhiteSpace(variant) && !perspectives.Any(p => p.Equals(variant, StringComparison.OrdinalIgnoreCase)))
+                    {
+                        perspectives.Add(variant.Trim());
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[Perspective Expansion] Falling back to single-query search: {SanitizeLogMessage(ex.Message)}");
+        }
+
+        return perspectives;
     }
 
     private async Task<bool> VerifyPeerReviewStatusViaLLMAsync(IChatCompletionService chatService, AcademicPaper paper)
@@ -359,13 +460,111 @@ public class PrismaReviewEngine
         return false;
     }
 
-private async Task GeneratePrismaChecklistReportWithRAGAsync(Guid sessionId, int sourceCount, IChatCompletionService chat, string query, string explicitObjective, string inc, string exc, string groundedChunksText, string referenceListMapping, ReviewState finalState)
+    /// <summary>
+    /// STORM-style outline-before-prose stage. Asks the model to identify a handful of themes and, per
+    /// theme, the specific claims the grounded chunks actually support along with which reference numbers
+    /// back each claim - so the final synthesis prose is written against a pre-checked claim map rather
+    /// than generating everything in one uncontrolled pass. Returns an empty string (never throws) on any
+    /// failure, so the calling report generation falls back to grounding directly on the raw chunks.
+    /// </summary>
+    private async Task<string> GenerateGroundedOutlineAsync(IChatCompletionService chat, string query, string explicitObjective, string groundedChunksText, string referenceListMapping)
     {
+        if (string.IsNullOrWhiteSpace(groundedChunksText)) return string.Empty;
+
+        var outlinePrompt = $$"""
+            You are preparing a grounded synthesis outline for a systematic literature review: before writing prose, map out the specific claims the literature supports and which sources back each claim.
+
+            REVIEW OBJECTIVE: "{{explicitObjective}}"
+            PRIMARY TOPIC: "{{query}}"
+
+            OFFICIAL ALPHABETIZED REFERENCE LIST FOR THIS RUN:
+            {{referenceListMapping}}
+
+            GROUNDED MANUSCRIPT RAW CONTEXT DATA CHUNKS:
+            {{groundedChunksText}}
+
+            TASK: Identify 3 to 6 distinct themes that emerge across the included sources. For each theme, list 1-3 concrete, specific claims that the grounded chunks actually support, and for each claim list which reference numbers from the list above support it. Only use reference numbers that appear in the list above. If the grounded chunks are too sparse to support a claim, omit it rather than inventing one.
+
+            Respond ONLY with a valid minified JSON object matching this structure exactly:
+            { "themes": [ { "theme": "short theme label", "claims": [ { "text": "specific claim grounded in the sources", "refs": [1, 3] } ] } ] }
+            """;
+
+        try
+        {
+            var structuralSettings = new MistralAIPromptExecutionSettings { Temperature = 0.2 };
+            structuralSettings.ExtensionData ??= new Dictionary<string, object>();
+            structuralSettings.ExtensionData["response_format"] = new { type = "json_object" };
+
+            var response = await chat.GetChatMessageContentAsync(outlinePrompt, structuralSettings);
+            string raw = response.ToString().Replace("```json", "").Replace("```", "").Trim();
+
+            using var doc = JsonDocument.Parse(raw);
+            var sb = new StringBuilder();
+            if (doc.RootElement.TryGetProperty("themes", out var themes) && themes.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var theme in themes.EnumerateArray())
+                {
+                    string themeLabel = theme.TryGetProperty("theme", out var t) && t.ValueKind == JsonValueKind.String ? t.GetString() ?? "" : "";
+                    if (string.IsNullOrWhiteSpace(themeLabel)) continue;
+                    sb.AppendLine($"- Theme: {themeLabel}");
+
+                    if (theme.TryGetProperty("claims", out var claims) && claims.ValueKind == JsonValueKind.Array)
+                    {
+                        foreach (var claim in claims.EnumerateArray())
+                        {
+                            string claimText = claim.TryGetProperty("text", out var c) && c.ValueKind == JsonValueKind.String ? c.GetString() ?? "" : "";
+                            if (string.IsNullOrWhiteSpace(claimText)) continue;
+
+                            var refs = new List<string>();
+                            if (claim.TryGetProperty("refs", out var refsArr) && refsArr.ValueKind == JsonValueKind.Array)
+                            {
+                                foreach (var r in refsArr.EnumerateArray())
+                                {
+                                    if (r.ValueKind == JsonValueKind.Number) refs.Add($"[{r.GetInt32()}]");
+                                }
+                            }
+                            sb.AppendLine($"    * {claimText} {string.Join("", refs)}");
+                        }
+                    }
+                }
+            }
+            return sb.ToString();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[Outline Generation] Skipped grounded outline stage: {SanitizeLogMessage(ex.Message)}");
+            return string.Empty;
+        }
+    }
+
+private async Task GeneratePrismaChecklistReportWithRAGAsync(Guid sessionId, int sourceCount, IChatCompletionService chat, string query, string explicitObjective, string inc, string exc, string groundedChunksText, string referenceListMapping, ReviewState finalState, List<string>? searchPerspectives = null, int referenceCount = 0)
+    {
+        var effectivePerspectives = searchPerspectives ?? new List<string> { query };
+        string supplementaryPerspectives = effectivePerspectives.Count > 1
+            ? string.Join(" | ", effectivePerspectives.Skip(1))
+            : "(none - single literal query only)";
+
+        // STORM-style outline stage: before writing prose, ask the model to map out which specific,
+        // grounded claims the sources actually support and which reference numbers back each one. This
+        // is persisted to disk as its own audit artifact and then fed back in below so synthesisResultsItem
+        // and discussionItem are written against a pre-checked claim map instead of free-associating.
+        string groundedOutline = await GenerateGroundedOutlineAsync(chat, query, explicitObjective, groundedChunksText, referenceListMapping);
+        if (!string.IsNullOrWhiteSpace(groundedOutline))
+        {
+            try
+            {
+                string outlinePath = Path.Combine(GetWorkspaceFolderPath(sessionId), "grounded-outline.txt");
+                await File.WriteAllTextAsync(outlinePath, groundedOutline);
+            }
+            catch { }
+        }
+
         var reportPrompt = $$"""
             You are an elite academic meta-analyst preparing an evaluation report mapped to the PRISMA 2020 Expanded Checklist.
 
             CRITICAL LIVE RUN CONSTRAINTS (ZERO HALLUCINATION DIRECTIVE):
-            - The ONLY search term/string used in this run was exactly: "{{query}}"
+            - The primary search query for this run was exactly: "{{query}}"
+            - To broaden recall (multi-perspective search), the engine additionally queried every source with these supplementary phrasings: {{supplementaryPerspectives}}
             - The review objective specified by the user was exactly: "{{explicitObjective}}"
             - The screening inclusion thresholds were exactly: "{{inc}}"
             - The screening exclusion thresholds were exactly: "{{exc}}"
@@ -375,6 +574,12 @@ private async Task GeneratePrismaChecklistReportWithRAGAsync(Guid sessionId, int
 
             GROUNDED MANUSCRIPT RAW CONTEXT DATA CHUNKS:
             {{groundedChunksText}}
+
+            PRE-COMPUTED GROUNDED OUTLINE (claims already checked against the sources above - ground synthesisResultsItem and discussionItem on these claims):
+            {{(string.IsNullOrWhiteSpace(groundedOutline) ? "(No outline could be generated - ground your synthesis directly on the raw context chunks above instead.)" : groundedOutline)}}
+
+            CITATION GROUNDING REQUIREMENT (mandatory traceability):
+            When writing "synthesisResultsItem" and "discussionItem", every specific claim, finding, or comparison drawn from the literature MUST end with an inline citation marker in square brackets referencing the OFFICIAL ALPHABETIZED REFERENCE LIST above by its number, e.g. "...improves fault isolation [3]." or "...as shown in both [2] and [5]." Only cite numbers that actually appear in that list - never invent one. General framing sentences that state no specific finding do not need a citation marker.
 
             TASK:
             Generate a fully formed, detailed academic paragraph for each checklist field below.
@@ -403,7 +608,7 @@ private async Task GeneratePrismaChecklistReportWithRAGAsync(Guid sessionId, int
                 "objectivesItem": "The explicit question formulation matching the stated goal: '{{explicitObjective}}' mapping to PRISMA Item 4.",
                 "eligibilityItem": "A comprehensive breakdown detailing the screening configuration limits (Inclusion: '{{inc}}' | Exclusion: '{{exc}}') mapping to PRISMA Item 5.",
                 "sourcesItem": "A concise record confirming that document platform searches were limited strictly to the active query interfaces mapping to PRISMA Item 6.",
-                "searchStrategyItem": "An analytical description confirming that execution was carried out using the literal search query phrase '{{query}}' mapping to PRISMA Item 7.",
+                "searchStrategyItem": "An analytical description confirming that execution was carried out using the primary query phrase '{{query}}' together with the supplementary perspective-driven query variants ({{supplementaryPerspectives}}) mapping to PRISMA Item 7.",
                 "selectionProcessItem": "An explanation detailing how fields were evaluated by an automated screening architecture according to constraints mapping to PRISMA Item 8.",
                 "biasAssessmentItem": "This field will be post-processed. Output exactly: 'PREDEFINED_METADATA_MARKER'",
                 "synthesisResultsItem": "Your simple-English factual literature summary paragraph mapping to PRISMA Item 20a. Do not place code syntax here.",
@@ -494,6 +699,52 @@ private async Task GeneratePrismaChecklistReportWithRAGAsync(Guid sessionId, int
 
             // Re-append the isolated architectural diagram strings back onto the humanized synthesis field
             string fullSynthesisField = (string.IsNullOrWhiteSpace(cleanSynthesis) ? rawSynthesisText : cleanSynthesis) + mermaidBlock + tikzBlock;
+            string preValidationDiscussion = !string.IsNullOrWhiteSpace(cleanDiscussion) ? cleanDiscussion : rawDiscussion;
+
+            // STORM-style traceability guardrail: every [n] citation marker the model writes must resolve to
+            // an entry that actually exists in the run's reference list. The model occasionally invents or
+            // miscounts numbers (e.g. citing [56] against a 53-entry list); strip those instead of shipping
+            // a report whose citations don't trace back to a real source, and log every removal to an
+            // on-disk audit artifact so the discrepancy itself stays visible rather than silently vanishing.
+            var citationAudit = new List<object>();
+            string ValidateAndStripInvalidCitations(string fieldName, string text)
+            {
+                if (string.IsNullOrWhiteSpace(text) || referenceCount <= 0) return text;
+                return Regex.Replace(text, @"\[(\d+(?:\s*,\s*\d+)*)\]", match =>
+                {
+                    var numbers = match.Groups[1].Value.Split(',').Select(n => n.Trim());
+                    var validNumbers = new List<string>();
+                    foreach (var numStr in numbers)
+                    {
+                        if (int.TryParse(numStr, out int num) && num >= 1 && num <= referenceCount)
+                        {
+                            validNumbers.Add(numStr);
+                        }
+                        else
+                        {
+                            finalState.Stats.InvalidCitationsStripped++;
+                            citationAudit.Add(new { Field = fieldName, InvalidMarker = numStr, ReferenceListSize = referenceCount, Action = "Stripped - out of range of the run's reference list" });
+                        }
+                    }
+                    return validNumbers.Count > 0 ? $"[{string.Join(", ", validNumbers)}]" : "";
+                });
+            }
+
+            fullSynthesisField = ValidateAndStripInvalidCitations("synthesisResultsItem", fullSynthesisField);
+            string cleanDiscussionValidated = ValidateAndStripInvalidCitations("discussionItem", preValidationDiscussion);
+
+            try
+            {
+                string auditPath = Path.Combine(GetWorkspaceFolderPath(sessionId), "citation-audit.json");
+                var auditPayload = new
+                {
+                    ReferenceListSize = referenceCount,
+                    InvalidMarkersStripped = citationAudit.Count,
+                    Details = citationAudit
+                };
+                await File.WriteAllTextAsync(auditPath, JsonSerializer.Serialize(auditPayload, new JsonSerializerOptions { WriteIndented = true }));
+            }
+            catch { }
 
             var reportObj = new PrismaReport
             {
@@ -507,7 +758,7 @@ private async Task GeneratePrismaChecklistReportWithRAGAsync(Guid sessionId, int
                 SearchStrategyItem = !string.IsNullOrWhiteSpace(cleanSearch) ? cleanSearch : rawSearch,
                 SelectionProcessItem = !string.IsNullOrWhiteSpace(cleanSelection) ? cleanSelection : rawSelection,
                 SynthesisResultsItem = fullSynthesisField,
-                DiscussionItem = !string.IsNullOrWhiteSpace(cleanDiscussion) ? cleanDiscussion : rawDiscussion,
+                DiscussionItem = cleanDiscussionValidated,
                 BiasAssessmentItem = "Internal risk of bias is controlled via mandatory post-generation human verification. Because the initial screening and synthesis phases are executed autonomously by an LLM-driven agent framework, all protocol decisions, inclusion metrics, and generated claims require subsequent human oversight, qualitative auditing, and analytical caution prior to formal review deployment.",
                 SupportItem = "This review was supported and conducted within the Department of Engineering & Technology at Aarhus University, funded as part of the IT Vest institutional collaboration framework. The funders played no active role in specific automated screening study designs, live stream extraction cycles, or pipeline synthesis determinations.",
                 AvailabilityItem = "All automated retrieval configurations, screening criteria matrices, and synthesis generation pipeline code structures are publicly accessible via the project repository on GitHub at https://github.com/lauPhilip/au-btech-literature-review-agent."
@@ -572,7 +823,48 @@ private async Task GeneratePrismaChecklistReportWithRAGAsync(Guid sessionId, int
                          .Replace("^", @"\textasciicircum ");
     }
     
-    public byte[] GenerateManuscriptPdf(Guid sessionId, PrismaReport report, List<IncludedPaperMetricRow> records)
+    /// <summary>
+    /// Loads the persisted report + synthesized records for a session straight off disk and builds the
+    /// workspace archive from them. Lets the download be served from a plain HTTP endpoint (Program.cs)
+    /// instead of round-tripping the whole zip through the Blazor Server SignalR connection, which has a
+    /// small default max message size and would silently fail once real source PDFs are included.
+    /// </summary>
+    public byte[] GenerateWorkspaceArchiveFromDisk(Guid sessionId)
+    {
+        var report = new PrismaReport();
+        string reportPath = GetReportFilePath(sessionId);
+        if (File.Exists(reportPath))
+        {
+            try
+            {
+                string content = File.ReadAllText(reportPath);
+                report = JsonSerializer.Deserialize<PrismaReport>(content, new JsonSerializerOptions { PropertyNameCaseInsensitive = true }) ?? new PrismaReport();
+            }
+            catch { }
+        }
+
+        var records = new List<IncludedPaperMetricRow>();
+        string statePath = GetStateFilePath(sessionId);
+        if (File.Exists(statePath))
+        {
+            try
+            {
+                string stateJson = File.ReadAllText(statePath);
+                using var doc = JsonDocument.Parse(stateJson);
+                if (doc.RootElement.TryGetProperty("SynthesizedRecords", out var recordsProp))
+                {
+                    records = JsonSerializer.Deserialize<List<IncludedPaperMetricRow>>(recordsProp.GetRawText()) ?? new();
+                }
+            }
+            catch { }
+        }
+
+        return GenerateWorkspaceArchive(sessionId, report, records);
+    }
+
+    // NOTE: historically named GenerateManuscriptPdf, but it never compiled a PDF - it always returned a
+    // zip bundle (LaTeX source + JSON ledger + source PDFs). Renamed to match what it actually produces.
+    public byte[] GenerateWorkspaceArchive(Guid sessionId, PrismaReport report, List<IncludedPaperMetricRow> records)
     {
         string projectRoot = Directory.GetCurrentDirectory();
         CleanOldManuscriptArtifacts(projectRoot);
@@ -838,10 +1130,12 @@ private async Task GeneratePrismaChecklistReportWithRAGAsync(Guid sessionId, int
             string reportPath = GetReportFilePath(sessionId);
             string isolatedFolder = GetWorkspaceFolderPath(sessionId);
             string ledgerPath = Path.Combine(isolatedFolder, "stylistic-transformation-ledger.json");
+            string citationAuditPath = Path.Combine(isolatedFolder, "citation-audit.json");
 
             if (File.Exists(reportPath)) archive.CreateEntryFromFile(reportPath, "prisma-report.json");
             if (File.Exists(statePath)) archive.CreateEntryFromFile(statePath, "transparent-process.json");
             if (File.Exists(ledgerPath)) archive.CreateEntryFromFile(ledgerPath, "stylistic-transformation-ledger.json");
+            if (File.Exists(citationAuditPath)) archive.CreateEntryFromFile(citationAuditPath, "citation-audit.json");
 
             if (Directory.Exists(isolatedFolder))
             {
@@ -850,7 +1144,17 @@ private async Task GeneratePrismaChecklistReportWithRAGAsync(Guid sessionId, int
                 {
                     if (file.EndsWith(".json")) continue;
                     string filename = Path.GetFileName(file);
-                    archive.CreateEntryFromFile(file, $"SourcePapers/{filename}");
+
+                    // The grounded outline is an audit artifact, not a source manuscript - keep it at the
+                    // archive root instead of filing it alongside the downloaded source PDFs.
+                    if (filename.Equals("grounded-outline.txt", StringComparison.OrdinalIgnoreCase))
+                    {
+                        archive.CreateEntryFromFile(file, filename);
+                    }
+                    else
+                    {
+                        archive.CreateEntryFromFile(file, $"SourcePapers/{filename}");
+                    }
                 }
             }
         }

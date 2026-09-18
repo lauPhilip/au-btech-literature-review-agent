@@ -4,8 +4,8 @@
 @using System.IO
 @using System.Text.Json
 @using System.Text.RegularExpressions
-@inject AuBtechReviewAgent.PrismaReviewEngine ReviewEngine
 @inject IJSRuntime JS
+@inject NavigationManager Nav
 
 <PageTitle>PRISMA 2020 Checklist Manuscript Preview</PageTitle>
 
@@ -254,34 +254,24 @@
                         }
                         else
                         {
-                            <span>We looked at each included paper was published to check the quality of our data.</span>
-                            @foreach (var r in tableRecords)
-                            {
-                                string venue = "";
-                                var venueMatch = Regex.Match(r.ApaCitation, @"\.\s+\*([^*]+)\*");
-                                if (venueMatch.Success) venue = venueMatch.Groups[1].Value.Trim();
-                                if (string.IsNullOrEmpty(venue)) venue = "Indexed Source Venue";
-                                if (venue.Contains("Transactions on Software Engineering and Methodology", StringComparison.OrdinalIgnoreCase))
-                                {
-                                    <span>The piece "@r.Title", published in <em>ACM Transactions on Software Engineering and Methodology</em>, is a <strong>Q1</strong> journal. It has an H-index score of 95, focusing on Computer Science, Software Engineering, and related subject categories. </span>
-                                }
-                                else if (venue.Contains("Information Fusion", StringComparison.OrdinalIgnoreCase))
-                                {
-                                    <span>The paper "@r.Title", published in <em>Information Fusion</em>, is a <strong>Q1</strong> tier journal by Elsevier. It holds an H-index score of 179 within Hardware, Signal Processing, and Software systems. </span>
-                                }
-                                else if (r.Category == "IEEE" || r.Category == "Scholar")
-                                {
-                                    <span>The study "@r.Title" was indexed via <em>@venue</em>. It maps to an established peer-reviewed index tracking domain classification with a baseline quartile tier rating of <strong>Q1</strong>. </span>
-                                }
-                                else if (r.VenueType == "Conferences")
-                                {
-                                    <span>The study "@r.Title" was published in the peer-reviewed conference proceedings of <em>@venue</em>. It maps to an established Computer Science conference venue with an H-index rating of 16. </span>
-                                }
-                                else
-                                {
-                                    <span>The research paper "@r.Title" was pulled from the un-reviewed preprint repository archive <em>@venue</em>, keeping a preprint source status. </span>
-                                }
-                            }
+                            // Aggregate summary instead of one near-identical sentence per paper: with dozens of
+                            // included papers the old per-paper loop produced a wall of repetitive boilerplate
+                            // ("was pulled from the un-reviewed preprint repository archive..."). The per-paper
+                            // venue/tier/citation detail this used to restate is already fully traceable in
+                            // Figure 3.4 and Table 3.1 immediately below, so it isn't lost - just not repeated in prose.
+                            int q1Count = tableRecords.Count(r => (r.Quartile ?? "").Equals("Q1", StringComparison.OrdinalIgnoreCase));
+                            int otherQCount = tableRecords.Count(r => !string.IsNullOrEmpty(r.Quartile) && r.Quartile != "N/A" && !r.Quartile.Equals("Q1", StringComparison.OrdinalIgnoreCase));
+                            int confCount = tableRecords.Count(r => r.VenueType == "Conferences");
+                            int preprintCount = tableRecords.Count(r => r.VenueType == "Preprints");
+
+                            var clauses = new List<string>();
+                            if (q1Count > 0) clauses.Add($"{q1Count} in Q1-ranked journals or equivalently-rated indexes");
+                            if (otherQCount > 0) clauses.Add($"{otherQCount} in lower-quartile (Q2-Q4) journals");
+                            if (confCount > 0) clauses.Add($"{confCount} in peer-reviewed conference proceedings");
+                            if (preprintCount > 0) clauses.Add($"{preprintCount} from un-reviewed preprint archives");
+                            string breakdownSentence = clauses.Count > 0 ? string.Join(", ", clauses) : "no venue-tier data could be resolved for the included set";
+
+                            <span>Of the @tableRecords.Count included papers, the source venues break down as follows: @breakdownSentence. The full per-paper venue, tier, and citation trace is available in Figure 3.4 and Table 3.1 below.</span>
                         }
                     </p>
                 </div>
@@ -458,29 +448,12 @@
 
     private string mermaidDiagramCode = "";
 
-    private async Task TriggerZipArchiveDownload()
+    private void TriggerZipArchiveDownload()
     {
-        try
-        {
-            byte[] zipBytes = ReviewEngine.GenerateManuscriptPdf(State.CurrentSessionId, report, tableRecords);
-            string base64String = Convert.ToBase64String(zipBytes);
-            string fileName = $"PRISMA_Evaluation_Footprint_{DateTime.UtcNow:yyyyMMdd}.zip";
-            
-            await JS.InvokeVoidAsync("eval", $@"
-                (function() {{
-                    const link = document.createElement('a');
-                    link.download = '{fileName}';
-                    link.href = 'data:application/zip;base64,{base64String}';
-                    document.body.appendChild(link);
-                    link.click();
-                    document.body.removeChild(link);
-                }})()
-            ");
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"[Archive Export Failed] Bundle generation fault: {ex.Message}");
-        }
+        // Full browser navigation to a real HTTP download endpoint - not JS interop pushing a base64
+        // payload over the SignalR connection, which silently fails once real source PDFs are included
+        // because that connection has a small default max message size.
+        Nav.NavigateTo($"/api/workspace/{State.CurrentSessionId}/archive", forceLoad: true);
     }
 
     private string ScrubAnchors(string rawText)
