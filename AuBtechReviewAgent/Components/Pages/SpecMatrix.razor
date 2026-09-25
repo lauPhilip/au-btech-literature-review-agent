@@ -567,7 +567,7 @@
                     var tempYears = new Dictionary<string, int> { { "2024", 0 }, { "2025", 0 }, { "2026", 0 } };
                     foreach(var r in tableRecords)
                     {
-                        string yrStr = r.Year.ToString();
+                        string yrStr = r.Year > 0 ? r.Year.ToString() : "n.d.";
                         if (!tempYears.ContainsKey(yrStr)) tempYears[yrStr] = 0;
                         tempYears[yrStr]++;
                     }
@@ -671,7 +671,11 @@
                                 }
                             }
                         }
-                        includedCitations = citations.OrderBy(c => c).ToList();
+                        // Use the run's own reference numbering when it exists, so the [n] list here matches
+                        // the citations in the synthesis and the LaTeX bibliography.
+                        includedCitations = tableRecords.Any(r => r.ReferenceNumber > 0)
+                            ? tableRecords.OrderBy(r => r.ReferenceNumber).Select(r => r.ApaCitation.Trim().TrimEnd('.')).ToList()
+                            : citations.OrderBy(c => c).ToList();
                     }
                 }
             }
