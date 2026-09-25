@@ -104,17 +104,32 @@ public static class MethodsSectionWriter
         return sb.ToString();
     }
 
-    public static string SelectionProcess(bool peerReviewOnly, ReviewStats stats)
+    public static string SelectionProcess(bool peerReviewOnly, ReviewStats stats, bool humanReviewRequested = false, string? humanReviewOutcome = null)
     {
         var sb = new StringBuilder();
         if (peerReviewOnly)
         {
             sb.Append($"Before screening, records were checked for peer-review status using source metadata and, where that was inconclusive, a language-model classification ({stats.PassedPeerReviewCheck} passed, {stats.FailedPeerReviewCheck} excluded). ");
         }
-        sb.Append($"Each remaining record was screened once by a language model ({ScreeningModelName}) against the eligibility criteria, using its title, authors, date, venue and abstract as returned by the source. ");
+        sb.Append($"Each remaining record was screened once by a language model ({ScreeningModelName}, temperature 0) against the eligibility criteria, using its title, authors, date, venue and abstract as returned by the source. ");
         sb.Append("Full texts were retrieved only for included records and were not used for the screening decision. ");
-        sb.Append($"Of {stats.Screened} records screened, {stats.Included} were included and {stats.Excluded} excluded. ");
-        sb.Append("No human reviewer took part in screening during the run. Every decision and its rationale is recorded in the run ledger (transparent-process.json) so that a human reviewer can verify it.");
+        if (stats.ScreeningErrors > 0)
+            sb.Append($"{stats.ScreeningErrors} record{(stats.ScreeningErrors == 1 ? "" : "s")} could not be screened because the model call failed; they are listed in the run ledger. ");
+
+        if (humanReviewRequested && stats.HumanReviewed > 0)
+        {
+            sb.Append($"A human reviewer then checked {stats.HumanReviewed} of the model's screening decisions in the dashboard and changed {stats.HumanOverrides}; ");
+            sb.Append("each change is recorded in the run ledger next to the model's original decision. ");
+        }
+        else if (humanReviewRequested)
+        {
+            sb.Append((humanReviewOutcome ?? "A human screening review was requested but not completed.") + " ");
+        }
+
+        sb.Append($"Of {stats.Screened} records screened, {stats.Included} were included and {stats.Excluded + stats.FailedPeerReviewCheck} excluded. ");
+        if (!(humanReviewRequested && stats.HumanReviewed > 0))
+            sb.Append("No human reviewer took part in screening during the run. ");
+        sb.Append("Every decision and its rationale is recorded in the run ledger (transparent-process.json) so that a human reviewer can verify it.");
         return sb.ToString();
     }
 
