@@ -17,6 +17,13 @@
 
 <ItemGroup>
   <Watch Remove="PapersWorkspace\**\*" />
+  <Watch Remove="WorkspaceStore\**\*" />
+  <Watch Remove="App_Data\**\*" />
+</ItemGroup>
+
+<!-- Ship the Scimago ranking data with the app so the quartile lookup also works after publish. -->
+<ItemGroup>
+  <None Update="ScimagoData\**\*.csv" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
 </ItemGroup>
 
 </Project>
