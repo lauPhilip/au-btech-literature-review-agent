@@ -7,87 +7,80 @@ using Microsoft.Extensions.Logging;
 
 namespace AuBtechReviewAgent;
 
+/// <summary>
+/// Deletes run folders (WorkspaceStore/{runId}) once they are older than Runs:RetentionDays. A folder's age
+/// is the newest write time of any file inside it: the folder's own timestamp does not change when the
+/// ledger inside is rewritten, which is why runs used to be deleted 30-60 minutes after they started,
+/// sometimes while still running. Runs that are active in this process are never deleted.
+/// </summary>
 public class SessionCleanupWorker : BackgroundService
 {
     private readonly ILogger<SessionCleanupWorker> _logger;
+    private readonly PrismaReviewEngine _engine;
     private readonly TimeSpan _cleanupInterval = TimeSpan.FromHours(1);
-    private readonly TimeSpan _sessionExpiration = TimeSpan.FromMinutes(30);
 
-    public SessionCleanupWorker(ILogger<SessionCleanupWorker> logger)
+    public SessionCleanupWorker(ILogger<SessionCleanupWorker> logger, PrismaReviewEngine engine)
     {
         _logger = logger;
+        _engine = engine;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        _logger.LogInformation("PRISMA Storage Lifecycle Engine activated.");
+        _logger.LogInformation("Run retention: results are kept for {Days} days.", _engine.RunsOptions.RetentionDays);
 
         while (!stoppingToken.IsCancellationRequested)
         {
             try
             {
-                PurgeExpiredSessions();
+                PurgeExpiredRuns(_engine.WorkspaceRoot,
+                    TimeSpan.FromDays(Math.Max(1, _engine.RunsOptions.RetentionDays)), DateTime.UtcNow, _engine.IsRunActive, _logger);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "An error occurred during the session cleanup pass.");
+                _logger.LogError(ex, "An error occurred during the run cleanup pass.");
             }
 
-            // Wait for 1 hour before evaluating file lifecycles again
             await Task.Delay(_cleanupInterval, stoppingToken);
         }
     }
 
-    private void PurgeExpiredSessions()
-{
-    string workspaceStore = Path.Combine(Directory.GetCurrentDirectory(), "WorkspaceStore");
-    DateTime cutoffTime = DateTime.UtcNow - _sessionExpiration;
-
-    if (!Directory.Exists(workspaceStore)) return;
-
-    // Scan through active session subfolders
-    var sessionDirs = Directory.GetDirectories(workspaceStore);
-    foreach (var dir in sessionDirs)
+    /// <summary>Deletes expired run folders and returns how many were deleted. Static so it can be unit-tested.</summary>
+    public static int PurgeExpiredRuns(string workspaceStore, TimeSpan retention, DateTime utcNow, Func<Guid, bool> isActive, ILogger? logger = null)
     {
-        // If the folder has remained untouched past the expiration threshold, drop the whole container
-        if (Directory.GetLastWriteTimeUtc(dir) < cutoffTime)
+        if (!Directory.Exists(workspaceStore)) return 0;
+        DateTime cutoff = utcNow - retention;
+        int deleted = 0;
+
+        foreach (var dir in Directory.GetDirectories(workspaceStore))
         {
+            if (Guid.TryParseExact(Path.GetFileName(dir), "N", out var runId) && isActive(runId)) continue;
+
+            DateTime lastActivity = LastActivityUtc(dir);
+            if (lastActivity >= cutoff) continue;
+
             try
             {
                 Directory.Delete(dir, true);
-                _logger.LogInformation("Purged expired user session store container: {DirName}", Path.GetFileName(dir));
+                deleted++;
+                logger?.LogInformation("Deleted expired run folder {DirName} (last activity {Last:u}).", Path.GetFileName(dir), lastActivity);
             }
             catch (Exception ex)
             {
-                _logger.LogWarning("Skipped folder purge (files locked or streaming): {Message}", ex.Message);
+                logger?.LogWarning("Skipped deleting run folder {DirName}: {Message}", Path.GetFileName(dir), ex.Message);
             }
         }
-    }
-}
-
-    private void TryDeleteFile(string path)
-    {
-        try
-        {
-            File.Delete(path);
-            _logger.LogInformation("Cleaned up expired tracking artifact: {FileName}", Path.GetFileName(path));
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning("Skipped file purge (locked or active channel): {Message}", ex.Message);
-        }
+        return deleted;
     }
 
-    private void TryDeleteDirectory(string path)
+    public static DateTime LastActivityUtc(string dir)
     {
-        try
+        DateTime newest = Directory.GetLastWriteTimeUtc(dir);
+        foreach (var file in Directory.EnumerateFiles(dir, "*", SearchOption.AllDirectories))
         {
-            Directory.Delete(path, true);
-            _logger.LogInformation("Purged expired user download sandbox container: {DirName}", Path.GetFileName(path));
+            DateTime t = File.GetLastWriteTimeUtc(file);
+            if (t > newest) newest = t;
         }
-        catch (Exception ex)
-        {
-            _logger.LogWarning("Skipped directory purge (active system write hold): {Message}", ex.Message);
-        }
+        return newest;
     }
 }

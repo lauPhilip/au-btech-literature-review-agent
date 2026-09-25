@@ -58,12 +58,21 @@ string scholarApiKey = builder.Configuration["SCHOLAR_API_KEY"] ?? "";
 
 string? supportStatement = builder.Configuration["Report:SupportStatement"];
 
-builder.Services.AddSingleton(new AuBtechReviewAgent.PrismaReviewEngine(mistralApiKey, elsevierApiKey, ieeeApiKey, scholarApiKey, supportStatement));
+var runsOptions = builder.Configuration.GetSection("Runs").Get<AuBtechReviewAgent.RunsOptions>() ?? new AuBtechReviewAgent.RunsOptions();
+builder.Services.AddSingleton(runsOptions);
+
+var reviewEngine = new AuBtechReviewAgent.PrismaReviewEngine(mistralApiKey, elsevierApiKey, ieeeApiKey, scholarApiKey, supportStatement, runsOptions);
+builder.Services.AddSingleton(reviewEngine);
 
 // Register the storage cleanup background worker
 builder.Services.AddHostedService<AuBtechReviewAgent.SessionCleanupWorker>();
 
-var app = builder.Build(); 
+var app = builder.Build();
+
+// Runs do not survive a restart (IIS recycles the app pool when idle and on a schedule). Mark any run that
+// was cut off as "Interrupted" so its link shows what happened instead of a spinner that never stops.
+int interrupted = reviewEngine.MarkInterruptedRuns();
+if (interrupted > 0) Console.WriteLine($"[Startup] Marked {interrupted} unfinished run(s) as interrupted.");
 
 // Apply Forwarded Headers immediately before evaluating redirection paths
 app.UseForwardedHeaders();
@@ -95,6 +104,16 @@ app.MapGet("/api/workspace/{sessionId:guid}/archive", (Guid sessionId, AuBtechRe
 
     string fileName = $"PRISMA_Evaluation_Footprint_{DateTime.UtcNow:yyyyMMdd}.zip";
     return Results.File(zipBytes, "application/zip", fileName);
+}).RequireRateLimiting("ArchiveDownloadPolicy");
+
+// The included papers as BibTeX or RIS, for Zotero / EndNote / Mendeley.
+app.MapGet("/api/workspace/{sessionId:guid}/references.{format}", (Guid sessionId, string format, AuBtechReviewAgent.PrismaReviewEngine engine) =>
+{
+    if (format is not ("bib" or "ris")) return Results.NotFound();
+    string? content = engine.ExportReferences(sessionId, format);
+    if (content == null) return Results.NotFound();
+    string mime = format == "bib" ? "application/x-bibtex" : "application/x-research-info-systems";
+    return Results.File(System.Text.Encoding.UTF8.GetBytes(content), mime, $"references.{format}");
 }).RequireRateLimiting("ArchiveDownloadPolicy");
 
 app.MapRazorComponents<App>()
