@@ -26,9 +26,9 @@
         </div>
 
         <div class="pl-4 space-y-0.5 text-[11px] text-gray-500">
-            <div class="flex justify-between" title="The same paper returned by more than one search string"><span>− Duplicates</span><span class="font-mono">@s.DuplicatesRemoved</span></div>
-            <div class="flex justify-between" title="Publication year outside the Date From / Date To range"><span>− Outside year range</span><span class="font-mono">@s.OutsideDateRange</span></div>
-            <div class="flex justify-between" title="Beyond the 'max results of each source' limit"><span>− Over per-source cap</span><span class="font-mono">@s.CappedBeyondMaxResults</span></div>
+            @RemovalRow("Duplicates", "The same paper returned by more than one search string or source", s.DuplicatesRemoved, AuBtechReviewAgent.RemovedRecord.Duplicate)
+            @RemovalRow("Outside year range", "Publication year outside the Date From / Date To range", s.OutsideDateRange, AuBtechReviewAgent.RemovedRecord.OutsideYearRange)
+            @RemovalRow("Over per-source cap", "Beyond the 'max results of each source' limit", s.CappedBeyondMaxResults, AuBtechReviewAgent.RemovedRecord.OverCap)
             @if (s.ScreeningErrors > 0)
             {
                 <div class="flex justify-between text-amber-700" title="The model call failed, so these records were not screened"><span>− Could not be screened</span><span class="font-mono">@s.ScreeningErrors</span></div>
@@ -83,5 +83,35 @@
 
 @code {
     [Parameter, EditorRequired] public AuBtechReviewAgent.ReviewStats Stats { get; set; } = new();
+
+    /// <summary>The removed records from the ledger; when present, each removal row can be opened to list them.</summary>
+    [Parameter] public IReadOnlyList<AuBtechReviewAgent.RemovedRecord>? Removed { get; set; }
+
+    private RenderFragment RemovalRow(string label, string tooltip, int count, string reason) => __builder =>
+    {
+        var records = Removed?.Where(r => r.Reason == reason).ToList() ?? new List<AuBtechReviewAgent.RemovedRecord>();
+        if (records.Count == 0)
+        {
+            <div class="flex justify-between" title="@tooltip"><span>− @label</span><span class="font-mono">@count</span></div>
+        }
+        else
+        {
+            <details title="@tooltip">
+                <summary class="flex justify-between cursor-pointer select-none list-none">
+                    <span>− @label <span class="text-[#003B5C] underline decoration-dotted">show</span></span>
+                    <span class="font-mono">@count</span>
+                </summary>
+                <ul class="mt-1 mb-1 ml-3 space-y-0.5 text-[10px] text-gray-600">
+                    @foreach (var r in records)
+                    {
+                        <li class="leading-snug break-words">
+                            @r.Title
+                            <span class="text-gray-400">(@(r.Year > 0 ? r.Year.ToString() : "n.d."), @r.Source@(r.DuplicateOf != null ? $", duplicate of {r.DuplicateOf}" : ""))</span>
+                        </li>
+                    }
+                </ul>
+            </details>
+        }
+    };
     [Parameter] public bool Running { get; set; }
 }
