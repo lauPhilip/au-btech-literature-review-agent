@@ -32,3 +32,5 @@ manuscript_*.log
 manuscript_*.aux
 
 AuBtechReviewAgent/WorkspaceStore/
+# Run-quota counters (hashed client addresses) - server state, not source
+AuBtechReviewAgent/App_Data/
