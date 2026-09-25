@@ -44,6 +44,17 @@ public class ReviewState
 
     // Short SHA-256 fingerprint of the run's protocol (query, criteria, perspectives, sources, cap).
     public string ProtocolHash { get; set; } = string.Empty;
+
+    // True when the user asked to confirm the screening decisions before the write-up.
+    public bool HumanScreeningReviewRequested { get; set; }
+    public string? HumanScreeningReviewOutcome { get; set; }
+
+    // Model, app version, temperatures and prompt fingerprints for this run (details in llm-calls.json).
+    public RunSettingsRecord? RunSettings { get; set; }
+
+    // Set when the run stopped early ("Failed" or "Interrupted" stage), so a returning user sees why.
+    public string? FailureMessage { get; set; }
+    public DateTime? CompletedUtc { get; set; }
 }
     
 public class IncludedPaperMetricRow
@@ -62,6 +73,13 @@ public class IncludedPaperMetricRow
     // 1-based position in the run's reference list. The [n] markers in the synthesis/discussion, the
     // extraction table and the LaTeX bibliography all use this same number.
     public int ReferenceNumber { get; set; }
+
+    // Structured metadata for the BibTeX / RIS export.
+    public string PaperId { get; set; } = string.Empty;
+    public List<string> Authors { get; set; } = new();
+    public string VenueName { get; set; } = string.Empty;
+    public string? Doi { get; set; }
+    public string? Url { get; set; }
 }
 public class ReviewStats 
 { 
@@ -76,6 +94,16 @@ public class ReviewStats
     public int CappedBeyondMaxResults { get; set; } // Candidates discarded by the hard per-source maxResults cap
     public int InvalidCitationsStripped { get; set; } // Out-of-range [n] markers removed from generated prose for traceability
     public int OutsideDateRange { get; set; }       // Records dropped because their publication year fell outside the chosen range
+    public int ScreeningErrors { get; set; }        // Records the model could not screen (call failed); not counted as screened
+    public int HumanReviewed { get; set; }          // Screening decisions confirmed by a human reviewer
+    public int HumanOverrides { get; set; }         // ...of which the reviewer changed the model's decision
+    public int FullTextRetrieved { get; set; }      // Included papers whose full text could be read
+    public int QueuePosition { get; set; }          // Place in the waiting line while all run slots are busy (0 = not waiting)
+    public int CitationsChecked { get; set; }       // Automated citation support check (see citation-audit.json)
+    public int CitationsSupported { get; set; }
+    public int CitationsPartiallySupported { get; set; }
+    public int CitationsNotSupported { get; set; }
+    public int CitationsUnverifiable { get; set; }
 }
 
 public class ReviewPhases 
@@ -94,7 +122,15 @@ public record ScreeningLog(
     // venue type, year and quartile lookup can all be traced back to what the database returned.
     string VenueType = "",
     string VenueName = "",
-    int Year = 0
+    int Year = 0,
+    List<string>? Authors = null,
+    string? Doi = null,
+    string? Url = null,
+    string? Abstract = null,
+    // Human screening review: the model's original decision is kept when a reviewer changes it.
+    string? ModelDecision = null,
+    bool HumanReviewed = false,
+    string? HumanNote = null
 );
 
 // ─── PLATFORM SEARCH METRIC DATA CONTAINER ──────────────────────────
@@ -160,4 +196,23 @@ public class PrismaReport
 
     // Fingerprint of the run's protocol, printed in the LaTeX header.
     public string ProtocolHash { get; set; } = "";
+
+    // One-paragraph summary of the automated citation support check.
+    public string CitationCheckSummary { get; set; } = "";
 }
+
+/// <summary>Everything the user chose in the dashboard for one run.</summary>
+public record ReviewRequest(
+    string Query,
+    string Objective,
+    string Inclusion,
+    string Exclusion,
+    int MaxResultsPerSource,
+    bool PeerReviewOnly = false,
+    string SynthesisDirective = "",
+    UserApiKeys? UserKeys = null,
+    IReadOnlyCollection<string>? SelectedSources = null,
+    int YearFrom = 0,
+    int YearTo = 0,
+    bool HumanScreeningReview = false
+);
