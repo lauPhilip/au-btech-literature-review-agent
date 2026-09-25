@@ -54,7 +54,7 @@ public class ResearchGateSource : IAcademicSource
                     string snippet = result.TryGetProperty("snippet", out var snippetProp) ? snippetProp.GetString() ?? string.Empty : string.Empty;
                     
                     string venue = "ResearchGate Institutional Preprint";
-                    string dateText = DateTime.UtcNow.ToString("yyyy");
+                    string dateText = ""; // unknown until parsed - never default to the current year
                     var authorsList = new List<string>();
 
                     if (result.TryGetProperty("publication_info", out var pubInfo) && pubInfo.TryGetProperty("summary", out var summaryProp))
@@ -77,7 +77,7 @@ public class ResearchGateSource : IAcademicSource
                         }
                     }
 
-                    if (authorsList.Count == 0) authorsList.Add("ResearchGate Independent Researcher");
+                    // No invented fallback author: an empty list renders as an author-less APA reference.
 
                     // Map fields directly into your strict constructor signature
                     // AcademicPaper order is (Id, Title, Abstract, PublishedDate, Authors, JournalSource) -
@@ -89,7 +89,8 @@ public class ResearchGateSource : IAcademicSource
                         snippet,
                         $"Published: {dateText}",
                         authorsList,
-                        venue
+                        venue,
+                        Url: result.TryGetProperty("link", out var linkProp) ? linkProp.GetString() : null
                     ));
                 }
             }

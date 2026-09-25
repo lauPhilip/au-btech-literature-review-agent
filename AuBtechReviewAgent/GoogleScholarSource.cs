@@ -55,7 +55,7 @@ public class GoogleScholarSource : IAcademicSource
                     string snippet = result.TryGetProperty("snippet", out var snippetProp) ? snippetProp.GetString() ?? string.Empty : string.Empty;
                     
                     string venue = "Google Scholar Indexed Publication";
-                    string dateText = DateTime.UtcNow.ToString("yyyy");
+                    string dateText = ""; // unknown until parsed - never default to the current year
                     var authorsList = new List<string>();
 
                     if (result.TryGetProperty("publication_info", out var pubInfo))
@@ -82,7 +82,7 @@ public class GoogleScholarSource : IAcademicSource
                         }
                     }
 
-                    if (authorsList.Count == 0) authorsList.Add("Scholar Indexed Authors");
+                    // No invented fallback author: an empty list renders as an author-less APA reference.
 
                     // Map fields straight into your strict positional constructor contract
                     // AcademicPaper order is (Id, Title, Abstract, PublishedDate, Authors, JournalSource) -
@@ -94,7 +94,8 @@ public class GoogleScholarSource : IAcademicSource
                         snippet,
                         $"Published: {dateText}",
                         authorsList,
-                        venue
+                        venue,
+                        Url: result.TryGetProperty("link", out var linkProp) ? linkProp.GetString() : null
                     ));
                 }
             }
