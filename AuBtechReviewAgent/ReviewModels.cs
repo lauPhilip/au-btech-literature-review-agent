@@ -45,6 +45,10 @@ public class ReviewState
     // Short SHA-256 fingerprint of the run's protocol (query, criteria, perspectives, sources, cap).
     public string ProtocolHash { get; set; } = string.Empty;
 
+    // Every record removed before screening (duplicate, outside the year range, over the per-source cap),
+    // with the reason, so the funnel's numbers can be traced to actual papers.
+    public List<RemovedRecord> RemovedBeforeScreening { get; set; } = new();
+
     // True when the user asked to confirm the screening decisions before the write-up.
     public bool HumanScreeningReviewRequested { get; set; }
     public string? HumanScreeningReviewOutcome { get; set; }
@@ -216,3 +220,19 @@ public record ReviewRequest(
     int YearTo = 0,
     bool HumanScreeningReview = false
 );
+
+/// <summary>A record that was found but removed before screening, and why (written to the run ledger).</summary>
+public record RemovedRecord(
+    string PaperId,
+    string Title,
+    string Source,
+    string QueryUsed,
+    int Year,
+    string Reason,
+    string? DuplicateOf = null,
+    string? Doi = null)
+{
+    public const string Duplicate = "Duplicate";
+    public const string OutsideYearRange = "Outside year range";
+    public const string OverCap = "Over per-source cap";
+}

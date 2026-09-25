@@ -299,11 +299,16 @@ public class PrismaReviewEngine
             searchPerspectives, reviewState.SelectedSources, maxResults, request.PeerReviewOnly);
         await SaveStateAsync(ctx.RunId, reviewState);
 
+        // Duplicates are detected across ALL sources (PRISMA counts a paper once, however many databases
+        // return it). This used to be reset per source, so the same paper from arXiv and Google Scholar was
+        // screened twice and could appear twice in the reference list. Keyed by source id, DOI and title.
+        var seenIds = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        var seenDois = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        var seenTitles = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
         foreach (var source in ctx.Sources)
         {
             var sourceCandidates = new List<AcademicPaper>();
-            var seenIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            var seenTitles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
             // maxResults is a hard per-source cap, not a per-query cap: split the budget across the
             // perspective phrasings so a source never contributes more than maxResults papers overall.
@@ -344,28 +349,43 @@ public class PrismaReviewEngine
                 // "break", and the records after it were counted as identified but never accounted for.
                 foreach (var candidate in perspectiveResults)
                 {
-                    string normalizedTitle = Regex.Replace((candidate.Title ?? "").ToLowerInvariant(), @"\s+", " ").Trim();
-                    bool isDuplicate = seenIds.Contains(candidate.Id) || (normalizedTitle.Length > 0 && seenTitles.Contains(normalizedTitle));
-                    if (isDuplicate)
+                    // Every record removed here is also written to the ledger (RemovedBeforeScreening) with its
+                    // reason, so each number in the funnel can be traced back to actual papers.
+                    int candidateYear = ApaCitationBuilder.ExtractYear(candidate.PublishedDate);
+                    RemovedRecord Removed(string reason, string? duplicateOf = null) => new(
+                        candidate.Id, candidate.Title ?? "", source.SourceName, perspectiveQuery, candidateYear,
+                        reason, duplicateOf, NormalizeDoi(candidate.Doi));
+
+                    string normalizedTitle = NormalizeTitle(candidate.Title);
+                    string? doi = NormalizeDoi(candidate.Doi);
+                    string? firstSeen =
+                        seenIds.TryGetValue(candidate.Id, out var byId) ? byId
+                        : doi != null && seenDois.TryGetValue(doi, out var byDoi) ? byDoi
+                        : normalizedTitle.Length > 0 && seenTitles.TryGetValue(normalizedTitle, out var byTitle) ? byTitle
+                        : null;
+                    if (firstSeen != null)
                     {
                         reviewState.Stats.DuplicatesRemoved++;
+                        reviewState.RemovedBeforeScreening.Add(Removed(RemovedRecord.Duplicate, firstSeen));
                         continue;
                     }
-                    seenIds.Add(candidate.Id);
-                    if (normalizedTitle.Length > 0) seenTitles.Add(normalizedTitle);
+                    seenIds[candidate.Id] = candidate.Id;
+                    if (doi != null) seenDois[doi] = candidate.Id;
+                    if (normalizedTitle.Length > 0) seenTitles[normalizedTitle] = candidate.Id;
 
                     // Publication-year window from the dashboard. Records with no year in the metadata are
                     // kept (they cannot be shown to be outside the range) and the report says so.
-                    int candidateYear = ApaCitationBuilder.ExtractYear(candidate.PublishedDate);
                     if (yearFrom > 0 && yearTo > 0 && candidateYear > 0 && (candidateYear < yearFrom || candidateYear > yearTo))
                     {
                         reviewState.Stats.OutsideDateRange++;
+                        reviewState.RemovedBeforeScreening.Add(Removed(RemovedRecord.OutsideYearRange));
                         continue;
                     }
 
                     if (sourceCandidates.Count >= maxResults)
                     {
                         reviewState.Stats.CappedBeyondMaxResults++;
+                        reviewState.RemovedBeforeScreening.Add(Removed(RemovedRecord.OverCap));
                         continue;
                     }
                     sourceCandidates.Add(candidate);
@@ -712,6 +732,18 @@ public class PrismaReviewEngine
     {
         if (string.IsNullOrEmpty(message)) return string.Empty;
         return Regex.Replace(message, @"([a-zA-Z0-9]{24,64})", "[REDACTED_API_CREDENTIAL]");
+    }
+
+    /// <summary>Lower-case title with punctuation and spacing removed, for duplicate detection.</summary>
+    public static string NormalizeTitle(string? title) =>
+        Regex.Replace(Regex.Replace((title ?? "").ToLowerInvariant(), @"[^\p{L}\p{N}]+", " "), @"\s+", " ").Trim();
+
+    /// <summary>Bare lower-case DOI ("10.x/y"), or null when there is no usable DOI.</summary>
+    public static string? NormalizeDoi(string? doi)
+    {
+        if (string.IsNullOrWhiteSpace(doi)) return null;
+        string d = Regex.Replace(doi.Trim(), @"^(https?://(dx\.)?doi\.org/|doi:)", "", RegexOptions.IgnoreCase).ToLowerInvariant();
+        return Regex.IsMatch(d, @"^10\.\d{4,9}/\S+$") ? d : null;
     }
 
     private static string ClassifyVenueFromCitation(string? citation)

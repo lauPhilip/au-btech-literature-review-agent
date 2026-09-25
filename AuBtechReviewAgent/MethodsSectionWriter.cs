@@ -90,8 +90,9 @@ public static class MethodsSectionWriter
         }
 
         sb.Append($"Each source contributed at most {maxResultsPerSource} record{(maxResultsPerSource == 1 ? "" : "s")} in total across all search strings. ");
-        sb.Append($"Within each source, duplicates were removed by identifier and normalised title ({duplicatesRemoved} removed)");
+        sb.Append($"Duplicates were removed across all sources by identifier, DOI and normalised title ({duplicatesRemoved} removed)");
         sb.Append(cappedBeyondMax > 0 ? $", and {cappedBeyondMax} further record{(cappedBeyondMax == 1 ? " was" : "s were")} dropped by the per-source cap. " : ". ");
+        sb.Append("Every record removed at this stage is listed with its reason in the run ledger. ");
         if (yearFrom > 0 && yearTo > 0)
         {
             sb.Append($"Records with a publication year outside {yearFrom}-{yearTo} were removed after retrieval ({outsideDateRange} removed); records with no year in the source metadata were kept. ");
