@@ -8,19 +8,23 @@ namespace AuBtechReviewAgent;
 
 public class ElsevierSource : IAcademicSource
 {
-    private readonly HttpClient _httpClient;
+    // One shared HttpClient for the whole app (a new one per run exhausts sockets under load). The API key
+    // differs per user (BYOK), so it is sent per request instead of as a default header.
+    private static readonly HttpClient _httpClient = CreateClient();
     private readonly string _apiKey;
     public string SourceName => "ScienceDirect API";
 
     public ElsevierSource(string apiKey)
     {
         _apiKey = apiKey;
-        _httpClient = new HttpClient();
+    }
 
-        // Standard developer connection headers without session cookie bindings
-        _httpClient.DefaultRequestHeaders.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36");
-        _httpClient.DefaultRequestHeaders.Add("X-ELS-APIKey", _apiKey);
-        _httpClient.DefaultRequestHeaders.Add("Accept", "application/json");
+    private static HttpClient CreateClient()
+    {
+        var client = new HttpClient { Timeout = TimeSpan.FromSeconds(60) };
+        client.DefaultRequestHeaders.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36");
+        client.DefaultRequestHeaders.Add("Accept", "application/json");
+        return client;
     }
 
     public async Task<List<AcademicPaper>> FetchPapersAsync(string query, int maxResults = 5)
@@ -37,7 +41,9 @@ public class ElsevierSource : IAcademicSource
 
         try
         {
-            var response = await _httpClient.GetAsync(url);
+            using var request = new HttpRequestMessage(HttpMethod.Get, url);
+            request.Headers.Add("X-ELS-APIKey", _apiKey);
+            using var response = await _httpClient.SendAsync(request);
             Console.WriteLine($"[Elsevier Engine] HTTP Response Code: {response.StatusCode}");
 
             string jsonResponse = await response.Content.ReadAsStringAsync();

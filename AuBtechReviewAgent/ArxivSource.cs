@@ -10,13 +10,15 @@ namespace AuBtechReviewAgent;
 
 public class ArxivSource : IAcademicSource
 {
-    private readonly HttpClient _httpClient;
+    // One shared HttpClient for the whole app; creating one per run exhausts sockets on a busy server.
+    private static readonly HttpClient _httpClient = CreateClient();
     public string SourceName => "arXiv API";
 
-    public ArxivSource()
+    private static HttpClient CreateClient()
     {
-        _httpClient = new HttpClient();
-        _httpClient.DefaultRequestHeaders.Add("User-Agent", "AU-BTech-Literature-Review-Agent/1.0");
+        var client = new HttpClient { Timeout = TimeSpan.FromSeconds(60) };
+        client.DefaultRequestHeaders.Add("User-Agent", "AU-BTech-Literature-Review-Agent/1.0");
+        return client;
     }
 
  public async Task<List<AcademicPaper>> FetchPapersAsync(string query, int maxResults = 5)
