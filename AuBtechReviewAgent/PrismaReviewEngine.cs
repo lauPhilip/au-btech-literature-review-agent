@@ -23,6 +23,11 @@ public class PrismaReviewEngine
     private readonly string? _globalIeeeKey;
     private readonly string? _globalScholarKey;
     private readonly string _supportStatement;
+    private readonly RunsOptions _runsOptions;
+
+    /// <summary>Tracks live runs, the waiting line for run slots, and screening reviews in progress.</summary>
+    public RunCoordinator Coordinator { get; }
+    public RunsOptions RunsOptions => _runsOptions;
 
     // The engine is a singleton shared by every connected user, so progress events carry the session id
     // and each dashboard only reacts to its own run (previously every open dashboard showed the counts of
@@ -34,7 +39,16 @@ public class PrismaReviewEngine
 
     // SECURE ENCAPSULATED ROUTING PATHS
     private string GetWorkspaceFolderPath(Guid sessionId) => 
-        Path.Combine(Directory.GetCurrentDirectory(), "WorkspaceStore", sessionId.ToString("N"));
+        Path.Combine(WorkspaceRoot, sessionId.ToString("N"));
+
+    /// <summary>Folder holding one sub-folder per run. Defaults to ./WorkspaceStore.</summary>
+    public string WorkspaceRoot { get; init; } = Path.Combine(Directory.GetCurrentDirectory(), "WorkspaceStore");
+
+    /// <summary>Test hook: builds the chat service from an API key (default: Mistral via Semantic Kernel).</summary>
+    public Func<string, IChatCompletionService>? ChatFactory { get; init; }
+
+    /// <summary>Test hook: builds a source gateway from a SourceCatalog key (default: the real API adapters).</summary>
+    public Func<string, IAcademicSource>? SourceFactory { get; init; }
 
     private string GetStateFilePath(Guid sessionId) => 
         Path.Combine(GetWorkspaceFolderPath(sessionId), "transparent-process.json");
@@ -42,8 +56,10 @@ public class PrismaReviewEngine
     private string GetReportFilePath(Guid sessionId) => 
         Path.Combine(GetWorkspaceFolderPath(sessionId), "prisma-report.json");
 
-    public PrismaReviewEngine(string mistralApiKey, string elsevierApiKey, string? ieeeApiKey = null, string? scholarApiKey = null, string? supportStatement = null)
+    public PrismaReviewEngine(string mistralApiKey, string elsevierApiKey, string? ieeeApiKey = null, string? scholarApiKey = null, string? supportStatement = null, RunsOptions? runsOptions = null)
     {
+        _runsOptions = runsOptions ?? new RunsOptions();
+        Coordinator = new RunCoordinator(_runsOptions.MaxConcurrentRuns);
         _globalMistralKey = mistralApiKey;
         _globalElsevierKey = elsevierApiKey;
         _globalIeeeKey = ieeeApiKey;
@@ -76,32 +92,100 @@ public class PrismaReviewEngine
         !string.IsNullOrWhiteSpace(userKeys?.IeeeApiKey) ? userKeys.IeeeApiKey : _globalIeeeKey,
         !string.IsNullOrWhiteSpace(userKeys?.ScholarApiKey) ? userKeys.ScholarApiKey : _globalScholarKey);
 
-    public async Task RunReviewLoopAsync(Guid sessionId, string initialQuery, string explicitObjective, string inclusionCriteria, string exclusionCriteria, int maxResults, bool requirePeerReview = false, string synthesisDirective = "", UserApiKeys? userKeys = null,
-        IReadOnlyCollection<string>? selectedSources = null, int yearFrom = 0, int yearTo = 0)
+    public const string ModelId = "mistral-large-latest";
+
+    // Stage names written to ReviewStats.ProcessingStage (and read by the dashboard).
+    public const string StageQueued = "Queued";
+    public const string StageScreening = "Screening";
+    public const string StageAwaitingReview = "AwaitingScreeningReview";
+    public const string StageSynthesizing = "Synthesizing";
+    public const string StageComplete = "Complete";
+    public const string StageFailed = "Failed";
+    public const string StageInterrupted = "Interrupted";
+
+    public static bool IsFinishedStage(string? stage) => stage is StageComplete or StageFailed or StageInterrupted;
+
+    /// <summary>True while the run is queued, running or waiting for a screening review in this process.</summary>
+    public bool IsRunActive(Guid runId) => Coordinator.IsActive(runId);
+
+    /// <summary>Hands the reviewer's screening decisions to a run that is waiting for them.</summary>
+    public bool SubmitScreeningReview(Guid runId, IReadOnlyList<ScreeningOverride> decisions) =>
+        Coordinator.SubmitScreeningReview(runId, decisions);
+
+    public bool IsAwaitingScreeningReview(Guid runId) => Coordinator.IsAwaitingScreeningReview(runId);
+
+    /// <summary>Per-run working data that is not part of the ledger (the full paper records and their text).</summary>
+    private sealed class RunContext
     {
-        // 1. Resolve runtime credentials (BYOK fallback chain)
-        var (activeMistral, activeElsevier, activeIeee, activeScholar) = ResolveKeys(userKeys);
+        public required Guid RunId { get; init; }
+        public required ReviewRequest Request { get; init; }
+        public required ReviewState State { get; init; }
+        public required RecordingChatCompletionService Chat { get; init; }
+        public required string Workspace { get; init; }
+        public List<IAcademicSource> Sources { get; } = new();
+        public Dictionary<string, AcademicPaper> Papers { get; } = new(StringComparer.Ordinal);
+        public Dictionary<string, List<DocumentChunk>> Chunks { get; } = new(StringComparer.Ordinal);
+    }
 
-        // 2. Build isolated kernel for this specific thread pass
-        var builder = Kernel.CreateBuilder();
-        builder.AddMistralChatCompletion("mistral-large-latest", activeMistral);
-        var kernel = builder.Build();
-        var chatService = kernel.GetRequiredService<IChatCompletionService>();
+    /// <summary>
+    /// Runs one review end to end. Model-heavy phases only start when the RunCoordinator hands out a slot,
+    /// so at most Runs:MaxConcurrentRuns reviews call the model at the same time; the others show their
+    /// place in line. With request.HumanScreeningReview the run pauses after screening until the user has
+    /// confirmed or changed the decisions (without holding a slot while it waits).
+    /// </summary>
+    public async Task RunReviewAsync(Guid sessionId, ReviewRequest request)
+    {
+        Coordinator.Register(sessionId);
+        var (activeMistral, activeElsevier, activeIeee, activeScholar) = ResolveKeys(request.UserKeys);
 
-        // 3. Assemble the source gateways the user ticked. A ticked source without a usable key is not
-        //    queried, and is recorded as unavailable so the report says so instead of implying it was searched.
-        var selectedKeys = (selectedSources == null || selectedSources.Count == 0 ? SourceCatalog.AllKeys : selectedSources)
-            .Where(k => SourceCatalog.Find(k) != null)
-            .Select(k => SourceCatalog.Find(k)!.Key)
+        IChatCompletionService innerChat;
+        if (ChatFactory != null)
+        {
+            innerChat = ChatFactory(activeMistral);
+        }
+        else
+        {
+            var builder = Kernel.CreateBuilder();
+            builder.AddMistralChatCompletion(ModelId, activeMistral);
+            innerChat = builder.Build().GetRequiredService<IChatCompletionService>();
+        }
+        var chat = new RecordingChatCompletionService(innerChat, ModelId);
+
+        int yearFrom = request.YearFrom, yearTo = request.YearTo;
+        if (yearFrom > 0 && yearTo > 0 && yearFrom > yearTo) (yearFrom, yearTo) = (yearTo, yearFrom);
+
+        // A ticked source without a usable key is not queried, and is recorded as unavailable so the report
+        // says so instead of implying it was searched.
+        var selectedKeys = (request.SelectedSources == null || request.SelectedSources.Count == 0 ? SourceCatalog.AllKeys : request.SelectedSources)
+            .Select(k => SourceCatalog.Find(k)?.Key)
+            .Where(k => k != null)
+            .Select(k => k!)
             .Distinct()
             .ToList();
-        var availability = GetSourceAvailability(userKeys);
-        var activeSources = new List<IAcademicSource>();
-        var unavailableKeys = new List<string>();
+        var availability = GetSourceAvailability(request.UserKeys);
+
+        var ctx = new RunContext
+        {
+            RunId = sessionId,
+            Request = request,
+            Chat = chat,
+            Workspace = GetWorkspaceFolderPath(sessionId),
+            State = new ReviewState
+            {
+                SearchQuery = request.Query,
+                PeerReviewOnlyToggle = request.PeerReviewOnly,
+                SynthesisTargetDirective = request.SynthesisDirective,
+                SelectedSources = selectedKeys,
+                MaxResultsPerSource = request.MaxResultsPerSource,
+                YearFrom = yearFrom,
+                YearTo = yearTo,
+                HumanScreeningReviewRequested = request.HumanScreeningReview,
+            }
+        };
         foreach (var key in selectedKeys)
         {
-            if (!availability.TryGetValue(key, out bool ok) || !ok) { unavailableKeys.Add(key); continue; }
-            activeSources.Add(key switch
+            if (!availability.TryGetValue(key, out bool ok) || !ok) { ctx.State.UnavailableSources.Add(key); continue; }
+            ctx.Sources.Add(SourceFactory?.Invoke(key) ?? key switch
             {
                 "arxiv" => new ArxivSource(),
                 "scopus" => new ElsevierSource(activeElsevier),
@@ -111,51 +195,123 @@ public class PrismaReviewEngine
                 _ => throw new InvalidOperationException($"Unknown source key '{key}'.")
             });
         }
-        if (yearFrom > 0 && yearTo > 0 && yearFrom > yearTo) (yearFrom, yearTo) = (yearTo, yearFrom);
 
-        string userWorkspace = GetWorkspaceFolderPath(sessionId);
-        Directory.CreateDirectory(userWorkspace);
-
-        var reviewState = new ReviewState
+        Directory.CreateDirectory(ctx.Workspace);
+        try
         {
-            SearchQuery = initialQuery,
-            PeerReviewOnlyToggle = requirePeerReview,
-            SynthesisTargetDirective = synthesisDirective,
-            SelectedSources = selectedKeys,
-            UnavailableSources = unavailableKeys,
-            MaxResultsPerSource = maxResults,
-            YearFrom = yearFrom,
-            YearTo = yearTo
-        };
-        reviewState.Stats.ProcessingStage = "Screening";
-        await SaveStateAsync(sessionId, reviewState);
+            ctx.State.Stats.ProcessingStage = StageQueued;
+            await PublishAsync(ctx);
+
+            using (await AcquireSlotAsync(ctx))
+            {
+                ctx.State.Stats.ProcessingStage = StageScreening;
+                await PublishAsync(ctx);
+                await SearchAndScreenAsync(ctx, yearFrom, yearTo);
+            }
+
+            if (request.HumanScreeningReview)
+            {
+                await AwaitScreeningReviewAsync(ctx);
+            }
+
+            using (await AcquireSlotAsync(ctx))
+            {
+                ctx.State.Stats.ProcessingStage = StageSynthesizing;
+                await PublishAsync(ctx);
+                await RetrieveFullTextsAsync(ctx);
+                await SynthesizeAsync(ctx);
+            }
+
+            ctx.State.Stats.ProcessingStage = StageComplete;
+            ctx.State.CompletedUtc = DateTime.UtcNow;
+            await PublishAsync(ctx);
+        }
+        catch (Exception ex)
+        {
+            ctx.State.Stats.ProcessingStage = StageFailed;
+            ctx.State.FailureMessage = $"The run stopped with an error: {SanitizeLogMessage(ex.Message)}";
+            ctx.State.CompletedUtc = DateTime.UtcNow;
+            try { await PublishAsync(ctx); } catch { }
+            throw;
+        }
+        finally
+        {
+            try
+            {
+                ctx.State.RunSettings = chat.Summarize(RecordingChatCompletionService.AppVersion);
+                await SaveStateAsync(sessionId, ctx.State);
+                await File.WriteAllTextAsync(Path.Combine(ctx.Workspace, "llm-calls.json"),
+                    JsonSerializer.Serialize(new { ctx.State.RunSettings, Calls = chat.Calls }, new JsonSerializerOptions { WriteIndented = true }));
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[Run Settings] Could not write llm-calls.json: {ex.Message}");
+            }
+            Coordinator.Unregister(sessionId);
+        }
+    }
+
+    private async Task PublishAsync(RunContext ctx)
+    {
+        await SaveStateAsync(ctx.RunId, ctx.State);
+        OnProgressUpdated?.Invoke(ctx.RunId, ctx.State.Stats);
+    }
+
+    /// <summary>Waits for a run slot, showing the run's place in line while it waits.</summary>
+    private async Task<IDisposable> AcquireSlotAsync(RunContext ctx)
+    {
+        var acquire = Coordinator.AcquireSlotAsync(ctx.RunId);
+        string stageBefore = ctx.State.Stats.ProcessingStage;
+        while (!acquire.IsCompleted)
+        {
+            int position = Coordinator.QueuePosition(ctx.RunId);
+            if (position > 0 && (position != ctx.State.Stats.QueuePosition || ctx.State.Stats.ProcessingStage != StageQueued))
+            {
+                ctx.State.Stats.QueuePosition = position;
+                ctx.State.Stats.ProcessingStage = StageQueued;
+                await PublishAsync(ctx);
+            }
+            await Task.WhenAny(acquire, Task.Delay(1000));
+        }
+        if (ctx.State.Stats.QueuePosition != 0)
+        {
+            ctx.State.Stats.QueuePosition = 0;
+            ctx.State.Stats.ProcessingStage = stageBefore;
+        }
+        return await acquire;
+    }
+
+    private async Task SearchAndScreenAsync(RunContext ctx, int yearFrom, int yearTo)
+    {
+        var request = ctx.Request;
+        var reviewState = ctx.State;
+        var chatService = ctx.Chat;
+        int maxResults = request.MaxResultsPerSource;
 
         // STORM-style multi-perspective search: survey the topic from a few distinct angles before
         // querying each source, instead of relying on the single literal query phrase alone.
-        var searchPerspectives = await GenerateSearchPerspectivesAsync(chatService, initialQuery, explicitObjective, inclusionCriteria);
+        List<string> searchPerspectives;
+        using (LlmStage.Begin("search-perspectives"))
+            searchPerspectives = await GenerateSearchPerspectivesAsync(chatService, request.Query, request.Objective, request.Inclusion);
         reviewState.SearchPerspectives = searchPerspectives;
         reviewState.ProtocolHash = MethodsSectionWriter.ComputeProtocolHash(
-            initialQuery, explicitObjective, inclusionCriteria, exclusionCriteria,
-            searchPerspectives, selectedKeys, maxResults, requirePeerReview);
-        await SaveStateAsync(sessionId, reviewState);
+            request.Query, request.Objective, request.Inclusion, request.Exclusion,
+            searchPerspectives, reviewState.SelectedSources, maxResults, request.PeerReviewOnly);
+        await SaveStateAsync(ctx.RunId, reviewState);
 
-        var allGroundedChunks = new List<DocumentChunk>();
-
-        foreach (var source in activeSources)
+        foreach (var source in ctx.Sources)
         {
             var sourceCandidates = new List<AcademicPaper>();
             var seenIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             var seenTitles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
             // maxResults is a hard per-source cap, not a per-query cap: split the budget across the
-            // perspective phrasings so a source never contributes more than maxResults papers overall,
-            // regardless of how many perspectives were generated. Keeps testing with a small maxResults
-            // cheap and predictable instead of silently multiplying by the perspective count.
+            // perspective phrasings so a source never contributes more than maxResults papers overall.
             int perPerspectiveCap = Math.Max(1, (int)Math.Ceiling(maxResults / (double)searchPerspectives.Count));
 
             foreach (var perspectiveQuery in searchPerspectives)
             {
-                if (sourceCandidates.Count >= maxResults) break; // per-source cap already met - skip remaining perspectives entirely
+                if (sourceCandidates.Count >= maxResults) break; // cap met - the remaining perspectives are not queried at all
 
                 var currentLog = new PlatformSearchLog
                 {
@@ -165,7 +321,7 @@ public class PrismaReviewEngine
                     QueryUsed = perspectiveQuery
                 };
                 reviewState.SearchLogs.Add(currentLog);
-                await SaveStateAsync(sessionId, reviewState);
+                await SaveStateAsync(ctx.RunId, reviewState);
 
                 List<AcademicPaper> perspectiveResults = new();
                 try
@@ -183,6 +339,9 @@ public class PrismaReviewEngine
 
                 reviewState.Stats.TotalIdentified += perspectiveResults.Count;
 
+                // Every identified record lands in exactly one bucket (duplicate, outside years, over cap, or
+                // candidate), so the PRISMA flow diagram adds up. The old loop stopped at the cap with a
+                // "break", and the records after it were counted as identified but never accounted for.
                 foreach (var candidate in perspectiveResults)
                 {
                     string normalizedTitle = Regex.Replace((candidate.Title ?? "").ToLowerInvariant(), @"\s+", " ").Trim();
@@ -203,58 +362,28 @@ public class PrismaReviewEngine
                         reviewState.Stats.OutsideDateRange++;
                         continue;
                     }
-                    sourceCandidates.Add(candidate);
 
-                    if (sourceCandidates.Count >= maxResults) break; // stop absorbing more candidates once the per-source cap is hit
+                    if (sourceCandidates.Count >= maxResults)
+                    {
+                        reviewState.Stats.CappedBeyondMaxResults++;
+                        continue;
+                    }
+                    sourceCandidates.Add(candidate);
                 }
 
-                OnProgressUpdated?.Invoke(sessionId, reviewState.Stats);
-                await SaveStateAsync(sessionId, reviewState);
+                OnProgressUpdated?.Invoke(ctx.RunId, reviewState.Stats);
+                await SaveStateAsync(ctx.RunId, reviewState);
             }
-
-            // Hard safety net: never let more than maxResults candidates per source reach screening, even if
-            // a source adapter under-respects the requested cap.
-            int overCap = Math.Max(0, sourceCandidates.Count - maxResults);
-            if (overCap > 0)
-            {
-                reviewState.Stats.CappedBeyondMaxResults += overCap;
-                sourceCandidates = sourceCandidates.Take(maxResults).ToList();
-            }
-
-            var candidates = sourceCandidates;
 
             var filteredCandidates = new List<AcademicPaper>();
-            foreach (var paper in candidates)
+            foreach (var paper in sourceCandidates)
             {
+                ctx.Papers[paper.Id] = paper;
                 if (reviewState.PeerReviewOnlyToggle)
                 {
-                    bool isPeerReviewed = false;
-
-                    if (paper.Id.StartsWith("SCOPUS_ID:") || source.SourceName.Contains("ScienceDirect", StringComparison.OrdinalIgnoreCase))
-                    {
-                        if (!string.IsNullOrEmpty(paper.JournalSource) && !paper.JournalSource.Contains("Preprint", StringComparison.OrdinalIgnoreCase))
-                        {
-                            isPeerReviewed = true;
-                        }
-                    }
-                    else if (paper.Id.StartsWith("IEEE_") || source.SourceName.Contains("IEEE", StringComparison.OrdinalIgnoreCase))
-                    {
-                        isPeerReviewed = true;
-                    }
-                    else if (paper.Id.Contains("arxiv.org", StringComparison.OrdinalIgnoreCase) || source.SourceName.Contains("arXiv", StringComparison.OrdinalIgnoreCase))
-                    {
-                        string combinedMetadata = $"{paper.Title} {paper.JournalSource} {paper.Abstract}";
-                        bool hasHintOfPublication = combinedMetadata.Contains("Proceedings of", StringComparison.OrdinalIgnoreCase) || 
-                                                    combinedMetadata.Contains("Journal of", StringComparison.OrdinalIgnoreCase) || 
-                                                    combinedMetadata.Contains("Transactions on", StringComparison.OrdinalIgnoreCase) ||
-                                                    combinedMetadata.Contains("Published in", StringComparison.OrdinalIgnoreCase);
-
-                        if (hasHintOfPublication) isPeerReviewed = await VerifyPeerReviewStatusViaLLMAsync(chatService, paper);
-                    }
-                    else
-                    {
-                        isPeerReviewed = await VerifyPeerReviewStatusViaLLMAsync(chatService, paper);
-                    }
+                    bool isPeerReviewed;
+                    using (LlmStage.Begin("peer-review-filter"))
+                        isPeerReviewed = await IsPeerReviewedAsync(chatService, source, paper);
 
                     if (!isPeerReviewed)
                     {
@@ -263,13 +392,14 @@ public class PrismaReviewEngine
 
                         var excludedApa = ApaCitationBuilder.Build(paper);
                         reviewState.Phases.Screening.Add(new ScreeningLog(
-                            paper.Id, paper.Title, "Excluded", 
+                            paper.Id, paper.Title, "Excluded",
                             "Excluded during post-retrieval pre-screening: Document was classified as an un-reviewed preprint or working paper, violating the active Peer-Reviewed Only configuration threshold.",
-                            excludedApa.Citation, "N/A", excludedApa.VenueType, excludedApa.VenueName, excludedApa.Year
+                            excludedApa.Citation, "N/A", excludedApa.VenueType, excludedApa.VenueName, excludedApa.Year,
+                            paper.Authors, paper.Doi, paper.Url, paper.Abstract
                         ));
-                        
-                        OnProgressUpdated?.Invoke(sessionId, reviewState.Stats);
-                        await SaveStateAsync(sessionId, reviewState);
+
+                        OnProgressUpdated?.Invoke(ctx.RunId, reviewState.Stats);
+                        await SaveStateAsync(ctx.RunId, reviewState);
                         continue;
                     }
 
@@ -281,159 +411,301 @@ public class PrismaReviewEngine
 
             foreach (var paper in filteredCandidates)
             {
-                string authorList = string.Join(", ", paper.Authors);
-                var prompt = $$"""
-                    Evaluate the following academic paper against the provided systematically structured PRISMA parameters.
-                    
-                    CRITERIA DIRECTIVES:
-                    - Inclusion Thresholds: {{inclusionCriteria}}
-                    - Exclusion Thresholds: {{exclusionCriteria}}
-                    
-                    PAPER TARGET DATA:
-                    - Title: {{paper.Title}}
-                    - Authors: {{authorList}}
-                    - Date Context: {{paper.PublishedDate}}
-                    - Publication/Journal Venue: {{paper.JournalSource}}
-                    - Abstract: {{paper.Abstract}}
-
-                    TASK:
-                    1. Determine if it should be Included or Excluded.
-                    2. Create a brief 1-2 sentence executive summary of the paper.
-                    (The reference string is built separately from the source metadata - do not write one.)
-
-                    Respond ONLY with a valid minified JSON object matching this structure exactly:
-                    {
-                        "decision": "Included" or "Excluded",
-                        "reasoning": "Why it meets inclusion or hits exclusion parameters.",
-                        "briefSummary": "The 1-2 sentence executive summary overview."
-                    }
-                    """;
-
                 try
                 {
-                    var response = await chatService.GetChatMessageContentAsync(prompt);
-                    var decisionData = DeserializeDecision(response.ToString());
+                    JsonElement decisionData;
+                    using (LlmStage.Begin("screening"))
+                        decisionData = await ScreenPaperAsync(chatService, paper, request.Inclusion, request.Exclusion);
 
                     UpdateReviewState(reviewState, paper, decisionData);
-                    OnProgressUpdated?.Invoke(sessionId, reviewState.Stats);
-                    await SaveStateAsync(sessionId, reviewState);
-
-                    string decision = decisionData.TryGetProperty("decision", out var d) ? d.GetString() ?? "Excluded" : "Excluded";
-                    if (decision.Equals("Included", StringComparison.OrdinalIgnoreCase))
-                    {
-                        var paperChunks = await DocumentRAGUtility.IngestAndChunkPaperAsync(paper.Id, paper.Title, userWorkspace);
-                        allGroundedChunks.AddRange(paperChunks);
-                    }
                 }
                 catch (Exception ex)
                 {
+                    // Not silently dropped any more: the record is logged as not screened and counted.
                     Console.WriteLine($"[Screening Exception] Problem processing paper '{paper.Title}': {SanitizeLogMessage(ex.Message)}");
+                    reviewState.Stats.ScreeningErrors++;
+                    var apa = ApaCitationBuilder.Build(paper);
+                    reviewState.Phases.Screening.Add(new ScreeningLog(paper.Id, paper.Title, "Error",
+                        $"Not screened: the model call failed ({SanitizeLogMessage(ex.Message)}).", apa.Citation, "N/A",
+                        apa.VenueType, apa.VenueName, apa.Year, paper.Authors, paper.Doi, paper.Url, paper.Abstract));
                 }
+                OnProgressUpdated?.Invoke(ctx.RunId, reviewState.Stats);
+                await SaveStateAsync(ctx.RunId, reviewState);
             }
         }
+    }
 
-        reviewState.Stats.ProcessingStage = "Synthesizing";
-        OnProgressUpdated?.Invoke(sessionId, reviewState.Stats);
+    /// <summary>
+    /// The screening prompt for one record, used by the review run and by the screening evaluation tool so
+    /// both measure exactly the same thing. Temperature 0 so repeated runs give the same decisions.
+    /// </summary>
+    public static async Task<JsonElement> ScreenPaperAsync(IChatCompletionService chatService, AcademicPaper paper, string inclusionCriteria, string exclusionCriteria)
+    {
+        string authorList = string.Join(", ", paper.Authors);
+        var prompt = $$"""
+            Evaluate the following academic paper against the provided systematically structured PRISMA parameters.
+            
+            CRITERIA DIRECTIVES:
+            - Inclusion Thresholds: {{inclusionCriteria}}
+            - Exclusion Thresholds: {{exclusionCriteria}}
+            
+            PAPER TARGET DATA:
+            - Title: {{paper.Title}}
+            - Authors: {{authorList}}
+            - Date Context: {{paper.PublishedDate}}
+            - Publication/Journal Venue: {{paper.JournalSource}}
+            - Abstract: {{paper.Abstract}}
 
-        var includedLogs = reviewState.Phases.Screening
-            .Where(p => p.Decision.Equals("Included", StringComparison.OrdinalIgnoreCase))
-            .ToList();
+            TASK:
+            1. Determine if it should be Included or Excluded.
+            2. Create a brief 1-2 sentence executive summary of the paper.
+            (The reference string is built separately from the source metadata - do not write one.)
+
+            Respond ONLY with a valid minified JSON object matching this structure exactly:
+            {
+                "decision": "Included" or "Excluded",
+                "reasoning": "Why it meets inclusion or hits exclusion parameters.",
+                "briefSummary": "The 1-2 sentence executive summary overview."
+            }
+            """;
+
+        var settings = new MistralAIPromptExecutionSettings { Temperature = 0.0 };
+        var response = await chatService.GetChatMessageContentAsync(prompt, settings);
+        return DeserializeDecision(response.ToString());
+    }
+
+    private async Task<bool> IsPeerReviewedAsync(IChatCompletionService chatService, IAcademicSource source, AcademicPaper paper)
+    {
+        if (paper.Id.StartsWith("SCOPUS_ID:") || source.SourceName.Contains("ScienceDirect", StringComparison.OrdinalIgnoreCase))
+            return !string.IsNullOrEmpty(paper.JournalSource) && !paper.JournalSource.Contains("Preprint", StringComparison.OrdinalIgnoreCase);
+
+        if (paper.Id.StartsWith("IEEE_") || source.SourceName.Contains("IEEE", StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        if (paper.Id.Contains("arxiv.org", StringComparison.OrdinalIgnoreCase) || source.SourceName.Contains("arXiv", StringComparison.OrdinalIgnoreCase))
+        {
+            string combinedMetadata = $"{paper.Title} {paper.JournalSource} {paper.Abstract}";
+            bool hasHintOfPublication = combinedMetadata.Contains("Proceedings of", StringComparison.OrdinalIgnoreCase) ||
+                                        combinedMetadata.Contains("Journal of", StringComparison.OrdinalIgnoreCase) ||
+                                        combinedMetadata.Contains("Transactions on", StringComparison.OrdinalIgnoreCase) ||
+                                        combinedMetadata.Contains("Published in", StringComparison.OrdinalIgnoreCase);
+            return hasHintOfPublication && await VerifyPeerReviewStatusViaLLMAsync(chatService, paper);
+        }
+
+        return await VerifyPeerReviewStatusViaLLMAsync(chatService, paper);
+    }
+
+    /// <summary>
+    /// Pauses the run until the user has confirmed or changed the screening decisions in the dashboard.
+    /// Every confirmation and change is written to the ledger (ModelDecision keeps what the model said).
+    /// If nobody responds within Runs:ScreeningReviewTimeoutHours, the model's decisions are kept and the
+    /// ledger says that no human review took place.
+    /// </summary>
+    private async Task AwaitScreeningReviewAsync(RunContext ctx)
+    {
+        var state = ctx.State;
+        Coordinator.OpenScreeningReview(ctx.RunId);
+        state.Stats.ProcessingStage = StageAwaitingReview;
+        await PublishAsync(ctx);
+
+        var decisions = await Coordinator.WaitForScreeningReviewAsync(ctx.RunId, TimeSpan.FromHours(Math.Max(1, _runsOptions.ScreeningReviewTimeoutHours)));
+        if (decisions == null)
+        {
+            state.HumanScreeningReviewOutcome = $"No review was submitted within {_runsOptions.ScreeningReviewTimeoutHours} hours; the model's screening decisions were kept unchanged.";
+            return;
+        }
+
+        ApplyScreeningReview(state, decisions);
+        state.HumanScreeningReviewOutcome = $"A human reviewer checked {state.Stats.HumanReviewed} screening decision(s) and changed {state.Stats.HumanOverrides}.";
+        await PublishAsync(ctx);
+    }
+
+    /// <summary>Applies a reviewer's decisions to the ledger and the PRISMA counters. Public for unit tests.</summary>
+    public static void ApplyScreeningReview(ReviewState state, IReadOnlyList<ScreeningOverride> decisions)
+    {
+        var byId = decisions
+            .Where(d => d.Decision is "Included" or "Excluded")
+            .GroupBy(d => d.PaperId)
+            .ToDictionary(g => g.Key, g => g.Last());
+
+        for (int i = 0; i < state.Phases.Screening.Count; i++)
+        {
+            var log = state.Phases.Screening[i];
+            if (log.Decision is not ("Included" or "Excluded")) continue;
+            if (!byId.TryGetValue(log.PaperId, out var d)) continue;
+
+            state.Stats.HumanReviewed++;
+            string? note = string.IsNullOrWhiteSpace(d.Note) ? null : d.Note.Trim();
+            if (d.Decision == log.Decision)
+            {
+                state.Phases.Screening[i] = log with { HumanReviewed = true, HumanNote = note };
+                continue;
+            }
+
+            state.Stats.HumanOverrides++;
+            bool wasPeerReviewFilter = log.BriefSummary == "N/A" && log.Reasoning.StartsWith("Excluded during post-retrieval pre-screening", StringComparison.Ordinal);
+            if (d.Decision == "Included")
+            {
+                state.Stats.Included++;
+                if (wasPeerReviewFilter) state.Stats.FailedPeerReviewCheck--; else state.Stats.Excluded--;
+            }
+            else
+            {
+                state.Stats.Included--;
+                state.Stats.Excluded++;
+            }
+
+            state.Phases.Screening[i] = log with
+            {
+                ModelDecision = log.Decision,
+                Decision = d.Decision,
+                HumanReviewed = true,
+                HumanNote = note,
+                BriefSummary = log.BriefSummary == "N/A" ? "(Included by the human reviewer; no model summary was produced.)" : log.BriefSummary,
+            };
+        }
+    }
+
+    /// <summary>Downloads and chunks the full text of every included paper (arXiv only, for now).</summary>
+    private async Task RetrieveFullTextsAsync(RunContext ctx)
+    {
+        foreach (var log in ctx.State.Phases.Screening.Where(l => l.Decision == "Included"))
+        {
+            if (!ctx.Papers.TryGetValue(log.PaperId, out var paper)) continue;
+            var chunks = await DocumentRAGUtility.IngestAndChunkPaperAsync(paper.Id, paper.Title, ctx.Workspace);
+            ctx.Chunks[log.PaperId] = chunks;
+            if (chunks.Count > 0) ctx.State.Stats.FullTextRetrieved++;
+        }
+        await PublishAsync(ctx);
+    }
+
+    private async Task SynthesizeAsync(RunContext ctx)
+    {
+        var reviewState = ctx.State;
+        var request = ctx.Request;
 
         // One ordering for the whole report. The reference list shown to the model, the [n] markers it
-        // writes, the extraction table and the LaTeX bibliography are all numbered from this list. They used
-        // to be ordered differently (alphabetical for the model, screening order for the bibliography), so a
-        // correctly cited [5] pointed at the wrong paper in main.tex.
-        var includedPapers = includedLogs
+        // writes, the extraction table and the LaTeX bibliography are all numbered from this list.
+        var includedPapers = reviewState.Phases.Screening
+            .Where(p => p.Decision.Equals("Included", StringComparison.OrdinalIgnoreCase))
             .OrderBy(p => p.ApaCitation ?? "", ApaCitationBuilder.ReferenceOrder)
             .ThenBy(p => p.PaperId, StringComparer.Ordinal)
             .ToList();
 
         reviewState.SynthesizedRecords.Clear();
+        var referencedPapers = new List<ReferencedPaper>();
         for (int i = 0; i < includedPapers.Count; i++)
         {
             var log = includedPapers[i];
-            // Venue type, venue name and year come from the source metadata (ApaCitationBuilder). Runs from
-            // before that change only have the citation string, so fall back to parsing it.
-            string venue = !string.IsNullOrEmpty(log.VenueType) ? log.VenueType : ClassifyVenueFromCitation(log.ApaCitation);
-            int parsedYear = log.Year > 0 ? log.Year : ExtractYearFromCitation(log.ApaCitation);
+            reviewState.SynthesizedRecords.Add(BuildRecord(log, i + 1));
 
-            string cleanCategory = log.PaperId.StartsWith("SCOPUS_ID:") ? "ScienceDirect" 
-                                 : log.PaperId.StartsWith("IEEE_") ? "IEEE" 
-                                 : log.PaperId.StartsWith("SCHOLAR_") ? "Scholar" 
-                                 : log.PaperId.StartsWith("RG_") ? "ResearchGate" 
-                                 : "Arxiv";
-
-            // Quartile only from an exact Scimago title match. There is no default: the old code filled in
-            // "Q1" for every IEEE and Scholar paper it could not match, which inflated the quality figures.
-            string quartile = "N/A";
-            if (venue is "Journals" or "Transactions" && !string.IsNullOrWhiteSpace(log.VenueName))
-            {
-                quartile = JournalRankingMatcher.LookupQuartile(log.VenueName, parsedYear);
-            }
-
-            string platformFull = log.PaperId.StartsWith("SCOPUS_ID:") ? "Scopus API" 
-                                : log.PaperId.StartsWith("IEEE_") ? "IEEE Xplore API" 
-                                : log.PaperId.StartsWith("SCHOLAR_") ? "Google Scholar API" 
-                                : log.PaperId.StartsWith("RG_") ? "ResearchGate API" 
-                                : "arXiv API";
-
-            reviewState.SynthesizedRecords.Add(new IncludedPaperMetricRow
-            {
-                Title = log.Title,
-                Summary = log.BriefSummary,
-                ApaCitation = log.ApaCitation ?? "",
-                SourcePlatform = platformFull,
-                Year = parsedYear,
-                VenueType = venue,
-                InclusionRationale = log.Reasoning,
-                Category = cleanCategory,
-                Quartile = quartile,
-                // No conference-ranking data source is wired in yet, so no rating is claimed (this used to
-                // print "A" for every ScienceDirect conference paper).
-                ConferenceRating = "N/A",
-                ReferenceNumber = i + 1
-            });
+            ctx.Papers.TryGetValue(log.PaperId, out var paper);
+            ctx.Chunks.TryGetValue(log.PaperId, out var chunks);
+            referencedPapers.Add(new ReferencedPaper(i + 1, log.PaperId, log.Title,
+                paper?.Abstract ?? log.Abstract ?? "", (IReadOnlyList<DocumentChunk>?)chunks ?? Array.Empty<DocumentChunk>()));
         }
-        await SaveStateAsync(sessionId, reviewState);
+        await SaveStateAsync(ctx.RunId, reviewState);
 
         var sbReferences = new StringBuilder();
         for (int i = 0; i < includedPapers.Count; i++)
         {
-            sbReferences.AppendLine($"[{i + 1}] - {includedPapers[i].ApaCitation} (Paper ID Token: {includedPapers[i].PaperId.Split('/').Last()})");
+            sbReferences.AppendLine($"[{i + 1}] - {includedPapers[i].ApaCitation}");
         }
-        string exactReferenceListForLLM = sbReferences.ToString();
 
-        var sbContext = new StringBuilder();
-        int chunkIdx = 1;
-        
-        foreach (var chunk in allGroundedChunks.Take(40))
+        string groundedContext = GroundingContextBuilder.Build(referencedPapers, $"{request.Query} {request.Objective}");
+
+        await GeneratePrismaChecklistReportWithRAGAsync(ctx.RunId, ctx.Chat, request.Query, request.Objective,
+            inc: request.Inclusion, exc: request.Exclusion, groundedContext, sbReferences.ToString(), reviewState,
+            reviewState.SearchPerspectives, referenceCount: includedPapers.Count, referencedPapers);
+    }
+
+    private static IncludedPaperMetricRow BuildRecord(ScreeningLog log, int referenceNumber)
+    {
+        // Venue type, venue name and year come from the source metadata (ApaCitationBuilder). Runs from
+        // before that change only have the citation string, so fall back to parsing it.
+        string venue = !string.IsNullOrEmpty(log.VenueType) ? log.VenueType : ClassifyVenueFromCitation(log.ApaCitation);
+        int parsedYear = log.Year > 0 ? log.Year : ExtractYearFromCitation(log.ApaCitation);
+
+        string cleanCategory = log.PaperId.StartsWith("SCOPUS_ID:") ? "ScienceDirect"
+                             : log.PaperId.StartsWith("IEEE_") ? "IEEE"
+                             : log.PaperId.StartsWith("SCHOLAR_") ? "Scholar"
+                             : log.PaperId.StartsWith("RG_") ? "ResearchGate"
+                             : "Arxiv";
+
+        // Quartile only from an exact Scimago title match; no default.
+        string quartile = "N/A";
+        if (venue is "Journals" or "Transactions" && !string.IsNullOrWhiteSpace(log.VenueName))
         {
-            sbContext.AppendLine($"[Source Context Anchor {chunkIdx}]: (Origin Paper ID: {chunk.SourceId})");
-            sbContext.AppendLine($"Content text: {chunk.Text}");
-            sbContext.AppendLine("---");
-            chunkIdx++;
+            quartile = JournalRankingMatcher.LookupQuartile(log.VenueName, parsedYear);
         }
 
-        foreach (var paper in includedPapers)
+        string platformFull = log.PaperId.StartsWith("SCOPUS_ID:") ? "Scopus API"
+                            : log.PaperId.StartsWith("IEEE_") ? "IEEE Xplore API"
+                            : log.PaperId.StartsWith("SCHOLAR_") ? "Google Scholar API"
+                            : log.PaperId.StartsWith("RG_") ? "ResearchGate API"
+                            : "arXiv API";
+
+        return new IncludedPaperMetricRow
         {
-            string cleanPaperIdToken = paper.PaperId.Split('/').Last();
-            bool hasChunks = allGroundedChunks.Any(c => c.SourceId == cleanPaperIdToken);
-            
-            if (!hasChunks)
-            {
-                sbContext.AppendLine($"[Source Context Anchor {chunkIdx}]: (Origin Paper ID: {cleanPaperIdToken})");
-                sbContext.AppendLine($"Content text: Abstract Summary: {paper.BriefSummary} Title Metadata: {paper.Title}");
-                sbContext.AppendLine("---");
-                chunkIdx++;
-            }
+            Title = log.Title,
+            Summary = log.BriefSummary,
+            ApaCitation = log.ApaCitation ?? "",
+            SourcePlatform = platformFull,
+            Year = parsedYear,
+            VenueType = venue,
+            InclusionRationale = log.HumanReviewed && log.ModelDecision != null
+                ? $"Included by the human reviewer (model decision: {log.ModelDecision}).{(log.HumanNote != null ? " Note: " + log.HumanNote : "")}"
+                : log.Reasoning,
+            Category = cleanCategory,
+            Quartile = quartile,
+            ConferenceRating = "N/A", // no conference-ranking data source is wired in, so no rating is claimed
+            ReferenceNumber = referenceNumber,
+            PaperId = log.PaperId,
+            Authors = log.Authors ?? new List<string>(),
+            VenueName = log.VenueName,
+            Doi = log.Doi,
+            Url = log.Url,
+        };
+    }
+
+    /// <summary>
+    /// Call once at startup. Runs cannot survive an app restart (IIS recycles the app pool on idle and on a
+    /// schedule), so any ledger still in a working stage is marked "Interrupted" instead of spinning forever.
+    /// </summary>
+    public int MarkInterruptedRuns()
+    {
+        string store = WorkspaceRoot;
+        if (!Directory.Exists(store)) return 0;
+        int marked = 0;
+        foreach (var dir in Directory.GetDirectories(store))
+        {
+            if (!Guid.TryParseExact(Path.GetFileName(dir), "N", out var runId) || IsRunActive(runId)) continue;
+            var state = LoadState(runId);
+            if (state == null || IsFinishedStage(state.Stats.ProcessingStage) || state.Stats.ProcessingStage == "Idle") continue;
+            state.Stats.ProcessingStage = StageInterrupted;
+            state.Stats.QueuePosition = 0;
+            state.FailureMessage = "The server restarted while this run was in progress, so it could not finish. Please start it again.";
+            state.CompletedUtc = DateTime.UtcNow;
+            try { File.WriteAllText(GetStateFilePath(runId), JsonSerializer.Serialize(state, new JsonSerializerOptions { WriteIndented = true })); marked++; }
+            catch { }
         }
+        return marked;
+    }
 
-        await GeneratePrismaChecklistReportWithRAGAsync(sessionId, activeSources.Count, chatService, initialQuery, explicitObjective,
-            inc: inclusionCriteria, exc: exclusionCriteria, sbContext.ToString(), exactReferenceListForLLM, reviewState, searchPerspectives, referenceCount: includedPapers.Count);
-
-        reviewState.Stats.ProcessingStage = "Complete";
-        OnProgressUpdated?.Invoke(sessionId, reviewState.Stats);
-        await SaveStateAsync(sessionId, reviewState);
+    /// <summary>Reads a run's ledger from disk, or null if there is none (e.g. expired and deleted).</summary>
+    public ReviewState? LoadState(Guid runId)
+    {
+        string path = GetStateFilePath(runId);
+        if (!File.Exists(path)) return null;
+        try
+        {
+            using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+            return JsonSerializer.Deserialize<ReviewState>(stream);
+        }
+        catch
+        {
+            return null;
+        }
     }
 
     private string SanitizeLogMessage(string message)
@@ -451,7 +723,7 @@ public class PrismaReviewEngine
         return "Preprints";
     }
 
-    private int ExtractYearFromCitation(string? citation)
+    private static int ExtractYearFromCitation(string? citation)
     {
         if (string.IsNullOrEmpty(citation)) return 2026;
         var yearMatch = Regex.Match(citation, @"\((20\d{2})\)");
@@ -822,7 +1094,7 @@ public class PrismaReviewEngine
         return log;
     }
 
-private async Task GeneratePrismaChecklistReportWithRAGAsync(Guid sessionId, int sourceCount, IChatCompletionService chat, string query, string explicitObjective, string inc, string exc, string groundedChunksText, string referenceListMapping, ReviewState finalState, List<string>? searchPerspectives = null, int referenceCount = 0)
+    private async Task GeneratePrismaChecklistReportWithRAGAsync(Guid sessionId, IChatCompletionService chat, string query, string explicitObjective, string inc, string exc, string groundedChunksText, string referenceListMapping, ReviewState finalState, List<string>? searchPerspectives = null, int referenceCount = 0, IReadOnlyList<ReferencedPaper>? referencedPapers = null)
     {
         var effectivePerspectives = searchPerspectives ?? new List<string> { query };
         string supplementaryPerspectives = effectivePerspectives.Count > 1
@@ -833,7 +1105,9 @@ private async Task GeneratePrismaChecklistReportWithRAGAsync(Guid sessionId, int
         // grounded claims the sources actually support and which reference numbers back each one. This
         // is persisted to disk as its own audit artifact and then fed back in below so synthesisResultsItem
         // and discussionItem are written against a pre-checked claim map instead of free-associating.
-        string groundedOutline = await GenerateGroundedOutlineAsync(chat, query, explicitObjective, groundedChunksText, referenceListMapping);
+        string groundedOutline;
+        using (LlmStage.Begin("outline"))
+            groundedOutline = await GenerateGroundedOutlineAsync(chat, query, explicitObjective, groundedChunksText, referenceListMapping);
         if (!string.IsNullOrWhiteSpace(groundedOutline))
         {
             try
@@ -853,6 +1127,10 @@ private async Task GeneratePrismaChecklistReportWithRAGAsync(Guid sessionId, int
             (venueBreakdown.Count > 0 ? $" ({string.Join(", ", venueBreakdown)})" : "") +
             $"; the peer-reviewed-only filter was {(finalState.PeerReviewOnlyToggle ? "ON" : "OFF")}.";
 
+        string screeningFacts = finalState.Stats.HumanReviewed > 0
+            ? $"a language model screened the records and a human reviewer then checked {finalState.Stats.HumanReviewed} decisions and changed {finalState.Stats.HumanOverrides}. Do not claim any other human involvement."
+            : "done by a language model only; do not claim that any human screened, verified or reviewed records during the run.";
+
         var reportPrompt = $$"""
             You are an elite academic meta-analyst preparing an evaluation report mapped to the PRISMA 2020 Expanded Checklist.
 
@@ -863,7 +1141,7 @@ private async Task GeneratePrismaChecklistReportWithRAGAsync(Guid sessionId, int
             - The screening inclusion thresholds were exactly: "{{inc}}"
             - The screening exclusion thresholds were exactly: "{{exc}}"
             - Included set: {{includedFacts}} Do not describe the included studies as peer-reviewed unless the filter was ON, and do not state any count that is not given here.
-            - Screening was done by a language model only; do not claim that any human screened, verified or reviewed records during the run.
+            - Screening: {{screeningFacts}}
 
             OFFICIAL ALPHABETIZED REFERENCE LIST FOR THIS RUN:
             {{referenceListMapping}}
@@ -922,7 +1200,9 @@ private async Task GeneratePrismaChecklistReportWithRAGAsync(Guid sessionId, int
             structuralSettings.ExtensionData ??= new Dictionary<string, object>();
             structuralSettings.ExtensionData["response_format"] = new { type = "json_object" };
 
-            var response = await chat.GetChatMessageContentAsync(reportPrompt, structuralSettings);
+            ChatMessageContent response;
+            using (LlmStage.Begin("report-draft"))
+                response = await chat.GetChatMessageContentAsync(reportPrompt, structuralSettings);
             string rawResponse = response.ToString().Trim();
 
             string mermaidBlock = "";
@@ -976,7 +1256,7 @@ private async Task GeneratePrismaChecklistReportWithRAGAsync(Guid sessionId, int
             string methodsSources = MethodsSectionWriter.InformationSources(selectedNames, unavailableNames, finalState.SearchLogs, finalState.Timestamp);
             string methodsSearch = MethodsSectionWriter.SearchStrategy(query, effectivePerspectives, finalState.MaxResultsPerSource,
                 finalState.Stats.DuplicatesRemoved, finalState.Stats.CappedBeyondMaxResults, finalState.YearFrom, finalState.YearTo, finalState.Stats.OutsideDateRange);
-            string methodsSelection = MethodsSectionWriter.SelectionProcess(finalState.PeerReviewOnlyToggle, finalState.Stats);
+            string methodsSelection = MethodsSectionWriter.SelectionProcess(finalState.PeerReviewOnlyToggle, finalState.Stats, finalState.HumanScreeningReviewRequested, finalState.HumanScreeningReviewOutcome);
             string rawDiscussion = ResolveField("discussionItem");
             string rawSynthesisText = ResolveField("synthesisResultsItem");
 
@@ -988,13 +1268,18 @@ private async Task GeneratePrismaChecklistReportWithRAGAsync(Guid sessionId, int
             // to copy-edit - rewriting them is how a search string got silently shortened in the report.
             string cleanTitle = CleanTitle(rawTitle, query);
             deltas.Add(new StyleDeltaLog("Title", rawTitle, cleanTitle, Applied: false, Note: "Title is not sent through the stylistic pass."));
-            var (cleanAbstract, dAbstract) = await StylisticRefinerUtility.RefineAcademicProseAsync(chat, "Abstract", rawAbstract); deltas.Add(dAbstract);
-            var (cleanRationale, dRationale) = await StylisticRefinerUtility.RefineAcademicProseAsync(chat, "Rationale", rawRationale); deltas.Add(dRationale);
-            var (cleanObjectives, dObjectives) = await StylisticRefinerUtility.RefineAcademicProseAsync(chat, "Objectives", rawObjectives); deltas.Add(dObjectives);
+            string cleanAbstract, cleanRationale, cleanObjectives;
+            using (LlmStage.Begin("style"))
+            {
+                var (a, dAbstract) = await StylisticRefinerUtility.RefineAcademicProseAsync(chat, "Abstract", rawAbstract); deltas.Add(dAbstract); cleanAbstract = a;
+                var (r, dRationale) = await StylisticRefinerUtility.RefineAcademicProseAsync(chat, "Rationale", rawRationale); deltas.Add(dRationale); cleanRationale = r;
+                var (o, dObjectives) = await StylisticRefinerUtility.RefineAcademicProseAsync(chat, "Objectives", rawObjectives); deltas.Add(dObjectives); cleanObjectives = o;
+            }
             // The Results & Synthesis (20a) and Discussion (23a) sections are NOT run through the generic
             // stylistic refiner - that rewrite step tends to drop the inline [n] citation markers. They are
             // instead produced by a dedicated citation-mandatory pass and then improved by a documented
             // peer-review pass, so the shipped text keeps its traceable citations and gains depth.
+            using var citedStage = LlmStage.Begin("cited-sections");
             var (citedSynthesis, citedDiscussion) = await GenerateCitedSectionsAsync(
                 chat, query, explicitObjective, groundedOutline, referenceListMapping, groundedChunksText);
 
@@ -1004,7 +1289,9 @@ private async Task GeneratePrismaChecklistReportWithRAGAsync(Guid sessionId, int
 
             // Documented "peer reviewer" pass: an LLM critiques the two sections and revises them, and the
             // whole exchange is written to peer-review-feedback.json in the workspace for transparency.
-            var peerReview = await PeerReviewAndReviseAsync(chat, citedSynthesis, citedDiscussion, referenceListMapping, groundedOutline);
+            PeerReviewLog peerReview;
+            using (LlmStage.Begin("automated-peer-review"))
+                peerReview = await PeerReviewAndReviseAsync(chat, citedSynthesis, citedDiscussion, referenceListMapping, groundedOutline);
             try
             {
                 string peerReviewPath = Path.Combine(GetWorkspaceFolderPath(sessionId), "peer-review-feedback.json");
@@ -1034,6 +1321,22 @@ private async Task GeneratePrismaChecklistReportWithRAGAsync(Guid sessionId, int
 
             finalState.Stats.InvalidCitationsStripped += citationStrips.Count;
 
+            // Citation SUPPORT check: does the cited paper actually say what the sentence claims? The range
+            // check above cannot catch a valid-looking [n] that points at the wrong paper.
+            string synthesisProse = Regex.Replace(fullSynthesisField, @"\[(MERMAID|TIKZ)_START\].*?\[(MERMAID|TIKZ)_END\]", "", RegexOptions.Singleline);
+            var citedSentences = CitationSupportChecker.ExtractCitedSentences(synthesisProse, "synthesisResultsItem")
+                .Concat(CitationSupportChecker.ExtractCitedSentences(cleanDiscussionValidated, "discussionItem"))
+                .ToList();
+            List<CitationSupportResult> supportChecks;
+            using (LlmStage.Begin("citation-check"))
+                supportChecks = await CitationSupportChecker.CheckAsync(chat, citedSentences, referencedPapers ?? Array.Empty<ReferencedPaper>());
+            var supportSummary = CitationSupportSummary.From(supportChecks);
+            finalState.Stats.CitationsChecked = supportSummary.Checked;
+            finalState.Stats.CitationsSupported = supportSummary.Supported;
+            finalState.Stats.CitationsPartiallySupported = supportSummary.PartiallySupported;
+            finalState.Stats.CitationsNotSupported = supportSummary.NotSupported;
+            finalState.Stats.CitationsUnverifiable = supportSummary.Unverifiable;
+
             try
             {
                 string auditPath = Path.Combine(GetWorkspaceFolderPath(sessionId), "citation-audit.json");
@@ -1041,7 +1344,9 @@ private async Task GeneratePrismaChecklistReportWithRAGAsync(Guid sessionId, int
                 {
                     ReferenceListSize = referenceCount,
                     InvalidMarkersStripped = citationStrips.Count,
-                    Details = citationStrips
+                    Details = citationStrips,
+                    SupportSummary = supportSummary,
+                    SupportChecks = supportChecks
                 };
                 await File.WriteAllTextAsync(auditPath, JsonSerializer.Serialize(auditPayload, new JsonSerializerOptions { WriteIndented = true }));
             }
@@ -1063,6 +1368,7 @@ private async Task GeneratePrismaChecklistReportWithRAGAsync(Guid sessionId, int
                 BiasAssessmentItem = "Internal risk of bias is controlled via mandatory post-generation human verification. Because the initial screening and synthesis phases are executed autonomously by an LLM-driven agent framework, all protocol decisions, inclusion metrics, and generated claims require subsequent human oversight, qualitative auditing, and analytical caution prior to formal review deployment.",
                 SupportItem = _supportStatement,
                 ProtocolHash = finalState.ProtocolHash,
+                CitationCheckSummary = supportSummary.ToSentence(),
                 AvailabilityItem = "All automated retrieval configurations, screening criteria matrices, and synthesis generation pipeline code structures are publicly accessible via the project repository on GitHub at https://github.com/lauPhilip/au-btech-literature-review-agent."
             };
 
@@ -1082,6 +1388,7 @@ private async Task GeneratePrismaChecklistReportWithRAGAsync(Guid sessionId, int
                 TitleItem = $"Checklist Synthesis generation completely faulted: {SanitizeLogMessage(fatalEx.Message)}"
             };
             await File.WriteAllTextAsync(GetReportFilePath(sessionId), JsonSerializer.Serialize(failureReport, new JsonSerializerOptions { WriteIndented = true }));
+            finalState.FailureMessage = $"The report could not be generated: {SanitizeLogMessage(fatalEx.Message)}";
         }
     }
 
@@ -1097,24 +1404,6 @@ private async Task GeneratePrismaChecklistReportWithRAGAsync(Guid sessionId, int
         if (string.IsNullOrWhiteSpace(t) || t == "Extraction failed" || looksLikeParagraph)
             return $"{query.Trim()}: A Systematic Literature Review";
         return t;
-    }
-
-    private void CleanOldManuscriptArtifacts(string directoryPath)
-    {
-        try
-        {
-            if (!Directory.Exists(directoryPath)) return;
-            var targets = Directory.GetFiles(directoryPath, "manuscript_*.*")
-                .Where(f => f.EndsWith(".tex") || f.EndsWith(".pdf") || f.EndsWith(".log") || f.EndsWith(".aux"));
-            foreach (var file in targets)
-            {
-                try { File.Delete(file); } catch (IOException) { }
-            }
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"[Startup Cleanup Warning] Safely skipped file purge: {ex.Message}");
-        }
     }
 
     private string EscapeLatexText(string input)
@@ -1138,6 +1427,8 @@ private async Task GeneratePrismaChecklistReportWithRAGAsync(Guid sessionId, int
                          .Replace("}", @"\}")
                          .Replace("~", @"\textasciitilde ")
                          .Replace("^", @"\textasciicircum ");
+        // Straight double quotes print as two closing quotes in LaTeX; use proper ``opening'' and closing quotes.
+        escaped = Regex.Replace(escaped, "\"([^\"\n]*)\"", "``$1''");
         // Markdown-style *italics* (used for venues in the APA references) -> real LaTeX italics.
         return Regex.Replace(escaped, @"\*([^*\n]+)\*", @"\textit{$1}");
     }
@@ -1150,6 +1441,9 @@ private async Task GeneratePrismaChecklistReportWithRAGAsync(Guid sessionId, int
     /// </summary>
     public byte[] GenerateWorkspaceArchiveFromDisk(Guid sessionId)
     {
+        var state = LoadState(sessionId);
+        if (state == null) return Array.Empty<byte>();
+
         var report = new PrismaReport();
         string reportPath = GetReportFilePath(sessionId);
         if (File.Exists(reportPath))
@@ -1162,28 +1456,20 @@ private async Task GeneratePrismaChecklistReportWithRAGAsync(Guid sessionId, int
             catch { }
         }
 
-        var records = new List<IncludedPaperMetricRow>();
-        string statePath = GetStateFilePath(sessionId);
-        if (File.Exists(statePath))
-        {
-            try
-            {
-                string stateJson = File.ReadAllText(statePath);
-                using var doc = JsonDocument.Parse(stateJson);
-                if (doc.RootElement.TryGetProperty("SynthesizedRecords", out var recordsProp))
-                {
-                    records = JsonSerializer.Deserialize<List<IncludedPaperMetricRow>>(recordsProp.GetRawText()) ?? new();
-                }
-            }
-            catch { }
-        }
+        return GenerateWorkspaceArchive(sessionId, report, state.SynthesizedRecords, state);
+    }
 
-        return GenerateWorkspaceArchive(sessionId, report, records);
+    /// <summary>references.bib / references.ris for a run, or null if the run does not exist.</summary>
+    public string? ExportReferences(Guid sessionId, string format)
+    {
+        var state = LoadState(sessionId);
+        if (state == null) return null;
+        return format == "ris" ? BibliographyExporter.ToRis(state.SynthesizedRecords) : BibliographyExporter.ToBibTeX(state.SynthesizedRecords);
     }
 
     // NOTE: historically named GenerateManuscriptPdf, but it never compiled a PDF - it always returned a
     // zip bundle (LaTeX source + JSON ledger + source PDFs). Renamed to match what it actually produces.
-    public byte[] GenerateWorkspaceArchive(Guid sessionId, PrismaReport report, List<IncludedPaperMetricRow> records)
+    public byte[] GenerateWorkspaceArchive(Guid sessionId, PrismaReport report, List<IncludedPaperMetricRow> records, ReviewState? state = null)
     {
         // The LaTeX below interpolates decimals (pie-slice angles, axis limits). On a machine with a Danish
         // (or any comma-decimal) culture those came out as "51,43", which breaks the TikZ syntax, so the
@@ -1192,7 +1478,7 @@ private async Task GeneratePrismaChecklistReportWithRAGAsync(Guid sessionId, int
         System.Globalization.CultureInfo.CurrentCulture = System.Globalization.CultureInfo.InvariantCulture;
         try
         {
-            return BuildWorkspaceArchive(sessionId, report, records);
+            return BuildWorkspaceArchive(sessionId, report, records, state);
         }
         finally
         {
@@ -1200,13 +1486,11 @@ private async Task GeneratePrismaChecklistReportWithRAGAsync(Guid sessionId, int
         }
     }
 
-    private byte[] BuildWorkspaceArchive(Guid sessionId, PrismaReport report, List<IncludedPaperMetricRow> records)
+    private byte[] BuildWorkspaceArchive(Guid sessionId, PrismaReport report, List<IncludedPaperMetricRow> records, ReviewState? state)
     {
-        string projectRoot = Directory.GetCurrentDirectory();
-        CleanOldManuscriptArtifacts(projectRoot);
-
-        string uniqueId = Guid.NewGuid().ToString("N").Substring(0, 8);
-        string texFilePath = Path.Combine(projectRoot, $"manuscript_{uniqueId}.tex");
+        // main.tex is built in memory and written straight into the zip. It used to go through a temporary
+        // manuscript_*.tex file in the project folder, and every download first deleted all such files - so
+        // two people downloading at the same moment could delete each other's main.tex.
 
         // Table 3.1 and the bibliography must follow the reference numbers the synthesis cites.
         // (Older runs have ReferenceNumber = 0 everywhere; OrderBy is stable, so they keep their order.)
@@ -1342,6 +1626,17 @@ private async Task GeneratePrismaChecklistReportWithRAGAsync(Guid sessionId, int
         sb.AppendLine($"In total, {records.Count} papers were chosen for final data extraction.");
         sb.AppendLine(@"\vspace{10pt}");
 
+        if (state != null)
+        {
+            var flow = PrismaFlowCounts.From(state);
+            sb.AppendLine(@"\begin{figure}[H]");
+            sb.AppendLine(@"\centering");
+            sb.AppendLine(PrismaFlowDiagram.ToTikz(flow));
+            sb.AppendLine(@"\caption{PRISMA 2020 flow diagram of this run" + (flow.IsConsistent ? "" : " (note: the run's counters do not fully add up; see transparent-process.json)") + "}");
+            sb.AppendLine(@"\end{figure}");
+            sb.AppendLine(@"\vspace{6pt}");
+        }
+
         sb.AppendLine(@"\begin{figure}[H]");
         sb.AppendLine(@"\centering");
         
@@ -1448,6 +1743,16 @@ private async Task GeneratePrismaChecklistReportWithRAGAsync(Guid sessionId, int
 
         sb.AppendLine(@"\section{Discussion}");
         sb.AppendLine(sanitizedDiscussionItem);
+        if (!string.IsNullOrWhiteSpace(report.CitationCheckSummary))
+        {
+            sb.AppendLine(@"\subsection{Automated Citation Check}");
+            sb.AppendLine(EscapeLatexText(report.CitationCheckSummary));
+        }
+        if (!string.IsNullOrWhiteSpace(state?.HumanScreeningReviewOutcome))
+        {
+            sb.AppendLine(@"\subsection{Human Screening Review}");
+            sb.AppendLine(EscapeLatexText(state!.HumanScreeningReviewOutcome!));
+        }
 
         sb.AppendLine(@"\section{Administrative Declarations}");
         sb.AppendLine(@"\subsection{Support \& Funding}");
@@ -1468,13 +1773,12 @@ private async Task GeneratePrismaChecklistReportWithRAGAsync(Guid sessionId, int
         sb.AppendLine(@"\end{thebibliography}");
         sb.AppendLine(@"\end{document}");
 
-        File.WriteAllText(texFilePath, sb.ToString());
-
         using var memoryStream = new MemoryStream();
         using (var archive = new ZipArchive(memoryStream, ZipArchiveMode.Create, true))
         {
-            if (File.Exists(texFilePath)) 
-                archive.CreateEntryFromFile(texFilePath, "main.tex");
+            AddTextEntry(archive, "main.tex", sb.ToString());
+            AddTextEntry(archive, "references.bib", BibliographyExporter.ToBibTeX(records));
+            AddTextEntry(archive, "references.ris", BibliographyExporter.ToRis(records));
 
             string statePath = GetStateFilePath(sessionId);
             string reportPath = GetReportFilePath(sessionId);
@@ -1482,12 +1786,14 @@ private async Task GeneratePrismaChecklistReportWithRAGAsync(Guid sessionId, int
             string ledgerPath = Path.Combine(isolatedFolder, "stylistic-transformation-ledger.json");
             string citationAuditPath = Path.Combine(isolatedFolder, "citation-audit.json");
             string peerReviewPath = Path.Combine(isolatedFolder, "peer-review-feedback.json");
+            string llmCallsPath = Path.Combine(isolatedFolder, "llm-calls.json");
+            if (File.Exists(llmCallsPath)) AddFileEntry(archive, llmCallsPath, "llm-calls.json");
 
-            if (File.Exists(reportPath)) archive.CreateEntryFromFile(reportPath, "prisma-report.json");
-            if (File.Exists(statePath)) archive.CreateEntryFromFile(statePath, "transparent-process.json");
-            if (File.Exists(ledgerPath)) archive.CreateEntryFromFile(ledgerPath, "stylistic-transformation-ledger.json");
-            if (File.Exists(citationAuditPath)) archive.CreateEntryFromFile(citationAuditPath, "citation-audit.json");
-            if (File.Exists(peerReviewPath)) archive.CreateEntryFromFile(peerReviewPath, "peer-review-feedback.json");
+            if (File.Exists(reportPath)) AddFileEntry(archive, reportPath, "prisma-report.json");
+            if (File.Exists(statePath)) AddFileEntry(archive, statePath, "transparent-process.json");
+            if (File.Exists(ledgerPath)) AddFileEntry(archive, ledgerPath, "stylistic-transformation-ledger.json");
+            if (File.Exists(citationAuditPath)) AddFileEntry(archive, citationAuditPath, "citation-audit.json");
+            if (File.Exists(peerReviewPath)) AddFileEntry(archive, peerReviewPath, "peer-review-feedback.json");
 
             if (Directory.Exists(isolatedFolder))
             {
@@ -1497,22 +1803,45 @@ private async Task GeneratePrismaChecklistReportWithRAGAsync(Guid sessionId, int
                     if (file.EndsWith(".json")) continue;
                     string filename = Path.GetFileName(file);
 
+                    if (filename.EndsWith(".tmp", StringComparison.OrdinalIgnoreCase)) continue;
                     // The grounded outline is an audit artifact, not a source manuscript - keep it at the
                     // archive root instead of filing it alongside the downloaded source PDFs.
                     if (filename.Equals("grounded-outline.txt", StringComparison.OrdinalIgnoreCase))
                     {
-                        archive.CreateEntryFromFile(file, filename);
+                        AddFileEntry(archive, file, filename);
                     }
                     else
                     {
-                        archive.CreateEntryFromFile(file, $"SourcePapers/{filename}");
+                        AddFileEntry(archive, file, $"SourcePapers/{filename}");
                     }
                 }
             }
         }
 
-        try { File.Delete(texFilePath); } catch { }
         return memoryStream.ToArray();
+    }
+
+    private static void AddTextEntry(ZipArchive archive, string name, string content)
+    {
+        var entry = archive.CreateEntry(name, CompressionLevel.Optimal);
+        using var writer = new StreamWriter(entry.Open(), new UTF8Encoding(false));
+        writer.Write(content);
+    }
+
+    // Reads with FileShare.ReadWrite so a download never fails because the run is writing its ledger.
+    private static void AddFileEntry(ZipArchive archive, string path, string name)
+    {
+        try
+        {
+            using var source = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+            var entry = archive.CreateEntry(name, CompressionLevel.Optimal);
+            using var target = entry.Open();
+            source.CopyTo(target);
+        }
+        catch (IOException ex)
+        {
+            Console.WriteLine($"[Archive] Skipped {name}: {ex.Message}");
+        }
     }
 
     private async Task SaveStateAsync(Guid sessionId, ReviewState state)
@@ -1521,7 +1850,7 @@ private async Task GeneratePrismaChecklistReportWithRAGAsync(Guid sessionId, int
         await File.WriteAllTextAsync(GetStateFilePath(sessionId), JsonSerializer.Serialize(state, options));
     }
 
-    private JsonElement DeserializeDecision(string rawJson)
+    private static JsonElement DeserializeDecision(string rawJson)
     {
         try 
         { 
@@ -1568,6 +1897,8 @@ private async Task GeneratePrismaChecklistReportWithRAGAsync(Guid sessionId, int
         string reasoning = GetJsonString(decisionData, "reasoning");
         string summary = GetJsonString(decisionData, "briefSummary");
         var apaResult = ApaCitationBuilder.Build(paper);
+        if (!decision.Equals("Included", StringComparison.OrdinalIgnoreCase) && !decision.Equals("Excluded", StringComparison.OrdinalIgnoreCase)) decision = "Excluded";
+        decision = decision.Equals("Included", StringComparison.OrdinalIgnoreCase) ? "Included" : "Excluded";
 
         if (decision == "N/A") decision = "Excluded";
 
@@ -1577,6 +1908,6 @@ private async Task GeneratePrismaChecklistReportWithRAGAsync(Guid sessionId, int
         else 
             state.Stats.Excluded++;
         state.Phases.Screening.Add(new ScreeningLog(paper.Id, paper.Title, decision, reasoning, apaResult.Citation, summary,
-            apaResult.VenueType, apaResult.VenueName, apaResult.Year));
+            apaResult.VenueType, apaResult.VenueName, apaResult.Year, paper.Authors, paper.Doi, paper.Url, paper.Abstract));
     }
 }

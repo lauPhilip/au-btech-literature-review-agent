@@ -1,5 +1,7 @@
 ﻿@page "/review"
+@page "/review/{RunId:guid}"
 @rendermode InteractiveServer
+@implements IDisposable
 
 @using System.IO
 @using System.Text.Json
@@ -9,6 +11,7 @@
 @inject IJSRuntime JS
 @inject AuBtechReviewAgent.RunQuotaService Quota
 @inject IHttpContextAccessor HttpContextAccessor
+@inject NavigationManager Nav
 
 <header class="bg-[#003B5C] text-white flex-none shrink-0 z-50 shadow-md">
     <div class="max-w-7xl mx-auto px-6 h-14 flex items-center justify-between">
@@ -19,8 +22,8 @@
         </a>
         <nav class="flex items-center space-x-6 text-xs font-semibold uppercase tracking-wider">
             <a href="/" class="text-white/70 hover:text-white transition-colors py-4">Overview</a>
-            <a href="/review" class="text-white border-b-2 border-white py-4">Dashboard</a>
-            <a href="/spec-matrix" class="text-white/70 hover:text-white transition-colors py-4">Review Output</a>
+            <a href="@(hasRun ? $"/review/{currentSessionId}" : "/review")" class="text-white border-b-2 border-white py-4">Dashboard</a>
+            <a href="@(hasRun ? $"/spec-matrix/{currentSessionId}" : "/spec-matrix")" class="text-white/70 hover:text-white transition-colors py-4">Review Output</a>
         </nav>
     </div>
 </header>
@@ -159,6 +162,13 @@
                             <p class="text-[11px] text-red-700 mt-1">Select at least one source.</p>
                         }
                     </fieldset>
+
+                    <label class="flex items-start gap-2 text-xs text-gray-700 font-semibold cursor-pointer select-none">
+                        <input type="checkbox" @bind="State.ReviewScreeningFirst" disabled="@isSearching" class="w-4 h-4 mt-0.5 rounded accent-[#003B5C]" />
+                        <span>Let me check the screening decisions before the write-up
+                            <span class="block font-normal text-[10px] text-gray-500">The run pauses after screening so you can include or exclude papers yourself. Your decisions are recorded in the ledger.</span>
+                        </span>
+                    </label>
                 </div>
 
                 <div class="pt-3 flex-none">
@@ -177,6 +187,24 @@
                     </button>
                 </div>
             </div>
+
+            @if (hasRun)
+            {
+                <div class="bg-white border border-gray-200 rounded-lg p-3 shadow-sm flex-none text-left space-y-1">
+                    <div class="flex items-center justify-between gap-2">
+                        <span class="text-[10px] font-bold uppercase tracking-wider text-gray-400">Run status</span>
+                        <span class="text-[11px] font-semibold @(StageColor())">@StageLabel()</span>
+                    </div>
+                    @if (!string.IsNullOrEmpty(failureMessage))
+                    {
+                        <p class="text-[11px] text-red-700">@failureMessage</p>
+                    }
+                    <p class="text-[10px] text-gray-500 leading-snug">
+                        Link to this run: <a class="text-[#003B5C] underline break-all" href="@($"/review/{currentSessionId}")">@($"/review/{currentSessionId}")</a>.
+                        Anyone with the link can open it. Results are kept for @RunsOptions.RetentionDays days@(completedUtc.HasValue ? $" (until {completedUtc.Value.AddDays(RunsOptions.RetentionDays):yyyy-MM-dd} UTC)" : "").
+                    </p>
+                </div>
+            }
 
             <div class="bg-white border border-gray-200 rounded-lg p-4 shadow-sm flex-none">
                 <span class="text-[10px] font-bold uppercase tracking-wider text-gray-400 block mb-3">PRISMA Funnel Tracking Fields</span>
@@ -202,13 +230,20 @@
         </div>
 
         <div class="lg:col-span-7 flex flex-col min-h-0 border border-gray-200 rounded-lg bg-white shadow-sm overflow-hidden">
-            <div class="bg-gray-800 text-white px-4 py-2.5 text-xs font-mono flex justify-between items-center flex-none">
-                <span>JSON output</span>
-                <span class="text-[9px] opacity-50 uppercase tracking-widest font-bold">Mistral LLM</span>
-            </div>
-            <div class="flex-1 bg-gray-950 p-4 font-mono text-xs text-green-400 overflow-y-auto whitespace-pre-wrap leading-relaxed">
-                @rawJsonLogs
-            </div>
+            @if (awaitingReview && reviewLogs != null)
+            {
+                <ScreeningReviewPanel RunId="currentSessionId" Logs="reviewLogs" OnSubmitted="OnScreeningReviewSubmitted" />
+            }
+            else
+            {
+                <div class="bg-gray-800 text-white px-4 py-2.5 text-xs font-mono flex justify-between items-center flex-none">
+                    <span>JSON output</span>
+                    <span class="text-[9px] opacity-50 uppercase tracking-widest font-bold">Mistral LLM</span>
+                </div>
+                <div class="flex-1 bg-gray-950 p-4 font-mono text-xs text-green-400 overflow-y-auto whitespace-pre-wrap leading-relaxed">
+                    @rawJsonLogs
+                </div>
+            }
         </div>
 
     </div>
@@ -325,39 +360,151 @@
     private string modalIeee = "";
     private string modalScholar = "";
 
-    // FIXED: Added a session fallback property accessor to the scoped container state
-    private Guid currentSessionId 
-    { 
-        get => State.CurrentSessionId == Guid.Empty ? (State.CurrentSessionId = Guid.NewGuid()) : State.CurrentSessionId;
-        set => State.CurrentSessionId = value; 
-    }
+    [Inject] private AuBtechReviewAgent.RunsOptions RunsOptions { get; set; } = default!;
 
-    protected override async Task OnInitializedAsync()
+    /// <summary>Set when the page is opened as /review/{RunId}: shows that run (and resumes following it if it is still going).</summary>
+    [Parameter] public Guid? RunId { get; set; }
+
+    private Guid currentSessionId
+    {
+        get => State.CurrentSessionId;
+        set => State.CurrentSessionId = value;
+    }
+    private bool hasRun => State.CurrentSessionId != Guid.Empty;
+
+    private string stage = "";
+    private int queuePosition;
+    private string? failureMessage;
+    private DateTime? completedUtc;
+    private bool awaitingReview;
+    private IReadOnlyList<AuBtechReviewAgent.ScreeningLog>? reviewLogs;
+    private CancellationTokenSource? monitorCts;
+    private bool subscribed;
+
+    protected override void OnInitialized()
     {
         PrerenderClientAddress ??= AuBtechReviewAgent.RunQuotaService.NormalizeClientAddress(HttpContextAccessor.HttpContext?.Connection.RemoteIpAddress);
         clientAddress = PrerenderClientAddress;
         RefreshQuotaAndSources();
+    }
 
+    protected override void OnParametersSet()
+    {
+        // Opening /review/{id} (after a reload, from a bookmark, or from another device) attaches this page to
+        // that run. Opening plain /review keeps whatever run this tab already shows.
+        if (RunId is Guid id && id != Guid.Empty && (id != currentSessionId || !subscribed))
+        {
+            AttachToRun(id);
+        }
+        else if (hasRun && !subscribed)
+        {
+            AttachToRun(currentSessionId);
+        }
+    }
+
+    private void AttachToRun(Guid id)
+    {
+        currentSessionId = id;
+        var state = ReviewEngine.LoadState(id);
+        if (state == null)
+        {
+            stage = "";
+            failureMessage = "This run could not be found. It may have expired and been deleted.";
+            isSearching = false;
+            return;
+        }
+
+        ApplyState(state, File.Exists(StatePath(id)) ? SafeRead(StatePath(id)) : null);
+        isSearching = ReviewEngine.IsRunActive(id);
         if (isSearching)
         {
-            ReviewEngine.OnProgressUpdated += HandleEngineProgress;
-            StartLogMonitoringLoop(); // Resume background log updates if navigating back mid-run
+            Subscribe();
+            StartLogMonitoringLoop();
         }
-        else 
+    }
+
+    private string StatePath(Guid id) =>
+        Path.Combine(ReviewEngine.WorkspaceRoot, id.ToString("N"), "transparent-process.json");
+
+    private static string? SafeRead(string path)
+    {
+        try
         {
-            // Rehydrate past search session text logs if navigating back to home after run completion
-            string dynamicStatePath = Path.Combine(Directory.GetCurrentDirectory(), "WorkspaceStore", currentSessionId.ToString("N"), "transparent-process.json");
-            if (File.Exists(dynamicStatePath))
-            {
-                try
-                {
-                    using var fileStream = new FileStream(dynamicStatePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
-                    using var reader = new StreamReader(fileStream);
-                    rawJsonLogs = await reader.ReadToEndAsync();
-                }
-                catch { }
-            }
+            using var fileStream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+            using var reader = new StreamReader(fileStream);
+            return reader.ReadToEnd();
         }
+        catch { return null; }
+    }
+
+    private void ApplyState(AuBtechReviewAgent.ReviewState state, string? rawJson)
+    {
+        var s = state.Stats;
+        totalIdentified = s.TotalIdentified;
+        screenedCount = s.Screened;
+        excludedCount = s.Excluded + s.FailedPeerReviewCheck;
+        includedCount = s.Included;
+        State.PassedPeerReviewCount = s.PassedPeerReviewCheck;
+        State.FailedPeerReviewCount = s.FailedPeerReviewCheck;
+        stage = s.ProcessingStage;
+        queuePosition = s.QueuePosition;
+        failureMessage = state.FailureMessage;
+        completedUtc = state.CompletedUtc;
+        awaitingReview = stage == AuBtechReviewAgent.PrismaReviewEngine.StageAwaitingReview && ReviewEngine.IsAwaitingScreeningReview(currentSessionId);
+        if (awaitingReview) reviewLogs ??= state.Phases.Screening.ToList();
+        else reviewLogs = null;
+        if (rawJson != null) rawJsonLogs = rawJson;
+    }
+
+    private string StageLabel() => stage switch
+    {
+        AuBtechReviewAgent.PrismaReviewEngine.StageQueued => queuePosition > 0 ? $"Waiting in line (position {queuePosition})" : "Waiting for a free slot",
+        AuBtechReviewAgent.PrismaReviewEngine.StageScreening => "Searching and screening",
+        AuBtechReviewAgent.PrismaReviewEngine.StageAwaitingReview => "Waiting for your screening review",
+        AuBtechReviewAgent.PrismaReviewEngine.StageSynthesizing => "Writing and checking the review",
+        AuBtechReviewAgent.PrismaReviewEngine.StageComplete => "Complete",
+        AuBtechReviewAgent.PrismaReviewEngine.StageFailed => "Failed",
+        AuBtechReviewAgent.PrismaReviewEngine.StageInterrupted => "Interrupted",
+        "" => "Not found",
+        _ => stage
+    };
+
+    private string StageColor() => stage switch
+    {
+        AuBtechReviewAgent.PrismaReviewEngine.StageComplete => "text-green-700",
+        AuBtechReviewAgent.PrismaReviewEngine.StageFailed or AuBtechReviewAgent.PrismaReviewEngine.StageInterrupted or "" => "text-red-700",
+        AuBtechReviewAgent.PrismaReviewEngine.StageAwaitingReview => "text-amber-700",
+        _ => "text-[#003B5C]"
+    };
+
+    private void Subscribe()
+    {
+        if (subscribed) return;
+        ReviewEngine.OnProgressUpdated += HandleEngineProgress;
+        subscribed = true;
+    }
+
+    private void Unsubscribe()
+    {
+        if (!subscribed) return;
+        ReviewEngine.OnProgressUpdated -= HandleEngineProgress;
+        subscribed = false;
+    }
+
+    private void OnScreeningReviewSubmitted()
+    {
+        awaitingReview = false;
+        reviewLogs = null;
+        stage = AuBtechReviewAgent.PrismaReviewEngine.StageSynthesizing;
+        StateHasChanged();
+    }
+
+    public void Dispose()
+    {
+        // The engine is a singleton: an event handler left behind would keep this page alive forever.
+        Unsubscribe();
+        monitorCts?.Cancel();
+        monitorCts?.Dispose();
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -483,77 +630,81 @@
         includedCount = 0;
         State.PassedPeerReviewCount = 0;
         State.FailedPeerReviewCount = 0;
+        failureMessage = null;
+        completedUtc = null;
+        awaitingReview = false;
+        reviewLogs = null;
+        stage = AuBtechReviewAgent.PrismaReviewEngine.StageQueued;
         isSearching = true;
-        rawJsonLogs = "{\n  \"status\": \"Initializing secure user session isolation container...\"\n}";
-        
-        // Refresh session key token on fresh user click loops
-        currentSessionId = Guid.NewGuid();
+        rawJsonLogs = "{\n  \"status\": \"Starting run...\"\n}";
 
-        ReviewEngine.OnProgressUpdated += HandleEngineProgress;
-        StateHasChanged();
+        var runId = Guid.NewGuid();
+        currentSessionId = runId;
+        var request = new AuBtechReviewAgent.ReviewRequest(
+            cleanQuery, cleanObjective, cleanInclusion, cleanExclusion, runMaxResults,
+            requirePeerReview, cleanDirective, sessionKeys, runSources, yearFrom, yearTo, State.ReviewScreeningFirst);
+
+        Subscribe();
 
         _ = Task.Run(async () =>
         {
             try
             {
-                await ReviewEngine.RunReviewLoopAsync(
-                    currentSessionId, 
-                    cleanQuery, 
-                    cleanObjective, 
-                    cleanInclusion, 
-                    cleanExclusion, 
-                    runMaxResults, 
-                    requirePeerReview, 
-                    cleanDirective,
-                    sessionKeys,
-                    runSources,
-                    yearFrom,
-                    yearTo
-                );
+                await ReviewEngine.RunReviewAsync(runId, request);
             }
             catch (Exception ex)
             {
-                // The run died before producing a review: give the quota slot back.
+                // The run failed: give the quota slot back. The reason is stored in the run's ledger.
                 if (lease != null) Quota.Refund(lease);
-                rawJsonLogs = JsonSerializer.Serialize(new { error = ex.Message }, new JsonSerializerOptions { WriteIndented = true });
+                Console.WriteLine($"[Run {runId:N}] failed: {ex.Message}");
             }
             finally
             {
-                ReviewEngine.OnProgressUpdated -= HandleEngineProgress;
-                isSearching = false;
-                await InvokeAsync(() => { RefreshQuotaAndSources(); StateHasChanged(); });
+                if (runId == currentSessionId)
+                {
+                    await InvokeAsync(() =>
+                    {
+                        isSearching = false;
+                        var final = ReviewEngine.LoadState(runId);
+                        if (final != null) ApplyState(final, SafeRead(StatePath(runId)));
+                        RefreshQuotaAndSources();
+                        StateHasChanged();
+                    });
+                }
             }
         });
 
+        // Put the run in the address bar so a reload, a bookmark or another device can find it again.
+        Nav.NavigateTo($"/review/{runId}", replace: true);
         StartLogMonitoringLoop();
     }
 
-private void StartLogMonitoringLoop()
+    private void StartLogMonitoringLoop()
     {
-        // FIXED: Explicitly look inside the sandboxed workspace folder instead of checking the application root
-        string dynamicStatePath = Path.Combine(Directory.GetCurrentDirectory(), "WorkspaceStore", currentSessionId.ToString("N"), "transparent-process.json");
+        monitorCts?.Cancel();
+        monitorCts = new CancellationTokenSource();
+        var token = monitorCts.Token;
+        Guid runId = currentSessionId;
 
         _ = Task.Run(async () =>
         {
-            while (isSearching)
+            while (!token.IsCancellationRequested && isSearching && runId == currentSessionId)
             {
-                await Task.Delay(250); 
-                if (File.Exists(dynamicStatePath))
+                try { await Task.Delay(1000, token); } catch (TaskCanceledException) { break; }
+                string? raw = SafeRead(StatePath(runId));
+                if (raw == null) continue;
+                try
                 {
-                    try
+                    var state = JsonSerializer.Deserialize<AuBtechReviewAgent.ReviewState>(raw);
+                    if (state == null) continue;
+                    await InvokeAsync(() =>
                     {
-                        using var fileStream = new FileStream(dynamicStatePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
-                        using var reader = new StreamReader(fileStream);
-                        string updatedContent = await reader.ReadToEndAsync();
-
-                        await InvokeAsync(() =>
-                        {
-                            rawJsonLogs = updatedContent;
-                            StateHasChanged();
-                        });
-                    }
-                    catch { }
+                        if (runId != currentSessionId) return;
+                        ApplyState(state, raw);
+                        StateHasChanged();
+                    });
                 }
+                catch { /* the ledger was mid-write; try again next tick */ }
             }
         });
     }
@@ -573,7 +724,15 @@ private void StartLogMonitoringLoop()
             State.PassedPeerReviewCount = updatedStats.PassedPeerReviewCheck;
             State.FailedPeerReviewCount = updatedStats.FailedPeerReviewCheck;
             
-            if (updatedStats.ProcessingStage == "Complete")
+            stage = updatedStats.ProcessingStage;
+            queuePosition = updatedStats.QueuePosition;
+            excludedCount = updatedStats.Excluded + updatedStats.FailedPeerReviewCheck;
+            if (stage == AuBtechReviewAgent.PrismaReviewEngine.StageAwaitingReview && !awaitingReview)
+            {
+                var state = ReviewEngine.LoadState(currentSessionId);
+                if (state != null) ApplyState(state, null);
+            }
+            if (AuBtechReviewAgent.PrismaReviewEngine.IsFinishedStage(stage))
             {
                 isSearching = false;
             }
