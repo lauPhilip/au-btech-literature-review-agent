@@ -26,4 +26,8 @@ public class UiStateContainer
     public int FailedPeerReviewCount { get; set; } = 0;
 
     public bool IsSearching { get; set; } = false;
+
+    // Source gateways ticked in the dashboard (keys from SourceCatalog). All are ticked by default;
+    // ones without an API key are shown greyed out and skipped.
+    public HashSet<string> SelectedSources { get; set; } = new(SourceCatalog.AllKeys, StringComparer.OrdinalIgnoreCase);
 }
