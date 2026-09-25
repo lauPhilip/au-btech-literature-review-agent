@@ -1,4 +1,6 @@
 using System;
+using System.Linq;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.ChatCompletion;
@@ -33,9 +35,49 @@ public static class StylisticRefinerUtility
             Respond ONLY with the clean, refined academic text paragraph. Do not add introductions, conversational remarks, or markdown code blocks.
             """;
 
-        var response = await chatService.GetChatMessageContentAsync(prompt);
-        string refinedText = response.ToString().Trim();
+        string refinedText;
+        try
+        {
+            var response = await chatService.GetChatMessageContentAsync(prompt);
+            refinedText = response.ToString().Trim();
+        }
+        catch (Exception ex)
+        {
+            return (rawText, new StyleDeltaLog(fieldName, rawText, rawText, Applied: false, Note: $"Refiner call failed: {ex.GetType().Name}"));
+        }
+
+        string? rejection = CheckRewrite(rawText, refinedText);
+        if (rejection != null)
+        {
+            // Keep the original and record why, so the ledger shows the rewrite was attempted and refused.
+            return (rawText, new StyleDeltaLog(fieldName, rawText, refinedText, Applied: false, Note: rejection));
+        }
 
         return (refinedText, new StyleDeltaLog(fieldName, rawText, refinedText));
+    }
+
+    /// <summary>
+    /// A copy-edit should not change what the text says. Reject rewrites that are far longer or shorter
+    /// than the original, or that drop or add a number or an inline [n] citation. Returns null when the
+    /// rewrite is acceptable, otherwise the reason it was rejected.
+    /// </summary>
+    public static string? CheckRewrite(string original, string rewrite)
+    {
+        if (string.IsNullOrWhiteSpace(rewrite)) return "Rewrite was empty.";
+
+        double ratio = rewrite.Length / (double)Math.Max(1, original.Length);
+        if (ratio > 1.6) return $"Rewrite is {ratio:0.0}x the original length; a copy-edit should not add content.";
+        if (ratio < 0.4) return $"Rewrite is {ratio:0.0}x the original length; a copy-edit should not remove content.";
+
+        var citesBefore = Regex.Matches(original, @"\[\d+(?:\s*[,\u2013-]\s*\d+)*\]").Select(m => m.Value).OrderBy(x => x).ToList();
+        var citesAfter = Regex.Matches(rewrite, @"\[\d+(?:\s*[,\u2013-]\s*\d+)*\]").Select(m => m.Value).OrderBy(x => x).ToList();
+        if (!citesBefore.SequenceEqual(citesAfter)) return "Rewrite changed the inline [n] citations.";
+
+        // Numbers written as digits (counts, years, percentages) must survive unchanged.
+        var numsBefore = Regex.Matches(Regex.Replace(original, @"\[[^\]]*\]", ""), @"\d+(?:[.,]\d+)?").Select(m => m.Value).OrderBy(x => x).ToList();
+        var numsAfter = Regex.Matches(Regex.Replace(rewrite, @"\[[^\]]*\]", ""), @"\d+(?:[.,]\d+)?").Select(m => m.Value).OrderBy(x => x).ToList();
+        if (!numsBefore.SequenceEqual(numsAfter)) return "Rewrite added, removed or changed a number.";
+
+        return null;
     }
 }
