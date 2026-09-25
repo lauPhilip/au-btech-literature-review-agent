@@ -368,9 +368,8 @@
                     {
                         <div class="mt-4 border border-gray-200 p-4 rounded bg-gray-50 flex flex-col items-center justify-center font-sans print:hidden">
                             <span class="text-[9px] font-bold text-gray-400 block mb-3 uppercase tracking-widest">Artifact (Live Preview)</span>
-                            <div class="mermaid w-full flex justify-center text-center">
-                                @mermaidDiagramCode
-                            </div>
+                            @* Filled by wwwroot/js/mermaid-render.js; Blazor leaves the empty element alone. *@
+                            <div id="mermaid-preview" class="w-full flex flex-col items-center justify-center text-center"></div>
                         </div>
                     }
                 </div>
@@ -487,21 +486,10 @@
         {
             try
             {
-                await JS.InvokeVoidAsync("eval", @"
-                    if (typeof mermaid === 'undefined') {
-                        var script = document.createElement('script');
-                        script.src = 'https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js';
-                        script.onload = function() {
-                            mermaid.initialize({ startOnLoad: true, theme: 'default' });
-                            mermaid.contentLoaded();
-                        };
-                        document.head.appendChild(script);
-                    } else {
-                        mermaid.contentLoaded();
-                    }
-                ");
+                await JS.InvokeAsync<bool>("traceableMermaid.render", "mermaid-preview", mermaidDiagramCode);
             }
-            catch { }
+            catch (JSException) { }
+            catch (JSDisconnectedException) { }
         }
     }
 
@@ -592,7 +580,8 @@
                     if (mermaidMatch.Success)
                     {
                         string rawMermaid = mermaidMatch.Groups[1].Value.Trim();
-                        mermaidDiagramCode = rawMermaid.Replace("```mermaid", "").Replace("```", "").Trim();
+                        // Older runs stored the model's diagram unrepaired; clean it here as well.
+                        mermaidDiagramCode = AuBtechReviewAgent.MermaidSanitizer.Sanitize(rawMermaid);
                     }
                 }
 
