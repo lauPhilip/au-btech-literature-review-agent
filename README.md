@@ -2,7 +2,7 @@
 
 A tool for running systematic literature reviews (SLRs) that you can check afterwards. It follows the PRISMA 2020 reporting standard and keeps a record of every step, so you can trace any statement in the final report back to the paper it came from.
 
-Built at the Department of Business Development and Technology (BTECH), Aarhus University.
+Built at the Department of Business Development and Technology (BTECH), Aarhus University, and presented at OSSYM 2026, the 8th International Open Search Symposium.
 
 [![CI/CD](https://github.com/lauPhilip/au-btech-literature-review-agent/actions/workflows/ci.yml/badge.svg)](https://github.com/lauPhilip/au-btech-literature-review-agent/actions/workflows/ci.yml)
 [![.NET](https://img.shields.io/badge/.NET-10.0-blue.svg)](https://dotnet.microsoft.com/en-us/download/dotnet/10.0)
@@ -15,64 +15,122 @@ Built at the Department of Business Development and Technology (BTECH), Aarhus U
 
 Most tools that write literature reviews for you have the same problem: the text reads well, but the citations behind it are often wrong, mismatched, or made up. That makes the output hard to trust, and it can't be used for a review that has to follow PRISMA 2020, where you're expected to show how you got to your conclusions.
 
-TraceableAI is an attempt to fix that. Instead of just handing you a finished write-up, it saves a full record of what it searched for, which papers it kept or dropped and why, and which source each statement in the report is based on. If something looks off, you can go back and check it.
+TraceableAI is an attempt to fix that. Instead of just handing you a finished write-up, it saves a full record of what it searched for, which papers it kept or dropped and why, and which source each statement in the report is based on. We call that record the Research Ledger. If something looks off, you can go back and check it. The tool is meant as a co-pilot for a human reviewer, not a replacement: the ledger exists so that a person can verify the work.
 
-## What it does
+## How a run works
 
-- **Ties claims to sources.** Before writing the review, it builds an outline that maps each point to the papers that support it, then writes the text against that outline instead of filling in generic placeholders.
-- **Checks its own citations.** Every reference number in the generated text is checked against the actual reference list. If the model invents a number that doesn't exist (for example, citing source 56 when there are only 53), it's removed, and every removal is written to a `citation-audit.json` file so you can see what was caught.
-- **Searches each source a few different ways.** Rather than running one exact phrase, it rephrases the query from a few angles (a wording variant, a narrower sub-topic, a method-focused version) to catch papers a single phrasing would miss, and removes duplicates.
-- **Keeps the result count predictable.** You can set a maximum number of results per source (for example, 3). That's a hard limit no matter how many query variations run, which keeps test runs small and cheap.
-- **Saves the whole run.** After a review finishes you can download a single .zip with the report, a step-by-step log of every decision, the source PDFs it used, and the citation audit.
-- **Shows a live preview.** The finished review is laid out as a two-column academic page with charts for publication year and where the papers came from.
+A review goes through eight stages, and every stage writes to the Research Ledger as it runs rather than only at the end.
 
-## How it works
+```mermaid
+flowchart LR
+    Q[Query + criteria] --> S1[1 Multi-perspective retrieval]
+    S1 --> S2[2 Screening]
+    S2 --> S3[3 Evidence extraction]
+    S3 --> S4[4 Grounded outline]
+    S4 --> S5[5 Cited synthesis]
+    S5 --> S6[6 Citation validation]
+    S6 --> S7[7 Automated peer review]
+    S7 --> S8[8 Stylistic refinement]
+    S8 --> OUT[PRISMA report + run archive]
+    S1 & S2 & S3 & S4 & S5 & S6 & S7 & S8 -.-> L[(Research Ledger)]
+```
 
-A run goes through five steps:
+The run starts by asking the model for a few extra phrasings of your query (a wording variant, a narrower sub-topic, and a method-focused version) and searches arXiv, ScienceDirect/Scopus, IEEE Xplore, Google Scholar and ResearchGate with each of them, removing duplicates by identifier and title. A per-source result cap sets a hard upper limit no matter how many phrasings run, which keeps test runs small, cheap and repeatable. Each candidate is then screened by the language model against your inclusion and exclusion criteria, with an optional peer-reviewed-only filter, and tagged with a journal quartile from a Scimago dataset.
 
-1. **Search.** It queries open and academic sources (arXiv, ScienceDirect/Scopus, IEEE Xplore, Google Scholar, and ResearchGate), using a few phrasings of your query for each one.
-2. **Screen.** Each candidate paper is checked by the language model against your inclusion and exclusion rules, with an optional peer-review-only filter.
-3. **Download.** The PDFs of the papers that pass are saved into a working folder (`PapersWorkspace/`).
-4. **Read the PDFs.** It extracts the text page by page (using PdfPig, a C# library) and splits it into short overlapping chunks, each tagged with the paper it came from.
-5. **Write the report.** It sends those chunks to Mistral Large and gets back the PRISMA checklist items, with the citation check described above applied to the text.
+The PDFs of the papers that pass are downloaded, and their text is extracted page by page with PdfPig and split into short overlapping chunks, each tagged with the paper it came from. Before any prose is written, the model builds a grounded outline that maps each claim to the reference numbers that support it, and the results and discussion are then written against that outline so that every specific claim ends with an inline citation.
 
-## System architecture
-
-![System Architecture](./diagram%20for%20traceability%20AI%20review%20agent.png)
+Three checks follow. A citation validator removes any reference number that falls outside the reference list (citing [56] when there are only 53 sources) and logs each removal. An automated peer-review pass has one model critique the synthesis for depth, citation coverage, grounding and over-claiming, and a second model revise it; the comments and the before-and-after text are kept. Finally, a stylistic pass tightens the wording of each PRISMA section and records every rewrite next to the original.
 
 ## What you get after a run
 
-Each run clears out the previous one and leaves a clean set of files you can download as a .zip:
+Each run clears out the previous one and leaves a single .zip you can download. Every file in it documents a different part of the process.
 
-```text
-├── PapersWorkspace/            # PDFs of the papers used in this run (cleared each run)
-│   ├── Framework_Design_Patterns.pdf
-│   └── Trustworthy_System_Safety.pdf
-├── prisma-report.json          # The finished PRISMA checklist items
-├── transparent-process.json    # A full log of every screening decision
-├── citation-audit.json         # Any invalid citation numbers that were removed
-└── grounded-outline.txt         # The claim-to-source outline used to write the review
 ```
+├── SourcePapers/                          # The exact PDFs used in this run
+├── main.tex                               # The finished review as a LaTeX document
+├── prisma-report.json                     # The PRISMA 2020 checklist items
+├── transparent-process.json               # The Research Ledger: searches, screening decisions, reasoning
+├── grounded-outline.txt                   # The claim-to-source outline written before the prose
+├── citation-audit.json                    # Out-of-range citation markers that were removed
+├── peer-review-feedback.json              # Reviewer comments plus before/after text
+└── stylistic-transformation-ledger.json   # Every stylistic rewrite, with the original text
+```
+
+| File | What it lets you check |
+|---|---|
+| `transparent-process.json` | Which query hit which source and when, what was found, and why each paper was included or excluded |
+| `grounded-outline.txt` | Which source each claim was assigned to before any prose was written |
+| `citation-audit.json` | Which invalid reference numbers the validator removed |
+| `peer-review-feedback.json` | What the automated reviewer criticised and whether the revision was applied |
+| `stylistic-transformation-ledger.json` | That stylistic rewriting didn't change facts, by comparing each rewrite with its original |
+| `prisma-report.json` / `main.tex` | The finished review itself |
+
+A screening decision in the ledger looks like this (abridged from a real run on the default query):
+
+```json
+{
+  "PaperId": "http://arxiv.org/abs/2607.02703v1",
+  "Title": "LLMoxie: Exploring Agentic AI for Scientific Software Development",
+  "Decision": "Included",
+  "Reasoning": "The paper focuses on agent architecture (LLMoxie's three-tiered AI platform and Plugin-Agent-Skill hierarchy) and loop execution (six-phase research-and-implement workflow), meeting the inclusion thresholds. It does not pertain to agronomy or commercial marketing, avoiding exclusion criteria."
+}
+```
+
+## What the checks do and don't catch
+
+The safeguards reduce the problem of unreliable citations but do not remove it, and it is worth being precise about where the limits are.
+
+The citation validator only checks that each reference number exists in the list. A citation that points to a real entry but the *wrong* one passes unchanged, and so does a reference entry whose metadata the model got wrong, for example an unresolved DOI or an implausible publication year. The automated peer reviewer catches some of these; in our pilot study it caught five of seven hallucinated citations, leaving two for the human check. Screening rationales are consistent and easy to audit, but they are also formulaic, and they are no substitute for a reviewer reading the papers.
+
+The ledger is what makes these errors findable. Before you use any output, follow a sample of claims from the report back through the outline and the ledger to the source PDFs.
+
+## Getting started
+
+You need the [.NET 10 SDK](https://dotnet.microsoft.com/en-us/download/dotnet/10.0) and a Mistral API key. Check the SDK with `dotnet --version`, which should print a version starting with `10.`.
+
+Store the API key with .NET user secrets so it never ends up in git:
+
+```
+cd AuBtechReviewAgent
+dotnet user-secrets set "Mistral:ApiKey" "your-key-here"
+```
+
+Then start the app with hot reload:
+
+```
+dotnet watch
+```
+
+NuGet packages are restored automatically on the first build, so no separate install step is needed. The terminal shows the local address the app is listening on.
 
 ## Tests and continuous integration
 
-The project has a test suite (xUnit) covering the citation-validation logic, input sanitizing, and the journal-ranking lookup. Run it locally with:
+The project has an xUnit test suite covering the citation-validation logic, input sanitizing, and the journal-ranking lookup. Run it from the repository root with:
 
-```bash
+```
 dotnet test
 ```
 
-On every push and pull request, GitHub Actions builds the project and runs the tests automatically (see the CI/CD badge above).
+On every push and pull request, GitHub Actions builds the project and runs the tests (see the CI/CD badge above).
 
 Deployment to the Simply server is also set up in the same workflow, but it stays switched off until you enable it: set a repository variable `DEPLOY_ENABLED` to `true` and add the server connection details as repository secrets. Until then, the deploy step is skipped and only the build-and-test step runs. The workflow file (`.github/workflows/ci.yml`) explains exactly which secrets to add and where to fill in the deploy command for your setup.
 
+## Citing TraceableAI
+
+If you use TraceableAI in your research, please cite the OSSYM 2026 paper:
+
+```bibtex
+@inproceedings{lau2026traceableai,
+  author    = {Lau, Philip S. P. {\O}. O. and Nidhi},
+  title     = {{TraceableAI}: An Open-Source Agentic Framework for {PRISMA}-Compliant Literature Synthesis},
+  booktitle = {Proceedings of the 8th International Open Search Symposium (OSSYM 2026)},
+  year      = {2026}
+}
+```
+
 ## Contributing
 
-This is an open-source project and contributions are welcome — whether that's reporting a bug, suggesting a feature, fixing a typo, or writing code.
-
-Have a look at [CONTRIBUTING.md](CONTRIBUTING.md) for how to set the project up locally and how to send changes. By taking part, you agree to follow our [Code of Conduct](CODE_OF_CONDUCT.md).
-
-If you're not sure where to start, open an issue and ask — we're happy to help.
+This is an open-source project and contributions are welcome, whether that's reporting a bug, suggesting a feature, fixing a typo, or writing code. Have a look at [CONTRIBUTING.md](CONTRIBUTING.md) for how to set the project up locally and how to send changes. By taking part, you agree to follow our [Code of Conduct](CODE_OF_CONDUCT.md). If you're not sure where to start, open an issue and ask; we're happy to help.
 
 ## License
 
