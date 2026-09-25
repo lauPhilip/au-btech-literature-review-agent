@@ -52,10 +52,15 @@ public class IeeeXploreSource : IAcademicSource
                     string title = article.TryGetProperty("title", out var titleProp) ? titleProp.GetString() ?? "Untitled Document" : "Untitled Document";
                     string abstractText = article.TryGetProperty("abstract", out var absProp) ? absProp.GetString() ?? string.Empty : string.Empty;
                     string venue = article.TryGetProperty("publication_title", out var publicationProp) ? publicationProp.GetString() ?? "IEEE Publication" : "IEEE Publication";
-                    string dateText = article.TryGetProperty("publication_date", out var dateProp) ? dateProp.GetString() ?? DateTime.UtcNow.ToString("yyyy") : DateTime.UtcNow.ToString("yyyy");
+                    // publication_year is the reliable field; publication_date is free text ("12-15 Nov. 2025").
+                    string dateText = article.TryGetProperty("publication_year", out var yearProp)
+                        ? (yearProp.ValueKind == JsonValueKind.Number ? yearProp.GetInt32().ToString() : yearProp.GetString() ?? "")
+                        : article.TryGetProperty("publication_date", out var dateProp) ? dateProp.GetString() ?? "" : "";
+                    string? doi = article.TryGetProperty("doi", out var doiProp) ? doiProp.GetString() : null;
+                    string? htmlUrl = article.TryGetProperty("html_url", out var urlProp) ? urlProp.GetString() : null;
                     
                     var authorsList = new List<string>();
-                    if (article.TryGetProperty("authors", out var authorsRoot) && authorsRoot.TryGetProperty("authors", out var authorsArray) && authorsRoot.ValueKind == JsonValueKind.Array)
+                    if (article.TryGetProperty("authors", out var authorsRoot) && authorsRoot.ValueKind == JsonValueKind.Object && authorsRoot.TryGetProperty("authors", out var authorsArray) && authorsArray.ValueKind == JsonValueKind.Array)
                     {
                         foreach (var authorObj in authorsArray.EnumerateArray())
                         {
@@ -66,15 +71,18 @@ public class IeeeXploreSource : IAcademicSource
                         }
                     }
 
-                    if (authorsList.Count == 0) authorsList.Add("IEEE Research Consortium");
-                    
+                    // No invented fallback author: an empty list renders as an author-less APA reference.
+                    // Argument order is (Id, Title, Abstract, PublishedDate, Authors, JournalSource) - the date
+                    // and venue used to be swapped here, like the Scholar/ResearchGate bug fixed earlier.
                     papers.Add(new AcademicPaper(
                         articleId,
                         title,
                         abstractText,
-                        venue,
+                        $"Published: {dateText}",
                         authorsList,
-                        dateText
+                        venue,
+                        doi,
+                        htmlUrl
                     ));
                 }
             }

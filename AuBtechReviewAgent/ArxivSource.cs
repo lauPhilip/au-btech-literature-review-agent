@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
 using System.Threading.Tasks;
+using System.Text.RegularExpressions;
 using System.Xml.Linq;
 
 namespace AuBtechReviewAgent;
@@ -58,7 +59,15 @@ public class ArxivSource : IAcademicSource
                     journalRef = $"arXiv Preprint Repository (arXiv:{id.Split('/').Last()})";
                 }
 
-                papers.Add(new AcademicPaper(id, title, summary, $"Published: {publishedYear}", authors, journalRef));
+                // Every arXiv paper has an official DataCite DOI of the form 10.48550/arXiv.<id> (no version
+                // suffix). Previously the raw id ("2607.02703v1") was pasted after https://doi.org/, which
+                // produced a link that does not resolve.
+                string arxivId = id.Split("/abs/").Last();
+                string bareArxivId = Regex.Replace(arxivId, @"v\d+$", "");
+                string? doi = Regex.IsMatch(bareArxivId, @"^\d{4}\.\d{4,5}$") ? $"10.48550/arXiv.{bareArxivId}" : null;
+                string landingUrl = $"https://arxiv.org/abs/{arxivId}";
+
+                papers.Add(new AcademicPaper(id, title, summary, $"Published: {publishedYear}", authors, journalRef, doi, landingUrl));
             }
         }
         catch (Exception ex)

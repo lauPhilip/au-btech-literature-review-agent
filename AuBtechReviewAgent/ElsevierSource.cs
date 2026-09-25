@@ -74,9 +74,10 @@ public class ElsevierSource : IAcademicSource
                     var authorsList = new List<string>();
                     if (entry.TryGetProperty("dc:creator", out var creatorProp))
                     {
-                        authorsList.Add(creatorProp.GetString() ?? "Unknown Author");
+                        string? creator = creatorProp.GetString();
+                        if (!string.IsNullOrWhiteSpace(creator)) authorsList.Add(creator);
                     }
-                    if (authorsList.Count == 0) authorsList.Add("Unknown Author");
+                    string? doi = entry.TryGetProperty("prism:doi", out var doiProp) ? doiProp.GetString() : null;
 
                     papers.Add(new AcademicPaper(
                         Id: id,
@@ -84,7 +85,8 @@ public class ElsevierSource : IAcademicSource
                         Abstract: abstractText,
                         PublishedDate: $"Published: {year}",
                         Authors: authorsList,
-                        JournalSource: journalName
+                        JournalSource: journalName,
+                        Doi: doi
                     ));
                 }
             }
