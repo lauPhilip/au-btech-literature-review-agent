@@ -9,7 +9,9 @@ public record AcademicPaper(
     string Abstract, 
     string PublishedDate, 
     List<string> Authors,
-    string JournalSource
+    string JournalSource,
+    string? Doi = null,   // Bare DOI (e.g. "10.1016/j.epsr.2025.109876") when the source API returns one
+    string? Url = null    // Landing-page URL used when no DOI is available
 );
 
 public class ReviewState
@@ -27,8 +29,22 @@ public class ReviewState
     // STORM-style multi-perspective search: the primary query plus LLM-generated variant phrasings
     // actually issued against every source, kept here so the run is auditable end-to-end.
     public List<string> SearchPerspectives { get; set; } = new();
-    
-    }
+
+    // Which gateways the user ticked for this run, and which ticked gateways could not be queried
+    // because no API key was available. Feeds the deterministic PRISMA Item 6 text.
+    public List<string> SelectedSources { get; set; } = new();
+    public List<string> UnavailableSources { get; set; } = new();
+
+    // The hard per-source result cap used for this run (PRISMA Item 7 detail).
+    public int MaxResultsPerSource { get; set; }
+
+    // Publication-year window applied after retrieval (0 = no limit).
+    public int YearFrom { get; set; }
+    public int YearTo { get; set; }
+
+    // Short SHA-256 fingerprint of the run's protocol (query, criteria, perspectives, sources, cap).
+    public string ProtocolHash { get; set; } = string.Empty;
+}
     
 public class IncludedPaperMetricRow
 {
@@ -42,6 +58,10 @@ public class IncludedPaperMetricRow
     public string Category { get; set; } = string.Empty;
     public string Quartile { get; set; } = "N/A";          // e.g., "Q1", "Q2", "Q3", "Q4"
     public string ConferenceRating { get; set; } = "N/A";  // e.g., "A*", "A", "B"
+
+    // 1-based position in the run's reference list. The [n] markers in the synthesis/discussion, the
+    // extraction table and the LaTeX bibliography all use this same number.
+    public int ReferenceNumber { get; set; }
 }
 public class ReviewStats 
 { 
@@ -55,6 +75,7 @@ public class ReviewStats
     public int DuplicatesRemoved { get; set; }      // Cross-perspective duplicate hits collapsed before screening
     public int CappedBeyondMaxResults { get; set; } // Candidates discarded by the hard per-source maxResults cap
     public int InvalidCitationsStripped { get; set; } // Out-of-range [n] markers removed from generated prose for traceability
+    public int OutsideDateRange { get; set; }       // Records dropped because their publication year fell outside the chosen range
 }
 
 public class ReviewPhases 
@@ -68,7 +89,12 @@ public record ScreeningLog(
     string Decision, 
     string Reasoning, 
     string ApaCitation, 
-    string BriefSummary
+    string BriefSummary,
+    // Metadata taken straight from the source API (not from the language model), so the citation,
+    // venue type, year and quartile lookup can all be traced back to what the database returned.
+    string VenueType = "",
+    string VenueName = "",
+    int Year = 0
 );
 
 // ─── PLATFORM SEARCH METRIC DATA CONTAINER ──────────────────────────
@@ -83,7 +109,9 @@ public class PlatformSearchLog
     public string QueryUsed { get; set; } = string.Empty; // Which search-perspective phrasing produced this pass
 }
 
-public record StyleDeltaLog(string FieldName, string OriginalText, string RefinedText);
+// Applied=false means the rewrite was rejected by a guard (for example it changed the length far
+// beyond a copy-edit) and the original text was kept; Note says why.
+public record StyleDeltaLog(string FieldName, string OriginalText, string RefinedText, bool Applied = true, string Note = "");
 
 // ─── LLM PEER-REVIEW AUDIT TRAIL ────────────────────────────────────
 // One issue raised by the automated peer reviewer against a generated section.
@@ -129,4 +157,7 @@ public class PrismaReport
     // SECTION 5: OTHER INFORMATION
     public string SupportItem { get; set; } = "Pending...";          // Item 25
     public string AvailabilityItem { get; set; } = "Pending...";     // Item 27
+
+    // Fingerprint of the run's protocol, printed in the LaTeX header.
+    public string ProtocolHash { get; set; } = "";
 }
