@@ -1,0 +1,87 @@
+@* The PRISMA funnel for one run, shown on the dashboard. Every identified record appears in exactly one row,
+   so the numbers add up: identified = removed before screening + waiting + screened, and
+   screened = excluded + included. The old four boxes (identified, screened, excluded, included) hid the
+   records removed in between, so 15 identified next to 8 screened looked like an error. *@
+
+@{
+    var s = Stats;
+    int removedBeforeScreening = s.DuplicatesRemoved + s.OutsideDateRange + s.CappedBeyondMaxResults + s.ScreeningErrors;
+    int excludedTotal = s.Excluded + s.FailedPeerReviewCheck;
+    int waiting = Math.Max(0, s.TotalIdentified - removedBeforeScreening - s.Screened);
+    var flow = new AuBtechReviewAgent.PrismaFlowCounts
+    {
+        Identified = s.TotalIdentified, DuplicatesRemoved = s.DuplicatesRemoved, OutsideDateRange = s.OutsideDateRange,
+        CappedBeyondMax = s.CappedBeyondMaxResults, ScreeningErrors = s.ScreeningErrors, Screened = s.Screened,
+        ExcludedPeerReview = s.FailedPeerReviewCheck, ExcludedAtScreening = s.Excluded, Included = s.Included,
+    };
+}
+
+<div class="bg-white border border-gray-200 rounded-lg p-4 shadow-sm flex-none text-left">
+    <span class="text-[10px] font-bold uppercase tracking-wider text-gray-400 block mb-3">PRISMA Funnel</span>
+
+    <div class="space-y-1.5 text-xs">
+        <div class="flex items-baseline justify-between p-2 bg-gray-50 border border-gray-100 rounded">
+            <span class="font-semibold text-gray-700" title="All records returned by the searches, before anything is removed">Identified</span>
+            <span class="text-lg font-bold text-[#003B5C] font-mono">@s.TotalIdentified</span>
+        </div>
+
+        <div class="pl-4 space-y-0.5 text-[11px] text-gray-500">
+            <div class="flex justify-between" title="The same paper returned by more than one search string"><span>− Duplicates</span><span class="font-mono">@s.DuplicatesRemoved</span></div>
+            <div class="flex justify-between" title="Publication year outside the Date From / Date To range"><span>− Outside year range</span><span class="font-mono">@s.OutsideDateRange</span></div>
+            <div class="flex justify-between" title="Beyond the 'max results of each source' limit"><span>− Over per-source cap</span><span class="font-mono">@s.CappedBeyondMaxResults</span></div>
+            @if (s.ScreeningErrors > 0)
+            {
+                <div class="flex justify-between text-amber-700" title="The model call failed, so these records were not screened"><span>− Could not be screened</span><span class="font-mono">@s.ScreeningErrors</span></div>
+            }
+            @if (Running && waiting > 0)
+            {
+                <div class="flex justify-between text-[#003B5C]"><span>… waiting to be screened</span><span class="font-mono">@waiting</span></div>
+            }
+        </div>
+
+        <div class="flex items-baseline justify-between p-2 bg-gray-50 border border-gray-100 rounded">
+            <span class="font-semibold text-gray-700" title="Records checked against the inclusion and exclusion criteria">Screened</span>
+            <span class="text-lg font-bold text-gray-700 font-mono">@s.Screened</span>
+        </div>
+
+        <div class="grid grid-cols-2 gap-1.5">
+            <div class="p-2 bg-red-50/60 border border-red-100 rounded">
+                <span class="block text-[9px] font-bold text-red-500 uppercase tracking-wider">Excluded</span>
+                <span class="text-lg font-bold text-red-600 font-mono">@excludedTotal</span>
+                @if (s.FailedPeerReviewCheck > 0)
+                {
+                    <span class="block text-[10px] text-red-500">incl. @s.FailedPeerReviewCheck not peer reviewed</span>
+                }
+            </div>
+            <div class="p-2 bg-green-50/60 border border-green-100 rounded">
+                <span class="block text-[9px] font-bold text-green-600 uppercase tracking-wider">Included</span>
+                <span class="text-lg font-bold text-green-700 font-mono">@s.Included</span>
+                @if (s.Included > 0 && !Running)
+                {
+                    <span class="block text-[10px] text-green-700">full text @s.FullTextRetrieved · abstract only @(Math.Max(0, s.Included - s.FullTextRetrieved))</span>
+                }
+            </div>
+        </div>
+
+        @if (s.HumanReviewed > 0)
+        {
+            <p class="text-[10px] text-gray-500">You checked @s.HumanReviewed screening decisions and changed @s.HumanOverrides.</p>
+        }
+        @if (!Running && s.TotalIdentified > 0 && !flow.IsConsistent)
+        {
+            <p class="text-[10px] text-amber-700">These counts do not add up for this run (it may predate the current counting); see transparent-process.json.</p>
+        }
+        @if (s.CitationsChecked > 0)
+        {
+            <p class="text-[10px] text-gray-500 pt-1 border-t border-gray-100">
+                Citation check: @s.CitationsSupported supported, @s.CitationsPartiallySupported partly, @s.CitationsNotSupported not supported,
+                @s.CitationsUnverifiable unverifiable (of @s.CitationsChecked).
+            </p>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public AuBtechReviewAgent.ReviewStats Stats { get; set; } = new();
+    [Parameter] public bool Running { get; set; }
+}
