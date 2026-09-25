@@ -22,8 +22,15 @@ public class PrismaReviewEngine
     private readonly string _globalElsevierKey;
     private readonly string? _globalIeeeKey;
     private readonly string? _globalScholarKey;
+    private readonly string _supportStatement;
 
-    public event Action<ReviewStats>? OnProgressUpdated;
+    // The engine is a singleton shared by every connected user, so progress events carry the session id
+    // and each dashboard only reacts to its own run (previously every open dashboard showed the counts of
+    // whichever run fired last).
+    public event Action<Guid, ReviewStats>? OnProgressUpdated;
+
+    public const string DefaultSupportStatement =
+        "No funding statement has been declared for this review. The funding and support text can be set in the Report:SupportStatement configuration value.";
 
     // SECURE ENCAPSULATED ROUTING PATHS
     private string GetWorkspaceFolderPath(Guid sessionId) => 
@@ -35,21 +42,45 @@ public class PrismaReviewEngine
     private string GetReportFilePath(Guid sessionId) => 
         Path.Combine(GetWorkspaceFolderPath(sessionId), "prisma-report.json");
 
-    public PrismaReviewEngine(string mistralApiKey, string elsevierApiKey, string? ieeeApiKey = null, string? scholarApiKey = null)
+    public PrismaReviewEngine(string mistralApiKey, string elsevierApiKey, string? ieeeApiKey = null, string? scholarApiKey = null, string? supportStatement = null)
     {
         _globalMistralKey = mistralApiKey;
         _globalElsevierKey = elsevierApiKey;
         _globalIeeeKey = ieeeApiKey;
         _globalScholarKey = scholarApiKey;
+        _supportStatement = string.IsNullOrWhiteSpace(supportStatement) ? DefaultSupportStatement : supportStatement.Trim();
     }
 
-    public async Task RunReviewLoopAsync(Guid sessionId, string initialQuery, string explicitObjective, string inclusionCriteria, string exclusionCriteria, int maxResults, bool requirePeerReview = false, string synthesisDirective = "", UserApiKeys? userKeys = null)
+    /// <summary>
+    /// For each gateway in SourceCatalog: can it be queried with the server keys plus the user's own keys?
+    /// Used by the dashboard to grey out sources that have no key.
+    /// </summary>
+    public IReadOnlyDictionary<string, bool> GetSourceAvailability(UserApiKeys? userKeys)
+    {
+        var keys = ResolveKeys(userKeys);
+        return SourceCatalog.All.ToDictionary(
+            s => s.Key,
+            s => s.KeyKind switch
+            {
+                SourceKeyKind.None => true,
+                SourceKeyKind.Elsevier => SourceCatalog.IsUsableKey(keys.Elsevier),
+                SourceKeyKind.Ieee => SourceCatalog.IsUsableKey(keys.Ieee),
+                SourceKeyKind.SerpApi => SourceCatalog.IsUsableKey(keys.Scholar),
+                _ => false
+            });
+    }
+
+    private (string Mistral, string Elsevier, string? Ieee, string? Scholar) ResolveKeys(UserApiKeys? userKeys) => (
+        !string.IsNullOrWhiteSpace(userKeys?.MistralApiKey) ? userKeys.MistralApiKey : _globalMistralKey,
+        !string.IsNullOrWhiteSpace(userKeys?.ElsevierApiKey) ? userKeys.ElsevierApiKey : _globalElsevierKey,
+        !string.IsNullOrWhiteSpace(userKeys?.IeeeApiKey) ? userKeys.IeeeApiKey : _globalIeeeKey,
+        !string.IsNullOrWhiteSpace(userKeys?.ScholarApiKey) ? userKeys.ScholarApiKey : _globalScholarKey);
+
+    public async Task RunReviewLoopAsync(Guid sessionId, string initialQuery, string explicitObjective, string inclusionCriteria, string exclusionCriteria, int maxResults, bool requirePeerReview = false, string synthesisDirective = "", UserApiKeys? userKeys = null,
+        IReadOnlyCollection<string>? selectedSources = null, int yearFrom = 0, int yearTo = 0)
     {
         // 1. Resolve runtime credentials (BYOK fallback chain)
-        string activeMistral = !string.IsNullOrWhiteSpace(userKeys?.MistralApiKey) ? userKeys.MistralApiKey : _globalMistralKey;
-        string activeElsevier = !string.IsNullOrWhiteSpace(userKeys?.ElsevierApiKey) ? userKeys.ElsevierApiKey : _globalElsevierKey;
-        string? activeIeee = !string.IsNullOrWhiteSpace(userKeys?.IeeeApiKey) ? userKeys.IeeeApiKey : _globalIeeeKey;
-        string? activeScholar = !string.IsNullOrWhiteSpace(userKeys?.ScholarApiKey) ? userKeys.ScholarApiKey : _globalScholarKey;
+        var (activeMistral, activeElsevier, activeIeee, activeScholar) = ResolveKeys(userKeys);
 
         // 2. Build isolated kernel for this specific thread pass
         var builder = Kernel.CreateBuilder();
@@ -57,15 +88,30 @@ public class PrismaReviewEngine
         var kernel = builder.Build();
         var chatService = kernel.GetRequiredService<IChatCompletionService>();
 
-        // 3. Assemble transient source gateway adapters for this session run
-        var activeSources = new List<IAcademicSource> { new ArxivSource() };
-        if (!string.IsNullOrEmpty(activeElsevier)) activeSources.Add(new ElsevierSource(activeElsevier));
-        if (!string.IsNullOrEmpty(activeIeee)) activeSources.Add(new IeeeXploreSource(activeIeee));
-        if (!string.IsNullOrEmpty(activeScholar))
+        // 3. Assemble the source gateways the user ticked. A ticked source without a usable key is not
+        //    queried, and is recorded as unavailable so the report says so instead of implying it was searched.
+        var selectedKeys = (selectedSources == null || selectedSources.Count == 0 ? SourceCatalog.AllKeys : selectedSources)
+            .Where(k => SourceCatalog.Find(k) != null)
+            .Select(k => SourceCatalog.Find(k)!.Key)
+            .Distinct()
+            .ToList();
+        var availability = GetSourceAvailability(userKeys);
+        var activeSources = new List<IAcademicSource>();
+        var unavailableKeys = new List<string>();
+        foreach (var key in selectedKeys)
         {
-            activeSources.Add(new GoogleScholarSource(activeScholar));
-            activeSources.Add(new ResearchGateSource(activeScholar));
+            if (!availability.TryGetValue(key, out bool ok) || !ok) { unavailableKeys.Add(key); continue; }
+            activeSources.Add(key switch
+            {
+                "arxiv" => new ArxivSource(),
+                "scopus" => new ElsevierSource(activeElsevier),
+                "ieee" => new IeeeXploreSource(activeIeee!),
+                "scholar" => new GoogleScholarSource(activeScholar),
+                "researchgate" => new ResearchGateSource(activeScholar),
+                _ => throw new InvalidOperationException($"Unknown source key '{key}'.")
+            });
         }
+        if (yearFrom > 0 && yearTo > 0 && yearFrom > yearTo) (yearFrom, yearTo) = (yearTo, yearFrom);
 
         string userWorkspace = GetWorkspaceFolderPath(sessionId);
         Directory.CreateDirectory(userWorkspace);
@@ -74,7 +120,12 @@ public class PrismaReviewEngine
         {
             SearchQuery = initialQuery,
             PeerReviewOnlyToggle = requirePeerReview,
-            SynthesisTargetDirective = synthesisDirective
+            SynthesisTargetDirective = synthesisDirective,
+            SelectedSources = selectedKeys,
+            UnavailableSources = unavailableKeys,
+            MaxResultsPerSource = maxResults,
+            YearFrom = yearFrom,
+            YearTo = yearTo
         };
         reviewState.Stats.ProcessingStage = "Screening";
         await SaveStateAsync(sessionId, reviewState);
@@ -83,6 +134,9 @@ public class PrismaReviewEngine
         // querying each source, instead of relying on the single literal query phrase alone.
         var searchPerspectives = await GenerateSearchPerspectivesAsync(chatService, initialQuery, explicitObjective, inclusionCriteria);
         reviewState.SearchPerspectives = searchPerspectives;
+        reviewState.ProtocolHash = MethodsSectionWriter.ComputeProtocolHash(
+            initialQuery, explicitObjective, inclusionCriteria, exclusionCriteria,
+            searchPerspectives, selectedKeys, maxResults, requirePeerReview);
         await SaveStateAsync(sessionId, reviewState);
 
         var allGroundedChunks = new List<DocumentChunk>();
@@ -140,12 +194,21 @@ public class PrismaReviewEngine
                     }
                     seenIds.Add(candidate.Id);
                     if (normalizedTitle.Length > 0) seenTitles.Add(normalizedTitle);
+
+                    // Publication-year window from the dashboard. Records with no year in the metadata are
+                    // kept (they cannot be shown to be outside the range) and the report says so.
+                    int candidateYear = ApaCitationBuilder.ExtractYear(candidate.PublishedDate);
+                    if (yearFrom > 0 && yearTo > 0 && candidateYear > 0 && (candidateYear < yearFrom || candidateYear > yearTo))
+                    {
+                        reviewState.Stats.OutsideDateRange++;
+                        continue;
+                    }
                     sourceCandidates.Add(candidate);
 
                     if (sourceCandidates.Count >= maxResults) break; // stop absorbing more candidates once the per-source cap is hit
                 }
 
-                OnProgressUpdated?.Invoke(reviewState.Stats);
+                OnProgressUpdated?.Invoke(sessionId, reviewState.Stats);
                 await SaveStateAsync(sessionId, reviewState);
             }
 
@@ -198,13 +261,14 @@ public class PrismaReviewEngine
                         reviewState.Stats.FailedPeerReviewCheck++;
                         reviewState.Stats.Screened++;
 
+                        var excludedApa = ApaCitationBuilder.Build(paper);
                         reviewState.Phases.Screening.Add(new ScreeningLog(
                             paper.Id, paper.Title, "Excluded", 
                             "Excluded during post-retrieval pre-screening: Document was classified as an un-reviewed preprint or working paper, violating the active Peer-Reviewed Only configuration threshold.",
-                            "N/A", "N/A"
+                            excludedApa.Citation, "N/A", excludedApa.VenueType, excludedApa.VenueName, excludedApa.Year
                         ));
                         
-                        OnProgressUpdated?.Invoke(reviewState.Stats);
+                        OnProgressUpdated?.Invoke(sessionId, reviewState.Stats);
                         await SaveStateAsync(sessionId, reviewState);
                         continue;
                     }
@@ -234,14 +298,13 @@ public class PrismaReviewEngine
 
                     TASK:
                     1. Determine if it should be Included or Excluded.
-                    2. Generate a valid APA 7th edition citation string based on the Authors, Title, Date Context, and the provided Publication/Journal Venue string. Do not use placeholders like "*Journal Name*".
-                    3. Create a brief 1-2 sentence executive summary of the paper.
+                    2. Create a brief 1-2 sentence executive summary of the paper.
+                    (The reference string is built separately from the source metadata - do not write one.)
 
                     Respond ONLY with a valid minified JSON object matching this structure exactly:
                     {
                         "decision": "Included" or "Excluded",
                         "reasoning": "Why it meets inclusion or hits exclusion parameters.",
-                        "apaCitation": "The generated APA 7th Edition style citation reference string using the real Publication/Journal Venue context.",
                         "briefSummary": "The 1-2 sentence executive summary overview."
                     }
                     """;
@@ -252,7 +315,7 @@ public class PrismaReviewEngine
                     var decisionData = DeserializeDecision(response.ToString());
 
                     UpdateReviewState(reviewState, paper, decisionData);
-                    OnProgressUpdated?.Invoke(reviewState.Stats);
+                    OnProgressUpdated?.Invoke(sessionId, reviewState.Stats);
                     await SaveStateAsync(sessionId, reviewState);
 
                     string decision = decisionData.TryGetProperty("decision", out var d) ? d.GetString() ?? "Excluded" : "Excluded";
@@ -270,38 +333,42 @@ public class PrismaReviewEngine
         }
 
         reviewState.Stats.ProcessingStage = "Synthesizing";
-        OnProgressUpdated?.Invoke(reviewState.Stats);
+        OnProgressUpdated?.Invoke(sessionId, reviewState.Stats);
 
         var includedLogs = reviewState.Phases.Screening
             .Where(p => p.Decision.Equals("Included", StringComparison.OrdinalIgnoreCase))
             .ToList();
 
+        // One ordering for the whole report. The reference list shown to the model, the [n] markers it
+        // writes, the extraction table and the LaTeX bibliography are all numbered from this list. They used
+        // to be ordered differently (alphabetical for the model, screening order for the bibliography), so a
+        // correctly cited [5] pointed at the wrong paper in main.tex.
+        var includedPapers = includedLogs
+            .OrderBy(p => p.ApaCitation ?? "", ApaCitationBuilder.ReferenceOrder)
+            .ThenBy(p => p.PaperId, StringComparer.Ordinal)
+            .ToList();
+
         reviewState.SynthesizedRecords.Clear();
-        foreach (var log in includedLogs)
+        for (int i = 0; i < includedPapers.Count; i++)
         {
-            string venue = "Preprints";
-            if ((log.ApaCitation ?? "").Contains("Proceedings of", StringComparison.OrdinalIgnoreCase) || (log.ApaCitation ?? "").Contains("Conference", StringComparison.OrdinalIgnoreCase)) venue = "Conferences";
-            else if ((log.ApaCitation ?? "").Contains("Transactions on", StringComparison.OrdinalIgnoreCase)) venue = "Transactions";
-            else if ((log.ApaCitation ?? "").Contains("Journal of", StringComparison.OrdinalIgnoreCase)) venue = "Journals";
+            var log = includedPapers[i];
+            // Venue type, venue name and year come from the source metadata (ApaCitationBuilder). Runs from
+            // before that change only have the citation string, so fall back to parsing it.
+            string venue = !string.IsNullOrEmpty(log.VenueType) ? log.VenueType : ClassifyVenueFromCitation(log.ApaCitation);
+            int parsedYear = log.Year > 0 ? log.Year : ExtractYearFromCitation(log.ApaCitation);
 
             string cleanCategory = log.PaperId.StartsWith("SCOPUS_ID:") ? "ScienceDirect" 
                                  : log.PaperId.StartsWith("IEEE_") ? "IEEE" 
                                  : log.PaperId.StartsWith("SCHOLAR_") ? "Scholar" 
                                  : log.PaperId.StartsWith("RG_") ? "ResearchGate" 
                                  : "Arxiv";
-            int parsedYear = ExtractYearFromCitation(log.ApaCitation);
 
+            // Quartile only from an exact Scimago title match. There is no default: the old code filled in
+            // "Q1" for every IEEE and Scholar paper it could not match, which inflated the quality figures.
             string quartile = "N/A";
-            if (cleanCategory == "ScienceDirect" || cleanCategory == "IEEE" || cleanCategory == "Scholar")
+            if (venue is "Journals" or "Transactions" && !string.IsNullOrWhiteSpace(log.VenueName))
             {
-                string extractedVenue = "";
-                // Matches both journal-style italicized venues (". *Journal Name*") and proceedings-style
-                // citations that introduce the venue with "In *Conference Name*" instead of a leading period.
-                var venueMatch = Regex.Match(log.ApaCitation ?? "", @"(?:\.\s+|In\s+)\*([^*]+)\*");
-                if (venueMatch.Success) extractedVenue = venueMatch.Groups[1].Value.Trim();
-                
-                quartile = JournalRankingMatcher.LookupQuartile(extractedVenue, parsedYear);
-                if ((cleanCategory == "IEEE" || cleanCategory == "Scholar") && quartile == "N/A") quartile = "Q1"; 
+                quartile = JournalRankingMatcher.LookupQuartile(log.VenueName, parsedYear);
             }
 
             string platformFull = log.PaperId.StartsWith("SCOPUS_ID:") ? "Scopus API" 
@@ -321,12 +388,14 @@ public class PrismaReviewEngine
                 InclusionRationale = log.Reasoning,
                 Category = cleanCategory,
                 Quartile = quartile,
-                ConferenceRating = cleanCategory == "ScienceDirect" && venue == "Conferences" ? "A" : "N/A"
+                // No conference-ranking data source is wired in yet, so no rating is claimed (this used to
+                // print "A" for every ScienceDirect conference paper).
+                ConferenceRating = "N/A",
+                ReferenceNumber = i + 1
             });
         }
         await SaveStateAsync(sessionId, reviewState);
 
-        var includedPapers = includedLogs.OrderBy(p => p.ApaCitation).ToList();
         var sbReferences = new StringBuilder();
         for (int i = 0; i < includedPapers.Count; i++)
         {
@@ -363,7 +432,7 @@ public class PrismaReviewEngine
             inc: inclusionCriteria, exc: exclusionCriteria, sbContext.ToString(), exactReferenceListForLLM, reviewState, searchPerspectives, referenceCount: includedPapers.Count);
 
         reviewState.Stats.ProcessingStage = "Complete";
-        OnProgressUpdated?.Invoke(reviewState.Stats);
+        OnProgressUpdated?.Invoke(sessionId, reviewState.Stats);
         await SaveStateAsync(sessionId, reviewState);
     }
 
@@ -371,6 +440,15 @@ public class PrismaReviewEngine
     {
         if (string.IsNullOrEmpty(message)) return string.Empty;
         return Regex.Replace(message, @"([a-zA-Z0-9]{24,64})", "[REDACTED_API_CREDENTIAL]");
+    }
+
+    private static string ClassifyVenueFromCitation(string? citation)
+    {
+        string c = citation ?? "";
+        if (c.Contains("Proceedings of", StringComparison.OrdinalIgnoreCase) || c.Contains("Conference", StringComparison.OrdinalIgnoreCase)) return "Conferences";
+        if (c.Contains("Transactions on", StringComparison.OrdinalIgnoreCase)) return "Transactions";
+        if (c.Contains("Journal of", StringComparison.OrdinalIgnoreCase)) return "Journals";
+        return "Preprints";
     }
 
     private int ExtractYearFromCitation(string? citation)
@@ -766,6 +844,15 @@ private async Task GeneratePrismaChecklistReportWithRAGAsync(Guid sessionId, int
             catch { }
         }
 
+        // Facts about the included set, so the abstract cannot call preprints "peer-reviewed studies".
+        var venueBreakdown = finalState.SynthesizedRecords
+            .GroupBy(r => r.VenueType)
+            .Select(g => $"{g.Count()} {g.Key.ToLowerInvariant()}")
+            .ToList();
+        string includedFacts = $"{finalState.SynthesizedRecords.Count} included record(s)" +
+            (venueBreakdown.Count > 0 ? $" ({string.Join(", ", venueBreakdown)})" : "") +
+            $"; the peer-reviewed-only filter was {(finalState.PeerReviewOnlyToggle ? "ON" : "OFF")}.";
+
         var reportPrompt = $$"""
             You are an elite academic meta-analyst preparing an evaluation report mapped to the PRISMA 2020 Expanded Checklist.
 
@@ -775,6 +862,8 @@ private async Task GeneratePrismaChecklistReportWithRAGAsync(Guid sessionId, int
             - The review objective specified by the user was exactly: "{{explicitObjective}}"
             - The screening inclusion thresholds were exactly: "{{inc}}"
             - The screening exclusion thresholds were exactly: "{{exc}}"
+            - Included set: {{includedFacts}} Do not describe the included studies as peer-reviewed unless the filter was ON, and do not state any count that is not given here.
+            - Screening was done by a language model only; do not claim that any human screened, verified or reviewed records during the run.
 
             OFFICIAL ALPHABETIZED REFERENCE LIST FOR THIS RUN:
             {{referenceListMapping}}
@@ -809,14 +898,10 @@ private async Task GeneratePrismaChecklistReportWithRAGAsync(Guid sessionId, int
 
             JSON TEMPLATE SCHEMA:
             {
-                "titleItem": "A rigorous systematic literature review title analyzing '{{query}}' mapping to PRISMA Item 1.",
+                "titleItem": "A single-line systematic review title (at most 25 words, no full stop) on '{{query}}' mapping to PRISMA Item 1.",
                 "abstractItem": "A formal abstract overview addressing the core objective ('{{explicitObjective}}') mapping to PRISMA Item 2.",
                 "rationaleItem": "A rigorous context justification detailing the current state of software frameworks regarding '{{query}}' mapping to PRISMA Item 3.",
                 "objectivesItem": "The explicit question formulation matching the stated goal: '{{explicitObjective}}' mapping to PRISMA Item 4.",
-                "eligibilityItem": "A comprehensive breakdown detailing the screening configuration limits (Inclusion: '{{inc}}' | Exclusion: '{{exc}}') mapping to PRISMA Item 5.",
-                "sourcesItem": "A concise record confirming that document platform searches were limited strictly to the active query interfaces mapping to PRISMA Item 6.",
-                "searchStrategyItem": "An analytical description confirming that execution was carried out using the primary query phrase '{{query}}' together with the supplementary perspective-driven query variants ({{supplementaryPerspectives}}) mapping to PRISMA Item 7.",
-                "selectionProcessItem": "An explanation detailing how fields were evaluated by an automated screening architecture according to constraints mapping to PRISMA Item 8.",
                 "biasAssessmentItem": "This field will be post-processed. Output exactly: 'PREDEFINED_METADATA_MARKER'",
                 "synthesisResultsItem": "Your simple-English factual literature summary paragraph mapping to PRISMA Item 20a. Do not place code syntax here.",
                 "discussionItem": "Provide a general architectural interpretation with multi-source citations mapping to PRISMA Item 23a.",
@@ -883,24 +968,29 @@ private async Task GeneratePrismaChecklistReportWithRAGAsync(Guid sessionId, int
             string rawAbstract = ResolveField("abstractItem");
             string rawRationale = ResolveField("rationaleItem");
             string rawObjectives = ResolveField("objectivesItem");
-            string rawEligibility = ResolveField("eligibilityItem");
-            string rawSources = ResolveField("sourcesItem");
-            string rawSearch = ResolveField("searchStrategyItem");
-            string rawSelection = ResolveField("selectionProcessItem");
+            // PRISMA Items 5-8 describe what the run did, so they are rendered from the run's own configuration
+            // and ledger rather than written by the model (see MethodsSectionWriter for why).
+            var selectedNames = finalState.SelectedSources.Select(SourceCatalog.DisplayNameFor).ToList();
+            var unavailableNames = finalState.UnavailableSources.Select(SourceCatalog.DisplayNameFor).ToList();
+            string methodsEligibility = MethodsSectionWriter.Eligibility(inc, exc, finalState.PeerReviewOnlyToggle);
+            string methodsSources = MethodsSectionWriter.InformationSources(selectedNames, unavailableNames, finalState.SearchLogs, finalState.Timestamp);
+            string methodsSearch = MethodsSectionWriter.SearchStrategy(query, effectivePerspectives, finalState.MaxResultsPerSource,
+                finalState.Stats.DuplicatesRemoved, finalState.Stats.CappedBeyondMaxResults, finalState.YearFrom, finalState.YearTo, finalState.Stats.OutsideDateRange);
+            string methodsSelection = MethodsSectionWriter.SelectionProcess(finalState.PeerReviewOnlyToggle, finalState.Stats);
             string rawDiscussion = ResolveField("discussionItem");
             string rawSynthesisText = ResolveField("synthesisResultsItem");
 
             var deltas = new List<StyleDeltaLog>();
 
-            // 2. PASS EACH ACADEMIC FIELD THROUGH THE HUMAN STYLISTIC REFINE SYSTEM
-            var (cleanTitle, dTitle) = await StylisticRefinerUtility.RefineAcademicProseAsync(chat, "Title", rawTitle); deltas.Add(dTitle);
+            // 2. PASS THE PROSE FIELDS THROUGH THE STYLISTIC REFINER
+            // Only free prose is copy-edited. The title is left alone (the refiner once turned it into a
+            // five-sentence paragraph), and the methods items are generated from run data so there is nothing
+            // to copy-edit - rewriting them is how a search string got silently shortened in the report.
+            string cleanTitle = CleanTitle(rawTitle, query);
+            deltas.Add(new StyleDeltaLog("Title", rawTitle, cleanTitle, Applied: false, Note: "Title is not sent through the stylistic pass."));
             var (cleanAbstract, dAbstract) = await StylisticRefinerUtility.RefineAcademicProseAsync(chat, "Abstract", rawAbstract); deltas.Add(dAbstract);
             var (cleanRationale, dRationale) = await StylisticRefinerUtility.RefineAcademicProseAsync(chat, "Rationale", rawRationale); deltas.Add(dRationale);
             var (cleanObjectives, dObjectives) = await StylisticRefinerUtility.RefineAcademicProseAsync(chat, "Objectives", rawObjectives); deltas.Add(dObjectives);
-            var (cleanEligibility, dEligibility) = await StylisticRefinerUtility.RefineAcademicProseAsync(chat, "Eligibility", rawEligibility); deltas.Add(cleanEligibility != "Extraction failed." ? dEligibility : dEligibility with { RefinedText = rawEligibility });
-            var (cleanSources, dSources) = await StylisticRefinerUtility.RefineAcademicProseAsync(chat, "Sources", rawSources); deltas.Add(dSources);
-            var (cleanSearch, dSearch) = await StylisticRefinerUtility.RefineAcademicProseAsync(chat, "Search Strategy", rawSearch); deltas.Add(dSearch);
-            var (cleanSelection, dSelection) = await StylisticRefinerUtility.RefineAcademicProseAsync(chat, "Selection Automation", rawSelection); deltas.Add(dSelection);
             // The Results & Synthesis (20a) and Discussion (23a) sections are NOT run through the generic
             // stylistic refiner - that rewrite step tends to drop the inline [n] citation markers. They are
             // instead produced by a dedicated citation-mandatory pass and then improved by a documented
@@ -960,18 +1050,19 @@ private async Task GeneratePrismaChecklistReportWithRAGAsync(Guid sessionId, int
             var reportObj = new PrismaReport
             {
                 GeneratedAt = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss UTC"),
-                TitleItem = !string.IsNullOrWhiteSpace(cleanTitle) ? cleanTitle : rawTitle,
+                TitleItem = cleanTitle,
                 AbstractItem = !string.IsNullOrWhiteSpace(cleanAbstract) ? cleanAbstract : rawAbstract,
                 RationaleItem = !string.IsNullOrWhiteSpace(cleanRationale) ? cleanRationale : rawRationale,
                 ObjectivesItem = !string.IsNullOrWhiteSpace(cleanObjectives) ? cleanObjectives : rawObjectives,
-                EligibilityItem = !string.IsNullOrWhiteSpace(cleanEligibility) ? cleanEligibility : rawEligibility,
-                SourcesItem = !string.IsNullOrWhiteSpace(cleanSources) ? cleanSources : rawSources,
-                SearchStrategyItem = !string.IsNullOrWhiteSpace(cleanSearch) ? cleanSearch : rawSearch,
-                SelectionProcessItem = !string.IsNullOrWhiteSpace(cleanSelection) ? cleanSelection : rawSelection,
+                EligibilityItem = methodsEligibility,
+                SourcesItem = methodsSources,
+                SearchStrategyItem = methodsSearch,
+                SelectionProcessItem = methodsSelection,
                 SynthesisResultsItem = fullSynthesisField,
                 DiscussionItem = cleanDiscussionValidated,
                 BiasAssessmentItem = "Internal risk of bias is controlled via mandatory post-generation human verification. Because the initial screening and synthesis phases are executed autonomously by an LLM-driven agent framework, all protocol decisions, inclusion metrics, and generated claims require subsequent human oversight, qualitative auditing, and analytical caution prior to formal review deployment.",
-                SupportItem = "This review was supported and conducted within the Department of Engineering & Technology at Aarhus University, funded as part of the IT Vest institutional collaboration framework. The funders played no active role in specific automated screening study designs, live stream extraction cycles, or pipeline synthesis determinations.",
+                SupportItem = _supportStatement,
+                ProtocolHash = finalState.ProtocolHash,
                 AvailabilityItem = "All automated retrieval configurations, screening criteria matrices, and synthesis generation pipeline code structures are publicly accessible via the project repository on GitHub at https://github.com/lauPhilip/au-btech-literature-review-agent."
             };
 
@@ -992,6 +1083,20 @@ private async Task GeneratePrismaChecklistReportWithRAGAsync(Guid sessionId, int
             };
             await File.WriteAllTextAsync(GetReportFilePath(sessionId), JsonSerializer.Serialize(failureReport, new JsonSerializerOptions { WriteIndented = true }));
         }
+    }
+
+    /// <summary>
+    /// Keeps the title a title: first line only, no trailing full stop, and if the model returned a
+    /// paragraph (or nothing) fall back to a neutral title built from the query.
+    /// </summary>
+    public static string CleanTitle(string rawTitle, string query)
+    {
+        string t = (rawTitle ?? "").Split('\n')[0].Trim().TrimEnd('.');
+        int words = t.Split(' ', StringSplitOptions.RemoveEmptyEntries).Length;
+        bool looksLikeParagraph = Regex.Matches(t, @"[.!?]\s+[A-Z]").Count > 0 || words > 30;
+        if (string.IsNullOrWhiteSpace(t) || t == "Extraction failed" || looksLikeParagraph)
+            return $"{query.Trim()}: A Systematic Literature Review";
+        return t;
     }
 
     private void CleanOldManuscriptArtifacts(string directoryPath)
@@ -1023,15 +1128,18 @@ private async Task GeneratePrismaChecklistReportWithRAGAsync(Guid sessionId, int
                                  .Replace("XXXXXX.XXXXX", "")
                                  .TrimEnd(' ', ',', '.', '/');
 
-        return cleanInput.Replace(@"\", @"\textbackwards ")
+        string escaped = cleanInput.Replace(@"\", @"\textbackslash ")
                          .Replace("&", @"\&")
                          .Replace("%", @"\%")
+                         .Replace("$", @"\$")
                          .Replace("_", @"\_")
                          .Replace("#", @"\#")
                          .Replace("{", @"\{")
                          .Replace("}", @"\}")
                          .Replace("~", @"\textasciitilde ")
                          .Replace("^", @"\textasciicircum ");
+        // Markdown-style *italics* (used for venues in the APA references) -> real LaTeX italics.
+        return Regex.Replace(escaped, @"\*([^*\n]+)\*", @"\textit{$1}");
     }
     
     /// <summary>
@@ -1077,11 +1185,32 @@ private async Task GeneratePrismaChecklistReportWithRAGAsync(Guid sessionId, int
     // zip bundle (LaTeX source + JSON ledger + source PDFs). Renamed to match what it actually produces.
     public byte[] GenerateWorkspaceArchive(Guid sessionId, PrismaReport report, List<IncludedPaperMetricRow> records)
     {
+        // The LaTeX below interpolates decimals (pie-slice angles, axis limits). On a machine with a Danish
+        // (or any comma-decimal) culture those came out as "51,43", which breaks the TikZ syntax, so the
+        // document is always written with the invariant culture.
+        var previousCulture = System.Globalization.CultureInfo.CurrentCulture;
+        System.Globalization.CultureInfo.CurrentCulture = System.Globalization.CultureInfo.InvariantCulture;
+        try
+        {
+            return BuildWorkspaceArchive(sessionId, report, records);
+        }
+        finally
+        {
+            System.Globalization.CultureInfo.CurrentCulture = previousCulture;
+        }
+    }
+
+    private byte[] BuildWorkspaceArchive(Guid sessionId, PrismaReport report, List<IncludedPaperMetricRow> records)
+    {
         string projectRoot = Directory.GetCurrentDirectory();
         CleanOldManuscriptArtifacts(projectRoot);
 
         string uniqueId = Guid.NewGuid().ToString("N").Substring(0, 8);
         string texFilePath = Path.Combine(projectRoot, $"manuscript_{uniqueId}.tex");
+
+        // Table 3.1 and the bibliography must follow the reference numbers the synthesis cites.
+        // (Older runs have ReferenceNumber = 0 everywhere; OrderBy is stable, so they keep their order.)
+        records = records.OrderBy(r => r.ReferenceNumber).ToList();
 
         int journalCount = records.Count(r => r.VenueType.Equals("Journals", StringComparison.OrdinalIgnoreCase));
         int conferenceCount = records.Count(r => r.VenueType.Equals("Conferences", StringComparison.OrdinalIgnoreCase));
@@ -1098,12 +1227,19 @@ private async Task GeneratePrismaChecklistReportWithRAGAsync(Guid sessionId, int
         double totalPie = journalCount + conferenceCount + transactionsCount + proceedingsCount + preprintCount;
         double totalSourcesPie = arxivCount + scopusCount + ieeeCount + scholarCount + rgCount;
 
-        var publicationsByYear = new Dictionary<string, int> { { "2023", 0 }, { "2024", 0 }, { "2025", 0 }, { "2026", 0 } };
-        foreach (var r in records)
-        {
-            string yrStr = r.Year.ToString();
-            if (publicationsByYear.ContainsKey(yrStr)) publicationsByYear[yrStr]++;
-        }
+        // Year axis built from the included papers themselves. It used to be fixed at 2023-2026, so papers
+        // from other years (or with no year) silently disappeared from the chart.
+        var publicationsByYear = records
+            .GroupBy(r => r.Year > 0 ? r.Year.ToString() : "nodate")
+            .OrderBy(g => g.Key == "nodate" ? "9999" : g.Key, StringComparer.Ordinal)
+            .ToDictionary(g => g.Key, g => g.Count());
+        if (publicationsByYear.Count == 0) publicationsByYear[DateTime.UtcNow.Year.ToString()] = 0;
+        // Plotted at x = 1..n with the years as tick labels. (pgfplots symbolic coords cannot hold "n.d.".)
+        var yearKeys = publicationsByYear.Keys.ToList();
+        string yearTicks = string.Join(",", Enumerable.Range(1, yearKeys.Count));
+        string yearLabels = string.Join(",", yearKeys.Select(k => k == "nodate" ? "n.d." : k));
+        string yearPoints = string.Join(" ", yearKeys.Select((k, i) => $"({i + 1},{publicationsByYear[k]})"));
+        int yearAxisMax = Math.Max(4, publicationsByYear.Values.DefaultIfEmpty(0).Max() + 1);
 
         string sanitizedTitleItem = EscapeLatexText((report.TitleItem ?? "Systematic Review Manuscript").Replace("[Source Context Anchor 1]", "").Trim());
         string sanitizedAbstractItem = EscapeLatexText(report.AbstractItem ?? "");
@@ -1124,7 +1260,9 @@ private async Task GeneratePrismaChecklistReportWithRAGAsync(Guid sessionId, int
         var tikzMatch = Regex.Match(rawSynthesis, @"\[TIKZ_START\](.*?)\[TIKZ_END\]", RegexOptions.Singleline);
         if (tikzMatch.Success) {
             tikzDiagramCode = tikzMatch.Groups[1].Value.Trim();
-            tikzDiagramCode = tikzDiagramCode.Replace("-¿", "->").Replace("->", "-->");
+            // "-->" is not a TikZ arrow tip (it made every generated main.tex fail to compile); only repair the
+            // mangled "-¿" some model outputs contain.
+            tikzDiagramCode = tikzDiagramCode.Replace("-¿", "->");
         }
 
         string sanitizedDiscussionItem = EscapeLatexText(report.DiscussionItem ?? "");
@@ -1165,7 +1303,8 @@ private async Task GeneratePrismaChecklistReportWithRAGAsync(Guid sessionId, int
         sb.AppendLine(@"    {\sffamily\bfseries\scriptsize\color{gray} AI-GENERATED SYSTEMATIC LITERATURE REVIEW  \\ \vspace{4pt}}");
         sb.AppendLine("    {\\rmfamily\\LARGE\\bfseries " + sanitizedTitleItem + " \\\\ \\vspace{10pt}}");
         sb.AppendLine(@"    {\sffamily\small\color{greyText} Department of Business Development and Technology, Aarhus University \\ \vspace{4pt}}");
-        sb.AppendLine("    {\\ttfamily\\scriptsize\\color{gray} Protocol Hash: cc584090 | Generated: " + (report.GeneratedAt ?? DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss UTC")) + " \\\\ \\vspace{15pt}}");
+        string protocolHash = string.IsNullOrWhiteSpace(report.ProtocolHash) ? "not recorded" : report.ProtocolHash;
+        sb.AppendLine("    {\\ttfamily\\scriptsize\\color{gray} Protocol Hash: " + protocolHash + " | Generated: " + (report.GeneratedAt ?? DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss UTC")) + " \\\\ \\vspace{15pt}}");
         sb.AppendLine(@"    \color{lightgray}\hrule\vspace{15pt}");
         sb.AppendLine(@"    \color{black}");
         sb.AppendLine(@"\end{center}");
@@ -1209,8 +1348,8 @@ private async Task GeneratePrismaChecklistReportWithRAGAsync(Guid sessionId, int
         sb.AppendLine(@"\begin{minipage}{0.32\textwidth}");
         sb.AppendLine(@"\centering");
         sb.AppendLine(@"\begin{tikzpicture}[scale=0.65]");
-        sb.AppendLine(@"\begin{axis}[ybar, symbolic coords={2023,2024,2025,2026}, xtick=data, x tick label style={/pgf/number format/set thousands separator={}}, ymin=0, ymax=12, ylabel={Papers}, xlabel={Year}, nodes near coords, width=\textwidth, height=5.5cm, bar width=10pt]");
-        sb.AppendLine($"\\addplot[fill=blue!50] coordinates {{(2023,{publicationsByYear["2023"]}) (2024,{publicationsByYear["2024"]}) (2025,{publicationsByYear["2025"]}) (2026,{publicationsByYear["2026"]})}};");
+        sb.AppendLine($"\\begin{{axis}}[ybar, xtick={{{yearTicks}}}, xticklabels={{{yearLabels}}}, xmin=0.5, xmax={yearKeys.Count + 0.5}, ymin=0, ymax={yearAxisMax}, ylabel={{Papers}}, xlabel={{Year}}, nodes near coords, width=\\textwidth, height=5.5cm, bar width=10pt]");
+        sb.AppendLine($"\\addplot[fill=blue!50] coordinates {{{yearPoints}}};");
         sb.AppendLine(@"\end{axis}");
         sb.AppendLine(@"\end{tikzpicture}");
         sb.AppendLine(@"\caption{Papers per Year}");
@@ -1228,7 +1367,7 @@ private async Task GeneratePrismaChecklistReportWithRAGAsync(Guid sessionId, int
             if (scholarCount > 0) { double d = (scholarCount / totalSourcesPie) * 360; sb.AppendLine($"\\draw[fill=yellow!40] (0,0) -- ({startSrc}:1.2cm) arc ({startSrc}:{startSrc + d}:1.2cm) -- cycle; \\node at ({startSrc + d/2}:0.8cm) {{\\scriptsize {scholarCount}}};"); startSrc += d; }
             if (rgCount > 0) { double d = (rgCount / totalSourcesPie) * 360; sb.AppendLine($"\\draw[fill=purple!30] (0,0) -- ({startSrc}:1.2cm) arc ({startSrc}:{startSrc + d}:1.2cm) -- cycle; \\node at ({startSrc + d/2}:0.8cm) {{\\scriptsize {rgCount}}};"); }
 
-            sb.AppendLine(@"\matrix [draw,below,matrix of nodes,text align=left,font=\tiny,at={(current bounding box.south)},yshift=-0.4cm] {");
+            sb.AppendLine(@"\matrix [draw,below,matrix of nodes,font=\tiny,at={(current bounding box.south)},yshift=-0.4cm] {");
             sb.AppendLine($"\\node[fill=teal!40,label=right:({arxivCount}) Arxiv] {{}}; & \\node[fill=orange!40,label=right:({scopusCount}) ScienceDirect] {{}}; \\\\");
             sb.AppendLine($"\\node[fill=blue!30,label=right:({ieeeCount}) IEEE Xplore] {{}}; & \\node[fill=yellow!40,label=right:({scholarCount}) Scholar] {{}}; \\\\");
             sb.AppendLine($"\\node[fill=purple!30,label=right:({rgCount}) ResearchGate] {{}}; & \\\\");
@@ -1254,7 +1393,7 @@ private async Task GeneratePrismaChecklistReportWithRAGAsync(Guid sessionId, int
             if (proceedingsCount > 0) { double d = (proceedingsCount / totalPie) * 360; sb.AppendLine($"\\draw[fill=orange!50] (0,0) -- ({start}:1.2cm) arc ({start}:{start + d}:1.2cm) -- cycle; \\node at ({start + d/2}:0.8cm) {{\\scriptsize {proceedingsCount}}};"); start += d; }
             if (preprintCount > 0) { double d = (preprintCount / totalPie) * 360; sb.AppendLine($"\\draw[fill=red!50] (0,0) -- ({start}:1.2cm) arc ({start}:{start + d}:1.2cm) -- cycle; \\node at ({start + d/2}:0.8cm) {{\\scriptsize {preprintCount}}};"); }
             
-            sb.AppendLine(@"\matrix [draw,below,matrix of nodes,text align=left,font=\tiny,at={(current bounding box.south)},yshift=-0.4cm] {");
+            sb.AppendLine(@"\matrix [draw,below,matrix of nodes,font=\tiny,at={(current bounding box.south)},yshift=-0.4cm] {");
             sb.AppendLine($"\\node[fill=blue!50,label=right:({journalCount}) Journals] {{}}; & \\node[fill=customIndigo!50,label=right:({conferenceCount}) Conferences] {{}}; \\\\");
             sb.AppendLine($"\\node[fill=teal!50,label=right:({transactionsCount}) Transactions] {{}}; & \\node[fill=orange!50,label=right:({proceedingsCount}) Proceedings] {{}}; \\\\");
             sb.AppendLine($"\\node[fill=red!50,label=right:({preprintCount}) Preprints] {{}}; & \\\\");
@@ -1427,8 +1566,8 @@ private async Task GeneratePrismaChecklistReportWithRAGAsync(Guid sessionId, int
 
         string decision = GetJsonString(decisionData, "decision");
         string reasoning = GetJsonString(decisionData, "reasoning");
-        string apa = GetJsonString(decisionData, "apaCitation");
         string summary = GetJsonString(decisionData, "briefSummary");
+        var apaResult = ApaCitationBuilder.Build(paper);
 
         if (decision == "N/A") decision = "Excluded";
 
@@ -1437,6 +1576,7 @@ private async Task GeneratePrismaChecklistReportWithRAGAsync(Guid sessionId, int
             state.Stats.Included++;
         else 
             state.Stats.Excluded++;
-        state.Phases.Screening.Add(new ScreeningLog(paper.Id, paper.Title, decision, reasoning, apa, summary));
+        state.Phases.Screening.Add(new ScreeningLog(paper.Id, paper.Title, decision, reasoning, apaResult.Citation, summary,
+            apaResult.VenueType, apaResult.VenueName, apaResult.Year));
     }
 }

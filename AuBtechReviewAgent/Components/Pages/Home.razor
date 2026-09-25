@@ -7,6 +7,8 @@
 @inject AuBtechReviewAgent.PrismaReviewEngine ReviewEngine
 @inject ProtectedSessionStorage SessionStorage
 @inject IJSRuntime JS
+@inject AuBtechReviewAgent.RunQuotaService Quota
+@inject IHttpContextAccessor HttpContextAccessor
 
 <header class="bg-[#003B5C] text-white flex-none shrink-0 z-50 shadow-md">
     <div class="max-w-7xl mx-auto px-6 h-14 flex items-center justify-between">
@@ -43,25 +45,33 @@
                 </div>
 
                 <div class="mb-3 flex-none">
-                    @if (isUsingByok)
-                    {
-                        <div class="bg-green-50 border border-green-200 rounded p-2 text-[11px] text-green-800 flex items-center justify-between font-sans">
-                            <span class="font-medium flex items-center gap-1">
-                                <span class="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span>
-                                Active Mode: Bring Your Own Key Tier
-                            </span>
-                            <span class="font-mono text-[10px] bg-green-100 text-green-800 px-1 rounded">3 req / min</span>
-                        </div>
+                    @{
+                        string badgeColor = quotaStatus.Tier switch
+                        {
+                            AuBtechReviewAgent.QuotaTier.Developer => "blue",
+                            AuBtechReviewAgent.QuotaTier.OwnKey => "green",
+                            _ => quotaStatus.Allowed ? "amber" : "red"
+                        };
+                        string tierLabel = quotaStatus.Tier switch
+                        {
+                            AuBtechReviewAgent.QuotaTier.Developer => "Developer access",
+                            AuBtechReviewAgent.QuotaTier.OwnKey => "Own Mistral key",
+                            _ => "Free tier"
+                        };
+                        string counter = quotaStatus.Limit == int.MaxValue ? "unlimited"
+                            : quotaStatus.Tier == AuBtechReviewAgent.QuotaTier.OwnKey ? $"{quotaStatus.Remaining} / {quotaStatus.Limit} this hour"
+                            : $"{quotaStatus.Remaining} / {quotaStatus.Limit} left today";
                     }
-                    else
+                    <div class="bg-@(badgeColor)-50 border border-@(badgeColor)-200 rounded p-2 text-[11px] text-@(badgeColor)-800 flex items-center justify-between font-sans">
+                        <span class="font-medium flex items-center gap-1">
+                            <span class="w-1.5 h-1.5 rounded-full bg-@(badgeColor)-500"></span>
+                            @tierLabel
+                        </span>
+                        <span class="font-mono text-[10px] bg-@(badgeColor)-100 text-@(badgeColor)-800 px-1 rounded">@counter</span>
+                    </div>
+                    @if (!string.IsNullOrEmpty(quotaNotice))
                     {
-                        <div class="bg-amber-50 border border-amber-200 rounded p-2 text-[11px] text-amber-800 flex items-center justify-between font-sans">
-                            <span class="font-medium flex items-center gap-1">
-                                <span class="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
-                                Active Mode: Shared Server Default Tier
-                            </span>
-                            <span class="font-mono text-[10px] bg-amber-100 text-amber-800 px-1 rounded">1 req / day</span>
-                        </div>
+                        <p class="mt-1 text-[11px] text-red-700">@quotaNotice</p>
                     }
                 </div>
                 
@@ -116,13 +126,43 @@
                         
                         <div>
                             <label class="block text-[10px] font-bold uppercase text-gray-500 mb-0.5">Max Results of Each Source</label>
-                            <input type="number" min="1" max="50" @bind="maxResults" class="w-full p-1 bg-gray-50 border border-gray-300 rounded text-xs text-center font-mono focus:outline-none focus:border-[#003B5C]" />
+                            <input type="number" min="1" max="@maxResultsCeiling" @bind="maxResults" class="w-full p-1 bg-gray-50 border border-gray-300 rounded text-xs text-center font-mono focus:outline-none focus:border-[#003B5C]" />
+                            @if (quotaStatus.Tier == AuBtechReviewAgent.QuotaTier.Free)
+                            {
+                                <span class="block text-[9px] text-gray-400 mt-0.5">Free tier: at most @maxResultsCeiling</span>
+                            }
                         </div>
                     </div>
+
+                    <fieldset>
+                        <legend class="block text-[11px] font-bold uppercase text-gray-600 mb-1">Sources</legend>
+                        <div class="grid grid-cols-2 gap-x-3 gap-y-1">
+                            @foreach (var source in AuBtechReviewAgent.SourceCatalog.All)
+                            {
+                                bool available = sourceAvailability.TryGetValue(source.Key, out var ok) && ok;
+                                <label class="flex items-center gap-2 text-xs select-none @(available ? "text-gray-700 cursor-pointer" : "text-gray-400 cursor-not-allowed")"
+                                       title="@(available ? "" : $"Needs an {source.KeyLabel}. Add one under API Credentials.")">
+                                    <input type="checkbox" class="w-4 h-4 rounded accent-[#003B5C]"
+                                           checked="@(available && State.SelectedSources.Contains(source.Key))"
+                                           disabled="@(!available || isSearching)"
+                                           @onchange="e => ToggleSource(source.Key, e)" />
+                                    <span>@source.DisplayName</span>
+                                    @if (!available)
+                                    {
+                                        <span class="text-[9px] uppercase tracking-wide">(needs key)</span>
+                                    }
+                                </label>
+                            }
+                        </div>
+                        @if (SelectedAvailableSources().Count == 0)
+                        {
+                            <p class="text-[11px] text-red-700 mt-1">Select at least one source.</p>
+                        }
+                    </fieldset>
                 </div>
 
                 <div class="pt-3 flex-none">
-                    <button @onclick="StartReviewProcess" disabled="@isSearching" class="w-full py-2.5 px-4 text-white text-xs font-bold uppercase tracking-wider rounded transition-all hover:bg-opacity-95 disabled:opacity-50 shadow-sm" style="background-color: #003B5C;">
+                    <button @onclick="StartReviewProcess" disabled="@(isSearching || !quotaStatus.Allowed || SelectedAvailableSources().Count == 0)" class="w-full py-2.5 px-4 text-white text-xs font-bold uppercase tracking-wider rounded transition-all hover:bg-opacity-95 disabled:opacity-50 shadow-sm" style="background-color: #003B5C;">
                         @if (isSearching)
                         {
                             <span class="flex items-center justify-center gap-2">
@@ -189,7 +229,7 @@
             </div>
             <div class="p-4 space-y-3 overflow-y-auto text-xs text-gray-700">
                 <div class="bg-blue-50 border border-blue-100 text-blue-800 p-2.5 rounded text-[11px] leading-normal font-light">
-                    <strong>Browser Encryption Notice:</strong> Keys entered here are encrypted and stored purely inside your browser's local tab session. They never touch public logs, are never saved on server disks, and vanish completely when the tab is closed.
+                    <strong>Browser Encryption Notice:</strong> Keys entered here are encrypted and stored purely inside your browser's local tab session. They never touch public logs, are never saved on server disks, and vanish completely when the tab is closed. With your own Mistral key the free-tier daily limit does not apply.
                 </div>
                 <div>
                     <label class="block font-bold text-gray-600 mb-1 uppercase text-[10px]">Mistral AI Large API Key</label>
@@ -206,6 +246,11 @@
                 <div>
                     <label class="block font-bold text-gray-600 mb-1 uppercase text-[10px]">SerpApi Key (Google Scholar / ResearchGate)</label>
                     <input type="password" placeholder="Optional..." @bind="modalScholar" class="w-full p-2 border border-gray-300 rounded font-mono focus:outline-none focus:border-[#003B5C]" />
+                </div>
+                <div class="pt-2 border-t border-gray-100">
+                    <label class="block font-bold text-gray-600 mb-1 uppercase text-[10px]">Developer Access Token</label>
+                    <input type="password" placeholder="Only for the maintainers of this deployment" @bind="modalAdminToken" class="w-full p-2 border border-gray-300 rounded font-mono focus:outline-none focus:border-[#003B5C]" />
+                    <p class="text-[10px] text-gray-400 mt-1">Removes the daily run limit. Set with Quota:AdminToken on the server.</p>
                 </div>
             </div>
             <div class="bg-gray-50 px-4 py-3 border-t border-gray-200 flex justify-end gap-2">
@@ -238,8 +283,42 @@
     private int maxResults { get; set; } = 5;
 
     private bool showKeyModal = false;
-    private bool isUsingByok = false;
     private AuBtechReviewAgent.UserApiKeys? sessionKeys = null;
+
+    // Run quota: the client's address is read once when the component starts (from the HTTP request
+    // behind the prerender or the SignalR connection) and used as the quota key for this session.
+    private string clientAddress = "unknown";
+
+    // Captured during prerendering (a normal HTTP request, so the address is reliable) and carried into
+    // the interactive circuit through persisted component state, which Blazor Server protects with Data
+    // Protection so the browser cannot change it. The HttpContextAccessor value is only a fallback.
+    [PersistentState]
+    public string? PrerenderClientAddress { get; set; }
+    private string adminToken = "";
+    private string modalAdminToken = "";
+    private string quotaNotice = "";
+    private AuBtechReviewAgent.QuotaStatus quotaStatus = new(AuBtechReviewAgent.QuotaTier.Free, true, 0, 0, "");
+    private IReadOnlyDictionary<string, bool> sourceAvailability = new Dictionary<string, bool>();
+
+    private bool hasOwnMistralKey => !string.IsNullOrWhiteSpace(sessionKeys?.MistralApiKey);
+    private AuBtechReviewAgent.QuotaTier currentTier => Quota.ResolveTier(hasOwnMistralKey, adminToken);
+    private int maxResultsCeiling => Quota.MaxResultsFor(currentTier, 50);
+
+    private void RefreshQuotaAndSources()
+    {
+        quotaStatus = Quota.GetStatus(clientAddress, currentTier);
+        sourceAvailability = ReviewEngine.GetSourceAvailability(sessionKeys);
+        if (maxResults > maxResultsCeiling) maxResults = maxResultsCeiling;
+    }
+
+    private List<string> SelectedAvailableSources() =>
+        State.SelectedSources.Where(k => sourceAvailability.TryGetValue(k, out var ok) && ok).ToList();
+
+    private void ToggleSource(string key, ChangeEventArgs e)
+    {
+        if (e.Value is bool isChecked && isChecked) State.SelectedSources.Add(key);
+        else State.SelectedSources.Remove(key);
+    }
 
     private string modalMistral = "";
     private string modalElsevier = "";
@@ -255,6 +334,10 @@
 
     protected override async Task OnInitializedAsync()
     {
+        PrerenderClientAddress ??= AuBtechReviewAgent.RunQuotaService.NormalizeClientAddress(HttpContextAccessor.HttpContext?.Connection.RemoteIpAddress);
+        clientAddress = PrerenderClientAddress;
+        RefreshQuotaAndSources();
+
         if (isSearching)
         {
             ReviewEngine.OnProgressUpdated += HandleEngineProgress;
@@ -283,11 +366,16 @@
         {
             try
             {
+                var tokenResult = await SessionStorage.GetAsync<string>("developer_access_token");
+                if (tokenResult.Success && !string.IsNullOrWhiteSpace(tokenResult.Value))
+                {
+                    adminToken = modalAdminToken = tokenResult.Value;
+                }
+
                 var result = await SessionStorage.GetAsync<string>("encrypted_byok_payload");
                 if (result.Success && !string.IsNullOrWhiteSpace(result.Value))
                 {
                     sessionKeys = JsonSerializer.Deserialize<AuBtechReviewAgent.UserApiKeys>(result.Value);
-                    isUsingByok = sessionKeys != null && (!string.IsNullOrWhiteSpace(sessionKeys.MistralApiKey) || !string.IsNullOrWhiteSpace(sessionKeys.ElsevierApiKey));
                     
                     if (sessionKeys != null)
                     {
@@ -296,8 +384,9 @@
                         modalIeee = sessionKeys.IeeeApiKey ?? "";
                         modalScholar = sessionKeys.ScholarApiKey ?? "";
                     }
-                    await InvokeAsync(StateHasChanged);
                 }
+                RefreshQuotaAndSources();
+                await InvokeAsync(StateHasChanged);
             }
             catch { }
         }
@@ -314,21 +403,29 @@
         string sScholar = AuBtechReviewAgent.SecurityUtility.SanitizeInput(modalScholar);
 
         sessionKeys = new AuBtechReviewAgent.UserApiKeys(sMistral, sElsevier, sIeee, sScholar);
-        isUsingByok = !string.IsNullOrWhiteSpace(sMistral) || !string.IsNullOrWhiteSpace(sElsevier);
 
         string jsonPayload = JsonSerializer.Serialize(sessionKeys);
         await SessionStorage.SetAsync("encrypted_byok_payload", jsonPayload);
-        
+
+        adminToken = modalAdminToken.Trim();
+        if (string.IsNullOrEmpty(adminToken)) await SessionStorage.DeleteAsync("developer_access_token");
+        else await SessionStorage.SetAsync("developer_access_token", adminToken);
+        quotaNotice = !string.IsNullOrEmpty(adminToken) && !Quota.IsValidAdminToken(adminToken)
+            ? "The developer access token was not recognised." : "";
+
+        RefreshQuotaAndSources();
         showKeyModal = false;
         StateHasChanged();
     }
 
     private async Task ClearVault()
     {
-        modalMistral = modalElsevier = modalIeee = modalScholar = "";
+        modalMistral = modalElsevier = modalIeee = modalScholar = modalAdminToken = adminToken = "";
         sessionKeys = null;
-        isUsingByok = false;
         await SessionStorage.DeleteAsync("encrypted_byok_payload");
+        await SessionStorage.DeleteAsync("developer_access_token");
+        quotaNotice = "";
+        RefreshQuotaAndSources();
         showKeyModal = false;
         StateHasChanged();
     }
@@ -347,6 +444,33 @@
 
     private async Task StartReviewProcess()
     {
+        if (isSearching) return;
+
+        // Count the run before it starts. The check happens here on the server, so it cannot be skipped
+        // from the browser, and a double click cannot start two runs on one remaining slot.
+        var tier = currentTier;
+        if (!Quota.TryReserve(clientAddress, tier, out var reservedStatus, out var lease))
+        {
+            quotaStatus = reservedStatus;
+            quotaNotice = reservedStatus.Message;
+            return;
+        }
+        quotaStatus = reservedStatus;
+        quotaNotice = "";
+
+        var runSources = SelectedAvailableSources();
+        if (runSources.Count == 0)
+        {
+            if (lease != null) Quota.Refund(lease);
+            RefreshQuotaAndSources();
+            quotaNotice = "Select at least one source.";
+            return;
+        }
+        int runMaxResults = Quota.MaxResultsFor(tier, maxResults);
+        maxResults = runMaxResults;
+        int yearFrom = dateFrom.Year;
+        int yearTo = dateTo.Year;
+
         string cleanQuery = AuBtechReviewAgent.SecurityUtility.SanitizeInput(searchQuery);
         string cleanObjective = AuBtechReviewAgent.SecurityUtility.SanitizeInput(reviewObjective);
         string cleanInclusion = AuBtechReviewAgent.SecurityUtility.SanitizeInput(inclusionCriteria);
@@ -378,21 +502,26 @@
                     cleanObjective, 
                     cleanInclusion, 
                     cleanExclusion, 
-                    maxResults, 
+                    runMaxResults, 
                     requirePeerReview, 
                     cleanDirective,
-                    sessionKeys
+                    sessionKeys,
+                    runSources,
+                    yearFrom,
+                    yearTo
                 );
             }
             catch (Exception ex)
             {
-                rawJsonLogs = $"{{\n  \"error\": \"{ex.Message}\"\n}}";
+                // The run died before producing a review: give the quota slot back.
+                if (lease != null) Quota.Refund(lease);
+                rawJsonLogs = JsonSerializer.Serialize(new { error = ex.Message }, new JsonSerializerOptions { WriteIndented = true });
             }
             finally
             {
                 ReviewEngine.OnProgressUpdated -= HandleEngineProgress;
                 isSearching = false;
-                await InvokeAsync(StateHasChanged);
+                await InvokeAsync(() => { RefreshQuotaAndSources(); StateHasChanged(); });
             }
         });
 
@@ -429,8 +558,11 @@ private void StartLogMonitoringLoop()
         });
     }
 
-    private void HandleEngineProgress(ReviewStats updatedStats)
+    private void HandleEngineProgress(Guid runSessionId, ReviewStats updatedStats)
     {
+        // The engine is shared by all users; only react to this dashboard's own run.
+        if (runSessionId != currentSessionId) return;
+
         InvokeAsync(() =>
         {
             totalIdentified = updatedStats.TotalIdentified;

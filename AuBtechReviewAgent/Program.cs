@@ -6,53 +6,43 @@ using System.Threading.RateLimiting;
 QuestPDF.Settings.License = QuestPDF.Infrastructure.LicenseType.Community;
 var builder = WebApplication.CreateBuilder(args);
 
-// 1. FORWARDED HEADERS CONFIGURATION (Resolves Simply.com SSL termination reverse proxy redirect warning)
+// 1. FORWARDED HEADERS CONFIGURATION
+// X-Forwarded-For is only trusted from proxies listed in ReverseProxy:KnownProxies (default: none besides
+// loopback). The old config cleared the trusted list, which meant any visitor could send their own
+// X-Forwarded-For header and pick the IP address the run quota counts against.
+// Under IIS in-process hosting (e.g. Simply.com) the real client IP arrives without any forwarded header,
+// so nothing needs to be listed there. Only add entries if a separate proxy sits in front of the app.
 builder.Services.Configure<ForwardedHeadersOptions>(options =>
 {
     options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
-    options.KnownIPNetworks.Clear();
-    options.KnownProxies.Clear();
+    foreach (var proxy in builder.Configuration.GetSection("ReverseProxy:KnownProxies").Get<string[]>() ?? Array.Empty<string>())
+    {
+        if (System.Net.IPAddress.TryParse(proxy, out var proxyAddress)) options.KnownProxies.Add(proxyAddress);
+    }
 });
 
-// 2. ENDPOINT RATE LIMITER DEFINITION (Protects downstream engine instances from automated queue spam)
+// 2. RATE LIMITING
+// Review runs are limited by RunQuotaService (per client address per day, see the Quota section in
+// appsettings.json). Runs start over the Blazor SignalR circuit, which HTTP rate-limiting middleware never
+// sees, so the middleware limiter only guards the one plain HTTP endpoint: the archive download.
 builder.Services.AddRateLimiter(options =>
 {
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
-    
-    options.AddPolicy("ExtractionQueuePolicy", httpContext =>
-    {
-        string ipAddress = httpContext.Connection.RemoteIpAddress?.ToString() ?? "anonymous";
-        
-        // Check if the user has activated their own keys
-        bool isUsingByok = httpContext.Request.Headers.TryGetValue("X-BYOK-Active", out var byokValue) 
-                           && byokValue == "true";
-
-        if (isUsingByok)
-        {
-            // BYOK Tier: Standard 3 searches per minute
-            return RateLimitPartition.GetFixedWindowLimiter(
-                partitionKey: $"byok_{ipAddress}",
-                factory: _ => new FixedWindowRateLimiterOptions
-                {
-                    PermitLimit = 3,
-                    Window = TimeSpan.FromMinutes(1),
-                    QueueLimit = 0
-                });
-        }
-        else
-        {
-            // Server Default Key Tier: Strict limit of 1 use per day (1440 minutes) per IP address
-            return RateLimitPartition.GetFixedWindowLimiter(
-                partitionKey: $"default_{ipAddress}",
-                factory: _ => new FixedWindowRateLimiterOptions
-                {
-                    PermitLimit = 1,
-                    Window = TimeSpan.FromDays(1),
-                    QueueLimit = 0
-                });
-        }
-    });
+    options.AddPolicy("ArchiveDownloadPolicy", httpContext =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: AuBtechReviewAgent.RunQuotaService.NormalizeClientAddress(httpContext.Connection.RemoteIpAddress),
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 20,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0
+            }));
 });
+
+var quotaOptions = builder.Configuration.GetSection("Quota").Get<AuBtechReviewAgent.QuotaOptions>() ?? new AuBtechReviewAgent.QuotaOptions();
+builder.Services.AddSingleton(new AuBtechReviewAgent.RunQuotaService(
+    quotaOptions, builder.Environment.IsDevelopment(), builder.Environment.ContentRootPath));
+builder.Services.AddHttpContextAccessor();
 
 // Add standard interactive services to the container
 builder.Services.AddRazorComponents()
@@ -66,7 +56,9 @@ string elsevierApiKey = builder.Configuration["ELSEVIER_API_KEY"] ?? "";
 string ieeeApiKey = builder.Configuration["IEEE_API_KEY"] ?? "";
 string scholarApiKey = builder.Configuration["SCHOLAR_API_KEY"] ?? ""; 
 
-builder.Services.AddSingleton(new AuBtechReviewAgent.PrismaReviewEngine(mistralApiKey, elsevierApiKey, ieeeApiKey, scholarApiKey));
+string? supportStatement = builder.Configuration["Report:SupportStatement"];
+
+builder.Services.AddSingleton(new AuBtechReviewAgent.PrismaReviewEngine(mistralApiKey, elsevierApiKey, ieeeApiKey, scholarApiKey, supportStatement));
 
 // Register the storage cleanup background worker
 builder.Services.AddHostedService<AuBtechReviewAgent.SessionCleanupWorker>();
@@ -103,7 +95,7 @@ app.MapGet("/api/workspace/{sessionId:guid}/archive", (Guid sessionId, AuBtechRe
 
     string fileName = $"PRISMA_Evaluation_Footprint_{DateTime.UtcNow:yyyyMMdd}.zip";
     return Results.File(zipBytes, "application/zip", fileName);
-});
+}).RequireRateLimiting("ArchiveDownloadPolicy");
 
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
