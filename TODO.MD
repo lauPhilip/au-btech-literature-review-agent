@@ -50,3 +50,20 @@ Implement dedicated API client adapters implementing the `IAcademicSource` inter
 * [X] **Date range applied:** the Date From / Date To fields now filter by publication year (they were previously ignored).
 * [X] **Per-session progress:** progress events carry the session id, so one user's dashboard no longer shows another user's counts.
 * [ ] **Deploy to Simply:** set `Quota:AdminToken`, `MISTRAL_API_KEY` and (optionally) `Report:SupportStatement` as server secrets; make sure `App_Data/` is writable.
+
+## 8. Multi-user hardening and research features
+* [X] **Concurrent downloads:** `main.tex` is built in memory; no more shared `manuscript_*.tex` files that one download could delete under another.
+* [X] **Run links:** `/review/{id}` and `/spec-matrix/{id}` reopen a run after a reload, from a bookmark or on another device.
+* [X] **Retention:** runs are kept 7 days (`Runs:RetentionDays`), judged by the newest file in the folder; active runs are never deleted.
+* [X] **Run slots:** at most `Runs:MaxConcurrentRuns` runs call the model at once, first come first served, with the place in line shown; 429/5xx responses are retried with backoff.
+* [X] **Restarts:** runs cut off by an app restart are marked "Interrupted" at startup.
+* [X] **Efficiency:** Scimago data is loaded once per year into memory; arXiv and Scopus adapters share one HttpClient.
+* [X] **Balanced grounding:** every included paper contributes its abstract and an equal share of relevant passages (the old first-40-chunks rule let one long PDF crowd out the rest).
+* [X] **Citation support check:** per cited sentence, a verdict with a verified verbatim quote in `citation-audit.json`, summarised in the report.
+* [X] **Human screening review:** optional pause after screening; overrides recorded with the model's original decision.
+* [X] **PRISMA flow diagram** in `main.tex`; every identified record is now counted in exactly one box (records dropped at the per-source cap and failed screening calls used to vanish).
+* [X] **BibTeX / RIS export** in the archive and as downloads.
+* [X] **Run settings:** `llm-calls.json` with model, app version, temperature per stage, retries, token use and prompt hashes; screening runs at temperature 0.
+* [X] **Screening evaluation tool** (`tools/ScreeningEval`) for SYNERGY/ASReview datasets.
+* [ ] **Open-access full text:** look up DOIs on Unpaywall so non-arXiv papers get full text (improves grounding and the citation check).
+* [ ] **Run history in a database** (see notes on PostgreSQL).
