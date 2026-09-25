@@ -14,13 +14,13 @@
 @inject NavigationManager Nav
 
 <header class="bg-[#003B5C] text-white flex-none shrink-0 z-50 shadow-md">
-    <div class="max-w-7xl mx-auto px-6 h-14 flex items-center justify-between">
-        <a href="/" class="flex items-center space-x-3 hover:opacity-90 transition-opacity">
-            <span class="font-bold tracking-tight text-sm">AARHUS UNIVERSITY</span>
-            <span class="text-white/40 font-light">|</span>
-            <span class="text-xs tracking-wider font-medium opacity-90 uppercase">au-btech-literature-review-agent</span>
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between gap-3">
+        <a href="/" class="flex items-center space-x-3 hover:opacity-90 transition-opacity min-w-0 shrink">
+            <span class="font-bold tracking-tight text-xs sm:text-sm whitespace-nowrap">AARHUS UNIVERSITY</span>
+            <span class="text-white/40 font-light hidden lg:inline">|</span>
+            <span class="text-xs tracking-wider font-medium opacity-90 uppercase hidden lg:inline">au-btech-literature-review-agent</span>
         </a>
-        <nav class="flex items-center space-x-6 text-xs font-semibold uppercase tracking-wider">
+        <nav class="flex items-center gap-3 sm:gap-6 text-[10px] sm:text-xs font-semibold uppercase tracking-wider whitespace-nowrap shrink-0">
             <a href="/" class="text-white/70 hover:text-white transition-colors py-4">Overview</a>
             <a href="@(hasRun ? $"/review/{currentSessionId}" : "/review")" class="text-white border-b-2 border-white py-4">Dashboard</a>
             <a href="@(hasRun ? $"/spec-matrix/{currentSessionId}" : "/spec-matrix")" class="text-white/70 hover:text-white transition-colors py-4">Review Output</a>
@@ -28,17 +28,17 @@
     </div>
 </header>
 
-<div class="flex-1 flex flex-col min-h-0 overflow-hidden items-center justify-center max-w-7xl w-full mx-auto p-4 lg:p-6 space-y-4">
+<div class="flex-1 flex flex-col min-h-0 overflow-y-auto lg:overflow-hidden max-w-7xl w-full mx-auto p-4 lg:p-6 gap-4">
     
     <div class="w-full text-center flex-none shrink-0 space-y-1">
         <h1 class="text-2xl lg:text-3xl font-light text-gray-900 tracking-tight">Literature Review Agent</h1>
         <p class="text-xs font-mono tracking-widest text-[#003B5C] uppercase font-bold">Traceable PRISMA Reviews</p>
     </div>
 
-    <div class="w-full flex-1 grid grid-cols-1 lg:grid-cols-12 gap-4 min-h-0 overflow-hidden">
+    <div class="w-full grid grid-cols-1 lg:grid-cols-12 gap-4 lg:flex-1 lg:min-h-0">
         
-        <div class="lg:col-span-5 flex flex-col space-y-4 min-h-0">
-            <div class="bg-white border border-gray-200 rounded-lg p-4 flex flex-col justify-between shadow-sm flex-1 min-h-0">
+        <div class="lg:col-span-5 flex flex-col gap-4 min-w-0 lg:min-h-0 lg:overflow-y-auto lg:pr-1">
+            <div class="bg-white border border-gray-200 rounded-lg p-4 flex flex-col shadow-sm flex-none">
                 <div class="flex justify-between items-center mb-2 flex-none">
                     <span class="text-[10px] font-bold uppercase tracking-wider text-gray-400 block">Execution Configuration</span>
                     <button @onclick="OpenKeyModal" class="text-[10px] bg-gray-100 hover:bg-gray-200 border border-gray-300 text-gray-700 px-2 py-0.5 rounded transition-all flex items-center gap-1">
@@ -78,7 +78,7 @@
                     }
                 </div>
                 
-                <div class="space-y-3 overflow-y-auto pr-1 flex-1 text-left">
+                <div class="space-y-3 text-left">
                     <div>
                         <label class="block text-[11px] font-bold uppercase text-gray-600 mb-1">Search Query</label>
                         <input type="text" @bind="searchQuery" class="w-full p-2 bg-gray-50 border border-gray-300 rounded focus:outline-none focus:border-[#003B5C] text-xs shadow-inner transition-all" />
@@ -206,10 +206,10 @@
                 </div>
             }
 
-            <PrismaFunnel Stats="State.Stats" Running="isSearching" />
+            <PrismaFunnel Stats="State.Stats" Removed="State.RemovedBeforeScreening" Running="isSearching" />
         </div>
 
-        <div class="lg:col-span-7 flex flex-col min-h-0 border border-gray-200 rounded-lg bg-white shadow-sm overflow-hidden">
+        <div class="lg:col-span-7 flex flex-col min-w-0 h-[32rem] lg:h-auto lg:min-h-0 border border-gray-200 rounded-lg bg-white shadow-sm overflow-hidden">
             @if (awaitingReview && reviewLogs != null)
             {
                 <ScreeningReviewPanel RunId="currentSessionId" Logs="reviewLogs" OnSubmitted="OnScreeningReviewSubmitted" />
@@ -220,7 +220,7 @@
                     <span>JSON output</span>
                     <span class="text-[9px] opacity-50 uppercase tracking-widest font-bold">Mistral LLM</span>
                 </div>
-                <div class="flex-1 bg-gray-950 p-4 font-mono text-xs text-green-400 overflow-y-auto whitespace-pre-wrap leading-relaxed">
+                <div class="flex-1 min-h-0 bg-gray-950 p-4 font-mono text-xs text-green-400 overflow-y-auto whitespace-pre-wrap break-words leading-relaxed">
                     @rawJsonLogs
                 </div>
             }
@@ -421,6 +421,7 @@
     {
         var s = state.Stats;
         State.Stats = s;
+        State.RemovedBeforeScreening = state.RemovedBeforeScreening;
         totalIdentified = s.TotalIdentified;
         screenedCount = s.Screened;
         excludedCount = s.Excluded + s.FailedPeerReviewCheck;
@@ -606,6 +607,7 @@
         string cleanDirective = AuBtechReviewAgent.SecurityUtility.SanitizeInput(synthesisTargetDirective);
 
         State.Stats = new ReviewStats();
+        State.RemovedBeforeScreening = new();
         totalIdentified = 0;
         screenedCount = 0;
         excludedCount = 0;
