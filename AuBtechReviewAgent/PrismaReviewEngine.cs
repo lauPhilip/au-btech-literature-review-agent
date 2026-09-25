@@ -1209,7 +1209,9 @@ public class PrismaReviewEngine
             var mermaidMatch = Regex.Match(rawResponse, @"\[MERMAID_START\](.*?)\[MERMAID_END\]", RegexOptions.Singleline);
             if (mermaidMatch.Success)
             {
-                mermaidBlock = "\n\n[MERMAID_START]\n" + mermaidMatch.Groups[1].Value.Trim() + "\n[MERMAID_END]\n";
+                // Labels like "Recovery (+20%) [4]" break Mermaid unless quoted; repair before storing.
+                string cleanMermaid = MermaidSanitizer.Sanitize(mermaidMatch.Groups[1].Value);
+                if (cleanMermaid.Length > 0) mermaidBlock = "\n\n[MERMAID_START]\n" + cleanMermaid + "\n[MERMAID_END]\n";
             }
 
             string tikzBlock = "";
