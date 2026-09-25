@@ -15,6 +15,7 @@ public class UiStateContainer
     public DateTime DateFrom { get; set; } = new DateTime(2020, 01, 01);
     public DateTime DateTo { get; set; } = DateTime.Today;
     public bool RequirePeerReview { get; set; } = false;
+    public bool ReviewScreeningFirst { get; set; } = false;
     public string SynthesisTargetDirective { get; set; } = "Create a conceptual architectural loop diagram detailing fault-tolerance gating mechanisms.";
     public string RawJsonLogs { get; set; } = "{\n  \"status\": \"Awaiting execution...\",\n  \"loopState\": \"Idle\"\n}";
     public int TotalIdentified { get; set; } = 0;
