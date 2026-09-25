@@ -66,7 +66,7 @@ Each run has its own link (`/review/{run-id}`), so you can reload the page, book
 
 | File | What it lets you check |
 |---|---|
-| `transparent-process.json` | Which query hit which source and when, what was found, and why each paper was included or excluded |
+| `transparent-process.json` | Which query hit which source and when, what was found, which papers were removed before screening (duplicate, outside the year range or over the per-source cap, with the reason), and why each screened paper was included or excluded |
 | `grounded-outline.txt` | Which source each claim was assigned to before any prose was written |
 | `citation-audit.json` | Which invalid reference numbers the validator removed, and for every cited sentence whether the cited paper supports it, with the quoted evidence |
 | `llm-calls.json` | Exactly how the run was produced: model and app version, temperature per stage, retries, token use, and a SHA-256 fingerprint of every prompt, so two runs can be compared |
