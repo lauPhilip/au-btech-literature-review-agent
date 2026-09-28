@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -236,7 +237,7 @@ public class RunQuotaService
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[Quota] Could not read {_storagePath}, starting with empty counters: {ex.Message}");
+            AppLog.For<RunQuotaService>().LogWarning("Could not read {Path}, starting with empty counters: {Message}", _storagePath, ex.Message);
         }
         return new QuotaFile { Secret = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32)) };
     }
@@ -261,7 +262,7 @@ public class RunQuotaService
         catch (Exception ex)
         {
             // Counting still works in memory; it just would not survive a restart.
-            Console.WriteLine($"[Quota] Could not write {_storagePath}: {ex.Message}");
+            AppLog.For<RunQuotaService>().LogWarning("Could not write {Path}: {Message}", _storagePath, ex.Message);
         }
     }
 
