@@ -1,0 +1,14 @@
+{
+  "title": "TraceableAI: an open-source agentic framework for PRISMA-compliant literature synthesis",
+  "description": "TraceableAI runs a systematic literature review following PRISMA 2020 with a language model and records every step: the protocol written before the search, the raw responses of the bibliographic sources, every screening decision with its rationale, the extraction and quality appraisal with verified quotes, a citation support check and a SHA-256 manifest of all files. This record is the software release archived by Zenodo; each GitHub release gets its own DOI.",
+  "upload_type": "software",
+  "creators": [
+    { "name": "Lau, Philip S. P. Ø. O.", "affiliation": "Aarhus University" },
+    { "name": "Nidhi" }
+  ],
+  "license": "Apache-2.0",
+  "keywords": ["systematic literature review", "PRISMA 2020", "large language models", "traceability", "open science"],
+  "related_identifiers": [
+    { "identifier": "https://github.com/lauPhilip/au-btech-literature-review-agent", "relation": "isSupplementTo", "scheme": "url" }
+  ]
+}

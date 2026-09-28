@@ -1,0 +1,27 @@
+# How to cite this software. GitHub shows a "Cite this repository" button based on this file.
+cff-version: 1.2.0
+message: "If you use TraceableAI in your research, please cite the paper below and the software version you used."
+title: "TraceableAI: an open-source agentic framework for PRISMA-compliant literature synthesis"
+type: software
+authors:
+  - family-names: Lau
+    given-names: "Philip S. P. Ø. O."
+    affiliation: "Department of Business Development and Technology, Aarhus University"
+  - given-names: Nidhi
+repository-code: "https://github.com/lauPhilip/au-btech-literature-review-agent"
+license: Apache-2.0
+keywords:
+  - systematic literature review
+  - PRISMA 2020
+  - large language models
+  - traceability
+  - open science
+preferred-citation:
+  type: conference-paper
+  title: "TraceableAI: An Open-Source Agentic Framework for PRISMA-Compliant Literature Synthesis"
+  authors:
+    - family-names: Lau
+      given-names: "Philip S. P. Ø. O."
+    - given-names: Nidhi
+  collection-title: "Proceedings of the 8th International Open Search Symposium (OSSYM 2026)"
+  year: 2026
