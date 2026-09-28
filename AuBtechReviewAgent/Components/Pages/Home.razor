@@ -12,11 +12,12 @@
 @inject AuBtechReviewAgent.RunQuotaService Quota
 @inject IHttpContextAccessor HttpContextAccessor
 @inject NavigationManager Nav
+@inject ILogger<Home> Logger
 
 <header class="bg-[#003B5C] text-white flex-none shrink-0 z-50 shadow-md">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between gap-3">
-        <a href="/" class="flex items-center space-x-3 hover:opacity-90 transition-opacity min-w-0 shrink">
-            <span class="font-bold tracking-tight text-xs sm:text-sm whitespace-nowrap">AARHUS UNIVERSITY</span>
+        <a href="/" class="flex items-center space-x-3 hover:opacity-90 transition-opacity min-w-0 shrink overflow-hidden">
+            <span class="font-bold tracking-tight text-xs sm:text-sm whitespace-nowrap truncate">AARHUS UNIVERSITY</span>
             <span class="text-white/40 font-light hidden lg:inline">|</span>
             <span class="text-xs tracking-wider font-medium opacity-90 uppercase hidden lg:inline">au-btech-literature-review-agent</span>
         </a>
@@ -49,11 +50,13 @@
 
                 <div class="mb-3 flex-none">
                     @{
-                        string badgeColor = quotaStatus.Tier switch
+                        // Full class names (not built from a colour variable) so the Tailwind build can find them.
+                        var (badgeBox, badgeDot, badgeCounter) = quotaStatus.Tier switch
                         {
-                            AuBtechReviewAgent.QuotaTier.Developer => "blue",
-                            AuBtechReviewAgent.QuotaTier.OwnKey => "green",
-                            _ => quotaStatus.Allowed ? "amber" : "red"
+                            AuBtechReviewAgent.QuotaTier.Developer => ("bg-blue-50 border-blue-200 text-blue-800", "bg-blue-500", "bg-blue-100 text-blue-800"),
+                            AuBtechReviewAgent.QuotaTier.OwnKey => ("bg-green-50 border-green-200 text-green-800", "bg-green-500", "bg-green-100 text-green-800"),
+                            _ when quotaStatus.Allowed => ("bg-amber-50 border-amber-200 text-amber-800", "bg-amber-500", "bg-amber-100 text-amber-800"),
+                            _ => ("bg-red-50 border-red-200 text-red-800", "bg-red-500", "bg-red-100 text-red-800"),
                         };
                         string tierLabel = quotaStatus.Tier switch
                         {
@@ -65,12 +68,12 @@
                             : quotaStatus.Tier == AuBtechReviewAgent.QuotaTier.OwnKey ? $"{quotaStatus.Remaining} / {quotaStatus.Limit} this hour"
                             : $"{quotaStatus.Remaining} / {quotaStatus.Limit} left today";
                     }
-                    <div class="bg-@(badgeColor)-50 border border-@(badgeColor)-200 rounded p-2 text-[11px] text-@(badgeColor)-800 flex items-center justify-between font-sans">
+                    <div class="@badgeBox border rounded p-2 text-[11px] flex items-center justify-between font-sans">
                         <span class="font-medium flex items-center gap-1">
-                            <span class="w-1.5 h-1.5 rounded-full bg-@(badgeColor)-500"></span>
+                            <span class="w-1.5 h-1.5 rounded-full @badgeDot"></span>
                             @tierLabel
                         </span>
-                        <span class="font-mono text-[10px] bg-@(badgeColor)-100 text-@(badgeColor)-800 px-1 rounded">@counter</span>
+                        <span class="font-mono text-[10px] @badgeCounter px-1 rounded">@counter</span>
                     </div>
                     @if (!string.IsNullOrEmpty(quotaNotice))
                     {
@@ -169,6 +172,20 @@
                             <span class="block font-normal text-[10px] text-gray-500">The run pauses after screening so you can include or exclude papers yourself. Your decisions are recorded in the ledger.</span>
                         </span>
                     </label>
+
+                    <label class="flex items-start gap-2 text-xs text-gray-700 font-semibold cursor-pointer select-none">
+                        <input type="checkbox" @bind="State.DualScreening" disabled="@isSearching" class="w-4 h-4 mt-0.5 rounded accent-[#003B5C]" />
+                        <span>Screen every record twice
+                            <span class="block font-normal text-[10px] text-gray-500">Two independent screening prompts. Disagreements are kept and flagged, and the agreement (Cohen's kappa) is reported in the methods.</span>
+                        </span>
+                    </label>
+
+                    <label class="flex items-start gap-2 text-xs text-gray-700 font-semibold cursor-pointer select-none">
+                        <input type="checkbox" @bind="State.CitationChaining" disabled="@isSearching" class="w-4 h-4 mt-0.5 rounded accent-[#003B5C]" />
+                        <span>Citation chaining
+                            <span class="block font-normal text-[10px] text-gray-500">Also screen the papers that included studies cite and the papers citing them (one round, via OpenAlex). Needs DOIs.</span>
+                        </span>
+                    </label>
                 </div>
 
                 <div class="pt-3 flex-none">
@@ -203,6 +220,21 @@
                         Link to this run: <a class="text-[#003B5C] underline break-all" href="@($"/review/{currentSessionId}")">@($"/review/{currentSessionId}")</a>.
                         Anyone with the link can open it. Results are kept for @RunsOptions.RetentionDays days@(completedUtc.HasValue ? $" (until {completedUtc.Value.AddDays(RunsOptions.RetentionDays):yyyy-MM-dd} UTC)" : "").
                     </p>
+                    @if (!isSearching && AuBtechReviewAgent.PrismaReviewEngine.IsFinishedStage(stage))
+                    {
+                        <div class="pt-1 flex items-center gap-2 text-[11px]">
+                            @if (!confirmDelete)
+                            {
+                                <button type="button" @onclick="() => confirmDelete = true" class="text-red-700 hover:text-red-900 underline">Delete this run</button>
+                            }
+                            else
+                            {
+                                <span class="text-red-800">Delete the run, its report and downloaded papers for good?</span>
+                                <button type="button" @onclick="DeleteRun" class="px-2 py-0.5 bg-red-600 text-white rounded font-semibold">Delete</button>
+                                <button type="button" @onclick="() => confirmDelete = false" class="px-2 py-0.5 border border-gray-300 rounded">Cancel</button>
+                            }
+                        </div>
+                    }
                 </div>
             }
 
@@ -218,7 +250,7 @@
             {
                 <div class="bg-gray-800 text-white px-4 py-2.5 text-xs font-mono flex justify-between items-center flex-none">
                     <span>JSON output</span>
-                    <span class="text-[9px] opacity-50 uppercase tracking-widest font-bold">Mistral LLM</span>
+                    <span class="text-[9px] opacity-50 uppercase tracking-widest font-bold">@ReviewEngine.Llm.Model</span>
                 </div>
                 <div class="flex-1 min-h-0 bg-gray-950 p-4 font-mono text-xs text-green-400 overflow-y-auto whitespace-pre-wrap break-words leading-relaxed">
                     @rawJsonLogs
@@ -357,6 +389,7 @@
     private string? failureMessage;
     private DateTime? completedUtc;
     private bool awaitingReview;
+    private bool confirmDelete;
     private IReadOnlyList<AuBtechReviewAgent.ScreeningLog>? reviewLogs;
     private CancellationTokenSource? monitorCts;
     private bool subscribed;
@@ -559,6 +592,26 @@
         StateHasChanged();
     }
 
+    /// <summary>Deletes the finished run shown on this page (its folder, report and downloaded papers).</summary>
+    private void DeleteRun()
+    {
+        confirmDelete = false;
+        var id = currentSessionId;
+        if (!ReviewEngine.DeleteRun(id))
+        {
+            failureMessage = "The run could not be deleted (it may still be running or already be gone).";
+            return;
+        }
+        Unsubscribe();
+        currentSessionId = Guid.Empty;
+        State.Stats = new ReviewStats();
+        State.RemovedBeforeScreening = new();
+        rawJsonLogs = "{\n  \"status\": \"Run deleted.\"\n}";
+        stage = "";
+        failureMessage = null;
+        Nav.NavigateTo("/review", replace: true);
+    }
+
     private void HandlePresetArtifactSelection(ChangeEventArgs e)
     {
         string chosen = e.Value?.ToString() ?? "Custom";
@@ -626,7 +679,8 @@
         currentSessionId = runId;
         var request = new AuBtechReviewAgent.ReviewRequest(
             cleanQuery, cleanObjective, cleanInclusion, cleanExclusion, runMaxResults,
-            requirePeerReview, cleanDirective, sessionKeys, runSources, yearFrom, yearTo, State.ReviewScreeningFirst);
+            requirePeerReview, cleanDirective, sessionKeys, runSources, yearFrom, yearTo, State.ReviewScreeningFirst,
+            DualScreening: State.DualScreening, CitationChaining: State.CitationChaining);
 
         Subscribe();
 
@@ -640,7 +694,7 @@
             {
                 // The run failed: give the quota slot back. The reason is stored in the run's ledger.
                 if (lease != null) Quota.Refund(lease);
-                Console.WriteLine($"[Run {runId:N}] failed: {ex.Message}");
+                Logger.LogWarning("Run {RunId} failed: {Message}", runId, ex.Message);
             }
             finally
             {
