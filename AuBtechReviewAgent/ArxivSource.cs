@@ -5,6 +5,7 @@ using System.Net.Http;
 using System.Threading.Tasks;
 using System.Text.RegularExpressions;
 using System.Xml.Linq;
+using Microsoft.Extensions.Logging;
 
 namespace AuBtechReviewAgent;
 
@@ -13,6 +14,8 @@ public class ArxivSource : IAcademicSource
     // One shared HttpClient for the whole app; creating one per run exhausts sockets on a busy server.
     private static readonly HttpClient _httpClient = CreateClient();
     public string SourceName => "arXiv API";
+    private readonly List<string> _raw = new();
+    public IReadOnlyList<string> LastRawResponses => _raw;
 
     private static HttpClient CreateClient()
     {
@@ -21,8 +24,9 @@ public class ArxivSource : IAcademicSource
         return client;
     }
 
- public async Task<List<AcademicPaper>> FetchPapersAsync(string query, int maxResults = 5)
+    public async Task<List<AcademicPaper>> FetchPapersAsync(string query, int maxResults = 5)
     {
+        _raw.Clear();
         var papers = new List<AcademicPaper>();
         string encodedQuery = Uri.EscapeDataString(query);
         string url = $"https://export.arxiv.org/api/query?search_query=all:{encodedQuery}&max_results={maxResults}";
@@ -30,8 +34,7 @@ public class ArxivSource : IAcademicSource
         try
         {
             string xmlContent = await _httpClient.GetStringAsync(url);
-            
-            // ─── ADD THIS LINE TO FIX THE COMPILATION ERROR ───
+            _raw.Add(xmlContent);
             XDocument doc = XDocument.Parse(xmlContent);
             
             XNamespace ns = "http://www.w3.org/2005/Atom";
@@ -72,9 +75,10 @@ public class ArxivSource : IAcademicSource
                 papers.Add(new AcademicPaper(id, title, summary, $"Published: {publishedYear}", authors, journalRef, doi, landingUrl));
             }
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not HttpRequestException and not TaskCanceledException)
         {
-            Console.WriteLine($"Error fetching data from arXiv: {ex.Message}");
+            // A malformed entry is skipped; network errors propagate so the search log shows the source as failed.
+            AppLog.For<ArxivSource>().LogWarning("arXiv response could not be parsed: {Message}", ex.Message);
         }
 
         return papers;

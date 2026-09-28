@@ -27,7 +27,7 @@ public static class ApaCitationBuilder
     private static readonly string[] PlaceholderVenues =
     {
         "Google Scholar Indexed Publication",
-        "ResearchGate Institutional Preprint",
+        "ResearchGate Institutional Preprint", // legacy runs
         "IEEE Publication",
         "Scopus Indexed Journal",
     };
@@ -43,7 +43,8 @@ public static class ApaCitationBuilder
         string title = CleanText(paper.Title).TrimEnd('.');
         string venue = CleanVenue(paper.JournalSource);
         string link = BuildLink(paper);
-        bool isArxiv = (paper.Id ?? "").Contains("arxiv.org", StringComparison.OrdinalIgnoreCase);
+        bool isArxiv = (paper.Id ?? "").Contains("arxiv.org", StringComparison.OrdinalIgnoreCase)
+                       || (paper.Doi ?? "").Contains("10.48550/arxiv", StringComparison.OrdinalIgnoreCase);
 
         string venueType;
         string venuePart;
