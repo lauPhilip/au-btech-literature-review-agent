@@ -1,0 +1,12 @@
+{
+  "name": "traceableai-web-assets",
+  "private": true,
+  "description": "Builds the Tailwind CSS for the Razor components at development time, so the site does not load Tailwind from a CDN.",
+  "scripts": {
+    "build:css": "tailwindcss -c tailwind.config.js -i Styles/tailwind.input.css -o wwwroot/css/tailwind.css --minify",
+    "watch:css": "tailwindcss -c tailwind.config.js -i Styles/tailwind.input.css -o wwwroot/css/tailwind.css --watch"
+  },
+  "devDependencies": {
+    "tailwindcss": "3.4.19"
+  }
+}
