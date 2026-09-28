@@ -14,6 +14,12 @@
     <PackageReference Include="PdfPig" Version="0.1.16" />
   </ItemGroup>
 
+<!-- Run folders, the cache and quota counters are data, not source: keep them out of the project entirely, so
+     dotnet watch does not reload the project every time a run writes a file (and publish does not copy them). -->
+<PropertyGroup>
+  <DefaultItemExcludes>$(DefaultItemExcludes);WorkspaceStore\**;App_Data\**;PapersWorkspace\**;node_modules\**</DefaultItemExcludes>
+</PropertyGroup>
+
 <ItemGroup>
   <Watch Remove="PapersWorkspace\**\*" />
   <Watch Remove="WorkspaceStore\**\*" />
