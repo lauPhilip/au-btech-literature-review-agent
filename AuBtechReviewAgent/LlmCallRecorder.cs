@@ -159,7 +159,9 @@ public class RecordingChatCompletionService : IChatCompletionService
             LlmCalls = calls.Count,
             LlmRetries = calls.Sum(c => Math.Max(0, c.Attempts - 1)),
             LlmFailures = calls.Count(c => c.Outcome != "ok"),
-            PromptSequenceSha256 = Sha256(string.Join("|", calls.Select(c => c.PromptSha256))),
+            // Sorted: screening and extraction run several calls at once, so the call order varies between
+            // otherwise identical runs; the set of prompts does not.
+            PromptSequenceSha256 = Sha256(string.Join("|", calls.Select(c => c.PromptSha256).OrderBy(h => h, StringComparer.Ordinal))),
         };
         foreach (var group in calls.Where(c => c.Temperature.HasValue).GroupBy(c => c.Stage))
             settings.StageTemperatures[group.Key] = group.First().Temperature!.Value;
