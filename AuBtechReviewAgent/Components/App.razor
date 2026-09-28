@@ -6,21 +6,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <base href="/" />
     <link rel="stylesheet" href="app.css" />
+    @* Tailwind is compiled ahead of time (npm run build:css) instead of loaded from a CDN, so the page needs no
+       third-party scripts and can run under a strict Content-Security-Policy. It comes after app.css, as the
+       CDN version did, so its reset (e.g. links inherit their colour) still wins over app.css. *@
+    <link rel="stylesheet" href="css/tailwind.css" />
     <link rel="icon" type="image/png" href="favicon.png" />
     <HeadOutlet />
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    colors: {
-                        auBlue: '#003B5C',
-                        auGrey: '#8A8D8F'
-                    }
-                }
-            }
-        }
-    </script>
 </head>
 
 <body class="h-full w-full m-0 p-0 bg-gray-100 overflow-hidden text-gray-900 font-sans">
