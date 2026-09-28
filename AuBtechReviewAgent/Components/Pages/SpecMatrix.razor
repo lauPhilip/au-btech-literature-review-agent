@@ -530,7 +530,8 @@
         if (string.IsNullOrWhiteSpace(rawText)) return "";
         string clean = Regex.Replace(rawText, @"\[MERMAID_START\].*?\[MERMAID_END\]", "", RegexOptions.Singleline);
         clean = Regex.Replace(clean, @"\[TIKZ_START\].*?\[TIKZ_END\]", "", RegexOptions.Singleline);
-        return Regex.Replace(clean, @"\[Source Context Anchor \d+.*?\]", "").Trim();
+        clean = Regex.Replace(clean, @"\[Source Context Anchor \d+.*?\]", "").Trim();
+        return AuBtechReviewAgent.MethodsSectionWriter.StripMarkdownEmphasis(clean);
     }
 
     private static string Deg(double d) => d.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
@@ -548,19 +549,7 @@
         e.AppraisalCategory.Replace('_', ' ');
 
     /// <summary>A one-paragraph description of the included set, built only from the run's own data.</summary>
-    private string DataParagraph()
-    {
-        if (tableRecords.Count == 0) return "No papers were included, so there is no data to describe.";
-        var years = tableRecords.Where(r => r.Year > 0).Select(r => r.Year).ToList();
-        int noYear = tableRecords.Count - years.Count;
-        string span = years.Count == 0 ? "None of the included papers has a publication year in its metadata."
-            : years.Min() == years.Max() ? $"All dated papers were published in {years.Min()}."
-            : $"The included papers were published between {years.Min()} and {years.Max()}, most of them in {years.GroupBy(y => y).OrderByDescending(g => g.Count()).ThenByDescending(g => g.Key).First().Key}.";
-        if (noYear > 0) span += $" {noYear} ha{(noYear == 1 ? "s" : "ve")} no year in the source metadata.";
-        string sources = string.Join(", ", platformShares.Select(p => $"{p.Count} from {p.Label}"));
-        return $"{span} By the source that first returned them: {sources}. " +
-               $"By venue type: {journalCount} journal, {transactionsCount} transactions, {conferenceCount + proceedingsCount} conference and {preprintCount} preprint or unknown.";
-    }
+    private string DataParagraph() => AuBtechReviewAgent.MethodsSectionWriter.IncludedSet(tableRecords);
 
     /// <summary>The value with its quote as a tooltip; a dagger when the quote was not found in the paper.</summary>
     private RenderFragment Evidence(AuBtechReviewAgent.EvidencedValue v) => __builder =>
@@ -580,15 +569,31 @@
     private RenderFragment CitedText(string field, string text) => __builder =>
     {
         var sentences = AuBtechReviewAgent.CitationSupportChecker.SplitSentences(text);
+        int scan = 0;
         <p class="text-gray-800">
             @for (int i = 0; i < sentences.Count; i++)
             {
                 int sentenceIndex = i;
+                // Keep the model's paragraph breaks: they sit in the whitespace between two sentences.
+                int at = (text ?? "").IndexOf(sentences[i], scan, StringComparison.Ordinal);
+                if (at > scan && text!.Substring(scan, at - scan).Contains("\n\n"))
+                {
+                    <br /><br />
+                }
+                if (at >= 0) scan = at + sentences[i].Length;
                 foreach (var (part, isMarker) in AuBtechReviewAgent.CitationSupportChecker.SplitMarkers(sentences[i]))
                 {
                     if (!isMarker || auditChecks.Count == 0)
                     {
-                        @part
+                        var pieces = AuBtechReviewAgent.MethodsSectionWriter.StripMarkdownEmphasis(part).Split("\n\n");
+                        for (int k = 0; k < pieces.Length; k++)
+                        {
+                            if (k > 0)
+                            {
+                                <br /><br />
+                            }
+                            @pieces[k]
+                        }
                         continue;
                     }
                     <span>[</span>

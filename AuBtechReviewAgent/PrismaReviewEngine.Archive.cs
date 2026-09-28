@@ -234,8 +234,7 @@ public partial class PrismaReviewEngine
 
         sb.AppendLine(@"\end{multicols}");
         sb.AppendLine(@"\section{Data \& Collection Metrics}");
-        sb.AppendLine(@"The empirical data metrics trace key research trends regarding structural database distributions. ");
-        sb.AppendLine($"In total, {records.Count} papers were chosen for final data extraction.");
+        sb.AppendLine(EscapeLatexText(MethodsSectionWriter.IncludedSet(records)));
         sb.AppendLine(@"\vspace{10pt}");
 
         if (state != null)
