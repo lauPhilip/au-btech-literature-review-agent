@@ -1,4 +1,4 @@
-# Weekly update proposals for NuGet packages, npm (Tailwind), the Docker base images and the pinned
+# Weekly update proposals for NuGet packages, npm (Tailwind) and the pinned
 # GitHub Actions. Each update arrives as a pull request, so CI runs before anything changes.
 version: 2
 updates:
@@ -12,11 +12,11 @@ updates:
     directory: "/AuBtechReviewAgent"
     schedule:
       interval: "weekly"
-
-  - package-ecosystem: "docker"
-    directory: "/"
-    schedule:
-      interval: "weekly"
+    ignore:
+      # Tailwind 4 is a rewrite (new CLI package, CSS-based config); moving to it is a deliberate job, not a
+      # routine bump. Minor and patch updates of Tailwind 3 still come through.
+      - dependency-name: "tailwindcss"
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: "github-actions"
     directory: "/"
