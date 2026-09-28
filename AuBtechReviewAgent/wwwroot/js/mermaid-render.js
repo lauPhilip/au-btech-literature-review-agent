@@ -1,5 +1,6 @@
 // Renders the Mermaid diagram on the Review Output page.
-// - Mermaid is pinned to major version 11 (the unpinned CDN URL silently moved to a new major version).
+// - Mermaid 11.17.2 is served by the app itself (wwwroot/lib/mermaid, MIT licence), not from a CDN, so the
+//   page loads no third-party script and the exact version is part of the repository.
 // - securityLevel "strict": the diagram text comes from the language model, so no HTML or click handlers.
 // - If the diagram still cannot be parsed, its source is shown as text instead of Mermaid's error bomb.
 window.traceableMermaid = (function () {
@@ -11,7 +12,7 @@ window.traceableMermaid = (function () {
         if (!loading) {
             loading = new Promise(function (resolve, reject) {
                 const script = document.createElement('script');
-                script.src = 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js';
+                script.src = 'lib/mermaid/mermaid.min.js';
                 script.onload = function () {
                     window.mermaid.initialize({ startOnLoad: false, theme: 'default', securityLevel: 'strict', suppressErrorRendering: true });
                     resolve(window.mermaid);
