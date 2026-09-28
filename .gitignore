@@ -38,3 +38,6 @@ node_modules/
 
 # Files the Claude desktop app saves into this folder
 Claude outputs/
+
+# Local publish output (contains web.config with API keys)
+**/publish/
