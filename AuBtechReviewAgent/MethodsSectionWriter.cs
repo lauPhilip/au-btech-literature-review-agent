@@ -21,8 +21,8 @@ public static class MethodsSectionWriter
     public static string Eligibility(string inclusion, string exclusion, bool peerReviewOnly)
     {
         var sb = new StringBuilder();
-        sb.Append($"Records were eligible if they met the inclusion criterion: \"{inclusion.Trim()}\". ");
-        sb.Append($"Records were excluded if they met the exclusion criterion: \"{exclusion.Trim()}\". ");
+        sb.Append($"Records were eligible if they met the inclusion criterion: \"{inclusion.Trim().TrimEnd('.')}\". ");
+        sb.Append($"Records were excluded if they met the exclusion criterion: \"{exclusion.Trim().TrimEnd('.')}\". ");
         sb.Append(peerReviewOnly
             ? "The peer-reviewed-only filter was enabled, so records classified as preprints or working papers were excluded before screening."
             : "The peer-reviewed-only filter was disabled, so preprints and other non-peer-reviewed records were eligible.");
@@ -196,6 +196,44 @@ public static class MethodsSectionWriter
         if (failed > 0) sb.Append($"Extraction failed for {failed} stud{(failed == 1 ? "y" : "ies")}. ");
         sb.Append("MMAT is not used to compute an overall score. The appraisal was done by a language model without a second human appraiser, so it should be checked before use (see extraction.json).");
         return sb.ToString();
+    }
+
+    /// <summary>
+    /// One paragraph describing the included set (years, sources, venue types), built only from the run's
+    /// records. Used by the Review Output page and main.tex, replacing a fixed sentence that claimed trends.
+    /// </summary>
+    public static string IncludedSet(IReadOnlyList<IncludedPaperMetricRow> records)
+    {
+        if (records.Count == 0) return "No papers were included, so there is no data to describe.";
+        var years = records.Where(r => r.Year > 0).Select(r => r.Year).ToList();
+        int noYear = records.Count - years.Count;
+        string span = years.Count == 0 ? "None of the included papers has a publication year in its metadata."
+            : years.Min() == years.Max() ? $"All dated papers were published in {years.Min()}."
+            : $"The {records.Count} included papers were published between {years.Min()} and {years.Max()}, most of them in {years.GroupBy(y => y).OrderByDescending(g => g.Count()).ThenByDescending(g => g.Key).First().Key}.";
+        if (noYear > 0) span += $" {noYear} ha{(noYear == 1 ? "s" : "ve")} no year in the source metadata.";
+        string sources = string.Join(", ", records
+            .GroupBy(r => string.IsNullOrWhiteSpace(r.Category) ? "Other" : r.Category)
+            .OrderByDescending(g => g.Count()).ThenBy(g => g.Key, StringComparer.Ordinal)
+            .Select(g => $"{g.Count()} from {PrismaReviewEngine.CategoryLabel(g.Key)}"));
+        int journals = records.Count(r => r.VenueType == "Journals");
+        int transactions = records.Count(r => r.VenueType == "Transactions");
+        int conferences = records.Count(r => r.VenueType is "Conferences" or "Proceedings");
+        int other = records.Count - journals - transactions - conferences;
+        return $"{span} By the source that first returned them: {sources}. " +
+               $"By venue type: {journals} journal, {transactions} transactions, {conferences} conference and {other} preprint or unknown.";
+    }
+
+    /// <summary>
+    /// Removes Markdown emphasis the model sometimes writes (**bold**, *italic*), which would otherwise show
+    /// as literal asterisks on the page and break the LaTeX. The words are kept.
+    /// </summary>
+    public static string StripMarkdownEmphasis(string? text)
+    {
+        if (string.IsNullOrEmpty(text)) return text ?? "";
+        string t = System.Text.RegularExpressions.Regex.Replace(text, @"\*\*(.+?)\*\*", "$1", System.Text.RegularExpressions.RegexOptions.Singleline);
+        t = System.Text.RegularExpressions.Regex.Replace(t, @"__(.+?)__", "$1");
+        t = System.Text.RegularExpressions.Regex.Replace(t, @"(?<![\w*])\*(?=\S)([^*\n]+?)(?<=\S)\*(?![\w*])", "$1");
+        return t;
     }
 
     /// <summary>PRISMA item 24 (registration and protocol).</summary>

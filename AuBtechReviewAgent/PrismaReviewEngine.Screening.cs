@@ -177,6 +177,14 @@ public partial class PrismaReviewEngine
             ? first.Reasoning
             : $"The two independent screenings disagreed (first: {first.Decision}, second: {second!.Decision}), so the record was kept and flagged for human attention. First screening: {first.Reasoning}";
         string? confidence = LowestConfidence(first.Confidence, second?.Confidence);
+        // A record without an abstract was judged on its title alone (in a real run the model then claimed
+        // the missing abstract "explicitly mentions" the criteria), so the decision is marked low-confidence.
+        bool noAbstract = string.IsNullOrWhiteSpace(paper.Abstract);
+        if (noAbstract)
+        {
+            confidence = "low";
+            reasoning = "(No abstract was available, so this decision rests on the title and venue only.) " + reasoning;
+        }
         bool uncertain = !agree || confidence == "low" || flags != null;
 
         stats.Screened++;

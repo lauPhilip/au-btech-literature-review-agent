@@ -607,8 +607,10 @@ public partial class PrismaReviewEngine
             catch { }
 
             // Re-append the isolated architectural diagram strings back onto the reviewed synthesis field
-            string fullSynthesisField = peerReview.SynthesisAfter + mermaidBlock + tikzBlock;
-            string preValidationDiscussion = peerReview.DiscussionAfter;
+            // The model sometimes writes Markdown emphasis (**Integration Challenges:**); strip it before the
+            // citation check so the checked sentences are exactly the ones shown on the page and in main.tex.
+            string fullSynthesisField = MethodsSectionWriter.StripMarkdownEmphasis(peerReview.SynthesisAfter) + mermaidBlock + tikzBlock;
+            string preValidationDiscussion = MethodsSectionWriter.StripMarkdownEmphasis(peerReview.DiscussionAfter);
 
             // STORM-style traceability guardrail: every [n] citation marker the model writes must resolve to
             // an entry that actually exists in the run's reference list. The model occasionally invents or
@@ -663,8 +665,8 @@ public partial class PrismaReviewEngine
             {
                 GeneratedAt = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss UTC"),
                 TitleItem = cleanTitle,
-                AbstractItem = !string.IsNullOrWhiteSpace(cleanAbstract) ? cleanAbstract : rawAbstract,
-                RationaleItem = !string.IsNullOrWhiteSpace(cleanRationale) ? cleanRationale : rawRationale,
+                AbstractItem = MethodsSectionWriter.StripMarkdownEmphasis(!string.IsNullOrWhiteSpace(cleanAbstract) ? cleanAbstract : rawAbstract),
+                RationaleItem = MethodsSectionWriter.StripMarkdownEmphasis(!string.IsNullOrWhiteSpace(cleanRationale) ? cleanRationale : rawRationale),
                 ObjectivesItem = !string.IsNullOrWhiteSpace(cleanObjectives) ? cleanObjectives : rawObjectives,
                 EligibilityItem = methodsEligibility,
                 SourcesItem = methodsSources,
