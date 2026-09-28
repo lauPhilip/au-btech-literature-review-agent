@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
 using System.Net.Http;
@@ -37,14 +38,14 @@ public class ElsevierSource : IAcademicSource
         
         // ─── TARGET SCOPUS WITH STANDARD METADATA VIEW ─────────────────────
         string url = $"https://api.elsevier.com/content/search/scopus?query=ALL({encodedQuery})&count={maxResults}&view=STANDARD";
-        Console.WriteLine($"\n[Elsevier Engine] Querying Scopus Index URL: {url}");
+        AppLog.For<ElsevierSource>().LogDebug("Querying Scopus: {Query}", query);
 
         try
         {
             using var request = new HttpRequestMessage(HttpMethod.Get, url);
             request.Headers.Add("X-ELS-APIKey", _apiKey);
             using var response = await _httpClient.SendAsync(request);
-            Console.WriteLine($"[Elsevier Engine] HTTP Response Code: {response.StatusCode}");
+            AppLog.For<ElsevierSource>().LogDebug("Scopus answered {Status}", response.StatusCode);
 
             string jsonResponse = await response.Content.ReadAsStringAsync();
 

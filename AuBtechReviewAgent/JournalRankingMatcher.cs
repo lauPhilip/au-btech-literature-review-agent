@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging;
 using System;
 using System.IO;
 using System.Linq;
@@ -59,7 +60,7 @@ public static class JournalRankingMatcher
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[Scimago] Could not read {csvPath}: {ex.Message}");
+            AppLog.For("Scimago").LogWarning("Could not read {Path}: {Message}", csvPath, ex.Message);
         }
         return table;
     }

@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
 using System.Net.Http;
@@ -25,7 +26,7 @@ public class IeeeXploreSource : IAcademicSource
 
         if (_apiKey == null)
         {
-            Console.WriteLine("[IEEE Xplore Gateway] Skipped retrieval pass: No active app credential token found.");
+            AppLog.For<IeeeXploreSource>().LogWarning("IEEE Xplore skipped: no API key.");
             return papers;
         }
 
@@ -37,7 +38,7 @@ public class IeeeXploreSource : IAcademicSource
             var response = await _httpClient.GetAsync(requestUrl);
             if (!response.IsSuccessStatusCode)
             {
-                Console.WriteLine($"[IEEE Xplore Gateway Warning] Retrieval cycle refused connection: {response.StatusCode}");
+                AppLog.For<IeeeXploreSource>().LogWarning("IEEE Xplore answered {Status}", response.StatusCode);
                 return papers;
             }
 
@@ -89,7 +90,7 @@ public class IeeeXploreSource : IAcademicSource
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[IEEE Xplore Adapter Interface Fault] Tracking breakdown: {ex.Message}");
+            AppLog.For<IeeeXploreSource>().LogWarning("IEEE Xplore failed: {Message}", ex.Message);
         }
 
         return papers;
