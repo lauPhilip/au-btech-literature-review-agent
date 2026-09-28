@@ -23,7 +23,8 @@ Paste anything the app printed, if you have it.
 **Your setup**
 - Operating system:
 - .NET version (run `dotnet --version`):
-- Which sources were enabled (arXiv, ScienceDirect, IEEE, Scholar, ResearchGate):
+- Which sources were enabled (arXiv, OpenAlex, Semantic Scholar, Crossref, ScienceDirect, IEEE):
+- Language model (Mistral or which local/OpenAI-compatible model):
 
 **Anything else**
 Screenshots or extra context that might help.

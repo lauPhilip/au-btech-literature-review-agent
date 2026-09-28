@@ -6,15 +6,20 @@ on:
   pull_request:
     branches: [ master ]
 
+# Least privilege for the default token. Third-party actions are pinned to a full commit SHA (the tag is in
+# the comment), so a moved or hijacked tag cannot change what runs here; Dependabot proposes updates.
+permissions:
+  contents: read
+
 jobs:
   build-and-test:
     name: Build & Test
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Set up .NET
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
         with:
           dotnet-version: '10.0.x'
 
@@ -27,6 +32,27 @@ jobs:
       - name: Test
         run: dotnet test AuBtechReviewAgent.sln --configuration Release --no-build --verbosity normal
 
+  css-up-to-date:
+    name: Compiled CSS matches the components
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: AuBtechReviewAgent
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '22'
+
+      # wwwroot/css/tailwind.css is committed. If a component uses a class that is not in it, this fails:
+      # run "npm ci && npm run build:css" in AuBtechReviewAgent and commit the result.
+      - name: Rebuild Tailwind CSS and compare
+        run: |
+          npm ci
+          npm run build:css
+          git diff --exit-code -- wwwroot/css/tailwind.css
+
   deploy:
     name: Deploy to Simply
     needs: build-and-test
@@ -38,10 +64,10 @@ jobs:
     if: github.event_name == 'push' && github.ref == 'refs/heads/master' && vars.DEPLOY_ENABLED == 'true'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Set up .NET
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
         with:
           dotnet-version: '10.0.x'
 
@@ -65,7 +91,7 @@ jobs:
       # equivalent secrets. Nothing here runs until DEPLOY_ENABLED is set.
       # ------------------------------------------------------------------
       - name: Copy published files to Simply over SSH
-        uses: appleboy/scp-action@v0.1.7
+        uses: appleboy/scp-action@917f8b81dfc1ccd331fef9e2d61bdc6c8be94634 # v0.1.7
         with:
           host: ${{ secrets.SIMPLY_SSH_HOST }}
           port: ${{ secrets.SIMPLY_SSH_PORT }}
@@ -76,7 +102,7 @@ jobs:
           strip_components: 1
 
       - name: Restart the app on Simply
-        uses: appleboy/ssh-action@v1.0.3
+        uses: appleboy/ssh-action@029f5b4aeeeb58fdfe1410a5d17f967dacf36262 # v1.0.3
         with:
           host: ${{ secrets.SIMPLY_SSH_HOST }}
           port: ${{ secrets.SIMPLY_SSH_PORT }}

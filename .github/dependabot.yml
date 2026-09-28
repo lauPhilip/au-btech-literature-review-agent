@@ -1,0 +1,24 @@
+# Weekly update proposals for NuGet packages, npm (Tailwind), the Docker base images and the pinned
+# GitHub Actions. Each update arrives as a pull request, so CI runs before anything changes.
+version: 2
+updates:
+  - package-ecosystem: "nuget"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+
+  - package-ecosystem: "npm"
+    directory: "/AuBtechReviewAgent"
+    schedule:
+      interval: "weekly"
+
+  - package-ecosystem: "docker"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
