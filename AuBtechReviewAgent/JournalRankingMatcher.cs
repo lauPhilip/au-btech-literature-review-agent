@@ -83,7 +83,7 @@ public static class JournalRankingMatcher
         foreach (var root in roots)
             foreach (var name in names)
             {
-                string path = Path.Combine(root, "ScimagoData", name);
+                string path = Path.Join(root, "ScimagoData", name);
                 if (File.Exists(path)) return path;
             }
         return null;

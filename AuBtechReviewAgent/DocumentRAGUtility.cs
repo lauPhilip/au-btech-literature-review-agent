@@ -44,7 +44,7 @@ public static class DocumentRAGUtility
 
         string sanitizedName = Regex.Replace(paper.Title ?? "paper", @"[^a-zA-Z0-9]", "_");
         if (sanitizedName.Length > 50) sanitizedName = sanitizedName.Substring(0, 50);
-        string pdfPath = Path.Combine(targetDir, $"{sanitizedName}.pdf");
+        string pdfPath = Path.Join(targetDir, $"{sanitizedName}.pdf");
         string sourceId = ChunkSourceId(paper.Id);
 
         var candidates = new List<(string Label, string Url)>();
@@ -140,7 +140,12 @@ public static class DocumentRAGUtility
         catch (Exception ex)
         {
             _log.LogInformation("PDF download from {Host} failed: {Message}", uri.Host, ex.Message);
-            try { if (File.Exists(tmp)) File.Delete(tmp); } catch { }
+            try { if (File.Exists(tmp)) File.Delete(tmp); }
+            catch (Exception cleanupEx)
+            {
+                // A leftover .tmp file is ignored by the archive and removed with the run folder.
+                _log.LogDebug("Could not delete a partial download: {Message}", cleanupEx.Message.Replace("\r", " ").Replace("\n", " "));
+            }
             return false;
         }
     }

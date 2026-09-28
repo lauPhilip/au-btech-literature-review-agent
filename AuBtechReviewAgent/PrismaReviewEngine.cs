@@ -38,12 +38,22 @@ public partial class PrismaReviewEngine
     public const string DefaultSupportStatement =
         "No funding statement has been declared for this review. The funding and support text can be set in the Report:SupportStatement configuration value.";
 
-    // SECURE ENCAPSULATED ROUTING PATHS
-    private string GetWorkspaceFolderPath(Guid sessionId) => 
-        Path.Combine(WorkspaceRoot, sessionId.ToString("N"));
+    /// <summary>
+    /// The folder of one run. The run id comes from the URL, but as a Guid its "N" form is 32 hex digits, so it
+    /// cannot contain a separator or "..". Path.GetFileName and the containment check below make that guarantee
+    /// explicit, so the folder can never resolve outside the workspace even if this method is changed later.
+    /// </summary>
+    private string GetWorkspaceFolderPath(Guid sessionId)
+    {
+        string root = Path.TrimEndingDirectorySeparator(Path.GetFullPath(WorkspaceRoot));
+        string folder = Path.GetFullPath(Path.Join(root, Path.GetFileName(sessionId.ToString("N"))));
+        if (!folder.StartsWith(root + Path.DirectorySeparatorChar, StringComparison.Ordinal))
+            throw new InvalidOperationException("A run folder resolved outside the workspace.");
+        return folder;
+    }
 
     /// <summary>Folder holding one sub-folder per run. Defaults to ./WorkspaceStore.</summary>
-    public string WorkspaceRoot { get; init; } = Path.Combine(Directory.GetCurrentDirectory(), "WorkspaceStore");
+    public string WorkspaceRoot { get; init; } = Path.Join(Directory.GetCurrentDirectory(), "WorkspaceStore");
 
     /// <summary>Test hook: builds the chat service from an API key (default: Mistral via Semantic Kernel).</summary>
     public Func<string, IChatCompletionService>? ChatFactory { get; init; }
@@ -52,10 +62,10 @@ public partial class PrismaReviewEngine
     public Func<string, IAcademicSource>? SourceFactory { get; init; }
 
     private string GetStateFilePath(Guid sessionId) => 
-        Path.Combine(GetWorkspaceFolderPath(sessionId), "transparent-process.json");
+        Path.Join(GetWorkspaceFolderPath(sessionId), "transparent-process.json");
 
     private string GetReportFilePath(Guid sessionId) => 
-        Path.Combine(GetWorkspaceFolderPath(sessionId), "prisma-report.json");
+        Path.Join(GetWorkspaceFolderPath(sessionId), "prisma-report.json");
 
     /// <summary>Contact e-mail and optional keys for OpenAlex, Semantic Scholar, Crossref and Unpaywall.</summary>
     public OpenSourcesOptions OpenSources { get; init; } = new();
@@ -69,7 +79,13 @@ public partial class PrismaReviewEngine
     // A property, not a field: the engine is created before Program.cs sets AppLog.Factory.
     private static ILogger _log => AppLog.For<PrismaReviewEngine>();
 
+    /// <summary>Creates the review engine with the server's API keys and run settings.</summary>
+    /// <param name="mistralApiKey">Mistral API key used for the language-model steps.</param>
+    /// <param name="elsevierApiKey">Optional Scopus / ScienceDirect key.</param>
+    /// <param name="ieeeApiKey">Optional IEEE Xplore key.</param>
     /// <param name="scholarApiKey">Optional Semantic Scholar API key (the API also works without one).</param>
+    /// <param name="supportStatement">Funding and support text for the report; a neutral default is used when empty.</param>
+    /// <param name="runsOptions">Concurrency, retention and screening-review settings.</param>
     public PrismaReviewEngine(string mistralApiKey, string elsevierApiKey, string? ieeeApiKey = null, string? scholarApiKey = null, string? supportStatement = null, RunsOptions? runsOptions = null)
     {
         _runsOptions = runsOptions ?? new RunsOptions();
@@ -253,7 +269,11 @@ public partial class PrismaReviewEngine
             ctx.State.Stats.ProcessingStage = StageFailed;
             ctx.State.FailureMessage = $"The run stopped with an error: {SanitizeLogMessage(ex.Message)}";
             ctx.State.CompletedUtc = DateTime.UtcNow;
-            try { await PublishAsync(ctx); } catch { }
+            try { await PublishAsync(ctx); }
+            catch (Exception publishEx)
+            {
+                _log.LogWarning("Could not save the ledger of the failed run: {Message}", SanitizeLogMessage(publishEx.Message));
+            }
             throw;
         }
         finally
@@ -262,7 +282,7 @@ public partial class PrismaReviewEngine
             {
                 ctx.State.RunSettings = chat.Summarize(RecordingChatCompletionService.AppVersion);
                 await SaveStateAsync(sessionId, ctx.State);
-                await File.WriteAllTextAsync(Path.Combine(ctx.Workspace, "llm-calls.json"),
+                await File.WriteAllTextAsync(Path.Join(ctx.Workspace, "llm-calls.json"),
                     JsonSerializer.Serialize(new { ctx.State.RunSettings, Calls = chat.Calls }, new JsonSerializerOptions { WriteIndented = true }));
             }
             catch (Exception ex)
@@ -322,7 +342,10 @@ public partial class PrismaReviewEngine
             state.FailureMessage = "The server restarted while this run was in progress, so it could not finish. Please start it again.";
             state.CompletedUtc = DateTime.UtcNow;
             try { File.WriteAllText(GetStateFilePath(runId), JsonSerializer.Serialize(state, new JsonSerializerOptions { WriteIndented = true })); marked++; }
-            catch { }
+            catch (Exception ex)
+            {
+                _log.LogWarning("Could not mark an interrupted run: {Message}", SanitizeLogMessage(ex.Message));
+            }
         }
         return marked;
     }
@@ -346,7 +369,9 @@ public partial class PrismaReviewEngine
     private string SanitizeLogMessage(string message)
     {
         if (string.IsNullOrEmpty(message)) return string.Empty;
-        return Regex.Replace(message, @"([a-zA-Z0-9]{24,64})", "[REDACTED_API_CREDENTIAL]");
+        // Line breaks are removed so a crafted value cannot add fake lines to the log (log forging).
+        string oneLine = message.Replace("\r", " ").Replace("\n", " ");
+        return Regex.Replace(oneLine, @"([a-zA-Z0-9]{24,64})", "[REDACTED_API_CREDENTIAL]");
     }
 
     /// <summary>Lower-case title with punctuation and spacing removed, for duplicate detection.</summary>
@@ -436,7 +461,7 @@ public partial class PrismaReviewEngine
     /// <summary>The run's protocol.md, or null when there is none.</summary>
     public string? ReadProtocol(Guid runId)
     {
-        string path = Path.Combine(GetWorkspaceFolderPath(runId), "protocol.md");
+        string path = Path.Join(GetWorkspaceFolderPath(runId), "protocol.md");
         return File.Exists(path) ? File.ReadAllText(path) : null;
     }
 
@@ -445,7 +470,7 @@ public partial class PrismaReviewEngine
     {
         var names = ctx.State.SelectedSources.Except(ctx.State.UnavailableSources).Select(SourceCatalog.DisplayNameFor).ToList();
         string text = ProtocolWriter.Write(ctx.RunId, ctx.Request with { UserKeys = null }, names, Llm.DisplayName, _runsOptions, DateTime.UtcNow);
-        string path = Path.Combine(ctx.Workspace, "protocol.md");
+        string path = Path.Join(ctx.Workspace, "protocol.md");
         await File.WriteAllTextAsync(path, text, new UTF8Encoding(false));
         ctx.State.ProtocolSha256 = RunManifest.Sha256(File.ReadAllBytes(path));
     }

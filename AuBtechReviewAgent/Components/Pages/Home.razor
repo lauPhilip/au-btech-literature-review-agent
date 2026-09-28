@@ -437,7 +437,7 @@
     }
 
     private string StatePath(Guid id) =>
-        Path.Combine(ReviewEngine.WorkspaceRoot, id.ToString("N"), "transparent-process.json");
+        Path.Join(ReviewEngine.WorkspaceRoot, id.ToString("N"), "transparent-process.json");
 
     private static string? SafeRead(string path)
     {
@@ -550,7 +550,11 @@
                 RefreshQuotaAndSources();
                 await InvokeAsync(StateHasChanged);
             }
-            catch { }
+            catch (Exception ex)
+            {
+                // Browser storage can be unavailable (private window, blocked storage); the page works without saved keys.
+                Logger.LogDebug("Could not restore saved keys from browser storage: {Message}", ex.Message.Replace("\r", " ").Replace("\n", " "));
+            }
         }
     }
 

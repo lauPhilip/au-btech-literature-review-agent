@@ -706,9 +706,9 @@
         openCitation = null;
         deleted = false;
 
-        string folder = Path.Combine(ReviewEngine.WorkspaceRoot, State.CurrentSessionId.ToString("N"));
-        string reportPath = Path.Combine(folder, "prisma-report.json");
-        hasProtocol = File.Exists(Path.Combine(folder, "protocol.md"));
+        string folder = Path.Join(ReviewEngine.WorkspaceRoot, State.CurrentSessionId.ToString("N"));
+        string reportPath = Path.Join(folder, "prisma-report.json");
+        hasProtocol = File.Exists(Path.Join(folder, "protocol.md"));
 
         if (File.Exists(reportPath))
         {
@@ -720,7 +720,7 @@
             catch { report = new PrismaReport(); }
         }
 
-        string auditPath = Path.Combine(folder, "citation-audit.json");
+        string auditPath = Path.Join(folder, "citation-audit.json");
         if (File.Exists(auditPath))
         {
             try

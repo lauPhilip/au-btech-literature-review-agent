@@ -25,6 +25,20 @@ public class SemanticScholarSource : IAcademicSource
 
     public SemanticScholarSource(string apiKey = "") => _apiKey = apiKey;
 
+    /// <summary>One request at a time across the whole app, at least <paramref name="spacing"/> apart.</summary>
+    private static async Task<string> GetSpacedAsync(string url, Dictionary<string, string>? headers, TimeSpan spacing)
+    {
+        await Gate.WaitAsync();
+        try
+        {
+            var wait = _lastRequestUtc + spacing - DateTime.UtcNow;
+            if (wait > TimeSpan.Zero) await Task.Delay(wait);
+            try { return await OpenSourceHttp.GetStringAsync(url, headers); }
+            finally { _lastRequestUtc = DateTime.UtcNow; }
+        }
+        finally { Gate.Release(); }
+    }
+
     public string SourceName => "Semantic Scholar";
     public IReadOnlyList<string> LastRawResponses => _raw;
 
@@ -34,17 +48,7 @@ public class SemanticScholarSource : IAcademicSource
         string url = $"https://api.semanticscholar.org/graph/v1/paper/search?query={Uri.EscapeDataString(query)}&limit={Math.Clamp(maxResults, 1, 100)}&fields={Fields}";
         bool hasKey = SourceCatalog.IsUsableKey(_apiKey);
         var headers = hasKey ? new Dictionary<string, string> { ["x-api-key"] = _apiKey } : null;
-        string json;
-        await Gate.WaitAsync();
-        try
-        {
-            var spacing = TimeSpan.FromSeconds(hasKey ? 1 : 3);
-            var wait = _lastRequestUtc + spacing - DateTime.UtcNow;
-            if (wait > TimeSpan.Zero) await Task.Delay(wait);
-            try { json = await OpenSourceHttp.GetStringAsync(url, headers); }
-            finally { _lastRequestUtc = DateTime.UtcNow; }
-        }
-        finally { Gate.Release(); }
+        string json = await GetSpacedAsync(url, headers, TimeSpan.FromSeconds(hasKey ? 1 : 3));
         _raw.Add(json);
         return Parse(json);
     }

@@ -66,7 +66,11 @@ public partial class PrismaReviewEngine
                 string content = File.ReadAllText(reportPath);
                 report = JsonSerializer.Deserialize<PrismaReport>(content, new JsonSerializerOptions { PropertyNameCaseInsensitive = true }) ?? new PrismaReport();
             }
-            catch { }
+            catch (Exception ex)
+            {
+                // The archive is still built from the ledger; only the report section is missing.
+                _log.LogWarning("Archive: could not read prisma-report.json: {Message}", SanitizeLogMessage(ex.Message));
+            }
         }
 
         return GenerateWorkspaceArchive(sessionId, report, state.SynthesizedRecords, state);
@@ -385,7 +389,7 @@ public partial class PrismaReviewEngine
         };
         foreach (var name in rootFiles)
         {
-            string path = Path.Combine(isolatedFolder, name);
+            string path = Path.Join(isolatedFolder, name);
             if (File.Exists(path)) AddFile(path, name);
         }
 
@@ -400,7 +404,7 @@ public partial class PrismaReviewEngine
                 AddFile(file, $"SourcePapers/{filename}");
             }
             // What each source returned, exactly as received.
-            string rawFolder = Path.Combine(isolatedFolder, RawResponsesFolder);
+            string rawFolder = Path.Join(isolatedFolder, RawResponsesFolder);
             if (Directory.Exists(rawFolder))
                 foreach (var file in Directory.GetFiles(rawFolder).OrderBy(f => f, StringComparer.Ordinal))
                     AddFile(file, $"{RawResponsesFolder}/{Path.GetFileName(file)}");
@@ -514,7 +518,7 @@ public partial class PrismaReviewEngine
         }
         catch (IOException ex)
         {
-            _log.LogWarning("Archive: skipped {File}: {Message}", Path.GetFileName(path), ex.Message);
+            _log.LogWarning("Archive: skipped {File}: {Message}", SanitizeLogMessage(Path.GetFileName(path)), SanitizeLogMessage(ex.Message));
             return null;
         }
     }

@@ -18,7 +18,7 @@ public record ScreeningConfusion(double TruePositives, double FalsePositives, do
     public double Recall => Ratio(TruePositives, TruePositives + FalseNegatives);
     public double Specificity => Ratio(TrueNegatives, TrueNegatives + FalsePositives);
     public double Precision => Ratio(TruePositives, TruePositives + FalsePositives);
-    public double F1 => Precision + Recall == 0 ? 0 : 2 * Precision * Recall / (Precision + Recall);
+    public double F1 => Precision + Recall <= 0 ? 0 : 2 * Precision * Recall / (Precision + Recall);
     public double Accuracy => Ratio(TruePositives + TrueNegatives, Total);
 
     /// <summary>Agreement between model and human beyond chance (0 = chance, 1 = perfect).</summary>
@@ -26,7 +26,7 @@ public record ScreeningConfusion(double TruePositives, double FalsePositives, do
     {
         get
         {
-            if (Total == 0) return 0;
+            if (Total <= 0) return 0; // counts are never negative, so this means "no records"
             double observed = Accuracy;
             double pYes = (TruePositives + FalsePositives) / Total * ((TruePositives + FalseNegatives) / Total);
             double pNo = (TrueNegatives + FalseNegatives) / Total * ((TrueNegatives + FalsePositives) / Total);
@@ -35,7 +35,7 @@ public record ScreeningConfusion(double TruePositives, double FalsePositives, do
         }
     }
 
-    private static double Ratio(double a, double b) => b == 0 ? 0 : a / b;
+    private static double Ratio(double a, double b) => b <= 0 ? 0 : a / b;
 
     public static ScreeningConfusion From(IEnumerable<(bool Gold, bool Predicted)> pairs, double excludedWeight = 1.0)
     {

@@ -36,7 +36,7 @@ public class QuotaOptions
     public bool UnlimitedInDevelopment { get; set; } = true;
 
     /// <summary>Where the run counters are stored (relative paths are resolved against the content root).</summary>
-    public string StoragePath { get; set; } = Path.Combine("App_Data", "run-quota.json");
+    public string StoragePath { get; set; } = Path.Join("App_Data", "run-quota.json");
 }
 
 public enum QuotaTier { Free, OwnKey, Developer }
@@ -67,14 +67,14 @@ public class RunQuotaService
     private readonly Func<DateTime> _utcNow;
     private readonly string _storagePath;
     private readonly object _gate = new();
-    private QuotaFile _data;
+    private readonly QuotaFile _data;
 
     public RunQuotaService(QuotaOptions options, bool isDevelopment, string contentRoot, Func<DateTime>? utcNow = null)
     {
         _options = options;
         _isDevelopment = isDevelopment;
         _utcNow = utcNow ?? (() => DateTime.UtcNow);
-        _storagePath = Path.IsPathRooted(options.StoragePath) ? options.StoragePath : Path.Combine(contentRoot, options.StoragePath);
+        _storagePath = Path.IsPathRooted(options.StoragePath) ? options.StoragePath : Path.Join(contentRoot, options.StoragePath);
         _data = Load();
     }
 

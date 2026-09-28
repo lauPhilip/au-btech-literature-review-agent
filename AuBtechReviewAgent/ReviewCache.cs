@@ -24,7 +24,7 @@ public class CacheOptions
     public int ScreeningDecisionDays { get; set; } = 90;
 
     /// <summary>Folder for the cache (relative paths are resolved against the content root).</summary>
-    public string Folder { get; set; } = Path.Combine("App_Data", "cache");
+    public string Folder { get; set; } = Path.Join("App_Data", "cache");
 }
 
 /// <summary>
@@ -41,7 +41,7 @@ public class ReviewCache
     public ReviewCache(CacheOptions options, string contentRoot)
     {
         _options = options;
-        _root = Path.IsPathRooted(options.Folder) ? options.Folder : Path.Combine(contentRoot, options.Folder);
+        _root = Path.IsPathRooted(options.Folder) ? options.Folder : Path.Join(contentRoot, options.Folder);
     }
 
     /// <summary>A cache that never stores anything (tests, tools).</summary>
@@ -97,10 +97,15 @@ public class ReviewCache
         int deleted = 0;
         foreach (var file in Directory.EnumerateFiles(_root, "*.json", SearchOption.AllDirectories))
         {
-            try { if (File.GetLastWriteTimeUtc(file) < cutoff) { File.Delete(file); deleted++; } } catch { }
+            try { if (File.GetLastWriteTimeUtc(file) < cutoff) { File.Delete(file); deleted++; } }
+            catch (Exception ex)
+            {
+                // A file in use is simply tried again at the next clean-up.
+                _log.LogDebug("Cache clean-up skipped a file: {Message}", ex.Message.Replace("\r", " ").Replace("\n", " "));
+            }
         }
         return deleted;
     }
 
-    private string PathFor(string kind, string key) => Path.Combine(_root, kind, key[..2], key + ".json");
+    private string PathFor(string kind, string key) => Path.Join(_root, kind, key[..2], key + ".json");
 }

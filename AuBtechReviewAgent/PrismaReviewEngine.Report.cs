@@ -81,7 +81,7 @@ public partial class PrismaReviewEngine
         ctx.State.Extractions = (await Task.WhenAll(work)).OrderBy(e => e.ReferenceNumber).ToList();
         try
         {
-            await File.WriteAllTextAsync(Path.Combine(ctx.Workspace, "extraction.json"),
+            await File.WriteAllTextAsync(Path.Join(ctx.Workspace, "extraction.json"),
                 JsonSerializer.Serialize(ctx.State.Extractions, new JsonSerializerOptions { WriteIndented = true }));
         }
         catch (Exception ex) { _log.LogWarning("Run {RunId}: extraction.json not written: {Message}", ctx.RunId, ex.Message); }
@@ -414,10 +414,13 @@ public partial class PrismaReviewEngine
         {
             try
             {
-                string outlinePath = Path.Combine(GetWorkspaceFolderPath(sessionId), "grounded-outline.txt");
+                string outlinePath = Path.Join(GetWorkspaceFolderPath(sessionId), "grounded-outline.txt");
                 await File.WriteAllTextAsync(outlinePath, groundedOutline);
             }
-            catch { }
+            catch (Exception ex)
+            {
+                _log.LogWarning("Could not save grounded-outline.txt: {Message}", SanitizeLogMessage(ex.Message));
+            }
         }
 
         // Facts about the included set, so the abstract cannot call preprints "peer-reviewed studies".
@@ -601,10 +604,13 @@ public partial class PrismaReviewEngine
                 peerReview = await PeerReviewAndReviseAsync(chat, citedSynthesis, citedDiscussion, referenceListMapping, groundedOutline);
             try
             {
-                string peerReviewPath = Path.Combine(GetWorkspaceFolderPath(sessionId), "peer-review-feedback.json");
+                string peerReviewPath = Path.Join(GetWorkspaceFolderPath(sessionId), "peer-review-feedback.json");
                 await File.WriteAllTextAsync(peerReviewPath, JsonSerializer.Serialize(peerReview, new JsonSerializerOptions { WriteIndented = true }));
             }
-            catch { }
+            catch (Exception ex)
+            {
+                _log.LogWarning("Could not save peer-review-feedback.json: {Message}", SanitizeLogMessage(ex.Message));
+            }
 
             // Re-append the isolated architectural diagram strings back onto the reviewed synthesis field
             // The model sometimes writes Markdown emphasis (**Integration Challenges:**); strip it before the
@@ -648,7 +654,7 @@ public partial class PrismaReviewEngine
 
             try
             {
-                string auditPath = Path.Combine(GetWorkspaceFolderPath(sessionId), "citation-audit.json");
+                string auditPath = Path.Join(GetWorkspaceFolderPath(sessionId), "citation-audit.json");
                 var auditPayload = new
                 {
                     ReferenceListSize = referenceCount,
@@ -659,7 +665,10 @@ public partial class PrismaReviewEngine
                 };
                 await File.WriteAllTextAsync(auditPath, JsonSerializer.Serialize(auditPayload, new JsonSerializerOptions { WriteIndented = true }));
             }
-            catch { }
+            catch (Exception ex)
+            {
+                _log.LogWarning("Could not save citation-audit.json: {Message}", SanitizeLogMessage(ex.Message));
+            }
 
             var reportObj = new PrismaReport
             {
@@ -684,7 +693,7 @@ public partial class PrismaReviewEngine
             };
 
             // 3. ARCHIVE THE AUDIT DELTA LEDGER DIRECTLY INTO THE ACTIVE WORKSPACE STORE SUBFOLDER
-            string ledgerPath = Path.Combine(GetWorkspaceFolderPath(sessionId), "stylistic-transformation-ledger.json");
+            string ledgerPath = Path.Join(GetWorkspaceFolderPath(sessionId), "stylistic-transformation-ledger.json");
             await File.WriteAllTextAsync(ledgerPath, JsonSerializer.Serialize(deltas, new JsonSerializerOptions { WriteIndented = true }));
 
             // 4. WRITE THE MAIN CONSOLIDATED REPORT

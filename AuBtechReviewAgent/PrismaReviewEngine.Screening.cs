@@ -339,9 +339,11 @@ public partial class PrismaReviewEngine
     private async Task AwaitScreeningReviewAsync(RunContext ctx)
     {
         var state = ctx.State;
-        Coordinator.OpenScreeningReview(ctx.RunId);
+        // Save the "awaiting review" stage first and only then open the gate, so anyone who sees the gate
+        // open (the dashboard, a test) also finds the ledger already saying that the run is waiting.
         state.Stats.ProcessingStage = StageAwaitingReview;
         await PublishAsync(ctx);
+        Coordinator.OpenScreeningReview(ctx.RunId);
 
         var decisions = await Coordinator.WaitForScreeningReviewAsync(ctx.RunId, TimeSpan.FromHours(Math.Max(1, _runsOptions.ScreeningReviewTimeoutHours)));
         if (decisions == null)

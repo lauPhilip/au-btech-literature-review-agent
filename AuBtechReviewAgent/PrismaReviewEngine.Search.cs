@@ -52,7 +52,7 @@ public partial class PrismaReviewEngine
         try
         {
             // The extra search strings are only known now, so they are added to the protocol as a dated amendment.
-            await File.AppendAllTextAsync(Path.Combine(ctx.Workspace, "protocol.md"), ProtocolWriter.Amendment(searchPerspectives, DateTime.UtcNow));
+            await File.AppendAllTextAsync(Path.Join(ctx.Workspace, "protocol.md"), ProtocolWriter.Amendment(searchPerspectives, DateTime.UtcNow));
         }
         catch (Exception ex) { _log.LogWarning("Run {RunId}: protocol amendment not written: {Message}", ctx.RunId, ex.Message); }
         await SaveStateAsync(ctx.RunId, reviewState);
@@ -199,7 +199,7 @@ public partial class PrismaReviewEngine
         if (raw.Count == 0) return;
         try
         {
-            string folder = Path.Combine(ctx.Workspace, RawResponsesFolder);
+            string folder = Path.Join(ctx.Workspace, RawResponsesFolder);
             Directory.CreateDirectory(folder);
             var names = new List<string>();
             var hashes = new List<string>();
@@ -208,7 +208,7 @@ public partial class PrismaReviewEngine
                 string ext = raw[i].TrimStart().StartsWith('<') ? ".xml" : ".json";
                 string name = baseName + (raw.Count > 1 ? $"-{i + 1}" : "") + ext;
                 byte[] bytes = new UTF8Encoding(false).GetBytes(raw[i]);
-                File.WriteAllBytes(Path.Combine(folder, name), bytes);
+                File.WriteAllBytes(Path.Join(folder, name), bytes);
                 names.Add($"{RawResponsesFolder}/{name}");
                 hashes.Add(RunManifest.Sha256(bytes));
             }
@@ -241,13 +241,14 @@ public partial class PrismaReviewEngine
         string sourceName = $"{graph.SourceName} (citation chaining)";
 
         using var throttle = new SemaphoreSlim(Math.Max(1, Llm.ScreeningParallelism));
-        var lookups = seeds.Select(async seed =>
+        async Task<(ScreeningLog Seed, CitationNeighbours? Result, string? Error)> LookUp(ScreeningLog seed)
         {
             await throttle.WaitAsync();
-            try { return (Seed: seed, Result: (CitationNeighbours?)await graph.GetCitationNeighboursAsync(NormalizeDoi(seed.Doi)!, perDirection), Error: (string?)null); }
-            catch (Exception ex) { return (Seed: seed, Result: (CitationNeighbours?)null, Error: (string?)SanitizeLogMessage(ex.Message)); }
+            try { return (seed, await graph.GetCitationNeighboursAsync(NormalizeDoi(seed.Doi)!, perDirection), null); }
+            catch (Exception ex) { return (seed, null, SanitizeLogMessage(ex.Message)); }
             finally { throttle.Release(); }
-        }).ToList();
+        }
+        var lookups = seeds.Select(LookUp).ToList();
 
         var candidates = new List<(AcademicPaper Paper, string SourceName)>();
         for (int i = 0; i < lookups.Count; i++)
