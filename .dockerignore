@@ -1,0 +1,15 @@
+**/bin/
+**/obj/
+**/node_modules/
+**/WorkspaceStore/
+**/App_Data/
+**/PapersWorkspace/
+**/*.user
+**/appsettings.Development.json
+.git/
+.github/
+.vs/
+.vscode/
+docs/
+AuBtechReviewAgent.Tests/
+tools/
