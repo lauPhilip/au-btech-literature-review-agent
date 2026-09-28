@@ -39,6 +39,17 @@ jobs:
             paths-ignore:
               - AuBtechReviewAgent/wwwroot/lib
               - AuBtechReviewAgent/wwwroot/css
+            # Style suggestions we have decided against, so they do not bury real findings:
+            # - catch-of-all-exceptions: a run must survive any failure in one paper, source or file write;
+            #   those catches are deliberate, and each one logs or records the failure in the ledger.
+            # - missed-where / missed-select: "use LINQ instead of this foreach" is a style preference.
+            query-filters:
+              - exclude:
+                  id: cs/catch-of-all-exceptions
+              - exclude:
+                  id: cs/linq/missed-where
+              - exclude:
+                  id: cs/linq/missed-select
 
       - uses: github/codeql-action/analyze@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4.38.2
         with:
