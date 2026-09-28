@@ -80,8 +80,9 @@ Implement dedicated API client adapters implementing the `IAcademicSource` inter
 * [X] **Traceability:** protocol.md before the search, raw source responses, manifest.json with SHA-256 of every file, clickable citations on the Review Output page.
 * [X] **Extraction and appraisal:** study type, method, sample, findings, limitations and MMAT 2018 with verified quotes (Tables 3.2 and 3.3).
 * [X] **Web security:** Tailwind compiled at build time, Mermaid served locally, Content-Security-Policy and security headers, 40 MB PDF limit, delete-run button.
-* [X] **CI:** actions pinned to commit SHAs, Dependabot, CodeQL, CSS freshness check, release workflow with Docker image and GitHub release (Zenodo DOI once linked).
+* [X] **CI:** actions pinned to commit SHAs, Dependabot, CodeQL, CSS freshness check, release workflow creating a GitHub release (Zenodo DOI once linked).
 * [X] **Open source packaging:** CITATION.cff, .zenodo.json, Dockerfile, SCImago licence note; unused QuestPDF dependency removed.
 * [X] **Code quality:** review engine split into search, screening, report and archive parts; ILogger instead of Console output.
-* [ ] **Live check of the open-source adapters** against the real APIs (tested only on stored responses so far).
+* [X] **Live check of the open-source adapters** (2026-09-28): OpenAlex search and citation lookups, Semantic Scholar, Crossref and Unpaywall answered in the formats the parsers expect. Fixes from it: longer back-off for Semantic Scholar's 429s, escaped HTML in Crossref abstracts, family-first author names from OpenAlex.
+* [ ] **Docker image in releases** (Dockerfile exists; not needed for the Simply deployment).
 * [ ] **Second model for dual screening** (currently two prompts to the same model).

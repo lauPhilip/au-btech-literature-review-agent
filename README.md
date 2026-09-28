@@ -147,9 +147,9 @@ NuGet packages are restored automatically on the first build, so no separate ins
 
 The styling is Tailwind CSS compiled ahead of time into `wwwroot/css/tailwind.css`, which is committed, so you only need Node.js if you change the classes used in a component. Then run `npm ci` once and `npm run build:css` (or `npm run watch:css` while editing) in the `AuBtechReviewAgent` folder, and commit the updated CSS; CI fails when it is out of date.
 
-### Docker
+### Docker (optional)
 
-A container image is published for every release (`ghcr.io/lauphilip/au-btech-literature-review-agent`), and the `Dockerfile` builds the same image locally:
+The main deployment is the .NET app on Simply, which does not use Docker. For running the tool elsewhere, the `Dockerfile` builds a container image (it has not been part of any release so far):
 
 ```
 docker build -t traceableai .
@@ -215,7 +215,7 @@ The project has an xUnit test suite covering citation validation and the citatio
 dotnet test
 ```
 
-On every push and pull request, GitHub Actions builds the project, runs the tests, checks that the compiled CSS is up to date and runs CodeQL (see the CI/CD badge above). Pushing a version tag such as `v1.2.0` runs the release workflow, which tests the code, publishes the Docker image to the GitHub Container Registry and creates a GitHub release.
+On every push and pull request, GitHub Actions builds the project, runs the tests, checks that the compiled CSS is up to date and runs CodeQL (see the CI/CD badge above). Pushing a version tag such as `v1.2.0` runs the release workflow, which tests the code and creates a GitHub release (archived by Zenodo with a DOI once the repository is linked there).
 
 Deployment to the Simply server is also set up in the same workflow, but it stays switched off until you enable it: set a repository variable `DEPLOY_ENABLED` to `true` and add the server connection details as repository secrets. Until then, the deploy step is skipped and only the build-and-test step runs. The workflow file (`.github/workflows/ci.yml`) explains exactly which secrets to add and where to fill in the deploy command for your setup.
 
