@@ -159,6 +159,20 @@ public class PipelineFeatureTests : IDisposable
     }
 
     [Fact]
+    public async Task ARecordWithoutAnAbstractIsMarkedLowConfidence()
+    {
+        var noAbstract = new AcademicPaper("SCHOLAR_n", "Agent supervision without an abstract", "", "Published: 2025", new() { "Ann" }, "Journal of Agents");
+        var engine = Engine(source: new PipelineTests.FakeSource(noAbstract));
+        var runId = Guid.NewGuid();
+        await engine.RunReviewAsync(runId, Request() with { MaxResultsPerSource = 4 });
+
+        var log = engine.LoadState(runId)!.Phases.Screening.Single(l => l.PaperId == "SCHOLAR_n");
+        Assert.Equal("low", log.Confidence);
+        Assert.True(log.Uncertain);
+        Assert.StartsWith("(No abstract was available", log.Reasoning);
+    }
+
+    [Fact]
     public async Task AFinishedRunCanBeDeleted()
     {
         var engine = Engine();
