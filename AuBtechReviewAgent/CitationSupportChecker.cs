@@ -165,8 +165,9 @@ public static class CitationSupportChecker
             prompt.AppendLine("You are checking citations in a systematic literature review. For each numbered sentence below, decide whether the EXCERPTS from the cited paper support what the sentence says about that paper.");
             prompt.AppendLine();
             prompt.AppendLine($"CITED PAPER [{group.Key}]: {paper.Title}");
+            prompt.AppendLine(PromptSafety.DataOnlyNotice);
             prompt.AppendLine("EXCERPTS:");
-            foreach (var (label, text) in excerpts) prompt.AppendLine($"{label.Split(' ')[0]}: {text}");
+            prompt.AppendLine(PromptSafety.Wrap(string.Join("\n", excerpts.Select(e => $"{e.Label.Split(' ')[0]}: {e.Text}")), "excerpts from the cited paper"));
             prompt.AppendLine();
             prompt.AppendLine("SENTENCES CITING THIS PAPER:");
             for (int i = 0; i < sentences.Count; i++) prompt.AppendLine($"S{i + 1}: {sentences[i].Sentence}");
