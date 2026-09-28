@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text.Json;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace AuBtechReviewAgent;
@@ -16,6 +17,12 @@ public class SemanticScholarSource : IAcademicSource
     private readonly string _apiKey;
     private readonly List<string> _raw = new();
 
+    // Semantic Scholar rate-limits per key, and all callers without a key share one pool that often answers
+    // 429. Requests from every run in this app therefore go one at a time, spaced out (1 s with a key, 3 s
+    // without), instead of several runs and search strings hitting it at once.
+    private static readonly SemaphoreSlim Gate = new(1, 1);
+    private static DateTime _lastRequestUtc = DateTime.MinValue;
+
     public SemanticScholarSource(string apiKey = "") => _apiKey = apiKey;
 
     public string SourceName => "Semantic Scholar";
@@ -25,8 +32,19 @@ public class SemanticScholarSource : IAcademicSource
     {
         _raw.Clear();
         string url = $"https://api.semanticscholar.org/graph/v1/paper/search?query={Uri.EscapeDataString(query)}&limit={Math.Clamp(maxResults, 1, 100)}&fields={Fields}";
-        var headers = SourceCatalog.IsUsableKey(_apiKey) ? new Dictionary<string, string> { ["x-api-key"] = _apiKey } : null;
-        string json = await OpenSourceHttp.GetStringAsync(url, headers);
+        bool hasKey = SourceCatalog.IsUsableKey(_apiKey);
+        var headers = hasKey ? new Dictionary<string, string> { ["x-api-key"] = _apiKey } : null;
+        string json;
+        await Gate.WaitAsync();
+        try
+        {
+            var spacing = TimeSpan.FromSeconds(hasKey ? 1 : 3);
+            var wait = _lastRequestUtc + spacing - DateTime.UtcNow;
+            if (wait > TimeSpan.Zero) await Task.Delay(wait);
+            try { json = await OpenSourceHttp.GetStringAsync(url, headers); }
+            finally { _lastRequestUtc = DateTime.UtcNow; }
+        }
+        finally { Gate.Release(); }
         _raw.Add(json);
         return Parse(json);
     }
