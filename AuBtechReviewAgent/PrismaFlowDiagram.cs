@@ -11,6 +11,7 @@ public class PrismaFlowCounts
 {
     public List<(string Source, int Count)> IdentifiedBySource { get; set; } = new();
     public int Identified { get; set; }
+    public int IdentifiedViaCitations { get; set; }  // PRISMA "other methods": citation chaining
     public int DuplicatesRemoved { get; set; }
     public int OutsideDateRange { get; set; }
     public int CappedBeyondMax { get; set; }
@@ -35,10 +36,12 @@ public class PrismaFlowCounts
         return new PrismaFlowCounts
         {
             IdentifiedBySource = state.SearchLogs
+                .Where(l => !l.SourceName.EndsWith("(citation chaining)", StringComparison.Ordinal))
                 .GroupBy(l => l.SourceName)
                 .Select(g => (g.Key, g.Sum(l => l.PapersFound)))
                 .ToList(),
             Identified = s.TotalIdentified,
+            IdentifiedViaCitations = s.IdentifiedViaCitations,
             DuplicatesRemoved = s.DuplicatesRemoved,
             OutsideDateRange = s.OutsideDateRange,
             CappedBeyondMax = s.CappedBeyondMaxResults,
@@ -65,6 +68,8 @@ public static class PrismaFlowDiagram
         string sources = c.IdentifiedBySource.Count == 0
             ? ""
             : "\\\\ " + string.Join("\\\\ ", c.IdentifiedBySource.Select(x => $"{Escape(x.Source)} (n = {x.Count})"));
+        if (c.IdentifiedViaCitations > 0)
+            sources += $"\\\\ Other methods: citation chaining (n = {c.IdentifiedViaCitations})";
 
         var removed = new List<string> { $"Duplicates (n = {c.DuplicatesRemoved})" };
         if (c.OutsideDateRange > 0) removed.Add($"Outside year range (n = {c.OutsideDateRange})");
@@ -81,7 +86,7 @@ public static class PrismaFlowDiagram
         sb.AppendLine(@"  flowbox/.style={draw, rounded corners=2pt, align=center, text width=5.2cm, inner sep=4pt, fill=white},");
         sb.AppendLine(@"  sidebox/.style={draw, rounded corners=2pt, align=left, text width=4.6cm, inner sep=4pt, fill=black!3},");
         sb.AppendLine(@"  arrow/.style={-{Stealth[length=2mm]}}]");
-        sb.AppendLine(Box("id", "", $"Records identified from databases (n = {c.Identified}){sources}"));
+        sb.AppendLine(Box("id", "", $"Records identified{(c.IdentifiedViaCitations > 0 ? "" : " from databases")} (n = {c.Identified}){sources}"));
         sb.AppendLine($"\\node[sidebox, right=of id] (removed) {{Records removed before screening:\\\\ {string.Join("\\\\ ", removed)}}};");
         sb.AppendLine(Box("screened", ", below=of id", $"Records screened (n = {c.Screened})"));
         sb.AppendLine($"\\node[sidebox, right=of screened] (excluded) {{Records excluded:\\\\ {string.Join("\\\\ ", excluded)}}};");

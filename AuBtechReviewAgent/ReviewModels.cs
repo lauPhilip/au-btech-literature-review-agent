@@ -11,7 +11,8 @@ public record AcademicPaper(
     List<string> Authors,
     string JournalSource,
     string? Doi = null,   // Bare DOI (e.g. "10.1016/j.epsr.2025.109876") when the source API returns one
-    string? Url = null    // Landing-page URL used when no DOI is available
+    string? Url = null,   // Landing-page URL used when no DOI is available
+    string? PdfUrl = null // Direct link to a legal open-access PDF, when the source knows one
 );
 
 public class ReviewState
@@ -45,9 +46,22 @@ public class ReviewState
     // Short SHA-256 fingerprint of the run's protocol (query, criteria, perspectives, sources, cap).
     public string ProtocolHash { get; set; } = string.Empty;
 
+    // Where each included paper's full text came from (arXiv, open-access link, Unpaywall) or why there is none.
+    public Dictionary<string, string> FullTextSources { get; set; } = new();
+
+    // Data extraction and MMAT appraisal per included study (also written to extraction.json).
+    public List<StudyExtraction> Extractions { get; set; } = new();
+
+    // SHA-256 of protocol.md as written before the search.
+    public string? ProtocolSha256 { get; set; }
+
     // Every record removed before screening (duplicate, outside the year range, over the per-source cap),
     // with the reason, so the funnel's numbers can be traced to actual papers.
     public List<RemovedRecord> RemovedBeforeScreening { get; set; } = new();
+
+    // Options chosen for this run (see ReviewRequest).
+    public bool DualScreeningRequested { get; set; }
+    public bool CitationChainingRequested { get; set; }
 
     // True when the user asked to confirm the screening decisions before the write-up.
     public bool HumanScreeningReviewRequested { get; set; }
@@ -108,6 +122,13 @@ public class ReviewStats
     public int CitationsPartiallySupported { get; set; }
     public int CitationsNotSupported { get; set; }
     public int CitationsUnverifiable { get; set; }
+    public int IdentifiedViaCitations { get; set; } // Subset of TotalIdentified found by citation chaining (PRISMA "other methods")
+    public int DualScreened { get; set; }           // Records screened by both independent prompts
+    public int ScreeningDisagreements { get; set; } // ...where the two prompts disagreed
+    public double? ScreeningKappa { get; set; }     // Cohen's kappa between the two screenings
+    public int UncertainDecisions { get; set; }     // Decisions flagged for human attention
+    public int InjectionSuspected { get; set; }     // Records whose text contained instruction-like phrases
+    public int CacheHits { get; set; }              // Screening decisions and search responses reused from the cache
 }
 
 public class ReviewPhases 
@@ -134,7 +155,20 @@ public record ScreeningLog(
     // Human screening review: the model's original decision is kept when a reviewer changes it.
     string? ModelDecision = null,
     bool HumanReviewed = false,
-    string? HumanNote = null
+    string? HumanNote = null,
+    // Dual screening: the second, independent screening prompt's decision and reasoning.
+    string? SecondDecision = null,
+    string? SecondReasoning = null,
+    // high / medium / low, as reported by the screening model.
+    string? Confidence = null,
+    // True when the decision should get human attention first: the two screenings disagreed, confidence was
+    // low, or the paper's text contained instruction-like phrases (possible prompt injection).
+    bool Uncertain = false,
+    List<string>? InjectionFlags = null,
+    // True when the decision was reused from the screening cache (same paper, criteria, model and prompt).
+    bool FromCache = false,
+    // "database search" or "citation chaining".
+    string Origin = "database search"
 );
 
 // ─── PLATFORM SEARCH METRIC DATA CONTAINER ──────────────────────────
@@ -147,6 +181,9 @@ public class PlatformSearchLog
     public int PapersFound { get; set; }
     public string ErrorMessage { get; set; } = "None";
     public string QueryUsed { get; set; } = string.Empty; // Which search-perspective phrasing produced this pass
+    public string? RawResponseFile { get; set; }          // SourceResponses/... file with the source's raw answer
+    public string? RawResponseSha256 { get; set; }
+    public bool FromCache { get; set; }                   // Response reused from the search cache (see CacheOptions)
 }
 
 // Applied=false means the rewrite was rejected by a guard (for example it changed the length far
@@ -203,6 +240,9 @@ public class PrismaReport
 
     // One-paragraph summary of the automated citation support check.
     public string CitationCheckSummary { get; set; } = "";
+
+    // PRISMA item 24: where the protocol is and when it was written.
+    public string ProtocolItem { get; set; } = "";
 }
 
 /// <summary>Everything the user chose in the dashboard for one run.</summary>
@@ -218,7 +258,9 @@ public record ReviewRequest(
     IReadOnlyCollection<string>? SelectedSources = null,
     int YearFrom = 0,
     int YearTo = 0,
-    bool HumanScreeningReview = false
+    bool HumanScreeningReview = false,
+    bool DualScreening = true,     // screen every record twice with two independent prompts
+    bool CitationChaining = false  // add references and citing papers of included studies (OpenAlex)
 );
 
 /// <summary>A record that was found but removed before screening, and why (written to the run ledger).</summary>
