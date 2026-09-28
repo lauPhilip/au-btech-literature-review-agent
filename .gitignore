@@ -35,3 +35,6 @@ AuBtechReviewAgent/WorkspaceStore/
 # Run-quota counters (hashed client addresses) - server state, not source
 AuBtechReviewAgent/App_Data/
 node_modules/
+
+# Files the Claude desktop app saves into this folder
+Claude outputs/
