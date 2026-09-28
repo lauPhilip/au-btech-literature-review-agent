@@ -57,9 +57,9 @@ foreach (var record in sample)
     {
         using (LlmStage.Begin("screening-eval"))
         {
-            var json = await PrismaReviewEngine.ScreenPaperAsync(chat, paper, inclusion, exclusion);
-            decision = json.TryGetProperty("decision", out var d) ? d.GetString() ?? "Excluded" : "Excluded";
-            reasoning = json.TryGetProperty("reasoning", out var r) ? r.GetString() ?? "" : "";
+            var answer = await PrismaReviewEngine.ScreenPaperAsync(chat, paper, inclusion, exclusion);
+            decision = answer.Decision;
+            reasoning = answer.Reasoning;
         }
     }
     catch (Exception ex)

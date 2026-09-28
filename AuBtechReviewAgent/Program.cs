@@ -51,17 +51,32 @@ builder.Services.AddRazorComponents()
 builder.Services.AddScoped<AuBtechReviewAgent.UiStateContainer>();
 
 // Read global environment configuration fallback boundaries securely
-string mistralApiKey = builder.Configuration["MISTRAL_API_KEY"] ?? throw new InvalidOperationException("Mistral Key missing.");
+// Language model: Mistral (default) or any OpenAI-compatible server, e.g. a local Ollama (see the Llm section).
+var llmOptions = builder.Configuration.GetSection("Llm").Get<AuBtechReviewAgent.LlmOptions>() ?? new AuBtechReviewAgent.LlmOptions();
+string mistralApiKey = builder.Configuration["MISTRAL_API_KEY"] ?? "";
+if (!llmOptions.IsOpenAICompatible && string.IsNullOrWhiteSpace(mistralApiKey))
+    throw new InvalidOperationException("MISTRAL_API_KEY is missing. Set it with dotnet user-secrets, or set Llm:Provider to OpenAICompatible.");
 string elsevierApiKey = builder.Configuration["ELSEVIER_API_KEY"] ?? "";
 string ieeeApiKey = builder.Configuration["IEEE_API_KEY"] ?? "";
-string scholarApiKey = builder.Configuration["SCHOLAR_API_KEY"] ?? ""; 
+// Optional Semantic Scholar key (the open sources OpenAlex, Semantic Scholar and Crossref need no key).
+var openSources = builder.Configuration.GetSection("OpenSources").Get<AuBtechReviewAgent.OpenSourcesOptions>() ?? new AuBtechReviewAgent.OpenSourcesOptions();
+string scholarApiKey = openSources.SemanticScholarApiKey;
 
 string? supportStatement = builder.Configuration["Report:SupportStatement"];
 
 var runsOptions = builder.Configuration.GetSection("Runs").Get<AuBtechReviewAgent.RunsOptions>() ?? new AuBtechReviewAgent.RunsOptions();
 builder.Services.AddSingleton(runsOptions);
 
-var reviewEngine = new AuBtechReviewAgent.PrismaReviewEngine(mistralApiKey, elsevierApiKey, ieeeApiKey, scholarApiKey, supportStatement, runsOptions);
+var cacheOptions = builder.Configuration.GetSection("Cache").Get<AuBtechReviewAgent.CacheOptions>() ?? new AuBtechReviewAgent.CacheOptions();
+var reviewCache = new AuBtechReviewAgent.ReviewCache(cacheOptions, builder.Environment.ContentRootPath);
+builder.Services.AddSingleton(reviewCache);
+
+var reviewEngine = new AuBtechReviewAgent.PrismaReviewEngine(mistralApiKey, elsevierApiKey, ieeeApiKey, scholarApiKey, supportStatement, runsOptions)
+{
+    OpenSources = openSources,
+    Llm = llmOptions,
+    Cache = reviewCache,
+};
 builder.Services.AddSingleton(reviewEngine);
 
 // Register the storage cleanup background worker
@@ -69,10 +84,17 @@ builder.Services.AddHostedService<AuBtechReviewAgent.SessionCleanupWorker>();
 
 var app = builder.Build();
 
+// Classes that are not created by dependency injection (engine, sources, cache) log through AppLog.
+AuBtechReviewAgent.AppLog.Factory = app.Services.GetRequiredService<ILoggerFactory>();
+var startupLog = AuBtechReviewAgent.AppLog.For("Startup");
+startupLog.LogInformation("Language model: {Model}", llmOptions.DisplayName);
+if (string.IsNullOrWhiteSpace(openSources.ContactEmail))
+    startupLog.LogWarning("OpenSources:ContactEmail is not set. OpenAlex, Crossref and Unpaywall ask for a contact e-mail; Unpaywall does not work without one.");
+
 // Runs do not survive a restart (IIS recycles the app pool when idle and on a schedule). Mark any run that
 // was cut off as "Interrupted" so its link shows what happened instead of a spinner that never stops.
 int interrupted = reviewEngine.MarkInterruptedRuns();
-if (interrupted > 0) Console.WriteLine($"[Startup] Marked {interrupted} unfinished run(s) as interrupted.");
+if (interrupted > 0) startupLog.LogInformation("Marked {Count} unfinished run(s) as interrupted.", interrupted);
 
 // Apply Forwarded Headers immediately before evaluating redirection paths
 app.UseForwardedHeaders();
@@ -114,6 +136,13 @@ app.MapGet("/api/workspace/{sessionId:guid}/references.{format}", (Guid sessionI
     if (content == null) return Results.NotFound();
     string mime = format == "bib" ? "application/x-bibtex" : "application/x-research-info-systems";
     return Results.File(System.Text.Encoding.UTF8.GetBytes(content), mime, $"references.{format}");
+}).RequireRateLimiting("ArchiveDownloadPolicy");
+
+// The protocol written before the search (PRISMA item 24), linked from the Review Output page.
+app.MapGet("/api/workspace/{sessionId:guid}/protocol.md", (Guid sessionId, AuBtechReviewAgent.PrismaReviewEngine engine) =>
+{
+    string? text = engine.ReadProtocol(sessionId);
+    return text == null ? Results.NotFound() : Results.Text(text, "text/markdown; charset=utf-8");
 }).RequireRateLimiting("ArchiveDownloadPolicy");
 
 app.MapRazorComponents<App>()
