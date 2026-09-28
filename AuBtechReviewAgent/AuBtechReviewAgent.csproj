@@ -2,6 +2,8 @@
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
+    <!-- Simply.com (IIS shared hosting): in-process hosting returned empty static files from the network share -->
+    <AspNetCoreHostingModel>OutOfProcess</AspNetCoreHostingModel>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <BlazorDisableThrowNavigationException>true</BlazorDisableThrowNavigationException>
@@ -17,7 +19,7 @@
 <!-- Run folders, the cache and quota counters are data, not source: keep them out of the project entirely, so
      dotnet watch does not reload the project every time a run writes a file (and publish does not copy them). -->
 <PropertyGroup>
-  <DefaultItemExcludes>$(DefaultItemExcludes);WorkspaceStore\**;App_Data\**;PapersWorkspace\**;node_modules\**</DefaultItemExcludes>
+  <DefaultItemExcludes>$(DefaultItemExcludes);WorkspaceStore\**;App_Data\**;PapersWorkspace\**;node_modules\**;publish\**</DefaultItemExcludes>
 </PropertyGroup>
 
 <ItemGroup>
