@@ -21,7 +21,7 @@ Implement dedicated API client adapters implementing the `IAcademicSource` inter
 * [ ] **Enhanced arXiv Adapter:** Deepen the current parser to handle clean category filter hooks more robustly.
 
 ## 4. Future Backlog Features
-* [ ] **Multi-Agent Screening Consensus:** Implement a dual-agent check where two different LLM prompts debate ambiguous papers to reduce selection bias.
+* [X] **Multi-Agent Screening Consensus:** (done as dual screening, section 9) Implement a dual-agent check where two different LLM prompts debate ambiguous papers to reduce selection bias.
 * [ ] **Automated Citation Chaining:** Automatically fetch and screen the reference lists of highly relevant included papers (backward and forward citation tracking).
 * [ ] **Live Document Workspace Sync:** Keep the local folder structure (`/PapersWorkspace`) automatically mirrored with a human-in-the-loop sorting dashboard.
 
@@ -65,5 +65,23 @@ Implement dedicated API client adapters implementing the `IAcademicSource` inter
 * [X] **BibTeX / RIS export** in the archive and as downloads.
 * [X] **Run settings:** `llm-calls.json` with model, app version, temperature per stage, retries, token use and prompt hashes; screening runs at temperature 0.
 * [X] **Screening evaluation tool** (`tools/ScreeningEval`) for SYNERGY/ASReview datasets.
-* [ ] **Open-access full text:** look up DOIs on Unpaywall so non-arXiv papers get full text (improves grounding and the citation check).
+* [X] **Open-access full text:** arXiv, the source's open-access link, then Unpaywall by DOI (see section 9).
 * [ ] **Run history in a database** (see notes on PostgreSQL).
+
+## 9. Open sources, security, run time, traceability and appraisal
+* [X] **Open sources:** Google Scholar and ResearchGate via SerpApi (paid scraping) replaced by OpenAlex, Semantic Scholar and Crossref; all sources are queried in parallel.
+* [X] **Citation chaining:** one round of backward and forward snowballing through OpenAlex, reported as "other methods" in the PRISMA flow.
+* [X] **Local models:** `Llm:Provider = OpenAICompatible` runs the review on Ollama or any OpenAI-compatible server.
+* [X] **Prompt injection:** third-party text wrapped in data markers in every prompt; instruction-like phrases flagged per record.
+* [X] **Structured output:** every model answer is parsed into a typed record and validated, with one repair attempt.
+* [X] **Dual screening:** two independent prompts, disagreements included and flagged, Cohen's kappa in the methods; confidence per decision; uncertain decisions shown first in the human review.
+* [X] **Parallel screening and extraction** (`Llm:ScreeningParallelism`), applied to the ledger in a fixed order.
+* [X] **Cache** for search responses (24 h) and screening decisions (90 days), keyed on paper, criteria, model and prompt version.
+* [X] **Traceability:** protocol.md before the search, raw source responses, manifest.json with SHA-256 of every file, clickable citations on the Review Output page.
+* [X] **Extraction and appraisal:** study type, method, sample, findings, limitations and MMAT 2018 with verified quotes (Tables 3.2 and 3.3).
+* [X] **Web security:** Tailwind compiled at build time, Mermaid served locally, Content-Security-Policy and security headers, 40 MB PDF limit, delete-run button.
+* [X] **CI:** actions pinned to commit SHAs, Dependabot, CodeQL, CSS freshness check, release workflow with Docker image and GitHub release (Zenodo DOI once linked).
+* [X] **Open source packaging:** CITATION.cff, .zenodo.json, Dockerfile, SCImago licence note; unused QuestPDF dependency removed.
+* [X] **Code quality:** review engine split into search, screening, report and archive parts; ILogger instead of Console output.
+* [ ] **Live check of the open-source adapters** against the real APIs (tested only on stored responses so far).
+* [ ] **Second model for dual screening** (currently two prompts to the same model).

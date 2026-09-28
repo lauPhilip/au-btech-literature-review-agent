@@ -22,7 +22,7 @@ You'll need:
 - The [.NET 10 SDK](https://dotnet.microsoft.com/en-us/download/dotnet/10.0)
 - A [Mistral API key](https://mistral.ai/) (required — the app won't start without one)
 
-Optional API keys, if you want to search those sources: Elsevier/ScienceDirect, IEEE Xplore, and Google Scholar.
+Optional API keys, if you want to search those sources: Elsevier/ScienceDirect and IEEE Xplore. arXiv, OpenAlex, Semantic Scholar and Crossref need no key. Instead of a Mistral key you can use a local model through Ollama (see "Running without Mistral" in the README).
 
 Then:
 
@@ -44,7 +44,9 @@ dotnet run
 
 The app will print a local URL you can open in your browser.
 
-Optional keys use the same pattern: `dotnet user-secrets set "ELSEVIER_API_KEY" "..."`, and likewise `IEEE_API_KEY` and `SCHOLAR_API_KEY`.
+Optional keys use the same pattern: `dotnet user-secrets set "ELSEVIER_API_KEY" "..."`, and likewise `IEEE_API_KEY`. Set a contact e-mail for the open sources with `dotnet user-secrets set "OpenSources:ContactEmail" "you@example.org"`.
+
+If you change the Tailwind classes in a component, rebuild the CSS in the `AuBtechReviewAgent` folder with `npm ci` and `npm run build:css`, and commit `wwwroot/css/tailwind.css` with your change. Never build a class name from a variable (write `bg-red-50`, not `"bg-" + colour + "-50"`), because the build only finds class names written out in full.
 
 **A note on secrets:** never commit API keys. Use `dotnet user-secrets` (as above) or environment variables so keys stay off the repo. If you think you've committed a key by accident, let a maintainer know so it can be rotated.
 
