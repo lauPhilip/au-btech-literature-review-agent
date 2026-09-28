@@ -17,12 +17,14 @@ public class SessionCleanupWorker : BackgroundService
 {
     private readonly ILogger<SessionCleanupWorker> _logger;
     private readonly PrismaReviewEngine _engine;
+    private readonly ReviewCache? _cache;
     private readonly TimeSpan _cleanupInterval = TimeSpan.FromHours(1);
 
-    public SessionCleanupWorker(ILogger<SessionCleanupWorker> logger, PrismaReviewEngine engine)
+    public SessionCleanupWorker(ILogger<SessionCleanupWorker> logger, PrismaReviewEngine engine, ReviewCache? cache = null)
     {
         _logger = logger;
         _engine = engine;
+        _cache = cache;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -35,6 +37,8 @@ public class SessionCleanupWorker : BackgroundService
             {
                 PurgeExpiredRuns(_engine.WorkspaceRoot,
                     TimeSpan.FromDays(Math.Max(1, _engine.RunsOptions.RetentionDays)), DateTime.UtcNow, _engine.IsRunActive, _logger);
+                int pruned = _cache?.Prune() ?? 0;
+                if (pruned > 0) _logger.LogInformation("Removed {Count} expired cache file(s).", pruned);
             }
             catch (Exception ex)
             {
