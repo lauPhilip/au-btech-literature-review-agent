@@ -3,7 +3,6 @@ using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.RateLimiting;
 using System.Threading.RateLimiting;
 
-QuestPDF.Settings.License = QuestPDF.Infrastructure.LicenseType.Community;
 var builder = WebApplication.CreateBuilder(args);
 
 // 1. FORWARDED HEADERS CONFIGURATION
@@ -98,6 +97,18 @@ if (interrupted > 0) startupLog.LogInformation("Marked {Count} unfinished run(s)
 
 // Apply Forwarded Headers immediately before evaluating redirection paths
 app.UseForwardedHeaders();
+
+// Content-Security-Policy and other security headers on every response (see SecurityHeaders).
+bool isDevelopment = app.Environment.IsDevelopment();
+app.Use(async (context, next) =>
+{
+    context.Response.OnStarting(() =>
+    {
+        AuBtechReviewAgent.SecurityHeaders.Apply(context.Response.Headers, isDevelopment);
+        return Task.CompletedTask;
+    });
+    await next();
+});
 
 if (!app.Environment.IsDevelopment())
 {

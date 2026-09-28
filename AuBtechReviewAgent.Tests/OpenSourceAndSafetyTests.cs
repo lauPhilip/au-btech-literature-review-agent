@@ -271,6 +271,18 @@ public class OpenSourceAndSafetyTests : IDisposable
     }
 
     [Fact]
+    public void ContentSecurityPolicyAllowsOnlyOwnScripts()
+    {
+        string csp = SecurityHeaders.ContentSecurityPolicy(isDevelopment: false);
+        Assert.Contains("script-src 'self'", csp);
+        Assert.Contains("frame-ancestors 'none'", csp);
+        Assert.DoesNotContain("unsafe-eval", csp);
+        Assert.DoesNotContain("cdn", csp);
+        Assert.DoesNotContain("localhost", csp);
+        Assert.Contains("ws://localhost:*", SecurityHeaders.ContentSecurityPolicy(isDevelopment: true));
+    }
+
+    [Fact]
     public void AppraisalTextIsBuiltFromTheExtractions()
     {
         var e1 = new StudyExtraction { ReferenceNumber = 1, EvidenceBasis = "full text", AppraisalCategory = "qualitative",
