@@ -13,7 +13,7 @@ namespace AuBtechReviewAgent.Tests;
 /// </summary>
 public class PipelineTests : IDisposable
 {
-    private readonly string _root = Path.Combine(Path.GetTempPath(), "pipeline-" + Guid.NewGuid().ToString("N"));
+    private readonly string _root = Path.Join(Path.GetTempPath(), "pipeline-" + Guid.NewGuid().ToString("N"));
 
     public void Dispose()
     {
@@ -102,7 +102,7 @@ public class PipelineTests : IDisposable
         Assert.NotNull(state.RunSettings);
         Assert.True(state.RunSettings!.LlmCalls > 5);
         Assert.Equal(0.0, state.RunSettings.StageTemperatures["screening"]);
-        Assert.True(File.Exists(Path.Combine(_root, runId.ToString("N"), "llm-calls.json")));
+        Assert.True(File.Exists(Path.Join(_root, runId.ToString("N"), "llm-calls.json")));
 
         byte[] zip = engine.GenerateWorkspaceArchiveFromDisk(runId);
         using var archive = new ZipArchive(new MemoryStream(zip));
@@ -110,11 +110,13 @@ public class PipelineTests : IDisposable
         foreach (var expected in new[] { "main.tex", "references.bib", "references.ris", "citation-audit.json", "llm-calls.json", "transparent-process.json", "prisma-report.json" })
             Assert.Contains(expected, names);
 
-        string tex = new StreamReader(archive.GetEntry("main.tex")!.Open()).ReadToEnd();
+        using var texReader = new StreamReader(archive.GetEntry("main.tex")!.Open());
+        string tex = texReader.ReadToEnd();
         Assert.Contains("PRISMA 2020 flow diagram", tex);
         Assert.Contains("Automated Citation Check", tex);
 
-        string audit = new StreamReader(archive.GetEntry("citation-audit.json")!.Open()).ReadToEnd();
+        using var auditReader = new StreamReader(archive.GetEntry("citation-audit.json")!.Open());
+        string audit = auditReader.ReadToEnd();
         Assert.Contains("\"SupportChecks\"", audit);
 
         // Dual screening: both prompts agree on all three records.
@@ -127,7 +129,8 @@ public class PipelineTests : IDisposable
             Assert.Contains(expected, names);
         Assert.True(names.Any(n => n.StartsWith(PrismaReviewEngine.RawResponsesFolder + "/")));
         Assert.NotNull(state.ProtocolSha256);
-        string protocol = new StreamReader(archive.GetEntry("protocol.md")!.Open()).ReadToEnd();
+        using var protocolReader = new StreamReader(archive.GetEntry("protocol.md")!.Open());
+        string protocol = protocolReader.ReadToEnd();
         Assert.Contains("Amendment", protocol);
         Assert.Contains("\"agent fault recovery\"", protocol);
 
@@ -135,7 +138,8 @@ public class PipelineTests : IDisposable
         {
             using var ms = new MemoryStream(); e.Open().CopyTo(ms); return ms.ToArray();
         });
-        string manifest = new StreamReader(archive.GetEntry("manifest.json")!.Open()).ReadToEnd();
+        using var manifestReader = new StreamReader(archive.GetEntry("manifest.json")!.Open());
+        string manifest = manifestReader.ReadToEnd();
         Assert.Empty(RunManifest.Verify(manifest, files));
 
         Assert.Equal(2, state.Extractions.Count);
@@ -144,7 +148,7 @@ public class PipelineTests : IDisposable
         Assert.Equal("cant_tell", appraisal[1].Answer); // "no" with a quote that is not in the paper
         Assert.Contains("Table 3.2", tex);
         Assert.Contains("Registration and Protocol", tex);
-        Assert.Contains("screened twice", File.ReadAllText(Path.Combine(_root, runId.ToString("N"), "prisma-report.json")));
+        Assert.Contains("screened twice", File.ReadAllText(Path.Join(_root, runId.ToString("N"), "prisma-report.json")));
     }
 
     [Fact]
@@ -176,7 +180,7 @@ public class PipelineTests : IDisposable
         Assert.Contains("changed 1", state.HumanScreeningReviewOutcome);
         Assert.True(PrismaFlowCounts.From(state).IsConsistent);
 
-        var report = File.ReadAllText(Path.Combine(_root, runId.ToString("N"), "prisma-report.json"));
+        var report = File.ReadAllText(Path.Join(_root, runId.ToString("N"), "prisma-report.json"));
         Assert.Contains("A human reviewer then checked 2", report);
     }
 
@@ -197,10 +201,10 @@ public class PipelineTests : IDisposable
     {
         var engine = Engine();
         var runId = Guid.NewGuid();
-        Directory.CreateDirectory(Path.Combine(_root, runId.ToString("N")));
+        Directory.CreateDirectory(Path.Join(_root, runId.ToString("N")));
         var state = new ReviewState();
         state.Stats.ProcessingStage = PrismaReviewEngine.StageScreening;
-        File.WriteAllText(Path.Combine(_root, runId.ToString("N"), "transparent-process.json"), JsonSerializer.Serialize(state));
+        File.WriteAllText(Path.Join(_root, runId.ToString("N"), "transparent-process.json"), JsonSerializer.Serialize(state));
 
         Assert.Equal(1, engine.MarkInterruptedRuns());
         Assert.Equal(PrismaReviewEngine.StageInterrupted, engine.LoadState(runId)!.Stats.ProcessingStage);

@@ -9,7 +9,7 @@ namespace AuBtechReviewAgent.Tests;
 /// </summary>
 public class RemovedRecordsTests : IDisposable
 {
-    private readonly string _root = Path.Combine(Path.GetTempPath(), "removed-" + Guid.NewGuid().ToString("N"));
+    private readonly string _root = Path.Join(Path.GetTempPath(), "removed-" + Guid.NewGuid().ToString("N"));
 
     public void Dispose()
     {

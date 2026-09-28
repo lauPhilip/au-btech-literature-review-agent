@@ -82,15 +82,15 @@ public class GroundingAndFlowTests
     [Fact]
     public void ExpiredRunFoldersAreDeletedButRecentAndActiveOnesAreKept()
     {
-        string store = Path.Combine(Path.GetTempPath(), "store-" + Guid.NewGuid().ToString("N"));
+        string store = Path.Join(Path.GetTempPath(), "store-" + Guid.NewGuid().ToString("N"));
         Guid oldRun = Guid.NewGuid(), activeOldRun = Guid.NewGuid(), recentRun = Guid.NewGuid();
         try
         {
             foreach (var id in new[] { oldRun, activeOldRun, recentRun })
             {
-                string dir = Path.Combine(store, id.ToString("N"));
+                string dir = Path.Join(store, id.ToString("N"));
                 Directory.CreateDirectory(dir);
-                string file = Path.Combine(dir, "transparent-process.json");
+                string file = Path.Join(dir, "transparent-process.json");
                 File.WriteAllText(file, "{}");
                 DateTime stamp = id == recentRun ? DateTime.UtcNow.AddDays(-1) : DateTime.UtcNow.AddDays(-10);
                 File.SetLastWriteTimeUtc(file, stamp);
@@ -100,9 +100,9 @@ public class GroundingAndFlowTests
             int deleted = SessionCleanupWorker.PurgeExpiredRuns(store, TimeSpan.FromDays(7), DateTime.UtcNow, id => id == activeOldRun);
 
             Assert.Equal(1, deleted);
-            Assert.False(Directory.Exists(Path.Combine(store, oldRun.ToString("N"))));
-            Assert.True(Directory.Exists(Path.Combine(store, activeOldRun.ToString("N"))));
-            Assert.True(Directory.Exists(Path.Combine(store, recentRun.ToString("N"))));
+            Assert.False(Directory.Exists(Path.Join(store, oldRun.ToString("N"))));
+            Assert.True(Directory.Exists(Path.Join(store, activeOldRun.ToString("N"))));
+            Assert.True(Directory.Exists(Path.Join(store, recentRun.ToString("N"))));
         }
         finally
         {
@@ -113,11 +113,11 @@ public class GroundingAndFlowTests
     [Fact]
     public void AFreshlyRewrittenLedgerKeepsAnOldFolderAlive()
     {
-        string dir = Path.Combine(Path.GetTempPath(), "run-" + Guid.NewGuid().ToString("N"));
+        string dir = Path.Join(Path.GetTempPath(), "run-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(dir);
         try
         {
-            string file = Path.Combine(dir, "transparent-process.json");
+            string file = Path.Join(dir, "transparent-process.json");
             File.WriteAllText(file, "{}");
             Directory.SetLastWriteTimeUtc(dir, DateTime.UtcNow.AddDays(-30));
 

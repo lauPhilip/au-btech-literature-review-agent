@@ -87,7 +87,8 @@ public class ReportGuardTests
 
             byte[] zip = engine.GenerateWorkspaceArchive(Guid.NewGuid(), new PrismaReport(), records);
             using var archive = new System.IO.Compression.ZipArchive(new MemoryStream(zip));
-            string tex = new StreamReader(archive.GetEntry("main.tex")!.Open()).ReadToEnd();
+            using var texReader = new StreamReader(archive.GetEntry("main.tex")!.Open());
+            string tex = texReader.ReadToEnd();
 
             // 360/7 degrees per slice must be written as 51.43..., never 51,43...
             Assert.False(System.Text.RegularExpressions.Regex.IsMatch(tex, @"\(\d+,\d+:1\.2cm\)"));
@@ -112,7 +113,8 @@ public class ReportGuardTests
 
         byte[] zip = engine.GenerateWorkspaceArchive(Guid.NewGuid(), new PrismaReport(), records);
         using var archive = new System.IO.Compression.ZipArchive(new MemoryStream(zip));
-        string tex = new StreamReader(archive.GetEntry("main.tex")!.Open()).ReadToEnd();
+        using var texReader = new StreamReader(archive.GetEntry("main.tex")!.Open());
+        string tex = texReader.ReadToEnd();
 
         int b = tex.IndexOf(@"\bibitem{ref1} Bandi");
         int p = tex.IndexOf(@"\bibitem{ref2} Pajo");

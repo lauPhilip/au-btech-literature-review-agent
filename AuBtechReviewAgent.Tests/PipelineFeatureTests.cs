@@ -10,7 +10,7 @@ namespace AuBtechReviewAgent.Tests;
 /// </summary>
 public class PipelineFeatureTests : IDisposable
 {
-    private readonly string _root = Path.Combine(Path.GetTempPath(), "features-" + Guid.NewGuid().ToString("N"));
+    private readonly string _root = Path.Join(Path.GetTempPath(), "features-" + Guid.NewGuid().ToString("N"));
 
     public void Dispose()
     {
@@ -132,14 +132,14 @@ public class PipelineFeatureTests : IDisposable
         Assert.Contains("citation chaining (n = 3)", PrismaFlowDiagram.ToTikz(PrismaFlowCounts.From(state)));
         Assert.True(state.SearchLogs.Any(l => l.SourceName == "OpenAlex (citation chaining)" && l.RawResponseFile != null));
 
-        string report = File.ReadAllText(Path.Combine(_root, runId.ToString("N"), "prisma-report.json"));
+        string report = File.ReadAllText(Path.Join(_root, runId.ToString("N"), "prisma-report.json"));
         Assert.Contains("citation chaining was run through OpenAlex", report);
     }
 
     [Fact]
     public async Task ASecondIdenticalRunReusesSearchesAndScreeningDecisions()
     {
-        var cache = new ReviewCache(new CacheOptions { Folder = Path.Combine(_root, "cache") }, _root);
+        var cache = new ReviewCache(new CacheOptions { Folder = Path.Join(_root, "cache") }, _root);
         var source = new PipelineTests.FakeSource();
         var firstChat = new FakeChatService().RespondsWith(PipelineTests.Respond);
         await Engine(source: source, cache: cache, chat: firstChat).RunReviewAsync(Guid.NewGuid(), Request());

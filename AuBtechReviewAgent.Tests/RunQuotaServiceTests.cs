@@ -6,7 +6,7 @@ namespace AuBtechReviewAgent.Tests;
 
 public class RunQuotaServiceTests : IDisposable
 {
-    private readonly string _dir = Path.Combine(Path.GetTempPath(), "quota-tests-" + Guid.NewGuid().ToString("N"));
+    private readonly string _dir = Path.Join(Path.GetTempPath(), "quota-tests-" + Guid.NewGuid().ToString("N"));
     private DateTime _now = new(2026, 9, 25, 10, 0, 0, DateTimeKind.Utc);
 
     private RunQuotaService Create(QuotaOptions? options = null, bool isDevelopment = false) =>
@@ -67,7 +67,7 @@ public class RunQuotaServiceTests : IDisposable
         var quota = Create();
         quota.TryReserve("203.0.113.77", QuotaTier.Free, out _, out _);
 
-        string file = File.ReadAllText(Path.Combine(_dir, "App_Data", "run-quota.json"));
+        string file = File.ReadAllText(Path.Join(_dir, "App_Data", "run-quota.json"));
 
         Assert.DoesNotContain("203.0.113.77", file);
     }

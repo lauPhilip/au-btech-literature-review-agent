@@ -18,7 +18,7 @@ namespace AuBtechReviewAgent.Tests;
 /// </summary>
 public class OpenSourceAndSafetyTests : IDisposable
 {
-    private readonly string _root = Path.Combine(Path.GetTempPath(), "oss-" + Guid.NewGuid().ToString("N"));
+    private readonly string _root = Path.Join(Path.GetTempPath(), "oss-" + Guid.NewGuid().ToString("N"));
 
     public void Dispose()
     {
@@ -197,9 +197,12 @@ public class OpenSourceAndSafetyTests : IDisposable
     [Fact]
     public async Task PdfDownloadsStopAtTheSizeLimit()
     {
-        var output = new MemoryStream();
-        Assert.False(await DocumentRAGUtility.CopyWithLimitAsync(new MemoryStream(new byte[5000]), output, maxBytes: 4096));
-        Assert.True(await DocumentRAGUtility.CopyWithLimitAsync(new MemoryStream(new byte[1000]), new MemoryStream(), maxBytes: 4096));
+        using var tooBig = new MemoryStream(new byte[5000]);
+        using var small = new MemoryStream(new byte[1000]);
+        using var output1 = new MemoryStream();
+        using var output2 = new MemoryStream();
+        Assert.False(await DocumentRAGUtility.CopyWithLimitAsync(tooBig, output1, maxBytes: 4096));
+        Assert.True(await DocumentRAGUtility.CopyWithLimitAsync(small, output2, maxBytes: 4096));
     }
 
     [Fact]
@@ -271,7 +274,7 @@ public class OpenSourceAndSafetyTests : IDisposable
         Assert.True(cache.TryGet<ScreeningAnswer>("search", key, out var hit));
         Assert.Equal("Included", hit!.Decision);
 
-        var file = Directory.GetFiles(Path.Combine(_root, "search"), "*.json", SearchOption.AllDirectories).Single();
+        var file = Directory.GetFiles(Path.Join(_root, "search"), "*.json", SearchOption.AllDirectories).Single();
         File.SetLastWriteTimeUtc(file, DateTime.UtcNow.AddHours(-2));
         Assert.False(cache.TryGet<ScreeningAnswer>("search", key, out _));
         Assert.False(ReviewCache.Disabled.TryGet<ScreeningAnswer>("search", key, out _));
