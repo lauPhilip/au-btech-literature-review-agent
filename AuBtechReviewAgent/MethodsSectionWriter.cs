@@ -33,7 +33,9 @@ public static class MethodsSectionWriter
         IReadOnlyList<string> selectedSourceNames,
         IReadOnlyList<string> unavailableSourceNames,
         IReadOnlyList<PlatformSearchLog> searchLogs,
-        DateTime runDateUtc)
+        DateTime runDateUtc,
+        int identifiedViaCitations = 0,
+        bool citationChaining = false)
     {
         var sb = new StringBuilder();
         var queried = searchLogs.Select(l => l.SourceName).Distinct().ToList();
@@ -60,7 +62,15 @@ public static class MethodsSectionWriter
             sb.Append($"At least one query to {JoinNatural(faulted)} failed; the failed requests are listed in the run ledger (transparent-process.json). ");
         }
 
-        sb.Append("No other databases, registers, websites or reference lists were consulted.");
+        if (citationChaining)
+        {
+            sb.Append($"In addition, one round of citation chaining was run through OpenAlex: for every included record with a DOI, up to a fixed number of the works it cites and of the works citing it were retrieved ({identifiedViaCitations} record{(identifiedViaCitations == 1 ? "" : "s")} identified this way) and screened in the same way. ");
+            sb.Append("No other databases, registers or websites were consulted.");
+        }
+        else
+        {
+            sb.Append("No other databases, registers, websites or reference lists were consulted.");
+        }
         return sb.ToString().Trim();
     }
 
@@ -105,14 +115,36 @@ public static class MethodsSectionWriter
         return sb.ToString();
     }
 
-    public static string SelectionProcess(bool peerReviewOnly, ReviewStats stats, bool humanReviewRequested = false, string? humanReviewOutcome = null)
+    public static string SelectionProcess(bool peerReviewOnly, ReviewStats stats, bool humanReviewRequested = false, string? humanReviewOutcome = null, string? modelName = null)
     {
+        string model = string.IsNullOrWhiteSpace(modelName) ? ScreeningModelName : modelName;
         var sb = new StringBuilder();
         if (peerReviewOnly)
         {
             sb.Append($"Before screening, records were checked for peer-review status using source metadata and, where that was inconclusive, a language-model classification ({stats.PassedPeerReviewCheck} passed, {stats.FailedPeerReviewCheck} excluded). ");
         }
-        sb.Append($"Each remaining record was screened once by a language model ({ScreeningModelName}, temperature 0) against the eligibility criteria, using its title, authors, date, venue and abstract as returned by the source. ");
+        if (stats.DualScreened > 0)
+        {
+            int agreed = stats.DualScreened - stats.ScreeningDisagreements;
+            sb.Append($"Each remaining record was screened twice by a language model ({model}, temperature 0) with two independent prompts that work through the criteria in a different order, using its title, authors, date, venue and abstract as returned by the source. ");
+            sb.Append($"The two screenings agreed on {agreed} of {stats.DualScreened} records");
+            sb.Append(stats.ScreeningKappa is double k ? $" (Cohen's kappa = {k.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture)}); " : "; ");
+            sb.Append(stats.ScreeningDisagreements == 0
+                ? "there were no disagreements to resolve. "
+                : $"the {stats.ScreeningDisagreements} disagreement{(stats.ScreeningDisagreements == 1 ? " was" : "s were")} resolved by inclusion and flagged for human attention. ");
+        }
+        else
+        {
+            sb.Append($"Each remaining record was screened once by a language model ({model}, temperature 0) against the eligibility criteria, using its title, authors, date, venue and abstract as returned by the source. ");
+        }
+        sb.Append("Text taken from the records was passed to the model inside marked data blocks with the instruction to treat it as data, never as instructions");
+        sb.Append(stats.InjectionSuspected > 0
+            ? $"; {stats.InjectionSuspected} record{(stats.InjectionSuspected == 1 ? "" : "s")} contained instruction-like phrases and {(stats.InjectionSuspected == 1 ? "was" : "were")} flagged as uncertain. "
+            : ". ");
+        if (stats.UncertainDecisions > 0)
+            sb.Append($"In total {stats.UncertainDecisions} decision{(stats.UncertainDecisions == 1 ? " was" : "s were")} flagged as uncertain (disagreement, low model confidence or suspected manipulation). ");
+        if (stats.CacheHits > 0)
+            sb.Append($"{stats.CacheHits} screening decision{(stats.CacheHits == 1 ? "" : "s")} or search response{(stats.CacheHits == 1 ? " was" : "s were")} reused from an earlier identical run (same record, criteria, model and prompt version); reuse is marked per record in the ledger. ");
         sb.Append("Full texts were retrieved only for included records and were not used for the screening decision. ");
         if (stats.ScreeningErrors > 0)
             sb.Append($"{stats.ScreeningErrors} record{(stats.ScreeningErrors == 1 ? "" : "s")} could not be screened because the model call failed; they are listed in the run ledger. ");
@@ -132,6 +164,46 @@ public static class MethodsSectionWriter
             sb.Append("No human reviewer took part in screening during the run. ");
         sb.Append("Every decision and its rationale is recorded in the run ledger (transparent-process.json) so that a human reviewer can verify it.");
         return sb.ToString();
+    }
+
+    /// <summary>
+    /// PRISMA items 9-11 (data collection, data items, study risk of bias): rendered from the extraction and
+    /// MMAT appraisal the run actually produced, instead of a fixed statement.
+    /// </summary>
+    public static string DataAndAppraisal(IReadOnlyList<StudyExtraction> extractions, string? modelName = null)
+    {
+        if (extractions.Count == 0)
+            return "No studies were included, so no data were extracted and no quality appraisal was carried out.";
+        string model = string.IsNullOrWhiteSpace(modelName) ? ScreeningModelName : modelName;
+        int failed = extractions.Count(e => e.Error != null);
+        int fullText = extractions.Count(e => e.EvidenceBasis == "full text");
+        var appraised = extractions.Where(e => e.Error == null && e.Appraisal.Count > 0).ToList();
+        int notEmpirical = extractions.Count(e => e.Error == null && e.AppraisalCategory == "not_empirical");
+        int answers = appraised.Sum(e => e.Appraisal.Count);
+        int cantTell = appraised.Sum(e => e.Appraisal.Count(a => a.Answer == "cant_tell"));
+        var values = extractions.Where(e => e.Error == null)
+            .SelectMany(e => new[] { e.Method, e.Sample, e.Limitations }.Concat(e.KeyFindings))
+            .Where(v => !v.Value.Equals("not reported", StringComparison.OrdinalIgnoreCase)).ToList();
+
+        var sb = new StringBuilder();
+        sb.Append($"For each included study, a language model ({model}, temperature 0) extracted the study type, method, sample, up to three key findings and the stated limitations ");
+        sb.Append($"from the full text where it could be retrieved ({fullText} of {extractions.Count} studies) and otherwise from the abstract. ");
+        sb.Append("Every extracted value had to come with a verbatim quote, which was checked against the paper's text in code");
+        sb.Append(values.Count > 0 ? $"; {values.Count(v => v.QuoteVerified)} of {values.Count} quotes were found. " : ". ");
+        sb.Append("Study quality was appraised with the Mixed Methods Appraisal Tool (MMAT, 2018): the model chose the study category and answered its five criteria with yes, no or can't tell, each backed by a quote; an answer whose quote could not be found in the text was changed to can't tell. ");
+        sb.Append($"{appraised.Count} stud{(appraised.Count == 1 ? "y was" : "ies were")} appraised ({cantTell} of {answers} answers were can't tell)");
+        sb.Append(notEmpirical > 0 ? $", and {notEmpirical} {(notEmpirical == 1 ? "was" : "were")} classified as non-empirical (for example position papers), to which MMAT does not apply. " : ". ");
+        if (failed > 0) sb.Append($"Extraction failed for {failed} stud{(failed == 1 ? "y" : "ies")}. ");
+        sb.Append("MMAT is not used to compute an overall score. The appraisal was done by a language model without a second human appraiser, so it should be checked before use (see extraction.json).");
+        return sb.ToString();
+    }
+
+    /// <summary>PRISMA item 24 (registration and protocol).</summary>
+    public static string Protocol(string? protocolSha256, DateTime createdUtc)
+    {
+        if (string.IsNullOrWhiteSpace(protocolSha256))
+            return "No protocol was recorded for this run, and the review was not registered.";
+        return $"The review was not registered. Its protocol (search query, objective, eligibility criteria, sources, limits and screening set-up) was written to protocol.md on {createdUtc:yyyy-MM-dd} (UTC) before any search was run, with SHA-256 fingerprint {protocolSha256[..16]}...; the search strings added by the language model are appended to it as a dated amendment. The file is part of the run archive.";
     }
 
     /// <summary>
