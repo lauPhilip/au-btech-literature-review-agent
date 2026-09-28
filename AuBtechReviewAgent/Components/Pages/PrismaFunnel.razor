@@ -63,6 +63,24 @@
             </div>
         </div>
 
+        @if (s.IdentifiedViaCitations > 0)
+        {
+            <p class="text-[10px] text-gray-500">@s.IdentifiedViaCitations of the identified records came from citation chaining.</p>
+        }
+        @if (s.DualScreened > 0)
+        {
+            <p class="text-[10px] text-gray-500" title="Every record was screened by two independent prompts; disagreements are included and flagged">
+                Dual screening: @(s.DualScreened - s.ScreeningDisagreements) of @s.DualScreened agreed@(s.ScreeningKappa is double k ? $" (kappa {k:0.00})" : "").
+            </p>
+        }
+        @if (s.UncertainDecisions > 0)
+        {
+            <p class="text-[10px] text-amber-700">@s.UncertainDecisions decision(s) flagged as uncertain@(s.InjectionSuspected > 0 ? $", {s.InjectionSuspected} with possible prompt injection" : "").</p>
+        }
+        @if (s.CacheHits > 0)
+        {
+            <p class="text-[10px] text-gray-500">@s.CacheHits search response(s) or decision(s) reused from the cache.</p>
+        }
         @if (s.HumanReviewed > 0)
         {
             <p class="text-[10px] text-gray-500">You checked @s.HumanReviewed screening decisions and changed @s.HumanOverrides.</p>

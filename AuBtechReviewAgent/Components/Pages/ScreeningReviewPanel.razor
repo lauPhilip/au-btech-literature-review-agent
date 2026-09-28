@@ -7,6 +7,10 @@
         <p class="text-[11px] text-amber-900 mt-1 leading-snug">
             The model has screened @rows.Count record(s). Change any decision you disagree with and add a note if you like,
             then continue. Every decision you confirm or change is recorded in the run ledger next to the model's decision.
+            @if (rows.Any(r => r.Uncertain))
+            {
+                <span class="font-semibold">The @rows.Count(r => r.Uncertain) uncertain decision(s) are listed first.</span>
+            }
         </p>
         <div class="flex gap-3 mt-2 text-[11px] text-amber-900 font-mono">
             <span>Included: @rows.Count(r => r.Decision == "Included")</span>
@@ -23,6 +27,29 @@
                     <div class="min-w-0">
                         <p class="text-xs font-semibold text-gray-900 leading-snug">@row.Title</p>
                         <p class="text-[10px] text-gray-500 mt-0.5">@row.Citation</p>
+                        <div class="flex flex-wrap gap-1 mt-1">
+                            @if (row.Uncertain)
+                            {
+                                <span class="text-[9px] font-bold uppercase tracking-wide bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded">Uncertain</span>
+                            }
+                            @if (row.SecondDecision != null && row.SecondDecision != row.FirstDecision)
+                            {
+                                <span class="text-[9px] font-bold uppercase tracking-wide bg-purple-100 text-purple-800 px-1.5 py-0.5 rounded" title="The two independent screenings disagreed">Screenings disagree</span>
+                            }
+                            @if (row.Confidence != null)
+                            {
+                                <span class="text-[9px] uppercase tracking-wide px-1.5 py-0.5 rounded @(row.Confidence == "low" ? "bg-red-50 text-red-700" : "bg-gray-100 text-gray-600")">Confidence: @row.Confidence</span>
+                            }
+                            @if (row.Flags.Count > 0)
+                            {
+                                <span class="text-[9px] font-bold uppercase tracking-wide bg-red-100 text-red-800 px-1.5 py-0.5 rounded"
+                                      title="The paper's text contains phrases that look like instructions to the model (@string.Join(", ", row.Flags)). Check that the decision is based on the content.">Possible prompt injection</span>
+                            }
+                            @if (row.Origin != "database search")
+                            {
+                                <span class="text-[9px] uppercase tracking-wide bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded">Found by @row.Origin</span>
+                            }
+                        </div>
                     </div>
                     <div class="flex-none flex rounded border border-gray-300 overflow-hidden text-[10px] font-bold uppercase">
                         <button type="button" disabled="@submitting" @onclick='() => SetDecision(row, "Included")'
@@ -32,6 +59,10 @@
                     </div>
                 </div>
                 <p class="text-[11px] text-gray-700 mt-1.5"><span class="font-semibold">Model (@row.ModelDecision):</span> @row.Reasoning</p>
+                @if (row.SecondDecision != null && row.SecondDecision != row.FirstDecision)
+                {
+                    <p class="text-[11px] text-gray-700 mt-1"><span class="font-semibold">Second screening (@row.SecondDecision):</span> @row.SecondReasoning</p>
+                }
                 @if (!string.IsNullOrWhiteSpace(row.Abstract))
                 {
                     <details class="mt-1">
@@ -74,6 +105,13 @@
         public string ModelDecision = "";
         public string Decision = "";
         public string? Note;
+        public bool Uncertain;
+        public string? Confidence;
+        public string FirstDecision = "";
+        public string? SecondDecision;
+        public string? SecondReasoning;
+        public List<string> Flags = new();
+        public string Origin = "database search";
     }
 
     protected override void OnParametersSet()
@@ -92,7 +130,20 @@
                 Abstract = l.Abstract,
                 ModelDecision = l.Decision,
                 Decision = l.Decision,
+                Uncertain = l.Uncertain,
+                Confidence = l.Confidence,
+                // When the screenings disagreed the ledger holds "Included"; the reasoning names both decisions.
+                FirstDecision = l.SecondDecision != null && l.Reasoning.StartsWith("The two independent screenings disagreed", StringComparison.Ordinal)
+                    ? (l.SecondDecision == "Included" ? "Excluded" : "Included") : l.Decision,
+                SecondDecision = l.SecondDecision,
+                SecondReasoning = l.SecondReasoning,
+                Flags = l.InjectionFlags ?? new List<string>(),
+                Origin = l.Origin ?? "database search",
             })
+            // Uncertain decisions first, so a reviewer with little time looks at those; otherwise ledger order.
+            .Select((r, i) => (r, i))
+            .OrderBy(x => x.r.Uncertain ? 0 : 1).ThenBy(x => x.i)
+            .Select(x => x.r)
             .ToList();
     }
 
