@@ -93,26 +93,57 @@ public static class CitationSupportChecker
         var result = new List<CitedSentence>();
         if (string.IsNullOrWhiteSpace(text)) return result;
 
-        // Split after ., ! or ? (optionally following a citation marker) when the next sentence starts.
-        var sentences = Regex.Split(text.Trim(), @"(?<=[.!?])\s+(?=[A-Z\[(""])");
-        for (int i = 0; i < sentences.Length; i++)
+        var sentences = SplitSentences(text);
+        for (int i = 0; i < sentences.Count; i++)
         {
-            string sentence = sentences[i].Trim();
-            var refs = new SortedSet<int>();
-            foreach (Match m in MarkerPattern.Matches(sentence))
-            {
-                foreach (var part in m.Groups[1].Value.Split(','))
-                {
-                    var range = part.Split(new[] { '-', '–' }, StringSplitOptions.TrimEntries);
-                    if (range.Length == 2 && int.TryParse(range[0], out int a) && int.TryParse(range[1], out int b) && b >= a && b - a < 50)
-                        for (int n = a; n <= b; n++) refs.Add(n);
-                    else if (int.TryParse(part.Trim(), out int single))
-                        refs.Add(single);
-                }
-            }
-            if (refs.Count > 0) result.Add(new CitedSentence(field, i, sentence, refs.ToList()));
+            var refs = ReferencesIn(sentences[i]);
+            if (refs.Count > 0) result.Add(new CitedSentence(field, i, sentences[i], refs));
         }
         return result;
+    }
+
+    /// <summary>
+    /// The sentence split used by the check. The Review Output page uses the same split, so a clicked [n] in
+    /// sentence i finds the verdict recorded for sentence i.
+    /// </summary>
+    public static IReadOnlyList<string> SplitSentences(string text)
+    {
+        if (string.IsNullOrWhiteSpace(text)) return Array.Empty<string>();
+        // Split after ., ! or ? (optionally following a citation marker) when the next sentence starts.
+        return Regex.Split(text.Trim(), @"(?<=[.!?])\s+(?=[A-Z\[(""])").Select(s => s.Trim()).ToList();
+    }
+
+    /// <summary>Reference numbers cited in one marker text or sentence; ranges like [2-4] are expanded.</summary>
+    public static IReadOnlyList<int> ReferencesIn(string sentence)
+    {
+        var refs = new SortedSet<int>();
+        foreach (Match m in MarkerPattern.Matches(sentence))
+        {
+            foreach (var part in m.Groups[1].Value.Split(','))
+            {
+                var range = part.Split(new[] { '-', '–' }, StringSplitOptions.TrimEntries);
+                if (range.Length == 2 && int.TryParse(range[0], out int a) && int.TryParse(range[1], out int b) && b >= a && b - a < 50)
+                    for (int n = a; n <= b; n++) refs.Add(n);
+                else if (int.TryParse(part.Trim(), out int single))
+                    refs.Add(single);
+            }
+        }
+        return refs.ToList();
+    }
+
+    /// <summary>Splits a sentence into plain text and citation markers, in order (for rendering clickable markers).</summary>
+    public static IReadOnlyList<(string Text, bool IsMarker)> SplitMarkers(string sentence)
+    {
+        var parts = new List<(string, bool)>();
+        int pos = 0;
+        foreach (Match m in MarkerPattern.Matches(sentence))
+        {
+            if (m.Index > pos) parts.Add((sentence[pos..m.Index], false));
+            parts.Add((m.Value, true));
+            pos = m.Index + m.Length;
+        }
+        if (pos < sentence.Length) parts.Add((sentence[pos..], false));
+        return parts;
     }
 
     /// <summary>True when the quote (whitespace/case-insensitive, at least 20 characters) occurs in the excerpt.</summary>

@@ -7,6 +7,7 @@
 @using System.Text.RegularExpressions
 @inject IJSRuntime JS
 @inject NavigationManager Nav
+@inject AuBtechReviewAgent.PrismaReviewEngine ReviewEngine
 
 <PageTitle>PRISMA 2020 Checklist Manuscript Preview</PageTitle>
 
@@ -26,8 +27,8 @@
 
 <header class="bg-[#003B5C] text-white flex-none shrink-0 z-50 shadow-md print:hidden">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between gap-3">
-        <a href="/" class="flex items-center space-x-3 hover:opacity-90 transition-opacity min-w-0 shrink">
-            <span class="font-bold tracking-tight text-xs sm:text-sm whitespace-nowrap">AARHUS UNIVERSITY</span>
+        <a href="/" class="flex items-center space-x-3 hover:opacity-90 transition-opacity min-w-0 shrink overflow-hidden">
+            <span class="font-bold tracking-tight text-xs sm:text-sm whitespace-nowrap truncate">AARHUS UNIVERSITY</span>
             <span class="text-white/40 font-light hidden lg:inline">|</span>
             <span class="text-xs tracking-wider font-medium opacity-90 uppercase hidden lg:inline">au-btech-literature-review-agent</span>
         </a>
@@ -40,10 +41,14 @@
 </header>
 
 <div class="w-full bg-gray-600 p-4 md:p-8 flex flex-col items-center justify-start min-h-screen overflow-y-auto print:bg-white print:p-0 pb-16">
-    
-    @if (report != null && !string.IsNullOrEmpty(report.TitleItem) && report.TitleItem != "Pending...")
+
+    @if (HasReport)
     {
-        <div class="w-full max-w-[8.5in] mb-4 flex justify-end gap-2 print:hidden flex-none">
+        <div class="w-full max-w-[8.5in] mb-4 flex flex-wrap justify-end gap-2 print:hidden flex-none">
+            @if (hasProtocol)
+            {
+                <a href="@($"/api/workspace/{State.CurrentSessionId}/protocol.md")" target="_blank" class="bg-white text-[#003B5C] text-xs font-bold uppercase tracking-wider px-3 py-2 rounded shadow hover:bg-gray-100 transition-all" title="The review plan written before the search started">Protocol</a>
+            }
             <a href="@($"/api/workspace/{State.CurrentSessionId}/references.bib")" target="_blank" class="bg-white text-[#003B5C] text-xs font-bold uppercase tracking-wider px-3 py-2 rounded shadow hover:bg-gray-100 transition-all">BibTeX</a>
             <a href="@($"/api/workspace/{State.CurrentSessionId}/references.ris")" target="_blank" class="bg-white text-[#003B5C] text-xs font-bold uppercase tracking-wider px-3 py-2 rounded shadow hover:bg-gray-100 transition-all">RIS (Zotero / EndNote)</a>
             <button @onclick="TriggerZipArchiveDownload" class="bg-[#003B5C] text-white text-xs font-bold uppercase tracking-wider px-4 py-2 rounded shadow hover:bg-opacity-95 transition-all flex items-center gap-2">
@@ -52,29 +57,47 @@
                 </svg>
                 <span>Download Review Footprint (.ZIP)</span>
             </button>
+            @if (!ReviewEngine.IsRunActive(State.CurrentSessionId))
+            {
+                @if (!confirmDelete)
+                {
+                    <button @onclick="() => confirmDelete = true" class="bg-white text-red-700 text-xs font-bold uppercase tracking-wider px-3 py-2 rounded shadow hover:bg-red-50 transition-all">Delete run</button>
+                }
+                else
+                {
+                    <span class="bg-red-50 text-red-800 text-xs px-3 py-2 rounded shadow flex items-center gap-2">
+                        Delete this run and its files for good?
+                        <button @onclick="DeleteRun" class="px-2 py-0.5 bg-red-600 text-white rounded font-bold">Delete</button>
+                        <button @onclick="() => confirmDelete = false" class="px-2 py-0.5 border border-red-200 rounded">Cancel</button>
+                    </span>
+                }
+            }
         </div>
     }
 
-    @if (report == null || string.IsNullOrEmpty(report.TitleItem) || report.TitleItem == "Pending...")
+    @if (!HasReport)
     {
         <div class="bg-amber-50 border border-amber-200 text-amber-800 p-6 rounded-lg text-sm max-w-xl text-center shadow-lg my-12">
-            <div class="font-bold mb-1">No Generated PRISMA Report Available</div>
-            <p class="text-xs text-amber-700 font-light">Go back to the Dashboard workspace tab, run the agent, and Mistral will auto-compile this layout upon loop completion.</p>
+            <div class="font-bold mb-1">@(deleted ? "The run was deleted" : "No Generated PRISMA Report Available")</div>
+            <p class="text-xs text-amber-700 font-light">
+                @(deleted ? "Its ledger, report and downloaded papers have been removed from the server."
+                          : "Go back to the Dashboard, run the agent, and the review appears here when the run is complete.")
+            </p>
         </div>
     }
     else
     {
-        <article class="w-full max-w-[8.5in] bg-white shadow-2xl p-[1in] text-gray-900 font-serif text-[11pt] leading-relaxed mx-auto border border-gray-300 print:shadow-none print:border-none print:p-0 overflow-visible">
-            
+        <article class="w-full max-w-[8.5in] bg-white shadow-2xl p-6 md:p-[1in] text-gray-900 font-serif text-[11pt] leading-relaxed mx-auto border border-gray-300 print:shadow-none print:border-none print:p-0 overflow-visible">
+
             <div class="text-center space-y-3 mb-8 font-sans print:space-y-2">
                 <div class="text-[9px] tracking-widest text-gray-500 uppercase font-bold">AI-Generated Systematic Literature Review</div>
                 <h1 class="text-2xl font-bold tracking-tight font-serif text-gray-900 leading-tight">@ScrubAnchors(report.TitleItem)</h1>
-                
+
                 <div class="text-xs font-medium text-gray-600 font-sans">
                     Department of Business Development and Technology, Aarhus University
                 </div>
                 <div class="text-[10px] text-gray-400 font-mono">
-                    Protocol Hash: cc584090 | Generated: @report.GeneratedAt
+                    Protocol Hash: @(string.IsNullOrWhiteSpace(report.ProtocolHash) ? "not recorded" : report.ProtocolHash) | Generated: @report.GeneratedAt
                 </div>
                 <hr class="border-gray-300 my-4" />
             </div>
@@ -85,16 +108,16 @@
             </div>
 
             <div class="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6 text-justify text-xs leading-relaxed overflow-visible">
-                
+
                 <div class="space-y-3 md:col-span-2 border-b border-gray-200 pb-1">
                     <h2 class="font-sans font-bold text-sm text-[#003B5C] uppercase tracking-wide">1. Introduction</h2>
                 </div>
-                
+
                 <div class="space-y-1">
                     <span class="font-sans font-bold text-[10px] text-gray-500 uppercase block">1.1 Rationale (Item 3)</span>
                     <p class="text-gray-800">@ScrubAnchors(report.RationaleItem)</p>
                 </div>
-                
+
                 <div class="space-y-1">
                     <span class="font-sans font-bold text-[10px] text-gray-500 uppercase block">1.2 Objectives (Item 4)</span>
                     <p class="text-gray-800">@ScrubAnchors(report.ObjectivesItem)</p>
@@ -120,12 +143,12 @@
                 </div>
 
                 <div class="space-y-1">
-                    <span class="font-sans font-bold text-[10px] text-gray-500 uppercase block">2.4 Selection Automation (Item 8)</span>
+                    <span class="font-sans font-bold text-[10px] text-gray-500 uppercase block">2.4 Selection Process (Item 8)</span>
                     <p class="text-gray-800">@ScrubAnchors(report.SelectionProcessItem)</p>
                 </div>
 
                 <div class="space-y-1 md:col-span-2">
-                    <span class="font-sans font-bold text-[10px] text-gray-500 uppercase block">2.5 Internal Risk of Bias Assessment (Item 11)</span>
+                    <span class="font-sans font-bold text-[10px] text-gray-500 uppercase block">2.5 Data Collection and Quality Appraisal (Items 9-11)</span>
                     <p class="text-gray-800">@ScrubAnchors(report.BiasAssessmentItem)</p>
                 </div>
 
@@ -134,36 +157,33 @@
                 </div>
 
                 <div class="md:col-span-2 space-y-2">
-                    <p class="text-gray-800 text-xs">
-                        The empirical data metrics trace key research trends regarding structural database distributions. Chronological yields highlight a heavy concentration within the 2025–2026 calendar years, mirroring the rapid growth of agentic deployment tools. Index yields split with @arxivShareCount entries retrieved from the arXiv preprint network, @scopusShareCount tracked via ScienceDirect, @ieeeShareCount via IEEE Xplore, @scholarShareCount via Google Scholar, and @rgShareCount entries via ResearchGate.
-                    </p>
-                    
+                    <p class="text-gray-800 text-xs">@DataParagraph()</p>
+
                     <p class="text-gray-800 text-xs pt-1">
                         @if (peerReviewOnlyToggle)
                         {
-                            <span>We turned on the peer-review filter for this review. Out of all papers found, @passedPeerReviewCheck passed our check and went to screening, while @failedPeerReviewCheck papers were skipped because they were un-reviewed preprints or working papers. </span>
+                            <span>The peer-review filter was on for this review: @passedPeerReviewCheck records passed the check and went to screening, while @failedPeerReviewCheck were excluded as un-reviewed preprints or working papers. </span>
                         }
                         else
                         {
-                            <span>We searched for papers across preprint servers and standard databases without filtering out un-reviewed work, choosing to check all available material. </span>
+                            <span>The peer-review filter was off, so preprints and other un-reviewed records could be included. </span>
                         }
-                        <span>In total, @tableRecords.Count papers were chosen for final data extraction.</span>
+                        <span>In total, @tableRecords.Count papers were included for data extraction.</span>
                     </p>
                 </div>
 
                 <div class="md:col-span-2 space-y-4 font-sans pt-2 overflow-visible">
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div class="space-y-2 border border-gray-200 p-3 bg-white rounded-sm">
-                            <span class="text-[11px] font-bold text-gray-800 block border-b border-gray-100 pb-1">Figure 3.1: Included Publications per Calendar Year</span>
+                            <span class="text-[11px] font-bold text-gray-800 block border-b border-gray-100 pb-1">Figure 3.1: Included Publications per Year</span>
                             <div class="space-y-2 pt-1">
-                                @foreach (var kvp in publicationsByYear.OrderBy(x => x.Key))
+                                @{ int maxYear = Math.Max(1, publicationsByYear.Values.DefaultIfEmpty(0).Max()); }
+                                @foreach (var kvp in publicationsByYear)
                                 {
-                                    int maxCount = GetMaxPublicationCount();
-                                    int pct = maxCount > 0 ? (kvp.Value * 100 / maxCount) : 0;
                                     <div class="flex items-center text-[11px]">
                                         <span class="w-10 font-mono text-gray-600 font-bold">@kvp.Key</span>
                                         <div class="flex-1 bg-gray-100 h-3.5 mx-2 border border-gray-200/60 overflow-hidden">
-                                            <div class="bg-[#003B5C] h-full transition-all" style="width: @(pct)%"></div>
+                                            <div class="bg-[#003B5C] h-full transition-all" style="width: @(kvp.Value * 100 / maxYear)%"></div>
                                         </div>
                                         <span class="w-4 font-mono text-right text-gray-900 font-bold">@kvp.Value</span>
                                     </div>
@@ -172,51 +192,19 @@
                         </div>
 
                         <div class="space-y-2 border border-gray-200 p-3 bg-white rounded-sm">
-                            <span class="text-[11px] font-bold text-gray-800 block border-b border-gray-100 pb-1">Figure 3.2: Distribution by Database Origin Share</span>
+                            <span class="text-[11px] font-bold text-gray-800 block border-b border-gray-100 pb-1">Figure 3.2: Included Papers by Source</span>
                             <div class="space-y-2 pt-1">
-                                @{
-                                    int totalPlats = arxivShareCount + scopusShareCount + ieeeShareCount + scholarShareCount + rgShareCount;
-                                    int axPct = totalPlats > 0 ? (arxivShareCount * 100 / totalPlats) : 0;
-                                    int scPct = totalPlats > 0 ? (scopusShareCount * 100 / totalPlats) : 0;
-                                    int iePct = totalPlats > 0 ? (ieeeShareCount * 100 / totalPlats) : 0;
-                                    int shPct = totalPlats > 0 ? (scholarShareCount * 100 / totalPlats) : 0;
-                                    int rgPct = totalPlats > 0 ? (rgShareCount * 100 / totalPlats) : 0;
+                                @{ int maxPlatform = Math.Max(1, platformShares.Select(p => p.Count).DefaultIfEmpty(0).Max()); }
+                                @foreach (var share in platformShares)
+                                {
+                                    <div class="flex items-center text-[11px] mb-1">
+                                        <span class="w-24 truncate text-gray-600 font-medium" title="@share.Label">@share.Label</span>
+                                        <div class="flex-1 bg-gray-100 h-3.5 mx-2 border border-gray-200/60 overflow-hidden">
+                                            <div class="@share.Color h-full" style="width: @(share.Count * 100 / maxPlatform)%"></div>
+                                        </div>
+                                        <span class="w-4 font-mono text-right text-gray-900 font-bold">@share.Count</span>
+                                    </div>
                                 }
-                                <div class="flex items-center text-[11px] mb-1">
-                                    <span class="w-20 truncate text-gray-600 font-medium">arXiv API</span>
-                                    <div class="flex-1 bg-gray-100 h-3.5 mx-2 border border-gray-200/60 overflow-hidden">
-                                        <div class="bg-teal-500 h-full" style="width: @(axPct)%"></div>
-                                    </div>
-                                    <span class="w-4 font-mono text-right text-gray-900 font-bold">@arxivShareCount</span>
-                                </div>
-                                <div class="flex items-center text-[11px] mb-1">
-                                    <span class="w-20 truncate text-gray-600 font-medium">Scopus API</span>
-                                    <div class="flex-1 bg-gray-100 h-3.5 mx-2 border border-gray-200/60 overflow-hidden">
-                                        <div class="bg-orange-500 h-full" style="width: @(scPct)%"></div>
-                                    </div>
-                                    <span class="w-4 font-mono text-right text-gray-900 font-bold">@scopusShareCount</span>
-                                </div>
-                                <div class="flex items-center text-[11px] mb-1">
-                                    <span class="w-20 truncate text-gray-600 font-medium">IEEE Xplore</span>
-                                    <div class="flex-1 bg-gray-100 h-3.5 mx-2 border border-gray-200/60 overflow-hidden">
-                                        <div class="bg-blue-400 h-full" style="width: @(iePct)%"></div>
-                                    </div>
-                                    <span class="w-4 font-mono text-right text-gray-900 font-bold">@ieeeShareCount</span>
-                                </div>
-                                <div class="flex items-center text-[11px] mb-1">
-                                    <span class="w-20 truncate text-gray-600 font-medium">Scholar</span>
-                                    <div class="flex-1 bg-gray-100 h-3.5 mx-2 border border-gray-200/60 overflow-hidden">
-                                        <div class="bg-yellow-400 h-full" style="width: @(shPct)%"></div>
-                                    </div>
-                                    <span class="w-4 font-mono text-right text-gray-900 font-bold">@scholarShareCount</span>
-                                </div>
-                                <div class="flex items-center text-[11px]">
-                                    <span class="w-20 truncate text-gray-600 font-medium">ResearchGate</span>
-                                    <div class="flex-1 bg-gray-100 h-3.5 mx-2 border border-gray-200/60 overflow-hidden">
-                                        <div class="bg-purple-400 h-full" style="width: @(rgPct)%"></div>
-                                    </div>
-                                    <span class="w-4 font-mono text-right text-gray-900 font-bold">@rgShareCount</span>
-                                </div>
                             </div>
                         </div>
                     </div>
@@ -230,8 +218,7 @@
                                 double cP = totalVenues > 0 ? ((double)conferenceCount / totalVenues) * 360 : 0;
                                 double tP = totalVenues > 0 ? ((double)transactionsCount / totalVenues) * 360 : 0;
                                 double pP = totalVenues > 0 ? ((double)proceedingsCount / totalVenues) * 360 : 0;
-
-                                double v1 = jP; double v2 = v1 + cP; double v3 = v2 + tP; double v4 = v3 + pP;
+                                string v1 = Deg(jP), v2 = Deg(jP + cP), v3 = Deg(jP + cP + tP), v4 = Deg(jP + cP + tP + pP);
                             }
                             <div class="flex items-center gap-6 py-2 px-1">
                                 <div class="w-16 h-14 rounded-full border border-gray-300 shadow-sm flex-none"
@@ -246,103 +233,65 @@
                                 </div>
                             </div>
                         </div>
-                        <div class="hidden md:block"></div>
-                    </div>
-                </div>
 
-                <div class="md:col-span-2 pt-2 border-t border-gray-100 overflow-visible">
-                    <p class="text-gray-800 text-xs">
-                        @if (tableRecords.Count == 0)
-                        {
-                            <span>No data records were successfully compiled for ranking breakdown analysis.</span>
-                        }
-                        else
-                        {
-                            // Aggregate summary instead of one near-identical sentence per paper: with dozens of
-                            // included papers the old per-paper loop produced a wall of repetitive boilerplate
-                            // ("was pulled from the un-reviewed preprint repository archive..."). The per-paper
-                            // venue/tier/citation detail this used to restate is already fully traceable in
-                            // Figure 3.4 and Table 3.1 immediately below, so it isn't lost - just not repeated in prose.
-                            int q1Count = tableRecords.Count(r => (r.Quartile ?? "").Equals("Q1", StringComparison.OrdinalIgnoreCase));
-                            int otherQCount = tableRecords.Count(r => !string.IsNullOrEmpty(r.Quartile) && r.Quartile != "N/A" && !r.Quartile.Equals("Q1", StringComparison.OrdinalIgnoreCase));
-                            int confCount = tableRecords.Count(r => r.VenueType == "Conferences");
-                            int preprintCount = tableRecords.Count(r => r.VenueType == "Preprints");
-
-                            var clauses = new List<string>();
-                            if (q1Count > 0) clauses.Add($"{q1Count} in Q1-ranked journals or equivalently-rated indexes");
-                            if (otherQCount > 0) clauses.Add($"{otherQCount} in lower-quartile (Q2-Q4) journals");
-                            if (confCount > 0) clauses.Add($"{confCount} in peer-reviewed conference proceedings");
-                            if (preprintCount > 0) clauses.Add($"{preprintCount} from un-reviewed preprint archives");
-                            string breakdownSentence = clauses.Count > 0 ? string.Join(", ", clauses) : "no venue-tier data could be resolved for the included set";
-
-                            <span>Of the @tableRecords.Count included papers, the source venues break down as follows: @breakdownSentence. The full per-paper venue, tier, and citation trace is available in Figure 3.4 and Table 3.1 below.</span>
-                        }
-                    </p>
-                </div>
-
-                <div class="md:col-span-2 border border-gray-200 p-4 bg-gray-50/50 rounded-sm font-sans my-2">
-                    <span class="text-[10px] font-bold text-gray-500 uppercase tracking-wider block mb-2">Figure 3.4: Quality Tier Rating Yield Distributions</span>
-                    <div class="flex items-end justify-between h-36 max-w-md mx-auto pt-4 border-b border-gray-300 px-4">
-                        @foreach (var label in new[] { "Q1", "Q2", "Q3", "Q4", "Conf", "Preprint" })
-                        {
-                            int sdCount = tableRecords.Count(r => r.Category == "ScienceDirect" && (label == "Conf" ? r.VenueType == "Conferences" : label == "Preprint" ? r.VenueType == "Preprints" : (r.Quartile ?? "").Equals(label, StringComparison.OrdinalIgnoreCase)));
-                            int axCount = tableRecords.Count(r => r.Category == "Arxiv" && (label == "Conf" ? r.VenueType == "Conferences" : label == "Preprint" ? r.VenueType == "Preprints" : (r.Quartile ?? "").Equals(label, StringComparison.OrdinalIgnoreCase)));
-                            int ieCount = tableRecords.Count(r => r.Category == "IEEE" && (label == "Conf" ? r.VenueType == "Conferences" : label == "Preprint" ? r.VenueType == "Preprints" : (r.Quartile ?? "").Equals(label, StringComparison.OrdinalIgnoreCase)));
-                            int scCount = tableRecords.Count(r => r.Category == "Scholar" && (label == "Conf" ? r.VenueType == "Conferences" : label == "Preprint" ? r.VenueType == "Preprints" : (r.Quartile ?? "").Equals(label, StringComparison.OrdinalIgnoreCase)));
-                            int rgCount = tableRecords.Count(r => r.Category == "ResearchGate" && (label == "Conf" ? r.VenueType == "Conferences" : label == "Preprint" ? r.VenueType == "Preprints" : (r.Quartile ?? "").Equals(label, StringComparison.OrdinalIgnoreCase)));
-                            
-                            int total = sdCount + axCount + ieCount + scCount + rgCount;
-                            int totalMax = Math.Max(1, tableRecords.Count);
-                            <div class="flex flex-col items-center w-12 group">
-                                <div class="w-5 bg-gray-200 border border-gray-300 rounded-t-xs overflow-hidden flex flex-col justify-end" style="height: @(total * 100 / totalMax)px">
-                                    <div class="bg-purple-400" style="height: @(rgCount * 100 / Math.Max(1, total))%"></div>
-                                    <div class="bg-yellow-400" style="height: @(scCount * 100 / Math.Max(1, total))%"></div>
-                                    <div class="bg-blue-400" style="height: @(ieCount * 100 / Math.Max(1, total))%"></div>
-                                    <div class="bg-amber-400" style="height: @(axCount * 100 / Math.Max(1, total))%"></div>
-                                    <div class="bg-green-500" style="height: @(sdCount * 100 / Math.Max(1, total))%"></div>
-                                </div>
-                                <span class="text-[9px] font-mono font-bold mt-1 text-gray-600">@label</span>
+                        <div class="space-y-2 border border-gray-200 p-3 bg-white rounded-sm">
+                            <span class="text-[11px] font-bold text-gray-700 block border-b border-gray-100 pb-1">Figure 3.4: Journal Quartile and Venue Tier</span>
+                            <div class="flex items-end justify-between h-28 pt-2 border-b border-gray-300 px-2">
+                                @foreach (var label in new[] { "Q1", "Q2", "Q3", "Q4", "Conf", "Preprint" })
+                                {
+                                    var inTier = tableRecords.Where(r => InTier(r, label)).ToList();
+                                    int totalMax = Math.Max(1, tableRecords.Count);
+                                    <div class="flex flex-col items-center w-10">
+                                        <div class="w-5 bg-gray-100 border border-gray-300 overflow-hidden flex flex-col justify-end" style="height: @(inTier.Count * 90 / totalMax)px" title="@label: @inTier.Count">
+                                            @foreach (var share in platformShares)
+                                            {
+                                                int n = inTier.Count(r => r.Category == share.Category);
+                                                if (n > 0)
+                                                {
+                                                    <div class="@share.Color" style="height: @(n * 100 / Math.Max(1, inTier.Count))%"></div>
+                                                }
+                                            }
+                                        </div>
+                                        <span class="text-[9px] font-mono font-bold mt-1 text-gray-600">@label</span>
+                                    </div>
+                                }
                             </div>
-                        }
-                    </div>
-                    <div class="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-[9px] font-mono mt-3 text-gray-500">
-                        <div class="flex items-center gap-1"><div class="w-2.5 h-2.5 bg-green-500 rounded-xs"></div> ScienceDirect (@scopusShareCount)</div>
-                        <div class="flex items-center gap-1"><div class="w-2.5 h-2.5 bg-amber-400 rounded-xs"></div> Arxiv (@arxivShareCount)</div>
-                        <div class="flex items-center gap-1"><div class="w-2.5 h-2.5 bg-blue-400 rounded-xs"></div> IEEE Xplore (@ieeeShareCount)</div>
-                        <div class="flex items-center gap-1"><div class="w-2.5 h-2.5 bg-yellow-400 rounded-xs"></div> Scholar (@scholarShareCount)</div>
-                        <div class="flex items-center gap-1"><div class="w-2.5 h-2.5 bg-purple-400 rounded-xs"></div> ResearchGate (@rgShareCount)</div>
+                            <div class="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-[9px] font-mono mt-2 text-gray-500">
+                                @foreach (var share in platformShares)
+                                {
+                                    <div class="flex items-center gap-1"><div class="w-2.5 h-2.5 @share.Color rounded-xs"></div> @share.Label (@share.Count)</div>
+                                }
+                            </div>
+                            <p class="text-[9px] text-gray-400">Quartiles from SCImago Journal Rank (SJR), exact title match only.</p>
+                        </div>
                     </div>
                 </div>
 
                 <div class="md:col-span-2 space-y-2 pt-4 font-sans max-w-full overflow-hidden">
-                    <span class="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">Table 3.1: Systematic Synthesis Extraction</span>
+                    <span class="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">Table 3.1: Included Studies</span>
                     <div class="border border-gray-200 bg-white rounded-sm overflow-x-auto">
                         <table class="w-full text-left border-collapse text-[10px] leading-relaxed table-fixed min-w-[700px]">
                             <thead>
                                 <tr class="bg-gray-100 border-b border-gray-200 text-gray-700 font-bold font-mono text-[9px] uppercase sticky top-0 z-10">
-                                    <th class="p-2 border-r border-gray-200 w-[18%]">Paper Name</th>
-                                    <th class="p-2 border-r border-gray-200 w-[24%]">Executive Summary</th>
+                                    <th class="p-2 border-r border-gray-200 w-[5%]">Ref.</th>
+                                    <th class="p-2 border-r border-gray-200 w-[17%]">Paper Name</th>
+                                    <th class="p-2 border-r border-gray-200 w-[22%]">Executive Summary</th>
                                     <th class="p-2 border-r border-gray-200 w-[20%]">Inclusion Rationale</th>
-                                    <th class="p-2 border-r border-gray-200 w-[14%] text-center">Category</th>
+                                    <th class="p-2 border-r border-gray-200 w-[12%] text-center">Source</th>
                                     <th class="p-2 w-[24%]">Citation (APA 7th)</th>
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-gray-100 text-gray-700 font-sans">
                                 @foreach (var paperRow in tableRecords)
                                 {
-                                    string badgeClass = paperRow.Category switch {
-                                        "ScienceDirect" => "text-amber-800 bg-amber-50",
-                                        "IEEE" => "text-blue-800 bg-blue-50",
-                                        "Scholar" => "text-yellow-800 bg-yellow-50",
-                                        "ResearchGate" => "text-purple-800 bg-purple-50",
-                                        _ => "text-teal-800 bg-teal-50"
-                                    };
-                                    <tr class="hover:bg-gray-50/40">
+                                    string badgeClass = platformShares.FirstOrDefault(p => p.Category == paperRow.Category)?.Badge ?? "text-gray-800 bg-gray-50";
+                                    <tr class="hover:bg-gray-50/40" id="@($"ref-{paperRow.ReferenceNumber}")">
+                                        <td class="p-2 font-mono text-[#003B5C] font-bold border-r border-gray-150 align-top">[@paperRow.ReferenceNumber]</td>
                                         <td class="p-2 font-semibold text-gray-900 border-r border-gray-150 align-top break-words">@paperRow.Title</td>
                                         <td class="p-2 text-gray-600 border-r border-gray-150 align-top font-light break-words">@paperRow.Summary</td>
                                         <td class="p-2 text-gray-600 border-r border-gray-150 align-top font-light text-[9.5px] break-words">@paperRow.InclusionRationale</td>
                                         <td class="p-2 border-r border-gray-150 align-top text-center font-mono font-medium text-[9.5px]">
-                                            <span class="px-1.5 py-0.5 rounded-xs @badgeClass">@paperRow.Category</span>
+                                            <span class="px-1.5 py-0.5 rounded-xs @badgeClass">@AuBtechReviewAgent.PrismaReviewEngine.CategoryLabel(paperRow.Category)</span>
                                         </td>
                                         <td class="p-2 font-mono text-[9px] text-gray-500 bg-gray-50/20 align-top leading-normal break-all">@paperRow.ApaCitation</td>
                                     </tr>
@@ -350,11 +299,88 @@
                             </tbody>
                         </table>
                     </div>
-                    
-                    <p class="text-justify text-xs text-gray-700 block pt-2 border-b border-gray-100 pb-4 px-0.5">
-                        <strong>Table Overview:</strong> The extraction logs archived inside Table 3.1 summarize the qualitative characteristics of each selected paper. Each data field records a specific study title mapping, structural context definitions built by the analytical RAG engine framework, the explicit screening logic rationale for core parameter inclusion, the designated origin repository engine indexing classification, and cleanly formatted APA citation paths required for external protocol verification.
-                    </p>
                 </div>
+
+                @if (extractions.Count > 0)
+                {
+                    <div class="md:col-span-2 space-y-2 pt-2 font-sans max-w-full overflow-hidden">
+                        <span class="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">Table 3.2: Extracted Study Data</span>
+                        <div class="border border-gray-200 bg-white rounded-sm overflow-x-auto">
+                            <table class="w-full text-left border-collapse text-[10px] leading-relaxed table-fixed min-w-[700px]">
+                                <thead>
+                                    <tr class="bg-gray-100 border-b border-gray-200 text-gray-700 font-bold font-mono text-[9px] uppercase">
+                                        <th class="p-2 border-r border-gray-200 w-[5%]">Ref.</th>
+                                        <th class="p-2 border-r border-gray-200 w-[15%]">Study type</th>
+                                        <th class="p-2 border-r border-gray-200 w-[20%]">Method</th>
+                                        <th class="p-2 border-r border-gray-200 w-[15%]">Sample</th>
+                                        <th class="p-2 w-[45%]">Key findings</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-gray-100 text-gray-700">
+                                    @foreach (var e in extractions)
+                                    {
+                                        <tr>
+                                            <td class="p-2 font-mono text-[#003B5C] font-bold border-r border-gray-150 align-top">[@e.ReferenceNumber]</td>
+                                            @if (e.Error != null)
+                                            {
+                                                <td colspan="4" class="p-2 text-red-700">Extraction failed for this study.</td>
+                                            }
+                                            else
+                                            {
+                                                <td class="p-2 border-r border-gray-150 align-top">@e.StudyType<span class="block text-[9px] text-gray-400">@e.EvidenceBasis</span></td>
+                                                <td class="p-2 border-r border-gray-150 align-top">@Evidence(e.Method)</td>
+                                                <td class="p-2 border-r border-gray-150 align-top">@Evidence(e.Sample)</td>
+                                                <td class="p-2 align-top space-y-1">
+                                                    @foreach (var f in e.KeyFindings)
+                                                    {
+                                                        <div>@Evidence(f)</div>
+                                                    }
+                                                </td>
+                                            }
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                        <p class="text-[10px] text-gray-500">Hover over a value to see the quote it was taken from. <span class="text-amber-700">†</span> The quote could not be found in the paper's text, so treat the value with caution.</p>
+                    </div>
+
+                    <div class="md:col-span-2 space-y-2 pt-2 font-sans max-w-full overflow-hidden">
+                        <span class="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">Table 3.3: Quality Appraisal (MMAT 2018)</span>
+                        <div class="border border-gray-200 bg-white rounded-sm overflow-x-auto">
+                            <table class="w-full text-left border-collapse text-[10px] min-w-[560px]">
+                                <thead>
+                                    <tr class="bg-gray-100 border-b border-gray-200 text-gray-700 font-bold font-mono text-[9px] uppercase">
+                                        <th class="p-2 border-r border-gray-200">Ref.</th>
+                                        <th class="p-2 border-r border-gray-200">Category</th>
+                                        @for (int i = 1; i <= 5; i++)
+                                        {
+                                            <th class="p-2 border-r border-gray-200 text-center">@i</th>
+                                        }
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-gray-100 text-gray-700">
+                                    @foreach (var e in extractions)
+                                    {
+                                        <tr>
+                                            <td class="p-2 font-mono text-[#003B5C] font-bold border-r border-gray-150">[@e.ReferenceNumber]</td>
+                                            <td class="p-2 border-r border-gray-150">@AppraisalCategory(e)</td>
+                                            @for (int i = 0; i < 5; i++)
+                                            {
+                                                var a = i < e.Appraisal.Count ? e.Appraisal[i] : null;
+                                                <td class="p-2 border-r border-gray-150 text-center font-mono @(a?.Answer switch { "yes" => "text-green-700", "no" => "text-red-700", _ => "text-gray-400" })"
+                                                    title="@(a == null ? "" : $"{a.Id} {a.Criterion}{(string.IsNullOrEmpty(a.Quote) ? "" : $" — \"{a.Quote}\"")}")">
+                                                    @(a?.Answer switch { "yes" => "Yes", "no" => "No", null => "–", _ => "?" })
+                                                </td>
+                                            }
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                        <p class="text-[10px] text-gray-500">? = can't tell. Hover over an answer to see the criterion and the supporting quote. Appraised by the language model; check before use.</p>
+                    </div>
+                }
 
                 <div class="space-y-3 md:col-span-2 border-b border-gray-200 pt-2 pb-1">
                     <h2 class="font-sans font-bold text-sm text-[#003B5C] uppercase tracking-wide">4. Results & Synthesis</h2>
@@ -362,8 +388,12 @@
 
                 <div class="space-y-1 md:col-span-2">
                     <span class="font-sans font-bold text-[10px] text-gray-500 uppercase block">4.1 Dataset Characteristics & Synthesis Outcomes (Item 20a)</span>
-                    <p class="text-gray-800">@ScrubAnchors(report.SynthesisResultsItem)</p>
-                    
+                    @if (auditChecks.Count > 0)
+                    {
+                        <p class="font-sans text-[10px] text-gray-400 print:hidden">Click a citation number to see what the automated check found in the cited paper.</p>
+                    }
+                    @CitedText("synthesisResultsItem", ScrubAnchors(report.SynthesisResultsItem))
+
                     @if (!string.IsNullOrEmpty(mermaidDiagramCode))
                     {
                         <div class="mt-4 border border-gray-200 p-4 rounded bg-gray-50 flex flex-col items-center justify-center font-sans print:hidden">
@@ -380,7 +410,7 @@
 
                 <div class="space-y-1 md:col-span-2">
                     <span class="font-sans font-bold text-[10px] text-gray-500 uppercase block">5.1 General Interpretation & Architectural Analysis (Item 23a)</span>
-                    <p class="text-gray-800">@ScrubAnchors(report.DiscussionItem)</p>
+                    @CitedText("discussionItem", report.DiscussionItem)
                     @if (!string.IsNullOrWhiteSpace(report.CitationCheckSummary))
                     {
                         <p class="text-gray-600 text-[11px] italic border-l-2 border-[#003B5C] pl-2">@report.CitationCheckSummary</p>
@@ -392,12 +422,23 @@
                 </div>
 
                 <div class="space-y-1">
-                    <span class="font-sans font-bold text-[10px] text-gray-500 uppercase block">6.1 Support & Funding (Item 25)</span>
-                    <p class="text-gray-800">@ScrubAnchors(report.SupportItem)</p>
+                    <span class="font-sans font-bold text-[10px] text-gray-500 uppercase block">6.1 Registration and Protocol (Item 24)</span>
+                    <p class="text-gray-800">
+                        @(string.IsNullOrWhiteSpace(report.ProtocolItem) ? "No protocol was recorded for this run (it was made before protocols were written)." : report.ProtocolItem)
+                        @if (hasProtocol)
+                        {
+                            <a class="text-[#003B5C] underline ml-1" href="@($"/api/workspace/{State.CurrentSessionId}/protocol.md")" target="_blank">Open protocol.md</a>
+                        }
+                    </p>
                 </div>
 
                 <div class="space-y-1">
-                    <span class="font-sans font-bold text-[10px] text-gray-500 uppercase block">6.2 Open Science Code Availability (Item 27)</span>
+                    <span class="font-sans font-bold text-[10px] text-gray-500 uppercase block">6.2 Support & Funding (Item 25)</span>
+                    <p class="text-gray-800">@ScrubAnchors(report.SupportItem)</p>
+                </div>
+
+                <div class="space-y-1 md:col-span-2">
+                    <span class="font-sans font-bold text-[10px] text-gray-500 uppercase block">6.3 Availability of Data and Code (Item 27)</span>
                     <p class="text-gray-800">@ScrubAnchors(report.AvailabilityItem)</p>
                 </div>
 
@@ -407,7 +448,7 @@
                 <h2 class="font-sans font-bold text-sm text-[#003B5C] uppercase tracking-wide mb-3">References</h2>
                 @if (includedCitations.Count == 0)
                 {
-                    <p class="text-xs italic text-gray-400 font-sans">No sources were included in this evaluation loop session.</p>
+                    <p class="text-xs italic text-gray-400 font-sans">No sources were included in this run.</p>
                 }
                 else
                 {
@@ -437,26 +478,33 @@
     [Parameter] public Guid? RunId { get; set; }
 
     private PrismaReport report = new PrismaReport();
-    private List<string> includedCitations = new List<string>();
-    private Dictionary<string, int> publicationsByYear = new Dictionary<string, int> { { "2024", 0 }, { "2025", 0 }, { "2026", 0 } };
-    private List<IncludedPaperMetricRow> tableRecords = new List<IncludedPaperMetricRow>();
-    private int journalCount = 0;
-    private int conferenceCount = 0;
-    private int transactionsCount = 0;
-    private int proceedingsCount = 0;
-    private int preprintCount = 0;
+    private List<string> includedCitations = new();
+    private Dictionary<string, int> publicationsByYear = new();
+    private List<IncludedPaperMetricRow> tableRecords = new();
+    private List<AuBtechReviewAgent.StudyExtraction> extractions = new();
+    private List<AuBtechReviewAgent.CitationSupportResult> auditChecks = new();
+    private int journalCount, conferenceCount, transactionsCount, proceedingsCount, preprintCount;
 
-    private int arxivShareCount = 0;
-    private int scopusShareCount = 0;
-    private int ieeeShareCount = 0;
-    private int scholarShareCount = 0;
-    private int rgShareCount = 0;
+    private sealed record PlatformShare(string Category, string Label, int Count, string Color, string Badge);
+    private List<PlatformShare> platformShares = new();
 
-    private bool peerReviewOnlyToggle = false;
-    private int passedPeerReviewCheck = 0;
-    private int failedPeerReviewCheck = 0;
+    // Literal class names so the Tailwind build finds them.
+    private static readonly string[] BarColors = { "bg-teal-500", "bg-orange-500", "bg-blue-400", "bg-yellow-400", "bg-purple-400", "bg-rose-400", "bg-lime-500", "bg-gray-400" };
+    private static readonly string[] BadgeColors = { "text-teal-800 bg-teal-50", "text-orange-800 bg-orange-50", "text-blue-800 bg-blue-50", "text-yellow-800 bg-yellow-50", "text-purple-800 bg-purple-50", "text-rose-800 bg-rose-50", "text-lime-800 bg-lime-50", "text-gray-800 bg-gray-50" };
+
+    private bool peerReviewOnlyToggle;
+    private int passedPeerReviewCheck;
+    private int failedPeerReviewCheck;
+    private bool hasProtocol;
+    private bool confirmDelete;
+    private bool deleted;
 
     private string mermaidDiagramCode = "";
+
+    // The citation marker the reader clicked: (field, sentence index, reference number).
+    private (string Field, int Sentence, int Reference)? openCitation;
+
+    private bool HasReport => !deleted && report != null && !string.IsNullOrEmpty(report.TitleItem) && report.TitleItem != "Pending...";
 
     private void TriggerZipArchiveDownload()
     {
@@ -466,7 +514,18 @@
         Nav.NavigateTo($"/api/workspace/{State.CurrentSessionId}/archive", forceLoad: true);
     }
 
-    private string ScrubAnchors(string rawText)
+    private void DeleteRun()
+    {
+        confirmDelete = false;
+        if (ReviewEngine.DeleteRun(State.CurrentSessionId))
+        {
+            deleted = true;
+            State.CurrentSessionId = Guid.Empty;
+            report = new PrismaReport();
+        }
+    }
+
+    private static string ScrubAnchors(string rawText)
     {
         if (string.IsNullOrWhiteSpace(rawText)) return "";
         string clean = Regex.Replace(rawText, @"\[MERMAID_START\].*?\[MERMAID_END\]", "", RegexOptions.Singleline);
@@ -474,11 +533,135 @@
         return Regex.Replace(clean, @"\[Source Context Anchor \d+.*?\]", "").Trim();
     }
 
-    private int GetMaxPublicationCount()
+    private static string Deg(double d) => d.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
+
+    private static bool InTier(IncludedPaperMetricRow r, string label) => label switch
     {
-        if (publicationsByYear == null || publicationsByYear.Count == 0) return 0;
-        return publicationsByYear.Values.Max();
+        "Conf" => r.VenueType is "Conferences" or "Proceedings",
+        "Preprint" => r.VenueType is "Preprints" or "Other",
+        _ => (r.Quartile ?? "").Equals(label, StringComparison.OrdinalIgnoreCase),
+    };
+
+    private static string AppraisalCategory(AuBtechReviewAgent.StudyExtraction e) =>
+        e.Error != null ? "not appraised" :
+        e.AppraisalCategory == "not_empirical" ? "not empirical (MMAT does not apply)" :
+        e.AppraisalCategory.Replace('_', ' ');
+
+    /// <summary>A one-paragraph description of the included set, built only from the run's own data.</summary>
+    private string DataParagraph()
+    {
+        if (tableRecords.Count == 0) return "No papers were included, so there is no data to describe.";
+        var years = tableRecords.Where(r => r.Year > 0).Select(r => r.Year).ToList();
+        int noYear = tableRecords.Count - years.Count;
+        string span = years.Count == 0 ? "None of the included papers has a publication year in its metadata."
+            : years.Min() == years.Max() ? $"All dated papers were published in {years.Min()}."
+            : $"The included papers were published between {years.Min()} and {years.Max()}, most of them in {years.GroupBy(y => y).OrderByDescending(g => g.Count()).ThenByDescending(g => g.Key).First().Key}.";
+        if (noYear > 0) span += $" {noYear} ha{(noYear == 1 ? "s" : "ve")} no year in the source metadata.";
+        string sources = string.Join(", ", platformShares.Select(p => $"{p.Count} from {p.Label}"));
+        return $"{span} By the source that first returned them: {sources}. " +
+               $"By venue type: {journalCount} journal, {transactionsCount} transactions, {conferenceCount + proceedingsCount} conference and {preprintCount} preprint or unknown.";
     }
+
+    /// <summary>The value with its quote as a tooltip; a dagger when the quote was not found in the paper.</summary>
+    private RenderFragment Evidence(AuBtechReviewAgent.EvidencedValue v) => __builder =>
+    {
+        bool notReported = v.Value.Equals("not reported", StringComparison.OrdinalIgnoreCase);
+        <span class="@(notReported ? "text-gray-400 italic" : "")" title="@(string.IsNullOrEmpty(v.Quote) ? "" : $"\"{v.Quote}\"")">@v.Value</span>
+        @if (!notReported && !v.QuoteVerified)
+        {
+            <span class="text-amber-700" title="The supporting quote was not found in the paper's text">†</span>
+        }
+    };
+
+    /// <summary>
+    /// Renders text with every [n] as a button. Clicking it opens the citation check's verdict, quote and
+    /// location for that sentence and reference. Sentences are split exactly as the check split them.
+    /// </summary>
+    private RenderFragment CitedText(string field, string text) => __builder =>
+    {
+        var sentences = AuBtechReviewAgent.CitationSupportChecker.SplitSentences(text);
+        <p class="text-gray-800">
+            @for (int i = 0; i < sentences.Count; i++)
+            {
+                int sentenceIndex = i;
+                foreach (var (part, isMarker) in AuBtechReviewAgent.CitationSupportChecker.SplitMarkers(sentences[i]))
+                {
+                    if (!isMarker || auditChecks.Count == 0)
+                    {
+                        @part
+                        continue;
+                    }
+                    <span>[</span>
+                    var refs = AuBtechReviewAgent.CitationSupportChecker.ReferencesIn(part);
+                    for (int r = 0; r < refs.Count; r++)
+                    {
+                        int reference = refs[r];
+                        var check = FindCheck(field, sentenceIndex, reference);
+                        bool isOpen = openCitation == (field, sentenceIndex, reference);
+                        <button type="button" class="font-mono underline decoration-dotted @VerdictText(check?.Verdict) @(isOpen ? "bg-yellow-100" : "")"
+                                title="@(check == null ? "Not checked" : VerdictLabel(check.Verdict))"
+                                @onclick="() => ToggleCitation(field, sentenceIndex, reference)">@reference</button>
+                        @(r < refs.Count - 1 ? ", " : "")
+                    }
+                    <span>]</span>
+                }
+                @(" ")
+            }
+        </p>
+        @if (openCitation is { } open && open.Field == field)
+        {
+            var check = FindCheck(open.Field, open.Sentence, open.Reference);
+            var paper = tableRecords.FirstOrDefault(t => t.ReferenceNumber == open.Reference);
+            <div class="font-sans text-[11px] border border-gray-200 bg-gray-50 rounded p-3 mt-2 space-y-1 print:hidden">
+                <div class="flex justify-between gap-2">
+                    <span class="font-bold text-[#003B5C]">[@open.Reference] @(paper?.Title ?? "Unknown reference")</span>
+                    <button type="button" class="text-gray-400 hover:text-gray-700" @onclick="() => openCitation = null">Close</button>
+                </div>
+                @if (check == null)
+                {
+                    <p class="text-gray-600">This citation was not part of the automated check.</p>
+                }
+                else
+                {
+                    <p><span class="font-semibold @VerdictText(check.Verdict)">@VerdictLabel(check.Verdict)</span> <span class="text-gray-500">(checked against the @check.EvidenceBasis@(string.IsNullOrEmpty(check.EvidenceLocation) ? "" : $", {check.EvidenceLocation}"))</span></p>
+                    @if (!string.IsNullOrWhiteSpace(check.Quote))
+                    {
+                        <blockquote class="border-l-2 border-gray-300 pl-2 italic text-gray-700">"@check.Quote"</blockquote>
+                        <p class="text-[10px] @(check.QuoteVerified ? "text-green-700" : "text-amber-700")">
+                            @(check.QuoteVerified ? "The quote was found in the paper's text." : "The quote could not be found in the paper's text.")
+                        </p>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(check.Reason))
+                    {
+                        <p class="text-gray-600">@check.Reason</p>
+                    }
+                }
+            </div>
+        }
+    };
+
+    private AuBtechReviewAgent.CitationSupportResult? FindCheck(string field, int sentence, int reference) =>
+        auditChecks.FirstOrDefault(c => c.Field == field && c.SentenceIndex == sentence && c.Reference == reference);
+
+    private void ToggleCitation(string field, int sentence, int reference) =>
+        openCitation = openCitation == (field, sentence, reference) ? null : (field, sentence, reference);
+
+    private static string VerdictLabel(string? verdict) => verdict switch
+    {
+        AuBtechReviewAgent.CitationSupportChecker.Supported => "Supported",
+        AuBtechReviewAgent.CitationSupportChecker.Partial => "Partly supported",
+        AuBtechReviewAgent.CitationSupportChecker.NotSupported => "Not supported",
+        AuBtechReviewAgent.CitationSupportChecker.Unverifiable => "Could not be verified",
+        _ => "Not checked",
+    };
+
+    private static string VerdictText(string? verdict) => verdict switch
+    {
+        AuBtechReviewAgent.CitationSupportChecker.Supported => "text-green-700",
+        AuBtechReviewAgent.CitationSupportChecker.Partial => "text-amber-700",
+        AuBtechReviewAgent.CitationSupportChecker.NotSupported => "text-red-700",
+        _ => "text-gray-500",
+    };
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -498,191 +681,80 @@
         if (RunId is Guid id && id != Guid.Empty) State.CurrentSessionId = id;
 
         report = new PrismaReport();
-        includedCitations = new List<string>();
-        tableRecords = new List<IncludedPaperMetricRow>();
-        publicationsByYear = new Dictionary<string, int> { { "2024", 0 }, { "2025", 0 }, { "2026", 0 } };
-        journalCount = 0;
-        conferenceCount = 0;
-        transactionsCount = 0;
-        proceedingsCount = 0;
-        preprintCount = 0;
-        arxivShareCount = 0;
-        scopusShareCount = 0;
-        ieeeShareCount = 0;
-        scholarShareCount = 0;
-        rgShareCount = 0;
-        
+        includedCitations = new();
+        tableRecords = new();
+        extractions = new();
+        auditChecks = new();
+        publicationsByYear = new();
+        platformShares = new();
+        journalCount = conferenceCount = transactionsCount = proceedingsCount = preprintCount = 0;
         peerReviewOnlyToggle = false;
-        passedPeerReviewCheck = 0;
-        failedPeerReviewCheck = 0;
+        passedPeerReviewCheck = failedPeerReviewCheck = 0;
         mermaidDiagramCode = "";
+        openCitation = null;
+        deleted = false;
 
-        string userWorkspaceFolder = Path.Combine(Directory.GetCurrentDirectory(), "WorkspaceStore", State.CurrentSessionId.ToString("N"));
-        string reportPath = Path.Combine(userWorkspaceFolder, "prisma-report.json");
-        string statePath = Path.Combine(userWorkspaceFolder, "transparent-process.json");
+        string folder = Path.Combine(ReviewEngine.WorkspaceRoot, State.CurrentSessionId.ToString("N"));
+        string reportPath = Path.Combine(folder, "prisma-report.json");
+        hasProtocol = File.Exists(Path.Combine(folder, "protocol.md"));
 
         if (File.Exists(reportPath))
         {
             try
             {
                 string content = await File.ReadAllTextAsync(reportPath);
-                var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
-                report = JsonSerializer.Deserialize<PrismaReport>(content, options) ?? new PrismaReport();
+                report = JsonSerializer.Deserialize<PrismaReport>(content, new JsonSerializerOptions { PropertyNameCaseInsensitive = true }) ?? new PrismaReport();
             }
-            catch 
-            {
-                if (report == null) report = new PrismaReport();
-            }
+            catch { report = new PrismaReport(); }
         }
 
-        if (File.Exists(statePath))
+        string auditPath = Path.Combine(folder, "citation-audit.json");
+        if (File.Exists(auditPath))
         {
             try
             {
-                using var fileStream = new FileStream(statePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
-                using var reader = new StreamReader(fileStream);
-                string jsonString = await reader.ReadToEndAsync();
-
-                if (string.IsNullOrWhiteSpace(jsonString)) return;
-
-                using JsonDocument doc = JsonDocument.Parse(jsonString);
-                if (doc.RootElement.TryGetProperty("PeerReviewOnlyToggle", out var toggleProp))
-                    peerReviewOnlyToggle = toggleProp.GetBoolean();
-                if (doc.RootElement.TryGetProperty("Stats", out var statsProp))
-                {
-                    if (statsProp.TryGetProperty("PassedPeerReviewCheck", out var pCheck)) passedPeerReviewCheck = pCheck.GetInt32();
-                    if (statsProp.TryGetProperty("FailedPeerReviewCheck", out var fCheck)) failedPeerReviewCheck = fCheck.GetInt32();
-                }
-
-                if (doc.RootElement.TryGetProperty("SynthesizedRecords", out var recordsProp))
-                {
-                    tableRecords = JsonSerializer.Deserialize<List<IncludedPaperMetricRow>>(recordsProp.GetRawText()) ?? new();
-                    
-                    arxivShareCount = tableRecords.Count(r => r.Category == "Arxiv");
-                    scopusShareCount = tableRecords.Count(r => r.Category == "ScienceDirect");
-                    ieeeShareCount = tableRecords.Count(r => r.Category == "IEEE");
-                    scholarShareCount = tableRecords.Count(r => r.Category == "Scholar");
-                    rgShareCount = tableRecords.Count(r => r.Category == "ResearchGate");
-
-                    var tempYears = new Dictionary<string, int> { { "2024", 0 }, { "2025", 0 }, { "2026", 0 } };
-                    foreach(var r in tableRecords)
-                    {
-                        string yrStr = r.Year > 0 ? r.Year.ToString() : "n.d.";
-                        if (!tempYears.ContainsKey(yrStr)) tempYears[yrStr] = 0;
-                        tempYears[yrStr]++;
-                    }
-                    publicationsByYear = tempYears;
-                }
-
-                if (!string.IsNullOrEmpty(report.SynthesisResultsItem))
-                {
-                    var mermaidMatch = Regex.Match(report.SynthesisResultsItem, @"\[MERMAID_START\](.*?)\[MERMAID_END\]", RegexOptions.Singleline);
-                    if (mermaidMatch.Success)
-                    {
-                        string rawMermaid = mermaidMatch.Groups[1].Value.Trim();
-                        // Older runs stored the model's diagram unrepaired; clean it here as well.
-                        mermaidDiagramCode = AuBtechReviewAgent.MermaidSanitizer.Sanitize(rawMermaid);
-                    }
-                }
-
-                JsonElement phasesEl = default;
-                foreach (var prop in doc.RootElement.EnumerateObject())
-                {
-                    if (prop.Name.Equals("Phases", StringComparison.OrdinalIgnoreCase))
-                    {
-                        phasesEl = prop.Value;
-                        break;
-                    }
-                }
-
-                if (phasesEl.ValueKind == JsonValueKind.Object)
-                {
-                    JsonElement screeningArray = default;
-                    foreach (var prop in phasesEl.EnumerateObject())
-                    {
-                        if (prop.Name.Equals("Screening", StringComparison.OrdinalIgnoreCase))
-                        {
-                            screeningArray = prop.Value;
-                            break;
-                        }
-                    }
-
-                    if (screeningArray.ValueKind == JsonValueKind.Array)
-                    {
-                        var citations = new List<string>();
-                        foreach (var element in screeningArray.EnumerateArray())
-                        {
-                            string decision = "Excluded";
-                            string citation = "";
-
-                            foreach (var prop in element.EnumerateObject())
-                            {
-                                if (prop.Name.Equals("decision", StringComparison.OrdinalIgnoreCase))
-                                {
-                                    decision = prop.Value.GetString() ?? "Excluded";
-                                }
-                                if (prop.Name.Equals("citation", StringComparison.OrdinalIgnoreCase) || 
-                                    prop.Name.Equals("apaCitation", StringComparison.OrdinalIgnoreCase))
-                                {
-                                    citation = prop.Value.GetString() ?? "";
-                                }
-                            }
-
-                            if (decision.Equals("Included", StringComparison.OrdinalIgnoreCase) && !string.IsNullOrWhiteSpace(citation))
-                            {
-                                citation = citation.Trim().TrimEnd('.');
-                                if (citation.Contains("https://doi.org/", StringComparison.OrdinalIgnoreCase))
-                                {
-                                    citation = citation.Replace(" https://doi.org/xxxx", "")
-                                                       .Replace(" https://doi.org/XXXX-XXXX", "")
-                                                       .Replace(" https://doi.org/XXXX", "");
-                                    citation = System.Text.RegularExpressions.Regex.Replace(
-                                        citation, 
-                                        @"https://doi\.org/[XxXx0-9\.]+/?[XxYyZz0-9\./]*", 
-                                        ""
-                                    ).Trim();
-                                }
-
-                                citation = citation.Replace(" (pp. XXX-XXX)", "")
-                                                   .Replace(" (pp. xxx-xxx)", "")
-                                                   .Replace(" (pp. )", "")
-                                                   .Replace(" pp. XXX-XXX", "")
-                                                   .Replace(" pp. ", "")
-                                                   .Replace(". *Journal Name*, *Volume*(Issue), Page range", "")
-                                                   .Replace(", *Journal Name*", "")
-                                                   .Replace(", *Preprint*", "");
-                                citation = citation.Replace("().", "").Replace("()", "");
-                                citations.Add(citation);
-
-                                if (citation.Contains("Journal", StringComparison.OrdinalIgnoreCase) || 
-                                    citation.Contains("Transactions", StringComparison.OrdinalIgnoreCase))
-                                {
-                                    if (citation.Contains("Transactions", StringComparison.OrdinalIgnoreCase)) transactionsCount++;
-                                    else journalCount++;
-                                }
-                                else if (citation.Contains("Proceedings", StringComparison.OrdinalIgnoreCase) || 
-                                         citation.Contains("Conference", StringComparison.OrdinalIgnoreCase))
-                                {
-                                    if (citation.Contains("Proceedings", StringComparison.OrdinalIgnoreCase)) proceedingsCount++;
-                                    else conferenceCount++;
-                                }
-                                else
-                                {
-                                    preprintCount++;
-                                }
-                            }
-                        }
-                        // Use the run's own reference numbering when it exists, so the [n] list here matches
-                        // the citations in the synthesis and the LaTeX bibliography.
-                        includedCitations = tableRecords.Any(r => r.ReferenceNumber > 0)
-                            ? tableRecords.OrderBy(r => r.ReferenceNumber).Select(r => r.ApaCitation.Trim().TrimEnd('.')).ToList()
-                            : citations.OrderBy(c => c).ToList();
-                    }
-                }
+                using var doc = JsonDocument.Parse(await File.ReadAllTextAsync(auditPath));
+                if (doc.RootElement.TryGetProperty("SupportChecks", out var checks))
+                    auditChecks = JsonSerializer.Deserialize<List<AuBtechReviewAgent.CitationSupportResult>>(checks.GetRawText()) ?? new();
             }
-            catch 
-            {
-            }
+            catch { auditChecks = new(); }
+        }
+
+        var state = ReviewEngine.LoadState(State.CurrentSessionId);
+        if (state == null) return;
+
+        peerReviewOnlyToggle = state.PeerReviewOnlyToggle;
+        passedPeerReviewCheck = state.Stats.PassedPeerReviewCheck;
+        failedPeerReviewCheck = state.Stats.FailedPeerReviewCheck;
+        extractions = state.Extractions ?? new();
+
+        // Older runs have ReferenceNumber = 0 everywhere; OrderBy is stable, so they keep their order.
+        tableRecords = state.SynthesizedRecords.OrderBy(r => r.ReferenceNumber).ToList();
+        includedCitations = tableRecords.Select(r => r.ApaCitation.Trim().TrimEnd('.')).ToList();
+
+        platformShares = tableRecords
+            .GroupBy(r => string.IsNullOrWhiteSpace(r.Category) ? "Other" : r.Category)
+            .OrderByDescending(g => g.Count()).ThenBy(g => g.Key, StringComparer.Ordinal)
+            .Select((g, i) => new PlatformShare(g.Key, AuBtechReviewAgent.PrismaReviewEngine.CategoryLabel(g.Key), g.Count(),
+                BarColors[i % BarColors.Length], BadgeColors[i % BadgeColors.Length]))
+            .ToList();
+
+        publicationsByYear = tableRecords
+            .GroupBy(r => r.Year > 0 ? r.Year.ToString() : "n.d.")
+            .OrderBy(g => g.Key == "n.d." ? "9999" : g.Key, StringComparer.Ordinal)
+            .ToDictionary(g => g.Key, g => g.Count());
+
+        journalCount = tableRecords.Count(r => r.VenueType == "Journals");
+        transactionsCount = tableRecords.Count(r => r.VenueType == "Transactions");
+        conferenceCount = tableRecords.Count(r => r.VenueType == "Conferences");
+        proceedingsCount = tableRecords.Count(r => r.VenueType == "Proceedings");
+        preprintCount = tableRecords.Count - journalCount - transactionsCount - conferenceCount - proceedingsCount;
+
+        if (!string.IsNullOrEmpty(report.SynthesisResultsItem))
+        {
+            var mermaidMatch = Regex.Match(report.SynthesisResultsItem, @"\[MERMAID_START\](.*?)\[MERMAID_END\]", RegexOptions.Singleline);
+            // Older runs stored the model's diagram unrepaired; clean it here as well.
+            if (mermaidMatch.Success) mermaidDiagramCode = AuBtechReviewAgent.MermaidSanitizer.Sanitize(mermaidMatch.Groups[1].Value.Trim());
         }
     }
 }
