@@ -100,7 +100,18 @@ public static class ApaCitationBuilder
     {
         string name = CleanText(rawName).Trim(' ', ',', '…');
         if (string.IsNullOrEmpty(name) || name.Trim('.').Length == 0) return "";
-        if (name.Contains(',')) return name;
+        if (name.Contains(','))
+        {
+            // "Kefallinos, Dionysios" (OpenAlex sometimes gives family, given) -> "Kefallinos, D."; "Doe, J." stays.
+            var sides = name.Split(',', 2);
+            string family = sides[0].Trim();
+            var given = sides[1].Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+            if (family.Length == 0 || given.Length == 0) return name;
+            var initialParts = given.SelectMany(t => t.Split('-', StringSplitOptions.RemoveEmptyEntries))
+                .Where(p => p.TrimEnd('.').Length > 0)
+                .Select(p => char.ToUpperInvariant(p.TrimEnd('.')[0]) + ".");
+            return $"{family}, {string.Join(" ", initialParts)}";
+        }
 
         var tokens = name.Split(' ', StringSplitOptions.RemoveEmptyEntries);
         if (tokens.Length == 1) return tokens[0];

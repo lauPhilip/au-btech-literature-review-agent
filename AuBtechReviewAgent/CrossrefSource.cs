@@ -87,8 +87,15 @@ public class CrossrefSource : IAcademicSource
     {
         if (string.IsNullOrWhiteSpace(jats)) return "";
         string text = Regex.Replace(jats, "<jats:title>.*?</jats:title>", " ", RegexOptions.Singleline | RegexOptions.IgnoreCase);
+        // Some publishers deposit escaped HTML inside the JATS ("&lt;span&gt;"), which only becomes a tag after
+        // decoding (seen in a live Crossref response), so tags are removed again after decoding.
+        for (int pass = 0; pass < 2; pass++)
+        {
+            text = Regex.Replace(text, "<[^>]+>", " ");
+            text = WebUtility.HtmlDecode(text);
+        }
         text = Regex.Replace(text, "<[^>]+>", " ");
-        return Regex.Replace(WebUtility.HtmlDecode(text), @"\s+", " ").Trim();
+        return Regex.Replace(text, @"\s+", " ").Trim();
     }
 
     private static string First(JsonElement e, string name) =>

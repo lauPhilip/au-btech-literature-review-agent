@@ -37,10 +37,14 @@ public static class OpenSourceHttp
         return client;
     }
 
-    /// <summary>GET with up to three attempts on rate limits and server errors (honouring Retry-After).</summary>
-    public static async Task<string> GetStringAsync(string url, IDictionary<string, string>? headers = null, Func<int, TimeSpan>? backoff = null)
+    /// <summary>
+    /// GET with up to five attempts on rate limits and server errors (honouring Retry-After). Waits 3, 6, 12
+    /// and 24 seconds: Semantic Scholar's shared pool without a key often answers 429 to the first request of
+    /// a burst (seen in a live check), and a longer wait gets through where a short one does not.
+    /// </summary>
+    public static async Task<string> GetStringAsync(string url, IDictionary<string, string>? headers = null, Func<int, TimeSpan>? backoff = null, int maxAttempts = 5)
     {
-        backoff ??= attempt => TimeSpan.FromSeconds(Math.Pow(2, attempt));
+        backoff ??= attempt => TimeSpan.FromSeconds(3 * Math.Pow(2, attempt - 1));
         for (int attempt = 1; ; attempt++)
         {
             using var request = new HttpRequestMessage(HttpMethod.Get, url);
@@ -50,7 +54,7 @@ public static class OpenSourceHttp
             if (response.IsSuccessStatusCode) return await response.Content.ReadAsStringAsync();
 
             bool transient = response.StatusCode == HttpStatusCode.TooManyRequests || (int)response.StatusCode >= 500;
-            if (!transient || attempt >= 3)
+            if (!transient || attempt >= maxAttempts)
                 throw new HttpRequestException($"{new Uri(url).Host} answered {(int)response.StatusCode} {response.ReasonPhrase}", null, response.StatusCode);
 
             TimeSpan wait = response.Headers.RetryAfter?.Delta ?? backoff(attempt);
