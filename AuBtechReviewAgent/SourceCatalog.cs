@@ -5,7 +5,7 @@ using System.Linq;
 namespace AuBtechReviewAgent;
 
 /// <summary>Which API key a source gateway needs before it can be queried.</summary>
-public enum SourceKeyKind { None, Elsevier, Ieee, SerpApi }
+public enum SourceKeyKind { None, Elsevier, Ieee }
 
 public record SourceOption(string Key, string DisplayName, SourceKeyKind KeyKind, string KeyLabel);
 
@@ -20,8 +20,11 @@ public static class SourceCatalog
         new("arxiv",        "arXiv",                     SourceKeyKind.None,     ""),
         new("scopus",       "Scopus / ScienceDirect",    SourceKeyKind.Elsevier, "Elsevier key"),
         new("ieee",         "IEEE Xplore",               SourceKeyKind.Ieee,     "IEEE key"),
-        new("scholar",      "Google Scholar",            SourceKeyKind.SerpApi,  "SerpApi key"),
-        new("researchgate", "ResearchGate (via SerpApi)", SourceKeyKind.SerpApi, "SerpApi key"),
+        // Open scholarly databases: free, no key, and their terms allow this use. They replaced the Google
+        // Scholar / ResearchGate route, which scraped those sites through SerpApi.
+        new("openalex",        "OpenAlex",         SourceKeyKind.None, ""),
+        new("semanticscholar", "Semantic Scholar", SourceKeyKind.None, ""),
+        new("crossref",        "Crossref",         SourceKeyKind.None, ""),
     };
 
     public static IReadOnlyList<string> AllKeys => All.Select(s => s.Key).ToList();
