@@ -103,6 +103,89 @@ public class OpenSourceAndSafetyTests : IDisposable
         Assert.Equal(2025, ApaCitationBuilder.ExtractYear(p.PublishedDate));
     }
 
+    // The next three tests use records copied (shortened) from live API responses on 2026-09-28, to pin the
+    // shapes the adapters actually meet: nulls, empty strings, family-first names and escaped HTML.
+
+    [Fact]
+    public void LiveOpenAlexShapesWithNullAbstractAndNullPdfAreHandled()
+    {
+        const string json = """
+        {"meta":{"count":258823},"results":[
+          {"id":"https://openalex.org/W2981731882","doi":"https://doi.org/10.1016/j.inffus.2019.12.012",
+           "display_name":"Explainable Artificial Intelligence (XAI): Concepts, taxonomies, opportunities and challenges toward responsible AI",
+           "publication_year":2019,"authorships":[{"author":{"display_name":"Alejandro Barredo Arrieta"}}],
+           "primary_location":{"source":{"display_name":"Information Fusion","type":"journal"}},
+           "best_oa_location":{"pdf_url":"http://hdl.handle.net/20.500.11824/1166"},"abstract_inverted_index":null},
+          {"id":"https://openalex.org/W4406728221","doi":"https://doi.org/10.1109/access.2025.3532853",
+           "display_name":"Agentic AI: Autonomous Intelligence for Complex Goals—A Comprehensive Survey","publication_year":2025,
+           "authorships":[{"author":{"display_name":"Deepak Bhaskar Acharya"}}],
+           "primary_location":{"source":{"display_name":"IEEE Access","type":"journal"}},
+           "best_oa_location":{"pdf_url":null},"abstract_inverted_index":{"Agentic":[0],"AI,":[1],"an":[2],"emerging":[3],"paradigm":[4]}},
+          {"id":"https://openalex.org/W2896457183","doi":"https://doi.org/10.4230/lipics.cosit.2022.18","display_name":"A repository record",
+           "publication_year":2018,"authorships":[{"author":{"display_name":"Kefallinos, Dionysios"}}],
+           "primary_location":{"source":null},"best_oa_location":null,"abstract_inverted_index":null}
+        ]}
+        """;
+        var papers = OpenAlexSource.ParseWorks(json);
+
+        Assert.Equal(3, papers.Count);
+        Assert.Equal("", papers[0].Abstract);
+        Assert.Equal("10.1109/access.2025.3532853", papers[1].Doi);
+        Assert.Null(papers[1].PdfUrl);
+        Assert.Equal("Agentic AI, an emerging paradigm", papers[1].Abstract);
+        Assert.Equal("", papers[2].JournalSource);
+        Assert.Equal("Kefallinos, D.", ApaCitationBuilder.FormatAuthor(papers[2].Authors[0]));
+    }
+
+    [Fact]
+    public void LiveSemanticScholarEmptyPdfUrlIsIgnored()
+    {
+        const string json = """
+        {"total":35653,"offset":0,"next":5,"data":[
+          {"paperId":"181744792430299bb2660af7a74cfa4a4f155291","externalIds":{"DOI":"10.63282/3050-9416.ijaibdcms-v6i1p122","CorpusId":288682746},
+           "url":"https://www.semanticscholar.org/paper/181744792430299bb2660af7a74cfa4a4f155291",
+           "title":"Agentic AI Frameworks for Autonomous Enterprise Software Development Workflows",
+           "venue":"International Journal of AI, BigData, Computational and Management Studies","year":2025,
+           "openAccessPdf":{"url":"","status":null,"license":null,"disclaimer":"Notice: ..."},
+           "publicationTypes":["JournalArticle"],"authors":[{"authorId":"2438775194","name":"Yasodhara Srinivas Aluri"}],
+           "abstract":"Enterprise software engineering has grown at a fast pace."},
+          {"paperId":"7ef12e7f28b538a044f3b2c2af4160446723a200","externalIds":{"ArXiv":"2512.23480","DOI":"10.1109/ICCA66035.2025.11430751"},
+           "title":"Agentic AI for Autonomous Defense in Software Supply Chain Security","venue":"International Conferences on Computing Advancements",
+           "year":2025,"openAccessPdf":{"url":"","status":null},"authors":[{"authorId":null,"name":"Mohammad Riyaz Belgaum"}],"abstract":null}
+        ]}
+        """;
+        var papers = SemanticScholarSource.Parse(json);
+
+        Assert.Equal(2, papers.Count);
+        Assert.Null(papers[0].PdfUrl);
+        Assert.Equal("10.1109/ICCA66035.2025.11430751", papers[1].Doi); // the publisher DOI wins over the arXiv one
+        Assert.Equal(2025, ApaCitationBuilder.ExtractYear(papers[1].PublishedDate));
+    }
+
+    [Fact]
+    public void LiveCrossrefAbstractWithEscapedHtmlIsCleaned()
+    {
+        const string json = """
+        {"status":"ok","message":{"total-results":915123,"items":[
+          {"DOI":"10.2139/ssrn.5342108","title":["Does Agentic AI Require New Policy Frameworks?"],
+           "author":[{"given":"Sarah","family":"Lam","sequence":"first","affiliation":[]}],
+           "issued":{"date-parts":[[2025]]},"type":"posted-content",
+           "abstract":"<jats:p>&lt;span&gt;Does the emergence of agentic AI require new policy frameworks?&lt;/span&gt;</jats:p>",
+           "URL":"https://doi.org/10.2139/ssrn.5342108","link":[]},
+          {"DOI":"10.1109/ms.2025.3622209","title":["Agentic AI Frameworks Under the Microscope: What Works, What Doesn’t"],
+           "author":[{"given":"Karthik","family":"Vaidhyanathan","sequence":"first"}],"container-title":["IEEE Software"],
+           "issued":{"date-parts":[[2026,1]]},"type":"journal-article","URL":"https://doi.org/10.1109/ms.2025.3622209",
+           "link":[{"URL":"http://xplorestaging.ieee.org/ielx8/52/11316879/11316910.pdf?arnumber=11316910","content-type":"unspecified","content-version":"vor","intended-application":"similarity-checking"}]}
+        ]}}
+        """;
+        var papers = CrossrefSource.Parse(json);
+
+        Assert.Equal("Does the emergence of agentic AI require new policy frameworks?", papers[0].Abstract);
+        Assert.Equal("", papers[0].JournalSource); // posted content (a preprint) has no venue
+        Assert.Null(papers[1].PdfUrl);             // "unspecified" links are text-mining copies, not open PDFs
+        Assert.Equal("IEEE Software", papers[1].JournalSource);
+    }
+
     [Fact]
     public void UnpaywallPdfLinkIsTakenFromTheBestOrAnyOpenLocation()
     {
