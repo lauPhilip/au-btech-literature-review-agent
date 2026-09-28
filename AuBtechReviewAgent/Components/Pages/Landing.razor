@@ -44,7 +44,8 @@
             </div>
 
             <p class="text-xs text-gray-500 mt-6">
-                Requires a Mistral API key. Free and open source under the Apache 2.0 license.
+                Try it with a few free runs a day, or add your own Mistral API key for more. Free and open
+                source under the Apache 2.0 license.
             </p>
         </div>
     </section>
@@ -55,32 +56,54 @@
             <h2 class="text-[11px] font-bold uppercase tracking-widest text-gray-400 mb-8">What it does</h2>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-px bg-gray-200 border border-gray-200">
                 <div class="bg-white p-7">
-                    <h3 class="font-serif text-lg text-gray-900 mb-2">Claims tied to sources</h3>
+                    <h3 class="font-serif text-lg text-gray-900 mb-2">Protocol first</h3>
                     <p class="text-sm text-gray-600 leading-relaxed">
-                        Before writing, it maps each point to the papers that support it, then writes against
-                        that outline instead of filling in placeholders.
+                        The review question, criteria and sources are written down and
+                        fingerprinted before any search runs. Any later change, such as the
+                        extra search phrasings, is added as a dated amendment.
                     </p>
                 </div>
                 <div class="bg-white p-7">
-                    <h3 class="font-serif text-lg text-gray-900 mb-2">Citations that check out</h3>
+                    <h3 class="font-serif text-lg text-gray-900 mb-2">Screened twice, disagreements flagged</h3>
                     <p class="text-sm text-gray-600 leading-relaxed">
-                        Every reference number in the generated text is checked against the actual reference
-                        list. Invalid numbers are removed and logged, so nothing is cited that isn&rsquo;t
-                        really there.
+                        Every record is screened by two independent prompts. Where they
+                        disagree, the paper is kept and flagged, and the agreement between the
+                        two is reported as Cohen&rsquo;s kappa. The least certain decisions are
+                        shown to you first.
                     </p>
                 </div>
                 <div class="bg-white p-7">
-                    <h3 class="font-serif text-lg text-gray-900 mb-2">Searches from several angles</h3>
+                    <h3 class="font-serif text-lg text-gray-900 mb-2">Every citation checked against the paper</h3>
                     <p class="text-sm text-gray-600 leading-relaxed">
-                        Each source is queried a few different ways to surface papers a single phrasing would
-                        miss, with duplicates removed. You can cap the results per source for quick test runs.
+                        Each cited sentence is compared with the text of the paper it cites, and
+                        the verdict comes with a verbatim quote. The tool checks that the quote
+                        really is in the paper, so an unsupported claim is flagged instead of
+                        trusted.
                     </p>
                 </div>
                 <div class="bg-white p-7">
-                    <h3 class="font-serif text-lg text-gray-900 mb-2">A complete, downloadable record</h3>
+                    <h3 class="font-serif text-lg text-gray-900 mb-2">Data extraction and quality appraisal</h3>
                     <p class="text-sm text-gray-600 leading-relaxed">
-                        Every run produces a single archive with the report, a log of every screening decision,
-                        the source PDFs, and the citation audit.
+                        For each included study it extracts the method, sample, findings and
+                        limitations, and appraises quality with MMAT 2018. Every value is backed
+                        by a quote that is checked against the source.
+                    </p>
+                </div>
+                <div class="bg-white p-7">
+                    <h3 class="font-serif text-lg text-gray-900 mb-2">Open sources and citation chaining</h3>
+                    <p class="text-sm text-gray-600 leading-relaxed">
+                        It searches arXiv, OpenAlex, Semantic Scholar and Crossref out of the
+                        box, and follows the references and citing papers of the included
+                        studies to find work the search missed.
+                    </p>
+                </div>
+                <div class="bg-white p-7">
+                    <h3 class="font-serif text-lg text-gray-900 mb-2">A complete, verifiable record</h3>
+                    <p class="text-sm text-gray-600 leading-relaxed">
+                        Every run produces one archive: the protocol, the raw source responses,
+                        every screening decision, every model call, the citation audit, a draft
+                        manuscript in LaTeX, BibTeX and RIS files, and a manifest that
+                        fingerprints every file.
                     </p>
                 </div>
             </div>
@@ -95,49 +118,76 @@
                 <li class="flex gap-5">
                     <span class="flex-none w-8 h-8 bg-[#003B5C] text-white flex items-center justify-center text-sm font-bold">1</span>
                     <div>
-                        <h3 class="font-serif text-lg text-gray-900">Search</h3>
+                        <h3 class="font-serif text-lg text-gray-900">Write the protocol</h3>
                         <p class="text-sm text-gray-600 leading-relaxed mt-1">
-                            Queries arXiv and the open scholarly databases OpenAlex, Semantic Scholar and Crossref
-                            (plus Scopus and IEEE Xplore when a key is set) using a few phrasings of your query.
+                            You give the question, the inclusion and exclusion criteria and the
+                            sources. The tool saves them as the review protocol before it
+                            searches.
                         </p>
                     </div>
                 </li>
                 <li class="flex gap-5">
                     <span class="flex-none w-8 h-8 bg-[#003B5C] text-white flex items-center justify-center text-sm font-bold">2</span>
                     <div>
-                        <h3 class="font-serif text-lg text-gray-900">Screen</h3>
+                        <h3 class="font-serif text-lg text-gray-900">Search</h3>
                         <p class="text-sm text-gray-600 leading-relaxed mt-1">
-                            Each candidate is checked against your inclusion and exclusion rules, with an
-                            optional peer-review-only filter.
+                            It queries arXiv, OpenAlex, Semantic Scholar and Crossref (plus
+                            Scopus and IEEE Xplore when a key is set) with your query and a few
+                            extra phrasings, keeps the raw response of every query, and removes
+                            duplicates.
                         </p>
                     </div>
                 </li>
                 <li class="flex gap-5">
                     <span class="flex-none w-8 h-8 bg-[#003B5C] text-white flex items-center justify-center text-sm font-bold">3</span>
                     <div>
-                        <h3 class="font-serif text-lg text-gray-900">Download</h3>
+                        <h3 class="font-serif text-lg text-gray-900">Screen</h3>
                         <p class="text-sm text-gray-600 leading-relaxed mt-1">
-                            The PDFs of the papers that pass are saved into a working folder for the run.
+                            Each record is screened twice against your criteria. If you like,
+                            the run pauses so you can include or exclude papers yourself,
+                            starting with the uncertain ones; your decisions are recorded.
                         </p>
                     </div>
                 </li>
                 <li class="flex gap-5">
                     <span class="flex-none w-8 h-8 bg-[#003B5C] text-white flex items-center justify-center text-sm font-bold">4</span>
                     <div>
-                        <h3 class="font-serif text-lg text-gray-900">Read the PDFs</h3>
+                        <h3 class="font-serif text-lg text-gray-900">Follow the citations</h3>
                         <p class="text-sm text-gray-600 leading-relaxed mt-1">
-                            The text is extracted page by page and split into short chunks, each tagged with the
-                            paper it came from.
+                            The references and citing papers of the included studies are fetched
+                            through OpenAlex and screened the same way.
                         </p>
                     </div>
                 </li>
                 <li class="flex gap-5">
                     <span class="flex-none w-8 h-8 bg-[#003B5C] text-white flex items-center justify-center text-sm font-bold">5</span>
                     <div>
-                        <h3 class="font-serif text-lg text-gray-900">Write the report</h3>
+                        <h3 class="font-serif text-lg text-gray-900">Read and appraise</h3>
                         <p class="text-sm text-gray-600 leading-relaxed mt-1">
-                            Those chunks are used to produce the PRISMA checklist items, with the citation check
-                            applied to the text.
+                            Open-access full text is fetched where it legally exists; otherwise
+                            the abstract is used. Each study is extracted and appraised with
+                            MMAT, and every quote is checked.
+                        </p>
+                    </div>
+                </li>
+                <li class="flex gap-5">
+                    <span class="flex-none w-8 h-8 bg-[#003B5C] text-white flex items-center justify-center text-sm font-bold">6</span>
+                    <div>
+                        <h3 class="font-serif text-lg text-gray-900">Write and check the report</h3>
+                        <p class="text-sm text-gray-600 leading-relaxed mt-1">
+                            The evidence is mapped to themes before any prose is written. The
+                            synthesis cites the studies, and every cited sentence is then
+                            checked against the paper it cites.
+                        </p>
+                    </div>
+                </li>
+                <li class="flex gap-5">
+                    <span class="flex-none w-8 h-8 bg-[#003B5C] text-white flex items-center justify-center text-sm font-bold">7</span>
+                    <div>
+                        <h3 class="font-serif text-lg text-gray-900">Download the record</h3>
+                        <p class="text-sm text-gray-600 leading-relaxed mt-1">
+                            You get the PRISMA report with clickable citations, a PRISMA flow
+                            diagram, and the full run archive to share, archive or check later.
                         </p>
                     </div>
                 </li>
@@ -153,8 +203,9 @@
                 <p class="font-serif text-lg lg:text-xl text-gray-800 leading-relaxed">
                     Automated review tools tend to produce fluent text with citations that are broken or
                     invented. That makes them hard to trust, and unsuitable for standards like PRISMA 2020,
-                    where you are expected to show how you reached your conclusions. This agent is built
-                    around keeping that trail intact.
+                    where you are expected to show how you reached your conclusions. This agent does not ask
+                    to be trusted: it keeps the whole trail, checks its own citations, and tells you where it
+                    is unsure, so a person can verify the review and stay responsible for it.
                 </p>
             </div>
         </div>
