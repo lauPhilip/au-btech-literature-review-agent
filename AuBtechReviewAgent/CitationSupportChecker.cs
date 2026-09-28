@@ -150,9 +150,38 @@ public static class CitationSupportChecker
     public static bool QuoteOccursIn(string? quote, string? excerpt)
     {
         if (string.IsNullOrWhiteSpace(quote) || string.IsNullOrWhiteSpace(excerpt)) return false;
-        static string Norm(string s) => Regex.Replace(s.ToLowerInvariant().Replace('’', '\'').Replace('“', '"').Replace('”', '"'), @"\s+", " ").Trim().Trim('"', '\'', '.', '…');
-        string q = Norm(quote);
-        return q.Length >= 20 && Norm(excerpt).Contains(q);
+        string text = Canonical(excerpt);
+
+        // Models often shorten a quote with "..." (seen in real runs); every part must then occur, in order.
+        // Parts shorter than 10 letters are ignored, so an ellipsis cannot turn a quote into loose keywords.
+        // A joining word after an ellipsis ("... and use tools") is the model's glue, not part of the source.
+        var parts = Regex.Split(quote, @"\.{3}|…")
+            .Select((p, i) => i == 0 ? p : Regex.Replace(p, @"^[\s,;:]*(and|or|but)\s+", "", RegexOptions.IgnoreCase))
+            .Select(Canonical).Where(p => p.Length > 0).ToList();
+        if (parts.Count > 1) parts = parts.Where(p => p.Length >= 10).ToList();
+        if (parts.Count == 0 || parts.Sum(p => p.Length) < 15) return false;
+
+        int from = 0;
+        foreach (var part in parts)
+        {
+            int at = text.IndexOf(part, from, StringComparison.Ordinal);
+            if (at < 0) return false;
+            from = at + part.Length;
+        }
+        return true;
+    }
+
+    /// <summary>
+    /// Letters and digits only, lower case, after Unicode normalisation. PDF text has line-break hyphens,
+    /// ligatures ("ﬁ"), odd quotes and spacing that a model does not reproduce; comparing only the letters
+    /// and digits makes a faithful quote match while a paraphrase still does not.
+    /// </summary>
+    public static string Canonical(string s)
+    {
+        string text = s.Normalize(System.Text.NormalizationForm.FormKC).ToLowerInvariant();
+        var sb = new StringBuilder(text.Length);
+        foreach (char c in text) if (char.IsLetterOrDigit(c)) sb.Append(c);
+        return sb.ToString();
     }
 
     public static async Task<List<CitationSupportResult>> CheckAsync(
@@ -209,7 +238,7 @@ public static class CitationSupportChecker
                 - "partially_supported": the excerpts support part of the claim, or support it only loosely.
                 - "not_supported": the excerpts do not say this, or contradict it.
                 - Judge only against the excerpts, not your own knowledge. If the sentence cites several papers, judge only the part that concerns this one.
-                - For supported and partially_supported, copy a short verbatim quote (one sentence, max 40 words) from ONE excerpt and name that excerpt (e.g. "E2").
+                - For supported and partially_supported, copy a short verbatim quote (one sentence, max 40 words) from ONE excerpt and name that excerpt (e.g. "E2"). Copy it as one unbroken passage: do not shorten it with "..." and do not rephrase it.
                 Respond ONLY with a minified JSON object:
                 {"results":[{"sentence":1,"verdict":"supported","excerpt":"E2","quote":"...","reason":"one short sentence"}]}
                 """);

@@ -125,7 +125,8 @@ public static class StudyExtractor
         var terms = TextRelevance.Terms("method methodology approach design sample participants dataset case study experiment evaluation results findings show limitations threats validity");
         var chunks = GroundingContextBuilder.SelectChunks(paper.Chunks, terms, excerpts);
         var evidence = new StringBuilder();
-        evidence.AppendLine($"Abstract: {paper.Abstract}");
+        evidence.AppendLine($"Title: {paper.Title}");
+        evidence.AppendLine($"Abstract: {(string.IsNullOrWhiteSpace(paper.Abstract) ? "(no abstract available)" : paper.Abstract)}");
         foreach (var c in chunks) evidence.AppendLine($"[page {c.PageNumber}] {c.Text}");
         string evidenceText = evidence.ToString();
 
@@ -138,7 +139,7 @@ public static class StudyExtractor
             STUDY: [{{paper.ReferenceNumber}}] {{paper.Title}}
             {{PromptSafety.Wrap(evidenceText, "paper text: abstract and selected passages")}}
 
-            TASK 1 - EXTRACTION. Fill each field from the text above. Every value must have a verbatim quote (one sentence, max 40 words) copied exactly from the text. If the text does not say, use value "not reported" and an empty quote.
+            TASK 1 - EXTRACTION. Fill each field from the text above. Every value must have a verbatim quote (one sentence, max 40 words) copied exactly from the text as one unbroken passage (no "...", no rephrasing). If the text does not say, use value "not reported" and an empty quote.
             - studyType: one short phrase (e.g. "design science artefact with case study", "controlled experiment", "survey", "literature review", "position paper").
             - method, sample, limitations: one sentence each.
             - keyFindings: 1 to 3 findings.
