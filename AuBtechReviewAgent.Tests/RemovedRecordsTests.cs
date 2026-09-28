@@ -5,7 +5,7 @@ namespace AuBtechReviewAgent.Tests;
 
 /// <summary>
 /// Records removed before screening must be listed in the ledger with their reason, and duplicates must be
-/// caught across sources (the same paper from arXiv and Google Scholar counts once).
+/// caught across sources (the same paper from arXiv and OpenAlex counts once).
 /// </summary>
 public class RemovedRecordsTests : IDisposable
 {
@@ -36,29 +36,28 @@ public class RemovedRecordsTests : IDisposable
             Paper("http://arxiv.org/abs/2", "Agent governance", 2024),
             Paper("http://arxiv.org/abs/3", "An old agent paper", 2012),
         });
-        var scholar = new ListSource("Google Scholar Gateway", new()
+        var openAlex = new ListSource("OpenAlex", new()
         {
-            Paper("SCHOLAR_x", "Agent Loops for Safety.", 2025),               // same title, other source
-            Paper("SCHOLAR_y", "Completely different title", 2025, "https://doi.org/10.1000/ABC"), // same DOI
-            Paper("SCHOLAR_z", "Agent memory", 2025),
-            Paper("SCHOLAR_w", "Agent planning", 2025),
-            Paper("SCHOLAR_v", "Agent tools", 2025),                         // third candidate: over the cap of 2
+            Paper("OPENALEX_Wx", "Agent Loops for Safety.", 2025),               // same title, other source
+            Paper("OPENALEX_Wy", "Completely different title", 2025, "https://doi.org/10.1000/ABC"), // same DOI
+            Paper("OPENALEX_Wz", "Agent memory", 2025),
+            Paper("OPENALEX_Ww", "Agent planning", 2025),
+            Paper("OPENALEX_Wv", "Agent tools", 2025),                         // third candidate: over the cap of 2
         });
 
-        // A SerpApi key is needed or the Scholar source is treated as unavailable and never queried.
-        var engine = new PrismaReviewEngine("test-key", "", null, "test-serpapi-key", null, new RunsOptions())
+        var engine = new PrismaReviewEngine("test-key", "", null, null, null, new RunsOptions())
         {
             WorkspaceRoot = _root,
             ChatFactory = _ => new FakeChatService().RespondsWith(prompt =>
                 prompt.Contains("Propose exactly 3 additional") ? """{"perspectives":[]}"""
                 : prompt.Contains("Evaluate the following academic paper") ? """{"decision":"Included","reasoning":"ok","briefSummary":"s"}"""
                 : "{}"),
-            SourceFactory = key => key == "arxiv" ? arxiv : scholar,
+            SourceFactory = key => key == "arxiv" ? arxiv : openAlex,
         };
         var runId = Guid.NewGuid();
 
         await engine.RunReviewAsync(runId, new ReviewRequest("agents", "o", "i", "e", 2,
-            SelectedSources: new[] { "arxiv", "scholar" }, YearFrom: 2020, YearTo: 2026));
+            SelectedSources: new[] { "arxiv", "openalex" }, YearFrom: 2020, YearTo: 2026));
 
         var state = engine.LoadState(runId)!;
         var removed = state.RemovedBeforeScreening;
@@ -69,11 +68,11 @@ public class RemovedRecordsTests : IDisposable
         Assert.Equal(state.Stats.DuplicatesRemoved + state.Stats.OutsideDateRange + state.Stats.CappedBeyondMaxResults, removed.Count);
         Assert.True(PrismaFlowCounts.From(state).IsConsistent);
 
-        var byTitle = removed.Single(r => r.PaperId == "SCHOLAR_x");
+        var byTitle = removed.Single(r => r.PaperId == "OPENALEX_Wx");
         Assert.Equal(RemovedRecord.Duplicate, byTitle.Reason);
         Assert.Equal("http://arxiv.org/abs/1", byTitle.DuplicateOf);
 
-        var byDoi = removed.Single(r => r.PaperId == "SCHOLAR_y");
+        var byDoi = removed.Single(r => r.PaperId == "OPENALEX_Wy");
         Assert.Equal("http://arxiv.org/abs/1", byDoi.DuplicateOf);
         Assert.Equal("10.1000/abc", byDoi.Doi);
 
@@ -81,7 +80,7 @@ public class RemovedRecordsTests : IDisposable
         Assert.Equal(2012, old.Year);
         Assert.Equal("arXiv API", old.Source);
 
-        Assert.Equal("SCHOLAR_v", removed.Single(r => r.Reason == RemovedRecord.OverCap).PaperId);
+        Assert.Equal("OPENALEX_Wv", removed.Single(r => r.Reason == RemovedRecord.OverCap).PaperId);
     }
 
     [Theory]

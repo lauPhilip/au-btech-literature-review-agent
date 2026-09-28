@@ -20,19 +20,25 @@ public class PipelineTests : IDisposable
         try { Directory.Delete(_root, true); } catch { }
     }
 
-    private class FakeSource : IAcademicSource
+    internal class FakeSource : IAcademicSource
     {
+        private readonly List<AcademicPaper> _extra;
+        public FakeSource(params AcademicPaper[] extra) => _extra = extra.ToList();
+        public int Calls;
         public string SourceName => "Google Scholar Gateway";
-        public Task<List<AcademicPaper>> FetchPapersAsync(string query, int maxResults = 5) => Task.FromResult(new List<AcademicPaper>
+        public Task<List<AcademicPaper>> FetchPapersAsync(string query, int maxResults = 5) { Interlocked.Increment(ref Calls); return Task.FromResult(new List<AcademicPaper>
         {
             new("SCHOLAR_a", "Agent loops for safe orchestration", "Agent loops recover from faults through supervisor checks.", "Published: 2025", new() { "Jane Doe" }, "Future Internet", "10.3390/fi1234567"),
             new("SCHOLAR_b", "Crop yields in wheat", "An agronomy study of wheat yields.", "Published: 2024", new() { "Ola Nordmann" }, "Field Crops Research"),
             new("SCHOLAR_c", "Agent governance layers", "Governance layers audit agent actions in production.", "Published: 2026", new() { "Kim Lee" }, "Proceedings of the Conference on Agents"),
-        }); // returns all three whatever the cap, like an adapter that over-returns; the engine enforces the cap
+        }.Concat(_extra).ToList()); } // returns all records whatever the cap, like an adapter that over-returns; the engine enforces the cap
+        public IReadOnlyList<string> LastRawResponses => new[] { "{\"results\":3}" };
     }
 
-    private static string Respond(string prompt)
+    internal static string Respond(string prompt)
     {
+        if (prompt.Contains("You are extracting data from one study"))
+            return """{"studyType":"design science artefact with evaluation","method":{"value":"Supervisor checks","quote":"Agent loops recover from faults through supervisor checks."},"sample":{"value":"not reported","quote":""},"keyFindings":[{"value":"Loops recover from faults","quote":"Agent loops recover from faults through supervisor checks."}],"limitations":{"value":"not reported","quote":""},"appraisalCategory":"quantitative_descriptive","appraisal":[{"id":"4.1","answer":"yes","quote":"Agent loops recover from faults through supervisor checks."},{"id":"4.2","answer":"no","quote":"a sentence that is not in the paper at all, invented"}]}""";
         if (prompt.Contains("Propose exactly 3 additional")) return """{"perspectives":["agent orchestration safety","agent fault recovery"]}""";
         if (prompt.Contains("Evaluate the following academic paper"))
         {
@@ -68,6 +74,7 @@ public class PipelineTests : IDisposable
         WorkspaceRoot = _root,
         ChatFactory = _ => new FakeChatService().RespondsWith(Respond),
         SourceFactory = _ => new FakeSource(),
+        FullTextFetcher = (_, _) => Task.FromResult(new FullTextResult(Array.Empty<DocumentChunk>(), "none (test)", null)),
     };
 
     private static ReviewRequest Request(bool humanReview = false) => new(
@@ -109,6 +116,35 @@ public class PipelineTests : IDisposable
 
         string audit = new StreamReader(archive.GetEntry("citation-audit.json")!.Open()).ReadToEnd();
         Assert.Contains("\"SupportChecks\"", audit);
+
+        // Dual screening: both prompts agree on all three records.
+        Assert.Equal(3, state.Stats.DualScreened);
+        Assert.Equal(0, state.Stats.ScreeningDisagreements);
+        Assert.Equal(1.0, state.Stats.ScreeningKappa!.Value, 3);
+
+        // Protocol written before the search, raw responses, extraction and a manifest that verifies.
+        foreach (var expected in new[] { "protocol.md", "extraction.json", "manifest.json" })
+            Assert.Contains(expected, names);
+        Assert.True(names.Any(n => n.StartsWith(PrismaReviewEngine.RawResponsesFolder + "/")));
+        Assert.NotNull(state.ProtocolSha256);
+        string protocol = new StreamReader(archive.GetEntry("protocol.md")!.Open()).ReadToEnd();
+        Assert.Contains("Amendment", protocol);
+        Assert.Contains("\"agent fault recovery\"", protocol);
+
+        var files = archive.Entries.Where(e => e.FullName != "manifest.json").ToDictionary(e => e.FullName, e =>
+        {
+            using var ms = new MemoryStream(); e.Open().CopyTo(ms); return ms.ToArray();
+        });
+        string manifest = new StreamReader(archive.GetEntry("manifest.json")!.Open()).ReadToEnd();
+        Assert.Empty(RunManifest.Verify(manifest, files));
+
+        Assert.Equal(2, state.Extractions.Count);
+        var appraisal = state.Extractions[0].Appraisal;
+        Assert.Equal("yes", appraisal[0].Answer);
+        Assert.Equal("cant_tell", appraisal[1].Answer); // "no" with a quote that is not in the paper
+        Assert.Contains("Table 3.2", tex);
+        Assert.Contains("Registration and Protocol", tex);
+        Assert.Contains("screened twice", File.ReadAllText(Path.Combine(_root, runId.ToString("N"), "prisma-report.json")));
     }
 
     [Fact]
