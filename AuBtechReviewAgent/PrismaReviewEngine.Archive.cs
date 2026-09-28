@@ -446,19 +446,26 @@ public partial class PrismaReviewEngine
         sb.AppendLine(@"\vspace{10pt}");
 
         string A(string answer) => answer switch { "yes" => "Yes", "no" => "No", _ => "?" };
-        sb.AppendLine(@"\begin{tabularx}{\textwidth}{>{\hsize=0.4\hsize}X >{\hsize=1.6\hsize}X c c c c c}");
-        sb.AppendLine(@"\multicolumn{7}{l}{\textbf{Table 3.3: Quality Appraisal (MMAT 2018; Yes / No / ? = can't tell)}} \\");
-        sb.AppendLine(@"\toprule");
-        sb.AppendLine(@"\textbf{Ref.} & \textbf{Category} & \textbf{1} & \textbf{2} & \textbf{3} & \textbf{4} & \textbf{5} \\");
-        sb.AppendLine(@"\midrule");
-        foreach (var e in extractions)
+        var appraised = extractions.Where(MethodsSectionWriter.ShowInAppraisalTable).ToList();
+        if (appraised.Count > 0)
         {
-            string category = e.Error != null ? "not appraised" : e.AppraisalCategory == "not_empirical" ? "not empirical (MMAT not applicable)" : e.AppraisalCategory.Replace('_', ' ');
-            var cells = Enumerable.Range(0, 5).Select(i => i < e.Appraisal.Count ? A(e.Appraisal[i].Answer) : "--");
-            sb.AppendLine($"{{[}}{e.ReferenceNumber}{{]}} & {EscapeLatexText(category)} & {string.Join(" & ", cells)} \\\\");
+            sb.AppendLine(@"\begin{tabularx}{\textwidth}{>{\hsize=0.4\hsize}X >{\hsize=1.6\hsize}X c c c c c}");
+            sb.AppendLine(@"\multicolumn{7}{l}{\textbf{Table 3.3: Quality Appraisal (MMAT 2018; Yes / No / ? = can't tell)}} \\");
+            sb.AppendLine(@"\toprule");
+            sb.AppendLine(@"\textbf{Ref.} & \textbf{Category} & \textbf{1} & \textbf{2} & \textbf{3} & \textbf{4} & \textbf{5} \\");
+            sb.AppendLine(@"\midrule");
+            foreach (var e in appraised)
+            {
+                string category = e.Error != null ? "not appraised" : e.AppraisalCategory.Replace('_', ' ');
+                var cells = Enumerable.Range(0, 5).Select(i => i < e.Appraisal.Count ? A(e.Appraisal[i].Answer) : "--");
+                sb.AppendLine($"{{[}}{e.ReferenceNumber}{{]}} & {EscapeLatexText(category)} & {string.Join(" & ", cells)} \\\\");
+            }
+            sb.AppendLine(@"\bottomrule");
+            sb.AppendLine(@"\end{tabularx}");
         }
-        sb.AppendLine(@"\bottomrule");
-        sb.AppendLine(@"\end{tabularx}");
+        string notAppraised = MethodsSectionWriter.NotAppraisedNote(extractions, "--");
+        if (notAppraised.Length > 0)
+            sb.AppendLine(@"\vspace{2pt}\noindent\scriptsize " + EscapeLatexText(notAppraised.TrimEnd('.')) + @".\normalsize");
         sb.AppendLine(@"\vspace{10pt}");
         return sb.ToString();
     }

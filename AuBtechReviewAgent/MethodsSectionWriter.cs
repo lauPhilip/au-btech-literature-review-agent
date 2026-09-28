@@ -272,4 +272,33 @@ public static class MethodsSectionWriter
         2 => $"{items[0]} and {items[1]}",
         _ => string.Join(", ", items.Take(items.Count - 1)) + ", and " + items[^1],
     };
+
+    /// <summary>
+    /// Whether a study gets a row in the MMAT table. Studies classified as non-empirical have no MMAT answers,
+    /// so they are left out of the table and named in <see cref="NotAppraisedNote"/> instead; studies whose
+    /// extraction failed stay in the table, because that failure is something a reader should see.
+    /// </summary>
+    public static bool ShowInAppraisalTable(StudyExtraction e) => e.Error != null || e.AppraisalCategory != "not_empirical";
+
+    /// <summary>
+    /// One sentence naming the studies left out of the MMAT table, e.g. "[1], [4]-[5] and [10] were classified
+    /// as non-empirical ...". Empty when every study is in the table.
+    /// </summary>
+    public static string NotAppraisedNote(IEnumerable<StudyExtraction> extractions, string rangeDash = "\u2013")
+    {
+        var refs = extractions.Where(e => !ShowInAppraisalTable(e)).Select(e => e.ReferenceNumber).Distinct().OrderBy(n => n).ToList();
+        if (refs.Count == 0) return "";
+        var parts = new List<string>();
+        for (int i = 0; i < refs.Count; i++)
+        {
+            int start = refs[i];
+            while (i + 1 < refs.Count && refs[i + 1] == refs[i] + 1) i++;
+            int end = refs[i];
+            parts.Add(end == start ? $"[{start}]" : end == start + 1 ? $"[{start}], [{end}]" : $"[{start}]{rangeDash}[{end}]");
+        }
+        string list = parts.Count == 1 ? parts[0] : string.Join(", ", parts.Take(parts.Count - 1)) + " and " + parts[^1];
+        string verb = refs.Count == 1 ? "was" : "were";
+        string study = refs.Count == 1 ? "study" : "studies";
+        return $"Not shown: {refs.Count} {study} ({list}) {verb} classified as non-empirical (for example reviews or position papers), to which MMAT does not apply.";
+    }
 }

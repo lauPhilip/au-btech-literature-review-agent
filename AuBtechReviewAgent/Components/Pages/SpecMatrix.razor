@@ -347,38 +347,45 @@
 
                     <div class="md:col-span-2 space-y-2 pt-2 font-sans max-w-full overflow-hidden">
                         <span class="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">Table 3.3: Quality Appraisal (MMAT 2018)</span>
-                        <div class="border border-gray-200 bg-white rounded-sm overflow-x-auto">
-                            <table class="w-full text-left border-collapse text-[10px] min-w-[560px]">
-                                <thead>
-                                    <tr class="bg-gray-100 border-b border-gray-200 text-gray-700 font-bold font-mono text-[9px] uppercase">
-                                        <th class="p-2 border-r border-gray-200">Ref.</th>
-                                        <th class="p-2 border-r border-gray-200">Category</th>
-                                        @for (int i = 1; i <= 5; i++)
-                                        {
-                                            <th class="p-2 border-r border-gray-200 text-center">@i</th>
-                                        }
-                                    </tr>
-                                </thead>
-                                <tbody class="divide-y divide-gray-100 text-gray-700">
-                                    @foreach (var e in extractions)
-                                    {
-                                        <tr>
-                                            <td class="p-2 font-mono text-[#003B5C] font-bold border-r border-gray-150">[@e.ReferenceNumber]</td>
-                                            <td class="p-2 border-r border-gray-150">@AppraisalCategory(e)</td>
-                                            @for (int i = 0; i < 5; i++)
+                        @if (extractions.Any(AuBtechReviewAgent.MethodsSectionWriter.ShowInAppraisalTable))
+                        {
+                            <div class="border border-gray-200 bg-white rounded-sm overflow-x-auto">
+                                <table class="w-full text-left border-collapse text-[10px] min-w-[560px]">
+                                    <thead>
+                                        <tr class="bg-gray-100 border-b border-gray-200 text-gray-700 font-bold font-mono text-[9px] uppercase">
+                                            <th class="p-2 border-r border-gray-200">Ref.</th>
+                                            <th class="p-2 border-r border-gray-200">Category</th>
+                                            @for (int i = 1; i <= 5; i++)
                                             {
-                                                var a = i < e.Appraisal.Count ? e.Appraisal[i] : null;
-                                                <td class="p-2 border-r border-gray-150 text-center font-mono @(a?.Answer switch { "yes" => "text-green-700", "no" => "text-red-700", _ => "text-gray-400" })"
-                                                    title="@(a == null ? "" : $"{a.Id} {a.Criterion}{(string.IsNullOrEmpty(a.Quote) ? "" : $" — \"{a.Quote}\"")}")">
-                                                    @(a?.Answer switch { "yes" => "Yes", "no" => "No", null => "–", _ => "?" })
-                                                </td>
+                                                <th class="p-2 border-r border-gray-200 text-center">@i</th>
                                             }
                                         </tr>
-                                    }
-                                </tbody>
-                            </table>
-                        </div>
-                        <p class="text-[10px] text-gray-500">? = can't tell. Hover over an answer to see the criterion and the supporting quote. Appraised by the language model; check before use.</p>
+                                    </thead>
+                                    <tbody class="divide-y divide-gray-100 text-gray-700">
+                                        @foreach (var e in extractions.Where(AuBtechReviewAgent.MethodsSectionWriter.ShowInAppraisalTable))
+                                        {
+                                            <tr>
+                                                <td class="p-2 font-mono text-[#003B5C] font-bold border-r border-gray-150">[@e.ReferenceNumber]</td>
+                                                <td class="p-2 border-r border-gray-150">@AppraisalCategory(e)</td>
+                                                @for (int i = 0; i < 5; i++)
+                                                {
+                                                    var a = i < e.Appraisal.Count ? e.Appraisal[i] : null;
+                                                    <td class="p-2 border-r border-gray-150 text-center font-mono @(a?.Answer switch { "yes" => "text-green-700", "no" => "text-red-700", _ => "text-gray-400" })"
+                                                        title="@(a == null ? "" : $"{a.Id} {a.Criterion}{(string.IsNullOrEmpty(a.Quote) ? "" : $" — \"{a.Quote}\"")}")">
+                                                        @(a?.Answer switch { "yes" => "Yes", "no" => "No", null => "–", _ => "?" })
+                                                    </td>
+                                                }
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
+                            <p class="text-[10px] text-gray-500">? = can't tell. Hover over an answer to see the criterion and the supporting quote. Appraised by the language model; check before use.</p>
+                        }
+                        @if (AuBtechReviewAgent.MethodsSectionWriter.NotAppraisedNote(extractions) is { Length: > 0 } notAppraised)
+                        {
+                            <p class="text-[10px] text-gray-500">@notAppraised</p>
+                        }
                     </div>
                 }
 
