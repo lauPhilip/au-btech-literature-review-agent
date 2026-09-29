@@ -124,12 +124,14 @@ app.MapStaticAssets();
 // Apply the rate limiter policies to the application pipeline routing channel
 app.UseRateLimiter();
 
+// The download endpoints use the one engine instance created above instead of taking it as a handler
+// parameter: every handler parameter counts as request input for static analysis, and the engine is not.
 // Serve the workspace footprint (.zip) as a real HTTP download instead of streaming it through the
 // Blazor Server SignalR connection: that connection has a small default max message size, so pushing a
 // base64-encoded zip through JS interop silently fails once a run has real downloaded source PDFs in it.
-app.MapGet("/api/workspace/{sessionId:guid}/archive", (Guid sessionId, AuBtechReviewAgent.PrismaReviewEngine engine) =>
+app.MapGet("/api/workspace/{sessionId:guid}/archive", (Guid sessionId) =>
 {
-    byte[] zipBytes = engine.GenerateWorkspaceArchiveFromDisk(sessionId);
+    byte[] zipBytes = reviewEngine.GenerateWorkspaceArchiveFromDisk(sessionId);
     if (zipBytes.Length == 0)
     {
         return Results.NotFound();
@@ -140,19 +142,19 @@ app.MapGet("/api/workspace/{sessionId:guid}/archive", (Guid sessionId, AuBtechRe
 }).RequireRateLimiting("ArchiveDownloadPolicy");
 
 // The included papers as BibTeX or RIS, for Zotero / EndNote / Mendeley.
-app.MapGet("/api/workspace/{sessionId:guid}/references.{format}", (Guid sessionId, string format, AuBtechReviewAgent.PrismaReviewEngine engine) =>
+app.MapGet("/api/workspace/{sessionId:guid}/references.{format}", (Guid sessionId, string format) =>
 {
     if (format is not ("bib" or "ris")) return Results.NotFound();
-    string? content = engine.ExportReferences(sessionId, format);
+    string? content = reviewEngine.ExportReferences(sessionId, format);
     if (content == null) return Results.NotFound();
     string mime = format == "bib" ? "application/x-bibtex" : "application/x-research-info-systems";
     return Results.File(System.Text.Encoding.UTF8.GetBytes(content), mime, $"references.{format}");
 }).RequireRateLimiting("ArchiveDownloadPolicy");
 
 // The protocol written before the search (PRISMA item 24), linked from the Review Output page.
-app.MapGet("/api/workspace/{sessionId:guid}/protocol.md", (Guid sessionId, AuBtechReviewAgent.PrismaReviewEngine engine) =>
+app.MapGet("/api/workspace/{sessionId:guid}/protocol.md", (Guid sessionId) =>
 {
-    string? text = engine.ReadProtocol(sessionId);
+    string? text = reviewEngine.ReadProtocol(sessionId);
     return text == null ? Results.NotFound() : Results.Text(text, "text/markdown; charset=utf-8");
 }).RequireRateLimiting("ArchiveDownloadPolicy");
 
