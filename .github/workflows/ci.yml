@@ -83,7 +83,8 @@ jobs:
             --runtime win-x86 --self-contained true -o ./publish
           # The server keeps its own web.config, which holds the API keys; never overwrite it.
           rm -f ./publish/web.config
-          echo '<html><body><p>Updating, back in a minute.</p></body></html>' > app_offline.htm
+          # The "we're updating" page shown while files are uploaded (self-contained, see deploy/app_offline.htm).
+          cp deploy/app_offline.htm app_offline.htm
 
       - name: Install lftp
         run: sudo apt-get update -qq && sudo apt-get install -y -qq lftp
