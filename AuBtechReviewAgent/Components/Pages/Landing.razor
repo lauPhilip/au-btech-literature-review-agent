@@ -5,6 +5,7 @@
 <header class="bg-[#003B5C] text-white flex-none shrink-0 z-50 shadow-md">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between gap-3">
         <a href="/" class="flex items-center space-x-3 hover:opacity-90 transition-opacity min-w-0 shrink overflow-hidden">
+            <span class="flex-none bg-white rounded-md p-0.5"><img src="img/logo.png" alt="" width="28" height="28" class="h-7 w-7" /></span>
             <span class="font-bold tracking-tight text-xs sm:text-sm whitespace-nowrap truncate">AARHUS UNIVERSITY</span>
             <span class="text-white/40 font-light hidden lg:inline">|</span>
             <span class="text-xs tracking-wider font-medium opacity-90 uppercase hidden lg:inline">au-btech-literature-review-agent</span>
@@ -16,7 +17,8 @@
 
     <!-- Hero -->
     <section class="border-b border-gray-200">
-        <div class="max-w-5xl mx-auto px-6 py-16 lg:py-24">
+        <div class="max-w-6xl mx-auto px-6 py-12 lg:py-20 grid grid-cols-1 lg:grid-cols-2 gap-10 lg:gap-14 items-center">
+            <div>
             <p class="text-[11px] font-bold uppercase tracking-widest text-[#003B5C] mb-5">
                 Aarhus University &middot; Department of Business Development and Technology
             </p>
@@ -47,6 +49,12 @@
                 Try it with a few free runs a day, or add your own Mistral API key for more. Free and open
                 source under the Apache 2.0 license.
             </p>
+            </div>
+            <figure class="order-first lg:order-none">
+                <img src="img/campus-960.webp" srcset="img/campus-480.webp 480w, img/campus-960.webp 960w" sizes="(min-width: 1024px) 520px, 100vw"
+                     width="960" height="717" alt="Illustration: a friendly robot reads a tablet under a tree on a university campus while students walk by." fetchpriority="high" decoding="async"
+                     class="w-full h-auto rounded-xl shadow-lg ring-1 ring-black/5" />
+            </figure>
         </div>
     </section>
 
@@ -54,6 +62,11 @@
     <section class="border-b border-gray-200">
         <div class="max-w-5xl mx-auto px-6 py-16">
             <h2 class="text-[11px] font-bold uppercase tracking-widest text-gray-400 mb-8">What it does</h2>
+            <figure class="mb-8">
+                <img src="img/library-960.webp" srcset="img/library-480.webp 480w, img/library-960.webp 960w" sizes="(min-width: 1024px) 1024px, 100vw"
+                     width="960" height="717" alt="Illustration: a robot reads a large book in a university library while library drones fetch books from the shelves." loading="lazy" decoding="async"
+                     class="w-full h-48 sm:h-64 lg:h-72 object-cover rounded-xl shadow-md ring-1 ring-black/5" />
+            </figure>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-px bg-gray-200 border border-gray-200">
                 <div class="bg-white p-7">
                     <h3 class="font-serif text-lg text-gray-900 mb-2">Protocol first</h3>
@@ -114,7 +127,8 @@
     <section class="border-b border-gray-200">
         <div class="max-w-5xl mx-auto px-6 py-16">
             <h2 class="text-[11px] font-bold uppercase tracking-widest text-gray-400 mb-8">How it works</h2>
-            <ol class="space-y-6">
+            <div class="grid grid-cols-1 lg:grid-cols-5 gap-10 items-start">
+            <ol class="space-y-6 lg:col-span-3">
                 <li class="flex gap-5">
                     <span class="flex-none w-8 h-8 bg-[#003B5C] text-white flex items-center justify-center text-sm font-bold">1</span>
                     <div>
@@ -192,6 +206,13 @@
                     </div>
                 </li>
             </ol>
+            <figure class="lg:col-span-2 lg:sticky lg:top-6">
+                <img src="img/lab-960.webp" srcset="img/lab-480.webp 480w, img/lab-960.webp 960w" sizes="(min-width: 1024px) 400px, 100vw"
+                     width="960" height="717" alt="Illustration: a robot examines a circuit board under a microscope in a laboratory while researchers work at their benches." loading="lazy" decoding="async"
+                     class="w-full h-auto rounded-xl shadow-md ring-1 ring-black/5" />
+                <figcaption class="text-xs text-gray-500 mt-3 leading-relaxed">Every step leaves a record you can check: the protocol, the raw search results, each screening decision and each citation verdict.</figcaption>
+            </figure>
+            </div>
         </div>
     </section>
 
@@ -199,7 +220,8 @@
     <section class="border-b border-gray-200">
         <div class="max-w-5xl mx-auto px-6 py-16">
             <h2 class="text-[11px] font-bold uppercase tracking-widest text-gray-400 mb-8">Why traceability</h2>
-            <div class="border-l-2 border-[#003B5C] pl-6 max-w-3xl">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-10 items-center">
+            <div class="border-l-2 border-[#003B5C] pl-6">
                 <p class="font-serif text-lg lg:text-xl text-gray-800 leading-relaxed">
                     Automated review tools tend to produce fluent text with citations that are broken or
                     invented. That makes them hard to trust, and unsuitable for standards like PRISMA 2020,
@@ -207,6 +229,12 @@
                     to be trusted: it keeps the whole trail, checks its own citations, and tells you where it
                     is unsure, so a person can verify the review and stay responsible for it.
                 </p>
+            </div>
+            <figure>
+                <img src="img/classroom-960.webp" srcset="img/classroom-480.webp 480w, img/classroom-960.webp 960w" sizes="(min-width: 768px) 480px, 100vw"
+                     width="960" height="717" alt="Illustration: a robot teacher explains a diagram at a blackboard to a class of robot students." loading="lazy" decoding="async"
+                     class="w-full h-auto rounded-xl shadow-md ring-1 ring-black/5" />
+            </figure>
             </div>
         </div>
     </section>
