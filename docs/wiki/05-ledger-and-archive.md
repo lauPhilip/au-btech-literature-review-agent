@@ -1,0 +1,131 @@
+# 5. Ledger, archive and data model
+
+Traceability is the point of the tool, so what it saves matters as much as what it computes. This page describes the files a run leaves behind, the types they are made of, and how the downloadable archive and `main.tex` are built from them.
+
+## The run folder
+
+Every run has a folder `WorkspaceStore/{runId}/`, where the run id is a GUID written as 32 hex digits. The folder path is built in exactly one place, `GetWorkspaceFolderPath`, which also refuses any path that would fall outside the workspace.
+
+| File | Written by | When | Contents |
+|---|---|---|---|
+| `protocol.md` | `WriteProtocolAsync`, `ProtocolWriter` | before the search; amendment after the search strings are known | Question, criteria, sources, limits, screening set-up; dated amendments |
+| `transparent-process.json` | `SaveStateAsync` (via `PublishAsync`) | after every step | The **ledger**: the whole `ReviewState` |
+| `SourceResponses/*.json`, `*.xml` | `SaveRawResponses` | during search and chaining | Each source response exactly as received |
+| `*.pdf` | `DocumentRAGUtility` | during synthesis | Open-access full texts used in the run |
+| `extraction.json` | `ExtractStudiesAsync` | during synthesis | Data extraction and MMAT answers with quotes |
+| `grounded-outline.txt` | report generation | during synthesis | Themes, claims and supporting reference numbers |
+| `peer-review-feedback.json` | report generation | during synthesis | Reviewer comments; text before and after revision |
+| `stylistic-transformation-ledger.json` | report generation | during synthesis | Each stylistic rewrite, before and after |
+| `citation-audit.json` | report generation | during synthesis | Removed markers; verdict and quote per cited sentence |
+| `prisma-report.json` | report generation | at the end | The PRISMA items shown on Review Output |
+| `llm-calls.json` | `finally` block of `RunReviewAsync` | at the end | Every model call; run settings |
+
+`main.tex`, `references.bib`, `references.ris` and `manifest.json` are not stored in the folder. They are built when someone downloads the archive, from the files above.
+
+## The data model
+
+```mermaid
+classDiagram
+    class ReviewRequest {
+        Query, Objective
+        Inclusion, Exclusion
+        MaxResultsPerSource, YearFrom, YearTo
+        SelectedSources, UserKeys
+        DualScreening, CitationChaining
+        HumanScreeningReview, PeerReviewOnly
+    }
+    class ReviewState {
+        ReviewId, Timestamp, SearchQuery
+        ProtocolSha256, ProtocolHash
+        SearchPerspectives, SelectedSources
+        UnavailableSources, FullTextSources
+        RunSettings, FailureMessage, CompletedUtc
+    }
+    class ReviewStats {
+        ProcessingStage, QueuePosition
+        TotalIdentified, DuplicatesRemoved
+        OutsideDateRange, CappedBeyondMaxResults
+        Screened, Included, Excluded
+        DualScreened, ScreeningDisagreements, ScreeningKappa
+        UncertainDecisions, InjectionSuspected
+        FullTextRetrieved, CitationsChecked ...
+    }
+    class PlatformSearchLog {
+        SourceName, QueryUsed, Timestamp
+        Status, PapersFound, ErrorMessage
+        RawResponseFile, RawResponseSha256, FromCache
+    }
+    class RemovedRecord {
+        PaperId, Title, Source, Reason, DuplicateOf
+    }
+    class ScreeningLog {
+        PaperId, Title, Decision, Reasoning
+        SecondDecision, SecondReasoning
+        Confidence, Uncertain, InjectionFlags
+        Origin, FromCache, HumanReviewed
+        ApaCitation, VenueType, Year, Doi, Abstract
+    }
+    class IncludedPaperMetricRow {
+        ReferenceNumber, Title, ApaCitation
+        VenueType, Year, Quartile, Category
+    }
+    class StudyExtraction {
+        ReferenceNumber, EvidenceBasis, StudyType
+        Method, Sample, KeyFindings, Limitations
+        AppraisalCategory, Appraisal
+    }
+    class PrismaReport {
+        TitleItem, AbstractItem, RationaleItem
+        EligibilityItem, SourcesItem, SelectionProcessItem
+        SynthesisResultsItem, DiscussionItem
+        CitationCheckSummary, ProtocolItem ...
+    }
+    ReviewRequest ..> ReviewState : RunReviewAsync creates
+    ReviewState "1" *-- "1" ReviewStats : Stats
+    ReviewState "1" *-- "*" PlatformSearchLog : SearchLogs
+    ReviewState "1" *-- "*" RemovedRecord : RemovedBeforeScreening
+    ReviewState "1" *-- "*" ScreeningLog : Phases.Screening
+    ReviewState "1" *-- "*" IncludedPaperMetricRow : SynthesizedRecords
+    ReviewState "1" *-- "*" StudyExtraction : Extractions
+    ReviewState ..> PrismaReport : written alongside
+```
+
+Most of these live in `ReviewModels.cs`; `StudyExtraction` is in `StudyExtractor.cs`, `CitationSupportResult` in `CitationSupportChecker.cs`, and `RunSettingsRecord` with `LlmCallRecord` in `LlmCallRecorder.cs`. `AcademicPaper` is the common shape every source returns (id, title, abstract, date, authors, venue, DOI, URL, PDF link).
+
+A few rules keep the ledger readable years later. Records are **added, never removed**: a duplicate is a `RemovedRecord` with a reason, a failed screening is a `ScreeningLog` with decision "Error". Counts in `ReviewStats` are **derived from the same events** as the lists, which is what lets `PrismaFlowCounts.From(state).IsConsistent` check that the PRISMA flow adds up. And the ledger is **JSON with property names as in the classes**; renaming a property breaks reading older runs, so add new ones instead of renaming.
+
+## The downloadable archive
+
+```mermaid
+flowchart LR
+    DL["GET /api/workspace/{id}/archive"] --> G["GenerateWorkspaceArchiveFromDisk"]
+    G --> L1["LoadState: transparent-process.json"]
+    G --> L2["prisma-report.json"]
+    L1 & L2 --> B["BuildWorkspaceArchive"]
+    B --> T["main.tex<br/>(built in memory)"]
+    B --> BIB["references.bib, .ris<br/>BibliographyExporter"]
+    B --> RF["root audit files<br/>(read with ReadShared)"]
+    B --> SP["SourcePapers/*.pdf"]
+    B --> SR["SourceResponses/*"]
+    T & BIB & RF & SP & SR --> M["manifest.json<br/>RunManifest.Build: SHA-256 of every file"]
+    M --> Z["zip"]
+```
+
+`BuildWorkspaceArchive` first collects every file as bytes, then writes `manifest.json` with the SHA-256 of each one, the tool and model version, and its own fingerprint, and finally zips everything. `RunManifest.Verify` does the reverse, and the tests use it to prove that an archive has not been changed. Files are read with `ReadShared`, which opens them with `FileShare.ReadWrite`, so a download never fails because a run happens to be writing its ledger at that moment. `ExportReferences` serves the BibTeX and RIS files on their own for the "BibTeX" and "RIS" links.
+
+## How main.tex is built
+
+`main.tex` is assembled line by line in `BuildWorkspaceArchive`. All text coming from the model or from sources passes through `EscapeLatexText`, which escapes LaTeX special characters. The pieces come from different places:
+
+| Part of `main.tex` | Source |
+|---|---|
+| Title, abstract, rationale, objectives, synthesis, discussion | `prisma-report.json` |
+| Methods sections, protocol and availability statements | `prisma-report.json`, written by `MethodsSectionWriter` |
+| "Data & Collection Metrics" paragraph | `MethodsSectionWriter.IncludedSet` |
+| PRISMA flow diagram (TikZ) | `PrismaFlowDiagram.ToTikz(PrismaFlowCounts.From(state))` |
+| Year bar chart and pie charts | computed from the included records; `LatexPie` |
+| Tables 3.1–3.3 (studies, extraction, MMAT) | `SynthesizedRecords`, `ExtractionTables` |
+| Synthesis diagram | the TikZ block the model wrote in the draft |
+| Bibliography | the included records, in reference-number order |
+
+Tables and bibliography are sorted by `ReferenceNumber`, so they always match the `[n]` markers in the text.

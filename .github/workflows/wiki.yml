@@ -1,0 +1,63 @@
+name: Wiki
+
+# Publishes docs/wiki/ to the repository's Wiki tab. The files in docs/wiki/ are the source: edit them in
+# a normal commit or pull request, and this job copies them to the wiki after they reach master. Edits made
+# directly in the Wiki tab are overwritten on the next sync.
+#
+# One-time set-up: the wiki's git repository only exists after its first page is created, so open the Wiki
+# tab once, click "Create the first page" and save it (any text). Then re-run this workflow.
+
+on:
+  push:
+    branches: [ master ]
+    paths: [ 'docs/wiki/**', '.github/workflows/wiki.yml' ]
+  workflow_dispatch:
+
+permissions:
+  contents: write   # the wiki is a separate git repository; pushing to it needs write access
+
+concurrency:
+  group: wiki-sync
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Publish docs/wiki to the Wiki tab
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Copy the pages into the wiki repository
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          git clone --depth 1 "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.wiki.git" wiki
+          # Replace the wiki's pages with docs/wiki (git keeps the history of earlier versions).
+          find wiki -maxdepth 1 -name '*.md' -delete
+          for f in docs/wiki/*.md; do
+            name=$(basename "$f")
+            [ "$name" = "README.md" ] && name="Home.md"
+            # Wiki pages are linked without the .md extension, and README is the wiki's Home page.
+            sed -E -e 's/\]\(README\.md\)/](Home)/g' -e 's/\]\(([0-9A-Za-z_-]+)\.md\)/](\1)/g' "$f" > "wiki/$name"
+          done
+          # Sidebar with the pages in order, built from each page's first heading.
+          {
+            echo "**TraceableAI developer wiki**"
+            echo
+            echo "- [Home](Home)"
+            for f in docs/wiki/[0-9]*.md; do
+              page=$(basename "$f" .md)
+              title=$(grep -m1 '^# ' "$f" | sed 's/^# //')
+              echo "- [$title]($page)"
+            done
+            echo
+            echo "_Source: [docs/wiki](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/tree/master/docs/wiki) in the repository._"
+          } > wiki/_Sidebar.md
+          cd wiki
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then echo "Wiki already up to date."; exit 0; fi
+          git commit -m "Sync from docs/wiki at ${GITHUB_SHA::7}"
+          git push

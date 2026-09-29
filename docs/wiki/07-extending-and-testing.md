@@ -1,0 +1,57 @@
+# 7. Extending and testing
+
+This page is for the person about to change something. It lists the common changes, the places each one touches, and the traps that break reproducibility or the audit trail. It ends with how the tests are organised and how to run them.
+
+## Common changes
+
+### Adding a bibliographic source
+
+A source is a class that implements `IAcademicSource`: a `SourceName`, `FetchPapersAsync(query, maxResults)` that returns `AcademicPaper` records, and `LastRawResponses` with the raw bodies of the last call. Do not skip the raw responses; they are what lets someone show later what the search returned on the day.
+
+1. Write `XyzSource.cs` next to the others. Use `OpenSourceHttp.GetStringAsync` for an open API, so retries and the `User-Agent` are handled for you. Fill `Doi` and `PdfUrl` when the API offers them: the DOI drives de-duplication and citation chaining, and the PDF link is tried for full text.
+2. Add an entry to `SourceCatalog` with a key, a display name and the kind of API key it needs.
+3. Add the key to the `switch` in `RunReviewAsync` that creates the sources, and, if it needs a key, to `GetSourceAvailability`.
+4. Add a parser test with a saved real response, like the ones in `OpenSourceAndSafetyTests.cs`.
+
+### Changing a prompt
+
+Screening decisions are cached for 90 days under a key that includes `ScreeningPromptVersion` (`PrismaReviewEngine.Screening.cs`). **Whenever you change either screening prompt, bump that constant**, or runs will keep reusing decisions made with the old prompt. The search cache key has its own version (`"search-v1"` in `FetchSourceAsync`); bump it if you change how search responses are turned into records. Other prompts (extraction, outline, report, citation check) are not cached, but the prompt hash in `llm-calls.json` still changes, so runs made before and after the change can be told apart.
+
+The screening prompt lives only in `ScreenPaperAsync`, which the evaluation tool also calls. Keep it that way, so the tool keeps measuring what the app does.
+
+### Adding a model step
+
+Wrap the call in `using (LlmStage.Begin("your-stage"))`, so it is recorded under its own name in `llm-calls.json`. If the answer is structured, use `LlmJson.GetAsync<T>` with a validation function and `JsonMode(temperature)`: it asks for JSON, checks the answer, and gives the model one chance to fix a bad answer. Put any text from papers inside `PromptSafety.Wrap(...)` and add `PromptSafety.DataOnlyNotice` to the prompt. If the model is asked to back something with a quote, check the quote with `CitationSupportChecker.QuoteOccursIn` rather than trusting it. Use temperature 0 for anything that decides or extracts. Save what the step produced to the run folder, and add the file to `rootFiles` in `BuildWorkspaceArchive` so it lands in the archive and the manifest.
+
+### Adding a field to the ledger or the report
+
+Add a property to `ReviewState`, `ReviewStats`, `ScreeningLog` or `PrismaReport`. Do not rename or remove existing ones: the ledger is read back from JSON, and older runs would lose that data. If the field is a count that should appear in the PRISMA flow, update `PrismaFlowCounts` and make sure `IsConsistent` still holds.
+
+### Changing the landing page or other components
+
+The CSS is compiled ahead of time. After changing a `.razor` file, run `npm ci` once and then `npm run build:css` in `AuBtechReviewAgent`, and commit `wwwroot/css/tailwind.css` along with the component. Tailwind picks up class names from ordinary text too, so even a wording change can change the CSS; the CI check tells you when you forgot. Never build a class name from a variable (`"bg-" + colour`), because Tailwind cannot see it.
+
+## Tests
+
+All tests are in `AuBtechReviewAgent.Tests` and run offline: no API keys, no network. Run them from the repository root with `dotnet test`; CI runs the same command.
+
+The engine has test hooks so a whole review can run against fakes. `ChatFactory` replaces the language model (usually with `FakeChatService`, which answers by matching text in the prompt), `SourceFactory` replaces the sources (`PipelineTests.FakeSource`), `CitationGraphFactory` replaces OpenAlex for chaining, `FullTextFetcher` replaces PDF downloads, `Cache` replaces the cache (`ReviewCache.Disabled` by default in tests), and `WorkspaceRoot` points the run folders at a temporary directory, which `TestFolders.TryDelete` removes afterwards.
+
+| Test file | What it covers |
+|---|---|
+| `PipelineTests.cs` | Whole runs end to end: archive contents, manifest verification, protocol, human review pause, interrupted runs |
+| `PipelineFeatureTests.cs` | Dual screening and disagreements, injection flags, citation chaining, cache reuse, deleting a run, parallel screening order |
+| `RealRunRegressionTests.cs` | Cases taken from real runs that once went wrong |
+| `OpenSourceAndSafetyTests.cs` | Source parsers on saved real responses, rate-limit handling, PDF size limit, prompt-injection markers |
+| `CitationSupportCheckerTests.cs`, `CitationValidatorTests.cs` | Quote matching, sentence splitting, range stripping |
+| `MethodsSectionWriterTests.cs`, `MmatTableTests.cs` | Generated methods text; the MMAT table and its note |
+| `ReportGuardTests.cs`, `GroundingAndFlowTests.cs` | `main.tex` details, grounding context, PRISMA flow counts, run clean-up |
+| `ApaCitationBuilderTests.cs`, `JournalRankingMatcherTests.cs`, `MermaidSanitizerTests.cs` | Reference formatting, quartile lookup, diagram cleaning |
+| `RunCoordinatorTests.cs`, `RunQuotaServiceTests.cs`, `ScreeningReviewTests.cs` | Slots and queue, quotas and tiers, applying a human review |
+| `ExportAndEvaluationTests.cs`, `RemovedRecordsTests.cs`, `SecurityUtilityTests.cs` | BibTeX/RIS, kappa and recall maths, removal reasons, input cleaning |
+
+When you fix a bug found in a real run, add a case to `RealRunRegressionTests.cs` with the input that caused it.
+
+## Measuring screening accuracy
+
+`tools/ScreeningEval` runs the app's own screening prompt over a dataset where human reviewers made the inclusion decisions (any ASReview-format CSV, for example from the SYNERGY collection) and reports recall, precision, specificity, F1 and Cohen's kappa, plus every paper the model missed. The usage is in the comment at the top of `tools/ScreeningEval/Program.cs`. It uses the first screening prompt only, needs a real API key and costs one model call per paper, so run it deliberately rather than in CI.

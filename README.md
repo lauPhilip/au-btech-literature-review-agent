@@ -232,6 +232,10 @@ If you use TraceableAI in your research, please cite the OSSYM 2026 paper, and t
 }
 ```
 
+## How the code fits together
+
+The [developer wiki](docs/wiki/README.md) explains the architecture for someone new to the codebase: the system overview, the review pipeline step by step, search and screening, evidence and report generation, the ledger and archive, the web app and deployment, and how to extend and test it. It includes diagrams of how the parts connect.
+
 ## Contributing
 
 This is an open-source project and contributions are welcome, whether that's reporting a bug, suggesting a feature, fixing a typo, or writing code. Have a look at [CONTRIBUTING.md](CONTRIBUTING.md) for how to set the project up locally and how to send changes. By taking part, you agree to follow our [Code of Conduct](CODE_OF_CONDUCT.md). If you're not sure where to start, open an issue and ask; we're happy to help.
