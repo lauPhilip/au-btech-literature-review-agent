@@ -14,7 +14,7 @@ public class PipelineFeatureTests : IDisposable
 
     public void Dispose()
     {
-        try { Directory.Delete(_root, true); } catch { }
+        TestFolders.TryDelete(_root);
     }
 
     private PrismaReviewEngine Engine(Func<string, string>? respond = null, PipelineTests.FakeSource? source = null,
@@ -130,7 +130,7 @@ public class PipelineFeatureTests : IDisposable
         Assert.Equal("Excluded", chained.Single(l => l.PaperId == "OPENALEX_W3").Decision);
         Assert.True(PrismaFlowCounts.From(state).IsConsistent);
         Assert.Contains("citation chaining (n = 3)", PrismaFlowDiagram.ToTikz(PrismaFlowCounts.From(state)));
-        Assert.True(state.SearchLogs.Any(l => l.SourceName == "OpenAlex (citation chaining)" && l.RawResponseFile != null));
+        Assert.Contains(state.SearchLogs, l => l.SourceName == "OpenAlex (citation chaining)" && l.RawResponseFile != null);
 
         string report = File.ReadAllText(Path.Join(_root, runId.ToString("N"), "prisma-report.json"));
         Assert.Contains("citation chaining was run through OpenAlex", report);

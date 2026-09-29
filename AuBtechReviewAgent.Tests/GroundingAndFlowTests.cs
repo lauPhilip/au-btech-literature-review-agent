@@ -106,7 +106,7 @@ public class GroundingAndFlowTests
         }
         finally
         {
-            try { Directory.Delete(store, true); } catch { }
+            TestFolders.TryDelete(store);
         }
     }
 

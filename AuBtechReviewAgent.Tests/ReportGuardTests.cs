@@ -91,7 +91,7 @@ public class ReportGuardTests
             string tex = texReader.ReadToEnd();
 
             // 360/7 degrees per slice must be written as 51.43..., never 51,43...
-            Assert.False(System.Text.RegularExpressions.Regex.IsMatch(tex, @"\(\d+,\d+:1\.2cm\)"));
+            Assert.DoesNotMatch(@"\(\d+,\d+:1\.2cm\)", tex);
             Assert.Contains("xmax=1.5", tex);
         }
         finally

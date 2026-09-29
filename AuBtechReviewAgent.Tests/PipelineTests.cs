@@ -17,7 +17,7 @@ public class PipelineTests : IDisposable
 
     public void Dispose()
     {
-        try { Directory.Delete(_root, true); } catch { }
+        TestFolders.TryDelete(_root);
     }
 
     internal class FakeSource : IAcademicSource
@@ -127,7 +127,7 @@ public class PipelineTests : IDisposable
         // Protocol written before the search, raw responses, extraction and a manifest that verifies.
         foreach (var expected in new[] { "protocol.md", "extraction.json", "manifest.json" })
             Assert.Contains(expected, names);
-        Assert.True(names.Any(n => n.StartsWith(PrismaReviewEngine.RawResponsesFolder + "/")));
+        Assert.Contains(names, n => n.StartsWith(PrismaReviewEngine.RawResponsesFolder + "/"));
         Assert.NotNull(state.ProtocolSha256);
         using var protocolReader = new StreamReader(archive.GetEntry("protocol.md")!.Open());
         string protocol = protocolReader.ReadToEnd();

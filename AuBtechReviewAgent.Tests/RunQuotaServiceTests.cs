@@ -14,7 +14,7 @@ public class RunQuotaServiceTests : IDisposable
 
     public void Dispose()
     {
-        try { Directory.Delete(_dir, recursive: true); } catch { }
+        TestFolders.TryDelete(_dir);
     }
 
     [Fact]
