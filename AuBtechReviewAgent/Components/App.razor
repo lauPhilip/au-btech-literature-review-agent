@@ -10,7 +10,10 @@
        third-party scripts and can run under a strict Content-Security-Policy. It comes after app.css, as the
        CDN version did, so its reset (e.g. links inherit their colour) still wins over app.css. *@
     <link rel="stylesheet" href="css/tailwind.css" />
-    <link rel="icon" type="image/png" href="favicon.png" />
+    <link rel="icon" href="favicon.ico" sizes="any" />
+    <link rel="icon" type="image/png" sizes="192x192" href="favicon.png" />
+    <link rel="apple-touch-icon" href="apple-touch-icon.png" />
+    <meta name="theme-color" content="#003B5C" />
     <HeadOutlet />
 </head>
 
