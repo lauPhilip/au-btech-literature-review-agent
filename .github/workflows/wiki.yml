@@ -32,7 +32,10 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          git clone --depth 1 "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.wiki.git" wiki
+          if ! git clone --depth 1 "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.wiki.git" wiki; then
+            echo "::error title=Wiki not set up yet::The wiki repository does not exist until its first page is created. Open the Wiki tab, click 'Create the first page', save it, and re-run this workflow."
+            exit 1
+          fi
           # Replace the wiki's pages with docs/wiki (git keeps the history of earlier versions).
           find wiki -maxdepth 1 -name '*.md' -delete
           for f in docs/wiki/*.md; do
