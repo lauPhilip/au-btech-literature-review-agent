@@ -9,7 +9,7 @@ The wiki describes the design as it is in the repository. When you change how so
 | Page | What it answers |
 |---|---|
 | [1. System overview](01-system-overview.md) | What the parts are, how a browser request reaches the engine, and where state lives |
-| [2. The review pipeline](02-review-pipeline.md) | What happens, in which order, from "Execute search" to a finished report |
+| [2. The review pipeline](02-review-pipeline.md) | What happens, in which order, from "Start review" to a finished report |
 | [3. Search and screening](03-search-and-screening.md) | How sources are queried, how records are de-duplicated, screened twice, chained and reviewed by a human |
 | [4. Evidence and report](04-evidence-and-report.md) | How full text is fetched, how studies are extracted and appraised, how the report is written and its citations checked |
 | [5. Ledger, archive and data model](05-ledger-and-archive.md) | What is saved for each run, the main data types, and how the downloadable archive and `main.tex` are built |
