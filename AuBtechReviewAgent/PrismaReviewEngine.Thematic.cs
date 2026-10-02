@@ -529,7 +529,7 @@ public partial class PrismaReviewEngine
                     var answer = await LlmJson.GetAsync<RepairAnswer>(chat, prompt, JsonMode(0.0), a =>
                         a.Repairs == null ? "repairs must be a list." :
                         a.Repairs.Any(r => !LlmJson.OneOf(r.Action, "rewrite", "drop_citation", "delete")) ? "each action must be rewrite, drop_citation or delete." : null);
-                    return (group.Key, items, answer.Repairs!, (string?)null);
+                    return (group.Key, items, answer.Repairs!, null);
                 }
                 catch (Exception ex)
                 {
