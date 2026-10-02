@@ -1,0 +1,58 @@
+@* Shown before a run: what the review will do with the current settings and what the reviewer gets at the
+   end, so the empty space next to the form explains the tool instead of showing an idle JSON box. *@
+
+@{
+    var steps = new List<(string Title, string Text)>
+    {
+        ("Protocol", "Your question and criteria are written down before anything is searched, with a fingerprint."),
+        ("Search", $"{SourceCount} source{(SourceCount == 1 ? "" : "s")}, your query plus up to three extra phrasings{(YearFrom > 0 ? $", {YearFrom}–{YearTo}" : "")}."),
+        ("Screening", DualScreening ? "Every record is screened twice by independent prompts; disagreements are kept and flagged." : "Every record is screened against your criteria."),
+    };
+    if (CitationChaining) steps.Add(("Citation chaining", "References and citing papers of the included studies are screened too."));
+    if (HumanReview) steps.Add(("Your check", "The run pauses so you can include or exclude papers yourself."));
+    steps.Add(("Evidence", "Open-access full texts are read; each study is extracted and appraised, every value with a verified quote."));
+    steps.Add(("Writing", "Findings are coded into themes and written up theme by theme, then discussed."));
+    if (ArtifactLabel != null) steps.Add(("Artifact", $"{ArtifactLabel}, built only from the findings."));
+    steps.Add(("Checking", "Every citation is compared with the cited paper; weak ones get a second check and are repaired."));
+}
+
+<div class="flex-1 min-h-0 overflow-y-auto p-5 space-y-5 text-left font-sans">
+    <div>
+        <h2 class="text-base font-semibold text-gray-900">What this review will do</h2>
+        <p class="text-xs text-gray-600 mt-0.5">With your current settings. A review of a few dozen studies usually takes a few minutes; the progress shows here once it starts.</p>
+    </div>
+
+    <ol class="space-y-3">
+        @for (int i = 0; i < steps.Count; i++)
+        {
+            <li class="flex gap-3">
+                <span class="flex-none w-6 h-6 rounded-full bg-[#003B5C]/10 text-[#003B5C] text-[11px] font-semibold flex items-center justify-center">@(i + 1)</span>
+                <span class="text-xs leading-snug">
+                    <span class="font-semibold text-gray-900">@steps[i].Title</span>
+                    <span class="text-gray-600"> · @steps[i].Text</span>
+                </span>
+            </li>
+        }
+    </ol>
+
+    <div class="border-t border-gray-100 pt-4">
+        <h3 class="text-xs font-semibold text-gray-900 mb-2">What you get</h3>
+        <div class="grid grid-cols-2 gap-2 text-[11px] text-gray-700">
+            <div class="border border-gray-200 rounded p-2"><span class="font-semibold block text-gray-900">PRISMA 2020 report</span>with every citation clickable to its quote</div>
+            <div class="border border-gray-200 rounded p-2"><span class="font-semibold block text-gray-900">Evidence map</span>which studies support which theme</div>
+            <div class="border border-gray-200 rounded p-2"><span class="font-semibold block text-gray-900">LaTeX manuscript</span>plus BibTeX and RIS for your reference manager</div>
+            <div class="border border-gray-200 rounded p-2"><span class="font-semibold block text-gray-900">Verifiable archive</span>protocol, ledger and every model call, fingerprinted</div>
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter] public int SourceCount { get; set; }
+    [Parameter] public int YearFrom { get; set; }
+    [Parameter] public int YearTo { get; set; }
+    [Parameter] public bool DualScreening { get; set; }
+    [Parameter] public bool CitationChaining { get; set; }
+    [Parameter] public bool HumanReview { get; set; }
+    /// <summary>Label of the requested artifact, or null when none is requested.</summary>
+    [Parameter] public string? ArtifactLabel { get; set; }
+}
