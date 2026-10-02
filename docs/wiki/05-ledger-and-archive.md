@@ -17,10 +17,12 @@ Every run has a folder `WorkspaceStore/{runId}/`, where the run id is a GUID wri
 | `thematic-codebook.json` | report generation | during synthesis | Codes with their anchors, themes, second coding and kappa, coverage per theme, studies not cited and why |
 | `peer-review-feedback.json` | report generation | during synthesis | Reviewer comments; text before and after revision; each section revision and whether the guard kept it |
 | `stylistic-transformation-ledger.json` | report generation | during synthesis | Each stylistic rewrite, before and after |
-| `citation-audit.json` | report generation | during synthesis | Removed markers; verdict and quote per cited sentence; repairs with before/after; summary before and after repair; studies not cited |
+| `citation-audit.json` | report generation | during synthesis | Removed markers; verdict and quote per cited sentence and artifact element; repairs with before/after; summary before and after repair; studies not cited; Markdown removed from the prose |
 | `prisma-report.json` | report generation | at the end | The PRISMA items shown on Review Output |
 | `llm-calls.json` | `finally` block of `RunReviewAsync` | at the end | Every model call; run settings |
 | `run-metrics.json` | `WriteRunMetricsAsync` | at the end of a completed run | Quality and cost figures of the run (also appended to the metrics store) |
+
+The ledger is written with `SafeFile.WriteAllTextAsync`: a temporary copy is written and moved into place, so a reader never sees half a file. On Windows that move can briefly fail with "Access to the path is denied" while an antivirus scanner or the search indexer holds the previous version, which stopped runs that save many times a second (screening served from the cache). The move is therefore retried a few times, then the file is overwritten in place, and only if that also fails does the run stop.
 
 `main.tex`, `references.bib`, `references.ris` and `manifest.json` are not stored in the folder. They are built when someone downloads the archive, from the files above.
 
@@ -136,6 +138,7 @@ To check an unpacked archive by hand, recompute a file's fingerprint and compare
 |---|---|
 | Title, abstract, rationale, objectives, synthesis overview, one `\subsection` per theme, discussion | `prisma-report.json` (`SynthesisSections` for the themes) |
 | Synthesis methods (item 13d), coverage sentence | `prisma-report.json`, written by `ThematicSynthesis.MethodsText` and `CoverageSentence` |
+| The artifact: TikZ figure, Table 4.2 or a list | `PrismaReport.Artifact`, `ArtifactLatex`, `ArtifactBuilder.ToTikz` |
 | Table 4.1, evidence map of the thematic synthesis | `ReviewState.ThematicSynthesis`, `EvidenceMapTable` |
 | Methods sections, protocol and availability statements | `prisma-report.json`, written by `MethodsSectionWriter` |
 | "Data & Collection Metrics" paragraph | `MethodsSectionWriter.IncludedSet` |

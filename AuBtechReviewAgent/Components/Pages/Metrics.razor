@@ -20,6 +20,7 @@
         <nav class="flex items-center gap-3 sm:gap-6 text-[10px] sm:text-xs font-semibold uppercase tracking-wider whitespace-nowrap shrink-0">
             <a href="/" class="text-white/70 hover:text-white transition-colors py-4">Overview</a>
             <a href="/review" class="text-white/70 hover:text-white transition-colors py-4">Dashboard</a>
+            <a href="/spec-matrix" class="text-white/70 hover:text-white transition-colors py-4">Review Output</a>
             <a href="/metrics" class="text-white border-b-2 border-white py-4">Metrics</a>
         </nav>
     </div>
@@ -31,25 +32,14 @@
         <p class="text-xs text-gray-600 mt-1 max-w-3xl">
             Every completed run stores its quality and cost figures here, computed in code from the run's own files. The store outlives the run folders, holds no
             research question or paper text, and groups runs by app version and settings, so you can see whether a change to the pipeline made the citations
-            better. Green is supported, amber partly supported, red not supported, blue not checkable from an abstract, grey could not be verified.
+            better. The page is public, like the code: it shows quality figures only. Links to the individual run reports are shown to the maintainers of
+            this deployment. Green is supported, amber partly supported, red not supported, blue not checkable from an abstract, grey could not be verified.
         </p>
     </div>
 
     @if (!loaded)
     {
         <p class="text-xs text-gray-500">Loading...</p>
-    }
-    else if (!allowed)
-    {
-        <div class="bg-white border border-gray-200 rounded p-4 max-w-md space-y-2">
-            <p class="text-xs text-gray-700">The metrics cover every run on this deployment, so they are only shown to its maintainers. Enter the developer token (Quota:AdminToken).</p>
-            <input type="password" @bind="tokenInput" class="w-full p-2 border border-gray-300 rounded font-mono text-xs" />
-            <button class="bg-[#003B5C] text-white text-xs font-bold uppercase tracking-wider px-3 py-2 rounded" @onclick="Unlock">Show metrics</button>
-            @if (tokenRejected)
-            {
-                <p class="text-xs text-red-700">That token is not valid.</p>
-            }
-        </div>
     }
     else if (runs.Count == 0)
     {
@@ -161,7 +151,16 @@
                                 <td class="p-1.5">@r.Repaired</td>
                                 <td class="p-1.5">@r.UpgradedBySecondCheck of @r.SecondChecked</td>
                                 <td class="p-1.5">@(r.SynthesisWords + r.DiscussionWords)</td>
-                                <td class="p-1.5"><a class="text-[#003B5C] underline" href="@($"/spec-matrix/{r.RunId}")" @onclick:stopPropagation="true">open</a></td>
+                                <td class="p-1.5">
+                                    @if (allowed)
+                                    {
+                                        <a class="text-[#003B5C] underline" href="@($"/spec-matrix/{r.RunId}")" @onclick:stopPropagation="true">open</a>
+                                    }
+                                    else
+                                    {
+                                        <span class="text-gray-400" title="Run reports are private to the person who ran them">–</span>
+                                    }
+                                </td>
                             </tr>
                         }
                     </tbody>
@@ -214,8 +213,7 @@
     // Wider bars when there are few runs, never wider than 36 px.
     private int BarWidth => Math.Clamp(720 / Math.Max(1, chartRuns.Count), 10, 36);
 
-    private bool loaded, allowed, tokenRejected;
-    private string tokenInput = "";
+    private bool loaded, allowed;
     private List<AuBtechReviewAgent.RunMetrics> runs = new();
     private List<AuBtechReviewAgent.RunMetrics> chartRuns = new();
     private List<Group> groups = new();
@@ -240,27 +238,14 @@
             // Browser storage can be unavailable (private window, blocked storage); the token can be typed in instead.
             Logger.LogDebug("Could not read the developer token from browser storage: {Message}", ex.Message);
         }
+        // Everyone sees the figures; only maintainers (developer token, or Development) get the report links.
         allowed = IsAllowed(token);
-        if (allowed) Load();
+        Load();
         loaded = true;
         StateHasChanged();
     }
 
     private bool IsAllowed(string? token) => Quota.ResolveTier(false, token) == AuBtechReviewAgent.QuotaTier.Developer;
-
-    private async Task Unlock()
-    {
-        tokenRejected = !IsAllowed(tokenInput);
-        if (tokenRejected) return;
-        allowed = true;
-        try { await SessionStorage.SetAsync("developer_access_token", tokenInput.Trim()); }
-        catch (Exception ex)
-        {
-            // Not remembering the token only means it has to be typed in again next time.
-            Logger.LogDebug("Could not save the developer token to browser storage: {Message}", ex.Message);
-        }
-        Load();
-    }
 
     private void Load()
     {

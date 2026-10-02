@@ -23,9 +23,12 @@ flowchart LR
     S --> SC[Screening<br/>twice, independently]
     SC --> E[Full text, extraction<br/>and quality appraisal]
     E --> T[Thematic synthesis<br/>one section per theme]
-    T --> C[Citation check<br/>and repair]
+    T --> A[Artifact<br/>diagram, table or list]
+    A --> C[Citation check<br/>and repair]
     C --> R[PRISMA report<br/>+ verifiable archive]
 ```
+
+You can also ask for an artifact built from the findings: a concept map, a flowchart, a comparison table or a list of recommendations. It is drawn from what the review found, and what it cites is checked like the text.
 
 In the finished report, every citation number is clickable. Click it and you see what the check found: supported, partly supported or not supported, the quote from the paper, and where in the paper it is. Green means the paper says it; orange and red stay in the report on purpose, so you know exactly where to look.
 

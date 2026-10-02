@@ -96,6 +96,10 @@ public static class ProtocolWriter
         sb.AppendLine($"- Human check of screening decisions before the write-up: {(request.HumanScreeningReview ? $"yes (waits up to {runs.ScreeningReviewTimeoutHours} hours)" : "no")}");
         sb.AppendLine("- Data extraction (study type, method, sample, findings, limitations) and quality appraisal with MMAT 2018 for each included study, every item backed by a verified quote.");
         sb.AppendLine("- Citation support check of every cited sentence in the synthesis.");
+        string artifactKind = ArtifactKinds.Normalize(request.ArtifactKind);
+        sb.AppendLine(artifactKind == ArtifactKinds.None
+            ? "- No artifact was requested."
+            : $"- Artifact built from the results: {ArtifactKinds.All.First(k => k.Key == artifactKind).Label}{(string.IsNullOrWhiteSpace(request.SynthesisDirective) ? "" : $" (\"{request.SynthesisDirective}\")")}.");
         if (inputFlags is { Count: > 0 })
         {
             sb.AppendLine();

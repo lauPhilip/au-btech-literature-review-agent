@@ -57,6 +57,26 @@ public static class RunProgress
         return (int)Math.Floor(done * 100 / total);
     }
 
+    /// <summary>
+    /// The dashboard gets progress from two places: live events, and the saved ledger it re-reads every few
+    /// seconds. The ledger is saved less often, so it can be behind. For the same run, keep whichever is
+    /// further along, so the bar never moves back.
+    /// </summary>
+    public static ReviewStats KeepFurthest(ReviewStats? shown, ReviewStats incoming)
+    {
+        if (shown == null || shown.RunStartedUtc == null || shown.RunStartedUtc != incoming.RunStartedUtc) return incoming;
+        if (Position(incoming) < Position(shown))
+        {
+            incoming.ProgressStep = shown.ProgressStep;
+            incoming.ProgressFraction = shown.ProgressFraction;
+            incoming.ProgressDetail = shown.ProgressDetail;
+        }
+        return incoming;
+    }
+
+    private static double Position(ReviewStats s) =>
+        s.ProgressStep == Done ? double.MaxValue : s.ProgressPlan.IndexOf(s.ProgressStep) + Math.Clamp(s.ProgressFraction, 0, 0.999);
+
     /// <summary>"done", "current" or "pending" for one step of the plan.</summary>
     public static string StateOf(ReviewStats stats, string step)
     {
@@ -70,8 +90,8 @@ public static class RunProgress
     public static double Phase(double[] boundaries, int phase, double within) =>
         boundaries[phase] + (boundaries[phase + 1] - boundaries[phase]) * Math.Clamp(within, 0, 1);
 
-    // Writing: outline and draft, coding, codebook, theme subsections, discussion, peer review.
-    public static readonly double[] SynthesisPhases = { 0, 0.15, 0.45, 0.5, 0.85, 0.92, 1 };
+    // Writing: outline and draft, coding, codebook, theme subsections, discussion, peer review, artifact.
+    public static readonly double[] SynthesisPhases = { 0, 0.15, 0.45, 0.5, 0.8, 0.87, 0.93, 1 };
     // Citation checks: first check, second check, repair.
     public static readonly double[] CheckingPhases = { 0, 0.6, 0.75, 1 };
 }

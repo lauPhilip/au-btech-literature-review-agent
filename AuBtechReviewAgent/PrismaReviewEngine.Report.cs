@@ -289,6 +289,7 @@ public partial class PrismaReviewEngine
             3. No placeholder venue names, no fabricated statistics. Ground every claim in the outline and
                context above.
 
+            {{ProseCleaner.PlainProseRule}}
             Respond ONLY with a valid minified JSON object matching this structure exactly:
             { "synthesis": "the full Results and Synthesis text with inline [n] citations", "discussion": "the full Discussion text with inline [n] citations" }
             """;
@@ -393,6 +394,7 @@ public partial class PrismaReviewEngine
             CURRENT DISCUSSION:
             {{discussion}}
 
+            {{ProseCleaner.PlainProseRule}}
             Respond ONLY with a valid minified JSON object:
             { "synthesis": "the revised synthesis with inline [n] citations", "discussion": "the revised discussion with inline [n] citations" }
             """;
@@ -486,27 +488,13 @@ public partial class PrismaReviewEngine
             TASK:
             Generate a fully formed, detailed academic paragraph for each checklist field below.
 
-            STRICT COMPOSITION SEPARATION RULES:
-            You MUST separate your response text into two completely isolated segments:
-            SEGMENT 1: Provide a clean, single minified JSON object matching the template below. The "synthesisResultsItem" field MUST contain only the standard text summary paragraph. Do NOT place diagram code, backslashes, or syntax inside the JSON text blocks.
-            SEGMENT 2: Completely OUTSIDE and AFTER the JSON object, write your model codes using these exact tag blocks:
-            
-            [MERMAID_START]
-            graph LR
-            ...
-            [MERMAID_END]
-
-            [TIKZ_START]
-            \begin{tikzpicture}[node distance=1.5cm, auto, >=Stealth]
-            ...
-            \end{tikzpicture}
-            [TIKZ_END]
+            Respond ONLY with a single valid minified JSON object matching the template below. Plain text in every field: no Markdown, no diagram code.
 
             JSON TEMPLATE SCHEMA:
             {
                 "titleItem": "A single-line systematic review title (at most 25 words, no full stop) on '{{query}}' mapping to PRISMA Item 1.",
                 "abstractItem": "A formal abstract overview addressing the core objective ('{{explicitObjective}}') mapping to PRISMA Item 2.",
-                "rationaleItem": "A rigorous context justification detailing the current state of software frameworks regarding '{{query}}' mapping to PRISMA Item 3.",
+                "rationaleItem": "A rigorous context justification on the current state of research on '{{query}}' and why a review is needed, mapping to PRISMA Item 3.",
                 "objectivesItem": "The explicit question formulation matching the stated goal: '{{explicitObjective}}' mapping to PRISMA Item 4.",
                 "biasAssessmentItem": "This field will be post-processed. Output exactly: 'PREDEFINED_METADATA_MARKER'",
                 "synthesisResultsItem": "Your simple-English factual literature summary paragraph mapping to PRISMA Item 20a. Do not place code syntax here.",
@@ -669,12 +657,36 @@ public partial class PrismaReviewEngine
                 _log.LogWarning("Could not save peer-review-feedback.json: {Message}", SanitizeLogMessage(ex.Message));
             }
 
-            // The model sometimes writes Markdown emphasis (**Integration Challenges:**); strip it before the
-            // citation check so the checked sentences are exactly the ones shown on the page and in main.tex.
+            // The model sometimes writes Markdown (headings, lists, tables, **emphasis**); turn it back into plain
+            // prose before the citation check, so the checked sentences are exactly the ones shown on the page
+            // and in main.tex. Every change is listed under FormattingChanges in citation-audit.json.
             // Fields are kept in report order: the synthesis overview, the theme subsections, the discussion.
-            var fields = new List<(string Field, string Text)> { ("synthesisResultsItem", MethodsSectionWriter.StripMarkdownEmphasis(synthesisProse)) };
-            fields.AddRange(sections.Select(s => (s.Field, MethodsSectionWriter.StripMarkdownEmphasis(s.Text))));
-            fields.Add(("discussionItem", MethodsSectionWriter.StripMarkdownEmphasis(discussionText)));
+            // The artifact the reviewer asked for, built from the finished results; its cited elements go through
+            // the same range check, support check and repair as the prose.
+            ReviewArtifact? artifact = null;
+            string artifactKind = ArtifactKinds.Normalize(finalState.ArtifactKind);
+            if (artifactKind != ArtifactKinds.None)
+            {
+                ReportProgress(sessionId, finalState, RunProgress.Synthesis, RunProgress.Phase(RunProgress.SynthesisPhases, 6, 0), "Building the artifact");
+                string results = sections.Count > 0
+                    ? string.Join("\n\n", sections.Select(x => $"THEME: {x.Heading}\n{x.Text}")) + $"\n\nDISCUSSION:\n{discussionText}"
+                    : $"{synthesisProse}\n\nDISCUSSION:\n{discussionText}";
+                using (LlmStage.Begin("artifact"))
+                    artifact = await ArtifactBuilder.BuildAsync(chat, artifactKind, finalState.SynthesisTargetDirective ?? "",
+                        explicitObjective, results, referenceListMapping, referenceCount);
+            }
+
+            var formattingChanges = new List<FormattingChange>();
+            string Plain(string text, string field)
+            {
+                var (clean, changes) = ProseCleaner.Clean(text, field);
+                formattingChanges.AddRange(changes);
+                return clean;
+            }
+            var fields = new List<(string Field, string Text)> { ("synthesisResultsItem", Plain(synthesisProse, "synthesisResultsItem")) };
+            fields.AddRange(sections.Select(s => (s.Field, Plain(s.Text, s.Field))));
+            fields.Add(("discussionItem", Plain(discussionText, "discussionItem")));
+            if (artifact is { Error: null }) fields.AddRange(artifact.CitableTexts().ToList());
 
             // STORM-style traceability guardrail: every [n] citation marker the model writes must resolve to
             // an entry that actually exists in the run's reference list. The model occasionally invents or
@@ -781,6 +793,12 @@ public partial class PrismaReviewEngine
             string fullSynthesisField = textOf["synthesisResultsItem"] + mermaidBlock + tikzBlock;
             string cleanDiscussionValidated = textOf["discussionItem"];
             foreach (var s in sections) s.Text = textOf[s.Field];
+            if (artifact is { Error: null })
+            {
+                foreach (var (field, _) in artifact.CitableTexts().ToList()) artifact.SetText(field, textOf[field]);
+                artifact.Compact();
+                artifact.Mermaid = ArtifactBuilder.ToMermaid(artifact);
+            }
 
             try
             {
@@ -794,6 +812,7 @@ public partial class PrismaReviewEngine
                     SupportSummary = supportSummary,
                     Repairs = repairs,
                     StudiesCited = citedStudies.Count,
+                    FormattingChanges = formattingChanges,
                     NotCited = notCited,
                     SupportChecks = supportChecks
                 };
@@ -814,8 +833,8 @@ public partial class PrismaReviewEngine
             {
                 GeneratedAt = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss UTC"),
                 TitleItem = cleanTitle,
-                AbstractItem = MethodsSectionWriter.StripMarkdownEmphasis(!string.IsNullOrWhiteSpace(cleanAbstract) ? cleanAbstract : rawAbstract),
-                RationaleItem = MethodsSectionWriter.StripMarkdownEmphasis(!string.IsNullOrWhiteSpace(cleanRationale) ? cleanRationale : rawRationale),
+                AbstractItem = Plain(!string.IsNullOrWhiteSpace(cleanAbstract) ? cleanAbstract : rawAbstract, "abstractItem"),
+                RationaleItem = Plain(!string.IsNullOrWhiteSpace(cleanRationale) ? cleanRationale : rawRationale, "rationaleItem"),
                 ObjectivesItem = !string.IsNullOrWhiteSpace(cleanObjectives) ? cleanObjectives : rawObjectives,
                 EligibilityItem = methodsEligibility,
                 SourcesItem = methodsSources,
@@ -823,7 +842,11 @@ public partial class PrismaReviewEngine
                 SelectionProcessItem = methodsSelection,
                 SynthesisResultsItem = fullSynthesisField,
                 SynthesisSections = sections,
-                SynthesisMethodsItem = ThematicSynthesis.MethodsText(useThematic ? thematic!.Codebook : thematic?.Codebook is { } fb ? new ThematicCodebook { FallbackReason = fb.FallbackReason } : null, Llm.DisplayName, Synthesis.RepairCitations),
+                SynthesisMethodsItem = ThematicSynthesis.MethodsText(useThematic ? thematic!.Codebook : thematic?.Codebook is { } fb ? new ThematicCodebook { FallbackReason = fb.FallbackReason } : null, Llm.DisplayName, Synthesis.RepairCitations)
+                    + (artifact == null ? "" : artifact.Error == null
+                        ? $" The {ArtifactKinds.All.First(k => k.Key == artifact.Requested).Label.ToLowerInvariant()} requested by the reviewer was built by the model from the finished results only, and the elements in it that cite a study were checked like the sentences of the report."
+                        : $" The requested artifact could not be built: {artifact.Error}"),
+                Artifact = artifact,
                 CoverageSummary = coverageSentence,
                 DiscussionItem = cleanDiscussionValidated,
                 // Items 9-11 from the extraction and MMAT appraisal the run actually produced.

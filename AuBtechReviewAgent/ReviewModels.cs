@@ -23,6 +23,12 @@ public class ReviewState
     public DateTime Timestamp { get; set; } = DateTime.UtcNow;
     public ReviewStats Stats { get; set; } = new();
     public string SynthesisTargetDirective { get; set; } = string.Empty;
+
+    // The rest of what the reviewer entered, so a later run can start from the same settings.
+    public string ReviewObjective { get; set; } = "";
+    public string InclusionCriteria { get; set; } = "";
+    public string ExclusionCriteria { get; set; } = "";
+    public string ArtifactKind { get; set; } = "";
     public ReviewPhases Phases { get; set; } = new();
     public List<PlatformSearchLog> SearchLogs { get; set; } = new();
     public List<IncludedPaperMetricRow> SynthesizedRecords { get; set; } = new();
@@ -283,6 +289,9 @@ public class PrismaReport
 
     // How many of the included studies the synthesis and discussion cite, and which ones they do not (and why).
     public string CoverageSummary { get; set; } = "";
+
+    // The artifact the reviewer asked for (diagram, table or list), built from the results; null when none was asked for.
+    public ReviewArtifact? Artifact { get; set; }
 }
 
 /// <summary>
@@ -312,7 +321,8 @@ public record ReviewRequest(
     int YearTo = 0,
     bool HumanScreeningReview = false,
     bool DualScreening = true,     // screen every record twice with two independent prompts
-    bool CitationChaining = false  // add references and citing papers of included studies (OpenAlex)
+    bool CitationChaining = false, // add references and citing papers of included studies (OpenAlex)
+    string ArtifactKind = ArtifactKinds.ConceptMap // what to build from the findings (see ArtifactKinds)
 );
 
 /// <summary>A record that was found but removed before screening, and why (written to the run ledger).</summary>
