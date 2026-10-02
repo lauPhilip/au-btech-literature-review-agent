@@ -211,6 +211,7 @@ public partial class PrismaReviewEngine
             2. Cite every one of these studies at least once: {{studyList}}. A study may be cited together with others when they report the same finding ("... [3, 7, 12]").
             3. Every sentence that states a finding, comparison or claim from the literature ends with an inline marker like [3] or [2, 5]. Attribute to a study only what its findings or excerpts above actually say; prefer the verified findings. Do not invent numbers, statistics or venue names.
             4. "heading" is a short subsection title for the theme (at most 10 words, no numbering).
+            {{ProseCleaner.PlainProseRule}}
             Respond ONLY with a valid minified JSON object:
             {"heading":"...","text":"the subsection with inline [n] citations"}
             """;
@@ -262,6 +263,7 @@ public partial class PrismaReviewEngine
                 {{PromptSafety.Wrap(missingEvidence, "evidence of the studies not yet cited")}}
 
                 TASK: Integrate the studies {{string.Join(", ", missing.Select(r => $"[{r}]"))}} where their evidence fits: add them to the comparisons that already exist, or add sentences that relate them to the studies already discussed. Attribute to them only what their evidence above says. Keep every existing citation. If the evidence of a study does not support any statement about this theme, leave it out rather than inventing one.
+                {{ProseCleaner.PlainProseRule}}
                 Respond ONLY with a valid minified JSON object:
                 {"text":"the revised subsection with inline [n] citations"}
                 """;
@@ -331,6 +333,7 @@ public partial class PrismaReviewEngine
             1. Write about {{paragraphs}} paragraphs, separated by a blank line: (a) what the themes together say about the objective, (b) where the themes connect, reinforce or contradict each other, (c) gaps the literature leaves open and directions for research, (d) implications for practice, (e) the limitations of the evidence base and of this review (automated screening and synthesis by a language model).
             2. Interpret, do not repeat the results. Ground every claim in the results above; every sentence that attributes something to the literature ends with an inline marker such as [3] or [2, 5], using the same studies the results cite for it.
             3. Do not invent numbers, statistics or studies.
+            {{ProseCleaner.PlainProseRule}}
             Respond ONLY with a valid minified JSON object:
             {"text":"the discussion with inline [n] citations"}
             """;
@@ -428,6 +431,7 @@ public partial class PrismaReviewEngine
                     CURRENT SECTION ({{(section == null ? "Discussion" : section.Heading)}}):
                     {{before}}
 
+                    {{ProseCleaner.PlainProseRule}}
                     Respond ONLY with a valid minified JSON object:
                     {"text":"the revised section with inline [n] citations"}
                     """;
