@@ -18,7 +18,7 @@ The wiki describes the design as it is in the repository. When you change how so
 
 ## The project in one paragraph
 
-TraceableAI is a .NET 10 Blazor Server application. A user enters a research question and eligibility criteria; the app writes a review protocol, searches open scholarly databases, screens every record twice with a language model, follows the citations of the included studies, extracts and appraises each study, writes a PRISMA 2020 report, and checks every cited sentence against a verbatim quote from the paper it cites. Everything the model decides is written to a per-run ledger, and the whole run can be downloaded as an archive whose files are fingerprinted in a manifest. Almost all of the logic lives in one class, `PrismaReviewEngine`, split over five files by stage; the rest are small, single-purpose helpers around it.
+TraceableAI is a .NET 10 Blazor Server application. A user enters a research question and eligibility criteria; the app writes a review protocol, searches open scholarly databases, screens every record twice with a language model, follows the citations of the included studies, extracts and appraises each study, codes their findings into themes, writes a PRISMA 2020 report with one cited subsection per theme, and checks every cited sentence against a verbatim quote from the paper it cites, repairing the ones that fail. Everything the model decides is written to a per-run ledger, and the whole run can be downloaded as an archive whose files are fingerprinted in a manifest. Almost all of the logic lives in one class, `PrismaReviewEngine`, split over five files by stage; the rest are small, single-purpose helpers around it.
 
 ## Where the code is
 

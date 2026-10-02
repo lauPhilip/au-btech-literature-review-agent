@@ -14,9 +14,10 @@ Every run has a folder `WorkspaceStore/{runId}/`, where the run id is a GUID wri
 | `*.pdf` | `DocumentRAGUtility` | during synthesis | Open-access full texts used in the run |
 | `extraction.json` | `ExtractStudiesAsync` | during synthesis | Data extraction and MMAT answers with quotes |
 | `grounded-outline.txt` | report generation | during synthesis | Themes, claims and supporting reference numbers |
-| `peer-review-feedback.json` | report generation | during synthesis | Reviewer comments; text before and after revision |
+| `thematic-codebook.json` | report generation | during synthesis | Codes with their anchors, themes, second coding and kappa, coverage per theme, studies not cited and why |
+| `peer-review-feedback.json` | report generation | during synthesis | Reviewer comments; text before and after revision; each section revision and whether the guard kept it |
 | `stylistic-transformation-ledger.json` | report generation | during synthesis | Each stylistic rewrite, before and after |
-| `citation-audit.json` | report generation | during synthesis | Removed markers; verdict and quote per cited sentence |
+| `citation-audit.json` | report generation | during synthesis | Removed markers; verdict and quote per cited sentence; repairs with before/after; summary before and after repair; studies not cited |
 | `prisma-report.json` | report generation | at the end | The PRISMA items shown on Review Output |
 | `llm-calls.json` | `finally` block of `RunReviewAsync` | at the end | Every model call; run settings |
 
@@ -49,6 +50,14 @@ classDiagram
         DualScreened, ScreeningDisagreements, ScreeningKappa
         UncertainDecisions, InjectionSuspected
         FullTextRetrieved, CitationsChecked ...
+        ThemesIdentified, StudiesCoded
+        StudiesCitedInSynthesis, CodingKappa
+        CitationsRepaired, CitationsOutsideTheme
+    }
+    class ThematicCodebook {
+        Codes, Themes, Uncoded
+        Coverage, SecondCoding, NotCited
+        FallbackReason
     }
     class PlatformSearchLog {
         SourceName, QueryUsed, Timestamp
@@ -87,6 +96,7 @@ classDiagram
     ReviewState "1" *-- "*" ScreeningLog : Phases.Screening
     ReviewState "1" *-- "*" IncludedPaperMetricRow : SynthesizedRecords
     ReviewState "1" *-- "*" StudyExtraction : Extractions
+    ReviewState "1" *-- "0..1" ThematicCodebook : ThematicSynthesis
     ReviewState ..> PrismaReport : written alongside
 ```
 
@@ -119,7 +129,9 @@ flowchart LR
 
 | Part of `main.tex` | Source |
 |---|---|
-| Title, abstract, rationale, objectives, synthesis, discussion | `prisma-report.json` |
+| Title, abstract, rationale, objectives, synthesis overview, one `\subsection` per theme, discussion | `prisma-report.json` (`SynthesisSections` for the themes) |
+| Synthesis methods (item 13d), coverage sentence | `prisma-report.json`, written by `ThematicSynthesis.MethodsText` and `CoverageSentence` |
+| Table 4.1, evidence map of the thematic synthesis | `ReviewState.ThematicSynthesis`, `EvidenceMapTable` |
 | Methods sections, protocol and availability statements | `prisma-report.json`, written by `MethodsSectionWriter` |
 | "Data & Collection Metrics" paragraph | `MethodsSectionWriter.IncludedSet` |
 | PRISMA flow diagram (TikZ) | `PrismaFlowDiagram.ToTikz(PrismaFlowCounts.From(state))` |

@@ -235,6 +235,11 @@ public partial class PrismaReviewEngine
         sb.AppendLine(sanitizedSelectionProcessItem);
         sb.AppendLine(@"\subsection{Data Collection and Quality Appraisal}");
         sb.AppendLine(sanitizedBiasAssessmentItem);
+        if (!string.IsNullOrWhiteSpace(report.SynthesisMethodsItem))
+        {
+            sb.AppendLine(@"\subsection{Synthesis Methods}");
+            sb.AppendLine(EscapeLatexText(report.SynthesisMethodsItem));
+        }
 
         sb.AppendLine(@"\end{multicols}");
         sb.AppendLine(@"\section{Data \& Collection Metrics}");
@@ -316,6 +321,21 @@ public partial class PrismaReviewEngine
         sb.AppendLine(@"\begin{multicols}{2}");
         sb.AppendLine(@"\section{Results \& Synthesis}");
         sb.AppendLine(sanitizedSynthesisResultsItem);
+        foreach (var section in report.SynthesisSections ?? new List<SynthesisSection>())
+        {
+            sb.AppendLine($"\\subsection{{{EscapeLatexText(section.Heading)}}}");
+            sb.AppendLine(EscapeLatexText(section.Text));
+        }
+        if (!string.IsNullOrWhiteSpace(report.CoverageSummary))
+        {
+            sb.AppendLine(@"\par\smallskip\noindent\textit{" + EscapeLatexText(report.CoverageSummary) + "}");
+        }
+        if (state?.ThematicSynthesis is { Themes.Count: > 0 } book && (report.SynthesisSections?.Count ?? 0) > 0)
+        {
+            sb.AppendLine(@"\end{multicols}");
+            sb.Append(EvidenceMapTable(book));
+            sb.AppendLine(@"\begin{multicols}{2}");
+        }
         
         if (!string.IsNullOrEmpty(tikzDiagramCode))
         {
@@ -385,7 +405,7 @@ public partial class PrismaReviewEngine
         string[] rootFiles =
         {
             "protocol.md", "transparent-process.json", "prisma-report.json", "llm-calls.json", "extraction.json",
-            "citation-audit.json", "peer-review-feedback.json", "stylistic-transformation-ledger.json", "grounded-outline.txt",
+            "citation-audit.json", "thematic-codebook.json", "peer-review-feedback.json", "stylistic-transformation-ledger.json", "grounded-outline.txt",
         };
         foreach (var name in rootFiles)
         {
@@ -423,6 +443,30 @@ public partial class PrismaReviewEngine
             }
         }
         return memoryStream.ToArray();
+    }
+
+    /// <summary>Evidence map: which studies contribute to which theme of the thematic synthesis.</summary>
+    private string EvidenceMapTable(ThematicCodebook book)
+    {
+        var sb = new StringBuilder();
+        sb.AppendLine(@"\vspace{6pt}");
+        sb.AppendLine(@"\begin{tabularx}{\textwidth}{>{\hsize=0.9\hsize}X >{\hsize=1.4\hsize}X >{\hsize=0.7\hsize}X}");
+        sb.AppendLine(@"\multicolumn{3}{l}{\textbf{Table 4.1: Evidence Map of the Thematic Synthesis}} \\");
+        sb.AppendLine(@"\toprule");
+        sb.AppendLine(@"\textbf{Theme} & \textbf{Description} & \textbf{Studies} \\");
+        sb.AppendLine(@"\midrule");
+        foreach (var t in book.Themes)
+            sb.AppendLine($"{EscapeLatexText(t.Name)} & {EscapeLatexText(t.Description)} & {string.Join(", ", t.Studies.Select(r => $"{{[}}{r}{{]}}"))} \\\\ \\hline");
+        sb.AppendLine(@"\end{tabularx}");
+        var notes = new List<string>();
+        if (book.SecondCoding?.Kappa is double k)
+            notes.Add($"Second, independent coding: Cohen's kappa = {k.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture)} over {book.SecondCoding.CellsCompared} study-theme decisions.");
+        if (book.Uncoded.Count > 0)
+            notes.Add("Not placed in a theme: " + string.Join("; ", book.Uncoded.Select(u => $"[{u.Reference}] {u.Reason.TrimEnd('.')}")) + ".");
+        if (notes.Count > 0)
+            sb.AppendLine(@"\vspace{2pt}\noindent\scriptsize " + EscapeLatexText(string.Join(" ", notes)) + @"\normalsize");
+        sb.AppendLine(@"\vspace{10pt}");
+        return sb.ToString();
     }
 
     /// <summary>Table 3.2 (extracted data, with a mark where the supporting quote was found) and Table 3.3 (MMAT).</summary>

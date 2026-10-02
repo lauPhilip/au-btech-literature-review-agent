@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.ChatCompletion;
@@ -38,6 +39,9 @@ public class CitationSupportResult
     /// </summary>
     public bool QuoteVerified { get; set; }
     public string Reason { get; set; } = "";
+
+    /// <summary>Set when a theme subsection cites a study that was not coded under that theme.</summary>
+    public string? ThemeNote { get; set; }
 }
 
 public class CitationSupportSummary
@@ -188,7 +192,9 @@ public static class CitationSupportChecker
         IChatCompletionService chat,
         IReadOnlyList<CitedSentence> citedSentences,
         IReadOnlyList<ReferencedPaper> papers,
-        int excerptsPerReference = 6)
+        int excerptsPerReference = 6,
+        IReadOnlyDictionary<int, IReadOnlyList<string>>? verifiedFindings = null,
+        int parallelism = 1)
     {
         var results = new List<CitationSupportResult>();
         var byReference = papers.ToDictionary(p => p.ReferenceNumber);
@@ -198,18 +204,41 @@ public static class CitationSupportChecker
             .GroupBy(x => x.Ref)
             .OrderBy(g => g.Key);
 
-        foreach (var group in pairsByRef)
+        // References are checked a few at a time; the results are sorted at the end, so the order of the
+        // answers does not matter.
+        using var throttle = new SemaphoreSlim(Math.Max(1, parallelism));
+        var work = pairsByRef.Select(async group =>
         {
-            var sentences = group.Select(x => x.Sentence).ToList();
+            await throttle.WaitAsync();
+            try { return await CheckReferenceAsync(chat, group.Key, group.Select(x => x.Sentence).ToList(), byReference, excerptsPerReference, verifiedFindings); }
+            finally { throttle.Release(); }
+        }).ToList();
+        foreach (var task in work) results.AddRange(await task);
+
+        return results.OrderBy(r => r.Field).ThenBy(r => r.SentenceIndex).ThenBy(r => r.Reference).ToList();
+    }
+
+    private static async Task<List<CitationSupportResult>> CheckReferenceAsync(
+        IChatCompletionService chat, int reference, List<CitedSentence> sentences,
+        IReadOnlyDictionary<int, ReferencedPaper> byReference, int excerptsPerReference,
+        IReadOnlyDictionary<int, IReadOnlyList<string>>? verifiedFindings)
+    {
+        var results = new List<CitationSupportResult>();
+        var group = (Key: reference, Count: sentences.Count);
+        {
             if (!byReference.TryGetValue(group.Key, out var paper))
             {
                 results.AddRange(sentences.Select(s => Result(s, group.Key, Unverifiable, "none", "The reference number is not in the reference list.")));
-                continue;
+                return results;
             }
 
             // Evidence: the abstract plus the full-text excerpts most relevant to these sentences.
             var excerpts = new List<(string Label, string Text)>();
             if (!string.IsNullOrWhiteSpace(paper.Abstract)) excerpts.Add(("E1 (abstract)", paper.Abstract.Trim()));
+            // The extraction quotes already found in this paper's text: the passages the synthesis was written from.
+            if (verifiedFindings != null && verifiedFindings.TryGetValue(group.Key, out var findingQuotes))
+                foreach (var q in findingQuotes.Where(q => !string.IsNullOrWhiteSpace(q)).Distinct())
+                    excerpts.Add(($"E{excerpts.Count + 1} (verified extraction quote)", q.Trim()));
             var terms = TextRelevance.Terms(string.Join(" ", sentences.Select(s => s.Sentence)));
             foreach (var chunk in GroundingContextBuilder.SelectChunks(paper.Chunks, terms, excerptsPerReference))
                 excerpts.Add(($"E{excerpts.Count + 1} (page {chunk.PageNumber})", chunk.Text));
@@ -218,7 +247,7 @@ public static class CitationSupportChecker
             if (excerpts.Count == 0)
             {
                 results.AddRange(sentences.Select(s => Result(s, group.Key, Unverifiable, "none", "No abstract or full text was available for this paper.")));
-                continue;
+                return results;
             }
 
             var prompt = new StringBuilder();
@@ -279,8 +308,7 @@ public static class CitationSupportChecker
                 results.AddRange(sentences.Select(s => Result(s, group.Key, Unverifiable, basis, $"Check failed: {ex.GetType().Name}.")));
             }
         }
-
-        return results.OrderBy(r => r.Field).ThenBy(r => r.SentenceIndex).ThenBy(r => r.Reference).ToList();
+        return results;
     }
 
     public record ParsedVerdict(string Verdict, string? Excerpt, string? Quote, string Reason);

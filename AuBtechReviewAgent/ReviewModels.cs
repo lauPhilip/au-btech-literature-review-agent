@@ -70,6 +70,9 @@ public class ReviewState
     // Model, app version, temperatures and prompt fingerprints for this run (details in llm-calls.json).
     public RunSettingsRecord? RunSettings { get; set; }
 
+    // Thematic synthesis: codes, themes, coverage and (optionally) the second coding (also thematic-codebook.json).
+    public ThematicCodebook? ThematicSynthesis { get; set; }
+
     // Set when the run stopped early ("Failed" or "Interrupted" stage), so a returning user sees why.
     public string? FailureMessage { get; set; }
     public DateTime? CompletedUtc { get; set; }
@@ -129,6 +132,12 @@ public class ReviewStats
     public int UncertainDecisions { get; set; }     // Decisions flagged for human attention
     public int InjectionSuspected { get; set; }     // Records whose text contained instruction-like phrases
     public int CacheHits { get; set; }              // Screening decisions and search responses reused from the cache
+    public int ThemesIdentified { get; set; }       // Thematic synthesis: descriptive themes in the codebook
+    public int StudiesCoded { get; set; }           // ...included studies that received at least one code in a theme
+    public int StudiesCitedInSynthesis { get; set; } // Included studies cited at least once in the synthesis or discussion
+    public double? CodingKappa { get; set; }        // Cohen's kappa between the two theme assignments (dual coding only)
+    public int CitationsRepaired { get; set; }      // Cited sentences rewritten by the repair pass after a failed support check
+    public int CitationsOutsideTheme { get; set; }  // Citations in a theme subsection of a study not coded under that theme
 }
 
 public class ReviewPhases 
@@ -206,7 +215,13 @@ public class PeerReviewLog
     public string SynthesisAfter { get; set; } = "";
     public string DiscussionBefore { get; set; } = "";
     public string DiscussionAfter { get; set; } = "";
+
+    // Thematic synthesis: the review is applied per subsection; each revision is listed with whether it was kept.
+    public List<SectionRevision> SectionRevisions { get; set; } = new();
 }
+
+/// <summary>A peer-review or coverage revision of one section, and whether the guard in code accepted it.</summary>
+public record SectionRevision(string Section, string Before, string After, bool Applied, string Note);
 
 public class PrismaReport
 {
@@ -243,6 +258,28 @@ public class PrismaReport
 
     // PRISMA item 24: where the protocol is and when it was written.
     public string ProtocolItem { get; set; } = "";
+
+    // PRISMA item 13d: how the findings were synthesised (written in code from the thematic codebook).
+    public string SynthesisMethodsItem { get; set; } = "";
+
+    // One subsection per theme of the thematic synthesis, shown after SynthesisResultsItem (the overview).
+    // Empty for runs made before thematic synthesis, or when it fell back to a single synthesis text.
+    public List<SynthesisSection> SynthesisSections { get; set; } = new();
+
+    // How many of the included studies the synthesis and discussion cite, and which ones they do not (and why).
+    public string CoverageSummary { get; set; } = "";
+}
+
+/// <summary>
+/// One theme subsection of the synthesis. <see cref="Field"/> is the name the citation check records for its
+/// sentences ("synthesis-1", "synthesis-2", ...), so a clicked [n] finds its verdict.
+/// </summary>
+public class SynthesisSection
+{
+    public string Field { get; set; } = "";
+    public string ThemeId { get; set; } = "";
+    public string Heading { get; set; } = "";
+    public string Text { get; set; } = "";
 }
 
 /// <summary>Everything the user chose in the dashboard for one run.</summary>

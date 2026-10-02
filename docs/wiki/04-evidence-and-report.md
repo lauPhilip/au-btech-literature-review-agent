@@ -17,11 +17,17 @@ flowchart TD
     GC --> OUT["Outline: themes, claims, [n]"]
     OUT --> DR["Report draft (JSON items)"]
     DR --> ST["Style pass: abstract,<br/>rationale, objectives"]
-    DR --> CS["Cited synthesis + discussion"]
-    CS --> PRV["Automated peer review:<br/>critique, then revise"]
+    EX --> COD["Thematic coding<br/>codes anchored to verified findings"]
+    COD --> CB["Codebook: themes from codes<br/>(+ optional second coding, kappa)"]
+    CB --> TS["One cited subsection per theme<br/>+ coverage fill pass"]
+    TS --> DIS["Discussion from the subsections"]
+    DIS --> PRV["Automated peer review per section<br/>(revision may not drop a citation)"]
+    DR -. "fallback when coding fails" .-> CS["Single-pass cited synthesis + discussion"]
+    CS -.-> PRV
     PRV --> RV["CitationValidator:<br/>remove [n] outside the list"]
     RV --> SC["CitationSupportChecker:<br/>verdict + verbatim quote per sentence"]
-    ST & SC --> REP["prisma-report.json<br/>+ audit files"]
+    SC --> RP["Citation repair: rewrite or drop<br/>rejected citations, check again"]
+    ST & RP --> REP["prisma-report.json, thematic-codebook.json<br/>+ audit files"]
 ```
 
 ## Full text
@@ -42,28 +48,50 @@ flowchart TD
 
 `GeneratePrismaChecklistReportWithRAGAsync` produces the PRISMA items. It is long, but it is a straight sequence:
 
-1. **Grounded context.** `GroundingContextBuilder.Build` gives every included paper its abstract plus an equal share of its most relevant chunks, each labelled with the paper's reference number, so one long PDF cannot crowd out the other papers.
+1. **Grounded context.** `GroundingContextBuilder.Build` gives every included paper its abstract plus an equal share of its most relevant chunks, each labelled with the paper's reference number, so one long PDF cannot crowd out the other papers. The total budget is about two chunks per paper (at least 40, at most 120), so a large review does not leave most papers with one chunk or none.
 2. **Outline** (`GenerateGroundedOutlineAsync`). Before any prose, the model maps the evidence into themes, each with specific claims and the reference numbers that support them. It is saved as `grounded-outline.txt` and fed into the writing steps.
 3. **Draft.** One call returns a JSON object with the title, abstract, rationale, objectives, synthesis and discussion, followed by a Mermaid and a TikZ diagram between `[MERMAID_START]`/`[TIKZ_START]` markers. The Mermaid source is cleaned by `MermaidSanitizer` before it is rendered.
 4. **Methods from data.** The eligibility, information sources, search strategy, selection process, data-collection and protocol items are written in code by `MethodsSectionWriter` from the run's own numbers, not by the model.
 5. **Style.** `StylisticRefinerUtility` rewrites the abstract, rationale and objectives into plainer academic prose, and every before/after pair goes into `stylistic-transformation-ledger.json`.
-6. **Cited sections** (`GenerateCitedSectionsAsync`). The synthesis and discussion are rewritten against the outline so that every specific claim ends with an `[n]` from the reference list.
-7. **Automated peer review** (`PeerReviewAndReviseAsync`). One call critiques the two sections for depth, coverage, grounding and over-claiming; a second revises them. Comments and before/after text go into `peer-review-feedback.json`. If the revision fails, the original text is kept and the file says so.
-8. **Citation checks,** described below.
-9. **Save.** The items are assembled into a `PrismaReport` and written to `prisma-report.json`. If anything in this method throws, a report with the error is written instead and the run's `FailureMessage` explains it.
+6. **Thematic synthesis** (`RunThematicSynthesisAsync`, described in the next section). The results are written as one cited subsection per theme, and the discussion is written from those subsections. When `Synthesis:ThematicSynthesis` is off, or coding fails, the run falls back to **cited sections** (`GenerateCitedSectionsAsync`): one call writes the synthesis and discussion against the outline, with a length that grows with the number of included studies (3 to 8 paragraphs of synthesis, 3 to 5 of discussion). The reason for a fallback is recorded in `thematic-codebook.json` and in the synthesis-methods text.
+7. **Automated peer review.** One call critiques the sections for depth, citation coverage, grounding and over-claiming, and each section with medium or high comments is revised (`PeerReviewSectionsAsync`; in the fallback, `PeerReviewAndReviseAsync` revises the two sections). A revision that drops a citation the section had, or cites outside the reference list, is rejected by `ThematicSynthesis.RevisionProblem` and the original is kept. Comments, before/after text and every accepted or rejected revision go into `peer-review-feedback.json`.
+8. **Citation checks and repair,** described below.
+9. **Save.** The items are assembled into a `PrismaReport` and written to `prisma-report.json`. The synthesis overview is `SynthesisResultsItem`, the theme subsections are `SynthesisSections`, the synthesis methods (PRISMA item 13d) are `SynthesisMethodsItem`, written in code by `ThematicSynthesis.MethodsText`, and `CoverageSummary` says how many included studies the text cites and why the others are not cited. If anything in this method throws, a report with the error is written instead and the run's `FailureMessage` explains it.
 
-## The two citation checks
+## Thematic synthesis
+
+A single call that writes the whole synthesis cannot use seventy papers: the outline it worked from allowed at most eighteen claims, and the text was six paragraphs long. The thematic synthesis follows Thomas and Harden (2008), the usual method for synthesising findings in systematic reviews, and spreads the writing over one call per theme so every included study has a place. Each step is in `ThematicSynthesis.cs` (coding, codebook, second coding, guards and text from data) or `PrismaReviewEngine.Thematic.cs` (writing, peer review, repair).
+
+**Coding** (`CodeStudiesAsync`, stage `thematic-coding`, temperature 0). Studies are coded a few at a time (`Synthesis:CodingBatchSize`). The model sees each study's key findings whose quotes `StudyExtractor` found in the paper, numbered `F{ref}.{i}`, and gives one to four short codes, each naming the findings it comes from. A study without verified findings is coded from its abstract, and its code must quote the abstract verbatim; the quote is checked with `QuoteOccursIn`. Each code records its anchor ("verified finding", "verified quote" or "unanchored"), so a reader can see which codes rest on checked evidence. A finding id that belongs to another study gets the answer rejected and asked again. A study with nothing that bears on the objective is recorded with the model's reason.
+
+**Codebook** (`BuildCodebookAsync`, stage `thematic-codebook`). The codes are grouped into descriptive themes, about one per three to six studies and at most `Synthesis:MaxThemes`. Which studies belong to a theme is derived in code from its codes, never taken from the model. The answer is rejected until every coded study is either in a theme or has its codes explicitly left out with a reason (`StudiesWithoutTheme`), so no study disappears silently between coding and writing.
+
+**Second coding** (`SecondCodingAsync`, optional with `Synthesis:DualCoding`). A second, independent prompt sees only the theme names and descriptions and each study's codes, and assigns the studies to themes. Agreement with the first assignment is Cohen's kappa over every study × theme decision (`CompareCodings`, the same maths as dual screening). It is reported, with every disagreement, and does not change the themes.
+
+**Subsections** (`WriteThemeAsync`, stages `theme-sections` and `coverage-fill`). Each theme is written from its own studies only: their codes, verified findings with quotes, and one or two excerpts chosen for the theme. The prompt asks for about one paragraph per four studies (1 to 8) and for every study of the theme to be cited. Code then compares the cited numbers with the theme's studies; if some are missing, one fill pass gives the model their evidence and asks it to integrate them. The fill pass goes through the same revision guard, so it can add citations but never lose one. The themes are written in parallel and assembled in codebook order. `ThemeCoverage` in the codebook records, per theme, which studies were cited after writing, after the fill pass and in the final text.
+
+**Discussion** (`WriteDiscussionAsync`, stage `discussion`). Written from the finished subsections, with facts about the evidence base taken from the extraction (how many studies were read in full text, how many are not empirical, the most common study types) so the limitations paragraph does not have to guess. Its length grows with the number of themes (3 to 6 paragraphs).
+
+The codebook, coverage, second coding and the list of studies not cited (with the reason) are saved as `thematic-codebook.json` and as `ReviewState.ThematicSynthesis`. The Review Output page and `main.tex` show them as an evidence map (themes × studies).
+
+## The citation checks
 
 The **range check** (`CitationValidator.ValidateAndStrip`) removes any `[n]` that is not in the reference list, and records each removal. It guarantees that every marker points somewhere real, but not that the paper it points to says what the sentence claims.
 
-The **support check** (`CitationSupportChecker`) closes that gap. `ExtractCitedSentences` splits the synthesis and discussion into sentences and keeps those with markers (ranges like `[2-4]` are expanded). For every cited reference, the sentences citing it are sent to the model with the most relevant excerpts of that paper, and the model must answer per sentence with a verdict (supported, partially supported, not supported) and a verbatim quote. `QuoteOccursIn` then checks the quote in code: both strings are normalised (Unicode NFKC, lower case, letters and digits only), and a quote shortened with "…" must have all its parts in order. A verdict whose quote cannot be found becomes "unverifiable". Nothing is removed from the report; the verdicts and quotes go into `citation-audit.json`, the counts into `ReviewStats`, and the Review Output page shows the verdict when a citation is clicked. The page uses the same sentence split as the checker, so a clicked `[n]` in sentence *i* finds the verdict recorded for sentence *i*.
+The **support check** (`CitationSupportChecker`) closes that gap. `ExtractCitedSentences` splits the synthesis and discussion into sentences and keeps those with markers (ranges like `[2-4]` are expanded). For every cited reference, the sentences citing it are sent to the model with the paper's abstract, its verified extraction quotes (the passages the synthesis was written from) and its most relevant full-text excerpts, and the model must answer per sentence with a verdict (supported, partially supported, not supported) and a verbatim quote. `QuoteOccursIn` then checks the quote in code: both strings are normalised (Unicode NFKC, lower case, letters and digits only), and a quote shortened with "…" must have all its parts in order. A verdict whose quote cannot be found becomes "unverifiable". References are checked a few at a time (`Llm:ScreeningParallelism`) and the results are sorted afterwards, so the order does not depend on which call answered first. Every section is its own field (`synthesisResultsItem` for the overview, `synthesis-1`, `synthesis-2`, ... for the themes, `discussionItem`), and the Review Output page uses the same sentence split as the checker, so a clicked `[n]` in sentence *i* of a section finds the verdict recorded for sentence *i* of that section.
+
+The **repair pass** (`RepairCitationsAsync`, stage `citation-repair`, `Synthesis:RepairCitations`) acts on the citations judged not supported, and on positive verdicts whose quote could not be found. One call per section shows the model each flagged sentence with the cited paper's evidence and the checker's reason, and asks for one of three actions: rewrite the sentence so it says what the evidence says, drop the flagged citation (done in code by `RemoveReference`), or delete the sentence. A rewrite may keep or remove the sentence's own citations but never add one, so a repair cannot move a claim onto a different paper. Changed sentences are checked again; unchanged sentences keep their verdict. Every repair, with the sentence before and after and the original verdicts, is listed under `Repairs` in `citation-audit.json`, next to the summary before (`InitialSupportSummary`) and after (`SupportSummary`) the repair. Nothing is removed silently: the report's citation-check paragraph says how many citations were not supported before the repair and how many sentences were changed.
+
+A theme subsection that cites a study not coded under that theme is flagged in the audit (`ThemeNote`) and counted in `ReviewStats.CitationsOutsideTheme`; it is not removed, because a study can legitimately be compared across themes, but a reader can see it.
 
 ## Where to look when a report looks wrong
 
 | Symptom | Look in | Likely place in the code |
 |---|---|---|
 | A claim is not in the cited paper | `citation-audit.json` (verdict and quote) | Cited sections prompt, peer review, `CitationSupportChecker` |
-| A theme is missing from the synthesis | `grounded-outline.txt` vs. the synthesis | `GenerateCitedSectionsAsync` |
+| A theme is missing from the synthesis | `thematic-codebook.json` (themes, `FallbackReason`) | `BuildCodebookAsync`, `RunThematicSynthesisAsync` |
+| An included study is never cited | `thematic-codebook.json` (`Uncoded`, `Coverage`, `NotCited`) | Coding prompt, `WriteThemeAsync` fill pass |
+| A citation was changed or dropped | `citation-audit.json` (`Repairs`) | `RepairCitationsAsync` |
 | An extraction value looks invented | `extraction.json` (`QuoteVerified`) | `StudyExtractor` |
 | Methods text disagrees with the funnel | `transparent-process.json` stats | `MethodsSectionWriter` |
 | A study has no full text | `FullTextSources` in the ledger | `DocumentRAGUtility` |
