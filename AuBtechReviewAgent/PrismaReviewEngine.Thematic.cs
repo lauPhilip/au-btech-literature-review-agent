@@ -34,6 +34,8 @@ public partial class PrismaReviewEngine
     private sealed class TextAnswer { public string? Text { get; set; } }
     private sealed class SectionCritiqueAnswer { public List<CritiqueComment>? Comments { get; set; } }
     private sealed class RepairAnswer { public List<RepairItem>? Repairs { get; set; } }
+    /// <summary>The repair answers for one section, or why the repair call failed.</summary>
+    private sealed record RepairBatch(string Field, List<(int Id, string Sentence, List<CitationSupportResult> Checks)> Items, List<RepairItem> Answers, string? Error);
     private sealed class RepairItem { public int Id { get; set; } public string Action { get; set; } = ""; public string? Sentence { get; set; } public string? Reason { get; set; } }
 
     /// <summary>One sentence changed (or left alone) by the citation repair pass, as written to citation-audit.json.</summary>
@@ -534,11 +536,11 @@ public partial class PrismaReviewEngine
                     var answer = await LlmJson.GetAsync<RepairAnswer>(chat, prompt, JsonMode(0.0), a =>
                         a.Repairs == null ? "repairs must be a list." :
                         a.Repairs.Any(r => !LlmJson.OneOf(r.Action, "rewrite", "drop_citation", "delete")) ? "each action must be rewrite, drop_citation or delete." : null);
-                    return (group.Key, items, answer.Repairs!, null);
+                    return new RepairBatch(group.Key, items, answer.Repairs!, null);
                 }
                 catch (Exception ex)
                 {
-                    return (group.Key, items, new List<RepairItem>(), $"Repair call failed ({ex.GetType().Name}).");
+                    return new RepairBatch(group.Key, items, new List<RepairItem>(), $"Repair call failed ({ex.GetType().Name}).");
                 }
             }
             finally { throttle.Release(); }
