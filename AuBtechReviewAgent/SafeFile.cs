@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 
 namespace AuBtechReviewAgent;
 
@@ -15,6 +16,20 @@ namespace AuBtechReviewAgent;
 /// </summary>
 public static class SafeFile
 {
+    /// <summary>
+    /// Removes a leftover temporary copy. If even that is locked, the copy stays behind: it is ignored by
+    /// everything that reads the run folder and goes with the folder when the run is deleted, so it is logged
+    /// instead of failing a save that has already succeeded.
+    /// </summary>
+    private static void DeleteQuietly(string tmp)
+    {
+        try { File.Delete(tmp); }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            AppLog.For(nameof(SafeFile)).LogDebug("Temporary file {File} could not be removed: {Message}", Path.GetFileName(tmp), ex.Message);
+        }
+    }
+
     public static async Task WriteAllTextAsync(string path, string content, int attempts = 6, CancellationToken cancellationToken = default)
     {
         string tmp = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
@@ -44,7 +59,7 @@ public static class SafeFile
                 }
                 finally
                 {
-                    try { File.Delete(tmp); } catch (IOException) { } catch (UnauthorizedAccessException) { }
+                    DeleteQuietly(tmp);
                 }
             }
         }

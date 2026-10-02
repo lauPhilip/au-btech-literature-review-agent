@@ -79,7 +79,12 @@ public class ReviewArtifact
     public void SetText(string field, string text)
     {
         var n = Regex.Match(field, @"^artifact-n(\d+)$");
-        if (n.Success) { int i = int.Parse(n.Groups[1].Value) - 1; if (i < Nodes.Count) Nodes[i].Label = text; return; }
+        if (n.Success)
+        {
+            int i = int.Parse(n.Groups[1].Value) - 1;
+            if (i < Nodes.Count) Nodes[i].Label = text;
+            return;
+        }
         var rc = Regex.Match(field, @"^artifact-r(\d+)c(\d+)$");
         if (rc.Success)
         {
@@ -88,7 +93,11 @@ public class ReviewArtifact
             return;
         }
         var b = Regex.Match(field, @"^artifact-b(\d+)$");
-        if (b.Success) { int i = int.Parse(b.Groups[1].Value) - 1; if (i < Bullets.Count) Bullets[i] = text; }
+        if (b.Success)
+        {
+            int i = int.Parse(b.Groups[1].Value) - 1;
+            if (i < Bullets.Count) Bullets[i] = text;
+        }
     }
 }
 
@@ -195,14 +204,16 @@ public static class ArtifactBuilder
                 var ids = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
                 foreach (var node in answer.Nodes!.Take(MaxNodes))
                 {
-                    if (ids.ContainsKey(node.Id.Trim())) continue;
-                    ids[node.Id.Trim()] = $"n{ids.Count + 1}";
-                    artifact.Nodes.Add(new ArtifactNode { Id = ids[node.Id.Trim()], Label = Clean(node.Label, 200) });
+                    string modelId = node.Id.Trim();
+                    string id = $"n{ids.Count + 1}";
+                    if (!ids.TryAdd(modelId, id)) continue; // a repeated id: the first box with it wins
+                    artifact.Nodes.Add(new ArtifactNode { Id = id, Label = Clean(node.Label, 200) });
                 }
-                artifact.Edges = (answer.Edges ?? new()).Take(MaxEdges)
-                    .Where(e => ids.ContainsKey(e.From.Trim()) && ids.ContainsKey(e.To.Trim()))
-                    .Select(e => new ArtifactEdge { From = ids[e.From.Trim()], To = ids[e.To.Trim()], Label = Clean(e.Label, 60) })
-                    .ToList();
+                foreach (var edge in (answer.Edges ?? new()).Take(MaxEdges))
+                {
+                    if (ids.TryGetValue(edge.From.Trim(), out var from) && ids.TryGetValue(edge.To.Trim(), out var to))
+                        artifact.Edges.Add(new ArtifactEdge { From = from, To = to, Label = Clean(edge.Label, 60) });
+                }
             }
             else if (kind == ArtifactKinds.Table)
             {
