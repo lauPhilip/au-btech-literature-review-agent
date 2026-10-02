@@ -1,0 +1,111 @@
+@using System.Globalization
+@implements IDisposable
+
+@* Live progress of one run: overall bar, current step with detail, elapsed time and the list of steps.
+   The numbers come from ReviewStats (set by the engine through RunProgress); this component only shows them. *@
+
+@{
+    int percent = AuBtechReviewAgent.RunProgress.Percent(Stats);
+    bool complete = Stage == AuBtechReviewAgent.PrismaReviewEngine.StageComplete;
+    bool failed = Stage is AuBtechReviewAgent.PrismaReviewEngine.StageFailed or AuBtechReviewAgent.PrismaReviewEngine.StageInterrupted;
+    var plan = Stats.ProgressPlan.Count > 0 ? Stats.ProgressPlan : AuBtechReviewAgent.RunProgress.Plan(false, false);
+    string barColor = failed ? "bg-red-600" : complete ? "bg-green-600" : "bg-[#003B5C]";
+}
+
+<div class="bg-white border border-gray-200 rounded-lg p-3 shadow-sm flex-none text-left space-y-2">
+    <div class="flex items-center justify-between gap-2">
+        <span class="text-[10px] font-bold uppercase tracking-wider text-gray-400">Progress</span>
+        <span class="text-[11px] font-mono text-gray-600">@(failed ? "stopped" : $"{percent}%")@(Elapsed is { } e ? $" · {e}" : "")</span>
+    </div>
+
+    <div class="w-full h-2 bg-gray-100 rounded-full overflow-hidden" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="@percent" aria-label="Run progress">
+        <div class="h-full @barColor rounded-full transition-all duration-500 @(Running && !complete && !failed && percent == 0 ? "animate-pulse w-1/12" : "")" style="@(percent > 0 || complete ? $"width:{(complete ? 100 : percent)}%" : "")"></div>
+    </div>
+
+    <p class="text-[11px] text-gray-700 leading-snug" aria-live="polite">
+        <span class="font-semibold">@CurrentLabel()</span>
+        @if (!string.IsNullOrWhiteSpace(CurrentDetail()))
+        {
+            <span class="text-gray-500"> · @CurrentDetail()</span>
+        }
+    </p>
+
+    <ol class="flex flex-wrap gap-x-3 gap-y-1">
+        @foreach (var step in plan)
+        {
+            string state = failed && AuBtechReviewAgent.RunProgress.StateOf(Stats, step) == "current" ? "failed" : AuBtechReviewAgent.RunProgress.StateOf(Stats, step);
+            <li class="flex items-center gap-1 text-[10px] @(state == "current" ? "text-[#003B5C] font-semibold" : state == "done" ? "text-gray-600" : "text-gray-400")">
+                @switch (state)
+                {
+                    case "done":
+                        <svg class="w-3 h-3 text-green-600" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M16.7 5.3a1 1 0 010 1.4l-8 8a1 1 0 01-1.4 0l-4-4a1 1 0 111.4-1.4L8 12.6l7.3-7.3a1 1 0 011.4 0z" clip-rule="evenodd" /></svg>
+                        break;
+                    case "current":
+                        <span class="inline-block w-2.5 h-2.5 border-2 border-[#003B5C] border-t-transparent rounded-full @(Running ? "animate-spin" : "")" aria-hidden="true"></span>
+                        break;
+                    case "failed":
+                        <span class="inline-block w-2.5 h-2.5 rounded-full bg-red-600" aria-hidden="true"></span>
+                        break;
+                    default:
+                        <span class="inline-block w-2.5 h-2.5 rounded-full border border-gray-300" aria-hidden="true"></span>
+                        break;
+                }
+                <span>@(AuBtechReviewAgent.RunProgress.Steps.TryGetValue(step, out var d) ? d.Label : step)</span>
+                <span class="sr-only">(@state)</span>
+            </li>
+        }
+    </ol>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public AuBtechReviewAgent.ReviewStats Stats { get; set; } = new();
+    [Parameter] public string Stage { get; set; } = "";
+    [Parameter] public bool Running { get; set; }
+    [Parameter] public int QueuePosition { get; set; }
+    [Parameter] public DateTime? CompletedUtc { get; set; }
+
+    private System.Threading.Timer? _timer;
+
+    protected override void OnParametersSet()
+    {
+        // Tick once a second while the run is going, so the elapsed time moves between engine updates.
+        if (Running && _timer == null)
+            _timer = new System.Threading.Timer(_ => InvokeAsync(StateHasChanged), null, 1000, 1000);
+        else if (!Running && _timer != null)
+        {
+            _timer.Dispose();
+            _timer = null;
+        }
+    }
+
+    private string? Elapsed
+    {
+        get
+        {
+            if (Stats.RunStartedUtc is not DateTime started) return null;
+            var span = (CompletedUtc ?? DateTime.UtcNow) - started;
+            if (span < TimeSpan.Zero) return null;
+            return span.TotalHours >= 1 ? $"{(int)span.TotalHours} h {span.Minutes} min"
+                 : span.TotalMinutes >= 1 ? $"{(int)span.TotalMinutes} min {span.Seconds:00} s"
+                 : $"{span.Seconds} s";
+        }
+    }
+
+    private string CurrentLabel()
+    {
+        if (Stage == AuBtechReviewAgent.PrismaReviewEngine.StageQueued)
+            return QueuePosition > 0 ? $"Waiting for a free run slot (number {QueuePosition} in line)" : "Waiting for a free run slot";
+        if (Stage == AuBtechReviewAgent.PrismaReviewEngine.StageAwaitingReview) return "Waiting for your screening decisions";
+        if (Stage == AuBtechReviewAgent.PrismaReviewEngine.StageComplete) return "Review complete";
+        if (Stage == AuBtechReviewAgent.PrismaReviewEngine.StageFailed) return "The run stopped with an error";
+        if (Stage == AuBtechReviewAgent.PrismaReviewEngine.StageInterrupted) return "The run was interrupted";
+        return AuBtechReviewAgent.RunProgress.Steps.TryGetValue(Stats.ProgressStep, out var d) ? d.Label : "Starting";
+    }
+
+    private string CurrentDetail() =>
+        Stage == AuBtechReviewAgent.PrismaReviewEngine.StageAwaitingReview ? "use the panel on the right, then submit"
+        : Stage is AuBtechReviewAgent.PrismaReviewEngine.StageComplete or AuBtechReviewAgent.PrismaReviewEngine.StageQueued ? ""
+        : Stats.ProgressDetail;
+
+    public void Dispose() => _timer?.Dispose();
+}
