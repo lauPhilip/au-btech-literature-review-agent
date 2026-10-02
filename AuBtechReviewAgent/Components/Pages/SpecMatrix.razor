@@ -36,6 +36,7 @@
             <a href="/" class="text-white/70 hover:text-white transition-colors py-4">Overview</a>
             <a href="@(State.CurrentSessionId != Guid.Empty ? $"/review/{State.CurrentSessionId}" : "/review")" class="text-white/70 hover:text-white transition-colors py-4">Dashboard</a>
             <a href="@(State.CurrentSessionId != Guid.Empty ? $"/spec-matrix/{State.CurrentSessionId}" : "/spec-matrix")" class="text-white border-b-2 border-white py-4">Review Output</a>
+            <a href="/metrics" class="text-white/70 hover:text-white transition-colors py-4">Metrics</a>
         </nav>
     </div>
 </header>
@@ -49,6 +50,7 @@
             {
                 <a href="@($"/api/workspace/{State.CurrentSessionId}/protocol.md")" target="_blank" class="bg-white text-[#003B5C] text-xs font-bold uppercase tracking-wider px-3 py-2 rounded shadow hover:bg-gray-100 transition-all" title="The review plan written before the search started">Protocol</a>
             }
+            <a href="@($"/review?from={State.CurrentSessionId}")" class="bg-white text-[#003B5C] text-xs font-bold uppercase tracking-wider px-3 py-2 rounded shadow hover:bg-gray-100 transition-all" title="Open the dashboard with this run's question, criteria and options filled in">New review from these settings</a>
             <a href="@($"/api/workspace/{State.CurrentSessionId}/references.bib")" target="_blank" class="bg-white text-[#003B5C] text-xs font-bold uppercase tracking-wider px-3 py-2 rounded shadow hover:bg-gray-100 transition-all">BibTeX</a>
             <a href="@($"/api/workspace/{State.CurrentSessionId}/references.ris")" target="_blank" class="bg-white text-[#003B5C] text-xs font-bold uppercase tracking-wider px-3 py-2 rounded shadow hover:bg-gray-100 transition-all">RIS (Zotero / EndNote)</a>
             <button @onclick="TriggerZipArchiveDownload" class="bg-[#003B5C] text-white text-xs font-bold uppercase tracking-wider px-4 py-2 rounded shadow hover:bg-opacity-95 transition-all flex items-center gap-2">
@@ -87,6 +89,23 @@
     }
     else
     {
+        @if (AttentionList is { Count: > 0 } attention)
+        {
+            <div class="sticky top-0 z-40 w-full max-w-[8.5in] mb-3 bg-white/95 backdrop-blur border border-amber-200 rounded shadow px-3 py-2 flex flex-wrap items-center justify-between gap-2 font-sans text-xs print:hidden">
+                <span class="text-gray-800">
+                    <span class="font-semibold text-amber-800">@attention.Count @(attention.Count == 1 ? "citation needs" : "citations need") your attention</span>
+                    <span class="text-gray-500"> · @attention.Count(c => c.Verdict == AuBtechReviewAgent.CitationSupportChecker.NotSupported) not supported, @attention.Count(c => c.Verdict == AuBtechReviewAgent.CitationSupportChecker.Partial) partly supported</span>
+                </span>
+                <span class="flex items-center gap-2">
+                    @if (attentionIndex >= 0)
+                    {
+                        <span class="text-gray-500 font-mono">@(attentionIndex + 1) / @attention.Count</span>
+                    }
+                    <button type="button" class="px-2 py-1 border border-gray-300 rounded hover:bg-gray-50" @onclick="() => StepAttention(-1)">Previous</button>
+                    <button type="button" class="px-2 py-1 bg-[#003B5C] text-white rounded hover:bg-opacity-95" @onclick="() => StepAttention(1)">@(attentionIndex < 0 ? "Show the first" : "Next")</button>
+                </span>
+            </div>
+        }
         <article class="w-full max-w-[8.5in] bg-white shadow-2xl p-6 md:p-[1in] text-gray-900 font-serif text-[11pt] leading-relaxed mx-auto border border-gray-300 print:shadow-none print:border-none print:p-0 overflow-visible">
 
             <div class="text-center space-y-3 mb-8 font-sans print:space-y-2">
@@ -453,11 +472,73 @@
                         <p class="text-gray-600 text-[11px] italic border-l-2 border-[#003B5C] pl-2 mt-2">@report.CoverageSummary</p>
                     }
 
-                    @if (!string.IsNullOrEmpty(mermaidDiagramCode))
+                    @if (report.Artifact is { } art)
+                    {
+                        <div class="mt-5 border border-gray-200 rounded p-3 space-y-2 font-sans">
+                            <span class="text-[10px] font-bold text-gray-500 uppercase block">Artifact: @(string.IsNullOrWhiteSpace(art.Title) ? AuBtechReviewAgent.ArtifactKinds.All.FirstOrDefault(k => k.Key == art.Requested).Label : art.Title)</span>
+                            @if (art.Error != null)
+                            {
+                                <p class="text-[11px] text-gray-600 italic">@art.Error</p>
+                            }
+                            else
+                            {
+                                @if (!string.IsNullOrWhiteSpace(art.Caption))
+                                {
+                                    <p class="text-[11px] text-gray-600">@art.Caption</p>
+                                }
+                                @if (art.IsDiagram && !string.IsNullOrEmpty(mermaidDiagramCode))
+                                {
+                                    @* Filled by wwwroot/js/mermaid-render.js; Blazor leaves the empty element alone. *@
+                                    <div id="mermaid-preview" class="w-full flex flex-col items-center justify-center text-center bg-gray-50 rounded p-3 overflow-x-auto"></div>
+                                    @if (art.Nodes.Any(n => AuBtechReviewAgent.CitationSupportChecker.ReferencesIn(n.Label).Count > 0))
+                                    {
+                                        <span class="text-[10px] font-bold text-gray-500 uppercase block pt-1">Cited boxes in the diagram</span>
+                                        @for (int k = 0; k < art.Nodes.Count; k++)
+                                        {
+                                            if (AuBtechReviewAgent.CitationSupportChecker.ReferencesIn(art.Nodes[k].Label).Count == 0) continue;
+                                            @CitedText($"artifact-n{k + 1}", art.Nodes[k].Label)
+                                        }
+                                    }
+                                }
+                                else if (art.Kind == AuBtechReviewAgent.ArtifactKinds.Table)
+                                {
+                                    <div class="overflow-x-auto">
+                                        <table class="w-full text-[11px] border border-gray-200 align-top">
+                                            <thead class="bg-gray-50 text-gray-600 text-left">
+                                                <tr>@foreach (var col in art.Columns) { <th class="p-1.5 border-b border-gray-200">@col</th> }</tr>
+                                            </thead>
+                                            <tbody>
+                                                @for (int r = 0; r < art.Rows.Count; r++)
+                                                {
+                                                    int row = r;
+                                                    <tr class="border-t border-gray-100 align-top">
+                                                        @for (int c = 0; c < art.Rows[row].Count; c++)
+                                                        {
+                                                            <td class="p-1.5">@CitedText($"artifact-r{row + 1}c{c + 1}", art.Rows[row][c])</td>
+                                                        }
+                                                    </tr>
+                                                }
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                }
+                                else
+                                {
+                                    <ul class="list-disc pl-5 space-y-1">
+                                        @for (int b = 0; b < art.Bullets.Count; b++)
+                                        {
+                                            <li>@CitedText($"artifact-b{b + 1}", art.Bullets[b])</li>
+                                        }
+                                    </ul>
+                                }
+                            }
+                        </div>
+                    }
+                    else if (!string.IsNullOrEmpty(mermaidDiagramCode))
                     {
                         <div class="mt-4 border border-gray-200 p-4 rounded bg-gray-50 flex flex-col items-center justify-center font-sans print:hidden">
-                            <span class="text-[9px] font-bold text-gray-400 block mb-3 uppercase tracking-widest">Artifact (Live Preview)</span>
-                            @* Filled by wwwroot/js/mermaid-render.js; Blazor leaves the empty element alone. *@
+                            <span class="text-[9px] font-bold text-gray-400 block mb-3 uppercase tracking-widest">Diagram</span>
+                            @* Older runs: the diagram the report draft wrote. *@
                             <div id="mermaid-preview" class="w-full flex flex-col items-center justify-center text-center"></div>
                         </div>
                     }
@@ -663,7 +744,7 @@
                         int reference = refs[r];
                         var check = FindCheck(field, sentenceIndex, reference);
                         bool isOpen = openCitation == (field, sentenceIndex, reference);
-                        <button type="button" class="font-mono underline decoration-dotted @VerdictText(check?.Verdict) @(isOpen ? "bg-yellow-100" : "")"
+                        <button type="button" id="@CiteId(field, sentenceIndex, reference)" class="font-mono underline decoration-dotted @VerdictText(check?.Verdict) @(isOpen ? "bg-yellow-100" : "")"
                                 title="@(check == null ? "Not checked" : VerdictLabel(check.Verdict))"
                                 @onclick="() => ToggleCitation(field, sentenceIndex, reference)">@reference</button>
                         @(r < refs.Count - 1 ? ", " : "")
@@ -722,6 +803,36 @@
 
     private AuBtechReviewAgent.CitationSupportResult? FindCheck(string field, int sentence, int reference) =>
         auditChecks.FirstOrDefault(c => c.Field == field && c.SentenceIndex == sentence && c.Reference == reference);
+
+    private static string CiteId(string field, int sentence, int reference) => $"cite-{field}-{sentence}-{reference}";
+
+    // Citations that need a reader's attention (partly or not supported), in the order they appear in the report.
+    private List<AuBtechReviewAgent.CitationSupportResult> AttentionList => auditChecks
+        .Where(c => c.Verdict is AuBtechReviewAgent.CitationSupportChecker.Partial or AuBtechReviewAgent.CitationSupportChecker.NotSupported)
+        .OrderBy(c => FieldRank(c.Field)).ThenBy(c => c.SentenceIndex).ThenBy(c => c.Reference).ToList();
+    private int attentionIndex = -1;
+
+    private int FieldRank(string field)
+    {
+        if (field == "synthesisResultsItem") return 0;
+        int section = report.SynthesisSections.FindIndex(s => s.Field == field);
+        if (section >= 0) return 1 + section;
+        if (field.StartsWith("artifact-", StringComparison.Ordinal)) return 1000;
+        return field == "discussionItem" ? 2000 : 3000;
+    }
+
+    private async Task StepAttention(int delta)
+    {
+        var list = AttentionList;
+        if (list.Count == 0) return;
+        attentionIndex = ((attentionIndex < 0 && delta < 0 ? 0 : attentionIndex) + delta + list.Count) % list.Count;
+        var c = list[attentionIndex];
+        openCitation = (c.Field, c.SentenceIndex, c.Reference);
+        StateHasChanged();
+        try { await JS.InvokeAsync<bool>("traceableReview.scrollTo", CiteId(c.Field, c.SentenceIndex, c.Reference)); }
+        catch (JSException) { }
+        catch (JSDisconnectedException) { }
+    }
 
     private void ToggleCitation(string field, int sentence, int reference) =>
         openCitation = openCitation == (field, sentence, reference) ? null : (field, sentence, reference);
@@ -834,7 +945,11 @@
         proceedingsCount = tableRecords.Count(r => r.VenueType == "Proceedings");
         preprintCount = tableRecords.Count - journalCount - transactionsCount - conferenceCount - proceedingsCount;
 
-        if (!string.IsNullOrEmpty(report.SynthesisResultsItem))
+        if (report.Artifact is { IsDiagram: true, Error: null } artifactDiagram)
+        {
+            mermaidDiagramCode = artifactDiagram.Mermaid;
+        }
+        else if (!string.IsNullOrEmpty(report.SynthesisResultsItem))
         {
             var mermaidMatch = Regex.Match(report.SynthesisResultsItem, @"\[MERMAID_START\](.*?)\[MERMAID_END\]", RegexOptions.Singleline);
             // Older runs stored the model's diagram unrepaired; clean it here as well.

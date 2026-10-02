@@ -336,6 +336,12 @@ public partial class PrismaReviewEngine
             sb.Append(EvidenceMapTable(book));
             sb.AppendLine(@"\begin{multicols}{2}");
         }
+        if (report.Artifact is { Error: null } artifact)
+        {
+            sb.AppendLine(@"\end{multicols}");
+            sb.Append(ArtifactLatex(artifact));
+            sb.AppendLine(@"\begin{multicols}{2}");
+        }
         
         if (!string.IsNullOrEmpty(tikzDiagramCode))
         {
@@ -443,6 +449,48 @@ public partial class PrismaReviewEngine
             }
         }
         return memoryStream.ToArray();
+    }
+
+    /// <summary>The artifact as a TikZ figure, a table or a list, outside the two-column layout.</summary>
+    private string ArtifactLatex(ReviewArtifact artifact)
+    {
+        var sb = new StringBuilder();
+        string title = EscapeLatexText(string.IsNullOrWhiteSpace(artifact.Title) ? "Artifact" : artifact.Title);
+        sb.AppendLine(@"\vspace{6pt}");
+        if (artifact.IsDiagram)
+        {
+            sb.AppendLine(@"\begin{figure}[H]");
+            sb.AppendLine(@"\centering");
+            sb.AppendLine(@"\resizebox{\linewidth}{!}{");
+            sb.Append(ArtifactBuilder.ToTikz(artifact, EscapeLatexText));
+            sb.AppendLine(@"}");
+            sb.AppendLine($"\\caption{{{title}. {EscapeLatexText(artifact.Caption)}}}");
+            sb.AppendLine(@"\end{figure}");
+        }
+        else if (artifact.Kind == ArtifactKinds.Table && artifact.Columns.Count > 0)
+        {
+            string spec = string.Join(" ", artifact.Columns.Select(_ => "X"));
+            sb.AppendLine($"\\begin{{tabularx}}{{\\textwidth}}{{{spec}}}");
+            sb.AppendLine($"\\multicolumn{{{artifact.Columns.Count}}}{{l}}{{\\textbf{{Table 4.2: {title}}}}} \\\\");
+            sb.AppendLine(@"\toprule");
+            sb.AppendLine(string.Join(" & ", artifact.Columns.Select(c => $"\\textbf{{{EscapeLatexText(c)}}}")) + @" \\");
+            sb.AppendLine(@"\midrule");
+            foreach (var row in artifact.Rows)
+                sb.AppendLine(string.Join(" & ", row.Select(EscapeLatexText)) + @" \\ \hline");
+            sb.AppendLine(@"\end{tabularx}");
+            if (!string.IsNullOrWhiteSpace(artifact.Caption))
+                sb.AppendLine(@"\vspace{2pt}\noindent\small " + EscapeLatexText(artifact.Caption) + @"\normalsize");
+        }
+        else
+        {
+            sb.AppendLine($"\\noindent\\textbf{{{title}}}");
+            if (!string.IsNullOrWhiteSpace(artifact.Caption)) sb.AppendLine(@"\par\noindent " + EscapeLatexText(artifact.Caption));
+            sb.AppendLine(@"\begin{itemize}");
+            foreach (var bullet in artifact.Bullets) sb.AppendLine(@"\item " + EscapeLatexText(bullet));
+            sb.AppendLine(@"\end{itemize}");
+        }
+        sb.AppendLine(@"\vspace{10pt}");
+        return sb.ToString();
     }
 
     /// <summary>Evidence map: which studies contribute to which theme of the thematic synthesis.</summary>
