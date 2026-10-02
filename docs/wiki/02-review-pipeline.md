@@ -67,6 +67,7 @@ The `LlmStage` names below are what `llm-calls.json` records for each call, and 
 | `theme-sections` | `WriteThemeAsync` | Thematic | One cited subsection per theme |
 | `coverage-fill` | `WriteThemeAsync` | Thematic | Revision that adds the theme's uncited studies |
 | `discussion` | `WriteDiscussionAsync` | Thematic | Discussion written from the subsections |
+| `artifact` | `ArtifactBuilder.BuildAsync` | `ReviewArtifact.cs` | The diagram, table or list the reviewer asked for, built from the finished results |
 | `cited-sections` | `GenerateCitedSectionsAsync` | Report | Fallback only: synthesis and discussion in one call |
 | `automated-peer-review` | `PeerReviewSectionsAsync` (fallback: `PeerReviewAndReviseAsync`) | Thematic / Report | Critique and revision; `peer-review-feedback.json` |
 | `citation-check` | `CitationSupportChecker.CheckAsync` | `CitationSupportChecker.cs` | Verdict and quote per citation, judged on the attributed part of the sentence, with a second check for partly and not supported ones; `citation-audit.json` |
