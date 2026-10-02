@@ -46,7 +46,7 @@ public partial class PrismaReviewEngine
     /// discussion and the per-section peer review. Returns a result without sections when the synthesis has
     /// to fall back to the single-pass writer (the reason is in <see cref="ThematicCodebook.FallbackReason"/>).
     /// </summary>
-    private async Task<ThematicResult> RunThematicSynthesisAsync(
+    private async Task<ThematicResult> RunThematicSynthesisAsync(Guid runId,
         IChatCompletionService chat, string query, string objective, ReviewState state,
         IReadOnlyList<ReferencedPaper> papers, int referenceCount)
     {
@@ -59,8 +59,10 @@ public partial class PrismaReviewEngine
         List<ThematicCode> codes;
         using (LlmStage.Begin("thematic-coding"))
         {
+            ReportProgress(runId, state, RunProgress.Synthesis, RunProgress.Phase(RunProgress.SynthesisPhases, 1, 0), $"Coding {papers.Count} studies");
             var (c, uncoded) = await ThematicSynthesis.CodeStudiesAsync(chat, goal, papers, extractions,
-                Synthesis.CodingBatchSize, Llm.ScreeningParallelism);
+                Synthesis.CodingBatchSize, Llm.ScreeningParallelism,
+                (done, total) => ReportProgress(runId, state, RunProgress.Synthesis, RunProgress.Phase(RunProgress.SynthesisPhases, 1, (double)done / total), $"Coding studies: {Of(done, total, "batches")}"));
             codes = c;
             book.Codes = codes;
             book.Uncoded.AddRange(uncoded);
@@ -74,6 +76,7 @@ public partial class PrismaReviewEngine
         // 2. Codebook
         try
         {
+            ReportProgress(runId, state, RunProgress.Synthesis, RunProgress.Phase(RunProgress.SynthesisPhases, 2, 0), $"Grouping {codes.Count} codes into themes");
             using (LlmStage.Begin("thematic-codebook"))
             {
                 var (themes, unplaced) = await ThematicSynthesis.BuildCodebookAsync(chat, goal, codes, Math.Max(2, Synthesis.MaxThemes));
@@ -107,10 +110,18 @@ public partial class PrismaReviewEngine
         var byRef = papers.ToDictionary(p => p.ReferenceNumber);
         var extractionByRef = extractions.ToDictionary(e => e.ReferenceNumber);
         using var throttle = new SemaphoreSlim(Math.Max(1, Llm.ScreeningParallelism));
+        int written = 0;
+        ReportProgress(runId, state, RunProgress.Synthesis, RunProgress.Phase(RunProgress.SynthesisPhases, 3, 0), $"Writing {book.Themes.Count} theme subsections");
         var work = book.Themes.Select((theme, index) => Task.Run(async () =>
         {
             await throttle.WaitAsync();
-            try { return await WriteThemeAsync(chat, goal, book, theme, index + 1, apa, byRef, extractionByRef, referenceCount); }
+            try
+            {
+                var written1 = await WriteThemeAsync(chat, goal, book, theme, index + 1, apa, byRef, extractionByRef, referenceCount);
+                int n = Interlocked.Increment(ref written);
+                ReportProgress(runId, state, RunProgress.Synthesis, RunProgress.Phase(RunProgress.SynthesisPhases, 3, (double)n / book.Themes.Count), $"Theme subsections: {Of(n, book.Themes.Count, "written")}");
+                return written1;
+            }
             finally { throttle.Release(); }
         })).ToList();
         foreach (var task in work)
@@ -126,10 +137,12 @@ public partial class PrismaReviewEngine
         }
 
         // 5. Discussion from the subsections
+        ReportProgress(runId, state, RunProgress.Synthesis, RunProgress.Phase(RunProgress.SynthesisPhases, 4, 0), "Writing the discussion");
         using (LlmStage.Begin("discussion"))
             result.Discussion = await WriteDiscussionAsync(chat, query, goal, result.Sections, extractions, apa, referenceCount);
 
         // 6. Peer review, per section, with the same coverage guard as the fill pass
+        ReportProgress(runId, state, RunProgress.Synthesis, RunProgress.Phase(RunProgress.SynthesisPhases, 5, 0), "Automated peer review");
         using (LlmStage.Begin("automated-peer-review"))
             result.PeerReview = await PeerReviewSectionsAsync(chat, result, apa, referenceCount);
 
@@ -182,6 +195,7 @@ public partial class PrismaReviewEngine
             You are writing one subsection of the Results & Synthesis section (PRISMA 2020 Item 20a) of a systematic literature review. The review used thematic synthesis; this subsection reports one theme.
 
             REVIEW OBJECTIVE: "{{goal}}"
+            {{PromptSafety.ReviewerInputNotice}}
             THEME: {{theme.Name}}. {{theme.Description}}
             OTHER THEMES (reported in their own subsections; do not cover them here): {{(otherThemes.Length == 0 ? "none" : otherThemes)}}
 
@@ -302,6 +316,7 @@ public partial class PrismaReviewEngine
 
             REVIEW OBJECTIVE: "{{goal}}"
             PRIMARY TOPIC: "{{query}}"
+            {{PromptSafety.ReviewerInputNotice}}
 
             REFERENCE LIST (cite ONLY these numbers):
             {{ReferenceLines(apa.Keys, apa)}}
