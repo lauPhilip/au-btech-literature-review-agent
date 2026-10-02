@@ -43,6 +43,7 @@ public partial class PrismaReviewEngine
         // STORM-style multi-perspective search: survey the topic from a few distinct angles before
         // querying each source, instead of relying on the single literal query phrase alone.
         List<string> searchPerspectives;
+        ReportProgress(ctx.RunId, reviewState, RunProgress.Search, 0, "Preparing search strings");
         using (LlmStage.Begin("search-perspectives"))
             searchPerspectives = await GenerateSearchPerspectivesAsync(ctx.Chat, request.Query, request.Objective, request.Inclusion);
         reviewState.SearchPerspectives = searchPerspectives;
@@ -56,6 +57,8 @@ public partial class PrismaReviewEngine
         }
         catch (Exception ex) { _log.LogWarning("Run {RunId}: protocol amendment not written: {Message}", ctx.RunId, ex.Message); }
         await SaveStateAsync(ctx.RunId, reviewState);
+        ctx.SearchPassesTotal = Math.Max(1, ctx.Sources.Count * searchPerspectives.Count);
+        ReportProgress(ctx.RunId, reviewState, RunProgress.Search, 0.05, $"Searching {ctx.Sources.Count} source(s) with {searchPerspectives.Count} search string(s)");
 
         // All sources are queried at the same time; each source runs its search strings one after another.
         // The results are then processed in a fixed order (source order, then search-string order), so the
@@ -189,6 +192,8 @@ public partial class PrismaReviewEngine
             SaveRawResponses(ctx, log, raw, $"{sourceIndex + 1:00}-{Slug(source.SourceName)}-q{p + 1}");
             foreach (var paper in papers) distinct.Add(paper.Id);
             passes.Add(new SearchPass(log, papers));
+            int searched = Interlocked.Increment(ref ctx.SearchPassesDone);
+            ReportProgress(ctx.RunId, ctx.State, RunProgress.Search, 0.05 + 0.95 * searched / ctx.SearchPassesTotal, Of(searched, ctx.SearchPassesTotal, "searches"));
         }
         return passes;
     }
@@ -248,12 +253,14 @@ public partial class PrismaReviewEngine
             catch (Exception ex) { return (seed, null, SanitizeLogMessage(ex.Message)); }
             finally { throttle.Release(); }
         }
+        ReportProgress(ctx.RunId, ctx.State, RunProgress.Chaining, 0, $"Looking up references and citing papers of {seeds.Count} included stud{(seeds.Count == 1 ? "y" : "ies")}");
         var lookups = seeds.Select(LookUp).ToList();
 
         var candidates = new List<(AcademicPaper Paper, string SourceName)>();
         for (int i = 0; i < lookups.Count; i++)
         {
             var (seed, result, error) = await lookups[i];
+            ReportProgress(ctx.RunId, ctx.State, RunProgress.Chaining, 0.3 * (i + 1) / lookups.Count, Of(i + 1, lookups.Count, "look-ups"));
             var log = new PlatformSearchLog
             {
                 SourceName = sourceName,
@@ -302,6 +309,8 @@ public partial class PrismaReviewEngine
             PRIMARY SEARCH QUERY: "{{initialQuery}}"
             REVIEW OBJECTIVE: "{{explicitObjective}}"
             INCLUSION THRESHOLDS: "{{inclusionCriteria}}"
+
+            {{PromptSafety.ReviewerInputNotice}}
 
             TASK: Propose exactly 3 additional, distinct search-query phrasings - for example a synonym/terminology variant, a narrower sub-topic or application-domain variant, and a methodology- or evaluation-focused variant. Each must stay tightly scoped to the same review objective; do not drift into unrelated topics. Keep each phrasing short enough to work as a literal database search string (roughly 3-8 words).
 

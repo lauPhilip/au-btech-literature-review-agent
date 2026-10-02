@@ -15,6 +15,7 @@ The wiki describes the design as it is in the repository. When you change how so
 | [5. Ledger, archive and data model](05-ledger-and-archive.md) | What is saved for each run, the main data types, and how the downloadable archive and `main.tex` are built |
 | [6. Web app, operations and deployment](06-web-app-and-operations.md) | Pages and endpoints, quotas, concurrency, caching, clean-up, configuration, security and CI/CD |
 | [7. Extending and testing](07-extending-and-testing.md) | How to add a source, change a prompt or add a stage without breaking reproducibility, and how the tests are organised |
+| [8. Setup and configuration](08-setup-and-configuration.md) | Keys, local models, Docker, every setting with its default, several users at once, and what the checks can and cannot catch |
 
 ## The project in one paragraph
 

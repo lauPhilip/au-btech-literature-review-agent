@@ -51,9 +51,11 @@ public partial class PrismaReviewEngine
             finally { throttle.Release(); }
         }).ToList();
 
+        ReportProgress(ctx.RunId, ctx.State, RunProgress.FullText, 0, $"Fetching open-access full texts of {included.Count} studies");
         for (int i = 0; i < included.Count; i++)
         {
             var result = await downloads[i];
+            ReportProgress(ctx.RunId, ctx.State, RunProgress.FullText, (double)(i + 1) / included.Count, Of(i + 1, included.Count, "papers"));
             ctx.Chunks[included[i].Id] = result.Chunks.ToList();
             ctx.State.FullTextSources[included[i].Id] = result.Source;
             if (result.Chunks.Count > 0) ctx.State.Stats.FullTextRetrieved++;
@@ -68,13 +70,19 @@ public partial class PrismaReviewEngine
     private async Task ExtractStudiesAsync(RunContext ctx, IReadOnlyList<ReferencedPaper> papers)
     {
         using var throttle = new SemaphoreSlim(Math.Max(1, Llm.ScreeningParallelism));
+        int extracted = 0;
+        ReportProgress(ctx.RunId, ctx.State, RunProgress.Extraction, 0, $"Extracting and appraising {papers.Count} studies");
         var work = papers.Select(async p =>
         {
             await throttle.WaitAsync();
             try
             {
+                StudyExtraction result;
                 using (LlmStage.Begin("extraction"))
-                    return await StudyExtractor.ExtractAsync(ctx.Chat, p);
+                    result = await StudyExtractor.ExtractAsync(ctx.Chat, p);
+                int n = Interlocked.Increment(ref extracted);
+                ReportProgress(ctx.RunId, ctx.State, RunProgress.Extraction, (double)n / papers.Count, Of(n, papers.Count, "studies"));
+                return result;
             }
             finally { throttle.Release(); }
         }).ToList();
@@ -189,6 +197,7 @@ public partial class PrismaReviewEngine
 
             REVIEW OBJECTIVE: "{{explicitObjective}}"
             PRIMARY TOPIC: "{{query}}"
+            {{PromptSafety.ReviewerInputNotice}}
 
             OFFICIAL ALPHABETIZED REFERENCE LIST FOR THIS RUN:
             {{referenceListMapping}}
@@ -251,6 +260,7 @@ public partial class PrismaReviewEngine
 
             REVIEW OBJECTIVE: "{{explicitObjective}}"
             PRIMARY TOPIC: "{{query}}"
+            {{PromptSafety.ReviewerInputNotice}}
 
             OFFICIAL ALPHABETIZED REFERENCE LIST (cite ONLY these numbers):
             {{referenceListMapping}}
@@ -416,6 +426,7 @@ public partial class PrismaReviewEngine
         // is persisted to disk as its own audit artifact and then fed back in below so synthesisResultsItem
         // and discussionItem are written against a pre-checked claim map instead of free-associating.
         string groundedOutline;
+        ReportProgress(sessionId, finalState, RunProgress.Synthesis, 0, "Outline and report draft");
         using (LlmStage.Begin("outline"))
             groundedOutline = await GenerateGroundedOutlineAsync(chat, query, explicitObjective, groundedChunksText, referenceListMapping);
         if (!string.IsNullOrWhiteSpace(groundedOutline))
@@ -455,6 +466,8 @@ public partial class PrismaReviewEngine
             - The screening exclusion thresholds were exactly: "{{exc}}"
             - Included set: {{includedFacts}} Do not describe the included studies as peer-reviewed unless the filter was ON, and do not state any count that is not given here.
             - Screening: {{screeningFacts}}
+
+            {{PromptSafety.ReviewerInputNotice}}
 
             OFFICIAL ALPHABETIZED REFERENCE LIST FOR THIS RUN:
             {{referenceListMapping}}
@@ -603,7 +616,7 @@ public partial class PrismaReviewEngine
             {
                 try
                 {
-                    thematic = await RunThematicSynthesisAsync(chat, query, explicitObjective, finalState, papersForCheck, referenceCount);
+                    thematic = await RunThematicSynthesisAsync(sessionId, chat, query, explicitObjective, finalState, papersForCheck, referenceCount);
                 }
                 catch (Exception ex)
                 {
@@ -630,6 +643,7 @@ public partial class PrismaReviewEngine
             else
             {
                 string citedSynthesis, citedDiscussion;
+                ReportProgress(sessionId, finalState, RunProgress.Synthesis, RunProgress.Phase(RunProgress.SynthesisPhases, 3, 0), "Writing the synthesis and discussion");
                 using (LlmStage.Begin("cited-sections"))
                     (citedSynthesis, citedDiscussion) = await GenerateCitedSectionsAsync(
                         chat, query, explicitObjective, groundedOutline, referenceListMapping, groundedChunksText, referenceCount);
@@ -639,6 +653,7 @@ public partial class PrismaReviewEngine
                 if (string.IsNullOrWhiteSpace(citedDiscussion)) citedDiscussion = rawDiscussion;
 
                 // Documented "peer reviewer" pass: an LLM critiques the two sections and revises them.
+                ReportProgress(sessionId, finalState, RunProgress.Synthesis, RunProgress.Phase(RunProgress.SynthesisPhases, 5, 0), "Automated peer review");
                 using (LlmStage.Begin("automated-peer-review"))
                     peerReview = await PeerReviewAndReviseAsync(chat, citedSynthesis, citedDiscussion, referenceListMapping, groundedOutline);
                 synthesisProse = peerReview.SynthesisAfter;
@@ -683,9 +698,13 @@ public partial class PrismaReviewEngine
                 .ToDictionary(e => e.ReferenceNumber, e => (IReadOnlyList<string>)ThematicSynthesis.VerifiedFindings(e).Select(f => f.Finding.Quote).ToList());
             var citedSentences = fields.SelectMany(f => CitationSupportChecker.ExtractCitedSentences(f.Text, f.Field)).ToList();
             List<CitationSupportResult> supportChecks;
+            ReportProgress(sessionId, finalState, RunProgress.Checking, 0, $"Checking {citedSentences.Sum(c => c.References.Count)} citations");
             using (LlmStage.Begin("citation-check"))
                 supportChecks = await CitationSupportChecker.CheckAsync(chat, citedSentences, papersForCheck,
-                    verifiedFindings: verifiedFindings, parallelism: Llm.ScreeningParallelism, secondCheck: Synthesis.SecondCitationCheck);
+                    verifiedFindings: verifiedFindings, parallelism: Llm.ScreeningParallelism, secondCheck: Synthesis.SecondCitationCheck,
+                    progress: (second, done, total) => ReportProgress(sessionId, finalState, RunProgress.Checking,
+                        RunProgress.Phase(RunProgress.CheckingPhases, second ? 1 : 0, (double)done / total),
+                        second ? $"Second check: {Of(done, total, "papers")}" : $"First check: {Of(done, total, "papers")}"));
             var initialSummary = CitationSupportSummary.From(supportChecks);
 
             // Repair: sentences whose citation was rejected are rewritten once from the cited paper's evidence
@@ -693,6 +712,8 @@ public partial class PrismaReviewEngine
             var repairs = new List<CitationRepair>();
             if (Synthesis.RepairCitations && supportChecks.Any(NeedsRepair))
             {
+                ReportProgress(sessionId, finalState, RunProgress.Checking, RunProgress.Phase(RunProgress.CheckingPhases, 2, 0),
+                    $"Repairing {supportChecks.Count(NeedsRepair)} citations and checking them again");
                 using (LlmStage.Begin("citation-repair"))
                     (fields, supportChecks, repairs) = await RepairCitationsAsync(chat, fields, supportChecks, papersForCheck, verifiedFindings, referenceCount);
             }

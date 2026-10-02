@@ -258,11 +258,12 @@ public static class CitationSupportChecker
         int excerptsPerReference = 6,
         IReadOnlyDictionary<int, IReadOnlyList<string>>? verifiedFindings = null,
         int parallelism = 1,
-        bool secondCheck = false)
+        bool secondCheck = false,
+        Action<bool, int, int>? progress = null)
     {
         var byReference = papers.ToDictionary(p => p.ReferenceNumber);
         var pairs = citedSentences.SelectMany(s => s.References.Select(r => (Ref: r, Sentence: s))).ToList();
-        var results = await RunPassAsync(chat, pairs, byReference, excerptsPerReference, verifiedFindings, parallelism, second: false);
+        var results = await RunPassAsync(chat, pairs, byReference, excerptsPerReference, verifiedFindings, parallelism, second: false, progress);
         foreach (var r in results) r.FirstVerdict = r.Verdict;
 
         // Second, independent check for what the first did not find fully supported. It does not see the first
@@ -276,7 +277,7 @@ public static class CitationSupportChecker
             {
                 var sentenceOf = citedSentences.ToDictionary(s => (s.Field, s.SentenceIndex));
                 var secondPairs = doubtful.Select(r => (Ref: r.Reference, Sentence: sentenceOf[(r.Field, r.SentenceIndex)])).ToList();
-                var second = await RunPassAsync(chat, secondPairs, byReference, excerptsPerReference * 2, verifiedFindings, parallelism, second: true);
+                var second = await RunPassAsync(chat, secondPairs, byReference, excerptsPerReference * 2, verifiedFindings, parallelism, second: true, progress);
                 var secondOf = second.ToDictionary(r => (r.Field, r.SentenceIndex, r.Reference));
                 foreach (var r in doubtful)
                 {
@@ -303,15 +304,23 @@ public static class CitationSupportChecker
     private static async Task<List<CitationSupportResult>> RunPassAsync(
         IChatCompletionService chat, List<(int Ref, CitedSentence Sentence)> pairs,
         IReadOnlyDictionary<int, ReferencedPaper> byReference, int excerptsPerReference,
-        IReadOnlyDictionary<int, IReadOnlyList<string>>? verifiedFindings, int parallelism, bool second)
+        IReadOnlyDictionary<int, IReadOnlyList<string>>? verifiedFindings, int parallelism, bool second,
+        Action<bool, int, int>? progress = null)
     {
         // References are checked a few at a time; the results are sorted afterwards, so the order of the
         // answers does not matter.
         using var throttle = new SemaphoreSlim(Math.Max(1, parallelism));
-        var work = pairs.GroupBy(x => x.Ref).OrderBy(g => g.Key).Select(async group =>
+        var groups = pairs.GroupBy(x => x.Ref).OrderBy(g => g.Key).ToList();
+        int finished = 0;
+        var work = groups.Select(async group =>
         {
             await throttle.WaitAsync();
-            try { return await CheckReferenceAsync(chat, group.Key, group.Select(x => x.Sentence).ToList(), byReference, excerptsPerReference, verifiedFindings, second); }
+            try
+            {
+                var checkedRef = await CheckReferenceAsync(chat, group.Key, group.Select(x => x.Sentence).ToList(), byReference, excerptsPerReference, verifiedFindings, second);
+                progress?.Invoke(second, Interlocked.Increment(ref finished), groups.Count);
+                return checkedRef;
+            }
             finally { throttle.Release(); }
         }).ToList();
         var results = new List<CitationSupportResult>();

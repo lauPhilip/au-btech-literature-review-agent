@@ -49,7 +49,7 @@ public partial class PrismaReviewEngine
     /// Part of the screening cache key: change it whenever a screening prompt changes, so decisions made
     /// with an older prompt are never reused.
     /// </summary>
-    public const string ScreeningPromptVersion = "screening-v3";
+    public const string ScreeningPromptVersion = "screening-v4";
 
     private sealed record ScreeningOutcome(
         AcademicPaper Paper,
@@ -78,10 +78,15 @@ public partial class PrismaReviewEngine
             finally { throttle.Release(); }
         }).ToList();
 
+        bool chaining = origin == OriginCitations;
+        int applied = 0;
         foreach (var task in work)
         {
             var outcome = await task;
             ApplyOutcome(ctx, outcome, origin);
+            applied++;
+            ReportProgress(ctx.RunId, ctx.State, chaining ? RunProgress.Chaining : RunProgress.Screening,
+                chaining ? 0.3 + 0.7 * applied / work.Count : (double)applied / work.Count, Of(applied, work.Count, "records screened"));
             OnProgressUpdated?.Invoke(ctx.RunId, ctx.State.Stats);
             await SaveStateAsync(ctx.RunId, ctx.State);
         }
@@ -259,6 +264,8 @@ public partial class PrismaReviewEngine
             - Inclusion Thresholds: {{inclusionCriteria}}
             - Exclusion Thresholds: {{exclusionCriteria}}
 
+            {{PromptSafety.ReviewerInputNotice}}
+
             {{PromptSafety.DataOnlyNotice}}
 
             PAPER TARGET DATA:
@@ -342,6 +349,7 @@ public partial class PrismaReviewEngine
         // Save the "awaiting review" stage first and only then open the gate, so anyone who sees the gate
         // open (the dashboard, a test) also finds the ledger already saying that the run is waiting.
         state.Stats.ProcessingStage = StageAwaitingReview;
+        ReportProgress(ctx.RunId, state, RunProgress.Review, 0, "Waiting for your screening decisions");
         await PublishAsync(ctx);
         Coordinator.OpenScreeningReview(ctx.RunId);
 

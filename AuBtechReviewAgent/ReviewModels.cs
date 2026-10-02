@@ -70,6 +70,10 @@ public class ReviewState
     // Model, app version, temperatures and prompt fingerprints for this run (details in llm-calls.json).
     public RunSettingsRecord? RunSettings { get; set; }
 
+    // Instruction-like phrases found in the reviewer's own query, objective or criteria (ReviewInputGuard);
+    // the reviewer confirmed them before the run, and protocol.md lists them.
+    public List<string> InputFlags { get; set; } = new();
+
     // Thematic synthesis: codes, themes, coverage and (optionally) the second coding (also thematic-codebook.json).
     public ThematicCodebook? ThematicSynthesis { get; set; }
 
@@ -141,6 +145,14 @@ public class ReviewStats
     public int CitationsInsufficientEvidence { get; set; } // Abstract-only papers whose abstract does not mention the attributed claim
     public int CitationsSecondChecked { get; set; } // Citations given the independent second check
     public int CitationsUpgradedBySecondCheck { get; set; } // ...whose verdict the second check raised with a verified quote
+
+    // Live progress for the dashboard (see RunProgress): the steps of this run, the current one, how far it
+    // is (0 to 1) and a short detail such as "12 of 40 records".
+    public List<string> ProgressPlan { get; set; } = new();
+    public string ProgressStep { get; set; } = "";
+    public double ProgressFraction { get; set; }
+    public string ProgressDetail { get; set; } = "";
+    public DateTime? RunStartedUtc { get; set; }
 }
 
 public class ReviewPhases 
