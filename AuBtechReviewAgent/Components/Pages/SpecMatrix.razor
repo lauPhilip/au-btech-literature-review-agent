@@ -152,6 +152,14 @@
                     <p class="text-gray-800">@ScrubAnchors(report.BiasAssessmentItem)</p>
                 </div>
 
+                @if (!string.IsNullOrWhiteSpace(report.SynthesisMethodsItem))
+                {
+                    <div class="space-y-1 md:col-span-2">
+                        <span class="font-sans font-bold text-[10px] text-gray-500 uppercase block">2.6 Synthesis Methods (Item 13d)</span>
+                        <p class="text-gray-800">@report.SynthesisMethodsItem</p>
+                    </div>
+                }
+
                 <div class="space-y-3 md:col-span-2 border-b border-gray-200 pt-2 pb-1">
                     <h2 class="font-sans font-bold text-sm text-[#003B5C] uppercase tracking-wide">3. Data & Collection Metrics</h2>
                 </div>
@@ -401,6 +409,50 @@
                     }
                     @CitedText("synthesisResultsItem", ScrubAnchors(report.SynthesisResultsItem))
 
+                    @for (int k = 0; k < report.SynthesisSections.Count; k++)
+                    {
+                        var part = report.SynthesisSections[k];
+                        <h3 class="font-sans font-bold text-[11px] text-[#003B5C] mt-4">4.@(k + 2) @part.Heading</h3>
+                        @CitedText(part.Field, part.Text)
+                    }
+
+                    @if (codebook is { Themes.Count: > 0 })
+                    {
+                        <div class="mt-4 font-sans">
+                            <span class="text-[10px] font-bold text-gray-500 uppercase block mb-1">Evidence map: studies by theme</span>
+                            <div class="overflow-x-auto">
+                                <table class="w-full text-[10px] border border-gray-200">
+                                    <thead class="bg-gray-50 text-gray-600">
+                                        <tr>
+                                            <th class="text-left p-1.5 border-b border-gray-200">Theme</th>
+                                            <th class="text-left p-1.5 border-b border-gray-200">Studies</th>
+                                            <th class="text-left p-1.5 border-b border-gray-200">Cited in its subsection</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach (var theme in codebook.Themes)
+                                        {
+                                            var cov = codebook.Coverage.FirstOrDefault(c => c.ThemeId == theme.Id);
+                                            <tr class="border-b border-gray-100 align-top">
+                                                <td class="p-1.5"><span class="font-semibold">@theme.Name</span><br /><span class="text-gray-500">@theme.Description</span></td>
+                                                <td class="p-1.5 font-mono">@string.Join(", ", theme.Studies.Select(r => $"[{r}]"))</td>
+                                                <td class="p-1.5">@(cov == null ? "-" : $"{cov.CitedFinal.Count} of {cov.Studies.Count}")</td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
+                            @if (codebook.SecondCoding?.Kappa is double kappa)
+                            {
+                                <p class="text-[10px] text-gray-500 mt-1">Second, independent coding: Cohen's kappa = @kappa.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture) over @codebook.SecondCoding.CellsCompared study-theme decisions.</p>
+                            }
+                        </div>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(report.CoverageSummary))
+                    {
+                        <p class="text-gray-600 text-[11px] italic border-l-2 border-[#003B5C] pl-2 mt-2">@report.CoverageSummary</p>
+                    }
+
                     @if (!string.IsNullOrEmpty(mermaidDiagramCode))
                     {
                         <div class="mt-4 border border-gray-200 p-4 rounded bg-gray-50 flex flex-col items-center justify-center font-sans print:hidden">
@@ -490,6 +542,7 @@
     private List<IncludedPaperMetricRow> tableRecords = new();
     private List<AuBtechReviewAgent.StudyExtraction> extractions = new();
     private List<AuBtechReviewAgent.CitationSupportResult> auditChecks = new();
+    private AuBtechReviewAgent.ThematicCodebook? codebook;
     private int journalCount, conferenceCount, transactionsCount, proceedingsCount, preprintCount;
 
     private sealed record PlatformShare(string Category, string Label, int Count, string Color, string Badge);
@@ -647,6 +700,10 @@
                     {
                         <p class="text-gray-600">@check.Reason</p>
                     }
+                    @if (!string.IsNullOrWhiteSpace(check.ThemeNote))
+                    {
+                        <p class="text-amber-700">@check.ThemeNote</p>
+                    }
                 }
             </div>
         }
@@ -697,6 +754,7 @@
         tableRecords = new();
         extractions = new();
         auditChecks = new();
+        codebook = null;
         publicationsByYear = new();
         platformShares = new();
         journalCount = conferenceCount = transactionsCount = proceedingsCount = preprintCount = 0;
@@ -739,6 +797,7 @@
         passedPeerReviewCheck = state.Stats.PassedPeerReviewCheck;
         failedPeerReviewCheck = state.Stats.FailedPeerReviewCheck;
         extractions = state.Extractions ?? new();
+        codebook = state.ThematicSynthesis;
 
         // Older runs have ReferenceNumber = 0 everywhere; OrderBy is stable, so they keep their order.
         tableRecords = state.SynthesizedRecords.OrderBy(r => r.ReferenceNumber).ToList();
