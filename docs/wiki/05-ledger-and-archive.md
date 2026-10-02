@@ -20,8 +20,11 @@ Every run has a folder `WorkspaceStore/{runId}/`, where the run id is a GUID wri
 | `citation-audit.json` | report generation | during synthesis | Removed markers; verdict and quote per cited sentence; repairs with before/after; summary before and after repair; studies not cited |
 | `prisma-report.json` | report generation | at the end | The PRISMA items shown on Review Output |
 | `llm-calls.json` | `finally` block of `RunReviewAsync` | at the end | Every model call; run settings |
+| `run-metrics.json` | `WriteRunMetricsAsync` | at the end of a completed run | Quality and cost figures of the run (also appended to the metrics store) |
 
 `main.tex`, `references.bib`, `references.ris` and `manifest.json` are not stored in the folder. They are built when someone downloads the archive, from the files above.
+
+Outside the run folders, `App_Data/metrics/runs.jsonl` (`RunMetricsStore`) keeps one line of `RunMetrics` per completed run. It is not removed by the run clean-up, so quality can be compared across months of runs and app versions. It holds no research question (only a hash of it) and no paper text. `ConfigFingerprint` is a hash of the model, the app version and the settings that shape the output; runs with the same fingerprint were produced the same way. The prompt fingerprint in `llm-calls.json` cannot serve for this, because it hashes the prompts with their paper excerpts and so differs between any two reviews.
 
 ## The data model
 

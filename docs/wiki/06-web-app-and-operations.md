@@ -6,7 +6,7 @@ The pipeline on pages 2 to 5 runs inside an ordinary ASP.NET Core web app. This 
 
 `Program.cs` reads configuration, creates the shared services, and sets up the request pipeline, in that order.
 
-The configuration sections are bound to option classes: `Quota` → `QuotaOptions`, `Runs` → `RunsOptions`, `Llm` → `LlmOptions`, `Cache` → `CacheOptions`, `OpenSources` → `OpenSourcesOptions`, `Synthesis` → `SynthesisOptions` (thematic synthesis on or off, dual coding, citation repair, maximum number of themes, studies per coding call), plus `Report:SupportStatement` and the API keys (`MISTRAL_API_KEY`, `ELSEVIER_API_KEY`, `IEEE_API_KEY`). The quota service, cache, run options and review engine are created once and registered as singletons; `UiStateContainer` is scoped, so each browser session gets its own. `SessionCleanupWorker` is registered as a hosted background service. Before the app starts serving, `MarkInterruptedRuns` marks runs that were cut off by the previous shutdown.
+The configuration sections are bound to option classes: `Quota` → `QuotaOptions`, `Runs` → `RunsOptions`, `Llm` → `LlmOptions`, `Cache` → `CacheOptions`, `OpenSources` → `OpenSourcesOptions`, `Synthesis` → `SynthesisOptions` (thematic synthesis on or off, dual coding, citation repair, second citation check, maximum number of themes, studies per coding call), `Metrics` → `MetricsOptions` (metrics store on or off, its folder), plus `Report:SupportStatement` and the API keys (`MISTRAL_API_KEY`, `ELSEVIER_API_KEY`, `IEEE_API_KEY`). The quota service, cache, run options and review engine are created once and registered as singletons; `UiStateContainer` is scoped, so each browser session gets its own. `SessionCleanupWorker` is registered as a hosted background service. Before the app starts serving, `MarkInterruptedRuns` marks runs that were cut off by the previous shutdown.
 
 The request pipeline then adds, in order: forwarded headers (for a reverse proxy, if one is configured), the security headers on every response, the error page and HSTS outside development, HTTPS redirection, static files, antiforgery, the rate limiter, the three download endpoints, and finally the Razor components in interactive-server mode.
 
@@ -17,6 +17,7 @@ The request pipeline then adds, in order: forwarded headers (for a reverse proxy
 | `/` | `Components/Pages/Landing.razor` | Public landing page |
 | `/review`, `/review/{runId}` | `Components/Pages/Home.razor` | Dashboard: API keys and quota, the review form, run status, PRISMA funnel, JSON view, the human screening review |
 | `/spec-matrix`, `/spec-matrix/{runId}` | `Components/Pages/SpecMatrix.razor` | Review Output: the report with clickable citations, tables, charts, downloads, "Delete run" |
+| `/metrics` | `Components/Pages/Metrics.razor` | Run quality metrics across runs: verdict shares per run, groups by app version and settings, and where a run's citations fail. Shown only with the developer token (`Quota:AdminToken`) or in Development, because it lists every run on the deployment |
 | component | `ScreeningReviewPanel.razor` | The include/exclude list shown while a run waits for review |
 | component | `PrismaFunnel.razor` | The funnel on the dashboard, with "show" links for removed records |
 | `GET /api/workspace/{id}/archive` | `Program.cs` | The run archive as a zip |
