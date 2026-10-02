@@ -1,0 +1,80 @@
+@* What a finished run produced, at a glance: studies, themes, coverage and the citation verdicts, with the
+   way into the report. Shown on the dashboard in place of the raw JSON when a run is complete. *@
+
+@{
+    var s = Stats;
+    int cited = s.CitationsChecked;
+    int attention = s.CitationsPartiallySupported + s.CitationsNotSupported;
+}
+
+<div class="flex-1 min-h-0 overflow-y-auto p-5 space-y-4 font-sans text-left">
+    <div>
+        <h2 class="text-base font-bold text-[#003B5C]">Your review is ready</h2>
+        <p class="text-xs text-gray-600 mt-0.5">The report, its checked citations and the full run archive are on the Review Output page.</p>
+    </div>
+
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+        @Tile(s.TotalIdentified.ToString(), "records found")
+        @Tile(s.Included.ToString(), "studies included")
+        @Tile(s.ThemesIdentified > 0 ? s.ThemesIdentified.ToString() : "–", "themes")
+        @Tile(s.Included > 0 ? $"{s.StudiesCitedInSynthesis} / {s.Included}" : "–", "studies cited")
+    </div>
+
+    @if (cited > 0)
+    {
+        <div class="space-y-1.5">
+            <span class="text-[10px] font-bold uppercase tracking-wider text-gray-500">@cited citations checked against the papers</span>
+            <div class="flex h-3 w-full rounded overflow-hidden bg-gray-100" role="img" aria-label="@($"{s.CitationsSupported} supported, {s.CitationsPartiallySupported} partly supported, {s.CitationsNotSupported} not supported")">
+                @Segment(s.CitationsSupported, cited, "bg-green-600")
+                @Segment(s.CitationsPartiallySupported, cited, "bg-amber-400")
+                @Segment(s.CitationsNotSupported, cited, "bg-red-600")
+                @Segment(s.CitationsInsufficientEvidence, cited, "bg-sky-600")
+                @Segment(s.CitationsUnverifiable, cited, "bg-gray-400")
+            </div>
+            <div class="flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-gray-700">
+                <span><span class="inline-block w-2 h-2 rounded-sm bg-green-600 mr-1"></span>@s.CitationsSupported supported</span>
+                <span><span class="inline-block w-2 h-2 rounded-sm bg-amber-400 mr-1"></span>@s.CitationsPartiallySupported partly supported</span>
+                <span><span class="inline-block w-2 h-2 rounded-sm bg-red-600 mr-1"></span>@s.CitationsNotSupported not supported</span>
+                @if (s.CitationsInsufficientEvidence > 0)
+                {
+                    <span><span class="inline-block w-2 h-2 rounded-sm bg-sky-600 mr-1"></span>@s.CitationsInsufficientEvidence abstract only</span>
+                }
+                @if (s.CitationsUnverifiable > 0)
+                {
+                    <span><span class="inline-block w-2 h-2 rounded-sm bg-gray-400 mr-1"></span>@s.CitationsUnverifiable could not be verified</span>
+                }
+            </div>
+            @if (attention > 0)
+            {
+                <p class="text-[11px] text-gray-600">@attention @(attention == 1 ? "citation needs" : "citations need") your attention; the report lets you step through them one by one.</p>
+            }
+        </div>
+    }
+
+    <div class="flex flex-wrap gap-2 pt-1">
+        <a href="@($"/spec-matrix/{RunId}")" class="bg-[#003B5C] text-white text-xs font-bold uppercase tracking-wider px-4 py-2 rounded shadow hover:bg-opacity-95">Open the report</a>
+        <a href="@($"/api/workspace/{RunId}/archive")" class="bg-white border border-gray-300 text-[#003B5C] text-xs font-bold uppercase tracking-wider px-3 py-2 rounded hover:bg-gray-50">Download archive</a>
+        <a href="@($"/review?from={RunId}")" class="bg-white border border-gray-300 text-gray-700 text-xs font-bold uppercase tracking-wider px-3 py-2 rounded hover:bg-gray-50">New review with these settings</a>
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public AuBtechReviewAgent.ReviewStats Stats { get; set; } = new();
+    [Parameter, EditorRequired] public Guid RunId { get; set; }
+
+    private static RenderFragment Tile(string value, string label) => __builder =>
+    {
+        <div class="border border-gray-200 rounded p-2">
+            <div class="text-lg font-bold text-gray-900 leading-tight">@value</div>
+            <div class="text-[10px] uppercase tracking-wide text-gray-500">@label</div>
+        </div>
+    };
+
+    private static RenderFragment Segment(int count, int total, string color) => __builder =>
+    {
+        if (count > 0 && total > 0)
+        {
+            <div class="@color h-full border-r-2 border-white last:border-r-0" style="@($"width:{(count * 100.0 / total).ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)}%")"></div>
+        }
+    };
+}

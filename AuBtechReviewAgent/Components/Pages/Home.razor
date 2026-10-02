@@ -25,6 +25,7 @@
             <a href="/" class="text-white/70 hover:text-white transition-colors py-4">Overview</a>
             <a href="@(hasRun ? $"/review/{currentSessionId}" : "/review")" class="text-white border-b-2 border-white py-4">Dashboard</a>
             <a href="@(hasRun ? $"/spec-matrix/{currentSessionId}" : "/spec-matrix")" class="text-white/70 hover:text-white transition-colors py-4">Review Output</a>
+            <a href="/metrics" class="text-white/70 hover:text-white transition-colors py-4">Metrics</a>
         </nav>
     </div>
 </header>
@@ -41,7 +42,7 @@
         <div class="lg:col-span-5 flex flex-col gap-4 min-w-0 lg:min-h-0 lg:overflow-y-auto lg:pr-1">
             <div class="bg-white border border-gray-200 rounded-lg p-4 flex flex-col shadow-sm flex-none">
                 <div class="flex justify-between items-center mb-2 flex-none">
-                    <span class="text-[10px] font-bold uppercase tracking-wider text-gray-400 block">Execution Configuration</span>
+                    <span class="text-[10px] font-bold uppercase tracking-wider text-gray-400 block">New review</span>
                     <button @onclick="OpenKeyModal" class="text-[10px] bg-gray-100 hover:bg-gray-200 border border-gray-300 text-gray-700 px-2 py-0.5 rounded transition-all flex items-center gap-1">
                         <svg class="w-3 h-3 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/></svg>
                         <span>API Credentials</span>
@@ -81,15 +82,21 @@
                     }
                 </div>
                 
+                @if (prefillNotice != null)
+                {
+                    <p class="mb-2 bg-blue-50 border border-blue-100 text-blue-900 rounded p-2 text-[11px]">@prefillNotice</p>
+                }
                 <div class="space-y-3 text-left">
                     <div>
-                        <label class="block text-[11px] font-bold uppercase text-gray-600 mb-1">Search Query</label>
-                        <input type="text" maxlength="@AuBtechReviewAgent.ReviewInputGuard.MaxQuery" @bind="searchQuery" class="w-full p-2 bg-gray-50 border border-gray-300 rounded focus:outline-none focus:border-[#003B5C] text-xs shadow-inner transition-all" />
+                        <label for="f-query" class="block text-[11px] font-bold uppercase text-gray-600 mb-1">Search query</label>
+                        <input id="f-query" type="text" maxlength="@AuBtechReviewAgent.ReviewInputGuard.MaxQuery" @bind="searchQuery" @bind:event="oninput" class="w-full p-2 bg-gray-50 border border-gray-300 rounded focus:outline-none focus:border-[#003B5C] text-xs shadow-inner transition-all" />
+                        @FieldHelp("The words sent to the databases. Example: agentic AI software frameworks", searchQuery, AuBtechReviewAgent.ReviewInputGuard.MaxQuery)
                     </div>
 
                     <div>
-                        <label class="block text-[11px] font-bold uppercase text-gray-600 mb-1">Review Objective</label>
-                        <textarea maxlength="@AuBtechReviewAgent.ReviewInputGuard.MaxObjective" @bind="reviewObjective" rows="2" class="w-full p-2 bg-gray-50 border border-gray-300 rounded focus:outline-none focus:border-[#003B5C] text-xs shadow-inner resize-none transition-all"></textarea>
+                        <label for="f-objective" class="block text-[11px] font-bold uppercase text-gray-600 mb-1">Review objective</label>
+                        <textarea id="f-objective" maxlength="@AuBtechReviewAgent.ReviewInputGuard.MaxObjective" @bind="reviewObjective" @bind:event="oninput" rows="2" class="w-full p-2 bg-gray-50 border border-gray-300 rounded focus:outline-none focus:border-[#003B5C] text-xs shadow-inner resize-none transition-all"></textarea>
+                        @FieldHelp("The question the review answers. Example: Which safety mechanisms do agent frameworks use, and how are they evaluated?", reviewObjective, AuBtechReviewAgent.ReviewInputGuard.MaxObjective)
                     </div>
 
                     <div class="grid grid-cols-2 gap-2">
@@ -104,24 +111,30 @@
                     </div>
 
                     <div>
-                        <label class="block text-[11px] font-bold uppercase text-gray-600 mb-1">Inclusion Criteria</label>
-                        <textarea maxlength="@AuBtechReviewAgent.ReviewInputGuard.MaxCriteria" @bind="inclusionCriteria" rows="2" class="w-full p-2 bg-gray-50 border border-gray-300 rounded focus:outline-none focus:border-[#003B5C] text-xs shadow-inner resize-none transition-all"></textarea>
+                        <label for="f-inclusion" class="block text-[11px] font-bold uppercase text-gray-600 mb-1">Inclusion criteria</label>
+                        <textarea id="f-inclusion" maxlength="@AuBtechReviewAgent.ReviewInputGuard.MaxCriteria" @bind="inclusionCriteria" @bind:event="oninput" rows="2" class="w-full p-2 bg-gray-50 border border-gray-300 rounded focus:outline-none focus:border-[#003B5C] text-xs shadow-inner resize-none transition-all"></textarea>
+                        @FieldHelp("What a study must be about or contain. Example: Peer-reviewed studies that describe or evaluate an agent framework.", inclusionCriteria, AuBtechReviewAgent.ReviewInputGuard.MaxCriteria)
                     </div>
 
                     <div>
-                        <label class="block text-[11px] font-bold uppercase text-gray-600 mb-1">Exclusion Criteria</label>
-                        <textarea maxlength="@AuBtechReviewAgent.ReviewInputGuard.MaxCriteria" @bind="exclusionCriteria" rows="2" class="w-full p-2 bg-gray-50 border border-gray-300 rounded focus:outline-none focus:border-[#003B5C] text-xs shadow-inner resize-none transition-all"></textarea>
+                        <label for="f-exclusion" class="block text-[11px] font-bold uppercase text-gray-600 mb-1">Exclusion criteria</label>
+                        <textarea id="f-exclusion" maxlength="@AuBtechReviewAgent.ReviewInputGuard.MaxCriteria" @bind="exclusionCriteria" @bind:event="oninput" rows="2" class="w-full p-2 bg-gray-50 border border-gray-300 rounded focus:outline-none focus:border-[#003B5C] text-xs shadow-inner resize-none transition-all"></textarea>
+                        @FieldHelp("What rules a study out. Example: Studies about agriculture or marketing; opinion pieces without evidence.", exclusionCriteria, AuBtechReviewAgent.ReviewInputGuard.MaxCriteria)
                     </div>
 
                     <div>
-                        <label class="block text-[11px] font-bold uppercase text-gray-600 mb-1">Artifact Target</label>
-                        <select @onchange="HandlePresetArtifactSelection" class="w-full p-2 bg-gray-50 border border-gray-300 rounded focus:outline-none focus:border-[#003B5C] text-xs shadow-inner transition-all mb-1.5 font-sans">
-                            <option value="Custom">Custom Target Directive...</option>
-                            <option value="LoopModel" selected>Conceptual Architectural Loop Diagram (Mermaid / TikZ)</option>
-                            <option value="Patterns">Bullet-Point System Safety Design Patterns Spec</option>
-                            <option value="Matrix">Comparative Multi-Agent Architectural Trade-off Matrix</option>
+                        <label for="f-artifact" class="block text-[11px] font-bold uppercase text-gray-600 mb-1">Artifact built from the findings</label>
+                        <select id="f-artifact" value="@State.ArtifactKind" @onchange="HandleArtifactKind" class="w-full p-2 bg-gray-50 border border-gray-300 rounded focus:outline-none focus:border-[#003B5C] text-xs shadow-inner transition-all mb-1.5 font-sans">
+                            @foreach (var kind in AuBtechReviewAgent.ArtifactKinds.All)
+                            {
+                                <option value="@kind.Key">@kind.Label</option>
+                            }
                         </select>
-                        <textarea maxlength="@AuBtechReviewAgent.ReviewInputGuard.MaxDirective" @bind="synthesisTargetDirective" rows="2" class="w-full p-2 bg-gray-50 border border-gray-300 rounded focus:outline-none focus:border-[#003B5C] text-xs shadow-inner resize-none transition-all font-mono" placeholder="Provide instructions on what the engine should create in section 4 based on the retrieved data facts..."></textarea>
+                        @if (State.ArtifactKind != AuBtechReviewAgent.ArtifactKinds.None)
+                        {
+                            <textarea maxlength="@AuBtechReviewAgent.ReviewInputGuard.MaxDirective" @bind="synthesisTargetDirective" @bind:event="oninput" rows="2" class="w-full p-2 bg-gray-50 border border-gray-300 rounded focus:outline-none focus:border-[#003B5C] text-xs shadow-inner resize-none transition-all" placeholder="Describe what it should show, for example: a flowchart of how the studies evaluate agent safety, from threat to mitigation"></textarea>
+                            @FieldHelp("Built after the analysis, only from the review's findings; what it cites is checked like the report text.", synthesisTargetDirective, AuBtechReviewAgent.ReviewInputGuard.MaxDirective)
+                        }
                     </div>
 
                     <div class="pt-1 grid grid-cols-2 gap-2 items-center">
@@ -223,7 +236,7 @@
                         }
                         else
                         {
-                            <span>Execute Search</span>
+                            <span>Start review</span>
                         }
                     </button>
                 </div>
@@ -272,11 +285,26 @@
             {
                 <ScreeningReviewPanel RunId="currentSessionId" Logs="reviewLogs" OnSubmitted="OnScreeningReviewSubmitted" />
             }
+            else if (stage == AuBtechReviewAgent.PrismaReviewEngine.StageComplete && !showJson)
+            {
+                <div class="bg-gray-800 text-white px-4 py-2.5 text-xs font-mono flex justify-between items-center flex-none">
+                    <span>Summary</span>
+                    <button type="button" class="text-[10px] uppercase tracking-widest font-bold opacity-70 hover:opacity-100" @onclick="() => showJson = true">Show the ledger (JSON)</button>
+                </div>
+                <RunSummaryCard Stats="State.Stats" RunId="currentSessionId" />
+            }
             else
             {
                 <div class="bg-gray-800 text-white px-4 py-2.5 text-xs font-mono flex justify-between items-center flex-none">
                     <span>JSON output</span>
-                    <span class="text-[9px] opacity-50 uppercase tracking-widest font-bold">@ReviewEngine.Llm.Model</span>
+                    @if (stage == AuBtechReviewAgent.PrismaReviewEngine.StageComplete)
+                    {
+                        <button type="button" class="text-[10px] uppercase tracking-widest font-bold opacity-70 hover:opacity-100" @onclick="() => showJson = false">Back to the summary</button>
+                    }
+                    else
+                    {
+                        <span class="text-[9px] opacity-50 uppercase tracking-widest font-bold">@ReviewEngine.Llm.Model</span>
+                    }
                 </div>
                 <div class="flex-1 min-h-0 bg-gray-950 p-4 font-mono text-xs text-green-400 overflow-y-auto whitespace-pre-wrap break-words leading-relaxed">
                     @rawJsonLogs
@@ -293,8 +321,8 @@
         <div class="bg-white border border-gray-200 w-full max-w-md rounded-lg shadow-2xl overflow-hidden flex flex-col text-left">
             <div class="bg-[#003B5C] text-white p-4 flex justify-between items-center">
                 <div>
-                    <h3 class="text-sm font-bold tracking-tight uppercase">Credential Vault Config</h3>
-                    <p class="text-[10px] opacity-70 font-mono mt-0.5">Isolate Custom Session Keys via SignalR Enclave</p>
+                    <h3 class="text-sm font-bold tracking-tight uppercase">API keys</h3>
+                    <p class="text-[10px] opacity-70 mt-0.5">Kept only in this browser tab</p>
                 </div>
                 <button @onclick="CloseKeyModal" class="text-white/60 hover:text-white transition-colors">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
@@ -302,18 +330,18 @@
             </div>
             <div class="p-4 space-y-3 overflow-y-auto text-xs text-gray-700">
                 <div class="bg-blue-50 border border-blue-100 text-blue-800 p-2.5 rounded text-[11px] leading-normal font-light">
-                    <strong>Browser Encryption Notice:</strong> Keys entered here are encrypted and stored purely inside your browser's local tab session. They never touch public logs, are never saved on server disks, and vanish completely when the tab is closed. With your own Mistral key the free-tier daily limit does not apply.
+                    Your keys are kept encrypted in this browser tab only. They are not written to the server's disk or logs, and they are gone when you close the tab. With your own Mistral key the free-tier daily limit does not apply.
                 </div>
                 <div>
-                    <label class="block font-bold text-gray-600 mb-1 uppercase text-[10px]">Mistral AI Large API Key</label>
+                    <label class="block font-bold text-gray-600 mb-1 uppercase text-[10px]">Mistral API key</label>
                     <input type="password" placeholder="Defaults to server standard key if blank..." @bind="modalMistral" class="w-full p-2 border border-gray-300 rounded font-mono focus:outline-none focus:border-[#003B5C]" />
                 </div>
                 <div>
-                    <label class="block font-bold text-gray-600 mb-1 uppercase text-[10px]">Elsevier / Scopus Scopus Key</label>
+                    <label class="block font-bold text-gray-600 mb-1 uppercase text-[10px]">Elsevier (Scopus / ScienceDirect) API key</label>
                     <input type="password" placeholder="Defaults to server standard key if blank..." @bind="modalElsevier" class="w-full p-2 border border-gray-300 rounded font-mono focus:outline-none focus:border-[#003B5C]" />
                 </div>
                 <div>
-                    <label class="block font-bold text-gray-600 mb-1 uppercase text-[10px]">IEEE Xplore Gateway Key</label>
+                    <label class="block font-bold text-gray-600 mb-1 uppercase text-[10px]">IEEE Xplore API key</label>
                     <input type="password" placeholder="Optional..." @bind="modalIeee" class="w-full p-2 border border-gray-300 rounded font-mono focus:outline-none focus:border-[#003B5C]" />
                 </div>
                 <div>
@@ -414,6 +442,12 @@
     /// <summary>Set when the page is opened as /review/{RunId}: shows that run (and resumes following it if it is still going).</summary>
     [Parameter] public Guid? RunId { get; set; }
 
+    /// <summary>/review?from={runId}: start a new review with the settings of an earlier run.</summary>
+    [SupplyParameterFromQuery(Name = "from")] public Guid? From { get; set; }
+    private Guid? prefilledFrom;
+    private string? prefillNotice;
+    private bool showJson;
+
     private Guid currentSessionId
     {
         get => State.CurrentSessionId;
@@ -440,6 +474,12 @@
 
     protected override void OnParametersSet()
     {
+        if (From is Guid from && from != Guid.Empty && from != prefilledFrom && !isSearching)
+        {
+            prefilledFrom = from;
+            PrefillFrom(from);
+            return;
+        }
         // Opening /review/{id} (after a reload, from a bookmark, or from another device) attaches this page to
         // that run. Opening plain /review keeps whatever run this tab already shows.
         if (RunId is Guid id && id != Guid.Empty && (id != currentSessionId || !subscribed))
@@ -450,6 +490,36 @@
         {
             AttachToRun(currentSessionId);
         }
+    }
+
+    /// <summary>Fills the form with an earlier run's settings (the reviewer still presses Start review).</summary>
+    private void PrefillFrom(Guid id)
+    {
+        var old = ReviewEngine.LoadState(id);
+        if (old == null)
+        {
+            prefillNotice = "That run could not be found, so the form was not changed. Runs are deleted after a few days.";
+            return;
+        }
+        currentSessionId = Guid.Empty; // the form starts a new run; the old one stays available at its own link
+        stage = "";
+        searchQuery = old.SearchQuery;
+        if (!string.IsNullOrWhiteSpace(old.ReviewObjective)) reviewObjective = old.ReviewObjective;
+        if (!string.IsNullOrWhiteSpace(old.InclusionCriteria)) inclusionCriteria = old.InclusionCriteria;
+        if (!string.IsNullOrWhiteSpace(old.ExclusionCriteria)) exclusionCriteria = old.ExclusionCriteria;
+        if (!string.IsNullOrWhiteSpace(old.ArtifactKind)) State.ArtifactKind = AuBtechReviewAgent.ArtifactKinds.Normalize(old.ArtifactKind);
+        synthesisTargetDirective = old.SynthesisTargetDirective ?? "";
+        if (old.YearFrom > 0) dateFrom = new DateTime(old.YearFrom, 1, 1);
+        if (old.YearTo > 0) dateTo = new DateTime(old.YearTo, 12, 31);
+        requirePeerReview = old.PeerReviewOnlyToggle;
+        State.DualScreening = old.DualScreeningRequested;
+        State.CitationChaining = old.CitationChainingRequested;
+        State.ReviewScreeningFirst = old.HumanScreeningReviewRequested;
+        if (old.SelectedSources.Count > 0) State.SelectedSources = new HashSet<string>(old.SelectedSources, StringComparer.OrdinalIgnoreCase);
+        if (old.MaxResultsPerSource > 0) maxResults = old.MaxResultsPerSource;
+        prefillNotice = string.IsNullOrWhiteSpace(old.ReviewObjective)
+            ? "The query and options were copied from the earlier run. Runs made before this feature did not store the objective and criteria; copy them from that run's protocol."
+            : "The settings of the earlier run were copied. Check them, change what you like, and press Start review.";
     }
 
     private void AttachToRun(Guid id)
@@ -489,7 +559,8 @@
 
     private void ApplyState(AuBtechReviewAgent.ReviewState state, string? rawJson)
     {
-        var s = state.Stats;
+        // The saved ledger can be a little behind the live events; never let the progress bar move back.
+        var s = AuBtechReviewAgent.RunProgress.KeepFurthest(State.Stats, state.Stats);
         State.Stats = s;
         State.RemovedBeforeScreening = state.RemovedBeforeScreening;
         totalIdentified = s.TotalIdentified;
@@ -653,17 +724,25 @@
         Nav.NavigateTo("/review", replace: true);
     }
 
-    private void HandlePresetArtifactSelection(ChangeEventArgs e)
+    /// <summary>Choosing a kind fills in its default instruction, unless the reviewer wrote their own.</summary>
+    private void HandleArtifactKind(ChangeEventArgs e)
     {
-        string chosen = e.Value?.ToString() ?? "Custom";
-        synthesisTargetDirective = chosen switch
-        {
-            "LoopModel" => "Conceptual Architectural Loop Diagram detailing fault-tolerance gating mechanisms.",
-            "Patterns" => "Create a complete numbered layout list of software design patterns for runtime safeguards and error containment.",
-            "Matrix" => "Create a detailed text table matrix comparing the specific tool-use security trade-offs of the reviewed engines.",
-            _ => synthesisTargetDirective
-        };
+        string previous = State.ArtifactKind;
+        State.ArtifactKind = AuBtechReviewAgent.ArtifactKinds.Normalize(e.Value?.ToString());
+        bool untouched = string.IsNullOrWhiteSpace(synthesisTargetDirective)
+            || synthesisTargetDirective == AuBtechReviewAgent.ArtifactKinds.DefaultInstruction(previous);
+        if (untouched) synthesisTargetDirective = AuBtechReviewAgent.ArtifactKinds.DefaultInstruction(State.ArtifactKind);
     }
+
+    /// <summary>A short help line under a field, with a live character count against its limit.</summary>
+    private RenderFragment FieldHelp(string help, string? value, int max) => __builder =>
+    {
+        int length = value?.Length ?? 0;
+        <div class="flex justify-between gap-2 mt-0.5 text-[10px] leading-snug">
+            <span class="text-gray-500">@help</span>
+            <span class="font-mono shrink-0 @(length > max * 0.9 ? "text-amber-700" : "text-gray-400")">@length / @max</span>
+        </div>
+    };
 
     private async Task StartReviewProcess()
     {
@@ -672,7 +751,7 @@
         // Check the text fields before anything is reserved or spent: too-long fields are errors, and
         // instruction-like phrases must be confirmed once (they are then recorded in the protocol).
         var draft = new AuBtechReviewAgent.ReviewRequest(searchQuery, reviewObjective, inclusionCriteria, exclusionCriteria, maxResults,
-            SynthesisDirective: synthesisTargetDirective);
+            SynthesisDirective: synthesisTargetDirective, ArtifactKind: State.ArtifactKind);
         inputCheck = AuBtechReviewAgent.ReviewInputGuard.Check(draft);
         if (!inputCheck.IsValid) return;
         string flagSignature = string.Join("|", inputCheck.Flags.Select(f => f.ToString()));
@@ -708,6 +787,8 @@
         int yearTo = dateTo.Year;
 
         // The engine runs the same check again; these are the normalised fields.
+        showJson = false;
+        prefillNotice = null;
         string cleanQuery = inputCheck.Request.Query;
         string cleanObjective = inputCheck.Request.Objective;
         string cleanInclusion = inputCheck.Request.Inclusion;
@@ -736,7 +817,7 @@
         var request = new AuBtechReviewAgent.ReviewRequest(
             cleanQuery, cleanObjective, cleanInclusion, cleanExclusion, runMaxResults,
             requirePeerReview, cleanDirective, sessionKeys, runSources, yearFrom, yearTo, State.ReviewScreeningFirst,
-            DualScreening: State.DualScreening, CitationChaining: State.CitationChaining);
+            DualScreening: State.DualScreening, CitationChaining: State.CitationChaining, ArtifactKind: State.ArtifactKind);
 
         Subscribe();
 

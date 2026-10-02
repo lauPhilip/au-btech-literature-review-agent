@@ -18,7 +18,8 @@ public class UiStateContainer
     public bool ReviewScreeningFirst { get; set; } = false;
     public bool DualScreening { get; set; } = true;
     public bool CitationChaining { get; set; } = false;
-    public string SynthesisTargetDirective { get; set; } = "Create a conceptual architectural loop diagram detailing fault-tolerance gating mechanisms.";
+    public string ArtifactKind { get; set; } = ArtifactKinds.ConceptMap;
+    public string SynthesisTargetDirective { get; set; } = ArtifactKinds.DefaultInstruction(ArtifactKinds.ConceptMap);
     public string RawJsonLogs { get; set; } = "{\n  \"status\": \"Awaiting execution...\",\n  \"loopState\": \"Idle\"\n}";
     public int TotalIdentified { get; set; } = 0;
     public int ScreenedCount { get; set; } = 0;
