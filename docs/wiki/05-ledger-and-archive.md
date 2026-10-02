@@ -126,6 +126,8 @@ flowchart LR
 
 `BuildWorkspaceArchive` first collects every file as bytes, then writes `manifest.json` with the SHA-256 of each one, the tool and model version, and its own fingerprint, and finally zips everything. `RunManifest.Verify` does the reverse, and the tests use it to prove that an archive has not been changed. Files are read with `ReadShared`, which opens them with `FileShare.ReadWrite`, so a download never fails because a run happens to be writing its ledger at that moment. `ExportReferences` serves the BibTeX and RIS files on their own for the "BibTeX" and "RIS" links.
 
+To check an unpacked archive by hand, recompute a file's fingerprint and compare it with `manifest.json`: `Get-FileHash -Algorithm SHA256 main.tex` on Windows, `sha256sum main.tex` on macOS and Linux. The manifest also records the app version (including the Git commit), the model and the protocol fingerprint.
+
 ## How main.tex is built
 
 `main.tex` is assembled line by line in `BuildWorkspaceArchive`. All text coming from the model or from sources passes through `EscapeLatexText`, which escapes LaTeX special characters. The pieces come from different places:

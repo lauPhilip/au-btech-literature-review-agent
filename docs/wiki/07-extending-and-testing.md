@@ -21,7 +21,7 @@ The screening prompt lives only in `ScreenPaperAsync`, which the evaluation tool
 
 ### Adding a model step
 
-Wrap the call in `using (LlmStage.Begin("your-stage"))`, so it is recorded under its own name in `llm-calls.json`. If the answer is structured, use `LlmJson.GetAsync<T>` with a validation function and `JsonMode(temperature)`: it asks for JSON, checks the answer, and gives the model one chance to fix a bad answer. Put any text from papers inside `PromptSafety.Wrap(...)` and add `PromptSafety.DataOnlyNotice` to the prompt. If the model is asked to back something with a quote, check the quote with `CitationSupportChecker.QuoteOccursIn` rather than trusting it. Use temperature 0 for anything that decides or extracts. Save what the step produced to the run folder, and add the file to `rootFiles` in `BuildWorkspaceArchive` so it lands in the archive and the manifest.
+Wrap the call in `using (LlmStage.Begin("your-stage"))`, so it is recorded under its own name in `llm-calls.json`. If the stage takes noticeable time, call `ReportProgress` with the step it belongs to, so the dashboard's progress bar keeps moving. If its prompt contains the reviewer's query, objective or criteria, include `PromptSafety.ReviewerInputNotice`. If the answer is structured, use `LlmJson.GetAsync<T>` with a validation function and `JsonMode(temperature)`: it asks for JSON, checks the answer, and gives the model one chance to fix a bad answer. Put any text from papers inside `PromptSafety.Wrap(...)` and add `PromptSafety.DataOnlyNotice` to the prompt. If the model is asked to back something with a quote, check the quote with `CitationSupportChecker.QuoteOccursIn` rather than trusting it. Use temperature 0 for anything that decides or extracts. Save what the step produced to the run folder, and add the file to `rootFiles` in `BuildWorkspaceArchive` so it lands in the archive and the manifest.
 
 ### Adding a field to the ledger or the report
 
@@ -43,6 +43,7 @@ The engine has test hooks so a whole review can run against fakes. `ChatFactory`
 | `PipelineFeatureTests.cs` | Dual screening and disagreements, injection flags, citation chaining, cache reuse, deleting a run, parallel screening order |
 | `RealRunRegressionTests.cs` | Cases taken from real runs that once went wrong |
 | `OpenSourceAndSafetyTests.cs` | Source parsers on saved real responses, rate-limit handling, PDF size limit, prompt-injection markers |
+| `InputGuardAndProgressTests.cs` | Input normalisation, length errors, instruction flags and the protocol entry, API key cleaning, the progress plan and percentage, monotonic progress through a full run |
 | `ArxivSourceTests.cs` | arXiv: retry on 503, a lasting 503 still fails the source, requests one at a time and spaced out |
 | `VerificationAndMetricsTests.cs` | Attributed clauses, the rubric and insufficient evidence, the second check and its quote rule, repair targets, token parsing, the metrics store, metrics of a full run |
 | `ThematicSynthesisTests.cs` | Coding anchors, the codebook guard, second-coding kappa, the revision guard, citation repair, a full run with themes and the fallback when coding fails |
