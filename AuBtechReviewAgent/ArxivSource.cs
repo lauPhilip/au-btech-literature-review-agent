@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Text.RegularExpressions;
 using System.Xml.Linq;
@@ -11,17 +12,43 @@ namespace AuBtechReviewAgent;
 
 public class ArxivSource : IAcademicSource
 {
-    // One shared HttpClient for the whole app; creating one per run exhausts sockets on a busy server.
-    private static readonly HttpClient _httpClient = CreateClient();
     public string SourceName => "arXiv API";
     private readonly List<string> _raw = new();
     public IReadOnlyList<string> LastRawResponses => _raw;
 
-    private static HttpClient CreateClient()
+    // arXiv asks API clients for one request at a time, about three seconds apart, and answers bursts with
+    // 503. A run sends several search strings and several runs can be active, so every request in the app
+    // goes through one gate, spaced out, with the shared wait-and-retry on 429/5xx (OpenSourceHttp).
+    private static readonly SemaphoreSlim Gate = new(1, 1);
+    private static DateTime _lastRequestUtc = DateTime.MinValue;
+
+    private readonly HttpClient? _client;
+    private readonly TimeSpan _spacing;
+    private readonly Func<int, TimeSpan>? _backoff;
+
+    /// <summary>Creates the arXiv source; the parameters are only set by tests.</summary>
+    /// <param name="client">Test hook: the HTTP client (default: the shared OpenSourceHttp client).</param>
+    /// <param name="spacing">Minimum time between two arXiv requests (default 3 seconds).</param>
+    /// <param name="backoff">Test hook: wait before retry n (default: OpenSourceHttp's 3, 6, 12, 24 seconds).</param>
+    public ArxivSource(HttpClient? client = null, TimeSpan? spacing = null, Func<int, TimeSpan>? backoff = null)
     {
-        var client = new HttpClient { Timeout = TimeSpan.FromSeconds(60) };
-        client.DefaultRequestHeaders.Add("User-Agent", "AU-BTech-Literature-Review-Agent/1.0");
-        return client;
+        _client = client;
+        _spacing = spacing ?? TimeSpan.FromSeconds(3);
+        _backoff = backoff;
+    }
+
+    /// <summary>One request at a time across the whole app, at least <paramref name="spacing"/> after the previous one.</summary>
+    private static async Task<string> GetSpacedAsync(string url, TimeSpan spacing, HttpClient? client, Func<int, TimeSpan>? backoff)
+    {
+        await Gate.WaitAsync();
+        try
+        {
+            var wait = _lastRequestUtc + spacing - DateTime.UtcNow;
+            if (wait > TimeSpan.Zero) await Task.Delay(wait);
+            try { return await OpenSourceHttp.GetStringAsync(url, backoff: backoff, client: client); }
+            finally { _lastRequestUtc = DateTime.UtcNow; }
+        }
+        finally { Gate.Release(); }
     }
 
     public async Task<List<AcademicPaper>> FetchPapersAsync(string query, int maxResults = 5)
@@ -33,7 +60,7 @@ public class ArxivSource : IAcademicSource
 
         try
         {
-            string xmlContent = await _httpClient.GetStringAsync(url);
+            string xmlContent = await GetSpacedAsync(url, _spacing, _client, _backoff);
             _raw.Add(xmlContent);
             XDocument doc = XDocument.Parse(xmlContent);
             

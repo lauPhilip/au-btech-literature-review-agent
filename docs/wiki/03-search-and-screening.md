@@ -32,7 +32,7 @@ Every source implements `IAcademicSource` (`IAcademicSource.cs`): a `SourceName`
 
 | Class | Key needed | Notes |
 |---|---|---|
-| `ArxivSource` | no | Atom XML API |
+| `ArxivSource` | no | Atom XML API. All requests in the app go one at a time through a static gate, 3 s apart, through `OpenSourceHttp`'s retries, because arXiv answers bursts with 503 |
 | `OpenAlexSource` | no | Also implements `ICitationGraph`, used for citation chaining; abstracts are rebuilt from OpenAlex's inverted index |
 | `SemanticScholarSource` | optional | All requests in the app go one at a time through a static gate, 1 s apart with a key and 3 s without, because the API rate-limits hard |
 | `CrossrefSource` | no | Abstracts arrive as JATS XML and are stripped to text |

@@ -405,7 +405,7 @@ public partial class PrismaReviewEngine
         string[] rootFiles =
         {
             "protocol.md", "transparent-process.json", "prisma-report.json", "llm-calls.json", "extraction.json",
-            "citation-audit.json", "thematic-codebook.json", "peer-review-feedback.json", "stylistic-transformation-ledger.json", "grounded-outline.txt",
+            "citation-audit.json", "thematic-codebook.json", "run-metrics.json", "peer-review-feedback.json", "stylistic-transformation-ledger.json", "grounded-outline.txt",
         };
         foreach (var name in rootFiles)
         {

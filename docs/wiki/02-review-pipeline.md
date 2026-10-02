@@ -45,7 +45,7 @@ A run moves through a fixed set of stages, stored in `ReviewStats.ProcessingStag
 
 **Synthesis** (`PrismaReviewEngine.Report.cs`). `RetrieveFullTextsAsync` fetches legal open-access full text for the included studies and splits it into chunks. `SynthesizeAsync` fixes the reference numbering, extracts and appraises each study, builds the grounded context, and calls `GeneratePrismaChecklistReportWithRAGAsync`, which codes the studies into themes, writes one cited subsection per theme and the discussion, and checks and repairs its citations. Details on [page 4](04-evidence-and-report.md).
 
-**Finishing.** Whatever happens, the `finally` block stores the run settings (model, version, temperatures, prompt fingerprint), saves the ledger one last time, writes `llm-calls.json`, and unregisters the run from the coordinator. If a step throws, the `catch` block marks the run `Failed` with a sanitised message before re-throwing, so the page never shows a run that silently stopped.
+**Finishing.** Whatever happens, the `finally` block stores the run settings (model, version, temperatures, prompt fingerprint), saves the ledger one last time, writes `llm-calls.json`, and unregisters the run from the coordinator. For a completed run it also computes `run-metrics.json` (`WriteRunMetricsAsync`, `RunMetrics.Build`) and appends it to the metrics store, which feeds the Metrics page (see [page 6](06-web-app-and-operations.md)). If a step throws, the `catch` block marks the run `Failed` with a sanitised message before re-throwing, so the page never shows a run that silently stopped.
 
 ## Every model call, by stage
 
@@ -69,7 +69,7 @@ The `LlmStage` names below are what `llm-calls.json` records for each call, and 
 | `discussion` | `WriteDiscussionAsync` | Thematic | Discussion written from the subsections |
 | `cited-sections` | `GenerateCitedSectionsAsync` | Report | Fallback only: synthesis and discussion in one call |
 | `automated-peer-review` | `PeerReviewSectionsAsync` (fallback: `PeerReviewAndReviseAsync`) | Thematic / Report | Critique and revision; `peer-review-feedback.json` |
-| `citation-check` | `CitationSupportChecker.CheckAsync` | `CitationSupportChecker.cs` | Verdict and quote per cited sentence; `citation-audit.json` |
+| `citation-check` | `CitationSupportChecker.CheckAsync` | `CitationSupportChecker.cs` | Verdict and quote per citation, judged on the attributed part of the sentence, with a second check for partly and not supported ones; `citation-audit.json` |
 | `citation-repair` | `RepairCitationsAsync` | Thematic | Rewrites or drops rejected citations, which are then checked again |
 
 Not everything in the report comes from the model. The methods sections (eligibility, information sources, search strategy, selection process, data collection and appraisal, protocol) are written in code by `MethodsSectionWriter` from the run's own numbers, so they can never disagree with what actually happened.

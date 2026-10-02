@@ -1,0 +1,320 @@
+@page "/metrics"
+@rendermode InteractiveServer
+
+@using System.Globalization
+@using Microsoft.AspNetCore.Components.Server.ProtectedBrowserStorage
+@inject AuBtechReviewAgent.RunMetricsStore Store
+@inject AuBtechReviewAgent.RunQuotaService Quota
+@inject ProtectedSessionStorage SessionStorage
+@inject ILogger<Metrics> Logger
+
+<PageTitle>Run Quality Metrics</PageTitle>
+
+<header class="bg-[#003B5C] text-white flex-none shrink-0 z-50 shadow-md">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between gap-3">
+        <a href="/" class="flex items-center space-x-3 hover:opacity-90 transition-opacity min-w-0 shrink overflow-hidden">
+            <span class="font-bold tracking-tight text-xs sm:text-sm whitespace-nowrap truncate">AARHUS UNIVERSITY</span>
+            <span class="text-white/40 font-light hidden lg:inline">|</span>
+            <span class="text-xs tracking-wider font-medium opacity-90 uppercase hidden lg:inline">au-btech-literature-review-agent</span>
+        </a>
+        <nav class="flex items-center gap-3 sm:gap-6 text-[10px] sm:text-xs font-semibold uppercase tracking-wider whitespace-nowrap shrink-0">
+            <a href="/" class="text-white/70 hover:text-white transition-colors py-4">Overview</a>
+            <a href="/review" class="text-white/70 hover:text-white transition-colors py-4">Dashboard</a>
+            <a href="/metrics" class="text-white border-b-2 border-white py-4">Metrics</a>
+        </nav>
+    </div>
+</header>
+
+<main class="max-w-7xl mx-auto px-4 sm:px-6 py-6 font-sans text-gray-800 space-y-6">
+    <div>
+        <h1 class="text-xl font-bold text-[#003B5C]">Run quality metrics</h1>
+        <p class="text-xs text-gray-600 mt-1 max-w-3xl">
+            Every completed run stores its quality and cost figures here, computed in code from the run's own files. The store outlives the run folders, holds no
+            research question or paper text, and groups runs by app version and settings, so you can see whether a change to the pipeline made the citations
+            better. Green is supported, amber partly supported, red not supported, blue not checkable from an abstract, grey could not be verified.
+        </p>
+    </div>
+
+    @if (!loaded)
+    {
+        <p class="text-xs text-gray-500">Loading...</p>
+    }
+    else if (!allowed)
+    {
+        <div class="bg-white border border-gray-200 rounded p-4 max-w-md space-y-2">
+            <p class="text-xs text-gray-700">The metrics cover every run on this deployment, so they are only shown to its maintainers. Enter the developer token (Quota:AdminToken).</p>
+            <input type="password" @bind="tokenInput" class="w-full p-2 border border-gray-300 rounded font-mono text-xs" />
+            <button class="bg-[#003B5C] text-white text-xs font-bold uppercase tracking-wider px-3 py-2 rounded" @onclick="Unlock">Show metrics</button>
+            @if (tokenRejected)
+            {
+                <p class="text-xs text-red-700">That token is not valid.</p>
+            }
+        </div>
+    }
+    else if (runs.Count == 0)
+    {
+        <p class="text-xs text-gray-600">No completed runs have been recorded yet. Metrics are written at the end of every completed run (Metrics:Enabled).</p>
+    }
+    else
+    {
+        <section class="bg-white border border-gray-200 rounded p-4 space-y-3">
+            <h2 class="text-sm font-bold text-[#003B5C]">Citation verdicts per run</h2>
+            <p class="text-[11px] text-gray-500">Share of final verdicts in each of the last @chartRuns.Count runs, oldest on the left. Hover a bar for the numbers; the runs table below has the same data.</p>
+            <div class="flex flex-wrap gap-4 text-[11px] text-gray-700">
+                @foreach (var (label, color) in Legend)
+                {
+                    <span class="flex items-center gap-1"><span class="inline-block w-3 h-3 rounded-sm" style="background:@color"></span>@label</span>
+                }
+            </div>
+            <div class="overflow-x-auto">
+                <svg width="@ChartWidth" height="@(ChartHeight + 24)" role="img" aria-label="Stacked bars of citation verdict shares per run">
+                    @foreach (var tick in new[] { 0, 25, 50, 75, 100 })
+                    {
+                        double y = ChartHeight - tick / 100.0 * ChartHeight + 4;
+                        <line x1="30" x2="@ChartWidth" y1="@F(y)" y2="@F(y)" stroke="#e5e7eb" stroke-width="1" />
+                        @SvgText(26, y + 3, "end", $"{tick}%")
+                    }
+                    @for (int i = 0; i < chartRuns.Count; i++)
+                    {
+                        var r = chartRuns[i];
+                        var c = r.CitationsFinal;
+                        double x = 34 + (double)i * (BarWidth + 2);
+                        double top = 4;
+                        <g>
+                            <title>@($"{r.CompletedUtc[..10]} · {r.ShortVersion} · {c.Total} citations: {c.Supported} supported, {c.PartiallySupported} partly, {c.NotSupported} not supported, {c.InsufficientEvidence} abstract only, {c.Unverifiable} unverifiable · {r.StudiesCited}/{r.Included} studies cited")</title>
+                            @foreach (var (count, color) in new[] { (c.Unverifiable, Grey), (c.InsufficientEvidence, Blue), (c.NotSupported, Red), (c.PartiallySupported, Amber), (c.Supported, Green) })
+                            {
+                                if (c.Total == 0 || count == 0) continue;
+                                double h = (double)count / c.Total * ChartHeight;
+                                <rect x="@F(x)" y="@F(top)" width="@BarWidth" height="@F(Math.Max(0, h - 2))" fill="@color" rx="1" />
+                                top += h;
+                            }
+                            @SvgText(x + BarWidth / 2.0, ChartHeight + 18, "middle", (i + 1).ToString())
+                        </g>
+                    }
+                </svg>
+            </div>
+        </section>
+
+        <section class="bg-white border border-gray-200 rounded p-4 space-y-2">
+            <h2 class="text-sm font-bold text-[#003B5C]">By app version and settings</h2>
+            <p class="text-[11px] text-gray-500">Verdict shares are pooled over all citations of the runs in a group. "Before" is the first check, before the second check and the repair pass.</p>
+            <div class="overflow-x-auto">
+                <table class="w-full text-[11px] border border-gray-200">
+                    <thead class="bg-gray-50 text-gray-600 text-left">
+                        <tr>
+                            <th class="p-1.5">Version</th><th class="p-1.5">Settings</th><th class="p-1.5">Runs</th><th class="p-1.5">Studies cited</th>
+                            <th class="p-1.5">Supported (before)</th><th class="p-1.5">Partly</th><th class="p-1.5">Not supported</th><th class="p-1.5">Abstract only</th>
+                            <th class="p-1.5">Full text</th><th class="p-1.5">Coding kappa</th><th class="p-1.5">Calls / run</th><th class="p-1.5">Minutes / run</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var g in groups)
+                        {
+                            <tr class="border-t border-gray-100">
+                                <td class="p-1.5 font-mono">@g.Version</td>
+                                <td class="p-1.5 font-mono" title="@g.SettingsText">@g.Fingerprint</td>
+                                <td class="p-1.5">@g.Runs</td>
+                                <td class="p-1.5">@Pct(g.Coverage)</td>
+                                <td class="p-1.5">@Pct(g.Final.SupportedShare) <span class="text-gray-400">(@Pct(g.Initial.SupportedShare))</span></td>
+                                <td class="p-1.5">@Pct(g.Final.PartialShare) <span class="text-gray-400">(@Pct(g.Initial.PartialShare))</span></td>
+                                <td class="p-1.5">@Pct(g.Final.NotSupportedShare) <span class="text-gray-400">(@Pct(g.Initial.NotSupportedShare))</span></td>
+                                <td class="p-1.5">@Pct(g.Final.InsufficientShare)</td>
+                                <td class="p-1.5">@Pct(g.FullText)</td>
+                                <td class="p-1.5">@(g.CodingKappa is double k ? k.ToString("0.00", CultureInfo.InvariantCulture) : "-")</td>
+                                <td class="p-1.5">@g.Calls.ToString("0", CultureInfo.InvariantCulture)</td>
+                                <td class="p-1.5">@g.Minutes.ToString("0.0", CultureInfo.InvariantCulture)</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <section class="bg-white border border-gray-200 rounded p-4 space-y-2">
+            <h2 class="text-sm font-bold text-[#003B5C]">Runs</h2>
+            <p class="text-[11px] text-gray-500">Select a run to see where its citations fail.</p>
+            <div class="overflow-x-auto">
+                <table class="w-full text-[11px] border border-gray-200">
+                    <thead class="bg-gray-50 text-gray-600 text-left">
+                        <tr>
+                            <th class="p-1.5">#</th><th class="p-1.5">Completed (UTC)</th><th class="p-1.5">Version</th><th class="p-1.5">Included</th><th class="p-1.5">Cited</th>
+                            <th class="p-1.5">Themes</th><th class="p-1.5">Citations</th><th class="p-1.5">Supported</th><th class="p-1.5">Partly</th><th class="p-1.5">Not</th>
+                            <th class="p-1.5">Repaired</th><th class="p-1.5">Raised by 2nd check</th><th class="p-1.5">Words</th><th class="p-1.5">Report</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var (r, i) in runs.Select((r, i) => (r, i)).Reverse())
+                        {
+                            var c = r.CitationsFinal;
+                            <tr class="border-t border-gray-100 cursor-pointer @(selected == r ? "bg-yellow-50" : "hover:bg-gray-50")" @onclick="() => selected = r">
+                                <td class="p-1.5">@(i + 1)</td>
+                                <td class="p-1.5 font-mono">@r.CompletedUtc.Replace("T", " ").TrimEnd('Z')</td>
+                                <td class="p-1.5 font-mono">@r.ShortVersion</td>
+                                <td class="p-1.5">@r.Included</td>
+                                <td class="p-1.5">@r.StudiesCited</td>
+                                <td class="p-1.5">@(r.ThematicSynthesisUsed ? r.Themes.ToString() : "fallback")</td>
+                                <td class="p-1.5">@c.Total</td>
+                                <td class="p-1.5 text-green-700">@c.Supported</td>
+                                <td class="p-1.5 text-amber-700">@c.PartiallySupported</td>
+                                <td class="p-1.5 text-red-700">@c.NotSupported</td>
+                                <td class="p-1.5">@r.Repaired</td>
+                                <td class="p-1.5">@r.UpgradedBySecondCheck of @r.SecondChecked</td>
+                                <td class="p-1.5">@(r.SynthesisWords + r.DiscussionWords)</td>
+                                <td class="p-1.5"><a class="text-[#003B5C] underline" href="@($"/spec-matrix/{r.RunId}")" @onclick:stopPropagation="true">open</a></td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        @if (selected is { } run)
+        {
+            <section class="bg-white border border-gray-200 rounded p-4 space-y-3">
+                <h2 class="text-sm font-bold text-[#003B5C]">Where the citations of the run from @run.CompletedUtc.Replace("T", " ").TrimEnd('Z') fail</h2>
+                <div class="grid md:grid-cols-3 gap-4">
+                    @Breakdown("By section", run.CitationsBySection)
+                    @Breakdown("By evidence available", run.CitationsByEvidence)
+                    @Breakdown("By papers cited in the sentence", run.CitationsByPapersInSentence)
+                </div>
+                <p class="text-[11px] text-gray-600">
+                    Full text for @Pct(run.FullTextShare) of the included studies; @Pct(run.VerifiedFindingShare) of the extracted findings had their quote found in the paper;
+                    @Pct(run.AnchoredCodeShare) of the codes rest on verified evidence. @Pct(run.CitedSentenceShare) of the sentences carry a citation,
+                    @Pct(run.MultiPaperSentenceShare) of those cite more than one paper, @run.CitationsPer100Words.ToString("0.0", CultureInfo.InvariantCulture) citations per 100 words.
+                    @(run.FallbackReason is { Length: > 0 } fb ? $"Thematic synthesis fell back: {fb}." : "")
+                </p>
+                <details class="text-[11px]">
+                    <summary class="cursor-pointer text-gray-600">Cost by stage (@run.LlmCalls calls, @run.Tokens.ToString("N0", CultureInfo.InvariantCulture) tokens, @run.DurationMinutes.ToString("0.0", CultureInfo.InvariantCulture) minutes)</summary>
+                    <table class="mt-2 text-[11px] border border-gray-200">
+                        <thead class="bg-gray-50 text-gray-600 text-left"><tr><th class="p-1.5">Stage</th><th class="p-1.5">Calls</th><th class="p-1.5">Seconds</th><th class="p-1.5">Tokens</th></tr></thead>
+                        <tbody>
+                            @foreach (var (stage, cost) in run.CostByStage)
+                            {
+                                <tr class="border-t border-gray-100"><td class="p-1.5 font-mono">@stage</td><td class="p-1.5">@cost.Calls</td><td class="p-1.5">@cost.Seconds.ToString("0", CultureInfo.InvariantCulture)</td><td class="p-1.5">@cost.Tokens.ToString("N0", CultureInfo.InvariantCulture)</td></tr>
+                            }
+                        </tbody>
+                    </table>
+                </details>
+            </section>
+        }
+
+        <p class="text-[10px] text-gray-400">Stored in @Store.FilePath (one JSON object per line); each run's own copy is run-metrics.json in its archive.</p>
+    }
+</main>
+
+@code {
+    // Status colours: reserved for verdicts, always shown with a label in the legend and the tooltip.
+    private const string Green = "#0ca30c", Amber = "#fab219", Red = "#d03b3b", Blue = "#5b8fd6", Grey = "#b5b5b0";
+    private static readonly (string, string)[] Legend =
+    {
+        ("Supported", Green), ("Partly supported", Amber), ("Not supported", Red), ("Abstract only, not checkable", Blue), ("Could not be verified", Grey),
+    };
+    private const int ChartHeight = 160;
+    // Wider bars when there are few runs, never wider than 36 px.
+    private int BarWidth => Math.Clamp(720 / Math.Max(1, chartRuns.Count), 10, 36);
+
+    private bool loaded, allowed, tokenRejected;
+    private string tokenInput = "";
+    private List<AuBtechReviewAgent.RunMetrics> runs = new();
+    private List<AuBtechReviewAgent.RunMetrics> chartRuns = new();
+    private List<Group> groups = new();
+    private AuBtechReviewAgent.RunMetrics? selected;
+
+    private int ChartWidth => 40 + Math.Max(1, chartRuns.Count) * (BarWidth + 2);
+
+    private sealed record Group(string Version, string Fingerprint, string SettingsText, int Runs, double Coverage,
+        AuBtechReviewAgent.VerdictCounts Initial, AuBtechReviewAgent.VerdictCounts Final, double FullText, double? CodingKappa, double Calls, double Minutes);
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        string? token = null;
+        try
+        {
+            var stored = await SessionStorage.GetAsync<string>("developer_access_token");
+            if (stored.Success) token = stored.Value;
+        }
+        catch (Exception ex)
+        {
+            // Browser storage can be unavailable (private window, blocked storage); the token can be typed in instead.
+            Logger.LogDebug("Could not read the developer token from browser storage: {Message}", ex.Message);
+        }
+        allowed = IsAllowed(token);
+        if (allowed) Load();
+        loaded = true;
+        StateHasChanged();
+    }
+
+    private bool IsAllowed(string? token) => Quota.ResolveTier(false, token) == AuBtechReviewAgent.QuotaTier.Developer;
+
+    private async Task Unlock()
+    {
+        tokenRejected = !IsAllowed(tokenInput);
+        if (tokenRejected) return;
+        allowed = true;
+        try { await SessionStorage.SetAsync("developer_access_token", tokenInput.Trim()); }
+        catch (Exception ex)
+        {
+            // Not remembering the token only means it has to be typed in again next time.
+            Logger.LogDebug("Could not save the developer token to browser storage: {Message}", ex.Message);
+        }
+        Load();
+    }
+
+    private void Load()
+    {
+        runs = Store.ReadAll();
+        chartRuns = runs.TakeLast(40).ToList();
+        selected = runs.LastOrDefault();
+        groups = runs.GroupBy(r => (r.ShortVersion, r.ConfigFingerprint))
+            .Select(g => new Group(
+                g.Key.ShortVersion, g.Key.ConfigFingerprint,
+                string.Join(", ", g.First().Settings.Select(kv => $"{kv.Key}={kv.Value}")) + $", model={g.First().Model}",
+                g.Count(),
+                Ratio(g.Sum(r => r.StudiesCited), g.Sum(r => r.Included)),
+                Pool(g.Select(r => r.CitationsInitial)), Pool(g.Select(r => r.CitationsFinal)),
+                Ratio(g.Sum(r => r.FullTextRetrieved), g.Sum(r => r.Included)),
+                g.Where(r => r.CodingKappa.HasValue).Select(r => r.CodingKappa!.Value).DefaultIfEmpty(double.NaN).Average() is double k && !double.IsNaN(k) ? k : null,
+                g.Average(r => r.LlmCalls), g.Average(r => r.DurationMinutes)))
+            .OrderByDescending(g => runs.Last(r => r.ConfigFingerprint == g.Fingerprint).CompletedUtc, StringComparer.Ordinal)
+            .ToList();
+    }
+
+    private static AuBtechReviewAgent.VerdictCounts Pool(IEnumerable<AuBtechReviewAgent.VerdictCounts> counts)
+    {
+        var list = counts.ToList();
+        return new AuBtechReviewAgent.VerdictCounts
+        {
+            Total = list.Sum(c => c.Total), Supported = list.Sum(c => c.Supported), PartiallySupported = list.Sum(c => c.PartiallySupported),
+            NotSupported = list.Sum(c => c.NotSupported), InsufficientEvidence = list.Sum(c => c.InsufficientEvidence), Unverifiable = list.Sum(c => c.Unverifiable),
+        };
+    }
+
+    private static double Ratio(double a, double b) => b <= 0 ? 0 : a / b;
+    private static string Pct(double share) => (share * 100).ToString("0", CultureInfo.InvariantCulture) + "%";
+    private static string F(double v) => v.ToString("0.#", CultureInfo.InvariantCulture);
+
+    // An SVG <text> element (Razor reserves the <text> tag inside code blocks, so it is written as markup).
+    private static MarkupString SvgText(double x, double y, string anchor, string content) =>
+        new($"<text x=\"{F(x)}\" y=\"{F(y)}\" text-anchor=\"{anchor}\" font-size=\"9\" fill=\"#6b7280\">{System.Net.WebUtility.HtmlEncode(content)}</text>");
+
+    private RenderFragment Breakdown(string title, Dictionary<string, AuBtechReviewAgent.VerdictCounts> data) => __builder =>
+    {
+        <div>
+            <span class="text-[10px] font-bold text-gray-500 uppercase block mb-1">@title</span>
+            <table class="w-full text-[11px] border border-gray-200">
+                <thead class="bg-gray-50 text-gray-600 text-left"><tr><th class="p-1.5"></th><th class="p-1.5">n</th><th class="p-1.5">Supported</th><th class="p-1.5">Partly</th><th class="p-1.5">Not</th></tr></thead>
+                <tbody>
+                    @foreach (var (key, c) in data)
+                    {
+                        <tr class="border-t border-gray-100">
+                            <td class="p-1.5">@key</td><td class="p-1.5">@c.Total</td>
+                            <td class="p-1.5 text-green-700">@Pct(c.SupportedShare)</td><td class="p-1.5 text-amber-700">@Pct(c.PartialShare)</td><td class="p-1.5 text-red-700">@Pct(c.NotSupportedShare)</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    };
+}

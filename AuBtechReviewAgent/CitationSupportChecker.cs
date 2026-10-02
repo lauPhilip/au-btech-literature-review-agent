@@ -42,6 +42,21 @@ public class CitationSupportResult
 
     /// <summary>Set when a theme subsection cites a study that was not coded under that theme.</summary>
     public string? ThemeNote { get; set; }
+
+    /// <summary>The part of the sentence attributed to this reference: what the check judged.</summary>
+    public string AttributedText { get; set; } = "";
+
+    /// <summary>The first check's verdict, before the second check (equal to Verdict when no second check ran).</summary>
+    public string FirstVerdict { get; set; } = "";
+
+    /// <summary>The independent second check, run on partly supported and not supported citations.</summary>
+    public string? SecondVerdict { get; set; }
+    public string? SecondQuote { get; set; }
+    public string? SecondEvidenceLocation { get; set; }
+    public string? SecondReason { get; set; }
+
+    /// <summary>"first check" or "second check": whose verdict is the final one.</summary>
+    public string ResolvedBy { get; set; } = "first check";
 }
 
 public class CitationSupportSummary
@@ -51,6 +66,10 @@ public class CitationSupportSummary
     public int PartiallySupported { get; set; }
     public int NotSupported { get; set; }
     public int Unverifiable { get; set; }
+    public int InsufficientEvidence { get; set; }
+    public int SecondChecked { get; set; }
+    public int SecondCheckAgreed { get; set; }
+    public int UpgradedBySecondCheck { get; set; }
 
     public static CitationSupportSummary From(IEnumerable<CitationSupportResult> results)
     {
@@ -62,6 +81,10 @@ public class CitationSupportSummary
             PartiallySupported = list.Count(r => r.Verdict == CitationSupportChecker.Partial),
             NotSupported = list.Count(r => r.Verdict == CitationSupportChecker.NotSupported),
             Unverifiable = list.Count(r => r.Verdict == CitationSupportChecker.Unverifiable),
+            InsufficientEvidence = list.Count(r => r.Verdict == CitationSupportChecker.InsufficientEvidence),
+            SecondChecked = list.Count(r => r.SecondVerdict != null),
+            SecondCheckAgreed = list.Count(r => r.SecondVerdict != null && r.SecondVerdict == r.FirstVerdict),
+            UpgradedBySecondCheck = list.Count(r => r.ResolvedBy == "second check"),
         };
     }
 
@@ -69,9 +92,13 @@ public class CitationSupportSummary
     public string ToSentence()
     {
         if (Checked == 0) return "No inline citations were available for the automated support check.";
-        return $"An automated check compared each cited sentence with the text of the cited paper. Of {Checked} citation{(Checked == 1 ? "" : "s")} checked, " +
+        string text = $"An automated check compared the part of each cited sentence attributed to a paper with the text of that paper. Of {Checked} citation{(Checked == 1 ? "" : "s")} checked, " +
                $"{Supported} {(Supported == 1 ? "was" : "were")} judged supported, {PartiallySupported} partially supported, {NotSupported} not supported, " +
-               $"and {Unverifiable} could not be verified. Every verdict, with the quoted evidence, is listed in citation-audit.json; these are model judgements and should be spot-checked by a human reviewer.";
+               (InsufficientEvidence > 0 ? $"{InsufficientEvidence} could not be judged because only the abstract was available and it does not mention the claim, " : "") +
+               $"and {Unverifiable} could not be verified.";
+        if (SecondChecked > 0)
+            text += $" {SecondChecked} citation{(SecondChecked == 1 ? " that was" : "s that were")} not fully supported went through a second, independent check with more of the paper's text; it agreed with the first check on {SecondCheckAgreed} and found verbatim support that raised the verdict for {UpgradedBySecondCheck}.";
+        return text + " Every verdict, with the quoted evidence, is listed in citation-audit.json; these are model judgements and should be spot-checked by a human reviewer.";
     }
 }
 
@@ -88,6 +115,42 @@ public static class CitationSupportChecker
     public const string Partial = "partially_supported";
     public const string NotSupported = "not_supported";
     public const string Unverifiable = "unverifiable";
+    public const string InsufficientEvidence = "insufficient_evidence";
+
+    /// <summary>Rank of a verdict for the second-check rule: only verified support counts.</summary>
+    public static int Rank(string verdict) => verdict switch { Supported => 2, Partial => 1, _ => 0 };
+
+    /// <summary>
+    /// The part of a sentence attributed to one reference: the text between the previous citation marker (or
+    /// the start of the sentence) and the marker that cites it. Text after the last marker is the review's own
+    /// interpretation and is not attributed to any paper. Falls back to the whole sentence when the clause is
+    /// too short to stand alone (e.g. "Studies [3] show ...").
+    /// </summary>
+    public static string AttributedClause(string sentence, int reference)
+    {
+        var markers = MarkerPattern.Matches(sentence).Cast<Match>().ToList();
+        string Plain(string t) => Regex.Replace(MarkerPattern.Replace(t, ""), @"\s{2,}", " ").Trim();
+        int index = markers.FindIndex(m => ReferencesIn(m.Value).Contains(reference));
+        if (index < 0) return Plain(sentence);
+        int start = index == 0 ? 0 : markers[index - 1].Index + markers[index - 1].Length;
+        string clause = sentence[start..markers[index].Index];
+        clause = Regex.Replace(clause, @"^[\s,;:.\u2014\u2013-]*(and|or|while|whereas|but|yet|with|from|to|as well as)?\s+", "", RegexOptions.IgnoreCase);
+        clause = Plain(clause).Trim(' ', ',', ';', ':', '\u2014', '\u2013', '-');
+        if (clause.Split(' ', StringSplitOptions.RemoveEmptyEntries).Length < 4)
+            clause = Plain(sentence[..markers[index].Index]).Trim(' ', ',', ';', ':');
+        if (clause.Split(' ', StringSplitOptions.RemoveEmptyEntries).Length < 4) clause = Plain(sentence);
+        return clause;
+    }
+
+    /// <summary>Text after the last citation marker (three words or more): the review's own interpretation.</summary>
+    public static string? UnattributedTail(string sentence)
+    {
+        var markers = MarkerPattern.Matches(sentence).Cast<Match>().ToList();
+        if (markers.Count == 0) return null;
+        var last = markers[^1];
+        string tail = sentence[(last.Index + last.Length)..].Trim().Trim(',', ';', ':', '.', ' ', '\u2014', '\u2013', '-');
+        return tail.Split(' ', StringSplitOptions.RemoveEmptyEntries).Length >= 3 ? tail : null;
+    }
 
     private static readonly Regex MarkerPattern = new(@"\[(\d+(?:\s*[,–-]\s*\d+)*)\]", RegexOptions.Compiled);
 
@@ -194,34 +257,72 @@ public static class CitationSupportChecker
         IReadOnlyList<ReferencedPaper> papers,
         int excerptsPerReference = 6,
         IReadOnlyDictionary<int, IReadOnlyList<string>>? verifiedFindings = null,
-        int parallelism = 1)
+        int parallelism = 1,
+        bool secondCheck = false)
     {
-        var results = new List<CitationSupportResult>();
         var byReference = papers.ToDictionary(p => p.ReferenceNumber);
+        var pairs = citedSentences.SelectMany(s => s.References.Select(r => (Ref: r, Sentence: s))).ToList();
+        var results = await RunPassAsync(chat, pairs, byReference, excerptsPerReference, verifiedFindings, parallelism, second: false);
+        foreach (var r in results) r.FirstVerdict = r.Verdict;
 
-        var pairsByRef = citedSentences
-            .SelectMany(s => s.References.Select(r => (Ref: r, Sentence: s)))
-            .GroupBy(x => x.Ref)
-            .OrderBy(g => g.Key);
+        // Second, independent check for what the first did not find fully supported. It does not see the first
+        // verdict and gets twice as many excerpts, chosen for the attributed clause. The final verdict is the
+        // better of the two only when that better verdict rests on a verbatim quote found in the paper.
+        if (secondCheck)
+        {
+            var doubtful = results.Where(r => r.Verdict is Partial or NotSupported ||
+                                              (r.Verdict == Unverifiable && r.Reason.StartsWith("Model said", StringComparison.Ordinal))).ToList();
+            if (doubtful.Count > 0)
+            {
+                var sentenceOf = citedSentences.ToDictionary(s => (s.Field, s.SentenceIndex));
+                var secondPairs = doubtful.Select(r => (Ref: r.Reference, Sentence: sentenceOf[(r.Field, r.SentenceIndex)])).ToList();
+                var second = await RunPassAsync(chat, secondPairs, byReference, excerptsPerReference * 2, verifiedFindings, parallelism, second: true);
+                var secondOf = second.ToDictionary(r => (r.Field, r.SentenceIndex, r.Reference));
+                foreach (var r in doubtful)
+                {
+                    if (!secondOf.TryGetValue((r.Field, r.SentenceIndex, r.Reference), out var s2)) continue;
+                    r.SecondVerdict = s2.Verdict;
+                    r.SecondQuote = s2.Quote;
+                    r.SecondEvidenceLocation = s2.EvidenceLocation;
+                    r.SecondReason = s2.Reason;
+                    if (Rank(s2.Verdict) > Rank(r.Verdict) && s2.QuoteVerified)
+                    {
+                        r.Verdict = s2.Verdict;
+                        r.Quote = s2.Quote;
+                        r.QuoteVerified = true;
+                        r.EvidenceLocation = s2.EvidenceLocation;
+                        r.Reason = s2.Reason;
+                        r.ResolvedBy = "second check";
+                    }
+                }
+            }
+        }
+        return results.OrderBy(r => r.Field).ThenBy(r => r.SentenceIndex).ThenBy(r => r.Reference).ToList();
+    }
 
-        // References are checked a few at a time; the results are sorted at the end, so the order of the
+    private static async Task<List<CitationSupportResult>> RunPassAsync(
+        IChatCompletionService chat, List<(int Ref, CitedSentence Sentence)> pairs,
+        IReadOnlyDictionary<int, ReferencedPaper> byReference, int excerptsPerReference,
+        IReadOnlyDictionary<int, IReadOnlyList<string>>? verifiedFindings, int parallelism, bool second)
+    {
+        // References are checked a few at a time; the results are sorted afterwards, so the order of the
         // answers does not matter.
         using var throttle = new SemaphoreSlim(Math.Max(1, parallelism));
-        var work = pairsByRef.Select(async group =>
+        var work = pairs.GroupBy(x => x.Ref).OrderBy(g => g.Key).Select(async group =>
         {
             await throttle.WaitAsync();
-            try { return await CheckReferenceAsync(chat, group.Key, group.Select(x => x.Sentence).ToList(), byReference, excerptsPerReference, verifiedFindings); }
+            try { return await CheckReferenceAsync(chat, group.Key, group.Select(x => x.Sentence).ToList(), byReference, excerptsPerReference, verifiedFindings, second); }
             finally { throttle.Release(); }
         }).ToList();
+        var results = new List<CitationSupportResult>();
         foreach (var task in work) results.AddRange(await task);
-
-        return results.OrderBy(r => r.Field).ThenBy(r => r.SentenceIndex).ThenBy(r => r.Reference).ToList();
+        return results;
     }
 
     private static async Task<List<CitationSupportResult>> CheckReferenceAsync(
         IChatCompletionService chat, int reference, List<CitedSentence> sentences,
         IReadOnlyDictionary<int, ReferencedPaper> byReference, int excerptsPerReference,
-        IReadOnlyDictionary<int, IReadOnlyList<string>>? verifiedFindings)
+        IReadOnlyDictionary<int, IReadOnlyList<string>>? verifiedFindings, bool second = false)
     {
         var results = new List<CitationSupportResult>();
         var group = (Key: reference, Count: sentences.Count);
@@ -239,7 +340,8 @@ public static class CitationSupportChecker
             if (verifiedFindings != null && verifiedFindings.TryGetValue(group.Key, out var findingQuotes))
                 foreach (var q in findingQuotes.Where(q => !string.IsNullOrWhiteSpace(q)).Distinct())
                     excerpts.Add(($"E{excerpts.Count + 1} (verified extraction quote)", q.Trim()));
-            var terms = TextRelevance.Terms(string.Join(" ", sentences.Select(s => s.Sentence)));
+            // Excerpts are chosen for the clauses attributed to this paper, not for the whole sentences.
+            var terms = TextRelevance.Terms(string.Join(" ", sentences.Select(s => AttributedClause(s.Sentence, group.Key))));
             foreach (var chunk in GroundingContextBuilder.SelectChunks(paper.Chunks, terms, excerptsPerReference))
                 excerpts.Add(($"E{excerpts.Count + 1} (page {chunk.PageNumber})", chunk.Text));
 
@@ -251,7 +353,10 @@ public static class CitationSupportChecker
             }
 
             var prompt = new StringBuilder();
-            prompt.AppendLine("You are checking citations in a systematic literature review. For each numbered sentence below, decide whether the EXCERPTS from the cited paper support what the sentence says about that paper.");
+            prompt.AppendLine(second
+                ? "You are checking citations in a systematic literature review as an independent second reviewer. For each numbered sentence below, decide whether the EXCERPTS from the cited paper support the part of the sentence attributed to this paper. Read all excerpts before deciding: the support may be in any of them."
+                : "You are checking citations in a systematic literature review. For each numbered sentence below, decide whether the EXCERPTS from the cited paper support the part of the sentence attributed to this paper.");
+            prompt.AppendLine("The full sentence is given for context only. Other papers cited in it are checked separately, and the review's own interpretation (text not attributed to any paper) is not checked against this paper.");
             prompt.AppendLine();
             prompt.AppendLine($"CITED PAPER [{group.Key}]: {paper.Title}");
             prompt.AppendLine(PromptSafety.DataOnlyNotice);
@@ -259,14 +364,20 @@ public static class CitationSupportChecker
             prompt.AppendLine(PromptSafety.Wrap(string.Join("\n", excerpts.Select(e => $"{e.Label.Split(' ')[0]}: {e.Text}")), "excerpts from the cited paper"));
             prompt.AppendLine();
             prompt.AppendLine("SENTENCES CITING THIS PAPER:");
-            for (int i = 0; i < sentences.Count; i++) prompt.AppendLine($"S{i + 1}: {sentences[i].Sentence}");
+            for (int i = 0; i < sentences.Count; i++)
+            {
+                prompt.AppendLine($"S{i + 1}: {sentences[i].Sentence}");
+                prompt.AppendLine($"   Attributed to [{group.Key}]: \"{AttributedClause(sentences[i].Sentence, group.Key)}\"");
+            }
             prompt.AppendLine();
             prompt.AppendLine("""
                 Rules:
-                - "supported": the excerpts clearly state what the sentence attributes to this paper.
-                - "partially_supported": the excerpts support part of the claim, or support it only loosely.
-                - "not_supported": the excerpts do not say this, or contradict it.
-                - Judge only against the excerpts, not your own knowledge. If the sentence cites several papers, judge only the part that concerns this one.
+                - "supported": the excerpts state the attributed claim in substance. Different wording, a summary, or a fair generalisation of what the paper reports counts as supported; do not downgrade only because the wording differs.
+                - "partially_supported": the core of the attributed claim is in the excerpts, but a specific element it adds is not: a number, a qualifier (such as "always" or "most"), a scope, a causal link or a comparison.
+                - "not_supported": the excerpts address the topic but say something different, or contradict the claim.
+                - "not_in_excerpts": the excerpts do not mention the topic of the attributed claim at all.
+                - When several papers are cited together for one claim or a list, this paper supports it if it supports the claim in substance or the element of the list it evidently contributes.
+                - Judge only against the excerpts, not your own knowledge.
                 - For supported and partially_supported, copy a short verbatim quote (one sentence, max 40 words) from ONE excerpt and name that excerpt (e.g. "E2"). Copy it as one unbroken passage: do not shorten it with "..." and do not rephrase it.
                 Respond ONLY with a minified JSON object:
                 {"results":[{"sentence":1,"verdict":"supported","excerpt":"E2","quote":"...","reason":"one short sentence"}]}
@@ -288,6 +399,13 @@ public static class CitationSupportChecker
                     {
                         r.Verdict = v.Verdict is Supported or Partial or NotSupported ? v.Verdict : Unverifiable;
                         r.Reason = v.Reason;
+                        // Absence from an abstract is not evidence against a claim; absence from the most
+                        // relevant full-text passages is treated as not supported.
+                        if (v.Verdict == "not_in_excerpts")
+                        {
+                            r.Verdict = paper.HasFullText ? NotSupported : InsufficientEvidence;
+                            r.Reason = $"The excerpts do not mention this. {v.Reason}".Trim();
+                        }
                         r.Quote = v.Quote;
                         var excerpt = excerpts.FirstOrDefault(e => e.Label.Split(' ')[0].Equals(v.Excerpt, StringComparison.OrdinalIgnoreCase));
                         r.EvidenceLocation = excerpt.Label;
@@ -342,5 +460,6 @@ public static class CitationSupportChecker
         Verdict = verdict,
         EvidenceBasis = basis,
         Reason = reason,
+        AttributedText = AttributedClause(s.Sentence, reference),
     };
 }

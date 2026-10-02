@@ -70,6 +70,11 @@ var cacheOptions = builder.Configuration.GetSection("Cache").Get<AuBtechReviewAg
 var reviewCache = new AuBtechReviewAgent.ReviewCache(cacheOptions, builder.Environment.ContentRootPath);
 builder.Services.AddSingleton(reviewCache);
 
+// Per-run quality metrics, kept in App_Data/metrics so they outlive the run folders (see the Metrics section).
+var metricsOptions = builder.Configuration.GetSection("Metrics").Get<AuBtechReviewAgent.MetricsOptions>() ?? new AuBtechReviewAgent.MetricsOptions();
+var metricsStore = new AuBtechReviewAgent.RunMetricsStore(metricsOptions, builder.Environment.ContentRootPath);
+builder.Services.AddSingleton(metricsStore);
+
 // Thematic synthesis, dual coding and citation repair (see the Synthesis section).
 var synthesisOptions = builder.Configuration.GetSection("Synthesis").Get<AuBtechReviewAgent.SynthesisOptions>() ?? new AuBtechReviewAgent.SynthesisOptions();
 
@@ -79,6 +84,7 @@ var reviewEngine = new AuBtechReviewAgent.PrismaReviewEngine(mistralApiKey, else
     Llm = llmOptions,
     Cache = reviewCache,
     Synthesis = synthesisOptions,
+    MetricsStore = metricsStore,
 };
 builder.Services.AddSingleton(reviewEngine);
 
