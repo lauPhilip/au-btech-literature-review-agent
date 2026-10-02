@@ -217,6 +217,10 @@ public partial class PrismaReviewEngine
                 SearchQuery = request.Query,
                 PeerReviewOnlyToggle = request.PeerReviewOnly,
                 SynthesisTargetDirective = request.SynthesisDirective,
+                ReviewObjective = request.Objective,
+                InclusionCriteria = request.Inclusion,
+                ExclusionCriteria = request.Exclusion,
+                ArtifactKind = ArtifactKinds.Normalize(request.ArtifactKind),
                 SelectedSources = selectedKeys,
                 MaxResultsPerSource = request.MaxResultsPerSource,
                 YearFrom = yearFrom,
@@ -504,10 +508,7 @@ public partial class PrismaReviewEngine
     private async Task SaveStateAsync(Guid sessionId, ReviewState state)
     {
         var options = new JsonSerializerOptions { WriteIndented = true };
-        string path = GetStateFilePath(sessionId);
-        string tmp = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
-        await File.WriteAllTextAsync(tmp, JsonSerializer.Serialize(state, options));
-        File.Move(tmp, path, overwrite: true);
+        await SafeFile.WriteAllTextAsync(GetStateFilePath(sessionId), JsonSerializer.Serialize(state, options));
     }
 
     /// <summary>
