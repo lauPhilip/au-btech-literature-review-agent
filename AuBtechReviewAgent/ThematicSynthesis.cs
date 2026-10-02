@@ -141,15 +141,21 @@ public static class ThematicSynthesis
     /// <summary>Codes every study, a batch at a time. Studies that could not be coded are returned with the reason.</summary>
     public static async Task<(List<ThematicCode> Codes, List<UncodedStudy> Uncoded)> CodeStudiesAsync(
         IChatCompletionService chat, string objective, IReadOnlyList<ReferencedPaper> papers,
-        IReadOnlyList<StudyExtraction> extractions, int batchSize, int parallelism)
+        IReadOnlyList<StudyExtraction> extractions, int batchSize, int parallelism, Action<int, int>? progress = null)
     {
         var byRef = extractions.ToDictionary(e => e.ReferenceNumber);
         var batches = papers.OrderBy(p => p.ReferenceNumber).Chunk(Math.Max(1, batchSize)).ToList();
         using var throttle = new SemaphoreSlim(Math.Max(1, parallelism));
+        int finished = 0;
         var work = batches.Select(async batch =>
         {
             await throttle.WaitAsync();
-            try { return await CodeBatchAsync(chat, objective, batch, byRef); }
+            try
+            {
+                var coded = await CodeBatchAsync(chat, objective, batch, byRef);
+                progress?.Invoke(Interlocked.Increment(ref finished), batches.Count);
+                return coded;
+            }
             finally { throttle.Release(); }
         }).ToList();
 
@@ -200,6 +206,7 @@ public static class ThematicSynthesis
             You are coding studies for the thematic synthesis of a systematic literature review (Thomas & Harden, 2008: line-by-line coding of findings, then descriptive themes).
 
             REVIEW OBJECTIVE: "{{objective}}"
+            {{PromptSafety.ReviewerInputNotice}}
 
             {{PromptSafety.DataOnlyNotice}}
 
@@ -280,6 +287,7 @@ public static class ThematicSynthesis
             You are building the codebook for the thematic synthesis of a systematic literature review: group the codes below into descriptive themes.
 
             REVIEW OBJECTIVE: "{{objective}}"
+            {{PromptSafety.ReviewerInputNotice}}
 
             {{PromptSafety.DataOnlyNotice}}
 
