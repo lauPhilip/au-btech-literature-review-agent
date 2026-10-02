@@ -20,8 +20,11 @@ public class SynthesisOptions
     /// <summary>A second, independent assignment of studies to themes, compared with Cohen's kappa.</summary>
     public bool DualCoding { get; set; } = true;
 
-    /// <summary>Rewrite cited sentences the support check judged not supported, then check them again.</summary>
+    /// <summary>Rewrite cited sentences the support check judged not supported or partly supported, then check them again.</summary>
     public bool RepairCitations { get; set; } = true;
+
+    /// <summary>Give partly supported and not supported citations a second, independent check with more excerpts.</summary>
+    public bool SecondCitationCheck { get; set; } = true;
 
     /// <summary>Upper limit on the number of themes in the codebook.</summary>
     public int MaxThemes { get; set; } = 8;
@@ -474,8 +477,8 @@ public static class ThematicSynthesis
         }
         sb.Append("Third, each theme was written up as a subsection from its own studies only, with every study of the theme to be cited; studies still uncited were given to one further revision pass. ");
         sb.Append(repairEnabled
-            ? "Finally, every cited sentence was checked against the cited paper; sentences judged not supported were rewritten once from the paper's evidence and checked again."
-            : "Finally, every cited sentence was checked against the cited paper.");
+            ? "Finally, the part of every cited sentence attributed to a paper was checked against that paper; sentences judged not supported or only partly supported were rewritten once from the paper's evidence and checked again."
+            : "Finally, the part of every cited sentence attributed to a paper was checked against that paper.");
         return sb.ToString();
     }
 }
