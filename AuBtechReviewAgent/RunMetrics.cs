@@ -331,14 +331,20 @@ public class RunMetricsStore
     {
         var list = new List<RunMetrics>();
         if (!_options.Enabled || !File.Exists(_file)) return list;
+        int skipped = 0;
         string[] lines;
         lock (Lock) lines = File.ReadAllLines(_file);
         foreach (var line in lines)
         {
             if (string.IsNullOrWhiteSpace(line)) continue;
             try { if (JsonSerializer.Deserialize<RunMetrics>(line) is { } m) list.Add(m); }
-            catch (JsonException) { }
+            catch (JsonException)
+            {
+                // A damaged line (for example from an interrupted write) is skipped so the rest stays readable.
+                skipped++;
+            }
         }
+        if (skipped > 0) _log.LogWarning("Skipped {Count} unreadable line(s) in {File}", skipped, _file);
         return list.OrderBy(m => m.CompletedUtc, StringComparer.Ordinal).ToList();
     }
 }

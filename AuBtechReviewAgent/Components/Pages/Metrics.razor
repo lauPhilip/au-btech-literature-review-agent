@@ -6,6 +6,7 @@
 @inject AuBtechReviewAgent.RunMetricsStore Store
 @inject AuBtechReviewAgent.RunQuotaService Quota
 @inject ProtectedSessionStorage SessionStorage
+@inject ILogger<Metrics> Logger
 
 <PageTitle>Run Quality Metrics</PageTitle>
 
@@ -77,7 +78,7 @@
                     {
                         var r = chartRuns[i];
                         var c = r.CitationsFinal;
-                        double x = 34 + i * (BarWidth + 2);
+                        double x = 34 + (double)i * (BarWidth + 2);
                         double top = 4;
                         <g>
                             <title>@($"{r.CompletedUtc[..10]} · {r.ShortVersion} · {c.Total} citations: {c.Supported} supported, {c.PartiallySupported} partly, {c.NotSupported} not supported, {c.InsufficientEvidence} abstract only, {c.Unverifiable} unverifiable · {r.StudiesCited}/{r.Included} studies cited")</title>
@@ -234,7 +235,11 @@
             var stored = await SessionStorage.GetAsync<string>("developer_access_token");
             if (stored.Success) token = stored.Value;
         }
-        catch { /* storage unavailable: the token can be typed in */ }
+        catch (Exception ex)
+        {
+            // Browser storage can be unavailable (private window, blocked storage); the token can be typed in instead.
+            Logger.LogDebug("Could not read the developer token from browser storage: {Message}", ex.Message);
+        }
         allowed = IsAllowed(token);
         if (allowed) Load();
         loaded = true;
@@ -248,7 +253,12 @@
         tokenRejected = !IsAllowed(tokenInput);
         if (tokenRejected) return;
         allowed = true;
-        try { await SessionStorage.SetAsync("developer_access_token", tokenInput.Trim()); } catch { }
+        try { await SessionStorage.SetAsync("developer_access_token", tokenInput.Trim()); }
+        catch (Exception ex)
+        {
+            // Not remembering the token only means it has to be typed in again next time.
+            Logger.LogDebug("Could not save the developer token to browser storage: {Message}", ex.Message);
+        }
         Load();
     }
 

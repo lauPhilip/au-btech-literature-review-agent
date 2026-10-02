@@ -26,6 +26,7 @@ public class ArxivSource : IAcademicSource
     private readonly TimeSpan _spacing;
     private readonly Func<int, TimeSpan>? _backoff;
 
+    /// <summary>Creates the arXiv source; the parameters are only set by tests.</summary>
     /// <param name="client">Test hook: the HTTP client (default: the shared OpenSourceHttp client).</param>
     /// <param name="spacing">Minimum time between two arXiv requests (default 3 seconds).</param>
     /// <param name="backoff">Test hook: wait before retry n (default: OpenSourceHttp's 3, 6, 12, 24 seconds).</param>
@@ -36,14 +37,15 @@ public class ArxivSource : IAcademicSource
         _backoff = backoff;
     }
 
-    private async Task<string> GetSpacedAsync(string url)
+    /// <summary>One request at a time across the whole app, at least <paramref name="spacing"/> after the previous one.</summary>
+    private static async Task<string> GetSpacedAsync(string url, TimeSpan spacing, HttpClient? client, Func<int, TimeSpan>? backoff)
     {
         await Gate.WaitAsync();
         try
         {
-            var wait = _lastRequestUtc + _spacing - DateTime.UtcNow;
+            var wait = _lastRequestUtc + spacing - DateTime.UtcNow;
             if (wait > TimeSpan.Zero) await Task.Delay(wait);
-            try { return await OpenSourceHttp.GetStringAsync(url, backoff: _backoff, client: _client); }
+            try { return await OpenSourceHttp.GetStringAsync(url, backoff: backoff, client: client); }
             finally { _lastRequestUtc = DateTime.UtcNow; }
         }
         finally { Gate.Release(); }
@@ -58,7 +60,7 @@ public class ArxivSource : IAcademicSource
 
         try
         {
-            string xmlContent = await GetSpacedAsync(url);
+            string xmlContent = await GetSpacedAsync(url, _spacing, _client, _backoff);
             _raw.Add(xmlContent);
             XDocument doc = XDocument.Parse(xmlContent);
             
