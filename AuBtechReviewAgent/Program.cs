@@ -70,11 +70,15 @@ var cacheOptions = builder.Configuration.GetSection("Cache").Get<AuBtechReviewAg
 var reviewCache = new AuBtechReviewAgent.ReviewCache(cacheOptions, builder.Environment.ContentRootPath);
 builder.Services.AddSingleton(reviewCache);
 
+// Thematic synthesis, dual coding and citation repair (see the Synthesis section).
+var synthesisOptions = builder.Configuration.GetSection("Synthesis").Get<AuBtechReviewAgent.SynthesisOptions>() ?? new AuBtechReviewAgent.SynthesisOptions();
+
 var reviewEngine = new AuBtechReviewAgent.PrismaReviewEngine(mistralApiKey, elsevierApiKey, ieeeApiKey, scholarApiKey, supportStatement, runsOptions)
 {
     OpenSources = openSources,
     Llm = llmOptions,
     Cache = reviewCache,
+    Synthesis = synthesisOptions,
 };
 builder.Services.AddSingleton(reviewEngine);
 

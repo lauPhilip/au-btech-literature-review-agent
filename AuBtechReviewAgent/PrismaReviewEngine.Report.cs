@@ -123,7 +123,10 @@ public partial class PrismaReviewEngine
             sbReferences.AppendLine($"[{i + 1}] - {includedPapers[i].ApaCitation}");
         }
 
-        string groundedContext = GroundingContextBuilder.Build(referencedPapers, $"{request.Query} {request.Objective}");
+        // About two excerpts per study (at least 40, at most 120), so a large review does not leave most
+        // studies with a single excerpt or none.
+        string groundedContext = GroundingContextBuilder.Build(referencedPapers, $"{request.Query} {request.Objective}",
+            Math.Clamp(2 * referencedPapers.Count, 40, 120));
 
         await GeneratePrismaChecklistReportWithRAGAsync(ctx.RunId, ctx.Chat, request.Query, request.Objective,
             inc: request.Inclusion, exc: request.Exclusion, groundedContext, sbReferences.ToString(), reviewState,
@@ -237,8 +240,11 @@ public partial class PrismaReviewEngine
     // outline is fed in so every specific claim can be tied to a real reference number.
     private async Task<(string Synthesis, string Discussion)> GenerateCitedSectionsAsync(
         IChatCompletionService chat, string query, string explicitObjective,
-        string groundedOutline, string referenceListMapping, string groundedChunksText)
+        string groundedOutline, string referenceListMapping, string groundedChunksText, int referenceCount = 0)
     {
+        // Length grows with the number of included studies: six paragraphs cannot cite seventy papers meaningfully.
+        int synthesisParagraphs = Math.Clamp((int)Math.Ceiling(referenceCount / 6.0), 3, 8);
+        int discussionParagraphs = Math.Clamp(2 + referenceCount / 15, 3, 5);
         var prompt = $$"""
             You are an expert systematic-review author writing two sections of a PRISMA 2020 review:
             the Results & Synthesis section (Item 20a) and the Discussion section (Item 23a).
@@ -258,10 +264,12 @@ public partial class PrismaReviewEngine
             {{PromptSafety.Wrap(groundedChunksText, "excerpts from the included papers")}}
 
             REQUIREMENTS:
-            1. Depth. For the synthesis, write 2 to 4 substantial paragraphs that group findings by theme,
-               compare and contrast what different sources report, and name agreements, tensions, and gaps.
-               For the discussion, write 2 to 3 paragraphs interpreting what the findings mean, their
-               limitations, and their implications - grounded in the same sources, not new claims.
+            1. Depth. For the synthesis, write about {{synthesisParagraphs}} substantial paragraphs that group findings
+               by theme, compare and contrast what different sources report, and name agreements, tensions, and
+               gaps. Draw on as many of the included sources as the context supports: every source whose
+               excerpts bear on a theme should be cited where it fits. For the discussion, write about
+               {{discussionParagraphs}} paragraphs interpreting what the findings mean, their limitations, and their
+               implications - grounded in the same sources, not new claims.
             2. MANDATORY INLINE CITATIONS. Every sentence that states a specific finding, comparison, or claim
                drawn from the literature MUST end with an inline citation marker in square brackets that
                references the reference list by number, for example "...separating inference from governance [3]."
@@ -587,21 +595,55 @@ public partial class PrismaReviewEngine
             }
             // The Results & Synthesis (20a) and Discussion (23a) sections are NOT run through the generic
             // stylistic refiner - that rewrite step tends to drop the inline [n] citation markers. They are
-            // instead produced by a dedicated citation-mandatory pass and then improved by a documented
-            // peer-review pass, so the shipped text keeps its traceable citations and gains depth.
-            using var citedStage = LlmStage.Begin("cited-sections");
-            var (citedSynthesis, citedDiscussion) = await GenerateCitedSectionsAsync(
-                chat, query, explicitObjective, groundedOutline, referenceListMapping, groundedChunksText);
+            // written by the thematic synthesis (one cited subsection per theme, then the discussion), or, when
+            // that is switched off or fails, by a single citation-mandatory pass; both are then peer reviewed.
+            var papersForCheck = referencedPapers ?? Array.Empty<ReferencedPaper>();
+            ThematicResult? thematic = null;
+            if (Synthesis.ThematicSynthesis && papersForCheck.Count > 0)
+            {
+                try
+                {
+                    thematic = await RunThematicSynthesisAsync(chat, query, explicitObjective, finalState, papersForCheck, referenceCount);
+                }
+                catch (Exception ex)
+                {
+                    _log.LogWarning("Thematic synthesis failed, falling back to the single-pass synthesis: {Message}", SanitizeLogMessage(ex.Message));
+                    thematic = new ThematicResult { Codebook = new ThematicCodebook { FallbackReason = $"the thematic synthesis failed ({SanitizeLogMessage(ex.Message)})" } };
+                }
+                finalState.ThematicSynthesis = thematic.Codebook;
+            }
+            bool useThematic = thematic != null && thematic.Sections.Count > 0 && !string.IsNullOrWhiteSpace(thematic.Discussion);
+            if (thematic != null && !useThematic && thematic.Codebook.FallbackReason == null)
+                thematic.Codebook.FallbackReason = "the discussion could not be written from the theme subsections";
 
-            // Fall back to the base multi-field draft only if the dedicated pass returned nothing.
-            if (string.IsNullOrWhiteSpace(citedSynthesis)) citedSynthesis = rawSynthesisText;
-            if (string.IsNullOrWhiteSpace(citedDiscussion)) citedDiscussion = rawDiscussion;
-
-            // Documented "peer reviewer" pass: an LLM critiques the two sections and revises them, and the
-            // whole exchange is written to peer-review-feedback.json in the workspace for transparency.
             PeerReviewLog peerReview;
-            using (LlmStage.Begin("automated-peer-review"))
-                peerReview = await PeerReviewAndReviseAsync(chat, citedSynthesis, citedDiscussion, referenceListMapping, groundedOutline);
+            string synthesisProse;
+            string discussionText;
+            var sections = new List<SynthesisSection>();
+            if (useThematic)
+            {
+                sections = thematic!.Sections;
+                synthesisProse = ThematicSynthesis.Overview(thematic.Codebook, referenceCount);
+                discussionText = thematic.Discussion;
+                peerReview = thematic.PeerReview ?? new PeerReviewLog { GeneratedAt = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss UTC"), Verdict = "Peer review not run" };
+            }
+            else
+            {
+                string citedSynthesis, citedDiscussion;
+                using (LlmStage.Begin("cited-sections"))
+                    (citedSynthesis, citedDiscussion) = await GenerateCitedSectionsAsync(
+                        chat, query, explicitObjective, groundedOutline, referenceListMapping, groundedChunksText, referenceCount);
+
+                // Fall back to the base multi-field draft only if the dedicated pass returned nothing.
+                if (string.IsNullOrWhiteSpace(citedSynthesis)) citedSynthesis = rawSynthesisText;
+                if (string.IsNullOrWhiteSpace(citedDiscussion)) citedDiscussion = rawDiscussion;
+
+                // Documented "peer reviewer" pass: an LLM critiques the two sections and revises them.
+                using (LlmStage.Begin("automated-peer-review"))
+                    peerReview = await PeerReviewAndReviseAsync(chat, citedSynthesis, citedDiscussion, referenceListMapping, groundedOutline);
+                synthesisProse = peerReview.SynthesisAfter;
+                discussionText = peerReview.DiscussionAfter;
+            }
             try
             {
                 string peerReviewPath = Path.Join(GetWorkspaceFolderPath(sessionId), "peer-review-feedback.json");
@@ -612,11 +654,12 @@ public partial class PrismaReviewEngine
                 _log.LogWarning("Could not save peer-review-feedback.json: {Message}", SanitizeLogMessage(ex.Message));
             }
 
-            // Re-append the isolated architectural diagram strings back onto the reviewed synthesis field
             // The model sometimes writes Markdown emphasis (**Integration Challenges:**); strip it before the
             // citation check so the checked sentences are exactly the ones shown on the page and in main.tex.
-            string fullSynthesisField = MethodsSectionWriter.StripMarkdownEmphasis(peerReview.SynthesisAfter) + mermaidBlock + tikzBlock;
-            string preValidationDiscussion = MethodsSectionWriter.StripMarkdownEmphasis(peerReview.DiscussionAfter);
+            // Fields are kept in report order: the synthesis overview, the theme subsections, the discussion.
+            var fields = new List<(string Field, string Text)> { ("synthesisResultsItem", MethodsSectionWriter.StripMarkdownEmphasis(synthesisProse)) };
+            fields.AddRange(sections.Select(s => (s.Field, MethodsSectionWriter.StripMarkdownEmphasis(s.Text))));
+            fields.Add(("discussionItem", MethodsSectionWriter.StripMarkdownEmphasis(discussionText)));
 
             // STORM-style traceability guardrail: every [n] citation marker the model writes must resolve to
             // an entry that actually exists in the run's reference list. The model occasionally invents or
@@ -625,32 +668,95 @@ public partial class PrismaReviewEngine
             // on-disk audit artifact so the discrepancy itself stays visible rather than silently vanishing.
             // The stripping logic lives in CitationValidator so it can be unit-tested in isolation.
             var citationStrips = new List<StrippedCitation>();
-
-            var synthesisValidation = CitationValidator.ValidateAndStrip(fullSynthesisField, referenceCount, "synthesisResultsItem");
-            fullSynthesisField = synthesisValidation.CleanedText;
-            citationStrips.AddRange(synthesisValidation.Stripped);
-
-            var discussionValidation = CitationValidator.ValidateAndStrip(preValidationDiscussion, referenceCount, "discussionItem");
-            string cleanDiscussionValidated = discussionValidation.CleanedText;
-            citationStrips.AddRange(discussionValidation.Stripped);
-
+            for (int i = 0; i < fields.Count; i++)
+            {
+                var validation = CitationValidator.ValidateAndStrip(fields[i].Text, referenceCount, fields[i].Field);
+                fields[i] = (fields[i].Field, validation.CleanedText);
+                citationStrips.AddRange(validation.Stripped);
+            }
             finalState.Stats.InvalidCitationsStripped += citationStrips.Count;
 
             // Citation SUPPORT check: does the cited paper actually say what the sentence claims? The range
-            // check above cannot catch a valid-looking [n] that points at the wrong paper.
-            string synthesisProse = Regex.Replace(fullSynthesisField, @"\[(MERMAID|TIKZ)_START\].*?\[(MERMAID|TIKZ)_END\]", "", RegexOptions.Singleline);
-            var citedSentences = CitationSupportChecker.ExtractCitedSentences(synthesisProse, "synthesisResultsItem")
-                .Concat(CitationSupportChecker.ExtractCitedSentences(cleanDiscussionValidated, "discussionItem"))
-                .ToList();
+            // check above cannot catch a valid-looking [n] that points at the wrong paper. The verified
+            // extraction quotes are given to the check as evidence too: they are what the synthesis was written from.
+            var verifiedFindings = (finalState.Extractions ?? new List<StudyExtraction>())
+                .ToDictionary(e => e.ReferenceNumber, e => (IReadOnlyList<string>)ThematicSynthesis.VerifiedFindings(e).Select(f => f.Finding.Quote).ToList());
+            var citedSentences = fields.SelectMany(f => CitationSupportChecker.ExtractCitedSentences(f.Text, f.Field)).ToList();
             List<CitationSupportResult> supportChecks;
             using (LlmStage.Begin("citation-check"))
-                supportChecks = await CitationSupportChecker.CheckAsync(chat, citedSentences, referencedPapers ?? Array.Empty<ReferencedPaper>());
+                supportChecks = await CitationSupportChecker.CheckAsync(chat, citedSentences, papersForCheck,
+                    verifiedFindings: verifiedFindings, parallelism: Llm.ScreeningParallelism);
+            var initialSummary = CitationSupportSummary.From(supportChecks);
+
+            // Repair: sentences whose citation was rejected are rewritten once from the cited paper's evidence
+            // (or lose that citation) and checked again. Before and after go into citation-audit.json.
+            var repairs = new List<CitationRepair>();
+            if (Synthesis.RepairCitations && supportChecks.Any(NeedsRepair))
+            {
+                using (LlmStage.Begin("citation-repair"))
+                    (fields, supportChecks, repairs) = await RepairCitationsAsync(chat, fields, supportChecks, papersForCheck, verifiedFindings, referenceCount);
+            }
+            finalState.Stats.CitationsRepaired = repairs.Count(r => r.Action is "rewrite" or "drop_citation" or "delete");
+
+            // Theme consistency: a subsection citing a study that was not coded under its theme is flagged (not removed).
+            var themeOfField = sections.ToDictionary(s => s.Field, s => thematic?.Codebook.Themes.FirstOrDefault(t => t.Id == s.ThemeId));
+            foreach (var check in supportChecks)
+            {
+                if (themeOfField.TryGetValue(check.Field, out var theme) && theme != null && !theme.Studies.Contains(check.Reference))
+                    check.ThemeNote = $"Study [{check.Reference}] was not coded under the theme \"{theme.Name}\".";
+            }
+            finalState.Stats.CitationsOutsideTheme = supportChecks.Count(c => c.ThemeNote != null);
+
             var supportSummary = CitationSupportSummary.From(supportChecks);
             finalState.Stats.CitationsChecked = supportSummary.Checked;
             finalState.Stats.CitationsSupported = supportSummary.Supported;
             finalState.Stats.CitationsPartiallySupported = supportSummary.PartiallySupported;
             finalState.Stats.CitationsNotSupported = supportSummary.NotSupported;
             finalState.Stats.CitationsUnverifiable = supportSummary.Unverifiable;
+
+            // Coverage: which included studies the synthesis and discussion cite, and why the others are not cited.
+            var textOf = fields.ToDictionary(f => f.Field, f => f.Text);
+            var citedStudies = new SortedSet<int>(fields.SelectMany(f => ThematicSynthesis.CitedIn(f.Text)).Where(r => r >= 1 && r <= referenceCount));
+            var notCited = new List<UncodedStudy>();
+            for (int refNo = 1; refNo <= referenceCount; refNo++)
+            {
+                if (citedStudies.Contains(refNo)) continue;
+                var uncodedReason = thematic?.Codebook.Uncoded.FirstOrDefault(u => u.Reference == refNo)?.Reason;
+                var theme = useThematic ? thematic!.Codebook.Themes.FirstOrDefault(t => t.Studies.Contains(refNo)) : null;
+                notCited.Add(new UncodedStudy(refNo,
+                    uncodedReason != null ? $"not coded: {uncodedReason.TrimEnd('.')}" :
+                    theme != null ? $"coded under \"{theme.Name}\" but not cited after the fill pass, peer review and citation repair" :
+                    "not cited by the synthesis"));
+            }
+            if (thematic != null)
+            {
+                thematic.Codebook.NotCited = notCited;
+                foreach (var cov in thematic.Codebook.Coverage)
+                {
+                    if (!textOf.TryGetValue(cov.Field, out var finalText)) continue;
+                    cov.CitedFinal = ThematicSynthesis.CitedIn(finalText).Intersect(cov.Studies).ToList();
+                    cov.NotCited = cov.Studies.Except(cov.CitedFinal).ToList();
+                }
+                finalState.Stats.ThemesIdentified = useThematic ? thematic.Codebook.Themes.Count : 0;
+                finalState.Stats.StudiesCoded = useThematic ? thematic.Codebook.CodedStudies.Count() : 0;
+                finalState.Stats.CodingKappa = useThematic ? thematic.Codebook.SecondCoding?.Kappa : null;
+                try
+                {
+                    await File.WriteAllTextAsync(Path.Join(GetWorkspaceFolderPath(sessionId), "thematic-codebook.json"),
+                        JsonSerializer.Serialize(thematic.Codebook, new JsonSerializerOptions { WriteIndented = true }));
+                }
+                catch (Exception ex)
+                {
+                    _log.LogWarning("Could not save thematic-codebook.json: {Message}", SanitizeLogMessage(ex.Message));
+                }
+            }
+            finalState.Stats.StudiesCitedInSynthesis = citedStudies.Count;
+            string coverageSentence = ThematicSynthesis.CoverageSentence(citedStudies.Count, referenceCount, notCited);
+
+            // Re-append the isolated diagram blocks to the overview field.
+            string fullSynthesisField = textOf["synthesisResultsItem"] + mermaidBlock + tikzBlock;
+            string cleanDiscussionValidated = textOf["discussionItem"];
+            foreach (var s in sections) s.Text = textOf[s.Field];
 
             try
             {
@@ -660,7 +766,11 @@ public partial class PrismaReviewEngine
                     ReferenceListSize = referenceCount,
                     InvalidMarkersStripped = citationStrips.Count,
                     Details = citationStrips,
+                    InitialSupportSummary = initialSummary,
                     SupportSummary = supportSummary,
+                    Repairs = repairs,
+                    StudiesCited = citedStudies.Count,
+                    NotCited = notCited,
                     SupportChecks = supportChecks
                 };
                 await File.WriteAllTextAsync(auditPath, JsonSerializer.Serialize(auditPayload, new JsonSerializerOptions { WriteIndented = true }));
@@ -669,6 +779,12 @@ public partial class PrismaReviewEngine
             {
                 _log.LogWarning("Could not save citation-audit.json: {Message}", SanitizeLogMessage(ex.Message));
             }
+
+            string checkSentence = supportSummary.ToSentence();
+            if (repairs.Count > 0)
+                checkSentence += $" Before this final count, {initialSummary.NotSupported} citation{(initialSummary.NotSupported == 1 ? " was" : "s were")} judged not supported; {finalState.Stats.CitationsRepaired} cited sentence{(finalState.Stats.CitationsRepaired == 1 ? " was" : "s were")} rewritten or had the citation removed once and checked again (listed under Repairs in citation-audit.json).";
+            if (finalState.Stats.CitationsOutsideTheme > 0)
+                checkSentence += $" {finalState.Stats.CitationsOutsideTheme} citation{(finalState.Stats.CitationsOutsideTheme == 1 ? "" : "s")} in a theme subsection refer to a study not coded under that theme and are flagged in the audit.";
 
             var reportObj = new PrismaReport
             {
@@ -682,14 +798,17 @@ public partial class PrismaReviewEngine
                 SearchStrategyItem = methodsSearch,
                 SelectionProcessItem = methodsSelection,
                 SynthesisResultsItem = fullSynthesisField,
+                SynthesisSections = sections,
+                SynthesisMethodsItem = ThematicSynthesis.MethodsText(useThematic ? thematic!.Codebook : thematic?.Codebook is { } fb ? new ThematicCodebook { FallbackReason = fb.FallbackReason } : null, Llm.DisplayName, Synthesis.RepairCitations),
+                CoverageSummary = coverageSentence,
                 DiscussionItem = cleanDiscussionValidated,
                 // Items 9-11 from the extraction and MMAT appraisal the run actually produced.
                 BiasAssessmentItem = MethodsSectionWriter.DataAndAppraisal(finalState.Extractions, Llm.DisplayName),
                 ProtocolItem = MethodsSectionWriter.Protocol(finalState.ProtocolSha256, finalState.Timestamp),
                 SupportItem = _supportStatement,
                 ProtocolHash = finalState.ProtocolHash,
-                CitationCheckSummary = supportSummary.ToSentence(),
-                AvailabilityItem = $"The code of the tool (version {RecordingChatCompletionService.AppVersion}) is openly available at https://github.com/lauPhilip/au-btech-literature-review-agent. The run archive contains the protocol, the raw source responses, the screening ledger, the extraction and appraisal data, every model call's fingerprint and a manifest.json with the SHA-256 fingerprint of every file. Journal quartiles are taken from the SCImago Journal Rank (SJR) data (https://www.scimagojr.com)."
+                CitationCheckSummary = checkSentence,
+                AvailabilityItem = $"The code of the tool (version {RecordingChatCompletionService.AppVersion}) is openly available at https://github.com/lauPhilip/au-btech-literature-review-agent. The run archive contains the protocol, the raw source responses, the screening ledger, the extraction and appraisal data, the thematic codebook, every model call's fingerprint and a manifest.json with the SHA-256 fingerprint of every file. Journal quartiles are taken from the SCImago Journal Rank (SJR) data (https://www.scimagojr.com)."
             };
 
             // 3. ARCHIVE THE AUDIT DELTA LEDGER DIRECTLY INTO THE ACTIVE WORKSPACE STORE SUBFOLDER
