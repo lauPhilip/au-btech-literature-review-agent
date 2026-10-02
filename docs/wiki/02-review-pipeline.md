@@ -43,7 +43,7 @@ A run moves through a fixed set of stages, stored in `ReviewStats.ProcessingStag
 
 **Human review** (optional). With `HumanScreeningReview`, the run saves its ledger with the stage `AwaitingScreeningReview` and then opens a gate in the `RunCoordinator`. The dashboard shows `ScreeningReviewPanel.razor`, the user includes or excludes records, and `SubmitScreeningReview` releases the gate with their decisions. If nobody answers within `Runs:ScreeningReviewTimeoutHours`, the model's decisions are kept and the ledger says so.
 
-**Synthesis** (`PrismaReviewEngine.Report.cs`). `RetrieveFullTextsAsync` fetches legal open-access full text for the included studies and splits it into chunks. `SynthesizeAsync` fixes the reference numbering, extracts and appraises each study, builds the grounded context, and calls `GeneratePrismaChecklistReportWithRAGAsync`, which writes the report and checks its citations. Details on [page 4](04-evidence-and-report.md).
+**Synthesis** (`PrismaReviewEngine.Report.cs`). `RetrieveFullTextsAsync` fetches legal open-access full text for the included studies and splits it into chunks. `SynthesizeAsync` fixes the reference numbering, extracts and appraises each study, builds the grounded context, and calls `GeneratePrismaChecklistReportWithRAGAsync`, which codes the studies into themes, writes one cited subsection per theme and the discussion, and checks and repairs its citations. Details on [page 4](04-evidence-and-report.md).
 
 **Finishing.** Whatever happens, the `finally` block stores the run settings (model, version, temperatures, prompt fingerprint), saves the ledger one last time, writes `llm-calls.json`, and unregisters the run from the coordinator. If a step throws, the `catch` block marks the run `Failed` with a sanitised message before re-throwing, so the page never shows a run that silently stopped.
 
@@ -61,9 +61,16 @@ The `LlmStage` names below are what `llm-calls.json` records for each call, and 
 | `outline` | `GenerateGroundedOutlineAsync` | Report | `grounded-outline.txt`: themes, claims, reference numbers |
 | `report-draft` | inside `GeneratePrismaChecklistReportWithRAGAsync` | Report | Draft PRISMA items as JSON |
 | `style` | `StylisticRefinerUtility.RefineAcademicProseAsync` | `StylisticRefinerUtility.cs` | Abstract, rationale and objectives rewritten; `stylistic-transformation-ledger.json` |
-| `cited-sections` | `GenerateCitedSectionsAsync` | Report | Synthesis and discussion with `[n]` citations |
-| `automated-peer-review` | `PeerReviewAndReviseAsync` | Report | Critique and revision; `peer-review-feedback.json` |
+| `thematic-coding` | `ThematicSynthesis.CodeStudiesAsync` | `ThematicSynthesis.cs` | Codes per study, anchored to verified findings |
+| `thematic-codebook` | `ThematicSynthesis.BuildCodebookAsync` | `ThematicSynthesis.cs` | Themes built from the codes |
+| `thematic-coding-second` | `ThematicSynthesis.SecondCodingAsync` | `ThematicSynthesis.cs` | Independent theme assignment, kappa (with `Synthesis:DualCoding`) |
+| `theme-sections` | `WriteThemeAsync` | Thematic | One cited subsection per theme |
+| `coverage-fill` | `WriteThemeAsync` | Thematic | Revision that adds the theme's uncited studies |
+| `discussion` | `WriteDiscussionAsync` | Thematic | Discussion written from the subsections |
+| `cited-sections` | `GenerateCitedSectionsAsync` | Report | Fallback only: synthesis and discussion in one call |
+| `automated-peer-review` | `PeerReviewSectionsAsync` (fallback: `PeerReviewAndReviseAsync`) | Thematic / Report | Critique and revision; `peer-review-feedback.json` |
 | `citation-check` | `CitationSupportChecker.CheckAsync` | `CitationSupportChecker.cs` | Verdict and quote per cited sentence; `citation-audit.json` |
+| `citation-repair` | `RepairCitationsAsync` | Thematic | Rewrites or drops rejected citations, which are then checked again |
 
 Not everything in the report comes from the model. The methods sections (eligibility, information sources, search strategy, selection process, data collection and appraisal, protocol) are written in code by `MethodsSectionWriter` from the run's own numbers, so they can never disagree with what actually happened.
 
@@ -75,4 +82,4 @@ First, **the ledger is saved after every step.** `PublishAsync` writes `transpar
 
 Second, **results are applied in a fixed order even when work runs in parallel.** Sources are queried at the same time, and screening runs several records at once (`Llm:ScreeningParallelism`), but the results are always applied in source order and candidate order. Duplicate decisions, reference numbers and the ledger therefore come out the same on every run with the same inputs, regardless of which request happened to answer first.
 
-Third, **nothing the model says is trusted without a check in code.** Structured answers are validated (`LlmJson`), extraction and citation quotes must be found in the source text, reference numbers must exist in the list, and the methods text is generated from data. Where a check fails, the result is marked (for example "unverifiable") rather than silently dropped.
+Third, **nothing the model says is trusted without a check in code.** Structured answers are validated (`LlmJson`), extraction and citation quotes must be found in the source text, reference numbers must exist in the list, the methods text is generated from data, a theme's studies are derived from its codes, and a revision may not drop a citation. Where a check fails, the result is marked (for example "unverifiable") rather than silently dropped.
