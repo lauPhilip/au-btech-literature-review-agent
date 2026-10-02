@@ -463,9 +463,13 @@ public partial class PrismaReviewEngine
         return Regex.Replace(cleaned, @"\s+([.,;:!?])", "$1");
     }
 
-    /// <summary>Should the repair pass look at this verdict? Not supported, or a positive verdict whose quote was not found.</summary>
+    /// <summary>
+    /// Should the repair pass look at this verdict? Not supported, partly supported (the sentence claims more
+    /// than the paper says), or a positive verdict whose quote was not found. Not "insufficient evidence":
+    /// with only an abstract there is nothing to rewrite the sentence from.
+    /// </summary>
     public static bool NeedsRepair(CitationSupportResult r) =>
-        r.Verdict == CitationSupportChecker.NotSupported ||
+        r.Verdict is CitationSupportChecker.NotSupported or CitationSupportChecker.Partial ||
         (r.Verdict == CitationSupportChecker.Unverifiable && r.EvidenceBasis != "none" && r.Reason.StartsWith("Model said", StringComparison.Ordinal));
 
     /// <summary>
@@ -507,13 +511,14 @@ public partial class PrismaReviewEngine
                     foreach (var check in item.Checks)
                     {
                         data.AppendLine($"  Citation [{check.Reference}] was judged {check.Verdict.Replace('_', ' ')}: {check.Reason}");
+                        data.AppendLine($"  Part attributed to [{check.Reference}]: \"{check.AttributedText}\"");
                         data.AppendLine($"  Evidence from [{check.Reference}]:\n{Evidence(check.Reference, item.Sentence)}");
                     }
                     data.AppendLine();
                 }
                 string prompt = $$"""
-                    You are correcting citations in a systematic literature review. An automated check found that the sentences below say something about a cited paper that its text does not support. For each item, choose one action:
-                    - "rewrite": return the sentence rewritten so that what it attributes to each flagged paper is what the evidence below says. Keep the sentence's role in the paragraph, and keep its citation markers (you may remove one, never add a new number).
+                    You are correcting citations in a systematic literature review. An automated check found that the sentences below attribute more to a cited paper than its text supports (not supported, or only partly supported). For each item, choose one action:
+                    - "rewrite": return the sentence with the part attributed to each flagged paper changed so that it says what the evidence below says, usually by narrowing it (drop the unsupported number, qualifier, scope or comparison). Change only that part; keep the rest of the sentence, its role in the paragraph and its citation markers (you may remove one, never add a new number).
                     - "drop_citation": the sentence is fine without the flagged paper; the flagged citation will be removed.
                     - "delete": the sentence cannot be supported and should be removed.
 
@@ -608,7 +613,7 @@ public partial class PrismaReviewEngine
         if (toCheck.Count > 0)
         {
             using (LlmStage.Begin("citation-check"))
-                merged.AddRange(await CitationSupportChecker.CheckAsync(chat, toCheck, papers, verifiedFindings: findings, parallelism: Llm.ScreeningParallelism));
+                merged.AddRange(await CitationSupportChecker.CheckAsync(chat, toCheck, papers, verifiedFindings: findings, parallelism: Llm.ScreeningParallelism, secondCheck: Synthesis.SecondCitationCheck));
         }
         var ordered = merged.OrderBy(r => r.Field).ThenBy(r => r.SentenceIndex).ThenBy(r => r.Reference).ToList();
         return (newFields, ordered, repairs);

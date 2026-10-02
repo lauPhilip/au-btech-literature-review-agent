@@ -685,7 +685,7 @@ public partial class PrismaReviewEngine
             List<CitationSupportResult> supportChecks;
             using (LlmStage.Begin("citation-check"))
                 supportChecks = await CitationSupportChecker.CheckAsync(chat, citedSentences, papersForCheck,
-                    verifiedFindings: verifiedFindings, parallelism: Llm.ScreeningParallelism);
+                    verifiedFindings: verifiedFindings, parallelism: Llm.ScreeningParallelism, secondCheck: Synthesis.SecondCitationCheck);
             var initialSummary = CitationSupportSummary.From(supportChecks);
 
             // Repair: sentences whose citation was rejected are rewritten once from the cited paper's evidence
@@ -713,6 +713,9 @@ public partial class PrismaReviewEngine
             finalState.Stats.CitationsPartiallySupported = supportSummary.PartiallySupported;
             finalState.Stats.CitationsNotSupported = supportSummary.NotSupported;
             finalState.Stats.CitationsUnverifiable = supportSummary.Unverifiable;
+            finalState.Stats.CitationsInsufficientEvidence = supportSummary.InsufficientEvidence;
+            finalState.Stats.CitationsSecondChecked = supportSummary.SecondChecked;
+            finalState.Stats.CitationsUpgradedBySecondCheck = supportSummary.UpgradedBySecondCheck;
 
             // Coverage: which included studies the synthesis and discussion cite, and why the others are not cited.
             var textOf = fields.ToDictionary(f => f.Field, f => f.Text);
@@ -782,7 +785,7 @@ public partial class PrismaReviewEngine
 
             string checkSentence = supportSummary.ToSentence();
             if (repairs.Count > 0)
-                checkSentence += $" Before this final count, {initialSummary.NotSupported} citation{(initialSummary.NotSupported == 1 ? " was" : "s were")} judged not supported; {finalState.Stats.CitationsRepaired} cited sentence{(finalState.Stats.CitationsRepaired == 1 ? " was" : "s were")} rewritten or had the citation removed once and checked again (listed under Repairs in citation-audit.json).";
+                checkSentence += $" Before this final count, {initialSummary.NotSupported} citation{(initialSummary.NotSupported == 1 ? " was" : "s were")} judged not supported and {initialSummary.PartiallySupported} partially supported; {finalState.Stats.CitationsRepaired} cited sentence{(finalState.Stats.CitationsRepaired == 1 ? " was" : "s were")} rewritten or had the citation removed once and checked again (listed under Repairs in citation-audit.json).";
             if (finalState.Stats.CitationsOutsideTheme > 0)
                 checkSentence += $" {finalState.Stats.CitationsOutsideTheme} citation{(finalState.Stats.CitationsOutsideTheme == 1 ? "" : "s")} in a theme subsection refer to a study not coded under that theme and are flagged in the audit.";
 

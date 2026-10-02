@@ -689,6 +689,10 @@
                 else
                 {
                     <p><span class="font-semibold @VerdictText(check.Verdict)">@VerdictLabel(check.Verdict)</span> <span class="text-gray-500">(checked against the @check.EvidenceBasis@(string.IsNullOrEmpty(check.EvidenceLocation) ? "" : $", {check.EvidenceLocation}"))</span></p>
+                    @if (!string.IsNullOrWhiteSpace(check.AttributedText))
+                    {
+                        <p class="text-gray-600">Checked part of the sentence: <span class="italic">"@check.AttributedText"</span></p>
+                    }
                     @if (!string.IsNullOrWhiteSpace(check.Quote))
                     {
                         <blockquote class="border-l-2 border-gray-300 pl-2 italic text-gray-700">"@check.Quote"</blockquote>
@@ -703,6 +707,13 @@
                     @if (!string.IsNullOrWhiteSpace(check.ThemeNote))
                     {
                         <p class="text-amber-700">@check.ThemeNote</p>
+                    }
+                    @if (check.SecondVerdict != null)
+                    {
+                        <p class="text-gray-500 text-[10px]">
+                            First check: @VerdictLabel(check.FirstVerdict). Second, independent check with more of the paper: @VerdictLabel(check.SecondVerdict).
+                            @(check.ResolvedBy == "second check" ? " The second check found a verbatim quote, so its verdict is shown." : "")
+                        </p>
                     }
                 }
             </div>
@@ -721,6 +732,7 @@
         AuBtechReviewAgent.CitationSupportChecker.Partial => "Partly supported",
         AuBtechReviewAgent.CitationSupportChecker.NotSupported => "Not supported",
         AuBtechReviewAgent.CitationSupportChecker.Unverifiable => "Could not be verified",
+        AuBtechReviewAgent.CitationSupportChecker.InsufficientEvidence => "Not enough text to check (abstract only)",
         _ => "Not checked",
     };
 
@@ -729,6 +741,7 @@
         AuBtechReviewAgent.CitationSupportChecker.Supported => "text-green-700",
         AuBtechReviewAgent.CitationSupportChecker.Partial => "text-amber-700",
         AuBtechReviewAgent.CitationSupportChecker.NotSupported => "text-red-700",
+        AuBtechReviewAgent.CitationSupportChecker.InsufficientEvidence => "text-sky-700",
         _ => "text-gray-500",
     };
 
