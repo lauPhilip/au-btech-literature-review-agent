@@ -166,6 +166,10 @@ public partial class PrismaReviewEngine
 
         // Screening results of both prompts, for Cohen's kappa.
         public List<(bool First, bool Second)> DualPairs { get; } = new();
+
+        // Search progress: passes finished (updated from parallel source tasks) and planned.
+        public int SearchPassesDone;
+        public int SearchPassesTotal;
     }
 
     /// <summary>
@@ -176,6 +180,13 @@ public partial class PrismaReviewEngine
     /// </summary>
     public async Task RunReviewAsync(Guid sessionId, ReviewRequest request)
     {
+        // Every caller gets the same input checks (the dashboard runs them first to show the result): the
+        // text fields are normalised, too-long fields stop the run before anything is spent, and
+        // instruction-like phrases are recorded in the protocol and the ledger.
+        var inputCheck = ReviewInputGuard.Check(request);
+        if (!inputCheck.IsValid) throw new ArgumentException(string.Join(" ", inputCheck.Errors));
+        request = inputCheck.Request;
+
         Coordinator.Register(sessionId);
         var (activeMistral, activeElsevier, activeIeee, activeScholar) = ResolveKeys(request.UserKeys);
 
@@ -213,6 +224,12 @@ public partial class PrismaReviewEngine
                 HumanScreeningReviewRequested = request.HumanScreeningReview,
                 DualScreeningRequested = request.DualScreening,
                 CitationChainingRequested = request.CitationChaining,
+                InputFlags = inputCheck.Flags.Select(f => f.ToString()).ToList(),
+                Stats = new ReviewStats
+                {
+                    RunStartedUtc = DateTime.UtcNow,
+                    ProgressPlan = RunProgress.Plan(request.CitationChaining, request.HumanScreeningReview),
+                },
             }
         };
         foreach (var key in selectedKeys)
@@ -264,6 +281,9 @@ public partial class PrismaReviewEngine
             }
 
             ctx.State.Stats.ProcessingStage = StageComplete;
+            ctx.State.Stats.ProgressStep = RunProgress.Done;
+            ctx.State.Stats.ProgressFraction = 1;
+            ctx.State.Stats.ProgressDetail = "";
             ctx.State.CompletedUtc = DateTime.UtcNow;
             await PublishAsync(ctx);
         }
@@ -295,6 +315,7 @@ public partial class PrismaReviewEngine
             if (ctx.State.Stats.ProcessingStage == StageComplete)
                 await WriteRunMetricsAsync(ctx);
             Coordinator.Unregister(sessionId);
+            _lastProgressTicks.TryRemove(sessionId, out _);
         }
     }
 
@@ -522,7 +543,7 @@ public partial class PrismaReviewEngine
     private async Task WriteProtocolAsync(RunContext ctx)
     {
         var names = ctx.State.SelectedSources.Except(ctx.State.UnavailableSources).Select(SourceCatalog.DisplayNameFor).ToList();
-        string text = ProtocolWriter.Write(ctx.RunId, ctx.Request with { UserKeys = null }, names, Llm.DisplayName, _runsOptions, DateTime.UtcNow);
+        string text = ProtocolWriter.Write(ctx.RunId, ctx.Request with { UserKeys = null }, names, Llm.DisplayName, _runsOptions, DateTime.UtcNow, ctx.State.InputFlags);
         string path = Path.Join(ctx.Workspace, "protocol.md");
         await File.WriteAllTextAsync(path, text, new UTF8Encoding(false));
         ctx.State.ProtocolSha256 = RunManifest.Sha256(File.ReadAllBytes(path));
