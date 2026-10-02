@@ -43,6 +43,7 @@ The engine has test hooks so a whole review can run against fakes. `ChatFactory`
 | `PipelineFeatureTests.cs` | Dual screening and disagreements, injection flags, citation chaining, cache reuse, deleting a run, parallel screening order |
 | `RealRunRegressionTests.cs` | Cases taken from real runs that once went wrong |
 | `OpenSourceAndSafetyTests.cs` | Source parsers on saved real responses, rate-limit handling, PDF size limit, prompt-injection markers |
+| `ThematicSynthesisTests.cs` | Coding anchors, the codebook guard, second-coding kappa, the revision guard, citation repair, a full run with themes and the fallback when coding fails |
 | `CitationSupportCheckerTests.cs`, `CitationValidatorTests.cs` | Quote matching, sentence splitting, range stripping |
 | `MethodsSectionWriterTests.cs`, `MmatTableTests.cs` | Generated methods text; the MMAT table and its note |
 | `ReportGuardTests.cs`, `GroundingAndFlowTests.cs` | `main.tex` details, grounding context, PRISMA flow counts, run clean-up |
