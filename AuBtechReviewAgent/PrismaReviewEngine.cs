@@ -73,6 +73,9 @@ public partial class PrismaReviewEngine
     /// <summary>Which language model to use (Mistral or any OpenAI-compatible server such as Ollama).</summary>
     public LlmOptions Llm { get; init; } = new();
 
+    /// <summary>Store of per-run quality metrics (disabled unless Program.cs sets one).</summary>
+    public RunMetricsStore MetricsStore { get; init; } = RunMetricsStore.Disabled;
+
     /// <summary>Cache for search responses and screening decisions (disabled unless Program.cs sets one).</summary>
     public ReviewCache Cache { get; init; } = ReviewCache.Disabled;
 
@@ -289,7 +292,57 @@ public partial class PrismaReviewEngine
             {
                 _log.LogWarning("Run {RunId}: could not write llm-calls.json: {Message}", sessionId, ex.Message);
             }
+            if (ctx.State.Stats.ProcessingStage == StageComplete)
+                await WriteRunMetricsAsync(ctx);
             Coordinator.Unregister(sessionId);
+        }
+    }
+
+    /// <summary>
+    /// Computes run-metrics.json from the run's own files and appends it to the metrics store. Never fails
+    /// the run: metrics are a by-product.
+    /// </summary>
+    private async Task WriteRunMetricsAsync(RunContext ctx)
+    {
+        try
+        {
+            PrismaReport? report = null;
+            string reportPath = GetReportFilePath(ctx.RunId);
+            if (File.Exists(reportPath))
+                report = JsonSerializer.Deserialize<PrismaReport>(await File.ReadAllTextAsync(reportPath));
+
+            var checks = new List<CitationSupportResult>();
+            CitationSupportSummary? initial = null;
+            int stripped = 0;
+            string auditPath = Path.Join(ctx.Workspace, "citation-audit.json");
+            if (File.Exists(auditPath))
+            {
+                using var doc = JsonDocument.Parse(await File.ReadAllTextAsync(auditPath));
+                var root = doc.RootElement;
+                if (root.TryGetProperty("SupportChecks", out var c)) checks = JsonSerializer.Deserialize<List<CitationSupportResult>>(c.GetRawText()) ?? new();
+                if (root.TryGetProperty("InitialSupportSummary", out var i)) initial = JsonSerializer.Deserialize<CitationSupportSummary>(i.GetRawText());
+                if (root.TryGetProperty("InvalidMarkersStripped", out var st) && st.TryGetInt32(out int n)) stripped = n;
+            }
+
+            var settings = new Dictionary<string, string>
+            {
+                ["Synthesis.ThematicSynthesis"] = Synthesis.ThematicSynthesis.ToString(),
+                ["Synthesis.DualCoding"] = Synthesis.DualCoding.ToString(),
+                ["Synthesis.RepairCitations"] = Synthesis.RepairCitations.ToString(),
+                ["Synthesis.SecondCitationCheck"] = Synthesis.SecondCitationCheck.ToString(),
+                ["Synthesis.MaxThemes"] = Synthesis.MaxThemes.ToString(),
+                ["DualScreening"] = ctx.Request.DualScreening.ToString(),
+                ["CitationChaining"] = ctx.Request.CitationChaining.ToString(),
+                ["PeerReviewOnly"] = ctx.Request.PeerReviewOnly.ToString(),
+            };
+            var metrics = RunMetrics.Build(ctx.RunId, ctx.State, report, checks, initial, stripped, ctx.Chat.Calls, settings);
+            await File.WriteAllTextAsync(Path.Join(ctx.Workspace, "run-metrics.json"),
+                JsonSerializer.Serialize(metrics, new JsonSerializerOptions { WriteIndented = true }));
+            MetricsStore.Append(metrics);
+        }
+        catch (Exception ex)
+        {
+            _log.LogWarning("Run {RunId}: run metrics not written: {Message}", ctx.RunId, SanitizeLogMessage(ex.Message));
         }
     }
 
