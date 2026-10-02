@@ -65,7 +65,7 @@ public static class RunManifest
 /// </summary>
 public static class ProtocolWriter
 {
-    public static string Write(Guid runId, ReviewRequest request, IReadOnlyList<string> sourceNames, string model, RunsOptions runs, DateTime createdUtc)
+    public static string Write(Guid runId, ReviewRequest request, IReadOnlyList<string> sourceNames, string model, RunsOptions runs, DateTime createdUtc, IReadOnlyList<string>? inputFlags = null)
     {
         var sb = new StringBuilder();
         sb.AppendLine("# Review protocol");
@@ -96,6 +96,15 @@ public static class ProtocolWriter
         sb.AppendLine($"- Human check of screening decisions before the write-up: {(request.HumanScreeningReview ? $"yes (waits up to {runs.ScreeningReviewTimeoutHours} hours)" : "no")}");
         sb.AppendLine("- Data extraction (study type, method, sample, findings, limitations) and quality appraisal with MMAT 2018 for each included study, every item backed by a verified quote.");
         sb.AppendLine("- Citation support check of every cited sentence in the synthesis.");
+        if (inputFlags is { Count: > 0 })
+        {
+            sb.AppendLine();
+            sb.AppendLine("## Input check");
+            sb.AppendLine();
+            sb.AppendLine("The query, objective or criteria above contain phrases that read like instructions to a language model. The person running the review saw this warning and started the run anyway:");
+            sb.AppendLine();
+            foreach (var flag in inputFlags) sb.AppendLine($"- {flag}");
+        }
         return sb.ToString();
     }
 
