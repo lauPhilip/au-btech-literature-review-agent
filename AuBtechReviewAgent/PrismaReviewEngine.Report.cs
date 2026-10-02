@@ -806,7 +806,7 @@ public partial class PrismaReviewEngine
                 CoverageSummary = coverageSentence,
                 DiscussionItem = cleanDiscussionValidated,
                 // Items 9-11 from the extraction and MMAT appraisal the run actually produced.
-                BiasAssessmentItem = MethodsSectionWriter.DataAndAppraisal(finalState.Extractions, Llm.DisplayName),
+                BiasAssessmentItem = MethodsSectionWriter.DataAndAppraisal(finalState.Extractions ?? new List<StudyExtraction>(), Llm.DisplayName),
                 ProtocolItem = MethodsSectionWriter.Protocol(finalState.ProtocolSha256, finalState.Timestamp),
                 SupportItem = _supportStatement,
                 ProtocolHash = finalState.ProtocolHash,
