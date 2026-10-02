@@ -42,15 +42,16 @@ public static class OpenSourceHttp
     /// and 24 seconds: Semantic Scholar's shared pool without a key often answers 429 to the first request of
     /// a burst (seen in a live check), and a longer wait gets through where a short one does not.
     /// </summary>
-    public static async Task<string> GetStringAsync(string url, IDictionary<string, string>? headers = null, Func<int, TimeSpan>? backoff = null, int maxAttempts = 5)
+    public static async Task<string> GetStringAsync(string url, IDictionary<string, string>? headers = null, Func<int, TimeSpan>? backoff = null, int maxAttempts = 5, HttpClient? client = null)
     {
+        client ??= Client;
         backoff ??= attempt => TimeSpan.FromSeconds(3 * Math.Pow(2, attempt - 1));
         for (int attempt = 1; ; attempt++)
         {
             using var request = new HttpRequestMessage(HttpMethod.Get, url);
             if (headers != null) foreach (var h in headers) request.Headers.TryAddWithoutValidation(h.Key, h.Value);
 
-            using var response = await Client.SendAsync(request);
+            using var response = await client.SendAsync(request);
             if (response.IsSuccessStatusCode) return await response.Content.ReadAsStringAsync();
 
             bool transient = response.StatusCode == HttpStatusCode.TooManyRequests || (int)response.StatusCode >= 500;
