@@ -43,6 +43,7 @@ The engine has test hooks so a whole review can run against fakes. `ChatFactory`
 | `PipelineFeatureTests.cs` | Dual screening and disagreements, injection flags, citation chaining, cache reuse, deleting a run, parallel screening order |
 | `RealRunRegressionTests.cs` | Cases taken from real runs that once went wrong |
 | `OpenSourceAndSafetyTests.cs` | Source parsers on saved real responses, rate-limit handling, PDF size limit, prompt-injection markers |
+| `ArtifactAndProseTests.cs` | Markdown turned into prose, artifact validation and drawing (Mermaid, TikZ), custom requests, compacting after repair, progress that never moves back, a full run with an artifact and with none |
 | `InputGuardAndProgressTests.cs` | Input normalisation, length errors, instruction flags and the protocol entry, API key cleaning, the progress plan and percentage, monotonic progress through a full run |
 | `ArxivSourceTests.cs` | arXiv: retry on 503, a lasting 503 still fails the source, requests one at a time and spaced out |
 | `VerificationAndMetricsTests.cs` | Attributed clauses, the rubric and insufficient evidence, the second check and its quote rule, repair targets, token parsing, the metrics store, metrics of a full run |
