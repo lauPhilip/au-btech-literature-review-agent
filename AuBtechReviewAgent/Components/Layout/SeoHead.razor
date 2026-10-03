@@ -1,0 +1,67 @@
+@* The page title and what search engines and link previews read: description, canonical address, robots,
+   Open Graph and Twitter cards, and optionally the structured data of the landing page (SiteSeo). *@
+@inject IConfiguration Configuration
+@inject NavigationManager Nav
+
+<PageTitle>@FullTitle</PageTitle>
+
+<HeadContent>
+    <meta name="description" content="@Description" />
+    @if (NoIndex)
+    {
+        <meta name="robots" content="noindex, nofollow" />
+    }
+    else
+    {
+        <link rel="canonical" href="@Url" />
+    }
+    <meta property="og:site_name" content="@AuBtechReviewAgent.SiteSeo.SiteName" />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="@FullTitle" />
+    <meta property="og:description" content="@Description" />
+    <meta property="og:url" content="@Url" />
+    <meta property="og:image" content="@Image" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="TraceableAI: literature reviews where every citation is checked." />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="@FullTitle" />
+    <meta name="twitter:description" content="@Description" />
+    <meta name="twitter:image" content="@Image" />
+    @if (StructuredData)
+    {
+        @* A data block, not a script: the Content-Security-Policy does not apply to it and nothing runs. *@
+        @((MarkupString)$"<script type=\"application/ld+json\">{AuBtechReviewAgent.SiteSeo.JsonLd(BaseUrl)}</script>")
+    }
+</HeadContent>
+
+@code {
+    /// <summary>The page's own title; " · TraceableAI" is added unless it already starts with the name.</summary>
+    [Parameter, EditorRequired] public string Title { get; set; } = "";
+
+    [Parameter] public string Description { get; set; } = AuBtechReviewAgent.SiteSeo.DefaultDescription;
+
+    /// <summary>The page's path for the canonical link, e.g. "/metrics".</summary>
+    [Parameter] public string Path { get; set; } = "/";
+
+    /// <summary>Keep the page out of search results (a run's own pages, error pages).</summary>
+    [Parameter] public bool NoIndex { get; set; }
+
+    /// <summary>Add the schema.org description of the app (landing page only).</summary>
+    [Parameter] public bool StructuredData { get; set; }
+
+    private string FullTitle => Title.StartsWith(AuBtechReviewAgent.SiteSeo.SiteName, StringComparison.Ordinal)
+        ? Title : $"{Title} · {AuBtechReviewAgent.SiteSeo.SiteName}";
+
+    private string BaseUrl
+    {
+        get
+        {
+            string? configured = Configuration["Site:PublicUrl"];
+            return string.IsNullOrWhiteSpace(configured) ? Nav.BaseUri.TrimEnd('/') : configured.Trim().TrimEnd('/');
+        }
+    }
+
+    private string Url => AuBtechReviewAgent.SiteSeo.Absolute(BaseUrl, Path);
+    private string Image => AuBtechReviewAgent.SiteSeo.Absolute(BaseUrl, AuBtechReviewAgent.SiteSeo.SocialImagePath);
+}
