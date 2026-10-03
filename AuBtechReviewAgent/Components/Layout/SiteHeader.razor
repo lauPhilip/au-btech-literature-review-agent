@@ -1,0 +1,49 @@
+@* The top bar every page shares: the name, and the four places of the app with the current one marked. *@
+
+<header class="bg-brand text-white flex-none shrink-0 z-50">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between gap-3">
+        <a href="/" class="flex items-center gap-2.5 min-w-0 shrink-0 focus-visible:outline focus-visible:outline-2 focus-visible:outline-white">
+            <span class="flex-none bg-white p-0.5"><img src="img/logo.png" alt="" width="28" height="28" class="h-7 w-7" /></span>
+            <span class="text-sm font-semibold tracking-tight whitespace-nowrap shrink-0">TraceableAI</span>
+            <span class="hidden md:inline text-white/40" aria-hidden="true">·</span>
+            <span class="hidden md:inline text-xs text-white/70 whitespace-nowrap truncate">Aarhus University</span>
+        </a>
+        <nav class="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm whitespace-nowrap shrink-0" aria-label="Main">
+            @foreach (var (key, label, shortLabel, href) in Items)
+            {
+                bool active = key == Active;
+                <a href="@href" aria-current="@(active ? "page" : null)"
+                   class="@(key == "overview" ? "hidden sm:block" : "")  px-2 sm:px-3 py-1.5 transition-colors @(active ? "bg-white/15 text-white font-semibold" : "text-white/75 hover:text-white hover:bg-white/10")">
+                    @if (label != shortLabel)
+                    {
+                        <span class="sm:hidden">@shortLabel</span><span class="hidden sm:inline">@label</span>
+                    }
+                    else
+                    {
+                        @label
+                    }
+                </a>
+            }
+        </nav>
+    </div>
+</header>
+
+@code {
+    /// <summary>Which item is the current page: "overview", "dashboard", "output" or "metrics".</summary>
+    [Parameter] public string Active { get; set; } = "";
+
+    /// <summary>Where Dashboard links to (the run this tab shows, when there is one).</summary>
+    [Parameter] public string DashboardHref { get; set; } = "/review";
+
+    /// <summary>Where Review Output links to.</summary>
+    [Parameter] public string OutputHref { get; set; } = "/spec-matrix";
+
+    // The short label is used on phones, where the four items and the name must fit on one line.
+    private IEnumerable<(string Key, string Label, string ShortLabel, string Href)> Items => new[]
+    {
+        ("overview", "Overview", "Overview", "/"),
+        ("dashboard", "Dashboard", "Dashboard", DashboardHref),
+        ("output", "Review output", "Output", OutputHref),
+        ("metrics", "Metrics", "Metrics", "/metrics"),
+    };
+}

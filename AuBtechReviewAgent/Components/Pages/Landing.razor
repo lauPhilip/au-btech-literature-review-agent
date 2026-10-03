@@ -1,257 +1,333 @@
 @page "/"
+@inject AuBtechReviewAgent.RunMetricsStore MetricsStore
 
-<PageTitle>au-btech-literature-review-agent</PageTitle>
+<PageTitle>TraceableAI · Literature reviews you can check</PageTitle>
 
-<header class="bg-[#003B5C] text-white flex-none shrink-0 z-50 shadow-md">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between gap-3">
-        <a href="/" class="flex items-center space-x-3 hover:opacity-90 transition-opacity min-w-0 shrink overflow-hidden">
-            <span class="flex-none bg-white rounded-md p-0.5"><img src="img/logo.png" alt="" width="28" height="28" class="h-7 w-7" /></span>
-            <span class="font-bold tracking-tight text-xs sm:text-sm whitespace-nowrap truncate">AARHUS UNIVERSITY</span>
-            <span class="text-white/40 font-light hidden lg:inline">|</span>
-            <span class="text-xs tracking-wider font-medium opacity-90 uppercase hidden lg:inline">au-btech-literature-review-agent</span>
-        </a>
-    </div>
-</header>
+<SiteHeader Active="overview" />
 
-<main class="flex-1 min-h-0 overflow-y-auto bg-white text-gray-900">
+<main class="flex-1 min-h-0 overflow-y-auto bg-white text-gray-900 font-sans">
 
-    <!-- Hero -->
-    <section class="border-b border-gray-200">
-        <div class="max-w-6xl mx-auto px-6 py-12 lg:py-20 grid grid-cols-1 lg:grid-cols-2 gap-10 lg:gap-14 items-center">
-            <div>
-            <p class="text-[11px] font-bold uppercase tracking-widest text-[#003B5C] mb-5">
-                Aarhus University &middot; Department of Business Development and Technology
-            </p>
-            <h1 class="font-serif text-3xl lg:text-4xl font-bold tracking-tight text-gray-900 break-words">
-                TraceableAI
-            </h1>
-            <p class="font-serif text-xl lg:text-2xl text-gray-700 mt-4 max-w-3xl leading-snug">
-                Systematic literature reviews you can check afterwards.
-            </p>
-            <p class="text-sm lg:text-base text-gray-600 mt-6 max-w-2xl leading-relaxed">
-                An open-source agent that runs PRISMA 2020&ndash;compliant literature reviews and keeps a
-                record of every step, so every statement in the final report can be traced back to the paper
-                it came from.
-            </p>
-
-            <div class="mt-9 flex flex-wrap items-center gap-4">
-                <a href="/review"
-                   class="bg-[#003B5C] text-white px-7 py-3 text-xs font-bold uppercase tracking-wider hover:bg-[#00293f] transition-colors">
-                    Get Started
-                </a>
-                <a href="https://github.com/lauPhilip/au-btech-literature-review-agent"
-                   class="border border-gray-300 text-gray-800 px-7 py-3 text-xs font-bold uppercase tracking-wider hover:border-[#003B5C] hover:text-[#003B5C] transition-colors">
-                    View on GitHub
-                </a>
-            </div>
-
-            <p class="text-xs text-gray-500 mt-6">
-                Try it with a few free runs a day, or add your own Mistral API key for more. Free and open
-                source under the Apache 2.0 license.
-            </p>
-            </div>
-            <figure class="order-first lg:order-none">
-                <img src="img/campus-960.webp" srcset="img/campus-480.webp 480w, img/campus-960.webp 960w" sizes="(min-width: 1024px) 520px, 100vw"
-                     width="960" height="717" alt="Illustration: a friendly robot reads a tablet under a tree on a university campus while students walk by." fetchpriority="high" decoding="async"
-                     class="w-full h-auto rounded-xl shadow-lg ring-1 ring-black/5" />
-            </figure>
-        </div>
-    </section>
-
-    <!-- What it does -->
-    <section class="border-b border-gray-200">
-        <div class="max-w-5xl mx-auto px-6 py-16">
-            <h2 class="text-[11px] font-bold uppercase tracking-widest text-gray-400 mb-8">What it does</h2>
-            <figure class="mb-8">
-                <img src="img/library-960.webp" srcset="img/library-480.webp 480w, img/library-960.webp 960w" sizes="(min-width: 1024px) 1024px, 100vw"
-                     width="960" height="717" alt="Illustration: a robot reads a large book in a university library while library drones fetch books from the shelves." loading="lazy" decoding="async"
-                     class="w-full h-48 sm:h-64 lg:h-72 object-cover rounded-xl shadow-md ring-1 ring-black/5" />
-            </figure>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-px bg-gray-200 border border-gray-200">
-                <div class="bg-white p-7">
-                    <h3 class="font-serif text-lg text-gray-900 mb-2">Protocol first</h3>
-                    <p class="text-sm text-gray-600 leading-relaxed">
-                        The review question, criteria and sources are written down and
-                        fingerprinted before any search runs. Any later change, such as the
-                        extra search phrasings, is added as a dated amendment.
-                    </p>
-                </div>
-                <div class="bg-white p-7">
-                    <h3 class="font-serif text-lg text-gray-900 mb-2">Screened twice, disagreements flagged</h3>
-                    <p class="text-sm text-gray-600 leading-relaxed">
-                        Every record is screened by two independent prompts. Where they
-                        disagree, the paper is kept and flagged, and the agreement between the
-                        two is reported as Cohen&rsquo;s kappa. The least certain decisions are
-                        shown to you first.
-                    </p>
-                </div>
-                <div class="bg-white p-7">
-                    <h3 class="font-serif text-lg text-gray-900 mb-2">Every citation checked against the paper</h3>
-                    <p class="text-sm text-gray-600 leading-relaxed">
-                        Each cited sentence is compared with the text of the paper it cites, and
-                        the verdict comes with a verbatim quote. The tool checks that the quote
-                        really is in the paper, so an unsupported claim is flagged instead of
-                        trusted.
-                    </p>
-                </div>
-                <div class="bg-white p-7">
-                    <h3 class="font-serif text-lg text-gray-900 mb-2">Data extraction and quality appraisal</h3>
-                    <p class="text-sm text-gray-600 leading-relaxed">
-                        For each included study it extracts the method, sample, findings and
-                        limitations, and appraises quality with MMAT 2018. Every value is backed
-                        by a quote that is checked against the source.
-                    </p>
-                </div>
-                <div class="bg-white p-7">
-                    <h3 class="font-serif text-lg text-gray-900 mb-2">Open sources and citation chaining</h3>
-                    <p class="text-sm text-gray-600 leading-relaxed">
-                        It searches arXiv, OpenAlex, Semantic Scholar and Crossref out of the
-                        box, and follows the references and citing papers of the included
-                        studies to find work the search missed.
-                    </p>
-                </div>
-                <div class="bg-white p-7">
-                    <h3 class="font-serif text-lg text-gray-900 mb-2">A complete, verifiable record</h3>
-                    <p class="text-sm text-gray-600 leading-relaxed">
-                        Every run produces one archive: the protocol, the raw source responses,
-                        every screening decision, every model call, the citation audit, a draft
-                        manuscript in LaTeX, BibTeX and RIS files, and a manifest that
-                        fingerprints every file.
-                    </p>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <!-- How it works -->
-    <section class="border-b border-gray-200">
-        <div class="max-w-5xl mx-auto px-6 py-16">
-            <h2 class="text-[11px] font-bold uppercase tracking-widest text-gray-400 mb-8">How it works</h2>
-            <div class="grid grid-cols-1 lg:grid-cols-5 gap-10 items-start">
-            <ol class="space-y-6 lg:col-span-3">
-                <li class="flex gap-5">
-                    <span class="flex-none w-8 h-8 bg-[#003B5C] text-white flex items-center justify-center text-sm font-bold">1</span>
-                    <div>
-                        <h3 class="font-serif text-lg text-gray-900">Write the protocol</h3>
-                        <p class="text-sm text-gray-600 leading-relaxed mt-1">
-                            You give the question, the inclusion and exclusion criteria and the
-                            sources. The tool saves them as the review protocol before it
-                            searches.
-                        </p>
-                    </div>
-                </li>
-                <li class="flex gap-5">
-                    <span class="flex-none w-8 h-8 bg-[#003B5C] text-white flex items-center justify-center text-sm font-bold">2</span>
-                    <div>
-                        <h3 class="font-serif text-lg text-gray-900">Search</h3>
-                        <p class="text-sm text-gray-600 leading-relaxed mt-1">
-                            It queries arXiv, OpenAlex, Semantic Scholar and Crossref (plus
-                            Scopus and IEEE Xplore when a key is set) with your query and a few
-                            extra phrasings, keeps the raw response of every query, and removes
-                            duplicates.
-                        </p>
-                    </div>
-                </li>
-                <li class="flex gap-5">
-                    <span class="flex-none w-8 h-8 bg-[#003B5C] text-white flex items-center justify-center text-sm font-bold">3</span>
-                    <div>
-                        <h3 class="font-serif text-lg text-gray-900">Screen</h3>
-                        <p class="text-sm text-gray-600 leading-relaxed mt-1">
-                            Each record is screened twice against your criteria. If you like,
-                            the run pauses so you can include or exclude papers yourself,
-                            starting with the uncertain ones; your decisions are recorded.
-                        </p>
-                    </div>
-                </li>
-                <li class="flex gap-5">
-                    <span class="flex-none w-8 h-8 bg-[#003B5C] text-white flex items-center justify-center text-sm font-bold">4</span>
-                    <div>
-                        <h3 class="font-serif text-lg text-gray-900">Follow the citations</h3>
-                        <p class="text-sm text-gray-600 leading-relaxed mt-1">
-                            The references and citing papers of the included studies are fetched
-                            through OpenAlex and screened the same way.
-                        </p>
-                    </div>
-                </li>
-                <li class="flex gap-5">
-                    <span class="flex-none w-8 h-8 bg-[#003B5C] text-white flex items-center justify-center text-sm font-bold">5</span>
-                    <div>
-                        <h3 class="font-serif text-lg text-gray-900">Read and appraise</h3>
-                        <p class="text-sm text-gray-600 leading-relaxed mt-1">
-                            Open-access full text is fetched where it legally exists; otherwise
-                            the abstract is used. Each study is extracted and appraised with
-                            MMAT, and every quote is checked.
-                        </p>
-                    </div>
-                </li>
-                <li class="flex gap-5">
-                    <span class="flex-none w-8 h-8 bg-[#003B5C] text-white flex items-center justify-center text-sm font-bold">6</span>
-                    <div>
-                        <h3 class="font-serif text-lg text-gray-900">Write and check the report</h3>
-                        <p class="text-sm text-gray-600 leading-relaxed mt-1">
-                            The evidence is mapped to themes before any prose is written. The
-                            synthesis cites the studies, and every cited sentence is then
-                            checked against the paper it cites.
-                        </p>
-                    </div>
-                </li>
-                <li class="flex gap-5">
-                    <span class="flex-none w-8 h-8 bg-[#003B5C] text-white flex items-center justify-center text-sm font-bold">7</span>
-                    <div>
-                        <h3 class="font-serif text-lg text-gray-900">Download the record</h3>
-                        <p class="text-sm text-gray-600 leading-relaxed mt-1">
-                            You get the PRISMA report with clickable citations, a PRISMA flow
-                            diagram, and the full run archive to share, archive or check later.
-                        </p>
-                    </div>
-                </li>
-            </ol>
-            <figure class="lg:col-span-2 lg:sticky lg:top-6">
-                <img src="img/lab-960.webp" srcset="img/lab-480.webp 480w, img/lab-960.webp 960w" sizes="(min-width: 1024px) 400px, 100vw"
-                     width="960" height="717" alt="Illustration: a robot examines a circuit board under a microscope in a laboratory while researchers work at their benches." loading="lazy" decoding="async"
-                     class="w-full h-auto rounded-xl shadow-md ring-1 ring-black/5" />
-                <figcaption class="text-xs text-gray-500 mt-3 leading-relaxed">Every step leaves a record you can check: the protocol, the raw search results, each screening decision and each citation verdict.</figcaption>
-            </figure>
-            </div>
-        </div>
-    </section>
-
-    <!-- Why traceability -->
-    <section class="border-b border-gray-200">
-        <div class="max-w-5xl mx-auto px-6 py-16">
-            <h2 class="text-[11px] font-bold uppercase tracking-widest text-gray-400 mb-8">Why traceability</h2>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-10 items-center">
-            <div class="border-l-2 border-[#003B5C] pl-6">
-                <p class="font-serif text-lg lg:text-xl text-gray-800 leading-relaxed">
-                    Automated review tools tend to produce fluent text with citations that are broken or
-                    invented. That makes them hard to trust, and unsuitable for standards like PRISMA 2020,
-                    where you are expected to show how you reached your conclusions. This agent does not ask
-                    to be trusted: it keeps the whole trail, checks its own citations, and tells you where it
-                    is unsure, so a person can verify the review and stay responsible for it.
+    @* Hero: one message, one main action, and the product working next to it instead of an illustration. *@
+    <section class="relative overflow-hidden border-b border-gray-100">
+        <div aria-hidden="true" class="absolute inset-0 -z-0 bg-[radial-gradient(60rem_30rem_at_85%_-10%,#EEF4F8,transparent)]"></div>
+        <div class="ui-container relative py-14 lg:py-24 grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
+            <div class="lg:col-span-6">
+                <p class="ui-eyebrow">Open source · PRISMA 2020</p>
+                <h1 class="ui-h1 mt-4">Literature reviews where every citation is checked.</h1>
+                <p class="ui-lead mt-5 max-w-xl">
+                    TraceableAI runs a systematic review for you, then compares every cited sentence with the paper it
+                    cites and shows you the quote. Where the paper does not back the claim, it says so.
                 </p>
+                <div class="mt-8 flex flex-wrap items-center gap-3">
+                    <a href="/review" class="ui-btn-primary px-6 py-3 text-base">
+                        Start a review
+                        <svg class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M10.3 4.3a1 1 0 011.4 0l5 5a1 1 0 010 1.4l-5 5a1 1 0 01-1.4-1.4l3.3-3.3H4a1 1 0 110-2h9.6l-3.3-3.3a1 1 0 010-1.4z" clip-rule="evenodd" /></svg>
+                    </a>
+                    <a href="https://github.com/lauPhilip/au-btech-literature-review-agent" class="ui-btn-ghost">View the code on GitHub</a>
+                </div>
+                <p class="ui-muted mt-5">A few free runs a day, or unlimited with your own Mistral key. Apache 2.0.</p>
             </div>
-            <figure>
-                <img src="img/classroom-960.webp" srcset="img/classroom-480.webp 480w, img/classroom-960.webp 960w" sizes="(min-width: 768px) 480px, 100vw"
-                     width="960" height="717" alt="Illustration: a robot teacher explains a diagram at a blackboard to a class of robot students." loading="lazy" decoding="async"
-                     class="w-full h-auto rounded-xl shadow-md ring-1 ring-black/5" />
+
+            @* The example: a paragraph of a report, its citations checked one after the other. *@
+            <figure class="lg:col-span-6" aria-label="Example of a checked citation">
+                <div class="ui-card shadow-lift overflow-hidden">
+                    <div class="flex items-center justify-between px-5 py-3 border-b border-gray-100">
+                        <span class="text-xs font-medium text-gray-500">Report · 3.2 Human oversight</span>
+                        <span class="text-[11px] text-gray-400">Example</span>
+                    </div>
+                    <div class="px-5 pt-5 pb-4">
+                        <p class="text-[15px] leading-7 text-gray-800">
+                            Most agent frameworks require a person to approve actions that change external systems
+                            <span class="tai-cite-a px-1 font-semibold text-brand">[3]</span>, but only a few
+                            report how often those safeguards fail in practice
+                            <span class="tai-cite-b px-1 font-semibold text-brand">[7]</span>.
+                        </p>
+                    </div>
+                    <div class="relative h-[11.5rem] sm:h-[9.25rem] mx-5 mb-5">
+                        <div class="tai-cycle-a absolute inset-0 border border-green-200 bg-verdict-okBg p-4">
+                            <div class="flex items-center justify-between gap-2">
+                                <span class="ui-chip-ok bg-white">
+                                    <svg class="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M16.7 5.3a1 1 0 010 1.4l-8 8a1 1 0 01-1.4 0l-4-4a1 1 0 111.4-1.4L8 12.6l7.3-7.3a1 1 0 011.4 0z" clip-rule="evenodd" /></svg>
+                                    Supported
+                                </span>
+                                <span class="text-[11px] text-gray-500">[3] Lee et al., 2024 · p. 6</span>
+                            </div>
+                            <blockquote class="mt-3 text-sm text-gray-700 leading-relaxed border-l-2 border-green-300 pl-3">
+                                “Every tool call that modifies external state requires explicit confirmation by the operator.”
+                            </blockquote>
+                            <div class="mt-3 h-1 rounded-full bg-green-100 overflow-hidden"><div class="tai-scan h-full bg-verdict-ok origin-left"></div></div>
+                            <p class="mt-1.5 text-[11px] text-gray-500">Quote found word for word in the paper</p>
+                        </div>
+                        <div class="tai-cycle-b absolute inset-0 border border-amber-200 bg-verdict-partialBg p-4">
+                            <div class="flex items-center justify-between gap-2">
+                                <span class="ui-chip-partial bg-white">
+                                    <svg class="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M4 9h12v2H4z" /></svg>
+                                    Partly supported
+                                </span>
+                                <span class="text-[11px] text-gray-500">[7] Okafor &amp; Berg, 2025 · p. 11</span>
+                            </div>
+                            <blockquote class="mt-3 text-sm text-gray-700 leading-relaxed border-l-2 border-amber-300 pl-3">
+                                “Two of the nine deployments logged override failures; the others did not report them.”
+                            </blockquote>
+                            <div class="mt-3 h-1 rounded-full bg-amber-100 overflow-hidden"><div class="tai-scan h-full bg-verdict-partial origin-left"></div></div>
+                            <p class="mt-1.5 text-[11px] text-gray-500">Covers part of the claim · kept and marked for you to check</p>
+                        </div>
+                    </div>
+                </div>
+                <figcaption class="ui-muted text-xs mt-3 text-center">Illustrative example. In a real report every citation number opens its verdict like this.</figcaption>
             </figure>
+        </div>
+    </section>
+
+    @* Evidence instead of claims: live numbers from the public metrics, or what every run does when there are none yet. *@
+    <section class="border-b border-gray-100 bg-gray-50/60">
+        <div class="ui-container py-10">
+            <dl class="grid grid-cols-3 gap-2 sm:gap-4">
+                @foreach (var (value, label) in Stats)
+                {
+                    <div class="ui-card px-3 sm:px-5 py-4 flex flex-col-reverse">
+                        <dt class="text-[11px] sm:text-xs text-gray-500 leading-snug mt-1">@label</dt>
+                        <dd class="text-xl sm:text-3xl font-semibold tracking-tight text-gray-950">@value</dd>
+                    </div>
+                }
+            </dl>
+            <p class="ui-muted text-xs mt-3">
+                @if (runCount > 0)
+                {
+                    <span>Live from the last @runCount completed runs on this server. </span>
+                }
+                <a href="/metrics" class="text-brand font-medium hover:underline">See the full metrics</a>, including where citations fail.
+            </p>
+        </div>
+    </section>
+
+    @* How it works: the pipeline as a picture. The light that runs along it is the review moving forward. *@
+    <section class="border-b border-gray-100">
+        <div class="ui-container py-16 lg:py-24">
+            <div class="max-w-2xl">
+                <p class="ui-eyebrow">How it works</p>
+                <h2 class="ui-h2 mt-3">From your question to a report you can verify</h2>
+                <p class="ui-lead mt-4">Six steps, each one written to the run's record. The numbers come from a typical run.</p>
+            </div>
+
+            <ol class="relative mt-12 grid grid-cols-1 lg:grid-cols-6 gap-6 lg:gap-4">
+                <li aria-hidden="true" class="hidden lg:block absolute left-[8%] right-[8%] top-6 h-0.5 bg-brand-100 overflow-hidden rounded-full">
+                    <span class="tai-flow-x block h-full w-1/6 bg-gradient-to-r from-transparent via-brand to-transparent"></span>
+                </li>
+                <li aria-hidden="true" class="lg:hidden absolute left-6 top-6 bottom-6 w-0.5 bg-brand-100 overflow-hidden rounded-full">
+                    <span class="tai-flow-y block w-full h-[8%] bg-gradient-to-b from-transparent via-brand to-transparent"></span>
+                </li>
+                @foreach (var step in Pipeline)
+                {
+                    <li class="relative flex lg:flex-col items-start lg:items-center gap-4 lg:gap-3 lg:text-center">
+                        <span class="relative z-10 flex-none w-12 h-12 rounded-full bg-white border-2 border-brand text-brand flex items-center justify-center shadow-card">
+                            <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <path d="@step.Icon" />
+                            </svg>
+                        </span>
+                        <div>
+                            <h3 class="ui-h3">@step.Title</h3>
+                            @if (step.Count != null)
+                            {
+                                <p class="text-xs font-mono text-brand mt-0.5">@step.Count</p>
+                            }
+                            <p class="text-sm text-gray-600 leading-snug mt-1">@step.Text</p>
+                        </div>
+                    </li>
+                }
+            </ol>
+        </div>
+    </section>
+
+    @* What you get: each output with a small picture of the real thing. *@
+    <section class="border-b border-gray-100 bg-gray-50/60">
+        <div class="ui-container py-16 lg:py-24">
+            <div class="max-w-2xl">
+                <p class="ui-eyebrow">What you get</p>
+                <h2 class="ui-h2 mt-3">A report, and everything behind it</h2>
+            </div>
+            <div class="mt-10 grid grid-cols-1 md:grid-cols-2 gap-5">
+
+                <article class="ui-card p-6">
+                    <div class="bg-gray-50 border border-gray-100 p-4 text-[13px] leading-6 text-gray-700">
+                        Frameworks log every tool call <span class="text-verdict-ok font-semibold">[2]</span>, and most
+                        add a human approval step <span class="text-verdict-ok font-semibold">[3]</span>, though evaluations
+                        rarely measure it <span class="text-verdict-partial font-semibold">[7]</span>.
+                    </div>
+                    <h3 class="ui-h3 mt-5">A PRISMA 2020 report with clickable citations</h3>
+                    <p class="ui-muted mt-1">Every citation opens its verdict and the quote from the paper. A bar at the top steps you through the ones that need a look.</p>
+                </article>
+
+                <article class="ui-card p-6">
+                    <div class="bg-gray-50 border border-gray-100 p-4">
+                        <div class="grid grid-cols-[5.5rem_repeat(6,1fr)] gap-1 items-center text-[10px] text-gray-500">
+                            @foreach (var (theme, cells) in EvidenceMap)
+                            {
+                                <span class="truncate">@theme</span>
+                                @foreach (var level in cells)
+                                {
+                                    <span class="h-4 @(level == 2 ? "bg-brand" : level == 1 ? "bg-brand-200" : "bg-gray-200/70")"></span>
+                                }
+                            }
+                        </div>
+                    </div>
+                    <h3 class="ui-h3 mt-5">An evidence map and an artifact</h3>
+                    <p class="ui-muted mt-1">Which studies support which theme, plus a concept map, flowchart or table built only from the findings.</p>
+                </article>
+
+                <article class="ui-card p-6">
+                    <pre class="bg-gray-950 text-gray-300 p-4 text-[11.5px] leading-5 font-mono overflow-hidden"><span class="text-sky-300">\section</span>{Results}
+Agent frameworks rely on approval gates
+<span class="text-sky-300">\cite</span>{lee2024guard} ...
+<span class="text-gray-500">% references.bib · references.ris</span></pre>
+                    <h3 class="ui-h3 mt-5">A LaTeX manuscript, BibTeX and RIS</h3>
+                    <p class="ui-muted mt-1">Ready to compile, and the included studies ready for Zotero, Mendeley or EndNote.</p>
+                </article>
+
+                <article class="ui-card p-6">
+                    <ul class="bg-gray-50 border border-gray-100 p-4 font-mono text-[11.5px] leading-6 text-gray-700">
+                        @foreach (var (file, hash) in ArchiveFiles)
+                        {
+                            <li class="flex justify-between gap-3"><span class="truncate">@file</span><span class="text-gray-400">@hash</span></li>
+                        }
+                    </ul>
+                    <h3 class="ui-h3 mt-5">A complete, fingerprinted record</h3>
+                    <p class="ui-muted mt-1">The protocol, raw search results, every screening decision and model call, and the citation audit, each with a SHA-256 fingerprint.</p>
+                </article>
             </div>
         </div>
     </section>
 
-    <!-- Footer -->
-    <footer>
-        <div class="max-w-5xl mx-auto px-6 py-10 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-            <div class="text-xs text-gray-500 leading-relaxed">
-                <span class="font-semibold text-gray-700">au-btech-literature-review-agent</span> &middot; Aarhus University, BTECH<br />
-                Presented at OSSYM 2026
+    @* Why: the difference with a general chatbot, side by side. *@
+    <section class="border-b border-gray-100">
+        <div class="ui-container py-16 lg:py-24">
+            <div class="max-w-2xl">
+                <p class="ui-eyebrow">Why traceability</p>
+                <h2 class="ui-h2 mt-3">It does not ask to be trusted</h2>
+                <p class="ui-lead mt-4">Ask a chatbot for a literature review and you get fluent text with citations that are often wrong or invented. TraceableAI keeps the whole trail, so a person can check it and stay responsible for it.</p>
             </div>
-            <div class="flex flex-wrap items-center gap-x-6 gap-y-2 text-xs font-semibold uppercase tracking-wider text-gray-600">
-                <a href="https://github.com/lauPhilip/au-btech-literature-review-agent" class="hover:text-[#003B5C] transition-colors">GitHub</a>
-                <a href="https://github.com/lauPhilip/au-btech-literature-review-agent/blob/master/CONTRIBUTING.md" class="hover:text-[#003B5C] transition-colors">Contributing</a>
-                <a href="https://github.com/lauPhilip/au-btech-literature-review-agent/blob/master/LICENSE" class="hover:text-[#003B5C] transition-colors">Apache 2.0 License</a>
+            <div class="mt-10 ui-card overflow-hidden">
+                <div class="grid grid-cols-[1fr_1fr] sm:grid-cols-[12rem_1fr_1fr] text-sm">
+                    <div class="hidden sm:block px-5 py-3 bg-gray-50 border-b border-gray-200"></div>
+                    <div class="px-5 py-3 bg-gray-50 border-b border-gray-200 text-xs font-semibold text-gray-500">A general chatbot</div>
+                    <div class="px-5 py-3 bg-brand-50 border-b border-brand-100 text-xs font-semibold text-brand">TraceableAI</div>
+                    @foreach (var (topic, chatbot, ours) in Comparison)
+                    {
+                        <div class="hidden sm:block px-5 py-4 border-b border-gray-100 font-medium text-gray-900">@topic</div>
+                        <div class="px-5 py-4 border-b border-gray-100 text-gray-500 flex gap-2">
+                            <svg class="w-4 h-4 mt-0.5 flex-none text-gray-400" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M6.3 5.3a1 1 0 011.4 0L10 7.6l2.3-2.3a1 1 0 111.4 1.4L11.4 9l2.3 2.3a1 1 0 01-1.4 1.4L10 10.4l-2.3 2.3a1 1 0 01-1.4-1.4L8.6 9 6.3 6.7a1 1 0 010-1.4z" /></svg>
+                            <span><span class="sm:hidden font-medium text-gray-700">@topic: </span>@chatbot</span>
+                        </div>
+                        <div class="px-5 py-4 border-b border-brand-100/60 bg-brand-50/40 text-gray-800 flex gap-2">
+                            <svg class="w-4 h-4 mt-0.5 flex-none text-verdict-ok" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M16.7 5.3a1 1 0 010 1.4l-8 8a1 1 0 01-1.4 0l-4-4a1 1 0 111.4-1.4L8 12.6l7.3-7.3a1 1 0 011.4 0z" clip-rule="evenodd" /></svg>
+                            <span>@ours</span>
+                        </div>
+                    }
+                </div>
             </div>
+            <p class="ui-muted mt-5 max-w-prose">
+                The checks make errors findable, not impossible. TraceableAI is a co-pilot for a human reviewer, and the
+                <a class="text-brand font-medium hover:underline" href="https://github.com/lauPhilip/au-btech-literature-review-agent/blob/master/docs/wiki/08-setup-and-configuration.md#what-the-checks-do-and-do-not-catch">developer wiki</a>
+                says precisely what the checks catch and what they miss.
+            </p>
+        </div>
+    </section>
+
+    @* Closing call to action: the same single action as at the top (peak-end). *@
+    <section class="bg-brand text-white">
+        <div class="ui-container py-14 flex flex-col md:flex-row md:items-center md:justify-between gap-6">
+            <div>
+                <h2 class="text-2xl sm:text-3xl font-semibold tracking-tight">Start with your own question</h2>
+                <p class="text-white/75 mt-2">A review of a few dozen studies takes a few minutes. Or press “Try an example” on the next page.</p>
+            </div>
+            <a href="/review" class="ui-btn bg-white text-brand hover:bg-brand-50 px-6 py-3 text-base shrink-0">Start a review</a>
+        </div>
+    </section>
+
+    <footer class="bg-white">
+        <div class="ui-container py-8 flex flex-col md:flex-row md:items-center md:justify-between gap-4 text-xs text-gray-500">
+            <p>TraceableAI · Department of Business Development and Technology, Aarhus University · Presented at OSSYM 2026</p>
+            <nav class="flex flex-wrap gap-x-5 gap-y-2" aria-label="Project">
+                <a href="https://github.com/lauPhilip/au-btech-literature-review-agent" class="hover:text-brand">GitHub</a>
+                <a href="https://github.com/lauPhilip/au-btech-literature-review-agent/blob/master/docs/wiki/README.md" class="hover:text-brand">Developer wiki</a>
+                <a href="https://github.com/lauPhilip/au-btech-literature-review-agent/blob/master/CONTRIBUTING.md" class="hover:text-brand">Contributing</a>
+                <a href="https://github.com/lauPhilip/au-btech-literature-review-agent/blob/master/LICENSE" class="hover:text-brand">Apache 2.0</a>
+            </nav>
         </div>
     </footer>
-
 </main>
+
+@code {
+    private int runCount;
+    private List<(string Value, string Label)> Stats = new();
+
+    private sealed record Step(string Title, string? Count, string Text, string Icon);
+
+    // Icons are single SVG paths (24×24, stroked), so the page needs no icon font or image.
+    private static readonly Step[] Pipeline =
+    {
+        new("Protocol", null, "Question, criteria and sources written down and fingerprinted before any search.",
+            "M9 12h6M9 16h6M7 3h7l5 5v12a1 1 0 01-1 1H7a1 1 0 01-1-1V4a1 1 0 011-1zM14 3v5h5"),
+        new("Search", "72 records", "Open databases, your query and three extra phrasings, duplicates removed.",
+            "M11 4a7 7 0 100 14 7 7 0 000-14zM21 21l-4.3-4.3"),
+        new("Screening", "28 included", "Every record screened twice; disagreements kept and flagged.",
+            "M4 5h16l-6 8v5l-4 2v-7L4 5z"),
+        new("Evidence", "21 full texts", "Open-access texts read; each study extracted and appraised, with quotes.",
+            "M4 5a2 2 0 012-2h5v18H6a2 2 0 01-2-2V5zM13 3h5a2 2 0 012 2v14a2 2 0 01-2 2h-5V3z"),
+        new("Writing", "5 themes", "Findings coded into themes and written up theme by theme.",
+            "M4 20h4L19 9a2.8 2.8 0 00-4-4L4 16v4zM13.5 6.5l4 4"),
+        new("Checking", "96 citations", "Every citation compared with the paper; weak ones re-checked and repaired.",
+            "M12 3l7 3v5c0 4.5-3 8.3-7 10-4-1.7-7-5.5-7-10V6l7-3zM9 12l2 2 4-4"),
+    };
+
+    private static readonly (string Theme, int[] Cells)[] EvidenceMap =
+    {
+        ("Approval gates", new[] { 2, 2, 1, 2, 0, 1 }),
+        ("Sandboxing", new[] { 0, 1, 2, 0, 2, 0 }),
+        ("Evaluation", new[] { 1, 0, 0, 2, 1, 2 }),
+        ("Logging", new[] { 2, 1, 0, 1, 0, 1 }),
+    };
+
+    private static readonly (string File, string Hash)[] ArchiveFiles =
+    {
+        ("protocol.md", "a41f…"), ("screening-log.json", "9c07…"), ("llm-calls.json", "e2b8…"),
+        ("citation-audit.json", "57d3…"), ("manuscript.tex", "0fa6…"), ("manifest.json", "c19e…"),
+    };
+
+    private static readonly (string Topic, string Chatbot, string Ours)[] Comparison =
+    {
+        ("Citations", "Fluent, but often wrong, mismatched or invented", "Each one compared with the cited paper, with the supporting quote"),
+        ("Method", "Not written down", "A protocol fingerprinted before the search; methods generated from what the run did"),
+        ("Study selection", "Unknown", "Every record screened twice, with the reason; you can check the decisions"),
+        ("Uncertainty", "Hidden behind confident text", "Partly and not supported citations stay visible and are counted"),
+        ("Record", "A chat transcript", "One archive with every decision and model call"),
+    };
+
+    protected override void OnInitialized()
+    {
+        var runs = MetricsStore.ReadAll().TakeLast(50).ToList();
+        runCount = runs.Count;
+        if (runCount > 0)
+        {
+            int total = runs.Sum(r => r.CitationsFinal.Total);
+            int supported = runs.Sum(r => r.CitationsFinal.Supported);
+            int included = runs.Sum(r => r.Included);
+            int cited = runs.Sum(r => r.StudiesCited);
+            Stats = new()
+            {
+                (total == 0 ? "–" : $"{supported * 100.0 / total:0}%", "of citations supported by the cited paper"),
+                (included == 0 ? "–" : $"{cited * 100.0 / included:0}%", "of included studies cited in the report"),
+                (total.ToString("N0"), "citations checked against the papers"),
+            };
+        }
+        else
+        {
+            Stats = new()
+            {
+                ("100%", "of citations checked against the cited paper"),
+                ("2×", "every record screened by two independent prompts"),
+                ("SHA-256", "fingerprint on every file of the run's record"),
+            };
+        }
+    }
+}

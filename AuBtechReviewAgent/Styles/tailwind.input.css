@@ -2,3 +2,85 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/*
+ * The shared building blocks of every page. Use these instead of repeating long class lists, so the pages
+ * look like one product and a change of style is made in one place. Colours come from tailwind.config.js.
+ * Only buttons are rounded (rounded-btn); cards, panels, fields and labels have square corners.
+ */
+@layer components {
+    .ui-container { @apply max-w-6xl mx-auto px-4 sm:px-6; }
+    .ui-eyebrow { @apply text-xs font-semibold uppercase tracking-[0.14em] text-brand; }
+    .ui-h1 { @apply text-4xl sm:text-5xl font-semibold tracking-tight text-gray-950 leading-[1.08]; }
+    .ui-h2 { @apply text-2xl sm:text-3xl font-semibold tracking-tight text-gray-950; }
+    .ui-h3 { @apply text-base font-semibold text-gray-900; }
+    .ui-lead { @apply text-base sm:text-lg text-gray-600 leading-relaxed; }
+    .ui-muted { @apply text-sm text-gray-500 leading-relaxed; }
+
+    .ui-btn { @apply inline-flex items-center justify-center gap-2 rounded-btn px-5 py-2.5 text-sm font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:opacity-50; }
+    .ui-btn-primary { @apply ui-btn bg-brand text-white shadow-sm hover:bg-brand-700; }
+    .ui-btn-secondary { @apply ui-btn bg-white text-gray-800 border border-gray-300 hover:border-brand hover:text-brand; }
+    .ui-btn-ghost { @apply ui-btn text-brand hover:bg-brand-50; }
+    .ui-btn-sm { @apply px-3 py-1.5 text-xs; }
+    .ui-btn-danger { @apply ui-btn bg-red-600 text-white hover:bg-red-700; }
+
+    .ui-card { @apply bg-white border border-gray-200 shadow-card; }
+    .ui-chip { @apply inline-flex items-center gap-1.5 border px-2 py-0.5 text-xs font-medium; }
+    .ui-label { @apply block text-sm font-medium text-gray-800 mb-1; }
+    .ui-input { @apply w-full px-3 py-2 bg-white border border-gray-300 text-sm placeholder:text-gray-400 focus:outline-none focus:border-brand focus:ring-2 focus:ring-brand/15 transition-colors; }
+    .ui-chip-ok { @apply ui-chip border-green-200 bg-verdict-okBg text-verdict-ok; }
+    .ui-chip-partial { @apply ui-chip border-amber-200 bg-verdict-partialBg text-verdict-partial; }
+    .ui-chip-bad { @apply ui-chip border-red-200 bg-verdict-badBg text-verdict-bad; }
+}
+
+/* Landing page: the citation check example in the hero and the moving light on the pipeline. Both stop for
+   visitors who ask their system for less motion; the first state is then shown still. */
+@layer components {
+    .tai-cycle-a { animation: tai-show-a 10s ease-in-out infinite; }
+    .tai-cycle-b { animation: tai-show-b 10s ease-in-out infinite; }
+    .tai-cite-a { animation: tai-cite-a 10s ease-in-out infinite; }
+    .tai-cite-b { animation: tai-cite-b 10s ease-in-out infinite; }
+    .tai-scan { animation: tai-scan 5s ease-in-out infinite; }
+    .tai-flow-x { animation: tai-flow-x 3.2s linear infinite; }
+    .tai-flow-y { animation: tai-flow-y 3.2s linear infinite; }
+
+    @media (prefers-reduced-motion: reduce) {
+        .tai-cycle-a, .tai-cite-a, .tai-cite-b, .tai-scan, .tai-flow-x, .tai-flow-y { animation: none; }
+        .tai-cycle-b { animation: none; opacity: 0; }
+        .tai-cite-a { background-color: rgba(0, 59, 92, 0.12); }
+        .tai-scan { transform: scaleX(1); }
+    }
+}
+
+@keyframes tai-show-a {
+    0%, 44% { opacity: 1; transform: translateY(0); }
+    50%, 94% { opacity: 0; transform: translateY(6px); }
+    100% { opacity: 1; transform: translateY(0); }
+}
+@keyframes tai-show-b {
+    0%, 44% { opacity: 0; transform: translateY(6px); }
+    50%, 94% { opacity: 1; transform: translateY(0); }
+    100% { opacity: 0; transform: translateY(6px); }
+}
+@keyframes tai-cite-a {
+    0%, 44% { background-color: rgba(0, 59, 92, 0.12); }
+    50%, 94% { background-color: transparent; }
+    100% { background-color: rgba(0, 59, 92, 0.12); }
+}
+@keyframes tai-cite-b {
+    0%, 44% { background-color: transparent; }
+    50%, 94% { background-color: rgba(180, 83, 9, 0.14); }
+    100% { background-color: transparent; }
+}
+@keyframes tai-scan {
+    0% { transform: scaleX(0); }
+    35%, 100% { transform: scaleX(1); }
+}
+@keyframes tai-flow-x {
+    from { transform: translateX(-100%); }
+    to { transform: translateX(600%); }
+}
+@keyframes tai-flow-y {
+    from { transform: translateY(-100%); }
+    to { transform: translateY(1200%); }
+}

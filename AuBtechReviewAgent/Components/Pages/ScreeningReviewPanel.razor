@@ -30,28 +30,28 @@
                         <div class="flex flex-wrap gap-1 mt-1">
                             @if (row.Uncertain)
                             {
-                                <span class="text-[9px] font-bold uppercase tracking-wide bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded">Uncertain</span>
+                                <span class="text-[9px] font-bold uppercase tracking-wide bg-amber-100 text-amber-800 px-1.5 py-0.5 ">Uncertain</span>
                             }
                             @if (row.SecondDecision != null && row.SecondDecision != row.FirstDecision)
                             {
-                                <span class="text-[9px] font-bold uppercase tracking-wide bg-purple-100 text-purple-800 px-1.5 py-0.5 rounded" title="The two independent screenings disagreed">Screenings disagree</span>
+                                <span class="text-[9px] font-bold uppercase tracking-wide bg-purple-100 text-purple-800 px-1.5 py-0.5 " title="The two independent screenings disagreed">Screenings disagree</span>
                             }
                             @if (row.Confidence != null)
                             {
-                                <span class="text-[9px] uppercase tracking-wide px-1.5 py-0.5 rounded @(row.Confidence == "low" ? "bg-red-50 text-red-700" : "bg-gray-100 text-gray-600")">Confidence: @row.Confidence</span>
+                                <span class="text-[9px] uppercase tracking-wide px-1.5 py-0.5 @(row.Confidence == "low" ? "bg-red-50 text-red-700" : "bg-gray-100 text-gray-600")">Confidence: @row.Confidence</span>
                             }
                             @if (row.Flags.Count > 0)
                             {
-                                <span class="text-[9px] font-bold uppercase tracking-wide bg-red-100 text-red-800 px-1.5 py-0.5 rounded"
+                                <span class="text-[9px] font-bold uppercase tracking-wide bg-red-100 text-red-800 px-1.5 py-0.5 "
                                       title="The paper's text contains phrases that look like instructions to the model (@string.Join(", ", row.Flags)). Check that the decision is based on the content.">Possible prompt injection</span>
                             }
                             @if (row.Origin != "database search")
                             {
-                                <span class="text-[9px] uppercase tracking-wide bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded">Found by @row.Origin</span>
+                                <span class="text-[9px] uppercase tracking-wide bg-blue-50 text-blue-700 px-1.5 py-0.5 ">Found by @row.Origin</span>
                             }
                         </div>
                     </div>
-                    <div class="flex-none flex rounded border border-gray-300 overflow-hidden text-[10px] font-bold uppercase">
+                    <div class="flex-none flex border border-gray-300 overflow-hidden text-[10px] font-bold uppercase">
                         <button type="button" disabled="@submitting" @onclick='() => SetDecision(row, "Included")'
                                 class="px-2 py-1 @(row.Decision == "Included" ? "bg-green-600 text-white" : "bg-white text-gray-500")">Include</button>
                         <button type="button" disabled="@submitting" @onclick='() => SetDecision(row, "Excluded")'
@@ -66,12 +66,12 @@
                 @if (!string.IsNullOrWhiteSpace(row.Abstract))
                 {
                     <details class="mt-1">
-                        <summary class="text-[10px] text-[#003B5C] cursor-pointer select-none">Show abstract</summary>
+                        <summary class="text-[10px] text-brand cursor-pointer select-none">Show abstract</summary>
                         <p class="text-[11px] text-gray-600 mt-1 leading-snug">@row.Abstract</p>
                     </details>
                 }
                 <input type="text" placeholder="Optional note (why you changed or confirmed this decision)" @bind="row.Note" disabled="@submitting"
-                       class="mt-1.5 w-full p-1.5 text-[11px] bg-gray-50 border border-gray-200 rounded focus:outline-none focus:border-[#003B5C]" />
+                       class="mt-1.5 w-full p-1.5 text-[11px] bg-gray-50 border border-gray-200 focus:outline-none focus:border-brand" />
             </div>
         }
     </div>
@@ -79,7 +79,7 @@
     <div class="p-3 border-t border-gray-200 flex-none flex items-center justify-between gap-3 bg-white">
         <span class="text-[11px] text-red-700">@error</span>
         <button type="button" @onclick="Submit" disabled="@submitting"
-                class="py-2 px-4 text-white text-xs font-bold uppercase tracking-wider rounded disabled:opacity-50" style="background-color:#003B5C;">
+                class="ui-btn-primary ui-btn-sm">
             @(submitting ? "Sending..." : "Continue with write-up")
         </button>
     </div>

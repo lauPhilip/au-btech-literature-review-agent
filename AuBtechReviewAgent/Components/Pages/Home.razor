@@ -14,21 +14,7 @@
 @inject NavigationManager Nav
 @inject ILogger<Home> Logger
 
-<header class="bg-[#003B5C] text-white flex-none shrink-0 z-50 shadow-md">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between gap-3">
-        <a href="/" class="flex items-center space-x-3 hover:opacity-90 transition-opacity min-w-0 shrink overflow-hidden">
-            <span class="font-bold tracking-tight text-xs sm:text-sm whitespace-nowrap truncate">AARHUS UNIVERSITY</span>
-            <span class="text-white/40 font-light hidden lg:inline">|</span>
-            <span class="text-xs tracking-wider font-medium opacity-90 uppercase hidden lg:inline">au-btech-literature-review-agent</span>
-        </a>
-        <nav class="flex items-center gap-3 sm:gap-6 text-[10px] sm:text-xs font-semibold uppercase tracking-wider whitespace-nowrap shrink-0">
-            <a href="/" class="text-white/70 hover:text-white transition-colors py-4">Overview</a>
-            <a href="@(hasRun ? $"/review/{currentSessionId}" : "/review")" class="text-white border-b-2 border-white py-4">Dashboard</a>
-            <a href="@(hasRun ? $"/spec-matrix/{currentSessionId}" : "/spec-matrix")" class="text-white/70 hover:text-white transition-colors py-4">Review Output</a>
-            <a href="/metrics" class="text-white/70 hover:text-white transition-colors py-4">Metrics</a>
-        </nav>
-    </div>
-</header>
+<SiteHeader Active="dashboard" DashboardHref="@(hasRun ? $"/review/{currentSessionId}" : "/review")" OutputHref="@(hasRun ? $"/spec-matrix/{currentSessionId}" : "/spec-matrix")" />
 
 <div class="flex-1 min-h-0 overflow-y-auto" id="dashboard-scroll">
 <div class="max-w-7xl w-full mx-auto p-4 lg:p-6 space-y-4">
@@ -36,8 +22,8 @@
     @* Toolbar: what this page is, and the account details in small print (they matter less than the question). *@
     <div class="flex flex-wrap items-end justify-between gap-3">
         <div>
-            <h1 class="text-xl font-semibold text-gray-900">@(Composing ? "New review" : "Your review")</h1>
-            <p class="text-xs text-gray-500">A PRISMA 2020 review in which every citation is checked against the paper it cites.</p>
+            <h1 class="ui-h2">@(Composing ? "New review" : "Your review")</h1>
+            <p class="text-sm text-gray-500 mt-1">A PRISMA 2020 review in which every citation is checked against the paper it cites.</p>
         </div>
         <div class="flex items-center gap-2">
             @{
@@ -59,10 +45,10 @@
                     : quotaStatus.Tier == AuBtechReviewAgent.QuotaTier.OwnKey ? $"{quotaStatus.Remaining} of {quotaStatus.Limit} left this hour"
                     : $"{quotaStatus.Remaining} of {quotaStatus.Limit} left today";
             }
-            <span class="@chipBox border rounded-full px-2.5 py-1 text-[11px] flex items-center gap-1.5" title="Runs you can still start">
+            <span class="@chipBox border px-2.5 py-1 text-[11px] flex items-center gap-1.5" title="Runs you can still start">
                 <span class="w-1.5 h-1.5 rounded-full @chipDot"></span>@tierLabel · @counter
             </span>
-            <button type="button" @onclick="OpenKeyModal" class="text-[11px] bg-white hover:bg-gray-50 border border-gray-300 text-gray-700 rounded-full px-2.5 py-1 flex items-center gap-1">
+            <button type="button" @onclick="OpenKeyModal" class="ui-btn-secondary ui-btn-sm">
                 <svg class="w-3 h-3 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/></svg>
                 API keys
             </button>
@@ -78,7 +64,7 @@
         <section class="lg:col-span-5 space-y-4 min-w-0" aria-label="Review settings">
             @if (Composing)
             {
-                <div class="bg-white border border-gray-200 rounded-lg shadow-sm">
+                <div class="bg-white border border-gray-200 shadow-sm">
                     @* Three short steps instead of one long form. Every step can be opened directly. *@
                     <nav class="flex border-b border-gray-200" aria-label="Steps">
                         @foreach (var (number, title) in Steps)
@@ -86,14 +72,14 @@
                             bool active = formStep == number;
                             bool done = StepDone(number);
                             <button type="button" @onclick="() => formStep = number" aria-current="@(active ? "step" : null)"
-                                    class="flex-1 flex items-center justify-center gap-1.5 px-2 py-3 text-xs border-b-2 -mb-px transition-colors @(active ? "border-[#003B5C] text-[#003B5C] font-semibold" : "border-transparent text-gray-500 hover:text-gray-800")">
+                                    class="flex-1 flex items-center justify-center gap-1.5 px-2 py-3 text-xs border-b-2 -mb-px transition-colors @(active ? "border-brand text-brand font-semibold" : "border-transparent text-gray-500 hover:text-gray-800")">
                                 @if (done && !active)
                                 {
                                     <svg class="w-3.5 h-3.5 text-green-600" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M16.7 5.3a1 1 0 010 1.4l-8 8a1 1 0 01-1.4 0l-4-4a1 1 0 111.4-1.4L8 12.6l7.3-7.3a1 1 0 011.4 0z" clip-rule="evenodd" /></svg>
                                 }
                                 else
                                 {
-                                    <span class="w-4 h-4 rounded-full text-[10px] flex items-center justify-center @(active ? "bg-[#003B5C] text-white" : "bg-gray-200 text-gray-600")">@number</span>
+                                    <span class="w-4 h-4 rounded-full text-[10px] flex items-center justify-center @(active ? "bg-brand text-white" : "bg-gray-200 text-gray-600")">@number</span>
                                 }
                                 @title
                             </button>
@@ -103,7 +89,7 @@
                     <div class="p-4 space-y-4">
                         @if (prefillNotice != null)
                         {
-                            <p class="bg-blue-50 border border-blue-100 text-blue-900 rounded-md p-2 text-xs">@prefillNotice</p>
+                            <p class="bg-blue-50 border border-blue-100 text-blue-900 p-2 text-xs">@prefillNotice</p>
                         }
 
                         @switch (formStep)
@@ -111,7 +97,7 @@
                             case 1:
                                 <div class="flex items-center justify-between gap-2">
                                     <p class="text-xs text-gray-600">What should the review find out?</p>
-                                    <button type="button" @onclick="LoadExample" class="text-xs text-[#003B5C] font-medium hover:underline">Try an example</button>
+                                    <button type="button" @onclick="LoadExample" class="text-xs text-brand font-medium hover:underline">Try an example</button>
                                 </div>
                                 <div>
                                     <label for="f-query" class="@LabelClass">Search query</label>
@@ -151,7 +137,7 @@
                                         @foreach (var (label, from) in YearPresets)
                                         {
                                             <button type="button" @onclick="() => SetYears(from)"
-                                                    class="text-[11px] rounded-full border px-2.5 py-0.5 @(yearFrom == from && yearTo == DateTime.UtcNow.Year ? "border-[#003B5C] bg-[#003B5C]/10 text-[#003B5C]" : "border-gray-300 text-gray-600 hover:bg-gray-50")">@label</button>
+                                                    class="text-[11px] rounded-full border px-2.5 py-0.5 @(yearFrom == from && yearTo == DateTime.UtcNow.Year ? "border-brand bg-brand/10 text-brand" : "border-gray-300 text-gray-600 hover:bg-gray-50")">@label</button>
                                         }
                                     </div>
                                 </fieldset>
@@ -182,7 +168,7 @@
                                             bool available = sourceAvailability.TryGetValue(source.Key, out var ok) && ok;
                                             <label class="flex items-center gap-2 text-sm select-none @(available ? "text-gray-800 cursor-pointer" : "text-gray-400 cursor-not-allowed")"
                                                    title="@(available ? "" : $"Needs an {source.KeyLabel}. Add one under API keys.")">
-                                                <input type="checkbox" class="w-4 h-4 rounded accent-[#003B5C]"
+                                                <input type="checkbox" class="w-4 h-4 accent-brand"
                                                        checked="@(available && State.SelectedSources.Contains(source.Key))"
                                                        disabled="@(!available || isSearching)"
                                                        @onchange="e => ToggleSource(source.Key, e)" />
@@ -197,7 +183,7 @@
                                 </fieldset>
 
                                 @* Options most people never change: folded away, with sensible defaults. *@
-                                <details class="group border border-gray-200 rounded-md">
+                                <details class="group border border-gray-200 ">
                                     <summary class="cursor-pointer select-none px-3 py-2 text-sm text-gray-800 flex items-center justify-between">
                                         <span>Advanced options</span>
                                         <span class="text-[11px] text-gray-500">@AdvancedSummary()</span>
@@ -221,7 +207,7 @@
 
                     @if (inputCheck is { IsValid: false } failedCheck)
                     {
-                        <div class="mx-4 mb-3 bg-red-50 border border-red-200 text-red-800 rounded-md p-2 text-xs space-y-0.5" role="alert">
+                        <div class="mx-4 mb-3 bg-red-50 border border-red-200 text-red-800 p-2 text-xs space-y-0.5" role="alert">
                             @foreach (var error in failedCheck.Errors)
                             {
                                 <p>@error</p>
@@ -230,7 +216,7 @@
                     }
                     else if (pendingFlagSignature != null && inputCheck != null)
                     {
-                        <div class="mx-4 mb-3 bg-amber-50 border border-amber-200 text-amber-900 rounded-md p-2 text-xs space-y-1" role="alert">
+                        <div class="mx-4 mb-3 bg-amber-50 border border-amber-200 text-amber-900 p-2 text-xs space-y-1" role="alert">
                             <p class="font-semibold">Some of your text reads like instructions to the language model:</p>
                             <ul class="list-disc pl-4 space-y-0.5">
                                 @foreach (var flag in inputCheck.Flags)
@@ -239,12 +225,12 @@
                                 }
                             </ul>
                             <p>The model is told to treat your fields only as the topic and criteria, so this usually changes nothing. If it is what you meant, start anyway; the warning is written to the protocol.</p>
-                            <button type="button" @onclick="ConfirmFlaggedInput" class="px-2 py-1 bg-amber-600 text-white rounded font-semibold">Start anyway</button>
+                            <button type="button" @onclick="ConfirmFlaggedInput" class="ui-btn ui-btn-sm bg-amber-600 text-white hover:bg-amber-700">Start anyway</button>
                         </div>
                     }
 
                     @* The action stays in reach: summary of the choices, what is missing, and one primary button. *@
-                    <div class="sticky bottom-0 bg-white/95 backdrop-blur border-t border-gray-200 rounded-b-lg px-4 py-3 space-y-2">
+                    <div class="sticky bottom-0 bg-white/95 backdrop-blur border-t border-gray-200 px-4 py-3 space-y-2">
                         <p class="text-[11px] text-gray-500 truncate" title="@SettingsLine()">@SettingsLine()</p>
                         @if (StartBlocker() is { } blocker)
                         {
@@ -253,21 +239,21 @@
                         <div class="flex items-center gap-2">
                             @if (formStep > 1)
                             {
-                                <button type="button" @onclick="() => formStep--" class="px-3 py-2 text-sm text-gray-700 hover:text-gray-900">Back</button>
+                                <button type="button" @onclick="() => formStep--" class="ui-btn-ghost">Back</button>
                             }
                             <span class="flex-1"></span>
                             @if (formStep < 3)
                             {
                                 @if (StartBlocker() == null)
                                 {
-                                    <button type="button" @onclick="StartReviewProcess" disabled="@isSearching" class="px-3 py-2 text-sm border border-[#003B5C] text-[#003B5C] rounded-md hover:bg-[#003B5C]/5 disabled:opacity-50">Start now</button>
+                                    <button type="button" @onclick="StartReviewProcess" disabled="@isSearching" class="ui-btn-secondary">Start now</button>
                                 }
-                                <button type="button" @onclick="() => formStep++" class="px-4 py-2 text-sm font-semibold text-white bg-[#003B5C] rounded-md shadow-sm hover:bg-opacity-95">Next: @Steps[formStep].Title</button>
+                                <button type="button" @onclick="() => formStep++" class="ui-btn-primary">Next: @Steps[formStep].Title</button>
                             }
                             else
                             {
                                 <button type="button" @onclick="StartReviewProcess" disabled="@(isSearching || StartBlocker() != null)"
-                                        class="px-5 py-2 text-sm font-semibold text-white bg-[#003B5C] rounded-md shadow-sm hover:bg-opacity-95 disabled:opacity-50">Start review</button>
+                                        class="ui-btn-primary">Start review</button>
                             }
                         </div>
                     </div>
@@ -276,7 +262,7 @@
             else
             {
                 @* While a run is going (or done), the form becomes a compact summary of what was asked. *@
-                <div class="bg-white border border-gray-200 rounded-lg shadow-sm p-4 space-y-3">
+                <div class="bg-white border border-gray-200 shadow-sm p-4 space-y-3">
                     <div class="flex items-center justify-between gap-2">
                         <div>
                             <h2 class="text-sm font-semibold text-gray-900">Review settings</h2>
@@ -284,7 +270,7 @@
                         </div>
                         @if (!isSearching)
                         {
-                            <button type="button" @onclick="StartNewDraft" class="text-xs px-3 py-1.5 bg-[#003B5C] text-white rounded-md font-semibold hover:bg-opacity-95">New review</button>
+                            <button type="button" @onclick="StartNewDraft" class="ui-btn-primary ui-btn-sm">New review</button>
                         }
                     </div>
                     <dl class="text-xs space-y-2">
@@ -295,7 +281,7 @@
                         @SettingRow("Sources", string.Join(", ", (runInfo?.SelectedSources ?? State.SelectedSources.ToList()).Select(AuBtechReviewAgent.SourceCatalog.DisplayNameFor)))
                     </dl>
                     <p class="text-[11px] text-gray-500 leading-snug border-t border-gray-100 pt-2">
-                        Link to this run: <a class="text-[#003B5C] underline break-all" href="@($"/review/{currentSessionId}")">@($"/review/{currentSessionId}")</a>.
+                        Link to this run: <a class="text-brand underline break-all" href="@($"/review/{currentSessionId}")">@($"/review/{currentSessionId}")</a>.
                         Anyone with the link can open it; results are kept for @RunsOptions.RetentionDays days@(completedUtc.HasValue ? $" (until {completedUtc.Value.AddDays(RunsOptions.RetentionDays):yyyy-MM-dd} UTC)" : "").
                     </p>
                     @if (!isSearching && AuBtechReviewAgent.PrismaReviewEngine.IsFinishedStage(stage))
@@ -308,8 +294,8 @@
                             else
                             {
                                 <span class="text-red-800">Delete the run, its report and downloaded papers for good?</span>
-                                <button type="button" @onclick="DeleteRun" class="px-2 py-0.5 bg-red-600 text-white rounded font-semibold">Delete</button>
-                                <button type="button" @onclick="() => confirmDelete = false" class="px-2 py-0.5 border border-gray-300 rounded">Cancel</button>
+                                <button type="button" @onclick="DeleteRun" class="ui-btn-danger ui-btn-sm">Delete</button>
+                                <button type="button" @onclick="() => confirmDelete = false" class="ui-btn-secondary ui-btn-sm">Cancel</button>
                             }
                         </div>
                     }
@@ -318,15 +304,15 @@
         </section>
 
         @* The right side follows the run: what will happen, then the progress, then the result. *@
-        <section id="run-panel" class="lg:col-span-7 lg:sticky lg:top-4 min-w-0 bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden flex flex-col lg:max-h-[calc(100vh-8rem)]" aria-live="polite">
+        <section id="run-panel" class="lg:col-span-7 lg:sticky lg:top-4 min-w-0 bg-white border border-gray-200 shadow-sm overflow-hidden flex flex-col lg:max-h-[calc(100vh-8rem)]" aria-live="polite">
             <div class="flex items-center justify-between border-b border-gray-200 px-3 flex-none">
                 <div class="flex" role="tablist">
                     <button type="button" role="tab" aria-selected="@(panelTab == "overview")" @onclick="@(() => panelTab = "overview")"
-                            class="px-3 py-2.5 text-xs border-b-2 -mb-px @(panelTab == "overview" ? "border-[#003B5C] text-[#003B5C] font-semibold" : "border-transparent text-gray-500 hover:text-gray-800")">@PanelTitle()</button>
+                            class="px-3 py-2.5 text-xs border-b-2 -mb-px @(panelTab == "overview" ? "border-brand text-brand font-semibold" : "border-transparent text-gray-500 hover:text-gray-800")">@PanelTitle()</button>
                     @if (hasRun && !Composing)
                     {
                         <button type="button" role="tab" aria-selected="@(panelTab == "ledger")" @onclick="@(() => panelTab = "ledger")"
-                                class="px-3 py-2.5 text-xs border-b-2 -mb-px @(panelTab == "ledger" ? "border-[#003B5C] text-[#003B5C] font-semibold" : "border-transparent text-gray-500 hover:text-gray-800")">Ledger (JSON)</button>
+                                class="px-3 py-2.5 text-xs border-b-2 -mb-px @(panelTab == "ledger" ? "border-brand text-brand font-semibold" : "border-transparent text-gray-500 hover:text-gray-800")">Ledger (JSON)</button>
                     }
                 </div>
                 <span class="text-[10px] text-gray-400 font-mono">@ReviewEngine.Llm.Model</span>
@@ -356,7 +342,7 @@
                     <div class="p-4 space-y-4">
                         @if (!string.IsNullOrEmpty(failureMessage))
                         {
-                            <p class="text-sm text-red-700 bg-red-50 border border-red-200 rounded-md p-2" role="alert">@failureMessage</p>
+                            <p class="text-sm text-red-700 bg-red-50 border border-red-200 p-2" role="alert">@failureMessage</p>
                         }
                         <RunProgressPanel Stats="State.Stats" Stage="@stage" Running="isSearching" QueuePosition="queuePosition" CompletedUtc="completedUtc" />
                         <PrismaFunnel Stats="State.Stats" Removed="State.RemovedBeforeScreening" Running="isSearching" />
@@ -371,8 +357,8 @@
 @if (showKeyModal)
 {
     <div class="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-[100] p-4 font-sans animate-fadeIn">
-        <div class="bg-white border border-gray-200 w-full max-w-md rounded-lg shadow-2xl overflow-hidden flex flex-col text-left">
-            <div class="bg-[#003B5C] text-white p-4 flex justify-between items-center">
+        <div class="bg-white border border-gray-200 w-full max-w-md shadow-2xl overflow-hidden flex flex-col text-left">
+            <div class="bg-brand text-white p-4 flex justify-between items-center">
                 <div>
                     <h3 class="text-sm font-bold tracking-tight uppercase">API keys</h3>
                     <p class="text-[10px] opacity-70 mt-0.5">Kept only in this browser tab</p>
@@ -382,34 +368,34 @@
                 </button>
             </div>
             <div class="p-4 space-y-3 overflow-y-auto text-xs text-gray-700">
-                <div class="bg-blue-50 border border-blue-100 text-blue-800 p-2.5 rounded text-[11px] leading-normal font-light">
+                <div class="bg-blue-50 border border-blue-100 text-blue-800 p-2.5 text-[11px] leading-normal font-light">
                     Your keys are kept encrypted in this browser tab only. They are not written to the server's disk or logs, and they are gone when you close the tab. With your own Mistral key the free-tier daily limit does not apply.
                 </div>
                 <div>
                     <label class="block font-bold text-gray-600 mb-1 uppercase text-[10px]">Mistral API key</label>
-                    <input type="password" placeholder="Defaults to server standard key if blank..." @bind="modalMistral" class="w-full p-2 border border-gray-300 rounded font-mono focus:outline-none focus:border-[#003B5C]" />
+                    <input type="password" placeholder="Defaults to server standard key if blank..." @bind="modalMistral" class="w-full p-2 border border-gray-300 font-mono focus:outline-none focus:border-brand" />
                 </div>
                 <div>
                     <label class="block font-bold text-gray-600 mb-1 uppercase text-[10px]">Elsevier (Scopus / ScienceDirect) API key</label>
-                    <input type="password" placeholder="Defaults to server standard key if blank..." @bind="modalElsevier" class="w-full p-2 border border-gray-300 rounded font-mono focus:outline-none focus:border-[#003B5C]" />
+                    <input type="password" placeholder="Defaults to server standard key if blank..." @bind="modalElsevier" class="w-full p-2 border border-gray-300 font-mono focus:outline-none focus:border-brand" />
                 </div>
                 <div>
                     <label class="block font-bold text-gray-600 mb-1 uppercase text-[10px]">IEEE Xplore API key</label>
-                    <input type="password" placeholder="Optional..." @bind="modalIeee" class="w-full p-2 border border-gray-300 rounded font-mono focus:outline-none focus:border-[#003B5C]" />
+                    <input type="password" placeholder="Optional..." @bind="modalIeee" class="w-full p-2 border border-gray-300 font-mono focus:outline-none focus:border-brand" />
                 </div>
                 <div>
                     <label class="block font-bold text-gray-600 mb-1 uppercase text-[10px]">Semantic Scholar API Key</label>
-                    <input type="password" placeholder="Optional..." @bind="modalScholar" class="w-full p-2 border border-gray-300 rounded font-mono focus:outline-none focus:border-[#003B5C]" />
+                    <input type="password" placeholder="Optional..." @bind="modalScholar" class="w-full p-2 border border-gray-300 font-mono focus:outline-none focus:border-brand" />
                 </div>
                 <div class="pt-2 border-t border-gray-100">
                     <label class="block font-bold text-gray-600 mb-1 uppercase text-[10px]">Developer Access Token</label>
-                    <input type="password" placeholder="Only for the maintainers of this deployment" @bind="modalAdminToken" class="w-full p-2 border border-gray-300 rounded font-mono focus:outline-none focus:border-[#003B5C]" />
+                    <input type="password" placeholder="Only for the maintainers of this deployment" @bind="modalAdminToken" class="w-full p-2 border border-gray-300 font-mono focus:outline-none focus:border-brand" />
                     <p class="text-[10px] text-gray-400 mt-1">Removes the daily run limit. Set with Quota:AdminToken on the server.</p>
                 </div>
             </div>
             <div class="bg-gray-50 px-4 py-3 border-t border-gray-200 flex justify-end gap-2">
-                <button @onclick="ClearVault" class="px-3 py-1.5 text-xs text-red-600 hover:text-red-800 transition-colors uppercase font-semibold">Clear Session</button>
-                <button @onclick="SaveSessionKeys" class="px-4 py-1.5 text-xs text-white font-bold bg-[#003B5C] rounded shadow hover:bg-opacity-95 uppercase tracking-wide transition-all">Apply to Session</button>
+                <button @onclick="ClearVault" class="ui-btn ui-btn-sm text-red-700 hover:bg-red-50">Clear session</button>
+                <button @onclick="SaveSessionKeys" class="ui-btn-primary ui-btn-sm">Apply to session</button>
             </div>
         </div>
     </div>
@@ -508,8 +494,8 @@
 
     private static readonly (int Number, string Title)[] Steps = { (1, "Question"), (2, "Criteria"), (3, "Output") };
 
-    private const string LabelClass = "block text-sm font-medium text-gray-800 mb-1";
-    private const string InputClass = "w-full px-3 py-2 bg-white border border-gray-300 rounded-md text-sm placeholder:text-gray-400 focus:outline-none focus:border-[#003B5C] focus:ring-2 focus:ring-[#003B5C]/15 transition-colors";
+    private const string LabelClass = "ui-label";
+    private const string InputClass = "ui-input";
 
     private int yearFrom
     {
@@ -752,7 +738,7 @@
         AuBtechReviewAgent.PrismaReviewEngine.StageComplete => "text-green-700",
         AuBtechReviewAgent.PrismaReviewEngine.StageFailed or AuBtechReviewAgent.PrismaReviewEngine.StageInterrupted or "" => "text-red-700",
         AuBtechReviewAgent.PrismaReviewEngine.StageAwaitingReview => "text-amber-700",
-        _ => "text-[#003B5C]"
+        _ => "text-brand"
     };
 
     private void Subscribe()
@@ -908,7 +894,7 @@
     private RenderFragment Option(string label, string help, bool value, Action<bool> set) => __builder =>
     {
         <label class="flex items-start gap-3 cursor-pointer select-none">
-            <input type="checkbox" checked="@value" disabled="@isSearching" @onchange="e => set(e.Value is true)" class="w-4 h-4 mt-0.5 rounded accent-[#003B5C]" />
+            <input type="checkbox" checked="@value" disabled="@isSearching" @onchange="e => set(e.Value is true)" class="w-4 h-4 mt-0.5 accent-brand" />
             <span class="text-sm text-gray-800">@label
                 <span class="block text-xs text-gray-500">@help</span>
             </span>
