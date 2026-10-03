@@ -60,6 +60,7 @@ All of these can be set in `appsettings.json` (non-secret values only), user sec
 | `Report:SupportStatement` | empty | Funding and support text printed in every report |
 | `Runs:MaxConcurrentRuns` | 3 | Runs allowed to call the model at the same time; the rest wait in line |
 | `Runs:RetentionDays` | 7 | How long a run's results and link are kept |
+| `Site:PublicUrl` | `https://au-btech-literature-review-agent.dk` | The public address used in the sitemap, robots.txt, canonical links and link previews, so search engines see one address whatever host name a visitor used. `appsettings.Development.json` sets it to empty, which uses the address of the request (`http://localhost:5038` with `dotnet watch`). Set your own address here when you deploy a copy elsewhere |
 | `Runs:ScreeningReviewTimeoutHours` | 24 | How long a run waits for the human screening review |
 | `Llm:Provider` | Mistral | `Mistral` or `OpenAICompatible` |
 | `Llm:Model` | mistral-large-latest | The model name sent to the provider |
