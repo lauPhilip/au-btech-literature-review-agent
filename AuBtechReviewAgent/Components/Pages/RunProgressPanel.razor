@@ -9,10 +9,10 @@
     bool complete = Stage == AuBtechReviewAgent.PrismaReviewEngine.StageComplete;
     bool failed = Stage is AuBtechReviewAgent.PrismaReviewEngine.StageFailed or AuBtechReviewAgent.PrismaReviewEngine.StageInterrupted;
     var plan = Stats.ProgressPlan.Count > 0 ? Stats.ProgressPlan : AuBtechReviewAgent.RunProgress.Plan(false, false);
-    string barColor = failed ? "bg-red-600" : complete ? "bg-green-600" : "bg-[#003B5C]";
+    string barColor = failed ? "bg-red-600" : complete ? "bg-green-600" : "bg-brand";
 }
 
-<div class="bg-white border border-gray-200 rounded-lg p-3 shadow-sm flex-none text-left space-y-2">
+<div class="bg-white border border-gray-200 p-3 shadow-sm flex-none text-left space-y-2">
     <div class="flex items-center justify-between gap-2">
         <span class="text-[10px] font-bold uppercase tracking-wider text-gray-400">Progress</span>
         <span class="text-[11px] font-mono text-gray-600">@(failed ? "stopped" : $"{percent}%")@(Elapsed is { } e ? $" · {e}" : "")</span>
@@ -34,14 +34,14 @@
         @foreach (var step in plan)
         {
             string state = failed && AuBtechReviewAgent.RunProgress.StateOf(Stats, step) == "current" ? "failed" : AuBtechReviewAgent.RunProgress.StateOf(Stats, step);
-            <li class="flex items-center gap-1 text-[10px] @(state == "current" ? "text-[#003B5C] font-semibold" : state == "done" ? "text-gray-600" : "text-gray-400")">
+            <li class="flex items-center gap-1 text-[10px] @(state == "current" ? "text-brand font-semibold" : state == "done" ? "text-gray-600" : "text-gray-400")">
                 @switch (state)
                 {
                     case "done":
                         <svg class="w-3 h-3 text-green-600" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M16.7 5.3a1 1 0 010 1.4l-8 8a1 1 0 01-1.4 0l-4-4a1 1 0 111.4-1.4L8 12.6l7.3-7.3a1 1 0 011.4 0z" clip-rule="evenodd" /></svg>
                         break;
                     case "current":
-                        <span class="inline-block w-2.5 h-2.5 border-2 border-[#003B5C] border-t-transparent rounded-full @(Running ? "animate-spin" : "")" aria-hidden="true"></span>
+                        <span class="inline-block w-2.5 h-2.5 border-2 border-brand border-t-transparent rounded-full @(Running ? "animate-spin" : "")" aria-hidden="true"></span>
                         break;
                     case "failed":
                         <span class="inline-block w-2.5 h-2.5 rounded-full bg-red-600" aria-hidden="true"></span>

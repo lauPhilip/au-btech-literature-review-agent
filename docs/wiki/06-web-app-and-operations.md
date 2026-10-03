@@ -14,7 +14,8 @@ The request pipeline then adds, in order: forwarded headers (for a reverse proxy
 
 | Route or name | File | Purpose |
 |---|---|---|
-| `/` | `Components/Pages/Landing.razor` | Public landing page |
+| `/` | `Components/Pages/Landing.razor` | Public landing page: an animated example of a checked citation, live numbers from the metrics store (or what every run does, when there are none yet), the pipeline, the outputs and the comparison with a general chatbot |
+| component | `Components/Layout/SiteHeader.razor` | The top bar every page shares, with the current page marked |
 | `/review`, `/review/{runId}` | `Components/Pages/Home.razor` | Dashboard: the review form in three steps with its input check, a summary of the settings once a run starts, and a run panel that follows the run (preview, progress, result, ledger, the human screening review) |
 | component | `RunPlanPreview.razor` | Shown in the run panel before a run: the steps the review will take with the current settings, and what it produces |
 | component | `RunProgressPanel.razor` | The progress bar, current step with detail, elapsed time and the list of steps |
@@ -31,6 +32,10 @@ The request pipeline then adds, in order: forwarded headers (for a reverse proxy
 The dashboard subscribes to `ReviewEngine.OnProgressUpdated` while it is open and unsubscribes when it is disposed. Progress is set by the engine through `ReportProgress` (`RunProgress.cs`): the run's step plan (`ProgressPlan`, with citation chaining and the human review only when asked for), the current step, how far it is from 0 to 1 and a short detail such as "16 of 40 records screened" are kept in `ReviewStats`. `RunProgress.Percent` turns them into an overall percentage using a rough weight per step, and within a step the value never goes back. Updates inside a step are sent at most every 400 ms and do not write the ledger, so loops can report freely. The dashboard also re-reads the saved ledger every few seconds, which can be a little behind the live events; `RunProgress.KeepFurthest` keeps whichever is further along for the same run, so the bar never moves back.
 
 On the Review Output page, a bar above the report counts the citations that need attention (partly supported or not supported) and steps through them in reading order with Previous and Next: each step opens the citation's verdict and scrolls it into view (`wwwroot/js/review-output.js`). The Review Output page does not follow a run live; it reads the finished files from the run folder each time it loads. Anyone with a run's link can open it, which is why run ids are random GUIDs and runs are deleted after `Runs:RetentionDays`.
+
+### Shared design
+
+The colours, fonts and shadows are design tokens in `tailwind.config.js`: one brand colour (Aarhus University navy, `brand`), greys for everything else, and the three citation verdicts (`verdict-ok`, `verdict-partial`, `verdict-bad`), which are always shown with an icon or a word as well, never by colour alone. The reusable pieces built from them are `ui-*` classes in `Styles/tailwind.input.css`: `ui-container`, `ui-eyebrow`, `ui-h1`/`ui-h2`/`ui-h3`, `ui-lead`, `ui-muted`, the buttons `ui-btn-primary`, `ui-btn-secondary` and `ui-btn-ghost`, `ui-card` and the verdict chips `ui-chip-ok`, `ui-chip-partial` and `ui-chip-bad`. Only buttons have rounded corners (`rounded-btn`, part of every `ui-btn-*`); cards, panels, fields and labels are square, so a rounded shape always means "you can click this". There are also `ui-btn-sm`, `ui-btn-danger`, `ui-label` and `ui-input`. All four pages use `SiteHeader` and these classes. Use them on new pages instead of long class lists, so the pages look like one product. Fonts are the system's own, because the Content-Security-Policy allows no font hosts. The animations on the landing page are CSS only and stop for visitors whose system asks for reduced motion.
 
 ### Dashboard layout
 
