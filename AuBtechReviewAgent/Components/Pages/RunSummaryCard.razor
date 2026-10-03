@@ -9,7 +9,7 @@
 
 <div class="flex-1 min-h-0 overflow-y-auto p-5 space-y-4 font-sans text-left">
     <div>
-        <h2 class="text-base font-bold text-[#003B5C]">Your review is ready</h2>
+        <h2 class="text-lg font-semibold text-gray-950">Your review is ready</h2>
         <p class="text-xs text-gray-600 mt-0.5">The report, its checked citations and the full run archive are on the Review Output page.</p>
     </div>
 
@@ -24,7 +24,7 @@
     {
         <div class="space-y-1.5">
             <span class="text-[10px] font-bold uppercase tracking-wider text-gray-500">@cited citations checked against the papers</span>
-            <div class="flex h-3 w-full rounded overflow-hidden bg-gray-100" role="img" aria-label="@($"{s.CitationsSupported} supported, {s.CitationsPartiallySupported} partly supported, {s.CitationsNotSupported} not supported")">
+            <div class="flex h-3 w-full overflow-hidden bg-gray-100" role="img" aria-label="@($"{s.CitationsSupported} supported, {s.CitationsPartiallySupported} partly supported, {s.CitationsNotSupported} not supported")">
                 @Segment(s.CitationsSupported, cited, "bg-green-600")
                 @Segment(s.CitationsPartiallySupported, cited, "bg-amber-400")
                 @Segment(s.CitationsNotSupported, cited, "bg-red-600")
@@ -32,16 +32,16 @@
                 @Segment(s.CitationsUnverifiable, cited, "bg-gray-400")
             </div>
             <div class="flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-gray-700">
-                <span><span class="inline-block w-2 h-2 rounded-sm bg-green-600 mr-1"></span>@s.CitationsSupported supported</span>
-                <span><span class="inline-block w-2 h-2 rounded-sm bg-amber-400 mr-1"></span>@s.CitationsPartiallySupported partly supported</span>
-                <span><span class="inline-block w-2 h-2 rounded-sm bg-red-600 mr-1"></span>@s.CitationsNotSupported not supported</span>
+                <span><span class="inline-block w-2 h-2 bg-green-600 mr-1"></span>@s.CitationsSupported supported</span>
+                <span><span class="inline-block w-2 h-2 bg-amber-400 mr-1"></span>@s.CitationsPartiallySupported partly supported</span>
+                <span><span class="inline-block w-2 h-2 bg-red-600 mr-1"></span>@s.CitationsNotSupported not supported</span>
                 @if (s.CitationsInsufficientEvidence > 0)
                 {
-                    <span><span class="inline-block w-2 h-2 rounded-sm bg-sky-600 mr-1"></span>@s.CitationsInsufficientEvidence abstract only</span>
+                    <span><span class="inline-block w-2 h-2 bg-sky-600 mr-1"></span>@s.CitationsInsufficientEvidence abstract only</span>
                 }
                 @if (s.CitationsUnverifiable > 0)
                 {
-                    <span><span class="inline-block w-2 h-2 rounded-sm bg-gray-400 mr-1"></span>@s.CitationsUnverifiable could not be verified</span>
+                    <span><span class="inline-block w-2 h-2 bg-gray-400 mr-1"></span>@s.CitationsUnverifiable could not be verified</span>
                 }
             </div>
             @if (attention > 0)
@@ -52,9 +52,9 @@
     }
 
     <div class="flex flex-wrap gap-2 pt-1">
-        <a href="@($"/spec-matrix/{RunId}")" class="bg-[#003B5C] text-white text-xs font-bold uppercase tracking-wider px-4 py-2 rounded shadow hover:bg-opacity-95">Open the report</a>
-        <a href="@($"/api/workspace/{RunId}/archive")" class="bg-white border border-gray-300 text-[#003B5C] text-xs font-bold uppercase tracking-wider px-3 py-2 rounded hover:bg-gray-50">Download archive</a>
-        <a href="@($"/review?from={RunId}")" class="bg-white border border-gray-300 text-gray-700 text-xs font-bold uppercase tracking-wider px-3 py-2 rounded hover:bg-gray-50">New review with these settings</a>
+        <a href="@($"/spec-matrix/{RunId}")" class="ui-btn-primary ui-btn-sm">Open the report</a>
+        <a href="@($"/api/workspace/{RunId}/archive")" class="ui-btn-secondary ui-btn-sm">Download archive</a>
+        <a href="@($"/review?from={RunId}")" class="ui-btn-secondary ui-btn-sm">New review with these settings</a>
     </div>
 </div>
 
@@ -64,7 +64,7 @@
 
     private static RenderFragment Tile(string value, string label) => __builder =>
     {
-        <div class="border border-gray-200 rounded p-2">
+        <div class="border border-gray-200 p-2">
             <div class="text-lg font-bold text-gray-900 leading-tight">@value</div>
             <div class="text-[10px] uppercase tracking-wide text-gray-500">@label</div>
         </div>
