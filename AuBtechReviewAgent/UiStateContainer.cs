@@ -8,10 +8,11 @@ public class UiStateContainer
     public Guid CurrentSessionId { get; set; } = Guid.Empty;
 
     // Holds the UI dashboard variables across tab switches
-    public string SearchQuery { get; set; } = "Agentic AI software frameworks";
-    public string InclusionCriteria { get; set; } = "Must focus on loop execution and agent architecture.";
-    public string ExclusionCriteria { get; set; } = "Exclude agronomy or commercial marketing studies.";
-    public string ReviewObjective { get; set; } = "To evaluate the current state of agentic orchestration loops and identify common design patterns regarding fault-tolerance and system safety.";
+    // The text fields start empty: the form shows examples as placeholders, and "Try an example" fills them in.
+    public string SearchQuery { get; set; } = "";
+    public string InclusionCriteria { get; set; } = "";
+    public string ExclusionCriteria { get; set; } = "";
+    public string ReviewObjective { get; set; } = "";
     public DateTime DateFrom { get; set; } = new DateTime(2020, 01, 01);
     public DateTime DateTo { get; set; } = DateTime.Today;
     public bool RequirePeerReview { get; set; } = false;
@@ -38,4 +39,4 @@ public class UiStateContainer
     // Source gateways ticked in the dashboard (keys from SourceCatalog). All are ticked by default;
     // ones without an API key are shown greyed out and skipped.
     public HashSet<string> SelectedSources { get; set; } = new(SourceCatalog.AllKeys, StringComparer.OrdinalIgnoreCase);
-}
+}

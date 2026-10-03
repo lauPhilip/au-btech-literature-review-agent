@@ -57,7 +57,7 @@ dotnet user-secrets set "OpenSources:ContactEmail" "you@example.org"
 dotnet watch
 ```
 
-Open the address shown in the terminal, go to the dashboard, fill in your question and criteria, and press **Execute search**. A progress bar shows each step; a review of a few dozen papers takes a few minutes. Running with a local model, Docker and every setting are described in [Setup and configuration](docs/wiki/08-setup-and-configuration.md).
+Open the address shown in the terminal, go to the dashboard, fill in your question and criteria (or press **Try an example**), and press **Start review**. A progress bar shows each step; a review of a few dozen papers takes a few minutes. Running with a local model, Docker and every setting are described in [Setup and configuration](docs/wiki/08-setup-and-configuration.md).
 
 ## Learn more
 

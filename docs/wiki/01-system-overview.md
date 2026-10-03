@@ -78,7 +78,7 @@ sequenceDiagram
     participant C as RunCoordinator
     participant F as WorkspaceStore/{runId}
 
-    U->>H: Execute search
+    U->>H: Start review
     H->>Q: TryReserve(client, tier)
     Q-->>H: allowed + lease
     H->>E: Task.Run(RunReviewAsync(runId, request))

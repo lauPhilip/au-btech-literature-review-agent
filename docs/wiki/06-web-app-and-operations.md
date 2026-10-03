@@ -15,12 +15,13 @@ The request pipeline then adds, in order: forwarded headers (for a reverse proxy
 | Route or name | File | Purpose |
 |---|---|---|
 | `/` | `Components/Pages/Landing.razor` | Public landing page |
-| `/review`, `/review/{runId}` | `Components/Pages/Home.razor` | Dashboard: API keys and quota, the review form with its input check, run status, live progress, PRISMA funnel, JSON view, the human screening review |
+| `/review`, `/review/{runId}` | `Components/Pages/Home.razor` | Dashboard: the review form in three steps with its input check, a summary of the settings once a run starts, and a run panel that follows the run (preview, progress, result, ledger, the human screening review) |
+| component | `RunPlanPreview.razor` | Shown in the run panel before a run: the steps the review will take with the current settings, and what it produces |
 | component | `RunProgressPanel.razor` | The progress bar, current step with detail, elapsed time and the list of steps |
 | `/spec-matrix`, `/spec-matrix/{runId}` | `Components/Pages/SpecMatrix.razor` | Review Output: the report with clickable citations, tables, charts, downloads, "Delete run" |
 | `/metrics` | `Components/Pages/Metrics.razor` | Run quality metrics across runs: verdict shares per run, groups by app version and settings, and where a run's citations fail. Public, like the code; the links to individual run reports are shown only with the developer token (`Quota:AdminToken`) or in Development, because a run's link opens its report |
 | `/review?from={runId}` | `Components/Pages/Home.razor` | A new review with the question, criteria, artifact and options of an earlier run filled in (from "New review from these settings") |
-| component | `RunSummaryCard.razor` | What a finished run produced: counts, themes, studies cited, the citation verdicts, and the way into the report; replaces the JSON panel when a run is complete |
+| component | `RunSummaryCard.razor` | What a finished run produced: counts, themes, studies cited, the citation verdicts, and the way into the report; shown at the top of the run panel when a run is complete |
 | component | `ScreeningReviewPanel.razor` | The include/exclude list shown while a run waits for review |
 | component | `PrismaFunnel.razor` | The funnel on the dashboard, with "show" links for removed records |
 | `GET /api/workspace/{id}/archive` | `Program.cs` | The run archive as a zip |
@@ -29,7 +30,16 @@ The request pipeline then adds, in order: forwarded headers (for a reverse proxy
 
 The dashboard subscribes to `ReviewEngine.OnProgressUpdated` while it is open and unsubscribes when it is disposed. Progress is set by the engine through `ReportProgress` (`RunProgress.cs`): the run's step plan (`ProgressPlan`, with citation chaining and the human review only when asked for), the current step, how far it is from 0 to 1 and a short detail such as "16 of 40 records screened" are kept in `ReviewStats`. `RunProgress.Percent` turns them into an overall percentage using a rough weight per step, and within a step the value never goes back. Updates inside a step are sent at most every 400 ms and do not write the ledger, so loops can report freely. The dashboard also re-reads the saved ledger every few seconds, which can be a little behind the live events; `RunProgress.KeepFurthest` keeps whichever is further along for the same run, so the bar never moves back.
 
-On the Review Output page, a bar above the report counts the citations that need attention (partly supported or not supported) and steps through them in reading order with Previous and Next: each step opens the citation's verdict and scrolls it into view (`wwwroot/js/review-output.js`). The form on the dashboard shows a short example and a character count under every field. The Review Output page does not follow a run live; it reads the finished files from the run folder each time it loads. Anyone with a run's link can open it, which is why run ids are random GUIDs and runs are deleted after `Runs:RetentionDays`.
+On the Review Output page, a bar above the report counts the citations that need attention (partly supported or not supported) and steps through them in reading order with Previous and Next: each step opens the citation's verdict and scrolls it into view (`wwwroot/js/review-output.js`). The Review Output page does not follow a run live; it reads the finished files from the run folder each time it loads. Anyone with a run's link can open it, which is why run ids are random GUIDs and runs are deleted after `Runs:RetentionDays`.
+
+### Dashboard layout
+
+The dashboard is laid out so that the next thing to do is always the most visible one. The page scrolls as a whole; on wide screens the run panel on the right stays in view while the left side scrolls.
+
+- **Toolbar.** The page title, the quota as a small chip (tier and runs left) and the API keys button. The account details are kept small because the question matters more.
+- **The form, in three steps.** *Question* (query and objective, with a "Try an example" button), *Criteria* (include, exclude, publication years with presets such as "Last 5 years") and *Output* (the artifact, the sources, and an "Advanced options" fold with dual screening, citation chaining, the human screening check, peer-reviewed only and records per source; the fold shows which are on). Every step can be opened directly, and finished steps get a check mark. The fields start empty with examples as placeholders; the help line under a field shows a character count only near the limit.
+- **Action bar.** A bar at the bottom of the form stays in reach: one line summarising the choices, the reason the review cannot start yet (for example "Add a search query (step 1)"), and the buttons. "Start now" is offered from the first step once nothing is missing.
+- **After the start.** The form folds into a short "Review settings" card with the run's status, its link and a "New review" button, and the run panel switches from the preview (`RunPlanPreview`) to the progress panel and the PRISMA funnel. On a phone the page scrolls to the run panel (`traceableReview.revealOnSmallScreens` in `wwwroot/js/review-output.js`). When the run is complete, `RunSummaryCard` opens the panel. The raw ledger is one tab away ("Ledger (JSON)").
 
 ## Limits: quota, slots, cache
 
