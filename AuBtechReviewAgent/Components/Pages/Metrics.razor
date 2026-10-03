@@ -10,25 +10,12 @@
 
 <PageTitle>Run Quality Metrics</PageTitle>
 
-<header class="bg-[#003B5C] text-white flex-none shrink-0 z-50 shadow-md">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between gap-3">
-        <a href="/" class="flex items-center space-x-3 hover:opacity-90 transition-opacity min-w-0 shrink overflow-hidden">
-            <span class="font-bold tracking-tight text-xs sm:text-sm whitespace-nowrap truncate">AARHUS UNIVERSITY</span>
-            <span class="text-white/40 font-light hidden lg:inline">|</span>
-            <span class="text-xs tracking-wider font-medium opacity-90 uppercase hidden lg:inline">au-btech-literature-review-agent</span>
-        </a>
-        <nav class="flex items-center gap-3 sm:gap-6 text-[10px] sm:text-xs font-semibold uppercase tracking-wider whitespace-nowrap shrink-0">
-            <a href="/" class="text-white/70 hover:text-white transition-colors py-4">Overview</a>
-            <a href="/review" class="text-white/70 hover:text-white transition-colors py-4">Dashboard</a>
-            <a href="/spec-matrix" class="text-white/70 hover:text-white transition-colors py-4">Review Output</a>
-            <a href="/metrics" class="text-white border-b-2 border-white py-4">Metrics</a>
-        </nav>
-    </div>
-</header>
+<SiteHeader Active="metrics" />
 
+<div class="flex-1 min-h-0 overflow-y-auto">
 <main class="max-w-7xl mx-auto px-4 sm:px-6 py-6 font-sans text-gray-800 space-y-6">
     <div>
-        <h1 class="text-xl font-bold text-[#003B5C]">Run quality metrics</h1>
+        <h1 class="ui-h2">Run quality metrics</h1>
         <p class="text-xs text-gray-600 mt-1 max-w-3xl">
             Every completed run stores its quality and cost figures here, computed in code from the run's own files. The store outlives the run folders, holds no
             research question or paper text, and groups runs by app version and settings, so you can see whether a change to the pipeline made the citations
@@ -47,13 +34,13 @@
     }
     else
     {
-        <section class="bg-white border border-gray-200 rounded p-4 space-y-3">
-            <h2 class="text-sm font-bold text-[#003B5C]">Citation verdicts per run</h2>
+        <section class="ui-card p-5 space-y-3">
+            <h2 class="ui-h3">Citation verdicts per run</h2>
             <p class="text-[11px] text-gray-500">Share of final verdicts in each of the last @chartRuns.Count runs, oldest on the left. Hover a bar for the numbers; the runs table below has the same data.</p>
             <div class="flex flex-wrap gap-4 text-[11px] text-gray-700">
                 @foreach (var (label, color) in Legend)
                 {
-                    <span class="flex items-center gap-1"><span class="inline-block w-3 h-3 rounded-sm" style="background:@color"></span>@label</span>
+                    <span class="flex items-center gap-1"><span class="inline-block w-3 h-3 " style="background:@color"></span>@label</span>
                 }
             </div>
             <div class="overflow-x-auto">
@@ -86,8 +73,8 @@
             </div>
         </section>
 
-        <section class="bg-white border border-gray-200 rounded p-4 space-y-2">
-            <h2 class="text-sm font-bold text-[#003B5C]">By app version and settings</h2>
+        <section class="ui-card p-5 space-y-2">
+            <h2 class="ui-h3">By app version and settings</h2>
             <p class="text-[11px] text-gray-500">Verdict shares are pooled over all citations of the runs in a group. "Before" is the first check, before the second check and the repair pass.</p>
             <div class="overflow-x-auto">
                 <table class="w-full text-[11px] border border-gray-200">
@@ -121,8 +108,8 @@
             </div>
         </section>
 
-        <section class="bg-white border border-gray-200 rounded p-4 space-y-2">
-            <h2 class="text-sm font-bold text-[#003B5C]">Runs</h2>
+        <section class="ui-card p-5 space-y-2">
+            <h2 class="ui-h3">Runs</h2>
             <p class="text-[11px] text-gray-500">Select a run to see where its citations fail.</p>
             <div class="overflow-x-auto">
                 <table class="w-full text-[11px] border border-gray-200">
@@ -154,7 +141,7 @@
                                 <td class="p-1.5">
                                     @if (allowed)
                                     {
-                                        <a class="text-[#003B5C] underline" href="@($"/spec-matrix/{r.RunId}")" @onclick:stopPropagation="true">open</a>
+                                        <a class="text-brand underline" href="@($"/spec-matrix/{r.RunId}")" @onclick:stopPropagation="true">open</a>
                                     }
                                     else
                                     {
@@ -170,8 +157,8 @@
 
         @if (selected is { } run)
         {
-            <section class="bg-white border border-gray-200 rounded p-4 space-y-3">
-                <h2 class="text-sm font-bold text-[#003B5C]">Where the citations of the run from @run.CompletedUtc.Replace("T", " ").TrimEnd('Z') fail</h2>
+            <section class="ui-card p-5 space-y-3">
+                <h2 class="ui-h3">Where the citations of the run from @run.CompletedUtc.Replace("T", " ").TrimEnd('Z') fail</h2>
                 <div class="grid md:grid-cols-3 gap-4">
                     @Breakdown("By section", run.CitationsBySection)
                     @Breakdown("By evidence available", run.CitationsByEvidence)
@@ -201,6 +188,7 @@
         <p class="text-[10px] text-gray-400">Stored in @Store.FilePath (one JSON object per line); each run's own copy is run-metrics.json in its archive.</p>
     }
 </main>
+</div>
 
 @code {
     // Status colours: reserved for verdicts, always shown with a label in the legend and the tooltip.
