@@ -115,6 +115,9 @@ app.Use(async (context, next) =>
     context.Response.OnStarting(() =>
     {
         AuBtechReviewAgent.SecurityHeaders.Apply(context.Response.Headers, isDevelopment);
+        // A run's own pages and downloads stay out of search results (see SiteSeo).
+        if (AuBtechReviewAgent.SiteSeo.IsNoIndexPath(context.Request.Path.Value))
+            context.Response.Headers["X-Robots-Tag"] = "noindex, nofollow";
         return Task.CompletedTask;
     });
     await next();
@@ -168,7 +171,14 @@ app.MapGet("/api/workspace/{sessionId:guid}/protocol.md", (Guid sessionId) =>
     return text == null ? Results.NotFound() : Results.Text(text, "text/markdown; charset=utf-8");
 }).RequireRateLimiting("ArchiveDownloadPolicy");
 
+// For search engines: which pages to crawl, and the list of public pages (see SiteSeo).
+var siteConfiguration = app.Configuration;
+app.MapGet("/robots.txt", (HttpRequest request) =>
+    Results.Text(AuBtechReviewAgent.SiteSeo.RobotsTxt(AuBtechReviewAgent.SiteSeo.BaseUrl(siteConfiguration, request)), "text/plain; charset=utf-8"));
+app.MapGet("/sitemap.xml", (HttpRequest request) =>
+    Results.Text(AuBtechReviewAgent.SiteSeo.SitemapXml(AuBtechReviewAgent.SiteSeo.BaseUrl(siteConfiguration, request)), "application/xml; charset=utf-8"));
+
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
 
-app.Run();
+app.Run();
