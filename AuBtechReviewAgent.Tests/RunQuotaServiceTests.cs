@@ -91,7 +91,46 @@ public class RunQuotaServiceTests : IDisposable
         quota.TryReserve("2.2.2.2", QuotaTier.Free, out _, out _);
 
         Assert.False(quota.TryReserve("3.3.3.3", QuotaTier.Free, out var status, out _));
-        Assert.Contains("shared capacity", status.Message);
+        Assert.Contains("shared free runs are used up", status.Message);
+    }
+
+    [Fact]
+    public void ABlockedFreeTierSaysWhenRunsComeBackAndOffersOwnKey()
+    {
+        var quota = Create(); // the clock is at 10:00 UTC
+        for (int i = 0; i < 3; i++) quota.TryReserve("1.2.3.4", QuotaTier.Free, out _, out _);
+
+        var status = quota.GetStatus("1.2.3.4", QuotaTier.Free);
+
+        Assert.Equal(new DateTime(2026, 9, 26, 0, 0, 0, DateTimeKind.Utc), status.ResetsUtc);
+        Assert.Contains("in 14 h (midnight UTC)", status.Message);
+        Assert.Contains("your own Mistral key", status.Message);
+    }
+
+    [Fact]
+    public void ABlockedOwnKeySaysWhenTheOldestRunLeavesTheHour()
+    {
+        var quota = Create(new QuotaOptions { FreeRunsPerDay = 3, GlobalFreeRunsPerDay = 50, OwnKeyRunsPerHour = 2 });
+        quota.TryReserve("1.2.3.4", QuotaTier.OwnKey, out _, out _);   // 10:00
+        _now = _now.AddMinutes(20);
+        quota.TryReserve("1.2.3.4", QuotaTier.OwnKey, out _, out _);   // 10:20
+
+        var status = quota.GetStatus("1.2.3.4", QuotaTier.OwnKey);
+
+        Assert.False(status.Allowed);
+        Assert.Equal(new DateTime(2026, 9, 25, 11, 0, 0, DateTimeKind.Utc), status.ResetsUtc);
+        Assert.Contains("in 40 min", status.Message);
+    }
+
+    [Theory]
+    [InlineData(0, "in less than a minute")]
+    [InlineData(0.2, "in 1 min")]
+    [InlineData(59, "in 59 min")]
+    [InlineData(60, "in 1 h")]
+    [InlineData(312, "in 5 h 12 min")]
+    public void ResetTimesAreRoundedUpAndReadable(double minutes, string expected)
+    {
+        Assert.Equal(expected, RunQuotaService.ResetText(TimeSpan.FromMinutes(minutes)));
     }
 
     [Fact]
