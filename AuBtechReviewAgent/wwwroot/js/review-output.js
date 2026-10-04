@@ -44,6 +44,12 @@ window.traceableReview = {
         if (firstField) firstField.focus();
         return true;
     },
+    // copyText: puts text on the clipboard (used for the statement on AI use); false when the browser refuses.
+    copyText: async function (text) {
+        try { await navigator.clipboard.writeText(text); return true; } catch { return false; }
+    },
+    // print: opens the browser's print window, where "Save as PDF" gives a PDF of the report.
+    print: function () { window.print(); return true; },
     releaseFocus: function () {
         const opener = window.traceableReview._opener;
         window.traceableReview._opener = null;
