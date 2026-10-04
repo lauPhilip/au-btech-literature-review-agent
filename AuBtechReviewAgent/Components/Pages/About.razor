@@ -1,0 +1,128 @@
+@page "/about"
+@inject AuBtechReviewAgent.RunsOptions RunsOptions
+
+<SeoHead Title="About and FAQ" Path="/about" BreadcrumbName="About"
+         Description="Who made TraceableAI, what the citation colours mean, what it can and cannot do, how to cite it, and answers to common questions."
+         ExtraJsonLd="AuBtechReviewAgent.SiteSeo.ScholarlyArticleJsonLd" />
+
+<SiteHeader />
+
+<main id="main" tabindex="-1" class="flex-1 min-h-0 overflow-y-auto bg-white text-gray-900 font-sans">
+    <div class="ui-container py-14 lg:py-20 max-w-3xl">
+        <p class="ui-eyebrow">About</p>
+        <h1 class="ui-h1 mt-3">Who made TraceableAI, and why</h1>
+        <p class="ui-lead mt-5">
+            Ask a language model for a literature review and you get fluent text with citations that are often wrong or
+            invented. TraceableAI runs a full PRISMA 2020 review instead, and checks every citation it writes against the
+            paper it cites, so you can see what holds up and what does not.
+        </p>
+
+        <section class="mt-14" aria-labelledby="who">
+            <h2 id="who" class="ui-h2">Who is behind it</h2>
+            <p class="mt-4 text-gray-700 leading-relaxed">
+                TraceableAI is built by @AuBtechReviewAgent.SiteSeo.Authors at the @AuBtechReviewAgent.SiteSeo.Organisation,
+                Herning, Denmark. It is open source under the Apache 2.0 licence, and was presented at the 8th International
+                Open Search Symposium (OSSYM 2026).
+            </p>
+        </section>
+
+        <section class="mt-14" aria-labelledby="colours">
+            <h2 id="colours" class="ui-h2">What the colours mean</h2>
+            <p class="mt-4 text-gray-700 leading-relaxed">Every citation in a report gets one of these verdicts. Click a citation number in the report to see the quote behind it.</p>
+            <dl class="mt-6 space-y-4">
+                @foreach (var (key, chip) in Verdicts)
+                {
+                    var entry = AuBtechReviewAgent.Glossary.Find(key)!;
+                    <div class="grid grid-cols-1 sm:grid-cols-[11rem_1fr] gap-2 sm:gap-6 items-start">
+                        <dt><span class="@chip">@entry.Term</span></dt>
+                        <dd class="text-gray-700 leading-relaxed">@entry.Explanation</dd>
+                    </div>
+                }
+            </dl>
+        </section>
+
+        <section class="mt-14" aria-labelledby="limits">
+            <h2 id="limits" class="ui-h2">What it can and cannot do</h2>
+            <p class="mt-4 text-gray-700 leading-relaxed">
+                TraceableAI is a co-pilot for a human reviewer, not a replacement. Its checks make errors findable; they do not
+                make them impossible. The citation check is itself a model's judgement, and for papers without an open-access
+                full text it only sees the abstract. The two screenings are two prompts to the same model, so their agreement is
+                an upper bound on what two people would reach. The <a href="/model-card" class="text-brand underline underline-offset-2">model card</a>
+                lists what the model decides, how it is checked and how well it does.
+            </p>
+        </section>
+
+        <section class="mt-14" aria-labelledby="faq">
+            <h2 id="faq" class="ui-h2">Questions</h2>
+            <div class="mt-6 divide-y divide-gray-200 border-y border-gray-200">
+                @foreach (var (question, answer) in Faq)
+                {
+                    <details class="group py-4">
+                        <summary class="cursor-pointer list-none flex items-center justify-between gap-4 font-medium text-gray-900">
+                            @question
+                            <span class="text-brand text-xl leading-none transition-transform group-open:rotate-45" aria-hidden="true">+</span>
+                        </summary>
+                        <div class="mt-3 text-gray-700 leading-relaxed">@answer</div>
+                    </details>
+                }
+            </div>
+        </section>
+
+        <section class="mt-14" aria-labelledby="cite">
+            <h2 id="cite" class="ui-h2">How to cite TraceableAI</h2>
+            <p class="mt-4 text-gray-700 leading-relaxed">Please cite the paper and name the software version you used; it is in every run's archive and on its report.</p>
+            <pre class="mt-4 bg-gray-950 text-gray-200 p-4 text-xs leading-5 font-mono whitespace-pre-wrap break-words">@Bibtex</pre>
+        </section>
+
+        <section class="mt-14" aria-labelledby="contact">
+            <h2 id="contact" class="ui-h2">Contact</h2>
+            <p class="mt-4 text-gray-700 leading-relaxed">
+                Questions, bugs and ideas go to the
+                <a href="@($"{AuBtechReviewAgent.SiteSeo.RepositoryUrl}/issues")" class="text-brand underline underline-offset-2">issues on GitHub</a>.
+                Report a security problem privately, as described in the
+                <a href="@($"{AuBtechReviewAgent.SiteSeo.RepositoryUrl}/blob/master/SECURITY.md")" class="text-brand underline underline-offset-2">security policy</a>.
+            </p>
+        </section>
+    </div>
+    <SiteFooter />
+</main>
+
+@code {
+    private static readonly (string Key, string Chip)[] Verdicts =
+    {
+        ("supported", "ui-chip-ok"),
+        ("partly-supported", "ui-chip-partial"),
+        ("not-supported", "ui-chip-bad"),
+        ("abstract-only", "ui-chip border-sky-200 bg-sky-50 text-sky-800"),
+        ("unverifiable", "ui-chip border-gray-200 bg-gray-50 text-gray-700"),
+    };
+
+    private const string Bibtex = """
+        @inproceedings{lau2026traceableai,
+          author    = {Lau, Philip S. P. {\O}. O. and Nidhi},
+          title     = {{TraceableAI}: An Open-Source Agentic Framework for {PRISMA}-Compliant Literature Synthesis},
+          booktitle = {Proceedings of the 8th International Open Search Symposium (OSSYM 2026)},
+          year      = {2026}
+        }
+        """;
+
+    private (string Question, string Answer)[] Faq => new[]
+    {
+        ("Is it free?",
+         "Yes. Anyone can run a few reviews a day on this server. With your own Mistral API key there is only a light hourly limit, and you can run the whole thing on your own computer, with a local model if you like."),
+        ("Which language model does it use, and where does my text go?",
+         "This server uses Mistral's API. Your question, criteria and the text of the papers are sent to the model to do the review; the search query goes to the scholarly databases. The privacy page lists exactly what is stored and sent where."),
+        ("Can I use the report in my thesis or paper?",
+         "Use it as a well-documented starting point, not as finished text. Check the orange and red citations, read the key studies yourself, and follow your institution's rules on AI use. Section 6.4 of every report has a statement on AI use you can copy and adapt."),
+        ("How reliable is it?",
+         "Every run reports how many of its citations were supported by the cited paper, and the public Metrics page shows this across runs. The model card explains which steps the model does, how each is checked, and the known failure modes."),
+        ("How long are my results kept?",
+         $"Each run is kept for {RunsOptions.RetentionDays} days and then deleted automatically. You can delete it earlier from its page, and download the complete archive before then."),
+        ("How can I check that an archive was not changed?",
+         "Every archive contains manifest.json with a SHA-256 fingerprint of each file. Upload the archive on the Verify page to check every file, or recompute the fingerprints yourself with sha256sum or Get-FileHash."),
+        ("Can I run it myself?",
+         "Yes. The code is on GitHub with a setup guide. You need the .NET 10 SDK and either a Mistral key or a local model through Ollama."),
+        ("How can I help?",
+         "Report problems, suggest improvements or contribute code on GitHub; the contributing guide explains how."),
+    };
+}
