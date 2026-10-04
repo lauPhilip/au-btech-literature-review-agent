@@ -27,7 +27,7 @@
 
 <div class="print:hidden"><SiteHeader Active="output" DashboardHref="@(State.CurrentSessionId != Guid.Empty ? $"/review/{State.CurrentSessionId}" : "/review")" OutputHref="@(State.CurrentSessionId != Guid.Empty ? $"/spec-matrix/{State.CurrentSessionId}" : "/spec-matrix")" /></div>
 
-<main id="main" tabindex="-1" class="w-full bg-gray-100 p-4 md:p-8 flex flex-col items-center justify-start min-h-screen overflow-y-auto print:bg-white print:p-0 pb-16">
+<main id="main" tabindex="-1" class="w-full bg-gray-100 p-4 md:p-8 flex flex-col items-center justify-start min-h-screen overflow-y-auto print:block print:min-h-0 print:overflow-visible print:bg-white print:p-0 pb-16">
 
     @if (HasReport)
     {
@@ -39,6 +39,7 @@
             <a href="@($"/review?from={State.CurrentSessionId}")" class="ui-btn-secondary ui-btn-sm" title="Open the dashboard with this run's question, criteria and options filled in">New review from these settings</a>
             <a href="@($"/api/workspace/{State.CurrentSessionId}/references.bib")" target="_blank" class="ui-btn-secondary ui-btn-sm">BibTeX</a>
             <a href="@($"/api/workspace/{State.CurrentSessionId}/references.ris")" target="_blank" class="ui-btn-secondary ui-btn-sm">RIS (Zotero / EndNote)</a>
+            <button type="button" @onclick="PrintReport" class="ui-btn-secondary ui-btn-sm" title="Print the report, or choose Save as PDF in the print window">Print or save as PDF</button>
             <button @onclick="TriggerZipArchiveDownload" class="ui-btn-primary ui-btn-sm">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
@@ -187,7 +188,7 @@
 
                 <div class="md:col-span-2 space-y-4 font-sans pt-2 overflow-visible">
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div class="space-y-2 border border-gray-200 p-3 bg-white ">
+                        <div class="space-y-2 border border-gray-200 p-3 bg-white print-keep">
                             <span class="text-[11px] font-bold text-gray-800 block border-b border-gray-100 pb-1">Figure 3.1: Included Publications per Year</span>
                             <div class="space-y-2 pt-1">
                                 @{ int maxYear = Math.Max(1, publicationsByYear.Values.DefaultIfEmpty(0).Max()); }
@@ -204,7 +205,7 @@
                             </div>
                         </div>
 
-                        <div class="space-y-2 border border-gray-200 p-3 bg-white ">
+                        <div class="space-y-2 border border-gray-200 p-3 bg-white print-keep">
                             <span class="text-[11px] font-bold text-gray-800 block border-b border-gray-100 pb-1">Figure 3.2: Included Papers by Source</span>
                             <div class="space-y-2 pt-1">
                                 @{ int maxPlatform = Math.Max(1, platformShares.Select(p => p.Count).DefaultIfEmpty(0).Max()); }
@@ -223,7 +224,7 @@
                     </div>
 
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div class="space-y-2 border border-gray-200 p-3 bg-white ">
+                        <div class="space-y-2 border border-gray-200 p-3 bg-white print-keep">
                             <span class="text-[11px] font-bold text-gray-700 block border-b border-gray-100 pb-1">Figure 3.3: Distribution by Publishing Venue Type</span>
                             @{
                                 int totalVenues = journalCount + conferenceCount + transactionsCount + proceedingsCount + preprintCount;
@@ -247,7 +248,7 @@
                             </div>
                         </div>
 
-                        <div class="space-y-2 border border-gray-200 p-3 bg-white ">
+                        <div class="space-y-2 border border-gray-200 p-3 bg-white print-keep">
                             <span class="text-[11px] font-bold text-gray-700 block border-b border-gray-100 pb-1">Figure 3.4: Journal Quartile and Venue Tier</span>
                             <div class="flex items-end justify-between h-28 pt-2 border-b border-gray-300 px-2">
                                 @foreach (var label in new[] { "Q1", "Q2", "Q3", "Q4", "Conf", "Preprint" })
@@ -282,8 +283,8 @@
 
                 <div class="md:col-span-2 space-y-2 pt-4 font-sans max-w-full overflow-hidden">
                     <span class="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">Table 3.1: Included Studies</span>
-                    <div class="border border-gray-200 bg-white overflow-x-auto">
-                        <table class="w-full text-left border-collapse text-[10px] leading-relaxed table-fixed min-w-[700px]">
+                    <div class="border border-gray-200 bg-white overflow-x-auto print:overflow-visible" tabindex="0" role="region" aria-label="Scrolls sideways">
+                        <table class="w-full text-left border-collapse text-[10px] leading-relaxed table-fixed min-w-[700px] print:min-w-0">
                             <thead>
                                 <tr class="bg-gray-100 border-b border-gray-200 text-gray-700 font-bold font-mono text-[9px] uppercase sticky top-0 z-10">
                                     <th class="p-2 border-r border-gray-200 w-[5%]">Ref.</th>
@@ -318,8 +319,8 @@
                 {
                     <div class="md:col-span-2 space-y-2 pt-2 font-sans max-w-full overflow-hidden">
                         <span class="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">Table 3.2: Extracted Study Data</span>
-                        <div class="border border-gray-200 bg-white overflow-x-auto">
-                            <table class="w-full text-left border-collapse text-[10px] leading-relaxed table-fixed min-w-[700px]">
+                        <div class="border border-gray-200 bg-white overflow-x-auto print:overflow-visible" tabindex="0" role="region" aria-label="Scrolls sideways">
+                            <table class="w-full text-left border-collapse text-[10px] leading-relaxed table-fixed min-w-[700px] print:min-w-0">
                                 <thead>
                                     <tr class="bg-gray-100 border-b border-gray-200 text-gray-700 font-bold font-mono text-[9px] uppercase">
                                         <th class="p-2 border-r border-gray-200 w-[5%]">Ref.</th>
@@ -362,8 +363,8 @@
                         <span class="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">Table 3.3: Quality Appraisal (MMAT 2018)</span>
                         @if (extractions.Any(AuBtechReviewAgent.MethodsSectionWriter.ShowInAppraisalTable))
                         {
-                            <div class="border border-gray-200 bg-white overflow-x-auto">
-                                <table class="w-full text-left border-collapse text-[10px] min-w-[560px]">
+                            <div class="border border-gray-200 bg-white overflow-x-auto print:overflow-visible" tabindex="0" role="region" aria-label="Scrolls sideways">
+                                <table class="w-full text-left border-collapse text-[10px] min-w-[560px] print:min-w-0">
                                     <thead>
                                         <tr class="bg-gray-100 border-b border-gray-200 text-gray-700 font-bold font-mono text-[9px] uppercase">
                                             <th class="p-2 border-r border-gray-200">Ref.</th>
@@ -425,7 +426,7 @@
                     {
                         <div class="mt-4 font-sans">
                             <span class="text-[10px] font-bold text-gray-500 uppercase block mb-1">Evidence map: studies by theme</span>
-                            <div class="overflow-x-auto">
+                            <div class="overflow-x-auto print:overflow-visible" tabindex="0" role="region" aria-label="Scrolls sideways">
                                 <table class="w-full text-[10px] border border-gray-200">
                                     <thead class="bg-gray-50 text-gray-600">
                                         <tr>
@@ -475,7 +476,7 @@
                                 @if (art.IsDiagram && !string.IsNullOrEmpty(mermaidDiagramCode))
                                 {
                                     @* Filled by wwwroot/js/mermaid-render.js; Blazor leaves the empty element alone. *@
-                                    <div id="mermaid-preview" class="w-full flex flex-col items-center justify-center text-center bg-gray-50 p-3 overflow-x-auto"></div>
+                                    <div id="mermaid-preview" class="w-full flex flex-col items-center justify-center text-center bg-gray-50 p-3 overflow-x-auto print:overflow-visible"></div>
                                     @if (art.Nodes.Any(n => AuBtechReviewAgent.CitationSupportChecker.ReferencesIn(n.Label).Count > 0))
                                     {
                                         <span class="text-[10px] font-bold text-gray-500 uppercase block pt-1">Cited boxes in the diagram</span>
@@ -488,7 +489,7 @@
                                 }
                                 else if (art.Kind == AuBtechReviewAgent.ArtifactKinds.Table)
                                 {
-                                    <div class="overflow-x-auto">
+                                    <div class="overflow-x-auto print:overflow-visible" tabindex="0" role="region" aria-label="Scrolls sideways">
                                         <table class="w-full text-[11px] border border-gray-200 align-top">
                                             <thead class="bg-gray-50 text-gray-600 text-left">
                                                 <tr>@foreach (var col in art.Columns) { <th class="p-1.5 border-b border-gray-200">@col</th> }</tr>
@@ -568,6 +569,22 @@
                     <p class="text-gray-800">@ScrubAnchors(report.AvailabilityItem)</p>
                 </div>
 
+                @if (aiStatement.Length > 0)
+                {
+                    @* Ready to copy into a paper or thesis; built only from what the run recorded (AiUseStatement). *@
+                    <div class="space-y-1 md:col-span-2" id="ai-use">
+                        <div class="flex items-center justify-between gap-2">
+                            <span class="font-sans font-bold text-[10px] text-gray-500 uppercase block">6.4 Use of Artificial Intelligence</span>
+                            <span class="flex gap-2 print:hidden font-sans">
+                                <button type="button" class="ui-btn-secondary ui-btn-sm" @onclick='() => CopyStatement(aiStatement, "Methods statement")'>Copy for the methods</button>
+                                <button type="button" class="ui-btn-secondary ui-btn-sm" @onclick='() => CopyStatement(aiShort, "Short declaration")'>Copy a short declaration</button>
+                            </span>
+                        </div>
+                        <p class="text-gray-800">@aiStatement</p>
+                        <p class="font-sans text-[10px] text-gray-500 print:hidden" role="status">@(copyNotice ?? "Edit it to fit your venue's policy on AI use before you submit.")</p>
+                    </div>
+                }
+
             </div>
 
             <div class="mt-8 pt-4 border-t border-gray-200 text-left overflow-visible">
@@ -592,6 +609,10 @@
             <div class="mt-12 pt-4 border-t border-gray-200 text-center font-sans text-[9px] text-gray-500 uppercase tracking-widest">
                 OSSYM 2026 - 8th International Open Search Symposium
             </div>
+            @* Only on paper: where the printed report came from, so a printout can be traced back to its run. *@
+            <p class="hidden print:block mt-2 text-center font-sans text-[8px] text-gray-500">
+                Generated with TraceableAI · run @State.CurrentSessionId · @(report.GeneratedAt) · protocol @(string.IsNullOrWhiteSpace(report.ProtocolHash) ? "not recorded" : report.ProtocolHash)
+            </p>
 
         </article>
     }
@@ -834,6 +855,27 @@
         pendingFocus = closing ? null : $"verdict-{field}";
     }
 
+    // The statement on AI use for this run (section 6.4), and the confirmation after copying it.
+    private string aiStatement = "";
+    private string aiShort = "";
+    private string? copyNotice;
+
+    private async Task CopyStatement(string text, string what)
+    {
+        bool copied = false;
+        try { copied = await JS.InvokeAsync<bool>("traceableReview.copyText", text); }
+        catch (JSException) { /* the browser refused the clipboard; the text stays on the page to select by hand */ }
+        catch (JSDisconnectedException) { /* the tab was closed */ }
+        copyNotice = copied ? $"{what} copied. Edit it to fit your venue's policy on AI use before you submit." : "Copying is not allowed here; select the text and copy it by hand.";
+    }
+
+    private async Task PrintReport()
+    {
+        try { await JS.InvokeVoidAsync("traceableReview.print"); }
+        catch (JSException) { /* printing is a convenience; Ctrl+P works too */ }
+        catch (JSDisconnectedException) { /* the tab was closed */ }
+    }
+
     private void CloseCitation()
     {
         if (openCitation is { } open) pendingFocus = CiteId(open.Field, open.Sentence, open.Reference);
@@ -898,6 +940,8 @@
         platformShares = new();
         journalCount = conferenceCount = transactionsCount = proceedingsCount = preprintCount = 0;
         peerReviewOnlyToggle = false;
+        aiStatement = aiShort = "";
+        copyNotice = null;
         passedPeerReviewCheck = failedPeerReviewCheck = 0;
         mermaidDiagramCode = "";
         openCitation = null;
@@ -933,6 +977,8 @@
         if (state == null) return;
 
         peerReviewOnlyToggle = state.PeerReviewOnlyToggle;
+        aiStatement = AuBtechReviewAgent.AiUseStatement.Methods(state, State.CurrentSessionId);
+        aiShort = AuBtechReviewAgent.AiUseStatement.Short(state);
         passedPeerReviewCheck = state.Stats.PassedPeerReviewCheck;
         failedPeerReviewCheck = state.Stats.FailedPeerReviewCheck;
         extractions = state.Extractions ?? new();

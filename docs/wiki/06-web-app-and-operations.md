@@ -17,6 +17,13 @@ The request pipeline then adds, in order: forwarded headers (for a reverse proxy
 | `/` | `Components/Pages/Landing.razor` | Public landing page: an animated example of a checked citation, live numbers from the metrics store (or what every run does, when there are none yet), the pipeline, the outputs and the comparison with a general chatbot |
 | component | `Components/Layout/SiteHeader.razor` | The top bar every page shares, with the current page marked and a "Skip to content" link |
 | `/glossary` | `Components/Pages/GlossaryPage.razor` | Plain-language explanations of the terms the app uses (`Glossary.cs`) |
+| `/about` | `Components/Pages/About.razor` | Who made it, what the verdict colours mean, the limits, questions and answers, how to cite, contact |
+| `/privacy` | `Components/Pages/Privacy.razor` | What is stored, for how long and what is sent where; the periods come from the running configuration |
+| `/model-card` | `Components/Pages/ModelCard.razor` | Which steps the model does and how each is checked in code, the known failure modes, measured citation accuracy from the metrics store |
+| `/verify` | `Components/Pages/Verify.razor` | Upload a run archive and check every file against `manifest.json` (`RunManifest.CheckArchive`); nothing is stored |
+| `GET /.well-known/security.txt` | `Program.cs`, `SiteSeo.SecurityTxt` | Where to report a vulnerability (RFC 9116), with an expiry date computed when served; see `SECURITY.md` |
+| `humans.txt` | `wwwroot/humans.txt` | Who built the site and with what |
+| component | `Components/Layout/SiteFooter.razor` | The footer of the public pages, with the about, privacy, model card, verify and project links |
 | component | `Components/Layout/Term.razor` | A term with its explanation on hover and focus: `<Term Key="kappa" />` |
 | `/review`, `/review/{runId}` | `Components/Pages/Home.razor` | Dashboard: the review form in three steps with its input check, a summary of the settings once a run starts, and a run panel that follows the run (preview, progress, result, ledger, the human screening review) |
 | component | `RunPlanPreview.razor` | Shown in the run panel before a run: the steps the review will take with the current settings, and what it produces |
@@ -37,7 +44,7 @@ On the Review Output page, a bar above the report counts the citations that need
 
 ### Search engines and link previews
 
-`SiteSeo.cs` holds what search engines get. `/robots.txt` and `/sitemap.xml` are served from code, so they always use the right address: `Site:PublicUrl` (https://au-btech-literature-review-agent.dk in production), or the request's own address in Development, where `appsettings.Development.json` leaves it empty. The sitemap lists the public pages: the landing page, the review form and Metrics. Every page sets its title, description, canonical link, Open Graph and Twitter card tags through `Components/Layout/SeoHead.razor`, and the landing page adds schema.org structured data (`SoftwareApplication`) as JSON-LD. The preview image is `wwwroot/img/social-card.png` (1200×630). A run's own pages (`/review/{runId}`, `/spec-matrix`), the downloads under `/api/` and the error pages are kept out of search results with a `noindex` meta tag and an `X-Robots-Tag` header; robots.txt blocks only `/api/`, because a crawler must be able to fetch a page to see its noindex. `wwwroot/site.webmanifest` names the app and its icons for "add to home screen".
+`SiteSeo.cs` holds what search engines get. `/robots.txt` and `/sitemap.xml` are served from code, so they always use the right address: `Site:PublicUrl` (https://au-btech-literature-review-agent.dk in production), or the request's own address in Development, where `appsettings.Development.json` leaves it empty. The sitemap lists the public pages (`SiteSeo.IndexedPages`). Every page sets its title, description, author, canonical link, Open Graph and Twitter card tags through `Components/Layout/SeoHead.razor`, which also adds a schema.org `BreadcrumbList` for every indexed page except the start page. Pages add their own structured data as JSON-LD: the landing page a `SoftwareApplication`, Metrics a `Dataset`, and About a `ScholarlyArticle` for the OSSYM paper (`SeoHead`'s `StructuredData` and `ExtraJsonLd`). The preview image is `wwwroot/img/social-card.png` (1200×630). A run's own pages (`/review/{runId}`, `/spec-matrix`), the downloads under `/api/` and the error pages are kept out of search results with a `noindex` meta tag and an `X-Robots-Tag` header; robots.txt blocks only `/api/`, because a crawler must be able to fetch a page to see its noindex. `wwwroot/site.webmanifest` names the app and its icons for "add to home screen".
 
 After deploying, add the site in Google Search Console, submit `https://<your address>/sitemap.xml`, and check the preview with the Rich Results Test.
 
@@ -59,6 +66,12 @@ The app aims at WCAG 2.2 level AA. What that means in the code:
 | Animations stop when the system asks for reduced motion | `Styles/tailwind.input.css` |
 
 The CI job **Accessibility** starts the app and runs axe-core on the public pages (`tools/a11y/axe-check.mjs`); a serious or critical problem fails the build. Automated checks find only part of the problems, so keyboard and screen-reader checks by hand are still needed after larger UI changes.
+
+### Printing a report and the statement on AI use
+
+Review Output has a "Print or save as PDF" button. The print styles (`@media print` in `Styles/tailwind.input.css`, and `print:` classes in `MainLayout.razor` and `SpecMatrix.razor`) release the fixed-height frame so the report flows over A4 pages, hide the top bar, buttons and citation popups, keep figures and table rows from splitting, and add a line at the end with the run id and protocol fingerprint, so a printout can be traced back to its run.
+
+Section 6.4 of every report is a statement on the use of AI, built by `AiUseStatement` only from what the run recorded: the model and app version, the steps the model did, the screening agreement, whether a person checked the screening, and the citation verdicts. Two buttons copy it, or a one-sentence declaration, for a paper or thesis.
 
 ### Shared design
 
