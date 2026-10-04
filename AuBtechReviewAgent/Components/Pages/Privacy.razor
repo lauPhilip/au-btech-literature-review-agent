@@ -110,6 +110,12 @@
             "Keys you enter under API keys are kept encrypted in your browser tab's session storage. The server uses them only to make the " +
             "calls of your run; it does not write them to disk or to its logs. They are gone when you close the tab, or when you press Clear session.",
         }),
+        ("browser", "What your browser keeps", new[]
+        {
+            "While you fill in the review form, an unfinished draft (the question, criteria and options, never your keys) is kept in your browser's " +
+            "local storage, so closing the tab does not lose it. It stays on your device until you start the review or press Start empty, and is " +
+            "ignored after 30 days. If you ask to be notified when a review is ready, your browser shows the notification; nothing is sent anywhere else.",
+        }),
         ("reuse", "What is kept longer", new[]
         {
             $"To save time and cost, a database's answer to a search is reused for {CacheOptions.SearchResponseHours} hours, and a screening " +

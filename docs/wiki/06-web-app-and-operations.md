@@ -67,6 +67,15 @@ The app aims at WCAG 2.2 level AA. What that means in the code:
 
 The CI job **Accessibility** starts the app and runs axe-core on the public pages (`tools/a11y/axe-check.mjs`); a serious or critical problem fails the build. Automated checks find only part of the problems, so keyboard and screen-reader checks by hand are still needed after larger UI changes.
 
+### Speed and the live connection
+
+- **Static files.** `App.razor` links CSS and scripts through `@Assets[...]`, which gives each file a fingerprinted address that changes when the file changes. `MapStaticAssets` serves them Brotli- or gzip-compressed (compressed at build time) with `Cache-Control: max-age=31536000, immutable`, so a returning visitor downloads nothing again until a new version is deployed. Mermaid (3.5 MB) is loaded only when a report has a diagram (`wwwroot/js/mermaid-render.js`). The unused Bootstrap copy was removed from `wwwroot/lib`.
+- **The HTML itself is not compressed by the app** on purpose: prerendered pages contain encrypted component state, and compressing secrets together with text a visitor can influence opens the door to BREACH-style attacks. The pages are small (about 30 KB).
+- **Lost connection.** `Components/Layout/ReconnectModal.razor` replaces Blazor's grey box with a banner at the bottom that does not cover the page or take keyboard focus, says that a running review keeps going on the server, and offers Try again or Reload when reconnecting fails. Blazor sets the state classes; the styles are in `Styles/tailwind.input.css`.
+- **Tab title and notification.** While a run is going, the dashboard's tab title shows its progress ("42% · Your review"), and "✓ Review ready" once it finished while the page was open. "Notify me when it is ready" asks the browser for permission; the notification is only shown when the tab is in the background (`notifyDone` in `review-output.js`).
+- **Remembered form.** An unfinished review form is kept in the browser's local storage (`loadDraft`/`saveDraft`, never the API keys) and brought back on the next visit to an empty form, with a "Start empty" button. It is removed when the run starts, and ignored after 30 days. The privacy page says so.
+- **Quota messages.** When the free tier or the own-key limit is reached, `RunQuotaService` says when the next run is available ("in 5 h 12 min (midnight UTC)", rounded up) in `QuotaStatus.Message` and `ResetsUtc`, and the dashboard offers to add your own Mistral key.
+
 ### Printing a report and the statement on AI use
 
 Review Output has a "Print or save as PDF" button. The print styles (`@media print` in `Styles/tailwind.input.css`, and `print:` classes in `MainLayout.razor` and `SpecMatrix.razor`) release the fixed-height frame so the report flows over A4 pages, hide the top bar, buttons and citation popups, keep figures and table rows from splitting, and add a line at the end with the run id and protocol fingerprint, so a printout can be traced back to its run.

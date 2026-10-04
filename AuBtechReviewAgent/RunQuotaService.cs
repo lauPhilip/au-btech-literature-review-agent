@@ -41,7 +41,8 @@ public class QuotaOptions
 
 public enum QuotaTier { Free, OwnKey, Developer }
 
-public record QuotaStatus(QuotaTier Tier, bool Allowed, int Used, int Limit, string Message)
+/// <param name="ResetsUtc">When the next run becomes available again, if the limit is reached (shown as "in 5 h 12 min").</param>
+public record QuotaStatus(QuotaTier Tier, bool Allowed, int Used, int Limit, string Message, DateTime? ResetsUtc = null)
 {
     public int Remaining => Math.Max(0, Limit - Used);
 }
@@ -178,9 +179,11 @@ public class RunQuotaService
                 int limit = _options.OwnKeyRunsPerHour;
                 if (limit <= 0) return new QuotaStatus(tier, true, 0, int.MaxValue, "Own Mistral key: no run limit.");
                 int used = Count(BucketFor(clientAddress, tier), t => t > now.AddHours(-1));
-                return used < limit
-                    ? new QuotaStatus(tier, true, used, limit, $"Own Mistral key: {limit - used} of {limit} runs left this hour.")
-                    : new QuotaStatus(tier, false, used, limit, $"Own Mistral key: the limit of {limit} runs per hour is reached. Try again later.");
+                if (used < limit) return new QuotaStatus(tier, true, used, limit, $"Own Mistral key: {limit - used} of {limit} runs left this hour.");
+                // The oldest run in the last hour drops out of the window first.
+                DateTime frees = Oldest(BucketFor(clientAddress, tier), t => t > now.AddHours(-1)).AddHours(1);
+                return new QuotaStatus(tier, false, used, limit,
+                    $"Own Mistral key: all {limit} runs for this hour are used. The next one is available {ResetText(frees - now)}.", frees);
             }
 
             default:
@@ -189,12 +192,13 @@ public class RunQuotaService
                 int used = Count(BucketFor(clientAddress, tier), t => t.Date == now.Date);
                 int globalUsed = Count(GlobalFreeBucket, t => t.Date == now.Date);
 
+                DateTime midnight = now.Date.AddDays(1);
                 if (used >= limit)
                     return new QuotaStatus(tier, false, used, limit,
-                        $"Free tier: you have used all {limit} runs for today. The count resets at midnight UTC, or add your own Mistral key under API Credentials.");
+                        $"Free tier: you have used all {limit} runs for today. New runs are available {ResetText(midnight - now)} (midnight UTC), or right away with your own Mistral key.", midnight);
                 if (_options.GlobalFreeRunsPerDay > 0 && globalUsed >= _options.GlobalFreeRunsPerDay)
                     return new QuotaStatus(tier, false, used, limit,
-                        "Free tier: today's shared capacity is used up. Try again after midnight UTC, or add your own Mistral key under API Credentials.");
+                        $"Free tier: today's shared free runs are used up by all visitors together. New runs are available {ResetText(midnight - now)} (midnight UTC), or right away with your own Mistral key.", midnight);
                 return new QuotaStatus(tier, true, used, limit, $"Free tier: {limit - used} of {limit} runs left today.");
             }
         }
@@ -206,6 +210,18 @@ public class RunQuotaService
         string digest = Convert.ToHexString(hmac.ComputeHash(Encoding.UTF8.GetBytes(clientAddress ?? "unknown")))[..24];
         return $"{(tier == QuotaTier.OwnKey ? "own" : "free")}:{digest}";
     }
+
+    /// <summary>"in 5 h 12 min", "in 12 min" or "in less than a minute", rounded up so it is never too early.</summary>
+    public static string ResetText(TimeSpan wait)
+    {
+        int minutes = (int)Math.Ceiling(Math.Max(0, wait.TotalMinutes));
+        if (minutes <= 0) return "in less than a minute";
+        return minutes < 60 ? $"in {minutes} min" : $"in {minutes / 60} h{(minutes % 60 == 0 ? "" : $" {minutes % 60} min")}";
+    }
+
+    // Called under _gate, like Count.
+    private DateTime Oldest(string bucket, Func<DateTime, bool> predicate) =>
+        _data.Events.TryGetValue(bucket, out var events) && events.Any(predicate) ? events.Where(predicate).Min() : _utcNow();
 
     private int Count(string bucket, Func<DateTime, bool> predicate) =>
         _data.Events.TryGetValue(bucket, out var list) ? list.Count(predicate) : 0;
