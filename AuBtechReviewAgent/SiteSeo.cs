@@ -44,6 +44,20 @@ public static class SiteSeo
     public const string Authors = "Philip S. P. Ø. O. Lau and Nidhi";
 
     /// <summary>
+    /// A new GitHub issue, filled in with what is needed to find the run in the server log (run ID, version,
+    /// the step it stopped at) and nothing the person typed: the question and criteria stay out of a public issue.
+    /// </summary>
+    public static string ProblemReportUrl(Guid runId, string version, string stage)
+    {
+        string title = $"Run failed during {stage} ({runId.ToString()[..8]})";
+        string body =
+            "**What happened**\n\nA review run stopped with an error.\n\n" +
+            $"- Run ID: `{runId}`\n- App version: `{version}`\n- Stopped during: {stage}\n- Time (UTC): {DateTime.UtcNow:yyyy-MM-dd HH:mm}\n\n" +
+            "**What were you doing?**\n\n(Please describe. Do not paste anything confidential: issues are public.)\n";
+        return $"{RepositoryUrl}/issues/new?labels=bug&title={Uri.EscapeDataString(title)}&body={Uri.EscapeDataString(body)}";
+    }
+
+    /// <summary>
     /// The site's public address without a trailing slash: Site:PublicUrl when set (recommended behind a proxy
     /// or with several host names), otherwise the scheme and host of the request.
     /// </summary>
@@ -89,7 +103,7 @@ public static class SiteSeo
         return p.StartsWith("/api/", StringComparison.Ordinal)
             || p.StartsWith("/review/", StringComparison.Ordinal)
             || p == "/spec-matrix" || p.StartsWith("/spec-matrix/", StringComparison.Ordinal)
-            || p == "/not-found" || p == "/error";
+            || p == "/not-found" || p == "/error" || p == "/health";
     }
 
     /// <summary>

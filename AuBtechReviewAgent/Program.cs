@@ -5,6 +5,24 @@ using System.Threading.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// 0. LOGGING
+// Log lines carry their scopes, so everything a run writes includes its RunId (see RunReviewAsync). On the
+// server the console log is one JSON object per line with a UTC timestamp, which log tools can filter by run;
+// in development it stays readable text.
+if (builder.Environment.IsDevelopment())
+{
+    builder.Logging.AddSimpleConsole(options => { options.IncludeScopes = true; options.SingleLine = true; options.TimestampFormat = "HH:mm:ss "; });
+}
+else
+{
+    builder.Logging.AddJsonConsole(options =>
+    {
+        options.IncludeScopes = true;
+        options.UseUtcTimestamp = true;
+        options.TimestampFormat = "yyyy-MM-ddTHH:mm:ss.fffZ";
+    });
+}
+
 // 1. FORWARDED HEADERS CONFIGURATION
 // X-Forwarded-For is only trusted from proxies listed in ReverseProxy:KnownProxies (default: none besides
 // loopback). The old config cleared the trusted list, which meant any visitor could send their own
@@ -179,6 +197,14 @@ app.MapGet("/robots.txt", (HttpRequest request) =>
     Results.Text(AuBtechReviewAgent.SiteSeo.RobotsTxt(AuBtechReviewAgent.SiteSeo.BaseUrl(siteConfiguration, request)), "text/plain; charset=utf-8"));
 app.MapGet("/sitemap.xml", (HttpRequest request) =>
     Results.Text(AuBtechReviewAgent.SiteSeo.SitemapXml(AuBtechReviewAgent.SiteSeo.BaseUrl(siteConfiguration, request)), "application/xml; charset=utf-8"));
+// For uptime monitoring: storage, model configuration and how the databases have been answering (SiteHealth).
+bool serverModelKey = !string.IsNullOrWhiteSpace(mistralApiKey) && !mistralApiKey.Contains("PLACEHOLDER", StringComparison.OrdinalIgnoreCase);
+app.MapGet("/health", () =>
+{
+    var report = AuBtechReviewAgent.SiteHealth.Build(reviewEngine, serverModelKey, DateTime.UtcNow);
+    return Results.Json(report, statusCode: report.Status == "unhealthy" ? StatusCodes.Status503ServiceUnavailable : StatusCodes.Status200OK);
+});
+
 // Where to report a vulnerability (RFC 9116); see SECURITY.md.
 app.MapGet("/.well-known/security.txt", (HttpRequest request) =>
     Results.Text(AuBtechReviewAgent.SiteSeo.SecurityTxt(AuBtechReviewAgent.SiteSeo.BaseUrl(siteConfiguration, request), DateTime.UtcNow), "text/plain; charset=utf-8"));
