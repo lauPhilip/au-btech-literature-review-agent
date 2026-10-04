@@ -39,6 +39,7 @@ builder.Services.AddRateLimiter(options =>
 });
 
 var quotaOptions = builder.Configuration.GetSection("Quota").Get<AuBtechReviewAgent.QuotaOptions>() ?? new AuBtechReviewAgent.QuotaOptions();
+builder.Services.AddSingleton(quotaOptions); // read by the privacy page
 builder.Services.AddSingleton(new AuBtechReviewAgent.RunQuotaService(
     quotaOptions, builder.Environment.IsDevelopment(), builder.Environment.ContentRootPath));
 builder.Services.AddHttpContextAccessor();
@@ -69,6 +70,7 @@ builder.Services.AddSingleton(runsOptions);
 var cacheOptions = builder.Configuration.GetSection("Cache").Get<AuBtechReviewAgent.CacheOptions>() ?? new AuBtechReviewAgent.CacheOptions();
 var reviewCache = new AuBtechReviewAgent.ReviewCache(cacheOptions, builder.Environment.ContentRootPath);
 builder.Services.AddSingleton(reviewCache);
+builder.Services.AddSingleton(cacheOptions); // read by the privacy page
 
 // Per-run quality metrics, kept in App_Data/metrics so they outlive the run folders (see the Metrics section).
 var metricsOptions = builder.Configuration.GetSection("Metrics").Get<AuBtechReviewAgent.MetricsOptions>() ?? new AuBtechReviewAgent.MetricsOptions();
@@ -177,6 +179,9 @@ app.MapGet("/robots.txt", (HttpRequest request) =>
     Results.Text(AuBtechReviewAgent.SiteSeo.RobotsTxt(AuBtechReviewAgent.SiteSeo.BaseUrl(siteConfiguration, request)), "text/plain; charset=utf-8"));
 app.MapGet("/sitemap.xml", (HttpRequest request) =>
     Results.Text(AuBtechReviewAgent.SiteSeo.SitemapXml(AuBtechReviewAgent.SiteSeo.BaseUrl(siteConfiguration, request)), "application/xml; charset=utf-8"));
+// Where to report a vulnerability (RFC 9116); see SECURITY.md.
+app.MapGet("/.well-known/security.txt", (HttpRequest request) =>
+    Results.Text(AuBtechReviewAgent.SiteSeo.SecurityTxt(AuBtechReviewAgent.SiteSeo.BaseUrl(siteConfiguration, request), DateTime.UtcNow), "text/plain; charset=utf-8"));
 
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();

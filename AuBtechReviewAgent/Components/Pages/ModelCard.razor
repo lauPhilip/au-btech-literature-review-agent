@@ -1,0 +1,154 @@
+@page "/model-card"
+@using System.Globalization
+@inject AuBtechReviewAgent.PrismaReviewEngine ReviewEngine
+@inject AuBtechReviewAgent.RunMetricsStore MetricsStore
+
+@* What the model decides, how each decision is checked, where it fails, and how well it does on this server
+   (pooled from the metrics store). The failure modes follow docs/wiki/08 "What the checks do and do not catch". *@
+
+<SeoHead Title="Model card" Path="/model-card"
+         Description="Which steps of a TraceableAI review a language model does, how each one is checked in code, the known failure modes, and the measured citation accuracy." />
+
+<SiteHeader />
+
+<main id="main" tabindex="-1" class="flex-1 min-h-0 overflow-y-auto bg-white text-gray-900 font-sans">
+    <div class="ui-container py-14 lg:py-20 max-w-4xl">
+        <p class="ui-eyebrow">Model card</p>
+        <h1 class="ui-h1 mt-3">What the model does, and how it is checked</h1>
+        <p class="ui-lead mt-5">
+            TraceableAI uses a language model for the steps that need reading and writing, and code for everything that
+            can be counted or verified. This page says which is which, where it goes wrong, and how often.
+        </p>
+
+        <dl class="mt-10 ui-card p-6 grid grid-cols-1 sm:grid-cols-3 gap-5 text-sm">
+            <div><dt class="text-gray-500">Model on this server</dt><dd class="font-semibold text-gray-900 mt-1 break-words">@ReviewEngine.Llm.DisplayName</dd></div>
+            <div><dt class="text-gray-500">App version</dt><dd class="font-semibold text-gray-900 mt-1 break-words">@AppVersion</dd></div>
+            <div><dt class="text-gray-500">Settings for decisions</dt><dd class="font-semibold text-gray-900 mt-1">Temperature 0, structured answers validated in code</dd></div>
+        </dl>
+
+        <section class="mt-14" aria-labelledby="steps">
+            <h2 id="steps" class="ui-h2">Who decides what</h2>
+            <div class="mt-6 ui-card overflow-x-auto" tabindex="0" role="region" aria-labelledby="steps">
+                <table class="w-full text-sm min-w-[640px]">
+                    <caption class="sr-only">Each step of a review, who does it, and how it is checked</caption>
+                    <thead class="bg-gray-50 text-left text-gray-600">
+                        <tr>
+                            <th scope="col" class="px-4 py-3 font-medium">Step</th>
+                            <th scope="col" class="px-4 py-3 font-medium">Done by</th>
+                            <th scope="col" class="px-4 py-3 font-medium">How it is checked</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-100 text-gray-700 align-top">
+                        @foreach (var (step, by, check) in Steps)
+                        {
+                            <tr>
+                                <th scope="row" class="px-4 py-3 text-left font-medium text-gray-900">@step</th>
+                                <td class="px-4 py-3 whitespace-nowrap"><span class="@(by == "Code" ? "ui-chip border-gray-200 bg-gray-50 text-gray-700" : "ui-chip border-brand-100 bg-brand-50 text-brand")">@by</span></td>
+                                <td class="px-4 py-3">@check</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <section class="mt-14" aria-labelledby="measured">
+            <h2 id="measured" class="ui-h2">How well it does</h2>
+            @if (runs.Count == 0)
+            {
+                <p class="mt-4 text-gray-700 leading-relaxed">No finished runs have been measured on this server yet. Every finished run adds its figures to the <a href="/metrics" class="text-brand underline underline-offset-2">Metrics page</a>.</p>
+            }
+            else
+            {
+                <p class="mt-4 text-gray-700 leading-relaxed">Pooled over the last @runs.Count finished runs on this server, from the same data as the <a href="/metrics" class="text-brand underline underline-offset-2">Metrics page</a>.</p>
+                <dl class="mt-6 grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    @foreach (var (value, label) in Measured)
+                    {
+                        <div class="ui-card px-4 py-3 flex flex-col-reverse">
+                            <dt class="text-xs text-gray-500 leading-snug mt-1">@label</dt>
+                            <dd class="text-2xl font-semibold tracking-tight text-gray-950">@value</dd>
+                        </div>
+                    }
+                </dl>
+            }
+            <p class="mt-5 text-gray-700 leading-relaxed">
+                Screening accuracy against human reviewers (recall, precision, kappa) can be measured with the
+                <a href="@($"{AuBtechReviewAgent.SiteSeo.RepositoryUrl}/blob/master/docs/wiki/07-extending-and-testing.md#measuring-screening-accuracy")" class="text-brand underline underline-offset-2">screening evaluation tool</a>
+                on datasets where people made the decisions. No benchmark result is published yet.
+            </p>
+        </section>
+
+        <section class="mt-14" aria-labelledby="failures">
+            <h2 id="failures" class="ui-h2">Known failure modes</h2>
+            <ul class="mt-5 space-y-4">
+                @foreach (var (title, text) in Failures)
+                {
+                    <li class="border-l-2 border-amber-300 pl-4">
+                        <p class="font-medium text-gray-900">@title</p>
+                        <p class="text-gray-700 leading-relaxed mt-1">@text</p>
+                    </li>
+                }
+            </ul>
+        </section>
+
+        <section class="mt-14" aria-labelledby="use">
+            <h2 id="use" class="ui-h2">Intended use</h2>
+            <p class="mt-4 text-gray-700 leading-relaxed">
+                A co-pilot for a researcher doing a systematic or scoping review: a documented first pass that a person checks,
+                corrects and takes responsibility for. It is not meant to publish a review without that check, to make clinical
+                or policy decisions, or to stand in for a second human screener. Every report includes a statement on AI use
+                (section 6.4) to adapt for your paper or thesis.
+            </p>
+        </section>
+    </div>
+    <SiteFooter />
+</main>
+
+@code {
+    private List<AuBtechReviewAgent.RunMetrics> runs = new();
+    private List<(string Value, string Label)> Measured = new();
+
+    private static string AppVersion => AuBtechReviewAgent.RecordingChatCompletionService.AppVersion.Split('+')[0];
+
+    private static readonly (string Step, string By, string Check)[] Steps =
+    {
+        ("Protocol", "You", "Written before the search and fingerprinted (SHA-256); later additions are dated amendments."),
+        ("Extra search phrasings", "Model", "Recorded in the protocol as an amendment; the raw database answers are saved."),
+        ("Searching, removing duplicates, year range", "Code", "Every query and response is saved; removals are counted with their reason."),
+        ("Screening titles and abstracts", "Model", "Two independent prompts; disagreements are kept and flagged; Cohen's kappa is reported; uncertain decisions can be checked by you."),
+        ("Data extraction and MMAT appraisal", "Model", "Every value must come with a quote that is found in the paper's text; values without one are marked."),
+        ("Themes and synthesis text", "Model", "Each theme's studies follow from coded findings with anchors; a revision may not drop citations; every study has a place in the evidence map."),
+        ("Methods section, counts, PRISMA flow diagram", "Code", "Generated from what the run actually did, so they never describe a step that did not happen."),
+        ("Reference numbers and reference list", "Code", "Built from the database metadata; a citation number that does not exist is removed."),
+        ("Citation check", "Model", "A verdict counts only when its supporting quote is found word for word in the paper; weak ones get a second check and a repair."),
+        ("Fingerprints and archive", "Code", "Every file of the run is fingerprinted in manifest.json, which you can check on the Verify page."),
+    };
+
+    private static readonly (string Title, string Text)[] Failures =
+    {
+        ("The citation check is a model judgement", "It reads excerpts of the paper. A supported verdict needs a verbatim quote, but the judgement whether the quote backs the sentence can still be wrong."),
+        ("Abstract-only papers", "When no open-access full text exists, the check and the extraction only see the abstract. Such citations are shown as \"abstract only\" rather than as errors."),
+        ("Agreement is an upper bound", "The two screenings and the two codings are two prompts to the same model, so they share its blind spots. Their kappa is higher than two people would typically reach."),
+        ("Metadata errors", "References are built from what the databases return; a wrong year or venue there is a wrong year or venue in the report."),
+        ("Search coverage", "Only the selected open databases are searched, with a limited number of records per source. Relevant studies outside them are missed unless citation chaining finds them."),
+        ("Steering attempts", "Instruction-like text in papers or in the review form is flagged and recorded, and the model is told to treat it as data, but this makes manipulation visible rather than impossible."),
+    };
+
+    protected override void OnInitialized()
+    {
+        runs = MetricsStore.ReadAll().TakeLast(50).ToList();
+        if (runs.Count == 0) return;
+        var inv = CultureInfo.InvariantCulture;
+        int total = runs.Sum(r => r.CitationsFinal.Total);
+        int totalBefore = runs.Sum(r => r.CitationsInitial.Total);
+        string Pct(int part, int whole) => whole == 0 ? "–" : (part * 100.0 / whole).ToString("0", inv) + "%";
+        var kappas = runs.Where(r => r.ScreeningKappa.HasValue).Select(r => r.ScreeningKappa!.Value).ToList();
+        Measured = new()
+        {
+            (Pct(runs.Sum(r => r.CitationsFinal.Supported), total), "of citations supported by the cited paper"),
+            (Pct(runs.Sum(r => r.CitationsInitial.Supported), totalBefore), "supported before the second check and repair"),
+            (Pct(runs.Sum(r => r.CitationsFinal.NotSupported), total), "not supported (shown in red)"),
+            (kappas.Count == 0 ? "–" : kappas.Average().ToString("0.00", inv), "average screening kappa (two prompts)"),
+        };
+    }
+}

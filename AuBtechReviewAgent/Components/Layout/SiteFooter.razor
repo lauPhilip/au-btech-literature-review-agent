@@ -1,0 +1,31 @@
+@* The footer of the public pages: who made it, and the pages about trust (how it works, privacy, the model,
+   checking an archive) next to the project links. *@
+
+<footer class="bg-white border-t border-gray-100 print:hidden">
+    <div class="ui-container py-10 grid grid-cols-2 md:grid-cols-4 gap-8 text-sm">
+        <div class="col-span-2">
+            <p class="font-semibold text-gray-900">TraceableAI</p>
+            <p class="text-gray-500 mt-1 max-w-sm">Literature reviews where every citation is checked. @AuBtechReviewAgent.SiteSeo.Organisation. Presented at OSSYM 2026.</p>
+        </div>
+        <nav aria-label="About TraceableAI">
+            <p class="font-semibold text-gray-900">About</p>
+            <ul class="mt-2 space-y-1.5 text-gray-600">
+                <li><a href="/about" class="hover:text-brand">About and FAQ</a></li>
+                <li><a href="/model-card" class="hover:text-brand">Model card</a></li>
+                <li><a href="/privacy" class="hover:text-brand">Privacy</a></li>
+                <li><a href="/verify" class="hover:text-brand">Verify an archive</a></li>
+                <li><a href="/glossary" class="hover:text-brand">Glossary</a></li>
+            </ul>
+        </nav>
+        <nav aria-label="Project">
+            <p class="font-semibold text-gray-900">Project</p>
+            <ul class="mt-2 space-y-1.5 text-gray-600">
+                <li><a href="@AuBtechReviewAgent.SiteSeo.RepositoryUrl" class="hover:text-brand">GitHub</a></li>
+                <li><a href="@($"{AuBtechReviewAgent.SiteSeo.RepositoryUrl}/blob/master/docs/wiki/README.md")" class="hover:text-brand">Developer wiki</a></li>
+                <li><a href="@($"{AuBtechReviewAgent.SiteSeo.RepositoryUrl}/blob/master/CONTRIBUTING.md")" class="hover:text-brand">Contributing</a></li>
+                <li><a href="@($"{AuBtechReviewAgent.SiteSeo.RepositoryUrl}/blob/master/SECURITY.md")" class="hover:text-brand">Security</a></li>
+                <li><a href="@($"{AuBtechReviewAgent.SiteSeo.RepositoryUrl}/blob/master/LICENSE")" class="hover:text-brand">Apache 2.0 licence</a></li>
+            </ul>
+        </nav>
+    </div>
+</footer>

@@ -1,0 +1,16 @@
+/* TEAM */
+Developer: Philip S. P. Ø. O. Lau
+Affiliation: Department of Business Development and Technology (BTECH), Aarhus University, Herning, Denmark
+Co-author: Nidhi
+Source: https://github.com/lauPhilip/au-btech-literature-review-agent
+
+/* THANKS */
+Everyone who reported issues and tried early versions.
+The open scholarly infrastructure it searches: arXiv, OpenAlex, Semantic Scholar, Crossref, Unpaywall, Zenodo.
+
+/* SITE */
+Built with: .NET 10, Blazor, Tailwind CSS, PdfPig, Mermaid
+Standards: PRISMA 2020, WCAG 2.2 AA, schema.org
+Language: English
+License: Apache 2.0
+Paper: TraceableAI, 8th International Open Search Symposium (OSSYM 2026)

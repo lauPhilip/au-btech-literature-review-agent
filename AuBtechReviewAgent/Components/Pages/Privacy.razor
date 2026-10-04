@@ -1,0 +1,130 @@
+@page "/privacy"
+@inject AuBtechReviewAgent.RunsOptions RunsOptions
+@inject AuBtechReviewAgent.CacheOptions CacheOptions
+@inject AuBtechReviewAgent.QuotaOptions QuotaOptions
+
+@* Everything on this page describes what the code does (RunQuotaService, ReviewCache, SessionCleanupWorker,
+   RunMetricsStore, the key dialog); the numbers come from the running configuration. Update it with the code. *@
+
+<SeoHead Title="Privacy" Path="/privacy"
+         Description="What TraceableAI stores, for how long, and what it sends to the language model and the scholarly databases. No accounts, no tracking." />
+
+<SiteHeader />
+
+<main id="main" tabindex="-1" class="flex-1 min-h-0 overflow-y-auto bg-white text-gray-900 font-sans">
+    <div class="ui-container py-14 lg:py-20 max-w-3xl">
+        <p class="ui-eyebrow">Privacy</p>
+        <h1 class="ui-h1 mt-3">What happens to your data</h1>
+        <p class="ui-lead mt-5">
+            There are no accounts, no advertising and no tracking. TraceableAI keeps what it needs to run your review and
+            show it to you, for a limited time, and nothing else.
+        </p>
+
+        <div class="mt-10 ui-card p-6 grid grid-cols-1 sm:grid-cols-2 gap-5 text-sm">
+            @foreach (var (title, text) in Summary)
+            {
+                <div>
+                    <p class="font-semibold text-gray-900">@title</p>
+                    <p class="text-gray-600 mt-1 leading-relaxed">@text</p>
+                </div>
+            }
+        </div>
+
+        @foreach (var (id, heading, paragraphs) in Sections)
+        {
+            <section class="mt-12" aria-labelledby="@id">
+                <h2 id="@id" class="ui-h2">@heading</h2>
+                @foreach (var paragraph in paragraphs)
+                {
+                    <p class="mt-4 text-gray-700 leading-relaxed">@paragraph</p>
+                }
+            </section>
+        }
+
+        <section class="mt-12" aria-labelledby="third-parties">
+            <h2 id="third-parties" class="ui-h2">Who else receives what</h2>
+            <div class="mt-5 ui-card overflow-hidden">
+                <table class="w-full text-sm">
+                    <caption class="sr-only">Services that receive data during a review</caption>
+                    <thead class="bg-gray-50 text-left text-gray-600">
+                        <tr><th scope="col" class="px-4 py-3 font-medium">Service</th><th scope="col" class="px-4 py-3 font-medium">What it receives</th></tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-100 text-gray-700">
+                        @foreach (var (service, receives) in ThirdParties)
+                        {
+                            <tr><th scope="row" class="px-4 py-3 text-left font-medium text-gray-900 align-top">@service</th><td class="px-4 py-3">@receives</td></tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+            <p class="mt-4 text-gray-700 leading-relaxed">Each of these services has its own privacy policy. None of them receives your network address from TraceableAI; they see the server's.</p>
+        </section>
+
+        <section class="mt-12" aria-labelledby="choices">
+            <h2 id="choices" class="ui-h2">Your choices</h2>
+            <p class="mt-4 text-gray-700 leading-relaxed">
+                You can delete a run and all its files at any time from its dashboard or report page. You can use your own
+                Mistral key, or run TraceableAI on your own computer with a local model, so that nothing leaves your machine
+                except the database searches. Questions about this page go to the
+                <a href="@($"{AuBtechReviewAgent.SiteSeo.RepositoryUrl}/issues")" class="text-brand underline underline-offset-2">issues on GitHub</a>.
+            </p>
+            <p class="mt-4 text-sm text-gray-500">Last updated October 2026. The page is generated from the app's own settings, so the periods above are the ones this server uses.</p>
+        </section>
+    </div>
+    <SiteFooter />
+</main>
+
+@code {
+    private (string Title, string Text)[] Summary => new[]
+    {
+        ("No account, no tracking", "No sign-up, no analytics, no advertising cookies."),
+        ("Your network address", $"Only used to count free runs, stored as a keyed fingerprint, and forgotten after two days."),
+        ("Your review", $"Kept on this server for {RunsOptions.RetentionDays} days, then deleted. You can delete it sooner."),
+        ("Your API keys", "Kept encrypted in this browser tab only, and gone when you close it."),
+    };
+
+    private (string Id, string Heading, string[] Paragraphs)[] Sections => new[]
+    {
+        ("cookies", "Cookies and tracking", new[]
+        {
+            "TraceableAI uses no analytics, advertising or tracking cookies, and loads no scripts, fonts or images from other sites. " +
+            "The only cookie is a technical one the web framework sets to protect forms against requests from other sites; it identifies no one.",
+        }),
+        ("address", "Your network address", new[]
+        {
+            $"Free runs are limited to {QuotaOptions.FreeRunsPerDay} per day per network address. To count them, your address is replaced " +
+            "by a keyed fingerprint (HMAC-SHA-256 with a secret that exists only on this server) before anything is stored, so the stored value " +
+            "cannot be turned back into an address. Counts older than two days are deleted.",
+            "Like any web server, the hosting provider may keep standard access logs (address, time, page) for operating and securing the server.",
+        }),
+        ("review", "Your review", new[]
+        {
+            "What you type in the review form (search query, objective, criteria, artifact instruction) is saved with the run, together with " +
+            "everything the run produces: the protocol, the search results, every screening decision, the downloaded open-access papers, the " +
+            "report and a record of every model call. This is what makes the review checkable.",
+            $"A run is kept for {RunsOptions.RetentionDays} days after it is created and then deleted automatically, files and all. Anyone who has " +
+            "the link to a run can open it; the links contain a random identifier that cannot be guessed, and they are not listed anywhere or shown to search engines.",
+        }),
+        ("keys", "Your API keys", new[]
+        {
+            "Keys you enter under API keys are kept encrypted in your browser tab's session storage. The server uses them only to make the " +
+            "calls of your run; it does not write them to disk or to its logs. They are gone when you close the tab, or when you press Clear session.",
+        }),
+        ("reuse", "What is kept longer", new[]
+        {
+            $"To save time and cost, a database's answer to a search is reused for {CacheOptions.SearchResponseHours} hours, and a screening " +
+            $"decision for the same paper, criteria and model is reused for {CacheOptions.ScreeningDecisionDays} days. They are filed under a " +
+            "fingerprint of the request and contain the papers' metadata and the decision, not who asked.",
+            "For the public Metrics page, every finished run leaves a line of quality figures: how many citations were supported, coverage, " +
+            "time and cost. It contains no research question, criteria or paper text, and no network address.",
+        }),
+    };
+
+    private static readonly (string Service, string Receives)[] ThirdParties =
+    {
+        ("Mistral AI (the language model)", "Your question, objective and criteria, and titles, abstracts and text of the papers, to screen, extract, write and check. Runs with your own key go through your own Mistral account."),
+        ("arXiv, OpenAlex, Semantic Scholar, Crossref", "Your search query and its extra phrasings, and the identifiers of included papers for citation chaining."),
+        ("Scopus, ScienceDirect, IEEE Xplore", "Your search query, only when a key for them is set."),
+        ("Unpaywall, Zenodo and publishers' open-access servers", "The DOI or link of an included paper, to download a legal open-access copy."),
+    };
+}

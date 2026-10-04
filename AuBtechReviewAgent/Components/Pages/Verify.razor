@@ -1,0 +1,146 @@
+@page "/verify"
+@rendermode InteractiveServer
+@inject ILogger<Verify> Logger
+
+@* Checks an uploaded run archive against its manifest.json (RunManifest.CheckArchive). The file is read in
+   memory for the check and not saved. *@
+
+<SeoHead Title="Verify a run archive" Path="/verify" BreadcrumbName="Verify"
+         Description="Check that a TraceableAI run archive has not been changed: every file is compared with the SHA-256 fingerprint in its manifest." />
+
+<SiteHeader />
+
+<main id="main" tabindex="-1" class="flex-1 min-h-0 overflow-y-auto bg-white text-gray-900 font-sans">
+    <div class="ui-container py-14 lg:py-20 max-w-3xl">
+        <p class="ui-eyebrow">Verify</p>
+        <h1 class="ui-h1 mt-3">Check that an archive is unchanged</h1>
+        <p class="ui-lead mt-5">
+            Every run archive contains <code class="text-base font-mono bg-gray-100 px-1">manifest.json</code>, with a SHA-256
+            fingerprint of each file and of the manifest itself. Upload an archive to compare every file with its fingerprint.
+        </p>
+
+        <div class="mt-10 ui-card p-6">
+            <label for="archive" class="ui-label">Run archive (.zip, at most @(MaxUploadMb) MB)</label>
+            <InputFile id="archive" OnChange="CheckAsync" accept=".zip,application/zip" disabled="@checking" aria-describedby="archive-help"
+                       class="block w-full text-sm text-gray-700 file:mr-4 file:rounded-btn file:border file:border-gray-300 file:bg-white file:px-4 file:py-2 file:text-sm file:font-semibold file:text-gray-800 hover:file:border-brand" />
+            <p id="archive-help" class="mt-2 text-xs text-gray-500">The file is checked in memory and not stored. You can also check it yourself: unzip it and compare <code class="font-mono">sha256sum</code> (or <code class="font-mono">Get-FileHash</code> in PowerShell) with the manifest.</p>
+        </div>
+
+        <div class="mt-8" role="status" aria-live="polite">
+            @if (checking)
+            {
+                <p class="text-gray-700">Checking @fileName …</p>
+            }
+            else if (error != null)
+            {
+                <div class="border border-red-200 bg-red-50 p-5 text-red-800">
+                    <p class="font-semibold">The file could not be checked</p>
+                    <p class="mt-1 text-sm">@error</p>
+                </div>
+            }
+            else if (result is { } r)
+            {
+                <div class="border p-5 @(r.Unchanged ? "border-green-200 bg-verdict-okBg" : "border-red-200 bg-verdict-badBg")">
+                    <p class="font-semibold text-lg @(r.Unchanged ? "text-verdict-ok" : "text-verdict-bad")">
+                        @if (r.Unchanged)
+                        {
+                            <span>✓ Unchanged: all @r.FilesListed files match their fingerprints</span>
+                        }
+                        else if (!r.HasManifest)
+                        {
+                            <span>✕ This is not a TraceableAI run archive: it has no manifest.json</span>
+                        }
+                        else
+                        {
+                            <span>✕ This archive was changed after the run</span>
+                        }
+                    </p>
+                    @if (r.HasManifest)
+                    {
+                        <p class="mt-1 text-sm text-gray-700">
+                            @(r.ManifestIntact switch
+                            {
+                                true => "The manifest itself is also unchanged.",
+                                false => "The manifest itself was edited: its own fingerprint no longer matches, so the list of fingerprints cannot be trusted.",
+                                null => "This manifest is from an older version without a fingerprint of itself.",
+                            })
+                        </p>
+                    }
+                </div>
+
+                @if (r.HasManifest)
+                {
+                    <dl class="mt-6 grid grid-cols-1 sm:grid-cols-[10rem_1fr] gap-x-6 gap-y-2 text-sm">
+                        <dt class="text-gray-500">File</dt><dd class="break-all">@fileName</dd>
+                        <dt class="text-gray-500">Run</dt><dd class="font-mono break-all">@(r.RunId ?? "–")</dd>
+                        <dt class="text-gray-500">Archive made</dt><dd>@(r.CreatedUtc?.Replace("T", " ").TrimEnd('Z') ?? "–") UTC</dd>
+                        <dt class="text-gray-500">App version</dt><dd class="break-all">@(r.AppVersion ?? "–")</dd>
+                        <dt class="text-gray-500">Model</dt><dd>@(r.Model ?? "–")</dd>
+                        <dt class="text-gray-500">Protocol fingerprint</dt><dd class="font-mono break-all">@(r.ProtocolHash ?? "–")</dd>
+                    </dl>
+                }
+
+                @foreach (var (title, files) in new[] { ("Changed files", r.Changed), ("Missing files", r.Missing), ("Files that are not in the manifest", r.NotListed) })
+                {
+                    @if (files.Count > 0)
+                    {
+                        <h2 class="ui-h3 mt-8">@title (@files.Count)</h2>
+                        <ul class="mt-2 font-mono text-xs text-gray-800 space-y-1">
+                            @foreach (var file in files.Take(200))
+                            {
+                                <li class="break-all">@file</li>
+                            }
+                        </ul>
+                    }
+                }
+            }
+        </div>
+    </div>
+    <SiteFooter />
+</main>
+
+@code {
+    private const int MaxUploadMb = 200;
+
+    private bool checking;
+    private string? fileName;
+    private string? error;
+    private AuBtechReviewAgent.RunManifest.ArchiveCheck? result;
+
+    private async Task CheckAsync(InputFileChangeEventArgs e)
+    {
+        checking = true;
+        error = null;
+        result = null;
+        fileName = e.File.Name;
+        try
+        {
+            using var buffer = new MemoryStream();
+            await using (var upload = e.File.OpenReadStream(MaxUploadMb * 1024L * 1024L))
+                await upload.CopyToAsync(buffer);
+            buffer.Position = 0;
+            result = await Task.Run(() => AuBtechReviewAgent.RunManifest.CheckArchive(buffer));
+        }
+        catch (IOException ex) when (ex.Message.Contains("exceeds", StringComparison.OrdinalIgnoreCase))
+        {
+            error = $"The file is larger than {MaxUploadMb} MB.";
+        }
+        catch (InvalidDataException ex)
+        {
+            error = ex.Message.StartsWith("The archive", StringComparison.Ordinal) ? ex.Message : "The file is not a valid zip archive.";
+        }
+        catch (System.Text.Json.JsonException)
+        {
+            error = "The archive's manifest.json could not be read.";
+        }
+        catch (Exception ex) when (ex is IOException or KeyNotFoundException or InvalidOperationException)
+        {
+            Logger.LogInformation("Archive check failed: {Message}", ex.Message.Replace("\r", " ").Replace("\n", " "));
+            error = "The file could not be read as a run archive.";
+        }
+        finally
+        {
+            checking = false;
+        }
+    }
+}

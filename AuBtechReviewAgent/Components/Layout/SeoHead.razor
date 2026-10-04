@@ -7,6 +7,8 @@
 
 <HeadContent>
     <meta name="description" content="@Description" />
+    <meta name="author" content="@AuBtechReviewAgent.SiteSeo.Authors, @AuBtechReviewAgent.SiteSeo.Organisation" />
+    <meta name="application-name" content="@AuBtechReviewAgent.SiteSeo.SiteName" />
     @if (NoIndex)
     {
         <meta name="robots" content="noindex, nofollow" />
@@ -28,10 +30,18 @@
     <meta name="twitter:title" content="@FullTitle" />
     <meta name="twitter:description" content="@Description" />
     <meta name="twitter:image" content="@Image" />
+    @* Data blocks, not scripts: the Content-Security-Policy does not apply to them and nothing runs. *@
     @if (StructuredData)
     {
-        @* A data block, not a script: the Content-Security-Policy does not apply to it and nothing runs. *@
-        @((MarkupString)$"<script type=\"application/ld+json\">{AuBtechReviewAgent.SiteSeo.JsonLd(BaseUrl)}</script>")
+        @JsonLdBlock(AuBtechReviewAgent.SiteSeo.JsonLd(BaseUrl))
+    }
+    @if (!NoIndex && Path != "/")
+    {
+        @JsonLdBlock(AuBtechReviewAgent.SiteSeo.BreadcrumbJsonLd(BaseUrl, new[] { (AuBtechReviewAgent.SiteSeo.SiteName, "/"), (BreadcrumbName ?? Title, Path) }))
+    }
+    @if (ExtraJsonLd != null)
+    {
+        @JsonLdBlock(ExtraJsonLd(BaseUrl))
     }
 </HeadContent>
 
@@ -49,6 +59,14 @@
 
     /// <summary>Add the schema.org description of the app (landing page only).</summary>
     [Parameter] public bool StructuredData { get; set; }
+
+    /// <summary>More schema.org data for this page, built from the site's address (e.g. SiteSeo.DatasetJsonLd).</summary>
+    [Parameter] public Func<string, string>? ExtraJsonLd { get; set; }
+
+    /// <summary>The page's name in the breadcrumb trail; the title when not set.</summary>
+    [Parameter] public string? BreadcrumbName { get; set; }
+
+    private static MarkupString JsonLdBlock(string json) => new($"<script type=\"application/ld+json\">{json}</script>");
 
     private string FullTitle => Title.StartsWith(AuBtechReviewAgent.SiteSeo.SiteName, StringComparison.Ordinal)
         ? Title : $"{Title} · {AuBtechReviewAgent.SiteSeo.SiteName}";
