@@ -567,8 +567,11 @@ public partial class PrismaReviewEngine
             string methodsSources = MethodsSectionWriter.InformationSources(selectedNames, unavailableNames, finalState.SearchLogs, finalState.Timestamp,
                 finalState.Stats.IdentifiedViaCitations, finalState.CitationChainingRequested);
             string methodsSearch = MethodsSectionWriter.SearchStrategy(query, effectivePerspectives, finalState.MaxResultsPerSource,
-                finalState.Stats.DuplicatesRemoved, finalState.Stats.CappedBeyondMaxResults, finalState.YearFrom, finalState.YearTo, finalState.Stats.OutsideDateRange);
+                finalState.Stats.DuplicatesRemoved, finalState.Stats.CappedBeyondMaxResults, finalState.YearFrom, finalState.YearTo, finalState.Stats.OutsideDateRange,
+                finalState.SearchStringsReviewed, finalState.SearchStringYields);
             string methodsSelection = MethodsSectionWriter.SelectionProcess(finalState.PeerReviewOnlyToggle, finalState.Stats, finalState.HumanScreeningReviewRequested, finalState.HumanScreeningReviewOutcome, Llm.DisplayName);
+            if (ExclusionReasons.Sentence(finalState.Phases.Screening) is { } exclusionSentence)
+                methodsSelection += " " + exclusionSentence;
             string rawDiscussion = ResolveField("discussionItem");
             string rawSynthesisText = ResolveField("synthesisResultsItem");
 

@@ -82,7 +82,9 @@ public static class MethodsSectionWriter
         int cappedBeyondMax,
         int yearFrom = 0,
         int yearTo = 0,
-        int outsideDateRange = 0)
+        int outsideDateRange = 0,
+        bool reviewedByReviewer = false,
+        IReadOnlyList<SearchStringYield>? yields = null)
     {
         var sb = new StringBuilder();
         sb.Append($"The primary search string was \"{primaryQuery.Trim()}\". ");
@@ -90,9 +92,16 @@ public static class MethodsSectionWriter
         var extra = perspectives.Skip(1).ToList();
         if (extra.Count > 0)
         {
-            sb.Append($"To improve recall, the language model proposed {extra.Count} additional search string{(extra.Count == 1 ? "" : "s")}, each of which was also run against every source: ");
+            sb.Append(reviewedByReviewer
+                ? $"To improve recall, {extra.Count} additional search string{(extra.Count == 1 ? " was" : "s were")} proposed by the language model and checked and approved (or edited) by the reviewer before the search, each run against every source: "
+                : $"To improve recall, the language model proposed {extra.Count} additional search string{(extra.Count == 1 ? "" : "s")}, each of which was also run against every source: ");
             sb.Append(string.Join("; ", extra.Select(p => $"\"{p.Trim()}\"")));
             sb.Append(". ");
+            if (yields != null && SearchSaturation.Hint(yields) is { } hint)
+                sb.Append("Taken in order, the search strings added " + string.Join(", ", yields.Where(y => y.Searches > 0).Select(y => y.New)) +
+                          " records not found by an earlier string" + (hint.Contains("close to saturation", StringComparison.Ordinal)
+                              ? ", so the search was close to saturation for these phrasings. "
+                              : ", so the last phrasing still added new records. "));
         }
         else
         {
@@ -241,7 +250,7 @@ public static class MethodsSectionWriter
     {
         if (string.IsNullOrWhiteSpace(protocolSha256))
             return "No protocol was recorded for this run, and the review was not registered.";
-        return $"The review was not registered. Its protocol (search query, objective, eligibility criteria, sources, limits and screening set-up) was written to protocol.md on {createdUtc:yyyy-MM-dd} (UTC) before any search was run, with SHA-256 fingerprint {protocolSha256[..16]}...; the search strings added by the language model are appended to it as a dated amendment. The file is part of the run archive.";
+        return $"The review was not registered. Its protocol (search query, objective, eligibility criteria, sources, limits and screening set-up) was written to protocol.md on {createdUtc:yyyy-MM-dd} (UTC) before any search was run, with SHA-256 fingerprint {protocolSha256[..16]}...; the extra search strings are appended to it as a dated amendment. The file is part of the run archive.";
     }
 
     /// <summary>
