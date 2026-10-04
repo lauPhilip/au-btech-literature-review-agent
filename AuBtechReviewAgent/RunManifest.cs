@@ -55,6 +55,78 @@ public static class RunManifest
     }
 
     public static string Sha256(byte[] content) => Convert.ToHexString(SHA256.HashData(content)).ToLowerInvariant();
+
+    /// <summary>
+    /// True when the manifest's own fingerprint (ManifestSha256) matches the rest of the manifest, so the list
+    /// of fingerprints itself was not edited. Older manifests without the field return null.
+    /// </summary>
+    public static bool? ManifestIsIntact(string manifestJson)
+    {
+        var node = System.Text.Json.Nodes.JsonNode.Parse(manifestJson)?.AsObject();
+        if (node == null || !node.TryGetPropertyValue("ManifestSha256", out var recorded) || recorded == null) return null;
+        node.Remove("ManifestSha256");
+        return string.Equals(Sha256(Encoding.UTF8.GetBytes(node.ToJsonString())), recorded.GetValue<string>(), StringComparison.Ordinal);
+    }
+
+    /// <summary>What checking a downloaded archive found (see <see cref="CheckArchive"/>).</summary>
+    public record ArchiveCheck(
+        bool HasManifest, bool? ManifestIntact, int FilesListed, IReadOnlyList<string> Changed, IReadOnlyList<string> Missing,
+        IReadOnlyList<string> NotListed, string? RunId, string? CreatedUtc, string? AppVersion, string? Model, string? ProtocolHash)
+    {
+        /// <summary>Every listed file is present and unchanged, nothing was added, and the manifest is untouched.</summary>
+        public bool Unchanged => HasManifest && ManifestIntact != false && Changed.Count == 0 && Missing.Count == 0 && NotListed.Count == 0;
+    }
+
+    /// <summary>Most files and bytes an uploaded archive may unpack to (a "zip bomb" stops here, not in memory).</summary>
+    public const int MaxArchiveEntries = 5000;
+    public const long MaxUnpackedBytes = 400L * 1024 * 1024;
+
+    /// <summary>
+    /// Opens a run archive (.zip) and compares every file with the fingerprint in its manifest.json: changed,
+    /// missing and added files are listed separately, and the manifest's own fingerprint is checked too.
+    /// Throws InvalidDataException for something that is not a zip, or unpacks to more than the limits.
+    /// </summary>
+    public static ArchiveCheck CheckArchive(Stream zip, long maxUnpackedBytes = MaxUnpackedBytes)
+    {
+        using var archive = new System.IO.Compression.ZipArchive(zip, System.IO.Compression.ZipArchiveMode.Read, leaveOpen: true);
+        if (archive.Entries.Count > MaxArchiveEntries) throw new InvalidDataException($"The archive has more than {MaxArchiveEntries} files.");
+        var files = new Dictionary<string, byte[]>(StringComparer.Ordinal);
+        long total = 0;
+        var buffer = new byte[81920];
+        foreach (var entry in archive.Entries.Where(e => !e.FullName.EndsWith('/')))
+        {
+            using var source = entry.Open();
+            using var copy = new MemoryStream();
+            int read;
+            // Count what is actually unpacked; the sizes in the zip's own directory can be forged.
+            while ((read = source.Read(buffer, 0, buffer.Length)) > 0)
+            {
+                total += read;
+                if (total > maxUnpackedBytes) throw new InvalidDataException($"The archive unpacks to more than {maxUnpackedBytes / (1024 * 1024)} MB.");
+                copy.Write(buffer, 0, read);
+            }
+            files[entry.FullName] = copy.ToArray();
+        }
+        var none = Array.Empty<string>();
+        if (!files.TryGetValue("manifest.json", out var manifestBytes))
+            return new ArchiveCheck(false, null, 0, none, none, files.Keys.OrderBy(k => k, StringComparer.Ordinal).ToList(), null, null, null, null, null);
+
+        string manifest = Encoding.UTF8.GetString(manifestBytes);
+        using var doc = JsonDocument.Parse(manifest);
+        var root = doc.RootElement;
+        string? Str(string name) => root.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.String ? v.GetString() : null;
+
+        var listed = root.GetProperty("Files").EnumerateArray()
+            .Select(e => (Path: e.GetProperty("Path").GetString()!, Sha: e.GetProperty("Sha256").GetString()!))
+            .ToList();
+        var changed = listed.Where(f => files.TryGetValue(f.Path, out var c) && Sha256(c) != f.Sha).Select(f => f.Path).ToList();
+        var missing = listed.Where(f => !files.ContainsKey(f.Path)).Select(f => f.Path).ToList();
+        var listedPaths = listed.Select(f => f.Path).ToHashSet(StringComparer.Ordinal);
+        var notListed = files.Keys.Where(k => k != "manifest.json" && !listedPaths.Contains(k)).OrderBy(k => k, StringComparer.Ordinal).ToList();
+
+        return new ArchiveCheck(true, ManifestIsIntact(manifest), listed.Count, changed, missing, notListed,
+            Str("RunId"), Str("CreatedUtc"), Str("AppVersion"), Str("Model"), Str("ProtocolHash"));
+    }
 }
 
 /// <summary>
