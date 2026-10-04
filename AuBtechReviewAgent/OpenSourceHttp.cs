@@ -46,20 +46,45 @@ public static class OpenSourceHttp
     {
         client ??= Client;
         backoff ??= attempt => TimeSpan.FromSeconds(3 * Math.Pow(2, attempt - 1));
+        string host = new Uri(url).Host;
+        var clock = System.Diagnostics.Stopwatch.StartNew();
         for (int attempt = 1; ; attempt++)
         {
             using var request = new HttpRequestMessage(HttpMethod.Get, url);
             if (headers != null) foreach (var h in headers) request.Headers.TryAddWithoutValidation(h.Key, h.Value);
 
-            using var response = await client.SendAsync(request);
-            if (response.IsSuccessStatusCode) return await response.Content.ReadAsStringAsync();
+            HttpResponseMessage response;
+            try { response = await client.SendAsync(request); }
+            catch (TaskCanceledException)
+            {
+                SourceStatus.Record(host, null, clock.Elapsed, timedOut: true);
+                throw;
+            }
+            catch (HttpRequestException)
+            {
+                SourceStatus.Record(host, null, clock.Elapsed, unreachable: true);
+                throw;
+            }
+            using (response)
+            {
+                if (response.IsSuccessStatusCode)
+                {
+                    string body = await response.Content.ReadAsStringAsync();
+                    // How the database is doing, for the dashboard and /health (SourceStatus).
+                    SourceStatus.Record(host, response.StatusCode, clock.Elapsed, retries: attempt - 1);
+                    return body;
+                }
 
-            bool transient = response.StatusCode == HttpStatusCode.TooManyRequests || (int)response.StatusCode >= 500;
-            if (!transient || attempt >= maxAttempts)
-                throw new HttpRequestException($"{new Uri(url).Host} answered {(int)response.StatusCode} {response.ReasonPhrase}", null, response.StatusCode);
+                bool transient = response.StatusCode == HttpStatusCode.TooManyRequests || (int)response.StatusCode >= 500;
+                if (!transient || attempt >= maxAttempts)
+                {
+                    if (transient) SourceStatus.Record(host, response.StatusCode, clock.Elapsed, retries: attempt - 1);
+                    throw new HttpRequestException($"{host} answered {(int)response.StatusCode} {response.ReasonPhrase}", null, response.StatusCode);
+                }
 
-            TimeSpan wait = response.Headers.RetryAfter?.Delta ?? backoff(attempt);
-            await Task.Delay(wait > TimeSpan.FromSeconds(30) ? TimeSpan.FromSeconds(30) : wait);
+                TimeSpan wait = response.Headers.RetryAfter?.Delta ?? backoff(attempt);
+                await Task.Delay(wait > TimeSpan.FromSeconds(30) ? TimeSpan.FromSeconds(30) : wait);
+            }
         }
     }
 
