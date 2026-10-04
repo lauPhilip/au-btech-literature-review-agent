@@ -1,4 +1,5 @@
-// Set up event handlers
+// Set up event handlers. The banner is not modal, so the page under it stays readable and scrollable while
+// the connection comes back.
 const reconnectModal = document.getElementById("components-reconnect-modal");
 reconnectModal.addEventListener("components-reconnect-state-changed", handleReconnectStateChanged);
 
@@ -6,11 +7,14 @@ const retryButton = document.getElementById("components-reconnect-button");
 retryButton.addEventListener("click", retry);
 
 const resumeButton = document.getElementById("components-resume-button");
+document.querySelectorAll("[data-reconnect-reload]").forEach(b => b.addEventListener("click", () => location.reload()));
 resumeButton.addEventListener("click", resume);
 
 function handleReconnectStateChanged(event) {
     if (event.detail.state === "show") {
-        reconnectModal.showModal();
+        // Opened without show(): show() would move keyboard focus into the banner, away from what you were
+        // typing. The aria-live region still announces it.
+        reconnectModal.setAttribute("open", "");
     } else if (event.detail.state === "hide") {
         reconnectModal.close();
     } else if (event.detail.state === "failed") {
