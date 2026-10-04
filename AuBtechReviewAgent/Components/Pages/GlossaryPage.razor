@@ -1,0 +1,28 @@
+@page "/glossary"
+
+<SeoHead Title="Glossary" Path="/glossary"
+         Description="Plain-language explanations of the terms TraceableAI uses: PRISMA 2020, screening, Cohen's kappa, MMAT, citation verdicts and more." />
+
+<SiteHeader />
+
+<main id="main" tabindex="-1" class="flex-1 min-h-0 overflow-y-auto bg-white text-gray-900 font-sans">
+    <div class="ui-container py-14 lg:py-20 max-w-3xl">
+        <p class="ui-eyebrow">Glossary</p>
+        <h1 class="ui-h1 mt-3">The words TraceableAI uses</h1>
+        <p class="ui-lead mt-4">The same explanations appear when you hover over or tab to an underlined word or a small “?” in the app.</p>
+
+        <dl class="mt-10 divide-y divide-gray-100 border-y border-gray-100">
+            @foreach (var entry in AuBtechReviewAgent.Glossary.All)
+            {
+                <div id="@entry.Key" class="py-5 grid grid-cols-1 sm:grid-cols-[12rem_1fr] gap-1 sm:gap-6">
+                    <dt class="font-semibold text-gray-950">@entry.Term</dt>
+                    <dd class="text-gray-700 leading-relaxed">@entry.Explanation</dd>
+                </div>
+            }
+        </dl>
+
+        <p class="ui-muted mt-8">
+            Something unclear or missing? <a class="text-brand font-medium underline underline-offset-2" href="https://github.com/lauPhilip/au-btech-literature-review-agent/issues">Open an issue on GitHub</a>.
+        </p>
+    </div>
+</main>

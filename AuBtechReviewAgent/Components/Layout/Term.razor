@@ -1,0 +1,39 @@
+@* A word with its plain-language explanation from Glossary.cs, shown on hover and on keyboard focus (Escape
+   hides it again, see wwwroot/js/review-output.js). Screen readers read the explanation as the description.
+   Usage: <Term Key="kappa" />, <Term Key="kappa">agreement</Term> to show other words, or
+   <Term Key="kappa" Icon="true" /> for a small "?" after a label. *@
+
+@if (entry == null)
+{
+    @if (!Icon)
+    {
+        @if (ChildContent != null) { @ChildContent } else { @Key }
+    }
+}
+else if (Icon)
+{
+    <span class="ui-term ui-term-icon" tabindex="0" role="img" aria-label="@($"What is {entry.Term}?")" aria-describedby="@tipId">?<span role="tooltip" id="@tipId" class="ui-term-tip @(Below ? "ui-term-tip-below" : "")"><strong class="block mb-0.5">@entry.Term</strong>@entry.Explanation</span></span>
+}
+else
+{
+    <span class="ui-term" tabindex="0" aria-describedby="@tipId">@if (ChildContent != null) { @ChildContent } else { @entry.Term }<span role="tooltip" id="@tipId" class="ui-term-tip @(Below ? "ui-term-tip-below" : "")">@entry.Explanation</span></span>
+}
+
+@code {
+    /// <summary>The glossary key, e.g. "kappa" (see Glossary.All).</summary>
+    [Parameter, EditorRequired] public string Key { get; set; } = "";
+
+    /// <summary>Text to show instead of the glossary term.</summary>
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>Show a small "?" instead of underlined words.</summary>
+    [Parameter] public bool Icon { get; set; }
+
+    /// <summary>Show the explanation below (near the top of a scrolling panel, where above is cut off).</summary>
+    [Parameter] public bool Below { get; set; }
+
+    private AuBtechReviewAgent.Glossary.Entry? entry;
+    private readonly string tipId = "tip-" + Guid.NewGuid().ToString("N")[..8];
+
+    protected override void OnParametersSet() => entry = AuBtechReviewAgent.Glossary.Find(Key);
+}
