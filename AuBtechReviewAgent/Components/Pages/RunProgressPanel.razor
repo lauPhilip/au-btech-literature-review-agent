@@ -55,6 +55,11 @@
             </li>
         }
     </ol>
+
+    @if (Running && !complete && !failed)
+    {
+        <SourceStatusNote Running="true" />
+    }
 </div>
 
 @code {
