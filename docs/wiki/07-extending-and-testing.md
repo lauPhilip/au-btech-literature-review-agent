@@ -31,6 +31,14 @@ Add a property to `ReviewState`, `ReviewStats`, `ScreeningLog` or `PrismaReport`
 
 The CSS is compiled ahead of time. After changing a `.razor` file, run `npm ci` once and then `npm run build:css` in `AuBtechReviewAgent`, and commit `wwwroot/css/tailwind.css` along with the component. Tailwind picks up class names from ordinary text too, so even a wording change can change the CSS; the CI check tells you when you forgot. Never build a class name from a variable (`"bg-" + colour`), because Tailwind cannot see it.
 
+### Adding a term to the glossary
+
+Add an entry to `Glossary.All` in `Glossary.cs` (a key, the term, and one or two plain sentences), then use it in a component with `<Term Key="your-key" />`, `<Term Key="your-key">other words</Term>`, or `<Term Key="your-key" Icon="true" />` for a small "?" after a label. Use `Below="true"` near the top of a scrolling panel. It appears on `/glossary` by itself, and a test fails if a component uses a key that does not exist.
+
+### Checking accessibility locally
+
+Start the app (`dotnet watch` in `AuBtechReviewAgent`), then in `tools/a11y` run `npm ci`, `npx playwright install chromium` and `node axe-check.mjs`. `BASE_URL` changes the address (default `http://localhost:5038`) and `A11Y_PAGES` the pages (default `/,/review,/metrics,/glossary`). Also try every changed page with the keyboard only: Tab through it, check that focus is always visible, and that Escape closes what it opened.
+
 ## Tests
 
 All tests are in `AuBtechReviewAgent.Tests` and run offline: no API keys, no network. Run them from the repository root with `dotnet test`; CI runs the same command.

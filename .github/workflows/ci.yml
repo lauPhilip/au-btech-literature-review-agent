@@ -53,9 +53,44 @@ jobs:
           npm run build:css
           git diff --exit-code -- wwwroot/css/tailwind.css
 
+  accessibility:
+    name: Accessibility (axe-core, WCAG 2.2 AA)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: '10.0.x'
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '22'
+
+      # The app runs without real keys: the checked pages never call the model or the sources.
+      - name: Start the app
+        env:
+          ASPNETCORE_ENVIRONMENT: Development
+          MISTRAL_API_KEY: ci-placeholder
+        run: |
+          dotnet run --project AuBtechReviewAgent/AuBtechReviewAgent.csproj --no-launch-profile --urls http://localhost:5038 > app.log 2>&1 &
+          for i in $(seq 1 60); do curl -sf http://localhost:5038/ > /dev/null && exit 0; sleep 2; done
+          cat app.log; exit 1
+
+      # Fails on any "serious" or "critical" problem; the log lists every rule and element (tools/a11y).
+      - name: Run axe-core on the public pages
+        working-directory: tools/a11y
+        env:
+          BASE_URL: http://localhost:5038
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+          node axe-check.mjs
+
   deploy:
     name: Deploy to Simply
-    needs: [ build-and-test, css-up-to-date ]
+    needs: [ build-and-test, css-up-to-date, accessibility ]
     # Runs only on a push to master (a merged PR), and only once you switch it on with a repository variable
     # DEPLOY_ENABLED = true (Settings -> Secrets and variables -> Actions -> Variables). Until then it is skipped.
     if: github.event_name == 'push' && github.ref == 'refs/heads/master' && vars.DEPLOY_ENABLED == 'true'

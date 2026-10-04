@@ -15,7 +15,9 @@ The request pipeline then adds, in order: forwarded headers (for a reverse proxy
 | Route or name | File | Purpose |
 |---|---|---|
 | `/` | `Components/Pages/Landing.razor` | Public landing page: an animated example of a checked citation, live numbers from the metrics store (or what every run does, when there are none yet), the pipeline, the outputs and the comparison with a general chatbot |
-| component | `Components/Layout/SiteHeader.razor` | The top bar every page shares, with the current page marked |
+| component | `Components/Layout/SiteHeader.razor` | The top bar every page shares, with the current page marked and a "Skip to content" link |
+| `/glossary` | `Components/Pages/GlossaryPage.razor` | Plain-language explanations of the terms the app uses (`Glossary.cs`) |
+| component | `Components/Layout/Term.razor` | A term with its explanation on hover and focus: `<Term Key="kappa" />` |
 | `/review`, `/review/{runId}` | `Components/Pages/Home.razor` | Dashboard: the review form in three steps with its input check, a summary of the settings once a run starts, and a run panel that follows the run (preview, progress, result, ledger, the human screening review) |
 | component | `RunPlanPreview.razor` | Shown in the run panel before a run: the steps the review will take with the current settings, and what it produces |
 | component | `RunProgressPanel.razor` | The progress bar, current step with detail, elapsed time and the list of steps |
@@ -38,6 +40,25 @@ On the Review Output page, a bar above the report counts the citations that need
 `SiteSeo.cs` holds what search engines get. `/robots.txt` and `/sitemap.xml` are served from code, so they always use the right address: `Site:PublicUrl` (https://au-btech-literature-review-agent.dk in production), or the request's own address in Development, where `appsettings.Development.json` leaves it empty. The sitemap lists the public pages: the landing page, the review form and Metrics. Every page sets its title, description, canonical link, Open Graph and Twitter card tags through `Components/Layout/SeoHead.razor`, and the landing page adds schema.org structured data (`SoftwareApplication`) as JSON-LD. The preview image is `wwwroot/img/social-card.png` (1200×630). A run's own pages (`/review/{runId}`, `/spec-matrix`), the downloads under `/api/` and the error pages are kept out of search results with a `noindex` meta tag and an `X-Robots-Tag` header; robots.txt blocks only `/api/`, because a crawler must be able to fetch a page to see its noindex. `wwwroot/site.webmanifest` names the app and its icons for "add to home screen".
 
 After deploying, add the site in Google Search Console, submit `https://<your address>/sitemap.xml`, and check the preview with the Rich Results Test.
+
+### Accessibility
+
+The app aims at WCAG 2.2 level AA. What that means in the code:
+
+| What | Where |
+|---|---|
+| A "Skip to content" link as the first thing on every page, and an element with `id="main"` on every page that it jumps to | `SiteHeader.razor`, the `data-skip-to` handler in `wwwroot/js/review-output.js` (a plain `#main` link would go to the home page because of `<base href="/">`) |
+| A visible focus ring on everything that can be focused | `:focus-visible` in `Styles/tailwind.input.css` |
+| Every form field has a label; its help line is linked with `aria-describedby`; required fields say so; a field the input check rejects gets `aria-invalid` and receives focus | `Home.razor` (`Help`, `Invalid`, `FocusFirstInvalidField`) |
+| "Start review" is never silently disabled: the reason is shown next to it, and pressing it (or the reason) goes to the field that needs attention | `StartBlocker`, `BlockerTarget`, `GoToProblem` in `Home.razor` |
+| Step changes and the end of a run are announced to screen readers, not every percent | the `role="status"` element and `Announcement()` in `Home.razor` |
+| The API key window is a real modal dialog: Escape closes it, Tab stays inside, and focus returns to the button that opened it | `Home.razor`, `trapFocus`/`releaseFocus` in `review-output.js` |
+| Opening a citation on Review Output moves focus to its verdict; Escape or Close returns to the citation number, which says its verdict in words | `SpecMatrix.razor` |
+| Terms have plain-language explanations on hover and keyboard focus, dismissed with Escape, from one list that also feeds the `/glossary` page | `Glossary.cs`, `Components/Layout/Term.razor` |
+| Text contrast at least 4.5:1 (no `text-gray-400` for text), links inside text underlined, click targets at least 24 × 24 px, verdicts never shown by colour alone | the components and `ui-*` classes |
+| Animations stop when the system asks for reduced motion | `Styles/tailwind.input.css` |
+
+The CI job **Accessibility** starts the app and runs axe-core on the public pages (`tools/a11y/axe-check.mjs`); a serious or critical problem fails the build. Automated checks find only part of the problems, so keyboard and screen-reader checks by hand are still needed after larger UI changes.
 
 ### Shared design
 
