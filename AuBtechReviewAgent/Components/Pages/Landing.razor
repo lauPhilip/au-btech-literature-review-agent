@@ -5,7 +5,7 @@
 
 <SiteHeader Active="overview" />
 
-<main class="flex-1 min-h-0 overflow-y-auto bg-white text-gray-900 font-sans">
+<main id="main" tabindex="-1" class="flex-1 min-h-0 overflow-y-auto bg-white text-gray-900 font-sans">
 
     @* Hero: one message, one main action, and the product working next to it instead of an illustration. *@
     <section class="relative overflow-hidden border-b border-gray-100">
@@ -33,7 +33,7 @@
                 <div class="ui-card shadow-lift overflow-hidden">
                     <div class="flex items-center justify-between px-5 py-3 border-b border-gray-100">
                         <span class="text-xs font-medium text-gray-500">Report · 3.2 Human oversight</span>
-                        <span class="text-[11px] text-gray-400">Example</span>
+                        <span class="text-[11px] text-gray-500">Example</span>
                     </div>
                     <div class="px-5 pt-5 pb-4">
                         <p class="text-[15px] leading-7 text-gray-800">
@@ -96,7 +96,7 @@
                 {
                     <span>Live from the last @runCount completed runs on this server. </span>
                 }
-                <a href="/metrics" class="text-brand font-medium hover:underline">See the full metrics</a>, including where citations fail.
+                <a href="/metrics" class="text-brand font-medium underline underline-offset-2">See the full metrics</a>, including where citations fail.
             </p>
         </div>
     </section>
@@ -154,7 +154,7 @@
                         add a human approval step <span class="text-verdict-ok font-semibold">[3]</span>, though evaluations
                         rarely measure it <span class="text-verdict-partial font-semibold">[7]</span>.
                     </div>
-                    <h3 class="ui-h3 mt-5">A PRISMA 2020 report with clickable citations</h3>
+                    <h3 class="ui-h3 mt-5">A <Term Key="prisma">PRISMA 2020</Term> report with clickable citations</h3>
                     <p class="ui-muted mt-1">Every citation opens its verdict and the quote from the paper. A bar at the top steps you through the ones that need a look.</p>
                 </article>
 
@@ -188,7 +188,7 @@ Agent frameworks rely on approval gates
                     <ul class="bg-gray-50 border border-gray-100 p-4 font-mono text-[11.5px] leading-6 text-gray-700">
                         @foreach (var (file, hash) in ArchiveFiles)
                         {
-                            <li class="flex justify-between gap-3"><span class="truncate">@file</span><span class="text-gray-400">@hash</span></li>
+                            <li class="flex justify-between gap-3"><span class="truncate">@file</span><span class="text-gray-500">@hash</span></li>
                         }
                     </ul>
                     <h3 class="ui-h3 mt-5">A complete, fingerprinted record</h3>
@@ -215,7 +215,7 @@ Agent frameworks rely on approval gates
                     {
                         <div class="hidden sm:block px-5 py-4 border-b border-gray-100 font-medium text-gray-900">@topic</div>
                         <div class="px-5 py-4 border-b border-gray-100 text-gray-500 flex gap-2">
-                            <svg class="w-4 h-4 mt-0.5 flex-none text-gray-400" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M6.3 5.3a1 1 0 011.4 0L10 7.6l2.3-2.3a1 1 0 111.4 1.4L11.4 9l2.3 2.3a1 1 0 01-1.4 1.4L10 10.4l-2.3 2.3a1 1 0 01-1.4-1.4L8.6 9 6.3 6.7a1 1 0 010-1.4z" /></svg>
+                            <svg class="w-4 h-4 mt-0.5 flex-none text-gray-500" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M6.3 5.3a1 1 0 011.4 0L10 7.6l2.3-2.3a1 1 0 111.4 1.4L11.4 9l2.3 2.3a1 1 0 01-1.4 1.4L10 10.4l-2.3 2.3a1 1 0 01-1.4-1.4L8.6 9 6.3 6.7a1 1 0 010-1.4z" /></svg>
                             <span><span class="sm:hidden font-medium text-gray-700">@topic: </span>@chatbot</span>
                         </div>
                         <div class="px-5 py-4 border-b border-brand-100/60 bg-brand-50/40 text-gray-800 flex gap-2">
@@ -227,7 +227,7 @@ Agent frameworks rely on approval gates
             </div>
             <p class="ui-muted mt-5 max-w-prose">
                 The checks make errors findable, not impossible. TraceableAI is a co-pilot for a human reviewer, and the
-                <a class="text-brand font-medium hover:underline" href="https://github.com/lauPhilip/au-btech-literature-review-agent/blob/master/docs/wiki/08-setup-and-configuration.md#what-the-checks-do-and-do-not-catch">developer wiki</a>
+                <a class="text-brand font-medium underline underline-offset-2" href="https://github.com/lauPhilip/au-btech-literature-review-agent/blob/master/docs/wiki/08-setup-and-configuration.md#what-the-checks-do-and-do-not-catch">developer wiki</a>
                 says precisely what the checks catch and what they miss.
             </p>
         </div>
@@ -249,6 +249,7 @@ Agent frameworks rely on approval gates
             <p>TraceableAI · Department of Business Development and Technology, Aarhus University · Presented at OSSYM 2026</p>
             <nav class="flex flex-wrap gap-x-5 gap-y-2" aria-label="Project">
                 <a href="https://github.com/lauPhilip/au-btech-literature-review-agent" class="hover:text-brand">GitHub</a>
+                <a href="/glossary" class="hover:text-brand">Glossary</a>
                 <a href="https://github.com/lauPhilip/au-btech-literature-review-agent/blob/master/docs/wiki/README.md" class="hover:text-brand">Developer wiki</a>
                 <a href="https://github.com/lauPhilip/au-btech-literature-review-agent/blob/master/CONTRIBUTING.md" class="hover:text-brand">Contributing</a>
                 <a href="https://github.com/lauPhilip/au-btech-literature-review-agent/blob/master/LICENSE" class="hover:text-brand">Apache 2.0</a>
