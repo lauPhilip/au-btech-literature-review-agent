@@ -3,6 +3,14 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Accessibility basics for every page: a visible focus ring for keyboard users (WCAG 2.4.7 / 2.4.11), and
+   anchors that scroll into view below nothing (the top bar is not fixed, so no offset is needed). */
+@layer base {
+    :focus-visible { outline: 2px solid #003B5C; outline-offset: 2px; }
+    header :focus-visible, .bg-brand :focus-visible { outline-color: #ffffff; }
+    [tabindex="-1"]:focus { outline: none; }
+}
+
 /*
  * The shared building blocks of every page. Use these instead of repeating long class lists, so the pages
  * look like one product and a change of style is made in one place. Colours come from tailwind.config.js.
@@ -27,7 +35,16 @@
     .ui-card { @apply bg-white border border-gray-200 shadow-card; }
     .ui-chip { @apply inline-flex items-center gap-1.5 border px-2 py-0.5 text-xs font-medium; }
     .ui-label { @apply block text-sm font-medium text-gray-800 mb-1; }
-    .ui-input { @apply w-full px-3 py-2 bg-white border border-gray-300 text-sm placeholder:text-gray-400 focus:outline-none focus:border-brand focus:ring-2 focus:ring-brand/15 transition-colors; }
+    /* A term with a plain-language explanation on hover and keyboard focus (Components/Layout/Term.razor). */
+    .ui-term { @apply relative inline cursor-help underline decoration-dotted decoration-gray-400 underline-offset-2; }
+    .ui-term-tip { @apply invisible opacity-0 absolute left-0 bottom-full z-50 w-64 max-w-[80vw] bg-gray-900 bg-clip-padding border-b-[6px] border-transparent text-white text-xs font-normal normal-case tracking-normal leading-snug text-left px-3 py-2 shadow-lift transition-opacity; }
+    /* 16 px to look at, 24 px to hit (WCAG 2.5.8): the ::after box widens the target without moving the text. */
+    .ui-term-icon { @apply no-underline inline-flex items-center justify-center w-4 h-4 ml-1 align-text-top rounded-full border border-gray-400 text-[10px] font-semibold text-gray-600 hover:border-brand hover:text-brand after:absolute after:-inset-1 after:content-['']; }
+    .ui-term-tip-below { @apply bottom-auto top-full border-b-0 border-t-[6px]; }
+    .ui-term:hover .ui-term-tip, .ui-term:focus .ui-term-tip, .ui-term:focus-within .ui-term-tip { @apply visible opacity-100; }
+    .ui-term.ui-term-dismissed .ui-term-tip { @apply invisible opacity-0; }
+    .ui-skip { @apply sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-[200] focus:bg-white focus:text-brand focus:px-4 focus:py-2 focus:font-semibold focus:shadow-lift; }
+    .ui-input { @apply w-full px-3 py-2 bg-white border border-gray-300 text-sm placeholder:text-gray-500 focus:outline-none focus:border-brand focus:ring-2 focus:ring-brand/15 transition-colors; }
     .ui-chip-ok { @apply ui-chip border-green-200 bg-verdict-okBg text-verdict-ok; }
     .ui-chip-partial { @apply ui-chip border-amber-200 bg-verdict-partialBg text-verdict-partial; }
     .ui-chip-bad { @apply ui-chip border-red-200 bg-verdict-badBg text-verdict-bad; }
