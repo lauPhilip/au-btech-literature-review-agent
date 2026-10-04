@@ -14,7 +14,7 @@
 @inject NavigationManager Nav
 @inject ILogger<Home> Logger
 
-<SeoHead Title="@(RunId != null ? "Your review" : "Start a review")" Path="/review" NoIndex="@(RunId != null)" Description="Start a PRISMA 2020 literature review: give your question and criteria, and TraceableAI searches, screens, writes and checks every citation against the paper." />
+<SeoHead Title="@TabTitle()" Path="/review" NoIndex="@(RunId != null)" Description="Start a PRISMA 2020 literature review: give your question and criteria, and TraceableAI searches, screens, writes and checks every citation against the paper." />
 
 <SiteHeader Active="dashboard" DashboardHref="@(hasRun ? $"/review/{currentSessionId}" : "/review")" OutputHref="@(hasRun ? $"/spec-matrix/{currentSessionId}" : "/spec-matrix")" />
 
@@ -47,7 +47,7 @@
                     : quotaStatus.Tier == AuBtechReviewAgent.QuotaTier.OwnKey ? $"{quotaStatus.Remaining} of {quotaStatus.Limit} left this hour"
                     : $"{quotaStatus.Remaining} of {quotaStatus.Limit} left today";
             }
-            <span class="@chipBox border px-2.5 py-1 text-[11px] flex items-center gap-1.5" title="Runs you can still start">
+            <span class="@chipBox border px-2.5 py-1 text-[11px] flex items-center gap-1.5" title="@(quotaStatus.ResetsUtc is { } resets ? $"Runs you can still start. More {AuBtechReviewAgent.RunQuotaService.ResetText(resets - DateTime.UtcNow)}." : "Runs you can still start")">
                 <span class="w-1.5 h-1.5 rounded-full @chipDot"></span>@tierLabel · @counter
             </span>
             <button type="button" @onclick="OpenKeyModal" class="ui-btn-secondary ui-btn-sm">
@@ -91,7 +91,13 @@
                     <div class="p-4 space-y-4">
                         @if (prefillNotice != null)
                         {
-                            <p class="bg-blue-50 border border-blue-100 text-blue-900 p-2 text-xs">@prefillNotice</p>
+                            <div class="bg-blue-50 border border-blue-100 text-blue-900 p-2 text-xs flex flex-wrap items-center justify-between gap-2">
+                                <span>@prefillNotice</span>
+                                @if (showStartEmpty)
+                                {
+                                    <button type="button" @onclick="StartEmpty" class="ui-btn ui-btn-sm py-1 text-blue-900 hover:bg-blue-100">Start empty</button>
+                                }
+                            </div>
                         }
 
                         @switch (formStep)
@@ -243,6 +249,10 @@
                             else
                             {
                                 <p class="text-xs text-amber-800">@blocker</p>
+                                @if (!quotaStatus.Allowed && quotaStatus.Tier == AuBtechReviewAgent.QuotaTier.Free)
+                                {
+                                    <button type="button" @onclick="OpenKeyModal" class="ui-btn-secondary ui-btn-sm">Add your own Mistral key</button>
+                                }
                             }
                         }
                         <div class="flex items-center gap-2">
@@ -357,6 +367,21 @@
                             <p class="text-sm text-red-700 bg-red-50 border border-red-200 p-2" role="alert">@failureMessage</p>
                         }
                         <RunProgressPanel Stats="State.Stats" Stage="@stage" Running="isSearching" QueuePosition="queuePosition" CompletedUtc="completedUtc" />
+                        @if (isSearching && notifyPermission is "default" or "granted")
+                        {
+                            @* Runs take minutes; people switch tabs. The tab title shows the progress, and this asks the browser to say when it is done. *@
+                            <p class="text-xs text-gray-600 flex items-center gap-2">
+                                @if (notifyPermission == "granted")
+                                {
+                                    <span>You will get a browser notification when the review is ready, if this tab is in the background.</span>
+                                }
+                                else
+                                {
+                                    <button type="button" @onclick="AskForNotification" class="ui-btn-secondary ui-btn-sm">Notify me when it is ready</button>
+                                    <span>The tab title also shows the progress.</span>
+                                }
+                            </p>
+                        }
                         <PrismaFunnel Stats="State.Stats" Removed="State.RemovedBeforeScreening" Running="isSearching" />
                     </div>
                 </div>
@@ -632,6 +657,142 @@
     private string? ArtifactLabel() => State.ArtifactKind == AuBtechReviewAgent.ArtifactKinds.None
         ? null : AuBtechReviewAgent.ArtifactKinds.All.FirstOrDefault(k => k.Key == State.ArtifactKind).Label;
 
+    // ── Tab title, notifications and the remembered draft (speed and feel) ─────────────────────────────
+
+    // Set when a run finished while this page was open, so the tab title says so until the next run.
+    private bool finishedWhileOpen;
+    private string notifyPermission = "unsupported";
+
+    /// <summary>The browser tab's title: the progress while running, "✓ Review ready" when it finished here.</summary>
+    private string TabTitle()
+    {
+        if (!Composing && isSearching) return $"{AuBtechReviewAgent.RunProgress.Percent(State.Stats)}% · Your review";
+        if (!Composing && finishedWhileOpen && stage == AuBtechReviewAgent.PrismaReviewEngine.StageComplete) return "✓ Review ready";
+        if (!Composing && finishedWhileOpen && AuBtechReviewAgent.PrismaReviewEngine.IsFinishedStage(stage)) return "Run stopped · Your review";
+        return RunId != null && !Composing ? "Your review" : "Start a review";
+    }
+
+    private void OnRunFinished()
+    {
+        finishedWhileOpen = true;
+        bool ok = stage == AuBtechReviewAgent.PrismaReviewEngine.StageComplete;
+        _ = NotifyAsync(ok ? "Your review is ready" : "Your review stopped",
+            ok ? "The report and its checked citations are ready in TraceableAI." : "Open TraceableAI to see what happened.");
+    }
+
+    private async Task NotifyAsync(string title, string body)
+    {
+        try { await JS.InvokeAsync<bool>("traceableReview.notifyDone", title, body); }
+        catch (Exception ex) when (ex is JSException or InvalidOperationException or TaskCanceledException)
+        {
+            Logger.LogDebug("Could not show the browser notification: {Message}", ex.Message);
+        }
+    }
+
+    private async Task AskForNotification()
+    {
+        try { notifyPermission = await JS.InvokeAsync<string>("traceableReview.requestNotify"); }
+        catch (Exception ex) when (ex is JSException or InvalidOperationException or TaskCanceledException)
+        {
+            Logger.LogDebug("Could not ask for notification permission: {Message}", ex.Message);
+        }
+    }
+
+    /// <summary>The review form as kept in this browser between visits. Never holds API keys.</summary>
+    private sealed record Draft(
+        string Query, string Objective, string Inclusion, string Exclusion, int YearFrom, int YearTo,
+        string ArtifactKind, string Directive, List<string> Sources, bool Dual, bool Chaining, bool Check, bool PeerReviewed,
+        int MaxResults, DateTime SavedUtc);
+
+    private string lastSavedDraft = "";
+    private bool draftRestored;
+
+    private bool FormIsEmpty() =>
+        string.IsNullOrWhiteSpace(searchQuery) && string.IsNullOrWhiteSpace(reviewObjective)
+        && string.IsNullOrWhiteSpace(inclusionCriteria) && string.IsNullOrWhiteSpace(exclusionCriteria);
+
+    private Draft CurrentDraft() => new(searchQuery, reviewObjective, inclusionCriteria, exclusionCriteria,
+        yearFrom, yearTo, State.ArtifactKind, synthesisTargetDirective, State.SelectedSources.OrderBy(x => x, StringComparer.Ordinal).ToList(),
+        State.DualScreening, State.CitationChaining, State.ReviewScreeningFirst, requirePeerReview, maxResults, DateTime.MinValue);
+
+    // The draft without its timestamp, to tell whether anything changed since the last save.
+    private string DraftFingerprint() => JsonSerializer.Serialize(CurrentDraft());
+
+    /// <summary>Saves the form to this browser after a change, so a closed tab or a crash does not lose it.</summary>
+    private async Task SaveDraftAsync()
+    {
+        if (!Composing || isSearching || !draftRestored) return;
+        string fingerprint = DraftFingerprint();
+        if (fingerprint == lastSavedDraft) return;
+        lastSavedDraft = fingerprint;
+        try
+        {
+            if (FormIsEmpty()) await JS.InvokeAsync<bool>("traceableReview.clearDraft");
+            else await JS.InvokeAsync<bool>("traceableReview.saveDraft", JsonSerializer.Serialize(CurrentDraft() with { SavedUtc = DateTime.UtcNow }));
+        }
+        catch (Exception ex) when (ex is JSException or InvalidOperationException or TaskCanceledException)
+        {
+            Logger.LogDebug("Could not save the form draft: {Message}", ex.Message);
+        }
+    }
+
+    /// <summary>On a fresh, empty form, brings back the draft this browser kept (at most 30 days old).</summary>
+    private async Task RestoreDraftAsync()
+    {
+        try
+        {
+            if (!Composing || hasRun || From != null || !FormIsEmpty()) return;
+            string? json = await JS.InvokeAsync<string?>("traceableReview.loadDraft");
+            if (string.IsNullOrWhiteSpace(json)) return;
+            var draft = JsonSerializer.Deserialize<Draft>(json);
+            if (draft == null || draft.SavedUtc < DateTime.UtcNow.AddDays(-30)) return;
+            searchQuery = draft.Query; reviewObjective = draft.Objective;
+            inclusionCriteria = draft.Inclusion; exclusionCriteria = draft.Exclusion;
+            if (draft.YearFrom > 0) yearFrom = draft.YearFrom;
+            if (draft.YearTo > 0) yearTo = draft.YearTo;
+            State.ArtifactKind = AuBtechReviewAgent.ArtifactKinds.Normalize(draft.ArtifactKind);
+            synthesisTargetDirective = draft.Directive;
+            if (draft.Sources.Count > 0) State.SelectedSources = new HashSet<string>(draft.Sources, StringComparer.OrdinalIgnoreCase);
+            State.DualScreening = draft.Dual; State.CitationChaining = draft.Chaining; State.ReviewScreeningFirst = draft.Check;
+            requirePeerReview = draft.PeerReviewed;
+            if (draft.MaxResults > 0) maxResults = Math.Min(draft.MaxResults, maxResultsCeiling);
+            prefillNotice = $"Your unfinished review from {draft.SavedUtc:d MMM} was brought back. It is kept in this browser only.";
+            showStartEmpty = true;
+        }
+        catch (Exception ex) when (ex is JSException or JsonException or InvalidOperationException or TaskCanceledException)
+        {
+            Logger.LogDebug("Could not restore the form draft: {Message}", ex.Message);
+        }
+        finally
+        {
+            draftRestored = true;
+            lastSavedDraft = DraftFingerprint();
+        }
+    }
+
+    // Shown next to the "brought back" notice: start with an empty form instead.
+    private bool showStartEmpty;
+
+    private async Task StartEmpty()
+    {
+        searchQuery = reviewObjective = inclusionCriteria = exclusionCriteria = "";
+        synthesisTargetDirective = AuBtechReviewAgent.ArtifactKinds.DefaultInstruction(State.ArtifactKind);
+        prefillNotice = null;
+        showStartEmpty = false;
+        formStep = 1;
+        await ClearDraftAsync();
+    }
+
+    private async Task ClearDraftAsync()
+    {
+        lastSavedDraft = "";
+        try { await JS.InvokeAsync<bool>("traceableReview.clearDraft"); }
+        catch (Exception ex) when (ex is JSException or InvalidOperationException or TaskCanceledException)
+        {
+            Logger.LogDebug("Could not clear the form draft: {Message}", ex.Message);
+        }
+    }
+
     /// <summary>One short sentence for the live region: changes only when the step or the outcome changes.</summary>
     private string Announcement()
     {
@@ -860,6 +1021,7 @@
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
+        await SaveDraftAsync();
         if (pendingFocus is { } fieldId)
         {
             pendingFocus = null;
@@ -909,6 +1071,15 @@
                 // Browser storage can be unavailable (private window, blocked storage); the page works without saved keys.
                 Logger.LogDebug("Could not restore saved keys from browser storage: {Message}", ex.Message.Replace("\r", " ").Replace("\n", " "));
             }
+
+            // Independent of the keys above: the form draft and whether notifications are possible.
+            await RestoreDraftAsync();
+            try { notifyPermission = await JS.InvokeAsync<string>("traceableReview.notifyPermission"); }
+            catch (Exception ex) when (ex is JSException or InvalidOperationException or TaskCanceledException)
+            {
+                Logger.LogDebug("Could not read the notification permission: {Message}", ex.Message);
+            }
+            StateHasChanged();
         }
     }
 
@@ -1126,6 +1297,7 @@
 
         var runId = Guid.NewGuid();
         currentSessionId = runId;
+        await ClearDraftAsync();
         editingNew = false;
         formStep = 1;
         runInfo = null;
@@ -1154,6 +1326,7 @@
                 {
                     await InvokeAsync(() =>
                     {
+                        if (isSearching) OnRunFinished();
                         isSearching = false;
                         var final = ReviewEngine.LoadState(runId);
                         if (final != null) ApplyState(final, SafeRead(StatePath(runId)));
@@ -1232,6 +1405,7 @@
             }
             if (AuBtechReviewAgent.PrismaReviewEngine.IsFinishedStage(stage))
             {
+                if (isSearching) OnRunFinished();
                 isSearching = false;
             }
             

@@ -50,6 +50,34 @@ window.traceableReview = {
     },
     // print: opens the browser's print window, where "Save as PDF" gives a PDF of the report.
     print: function () { window.print(); return true; },
+    // A draft of the review form, kept in this browser only (localStorage), so closing the tab does not lose it.
+    // Never contains API keys. Returns null when storage is unavailable (private window, blocked storage).
+    loadDraft: function () {
+        try { return window.localStorage.getItem('traceable-review-draft'); } catch { return null; }
+    },
+    saveDraft: function (json) {
+        try { window.localStorage.setItem('traceable-review-draft', json); return true; } catch { return false; }
+    },
+    clearDraft: function () {
+        try { window.localStorage.removeItem('traceable-review-draft'); return true; } catch { return false; }
+    },
+    // Browser notifications for a finished run: only when the person asked for them, and only while the tab is
+    // in the background (in the foreground the page itself shows it).
+    notifyPermission: function () {
+        return ('Notification' in window) ? Notification.permission : 'unsupported';
+    },
+    requestNotify: async function () {
+        if (!('Notification' in window)) return 'unsupported';
+        try { return await Notification.requestPermission(); } catch { return Notification.permission; }
+    },
+    notifyDone: function (title, body) {
+        if (!('Notification' in window) || Notification.permission !== 'granted' || !document.hidden) return false;
+        try {
+            const n = new Notification(title, { body: body, icon: 'favicon.png', tag: 'traceable-run' });
+            n.onclick = function () { window.focus(); n.close(); };
+            return true;
+        } catch { return false; }
+    },
     releaseFocus: function () {
         const opener = window.traceableReview._opener;
         window.traceableReview._opener = null;
