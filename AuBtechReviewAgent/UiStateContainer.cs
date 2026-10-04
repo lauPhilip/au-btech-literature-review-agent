@@ -30,6 +30,8 @@ public class UiStateContainer
     // Latest counters of the run shown on the dashboard (drives the PRISMA funnel).
     public ReviewStats Stats { get; set; } = new();
     public List<RemovedRecord> RemovedBeforeScreening { get; set; } = new();
+    public List<SearchStringYield> SearchStringYields { get; set; } = new();
+    public List<ExclusionReasons.Group> ExclusionGroups { get; set; } = new();
 
     public int PassedPeerReviewCount { get; set; } = 0;
     public int FailedPeerReviewCount { get; set; } = 0;
