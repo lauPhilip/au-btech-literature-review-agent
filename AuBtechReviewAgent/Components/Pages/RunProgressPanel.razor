@@ -14,7 +14,7 @@
 
 <div class="bg-white border border-gray-200 p-3 shadow-sm flex-none text-left space-y-2">
     <div class="flex items-center justify-between gap-2">
-        <span class="text-[10px] font-bold uppercase tracking-wider text-gray-400">Progress</span>
+        <span class="text-[10px] font-bold uppercase tracking-wider text-gray-500">Progress</span>
         <span class="text-[11px] font-mono text-gray-600">@(failed ? "stopped" : $"{percent}%")@(Elapsed is { } e ? $" · {e}" : "")</span>
     </div>
 
@@ -34,7 +34,7 @@
         @foreach (var step in plan)
         {
             string state = failed && AuBtechReviewAgent.RunProgress.StateOf(Stats, step) == "current" ? "failed" : AuBtechReviewAgent.RunProgress.StateOf(Stats, step);
-            <li class="flex items-center gap-1 text-[10px] @(state == "current" ? "text-brand font-semibold" : state == "done" ? "text-gray-600" : "text-gray-400")">
+            <li class="flex items-center gap-1 text-[10px] @(state == "current" ? "text-brand font-semibold" : state == "done" ? "text-gray-600" : "text-gray-500")">
                 @switch (state)
                 {
                     case "done":

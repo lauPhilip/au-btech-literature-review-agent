@@ -32,16 +32,16 @@
                 @Segment(s.CitationsUnverifiable, cited, "bg-gray-400")
             </div>
             <div class="flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-gray-700">
-                <span><span class="inline-block w-2 h-2 bg-green-600 mr-1"></span>@s.CitationsSupported supported</span>
-                <span><span class="inline-block w-2 h-2 bg-amber-400 mr-1"></span>@s.CitationsPartiallySupported partly supported</span>
-                <span><span class="inline-block w-2 h-2 bg-red-600 mr-1"></span>@s.CitationsNotSupported not supported</span>
+                <span><span class="inline-block w-2 h-2 bg-green-600 mr-1"></span>@s.CitationsSupported <Term Key="supported">supported</Term></span>
+                <span><span class="inline-block w-2 h-2 bg-amber-400 mr-1"></span>@s.CitationsPartiallySupported <Term Key="partly-supported">partly supported</Term></span>
+                <span><span class="inline-block w-2 h-2 bg-red-600 mr-1"></span>@s.CitationsNotSupported <Term Key="not-supported">not supported</Term></span>
                 @if (s.CitationsInsufficientEvidence > 0)
                 {
-                    <span><span class="inline-block w-2 h-2 bg-sky-600 mr-1"></span>@s.CitationsInsufficientEvidence abstract only</span>
+                    <span><span class="inline-block w-2 h-2 bg-sky-600 mr-1"></span>@s.CitationsInsufficientEvidence <Term Key="abstract-only">abstract only</Term></span>
                 }
                 @if (s.CitationsUnverifiable > 0)
                 {
-                    <span><span class="inline-block w-2 h-2 bg-gray-400 mr-1"></span>@s.CitationsUnverifiable could not be verified</span>
+                    <span><span class="inline-block w-2 h-2 bg-gray-400 mr-1"></span>@s.CitationsUnverifiable <Term Key="unverifiable">could not be verified</Term></span>
                 }
             </div>
             @if (attention > 0)

@@ -17,11 +17,11 @@
 }
 
 <div class="bg-white border border-gray-200 p-4 shadow-sm flex-none text-left">
-    <span class="text-[10px] font-bold uppercase tracking-wider text-gray-400 block mb-3">PRISMA Funnel</span>
+    <span class="text-[10px] font-bold uppercase tracking-wider text-gray-500 block mb-3">PRISMA Funnel</span>
 
     <div class="space-y-1.5 text-xs">
         <div class="flex items-baseline justify-between p-2 bg-gray-50 border border-gray-100 ">
-            <span class="font-semibold text-gray-700" title="All records returned by the searches, before anything is removed">Identified</span>
+            <span class="font-semibold text-gray-700"><Term Key="records">Identified</Term></span>
             <span class="text-lg font-bold text-brand font-mono">@s.TotalIdentified</span>
         </div>
 
@@ -40,7 +40,7 @@
         </div>
 
         <div class="flex items-baseline justify-between p-2 bg-gray-50 border border-gray-100 ">
-            <span class="font-semibold text-gray-700" title="Records checked against the inclusion and exclusion criteria">Screened</span>
+            <span class="font-semibold text-gray-700"><Term Key="screening">Screened</Term></span>
             <span class="text-lg font-bold text-gray-700 font-mono">@s.Screened</span>
         </div>
 
@@ -124,7 +124,7 @@
                     {
                         <li class="leading-snug break-words">
                             @r.Title
-                            <span class="text-gray-400">(@(r.Year > 0 ? r.Year.ToString() : "n.d."), @r.Source@(r.DuplicateOf != null ? $", duplicate of {r.DuplicateOf}" : ""))</span>
+                            <span class="text-gray-500">(@(r.Year > 0 ? r.Year.ToString() : "n.d."), @r.Source@(r.DuplicateOf != null ? $", duplicate of {r.DuplicateOf}" : ""))</span>
                         </li>
                     }
                 </ul>
