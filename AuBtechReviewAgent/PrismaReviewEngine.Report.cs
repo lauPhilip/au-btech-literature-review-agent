@@ -541,16 +541,9 @@ public partial class PrismaReviewEngine
             jsonSearchText = Regex.Replace(jsonSearchText, @"\[MERMAID_START\].*?\[MERMAID_END\]", "", RegexOptions.Singleline);
             jsonSearchText = Regex.Replace(jsonSearchText, @"\[TIKZ_START\].*?\[TIKZ_END\]", "", RegexOptions.Singleline);
 
-            int jsonStartIdx = jsonSearchText.IndexOf('{');
-            int jsonEndIdx = jsonSearchText.LastIndexOf('}');
-            string jsonPart = "{}";
-            if (jsonStartIdx != -1 && jsonEndIdx != -1 && jsonEndIdx > jsonStartIdx)
-            {
-                jsonPart = jsonSearchText.Substring(jsonStartIdx, jsonEndIdx - jsonStartIdx + 1).Trim();
-            }
+            // The first complete object, with line breaks inside quotes kept as \n (see LlmJson.ExtractObject).
+            string jsonPart = jsonSearchText.Contains('{') ? LlmJson.ExtractObject(jsonSearchText) : "{}";
 
-            jsonPart = jsonPart.Replace("```json", "").Replace("```", "").Trim();
-            
             // CLEANING PASS: Clean hidden ASCII control characters and wrap unescaped path backslashes
             jsonPart = Regex.Replace(jsonPart, "[\x00-\x1F]", " "); 
             jsonPart = Regex.Replace(jsonPart, @"\\(?![""\\/bfnrtu])", @"\\");
