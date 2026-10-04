@@ -3,26 +3,23 @@
 
 <SeoHead Title="Error" NoIndex="true" />
 
-<h1 class="text-danger">Error.</h1>
-<h2 class="text-danger">An error occurred while processing your request.</h2>
+<SiteHeader />
 
-@if (ShowRequestId)
-{
-    <p>
-        <strong>Request ID:</strong> <code>@RequestId</code>
-    </p>
-}
-
-<h3>Development Mode</h3>
-<p>
-    Swapping to <strong>Development</strong> environment will display more detailed information about the error that occurred.
-</p>
-<p>
-    <strong>The Development environment shouldn't be enabled for deployed applications.</strong>
-    It can result in displaying sensitive information from exceptions to end users.
-    For local debugging, enable the <strong>Development</strong> environment by setting the <strong>ASPNETCORE_ENVIRONMENT</strong> environment variable to <strong>Development</strong>
-    and restarting the app.
-</p>
+<main id="main" tabindex="-1" class="flex-1 min-h-0 overflow-y-auto bg-white">
+    <div class="ui-container py-20 max-w-2xl">
+        <p class="ui-eyebrow">Something went wrong</p>
+        <h1 class="ui-h1 mt-3">An error occurred while handling your request.</h1>
+        <p class="ui-lead mt-4">Please try again. If it keeps happening, open an issue on GitHub and include the request ID below, so the error can be found in the server log.</p>
+        @if (ShowRequestId)
+        {
+            <p class="mt-4 text-sm text-gray-700">Request ID: <code class="font-mono bg-gray-100 px-1.5 py-0.5">@RequestId</code></p>
+        }
+        <div class="mt-8 flex flex-wrap gap-3">
+            <a href="/" class="ui-btn-primary">Go to the start page</a>
+            <a href="https://github.com/lauPhilip/au-btech-literature-review-agent/issues" class="ui-btn-secondary">Report the problem</a>
+        </div>
+    </div>
+</main>
 
 @code{
     [CascadingParameter]
