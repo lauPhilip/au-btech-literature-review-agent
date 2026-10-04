@@ -80,7 +80,7 @@
         {
             <div class="sticky top-0 z-40 w-full max-w-[8.5in] mb-3 bg-white/95 backdrop-blur border border-amber-200 shadow px-3 py-2 flex flex-wrap items-center justify-between gap-2 font-sans text-xs print:hidden">
                 <span class="text-gray-800">
-                    <span class="font-semibold text-amber-800">@attention.Count @(attention.Count == 1 ? "citation needs" : "citations need") your attention</span>
+                    <span class="font-semibold text-verdict-partial">@attention.Count @(attention.Count == 1 ? "citation needs" : "citations need") your attention</span>
                     <span class="text-gray-500"> · @attention.Count(c => c.Verdict == AuBtechReviewAgent.CitationSupportChecker.NotSupported) not supported, @attention.Count(c => c.Verdict == AuBtechReviewAgent.CitationSupportChecker.Partial) partly supported</span>
                 </span>
                 <span class="flex items-center gap-2">
@@ -360,7 +360,7 @@
                     </div>
 
                     <div class="md:col-span-2 space-y-2 pt-2 font-sans max-w-full overflow-hidden">
-                        <span class="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">Table 3.3: Quality Appraisal (MMAT 2018)</span>
+                        <span class="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">Table 3.3: Quality Appraisal and <Term Key="risk-of-bias">Risk of Bias</Term> (MMAT 2018)</span>
                         @if (extractions.Any(AuBtechReviewAgent.MethodsSectionWriter.ShowInAppraisalTable))
                         {
                             <div class="border border-gray-200 bg-white overflow-x-auto print:overflow-visible" tabindex="0" role="region" aria-label="Scrolls sideways">
@@ -373,6 +373,7 @@
                                             {
                                                 <th class="p-2 border-r border-gray-200 text-center">@i</th>
                                             }
+                                            <th class="p-2 text-center" title="How many of the five questions were answered yes. MMAT does not combine them into one score.">Met</th>
                                         </tr>
                                     </thead>
                                     <tbody class="divide-y divide-gray-100 text-gray-700">
@@ -384,17 +385,44 @@
                                                 @for (int i = 0; i < 5; i++)
                                                 {
                                                     var a = i < e.Appraisal.Count ? e.Appraisal[i] : null;
-                                                    <td class="p-2 border-r border-gray-150 text-center font-mono @(a?.Answer switch { "yes" => "text-green-700", "no" => "text-red-700", _ => "text-gray-500" })"
+                                                    var light = AuBtechReviewAgent.RiskOfBias.For(a?.Answer);
+                                                    <td class="p-2 border-r border-gray-150 text-center whitespace-nowrap @light.Text"
                                                         title="@(a == null ? "" : $"{a.Id} {a.Criterion}{(string.IsNullOrEmpty(a.Quote) ? "" : $" — \"{a.Quote}\"")}")">
-                                                        @(a?.Answer switch { "yes" => "Yes", "no" => "No", null => "–", _ => "?" })
+                                                        <span class="inline-block w-2 h-2 rounded-full align-middle mr-1 @light.Dot" aria-hidden="true"></span><span class="align-middle">@light.Word</span>
                                                     </td>
                                                 }
+                                                <td class="p-2 text-center font-mono whitespace-nowrap">@(e.Appraisal.Count == 0 ? "–" : $"{e.AppraisalYes} of {e.Appraisal.Count}")</td>
                                             </tr>
                                         }
                                     </tbody>
                                 </table>
                             </div>
-                            <p class="text-[10px] text-gray-500">? = can't tell. Hover over an answer to see the criterion and the supporting quote. Appraised by the language model; check before use.</p>
+                            <p class="text-[10px] text-gray-500">Hover over an answer to see the question and the supporting quote. "Met" counts the questions answered yes; following MMAT's guidance it is not an overall quality score. Appraised by the language model; check before use.</p>
+                            @foreach (var category in AuBtechReviewAgent.RiskOfBias.Summarise(extractions))
+                            {
+                                <figure class="mt-3 border border-gray-200 bg-white p-3">
+                                    <figcaption class="text-[10px] font-semibold text-gray-700">@category.Category.Replace('_', ' ') studies (@category.Studies): answers per question</figcaption>
+                                    <div class="mt-2 space-y-1.5">
+                                        @foreach (var q in category.Questions)
+                                        {
+                                            <div class="grid grid-cols-[minmax(0,1fr)_8rem] sm:grid-cols-[minmax(0,1fr)_12rem] gap-2 items-center text-[10px]">
+                                                <span class="text-gray-700 leading-snug"><span class="font-mono text-gray-500">@q.Id</span> @q.Criterion</span>
+                                                <span class="flex h-3 w-full overflow-hidden bg-gray-100" role="img" aria-label="@($"{q.Yes} yes, {q.No} no, {q.CantTell} can't tell")"
+                                                      title="@($"{q.Yes} yes · {q.No} no · {q.CantTell} can't tell")">
+                                                    @foreach (var (count, dot) in new[] { (q.Yes, "bg-verdict-ok"), (q.CantTell, "bg-verdict-partial"), (q.No, "bg-verdict-bad") })
+                                                    {
+                                                        @if (count > 0)
+                                                        {
+                                                            <span class="h-full @dot" style="width:@((100.0 * count / q.Total).ToString("0.#", System.Globalization.CultureInfo.InvariantCulture))%"></span>
+                                                        }
+                                                    }
+                                                </span>
+                                            </div>
+                                        }
+                                    </div>
+                                    <p class="mt-2 text-[10px] text-gray-500"><span class="inline-block w-2 h-2 rounded-full bg-verdict-ok align-middle"></span> yes · <span class="inline-block w-2 h-2 rounded-full bg-verdict-partial align-middle"></span> can't tell · <span class="inline-block w-2 h-2 rounded-full bg-verdict-bad align-middle"></span> no</p>
+                                </figure>
+                            }
                         }
                         @if (AuBtechReviewAgent.MethodsSectionWriter.NotAppraisedNote(extractions) is { Length: > 0 } notAppraised)
                         {
@@ -807,10 +835,102 @@
                             @(check.ResolvedBy == "second check" ? " The second check found a verbatim quote, so its verdict is shown." : "")
                         </p>
                     }
+                    @if (RecheckOf(open) is { } done)
+                    {
+                        <p class="text-[10px] text-gray-600">Checked again @done.CheckedUtc.ToString("yyyy-MM-dd HH:mm") UTC: was @VerdictLabel(done.VerdictBefore) (@done.EvidenceBefore), now @VerdictLabel(done.VerdictAfter) (@done.EvidenceAfter).</p>
+                    }
+                    @if (check.Verdict is AuBtechReviewAgent.CitationSupportChecker.Partial or AuBtechReviewAgent.CitationSupportChecker.NotSupported)
+                    {
+                        <div class="pt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
+                            <button type="button" class="ui-btn ui-btn-sm py-0.5 border border-gray-300 bg-white text-gray-800 hover:border-brand disabled:opacity-50"
+                                    disabled="@(rechecking || rechecksLeft <= 0)" @onclick="() => RecheckAsync(open)">
+                                @(rechecking ? "Checking again…" : "Check again")
+                            </button>
+                            <span class="text-[10px] text-gray-500">
+                                @(rechecksLeft > 0
+                                    ? $"Runs the check once more{(check.EvidenceBasis == "abstract only" ? ", with the full text if an open-access copy can be found now" : " on the full text")}. {rechecksLeft} re-check{(rechecksLeft == 1 ? "" : "s")} left for this run."
+                                    : "This run has used its re-checks.")
+                            </span>
+                        </div>
+                    }
+                    @if (recheckMessage != null)
+                    {
+                        <p class="text-[10px] @(recheckFailed ? "text-red-700" : "text-gray-700")" role="status">@recheckMessage</p>
+                    }
                 }
             </div>
         }
     };
+
+    // Re-checking one citation after the run (PrismaReviewEngine.RecheckCitationAsync).
+    private List<AuBtechReviewAgent.CitationRecheck> rechecks = new();
+    private int rechecksLeft;
+    private bool rechecking;
+    private string? recheckMessage;
+    private bool recheckFailed;
+
+    /// <summary>Reads the verdicts and re-checks from citation-audit.json (and, after a re-check, the report's check sentence).</summary>
+    private async Task LoadAuditAsync(string folder, bool reloadReport = true)
+    {
+        string auditPath = Path.Join(folder, "citation-audit.json");
+        auditChecks = new();
+        rechecks = new();
+        if (File.Exists(auditPath))
+        {
+            try
+            {
+                using var doc = JsonDocument.Parse(await File.ReadAllTextAsync(auditPath));
+                if (doc.RootElement.TryGetProperty("SupportChecks", out var checks))
+                    auditChecks = JsonSerializer.Deserialize<List<AuBtechReviewAgent.CitationSupportResult>>(checks.GetRawText()) ?? new();
+                if (doc.RootElement.TryGetProperty("Rechecks", out var done))
+                    rechecks = JsonSerializer.Deserialize<List<AuBtechReviewAgent.CitationRecheck>>(done.GetRawText()) ?? new();
+            }
+            catch (Exception ex) when (ex is JsonException or IOException) { auditChecks = new(); rechecks = new(); }
+        }
+        rechecksLeft = auditChecks.Count == 0 ? 0 : Math.Max(0, AuBtechReviewAgent.PrismaReviewEngine.MaxRechecksPerRun - rechecks.Count);
+
+        string reportPath = Path.Join(folder, "prisma-report.json");
+        if (reloadReport && File.Exists(reportPath))
+        {
+            try
+            {
+                var updated = JsonSerializer.Deserialize<PrismaReport>(await File.ReadAllTextAsync(reportPath), new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                if (updated != null) report.CitationCheckSummary = updated.CitationCheckSummary;
+            }
+            catch (Exception ex) when (ex is JsonException or IOException) { }
+        }
+    }
+
+    private AuBtechReviewAgent.CitationRecheck? RecheckOf((string Field, int Sentence, int Reference) c) =>
+        rechecks.LastOrDefault(r => r.Field == c.Field && r.SentenceIndex == c.Sentence && r.Reference == c.Reference);
+
+    private async Task RecheckAsync((string Field, int Sentence, int Reference) c)
+    {
+        if (rechecking) return;
+        rechecking = true;
+        recheckMessage = null;
+        recheckFailed = false;
+        try
+        {
+            var result = await ReviewEngine.RecheckCitationAsync(State.CurrentSessionId, c.Field, c.Sentence, c.Reference);
+            await LoadAuditAsync(Path.Join(ReviewEngine.WorkspaceRoot, State.CurrentSessionId.ToString("N")));
+            recheckMessage = $"Checked again: {VerdictLabel(result.Verdict).ToLowerInvariant()}, against the {result.EvidenceBasis}.";
+        }
+        catch (AuBtechReviewAgent.PrismaReviewEngine.RecheckException ex)
+        {
+            recheckMessage = ex.Message;
+            recheckFailed = true;
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            recheckMessage = "The check could not be run just now (the model or the paper's server did not answer). Try again later.";
+            recheckFailed = true;
+        }
+        finally
+        {
+            rechecking = false;
+        }
+    }
 
     private AuBtechReviewAgent.CitationSupportResult? FindCheck(string field, int sentence, int reference) =>
         auditChecks.FirstOrDefault(c => c.Field == field && c.SentenceIndex == sentence && c.Reference == reference);
@@ -961,17 +1081,7 @@
             catch { report = new PrismaReport(); }
         }
 
-        string auditPath = Path.Join(folder, "citation-audit.json");
-        if (File.Exists(auditPath))
-        {
-            try
-            {
-                using var doc = JsonDocument.Parse(await File.ReadAllTextAsync(auditPath));
-                if (doc.RootElement.TryGetProperty("SupportChecks", out var checks))
-                    auditChecks = JsonSerializer.Deserialize<List<AuBtechReviewAgent.CitationSupportResult>>(checks.GetRawText()) ?? new();
-            }
-            catch { auditChecks = new(); }
-        }
+        await LoadAuditAsync(folder, reloadReport: false);
 
         var state = ReviewEngine.LoadState(State.CurrentSessionId);
         if (state == null) return;
