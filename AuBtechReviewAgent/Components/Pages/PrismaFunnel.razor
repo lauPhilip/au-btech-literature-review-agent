@@ -39,6 +39,32 @@
             }
         </div>
 
+        @if (Yields is { Count: > 1 })
+        {
+            string? hint = AuBtechReviewAgent.SearchSaturation.Hint(Yields);
+            <details class="text-[11px] text-gray-600">
+                <summary class="cursor-pointer select-none">New records per <Term Key="search-strings">search string</Term> <span class="text-brand underline decoration-dotted">show</span></summary>
+                <table class="mt-1 w-full">
+                    <caption class="sr-only">Records retrieved and new records per search string, in the order they were run</caption>
+                    <thead><tr class="text-[10px] text-gray-500"><th scope="col" class="text-left font-normal">Search string</th><th scope="col" class="text-right font-normal">Found</th><th scope="col" class="text-right font-normal">New</th></tr></thead>
+                    <tbody>
+                        @foreach (var y in Yields)
+                        {
+                            <tr class="@(y.Searches == 0 ? "text-gray-500" : "")">
+                                <td class="pr-2 py-0.5 break-words">@y.SearchString</td>
+                                <td class="text-right font-mono">@(y.Searches == 0 ? "–" : y.Retrieved.ToString())</td>
+                                <td class="text-right font-mono font-semibold">@(y.Searches == 0 ? "–" : y.New.ToString())</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </details>
+            @if (hint != null)
+            {
+                <p class="text-[10px] text-gray-600 leading-snug"><Term Key="saturation">Saturation</Term>: @hint</p>
+            }
+        }
+
         <div class="flex items-baseline justify-between p-2 bg-gray-50 border border-gray-100 ">
             <span class="font-semibold text-gray-700"><Term Key="screening">Screened</Term></span>
             <span class="text-lg font-bold text-gray-700 font-mono">@s.Screened</span>
@@ -48,7 +74,16 @@
             <div class="p-2 bg-red-50/60 border border-red-100 ">
                 <span class="block text-[9px] font-bold text-red-500 uppercase tracking-wider">Excluded</span>
                 <span class="text-lg font-bold text-red-600 font-mono">@excludedTotal</span>
-                @if (s.FailedPeerReviewCheck > 0)
+                @if (ExclusionGroups is { Count: > 0 } groups && groups.Any(g => g.Key != AuBtechReviewAgent.ExclusionReasons.Unspecified))
+                {
+                    <ul class="mt-1 space-y-0.5 text-[10px] text-red-700" aria-label="Reasons for exclusion">
+                        @foreach (var g in groups)
+                        {
+                            <li class="flex justify-between gap-2"><span>@g.Label</span><span class="font-mono">@g.Count</span></li>
+                        }
+                    </ul>
+                }
+                else if (s.FailedPeerReviewCheck > 0)
                 {
                     <span class="block text-[10px] text-red-500">incl. @s.FailedPeerReviewCheck not peer reviewed</span>
                 }
@@ -132,4 +167,10 @@
         }
     };
     [Parameter] public bool Running { get; set; }
+
+    /// <summary>Records found and new per search string, in the order they were run (saturation hint).</summary>
+    [Parameter] public IReadOnlyList<AuBtechReviewAgent.SearchStringYield>? Yields { get; set; }
+
+    /// <summary>The excluded records grouped by reason.</summary>
+    [Parameter] public IReadOnlyList<AuBtechReviewAgent.ExclusionReasons.Group>? ExclusionGroups { get; set; }
 }

@@ -19,6 +19,8 @@ public class PrismaFlowCounts
     public int ScreeningErrors { get; set; }
     public int ExcludedPeerReview { get; set; }
     public int ExcludedAtScreening { get; set; }
+    /// <summary>The screening exclusions (not the peer-review filter) by reason, when the run recorded reasons.</summary>
+    public List<(string Reason, int Count)> ExcludedByReason { get; set; } = new();
     public int HumanOverrides { get; set; }
     public bool HumanReviewed { get; set; }
     public int Included { get; set; }
@@ -49,6 +51,10 @@ public class PrismaFlowCounts
             ScreeningErrors = s.ScreeningErrors,
             ExcludedPeerReview = s.FailedPeerReviewCheck,
             ExcludedAtScreening = s.Excluded,
+            ExcludedByReason = ExclusionReasons.Count(state.Phases.Screening)
+                .Where(g => g.Key != ExclusionReasons.NotPeerReviewed && g.Key != ExclusionReasons.Unspecified)
+                .Select(g => (g.Label, g.Count))
+                .ToList(),
             HumanOverrides = s.HumanOverrides,
             HumanReviewed = s.HumanReviewed > 0,
             Included = s.Included,
@@ -79,6 +85,8 @@ public static class PrismaFlowDiagram
         var excluded = new List<string>();
         if (c.ExcludedPeerReview > 0) excluded.Add($"Not peer reviewed (n = {c.ExcludedPeerReview})");
         excluded.Add($"Did not meet criteria (n = {c.ExcludedAtScreening})");
+        foreach (var (reason, count) in c.ExcludedByReason)
+            excluded.Add($"\\quad {Escape(reason)} (n = {count})");
         if (c.HumanReviewed) excluded.Add($"Decisions changed by reviewer: {c.HumanOverrides}");
 
         var sb = new StringBuilder();

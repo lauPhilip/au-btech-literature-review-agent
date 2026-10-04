@@ -545,16 +545,17 @@ public partial class PrismaReviewEngine
         var appraised = extractions.Where(MethodsSectionWriter.ShowInAppraisalTable).ToList();
         if (appraised.Count > 0)
         {
-            sb.AppendLine(@"\begin{tabularx}{\textwidth}{>{\hsize=0.4\hsize}X >{\hsize=1.6\hsize}X c c c c c}");
-            sb.AppendLine(@"\multicolumn{7}{l}{\textbf{Table 3.3: Quality Appraisal (MMAT 2018; Yes / No / ? = can't tell)}} \\");
+            sb.AppendLine(@"\begin{tabularx}{\textwidth}{>{\hsize=0.4\hsize}X >{\hsize=1.6\hsize}X c c c c c c}");
+            sb.AppendLine(@"\multicolumn{8}{l}{\textbf{Table 3.3: Quality Appraisal (MMAT 2018; Yes / No / ? = can't tell; Met = questions answered yes, not an overall score)}} \\");
             sb.AppendLine(@"\toprule");
-            sb.AppendLine(@"\textbf{Ref.} & \textbf{Category} & \textbf{1} & \textbf{2} & \textbf{3} & \textbf{4} & \textbf{5} \\");
+            sb.AppendLine(@"\textbf{Ref.} & \textbf{Category} & \textbf{1} & \textbf{2} & \textbf{3} & \textbf{4} & \textbf{5} & \textbf{Met} \\");
             sb.AppendLine(@"\midrule");
             foreach (var e in appraised)
             {
                 string category = e.Error != null ? "not appraised" : e.AppraisalCategory.Replace('_', ' ');
                 var cells = Enumerable.Range(0, 5).Select(i => i < e.Appraisal.Count ? A(e.Appraisal[i].Answer) : "--");
-                sb.AppendLine($"{{[}}{e.ReferenceNumber}{{]}} & {EscapeLatexText(category)} & {string.Join(" & ", cells)} \\\\");
+                string met = e.Appraisal.Count == 0 ? "--" : $"{e.AppraisalYes}/{e.Appraisal.Count}";
+                sb.AppendLine($"{{[}}{e.ReferenceNumber}{{]}} & {EscapeLatexText(category)} & {string.Join(" & ", cells)} & {met} \\\\");
             }
             sb.AppendLine(@"\bottomrule");
             sb.AppendLine(@"\end{tabularx}");

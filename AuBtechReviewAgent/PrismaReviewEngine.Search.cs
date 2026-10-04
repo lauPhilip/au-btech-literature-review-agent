@@ -32,7 +32,7 @@ public partial class PrismaReviewEngine
         public List<string> Raw { get; set; } = new();
     }
 
-    private sealed record SearchPass(PlatformSearchLog Log, List<AcademicPaper> Papers);
+    private sealed record SearchPass(PlatformSearchLog Log, List<AcademicPaper> Papers, int StringIndex);
 
     private async Task SearchAndScreenAsync(RunContext ctx, int yearFrom, int yearTo)
     {
@@ -42,10 +42,19 @@ public partial class PrismaReviewEngine
 
         // STORM-style multi-perspective search: survey the topic from a few distinct angles before
         // querying each source, instead of relying on the single literal query phrase alone.
+        // When the reviewer has seen and approved the extra strings on the form, those are used as they are.
         List<string> searchPerspectives;
         ReportProgress(ctx.RunId, reviewState, RunProgress.Search, 0, "Preparing search strings");
-        using (LlmStage.Begin("search-perspectives"))
-            searchPerspectives = await GenerateSearchPerspectivesAsync(ctx.Chat, request.Query, request.Objective, request.Inclusion);
+        if (request.SearchStrings != null)
+        {
+            searchPerspectives = WithPrimaryQuery(request.Query, request.SearchStrings);
+            reviewState.SearchStringsReviewed = true;
+        }
+        else
+        {
+            using (LlmStage.Begin("search-perspectives"))
+                searchPerspectives = await GenerateSearchPerspectivesAsync(ctx.Chat, request.Query, request.Objective, request.Inclusion);
+        }
         reviewState.SearchPerspectives = searchPerspectives;
         reviewState.ProtocolHash = MethodsSectionWriter.ComputeProtocolHash(
             request.Query, request.Objective, request.Inclusion, request.Exclusion,
@@ -53,7 +62,7 @@ public partial class PrismaReviewEngine
         try
         {
             // The extra search strings are only known now, so they are added to the protocol as a dated amendment.
-            await File.AppendAllTextAsync(Path.Join(ctx.Workspace, "protocol.md"), ProtocolWriter.Amendment(searchPerspectives, DateTime.UtcNow));
+            await File.AppendAllTextAsync(Path.Join(ctx.Workspace, "protocol.md"), ProtocolWriter.Amendment(searchPerspectives, DateTime.UtcNow, reviewState.SearchStringsReviewed));
         }
         catch (Exception ex) { _log.LogWarning("Run {RunId}: protocol amendment not written: {Message}", ctx.RunId, ex.Message); }
         await SaveStateAsync(ctx.RunId, reviewState);
@@ -87,6 +96,8 @@ public partial class PrismaReviewEngine
                 }
             }
         }
+        reviewState.SearchStringYields = SearchSaturation.Compute(searchPerspectives,
+            fetches.SelectMany(f => f).Select(pass => (pass.StringIndex, (IReadOnlyList<AcademicPaper>)pass.Papers)));
         OnProgressUpdated?.Invoke(ctx.RunId, reviewState.Stats);
         await SaveStateAsync(ctx.RunId, reviewState);
 
@@ -191,7 +202,7 @@ public partial class PrismaReviewEngine
 
             SaveRawResponses(ctx, log, raw, $"{sourceIndex + 1:00}-{Slug(source.SourceName)}-q{p + 1}");
             foreach (var paper in papers) distinct.Add(paper.Id);
-            passes.Add(new SearchPass(log, papers));
+            passes.Add(new SearchPass(log, papers, p));
             int searched = Interlocked.Increment(ref ctx.SearchPassesDone);
             ReportProgress(ctx.RunId, ctx.State, RunProgress.Search, 0.05 + 0.95 * searched / ctx.SearchPassesTotal, Of(searched, ctx.SearchPassesTotal, "searches"));
         }
@@ -286,6 +297,33 @@ public partial class PrismaReviewEngine
         await SaveStateAsync(ctx.RunId, ctx.State);
 
         await ScreenCandidatesAsync(ctx, candidates, OriginCitations);
+    }
+
+    /// <summary>The primary query followed by the reviewer's extra strings, without repeats, at most MaxSearchStrings in all.</summary>
+    internal static List<string> WithPrimaryQuery(string query, IEnumerable<string> extra)
+    {
+        var all = new List<string> { query };
+        foreach (var s in extra)
+        {
+            string clean = s.Trim();
+            if (clean.Length > 0 && !all.Any(a => a.Equals(clean, StringComparison.OrdinalIgnoreCase))) all.Add(clean);
+        }
+        return all.Take(ReviewInputGuard.MaxSearchStrings + 1).ToList();
+    }
+
+    /// <summary>
+    /// Proposes the extra search strings before a run, so the reviewer can see and edit them on the form. One small
+    /// model call with the key the run would use; the caller limits how often it is asked.
+    /// Returns only the extra strings (not the primary query).
+    /// </summary>
+    public async Task<List<string>> PreviewSearchStringsAsync(string query, string objective, string inclusion, UserApiKeys? userKeys)
+    {
+        var (activeMistral, _, _, _) = ResolveKeys(userKeys);
+        IChatCompletionService chat = ChatFactory != null ? ChatFactory(activeMistral) : LlmFactory.Create(Llm, activeMistral);
+        string cleanQuery = ReviewInputGuard.Normalize(query, singleLine: true);
+        var all = await GenerateSearchPerspectivesAsync(chat, cleanQuery,
+            ReviewInputGuard.Normalize(objective, singleLine: false), ReviewInputGuard.Normalize(inclusion, singleLine: false));
+        return all.Skip(1).ToList();
     }
 
     private sealed class PerspectivesAnswer

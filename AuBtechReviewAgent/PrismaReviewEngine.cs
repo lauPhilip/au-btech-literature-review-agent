@@ -180,6 +180,10 @@ public partial class PrismaReviewEngine
     /// </summary>
     public async Task RunReviewAsync(Guid sessionId, ReviewRequest request)
     {
+        // Every log line written while this run works (engine, sources, cache, model calls) carries its run ID,
+        // so a bug report with the ID from the dashboard can be matched to the server log.
+        using var logScope = _log.BeginScope(new Dictionary<string, object> { ["RunId"] = sessionId });
+
         // Every caller gets the same input checks (the dashboard runs them first to show the result): the
         // text fields are normalised, too-long fields stop the run before anything is spent, and
         // instruction-like phrases are recorded in the protocol and the ledger.
@@ -293,6 +297,7 @@ public partial class PrismaReviewEngine
         }
         catch (Exception ex)
         {
+            _log.LogError(ex, "Run {RunId} failed during {Stage}", sessionId, ctx.State.Stats.ProcessingStage);
             ctx.State.Stats.ProcessingStage = StageFailed;
             ctx.State.FailureMessage = $"The run stopped with an error: {SanitizeLogMessage(ex.Message)}";
             ctx.State.CompletedUtc = DateTime.UtcNow;

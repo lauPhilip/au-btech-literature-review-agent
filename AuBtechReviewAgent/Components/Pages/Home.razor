@@ -168,6 +168,50 @@
                                     }
                                 </div>
 
+                                <fieldset id="f-strings" tabindex="-1" aria-describedby="h-strings">
+                                    <legend class="@LabelClass">Search strings <Term Key="search-strings" Icon="true" /></legend>
+                                    @if (reviewedSearchStrings == null)
+                                    {
+                                        <p id="h-strings" class="text-xs text-gray-600 leading-snug">The model adds up to three other phrasings of your query during the run. Preview them to check and edit them before anything is searched.</p>
+                                        <button type="button" @onclick="PreviewSearchStrings" disabled="@(previewingStrings || string.IsNullOrWhiteSpace(searchQuery) || previewsLeft <= 0)"
+                                                class="ui-btn ui-btn-sm mt-2 border border-gray-300 text-gray-800 hover:border-brand disabled:opacity-50">
+                                            @(previewingStrings ? "Asking the model…" : "Preview search strings")
+                                        </button>
+                                    }
+                                    else
+                                    {
+                                        <p id="h-strings" class="text-xs text-gray-600 leading-snug">These are searched as they are, after your query; the report records that you approved them.</p>
+                                        <ol class="mt-2 space-y-1.5">
+                                            <li class="flex items-center gap-2 text-sm text-gray-700"><span class="w-4 text-right text-xs text-gray-500">1</span><span class="truncate" title="@searchQuery">@searchQuery</span><span class="text-[10px] text-gray-500 whitespace-nowrap">(your query)</span></li>
+                                            @for (int i = 0; i < reviewedSearchStrings.Count; i++)
+                                            {
+                                                int index = i;
+                                                <li class="flex items-center gap-2">
+                                                    <span class="w-4 text-right text-xs text-gray-500">@(index + 2)</span>
+                                                    <input type="text" aria-label="@($"Search string {index + 2}")" maxlength="@AuBtechReviewAgent.ReviewInputGuard.MaxSearchString"
+                                                           value="@reviewedSearchStrings[index]" @onchange="e => reviewedSearchStrings[index] = e.Value?.ToString() ?? string.Empty" class="@InputClass py-1" />
+                                                    <button type="button" @onclick="() => reviewedSearchStrings.RemoveAt(index)" class="ui-btn ui-btn-sm px-2 text-gray-600 hover:text-red-700" aria-label="@($"Remove search string {index + 2}")">✕</button>
+                                                </li>
+                                            }
+                                        </ol>
+                                        <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+                                            @if (reviewedSearchStrings.Count < AuBtechReviewAgent.ReviewInputGuard.MaxSearchStrings)
+                                            {
+                                                <button type="button" @onclick="() => reviewedSearchStrings.Add(string.Empty)" class="text-brand font-medium hover:underline">Add a search string</button>
+                                            }
+                                            <button type="button" @onclick="() => reviewedSearchStrings = null" class="text-gray-600 hover:underline">Let the model choose during the run</button>
+                                        </div>
+                                        @if (previewQuery != null && !string.Equals(previewQuery, searchQuery?.Trim(), StringComparison.OrdinalIgnoreCase))
+                                        {
+                                            <p class="mt-1.5 text-[11px] text-amber-800">Your query changed after the preview. Check that these still fit.</p>
+                                        }
+                                    }
+                                    @if (previewError != null)
+                                    {
+                                        <p class="mt-1.5 text-[11px] text-red-700" role="alert">@previewError</p>
+                                    }
+                                </fieldset>
+
                                 <fieldset id="f-sources" tabindex="-1">
                                     <legend class="@LabelClass">Sources <span class="font-normal text-gray-500">(at least one)</span></legend>
                                     <div class="grid grid-cols-2 gap-x-3 gap-y-1.5">
@@ -188,6 +232,7 @@
                                             </label>
                                         }
                                     </div>
+                                    <div class="mt-2"><SourceStatusNote /></div>
                                 </fieldset>
 
                                 @* Options most people never change: folded away, with sensible defaults. *@
@@ -364,7 +409,17 @@
                     <div class="p-4 space-y-4">
                         @if (!string.IsNullOrEmpty(failureMessage))
                         {
-                            <p class="text-sm text-red-700 bg-red-50 border border-red-200 p-2" role="alert">@failureMessage</p>
+                            <div class="text-sm text-red-700 bg-red-50 border border-red-200 p-2" role="alert">
+                                <p>@failureMessage</p>
+                                @if (stage is AuBtechReviewAgent.PrismaReviewEngine.StageFailed or AuBtechReviewAgent.PrismaReviewEngine.StageInterrupted)
+                                {
+                                    <p class="mt-1.5 text-xs text-red-900">
+                                        Run <span class="font-mono select-all">@currentSessionId</span> · version @AppVersionShort ·
+                                        <a href="@AuBtechReviewAgent.SiteSeo.ProblemReportUrl(currentSessionId, AppVersionShort, stage)" target="_blank" rel="noopener" class="underline underline-offset-2">Report this problem</a>
+                                        <span class="text-red-800">(the report includes the run ID and version, not your question)</span>
+                                    </p>
+                                }
+                            </div>
                         }
                         <RunProgressPanel Stats="State.Stats" Stage="@stage" Running="isSearching" QueuePosition="queuePosition" CompletedUtc="completedUtc" />
                         @if (isSearching && notifyPermission is "default" or "granted")
@@ -382,7 +437,8 @@
                                 }
                             </p>
                         }
-                        <PrismaFunnel Stats="State.Stats" Removed="State.RemovedBeforeScreening" Running="isSearching" />
+                        <PrismaFunnel Stats="State.Stats" Removed="State.RemovedBeforeScreening" Running="isSearching"
+                                      Yields="State.SearchStringYields" ExclusionGroups="State.ExclusionGroups" />
                     </div>
                 </div>
             }
@@ -461,6 +517,38 @@
 
     private bool showKeyModal = false;
     private AuBtechReviewAgent.UserApiKeys? sessionKeys = null;
+
+    // Search-string preview: null until the reviewer previews (the model then chooses during the run).
+    private List<string>? reviewedSearchStrings;
+    private string? previewQuery;
+    private string? previewError;
+    private bool previewingStrings;
+    private int previewsLeft = 5; // each preview is one model call; a page gets a few
+
+    private async Task PreviewSearchStrings()
+    {
+        if (previewingStrings || previewsLeft <= 0 || string.IsNullOrWhiteSpace(searchQuery)) return;
+        previewingStrings = true;
+        previewError = null;
+        previewsLeft--;
+        try
+        {
+            var strings = await ReviewEngine.PreviewSearchStringsAsync(searchQuery, reviewObjective, inclusionCriteria, sessionKeys);
+            reviewedSearchStrings = strings.Take(AuBtechReviewAgent.ReviewInputGuard.MaxSearchStrings).ToList();
+            previewQuery = searchQuery.Trim();
+            if (reviewedSearchStrings.Count == 0)
+                previewError = "The model did not propose other phrasings. Add your own, or let the model try again during the run.";
+        }
+        catch (Exception ex)
+        {
+            Logger.LogInformation("Search-string preview failed: {Error}", ex.GetType().Name);
+            previewError = "The preview did not work just now. The model will propose the search strings during the run instead.";
+        }
+        finally
+        {
+            previewingStrings = false;
+        }
+    }
 
     // Run quota: the client's address is read once when the component starts (from the HTTP request
     // behind the prerender or the SignalR connection) and used as the quota key for this session.
@@ -702,7 +790,7 @@
     private sealed record Draft(
         string Query, string Objective, string Inclusion, string Exclusion, int YearFrom, int YearTo,
         string ArtifactKind, string Directive, List<string> Sources, bool Dual, bool Chaining, bool Check, bool PeerReviewed,
-        int MaxResults, DateTime SavedUtc);
+        int MaxResults, DateTime SavedUtc, List<string>? SearchStrings = null);
 
     private string lastSavedDraft = "";
     private bool draftRestored;
@@ -713,7 +801,8 @@
 
     private Draft CurrentDraft() => new(searchQuery, reviewObjective, inclusionCriteria, exclusionCriteria,
         yearFrom, yearTo, State.ArtifactKind, synthesisTargetDirective, State.SelectedSources.OrderBy(x => x, StringComparer.Ordinal).ToList(),
-        State.DualScreening, State.CitationChaining, State.ReviewScreeningFirst, requirePeerReview, maxResults, DateTime.MinValue);
+        State.DualScreening, State.CitationChaining, State.ReviewScreeningFirst, requirePeerReview, maxResults, DateTime.MinValue,
+        reviewedSearchStrings?.ToList());
 
     // The draft without its timestamp, to tell whether anything changed since the last save.
     private string DraftFingerprint() => JsonSerializer.Serialize(CurrentDraft());
@@ -756,6 +845,7 @@
             State.DualScreening = draft.Dual; State.CitationChaining = draft.Chaining; State.ReviewScreeningFirst = draft.Check;
             requirePeerReview = draft.PeerReviewed;
             if (draft.MaxResults > 0) maxResults = Math.Min(draft.MaxResults, maxResultsCeiling);
+            reviewedSearchStrings = draft.SearchStrings?.Take(AuBtechReviewAgent.ReviewInputGuard.MaxSearchStrings).ToList();
             prefillNotice = $"Your unfinished review from {draft.SavedUtc:d MMM} was brought back. It is kept in this browser only.";
             showStartEmpty = true;
         }
@@ -776,6 +866,7 @@
     private async Task StartEmpty()
     {
         searchQuery = reviewObjective = inclusionCriteria = exclusionCriteria = "";
+        reviewedSearchStrings = null;
         synthesisTargetDirective = AuBtechReviewAgent.ArtifactKinds.DefaultInstruction(State.ArtifactKind);
         prefillNotice = null;
         showStartEmpty = false;
@@ -843,6 +934,7 @@
     private int queuePosition;
     private string? failureMessage;
     private DateTime? completedUtc;
+    private static string AppVersionShort => AuBtechReviewAgent.RecordingChatCompletionService.AppVersion.Split('+')[0];
     private bool awaitingReview;
     private bool confirmDelete;
     private IReadOnlyList<AuBtechReviewAgent.ScreeningLog>? reviewLogs;
@@ -951,6 +1043,8 @@
         var s = AuBtechReviewAgent.RunProgress.KeepFurthest(State.Stats, state.Stats);
         State.Stats = s;
         State.RemovedBeforeScreening = state.RemovedBeforeScreening;
+        State.SearchStringYields = state.SearchStringYields;
+        State.ExclusionGroups = AuBtechReviewAgent.ExclusionReasons.Count(state.Phases.Screening);
         runInfo = state;
         totalIdentified = s.TotalIdentified;
         screenedCount = s.Screened;
@@ -1163,6 +1257,8 @@
         currentSessionId = Guid.Empty;
         State.Stats = new ReviewStats();
         State.RemovedBeforeScreening = new();
+        State.SearchStringYields = new();
+        State.ExclusionGroups = new();
         rawJsonLogs = "{\n  \"status\": \"Run deleted.\"\n}";
         stage = "";
         failureMessage = null;
@@ -1233,7 +1329,7 @@
         // Check the text fields before anything is reserved or spent: too-long fields are errors, and
         // instruction-like phrases must be confirmed once (they are then recorded in the protocol).
         var draft = new AuBtechReviewAgent.ReviewRequest(searchQuery, reviewObjective, inclusionCriteria, exclusionCriteria, maxResults,
-            SynthesisDirective: synthesisTargetDirective, ArtifactKind: State.ArtifactKind);
+            SynthesisDirective: synthesisTargetDirective, ArtifactKind: State.ArtifactKind, SearchStrings: reviewedSearchStrings);
         inputCheck = AuBtechReviewAgent.ReviewInputGuard.Check(draft);
         if (!inputCheck.IsValid)
         {
@@ -1281,6 +1377,8 @@
 
         State.Stats = new ReviewStats();
         State.RemovedBeforeScreening = new();
+        State.SearchStringYields = new();
+        State.ExclusionGroups = new();
         totalIdentified = 0;
         screenedCount = 0;
         excludedCount = 0;
@@ -1304,7 +1402,8 @@
         var request = new AuBtechReviewAgent.ReviewRequest(
             cleanQuery, cleanObjective, cleanInclusion, cleanExclusion, runMaxResults,
             requirePeerReview, cleanDirective, sessionKeys, runSources, yearFrom, yearTo, State.ReviewScreeningFirst,
-            DualScreening: State.DualScreening, CitationChaining: State.CitationChaining, ArtifactKind: State.ArtifactKind);
+            DualScreening: State.DualScreening, CitationChaining: State.CitationChaining, ArtifactKind: State.ArtifactKind,
+            SearchStrings: inputCheck.Request.SearchStrings);
 
         Subscribe();
 
@@ -1316,9 +1415,10 @@
             }
             catch (Exception ex)
             {
-                // The run failed: give the quota slot back. The reason is stored in the run's ledger.
+                // The run failed: give the quota slot back. The reason is stored in the run's ledger, and the
+                // engine has logged the error with the run ID.
                 if (lease != null) Quota.Refund(lease);
-                Logger.LogWarning("Run {RunId} failed: {Message}", runId, ex.Message);
+                Logger.LogDebug("Run {RunId} ended with {Error}", runId, ex.GetType().Name);
             }
             finally
             {

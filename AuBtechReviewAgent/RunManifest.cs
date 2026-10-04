@@ -184,11 +184,15 @@ public static class ProtocolWriter
         return sb.ToString();
     }
 
-    public static string Amendment(IReadOnlyList<string> searchStrings, DateTime utc)
+    public static string Amendment(IReadOnlyList<string> searchStrings, DateTime utc, bool reviewedByReviewer = false)
     {
         var sb = new StringBuilder();
         sb.AppendLine();
         sb.AppendLine($"## Amendment {utc:yyyy-MM-dd HH:mm:ss} UTC: search strings used");
+        sb.AppendLine();
+        sb.AppendLine(reviewedByReviewer
+            ? "The person running the review saw the extra search strings before the run and approved or edited them."
+            : "The extra search strings were proposed by the language model during the run.");
         sb.AppendLine();
         foreach (var s in searchStrings) sb.AppendLine($"- \"{s}\"");
         return sb.ToString();

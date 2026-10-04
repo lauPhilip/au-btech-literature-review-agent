@@ -20,6 +20,8 @@ public class ScreeningAnswer
     public string BriefSummary { get; set; } = "";
     /// <summary>high, medium or low (older fakes and models may leave it out).</summary>
     public string? Confidence { get; set; }
+    /// <summary>Only for Excluded: one of ExclusionReasons.ModelKeys (optional, so older answers stay valid).</summary>
+    public string? ExclusionReason { get; set; }
 
     public bool IsIncluded => Decision.Equals("Included", StringComparison.OrdinalIgnoreCase);
 
@@ -30,6 +32,8 @@ public class ScreeningAnswer
         if (string.IsNullOrWhiteSpace(a.Reasoning)) return "reasoning must not be empty.";
         if (!string.IsNullOrWhiteSpace(a.Confidence) && !LlmJson.OneOf(a.Confidence, "high", "medium", "low"))
             return "confidence must be \"high\", \"medium\" or \"low\".";
+        if (!a.IsIncluded && !string.IsNullOrWhiteSpace(a.ExclusionReason) && !ExclusionReasons.ModelKeys.Contains(a.ExclusionReason.Trim().ToLowerInvariant()))
+            return $"exclusionReason must be one of {string.Join(", ", ExclusionReasons.ModelKeys.Select(k => $"\"{k}\""))}.";
         return null;
     }
 
@@ -39,6 +43,7 @@ public class ScreeningAnswer
         Reasoning = Reasoning.Trim(),
         BriefSummary = string.IsNullOrWhiteSpace(BriefSummary) ? "N/A" : BriefSummary.Trim(),
         Confidence = string.IsNullOrWhiteSpace(Confidence) ? null : Confidence.Trim().ToLowerInvariant(),
+        ExclusionReason = IsIncluded || string.IsNullOrWhiteSpace(ExclusionReason) ? null : ExclusionReason.Trim().ToLowerInvariant(),
     };
 }
 
@@ -49,7 +54,7 @@ public partial class PrismaReviewEngine
     /// Part of the screening cache key: change it whenever a screening prompt changes, so decisions made
     /// with an older prompt are never reused.
     /// </summary>
-    public const string ScreeningPromptVersion = "screening-v4";
+    public const string ScreeningPromptVersion = "screening-v5";
 
     private sealed record ScreeningOutcome(
         AcademicPaper Paper,
@@ -167,7 +172,7 @@ public partial class PrismaReviewEngine
             stats.Screened++;
             state.Phases.Screening.Add(Log("Excluded",
                 "Excluded during post-retrieval pre-screening: Document was classified as an un-reviewed preprint or working paper, violating the active Peer-Reviewed Only configuration threshold.",
-                "N/A"));
+                "N/A") with { ExclusionReason = ExclusionReasons.NotPeerReviewed });
             return;
         }
         if (state.PeerReviewOnlyToggle) stats.PassedPeerReviewCheck++;
@@ -209,6 +214,7 @@ public partial class PrismaReviewEngine
             Confidence = confidence,
             Uncertain = uncertain,
             FromCache = o.CacheHits > 0 && o.CacheHits == (second == null ? 1 : 2),
+            ExclusionReason = decision == "Excluded" ? first.ExclusionReason ?? second?.ExclusionReason ?? ExclusionReasons.Unspecified : null,
         });
     }
 
@@ -249,12 +255,14 @@ public partial class PrismaReviewEngine
               1. Check each exclusion threshold. If one clearly applies, the decision is Excluded.
               2. Otherwise decide Included only if the record gives positive evidence that it meets the inclusion thresholds.
               3. If the title and abstract are too thin to judge, decide on what is there and set confidence to "low".
+              4. If Excluded, name the main reason: "exclusion-matched", "off-topic", "inclusion-not-met" or "too-little-information".
               """
             : """
               TASK:
               1. Determine if it should be Included or Excluded.
               2. Create a brief 1-2 sentence executive summary of the paper.
               3. Say how confident you are: "high", "medium" or "low" (low when the abstract is too thin to judge).
+              4. If Excluded, name the main reason: "off-topic" (not about the review's subject), "inclusion-not-met" (on topic but misses an inclusion threshold), "exclusion-matched" (an exclusion threshold applies) or "too-little-information" (the record is too thin to show it qualifies).
               """;
 
         var prompt = $$"""
@@ -275,7 +283,7 @@ public partial class PrismaReviewEngine
             (The reference string is built separately from the source metadata - do not write one.)
 
             Respond ONLY with a valid minified JSON object matching this structure exactly:
-            {"decision":"Included or Excluded","reasoning":"Why it meets inclusion or hits exclusion parameters.","briefSummary":"The 1-2 sentence executive summary.","confidence":"high, medium or low"}
+            {"decision":"Included or Excluded","reasoning":"Why it meets inclusion or hits exclusion parameters.","briefSummary":"The 1-2 sentence executive summary.","confidence":"high, medium or low","exclusionReason":"only when Excluded: off-topic, inclusion-not-met, exclusion-matched or too-little-information"}
             """;
 
         var answer = await LlmJson.GetAsync<ScreeningAnswer>(chatService, prompt, JsonMode(0.0), ScreeningAnswer.Validate);
@@ -404,6 +412,7 @@ public partial class PrismaReviewEngine
             {
                 ModelDecision = log.Decision,
                 Decision = d.Decision,
+                ExclusionReason = d.Decision == "Excluded" ? ExclusionReasons.ByReviewer : null,
                 HumanReviewed = true,
                 HumanNote = note,
                 BriefSummary = log.BriefSummary == "N/A" ? "(Included by the human reviewer; no model summary was produced.)" : log.BriefSummary,

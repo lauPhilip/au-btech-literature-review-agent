@@ -37,6 +37,12 @@ public class ReviewState
     // actually issued against every source, kept here so the run is auditable end-to-end.
     public List<string> SearchPerspectives { get; set; } = new();
 
+    // True when the reviewer saw and approved (or edited) the extra search strings before the run.
+    public bool SearchStringsReviewed { get; set; }
+
+    // Per search string, in the order they were run: records retrieved and how many no earlier string had found.
+    public List<SearchStringYield> SearchStringYields { get; set; } = new();
+
     // Which gateways the user ticked for this run, and which ticked gateways could not be queried
     // because no API key was available. Feeds the deterministic PRISMA Item 6 text.
     public List<string> SelectedSources { get; set; } = new();
@@ -198,7 +204,9 @@ public record ScreeningLog(
     // True when the decision was reused from the screening cache (same paper, criteria, model and prompt).
     bool FromCache = false,
     // "database search" or "citation chaining".
-    string Origin = "database search"
+    string Origin = "database search",
+    // For excluded records: the group of reasons (see ExclusionReasons), for the funnel and PRISMA item 16a.
+    string? ExclusionReason = null
 );
 
 // ─── PLATFORM SEARCH METRIC DATA CONTAINER ──────────────────────────
@@ -322,7 +330,10 @@ public record ReviewRequest(
     bool HumanScreeningReview = false,
     bool DualScreening = true,     // screen every record twice with two independent prompts
     bool CitationChaining = false, // add references and citing papers of included studies (OpenAlex)
-    string ArtifactKind = ArtifactKinds.ConceptMap // what to build from the findings (see ArtifactKinds)
+    string ArtifactKind = ArtifactKinds.ConceptMap, // what to build from the findings (see ArtifactKinds)
+    // The extra search strings the reviewer saw and approved before the run (the primary query is not repeated
+    // here). null: the model proposes them during the run; an empty list: only the primary query is searched.
+    IReadOnlyList<string>? SearchStrings = null
 );
 
 /// <summary>A record that was found but removed before screening, and why (written to the run ledger).</summary>

@@ -40,6 +40,9 @@ public static class ReviewInputGuard
     public const int MaxObjective = 1500;
     public const int MaxCriteria = 2500;
     public const int MaxDirective = 1500;
+    public const int MaxSearchString = 200;
+    /// <summary>Extra search strings besides the primary query.</summary>
+    public const int MaxSearchStrings = 4;
 
     // Patterns that are ordinary in eligibility criteria and would flag almost every honest input.
     private static readonly HashSet<string> NotFlaggedForReviewers = new() { "demands-inclusion", "claims-criteria-met" };
@@ -92,6 +95,16 @@ public static class ReviewInputGuard
             Exclusion = Field("Exclusion criteria", request.Exclusion, MaxCriteria, singleLine: false, required: false),
             SynthesisDirective = Field("Artifact target", request.SynthesisDirective, MaxDirective, singleLine: false, required: false),
         };
+        if (request.SearchStrings != null)
+        {
+            var strings = request.SearchStrings
+                .Select((s, i) => Field($"Search string {i + 2}", s, MaxSearchString, singleLine: true, required: false))
+                .Where(s => s.Length > 0 && !s.Equals(cleaned.Query, StringComparison.OrdinalIgnoreCase))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            if (strings.Count > MaxSearchStrings) errors.Add($"There are {strings.Count} extra search strings; the limit is {MaxSearchStrings}.");
+            cleaned = cleaned with { SearchStrings = strings };
+        }
         return new InputCheck(cleaned, errors, flags);
     }
 
