@@ -33,7 +33,15 @@ public static class SiteSeo
         ("/review", "monthly", "0.8"),
         ("/metrics", "daily", "0.5"),
         ("/glossary", "monthly", "0.4"),
+        ("/about", "monthly", "0.6"),
+        ("/model-card", "monthly", "0.5"),
+        ("/privacy", "yearly", "0.3"),
+        ("/verify", "yearly", "0.3"),
     };
+
+    public const string RepositoryUrl = "https://github.com/lauPhilip/au-btech-literature-review-agent";
+    public const string Organisation = "Department of Business Development and Technology, Aarhus University";
+    public const string Authors = "Philip S. P. Ø. O. Lau and Nidhi";
 
     /// <summary>
     /// The site's public address without a trailing slash: Site:PublicUrl when set (recommended behind a proxy
@@ -103,14 +111,87 @@ public static class SiteSeo
             ["isAccessibleForFree"] = true,
             ["license"] = "https://www.apache.org/licenses/LICENSE-2.0",
             ["offers"] = new Dictionary<string, object> { ["@type"] = "Offer", ["price"] = "0", ["priceCurrency"] = "EUR" },
-            ["sameAs"] = new[] { "https://github.com/lauPhilip/au-btech-literature-review-agent" },
-            ["creator"] = new Dictionary<string, object>
-            {
-                ["@type"] = "Organization",
-                ["name"] = "Department of Business Development and Technology, Aarhus University",
-                ["url"] = "https://btech.au.dk/en/",
-            },
+            ["sameAs"] = new[] { RepositoryUrl },
+            ["creator"] = Creator(),
         };
-        return JsonSerializer.Serialize(data).Replace("<", "\\u003c", StringComparison.Ordinal);
+        return Serialize(data);
     }
+
+    /// <summary>JSON for a script element: "&lt;" escaped so the text can never close the element it sits in.</summary>
+    private static string Serialize(object data) =>
+        JsonSerializer.Serialize(data).Replace("<", "\\u003c", StringComparison.Ordinal);
+
+    private static Dictionary<string, object> Creator() => new()
+    {
+        ["@type"] = "Organization",
+        ["name"] = Organisation,
+        ["url"] = "https://btech.au.dk/en/",
+    };
+
+    /// <summary>The trail from the start page to this page, for search results (schema.org BreadcrumbList).</summary>
+    public static string BreadcrumbJsonLd(string baseUrl, IReadOnlyList<(string Name, string Path)> trail) => Serialize(new Dictionary<string, object>
+    {
+        ["@context"] = "https://schema.org",
+        ["@type"] = "BreadcrumbList",
+        ["itemListElement"] = trail.Select((t, i) => new Dictionary<string, object>
+        {
+            ["@type"] = "ListItem",
+            ["position"] = i + 1,
+            ["name"] = t.Name,
+            ["item"] = Absolute(baseUrl, t.Path),
+        }).ToList(),
+    });
+
+    /// <summary>The public run metrics as a dataset (schema.org Dataset): what is measured, by whom, under which licence.</summary>
+    public static string DatasetJsonLd(string baseUrl, int runs) => Serialize(new Dictionary<string, object>
+    {
+        ["@context"] = "https://schema.org",
+        ["@type"] = "Dataset",
+        ["name"] = "TraceableAI run quality metrics",
+        ["description"] = "Citation-check verdicts, coverage, full-text share, agreement (Cohen's kappa) and cost of every completed " +
+                          $"TraceableAI review on this server ({runs} runs), grouped by app version and settings. No research questions or paper text are stored.",
+        ["url"] = Absolute(baseUrl, "/metrics"),
+        ["isAccessibleForFree"] = true,
+        ["license"] = "https://www.apache.org/licenses/LICENSE-2.0",
+        ["creator"] = Creator(),
+        ["variableMeasured"] = new[]
+        {
+            "Share of supported citations", "Share of partly supported citations", "Share of not supported citations",
+            "Share of included studies cited", "Share of studies read in full text", "Cohen's kappa of the theme coding",
+            "Model calls per run", "Minutes per run",
+        },
+        ["measurementTechnique"] = "Automated citation support check against the cited paper, with verbatim quote verification",
+    });
+
+    /// <summary>The OSSYM 2026 paper describing the tool (schema.org ScholarlyArticle).</summary>
+    public static string ScholarlyArticleJsonLd(string baseUrl) => Serialize(new Dictionary<string, object>
+    {
+        ["@context"] = "https://schema.org",
+        ["@type"] = "ScholarlyArticle",
+        ["headline"] = "TraceableAI: An Open-Source Agentic Framework for PRISMA-Compliant Literature Synthesis",
+        ["author"] = new[]
+        {
+            new Dictionary<string, object> { ["@type"] = "Person", ["name"] = "Philip S. P. Ø. O. Lau", ["affiliation"] = Creator() },
+            new Dictionary<string, object> { ["@type"] = "Person", ["name"] = "Nidhi" },
+        },
+        ["datePublished"] = "2026",
+        ["isPartOf"] = new Dictionary<string, object>
+        {
+            ["@type"] = "PublicationEvent",
+            ["name"] = "8th International Open Search Symposium (OSSYM 2026)",
+        },
+        ["about"] = new Dictionary<string, object> { ["@type"] = "SoftwareApplication", ["name"] = SiteName, ["url"] = Absolute(baseUrl, "/") },
+        ["url"] = Absolute(baseUrl, "/about"),
+    });
+
+    /// <summary>
+    /// /.well-known/security.txt (RFC 9116): where to report a vulnerability. Expires must be less than a year
+    /// ahead, so it is computed when served instead of being written down once and forgotten.
+    /// </summary>
+    public static string SecurityTxt(string baseUrl, DateTime utcNow) =>
+        $"Contact: {RepositoryUrl}/security/advisories/new\n" +
+        $"Expires: {utcNow.Date.AddDays(180):yyyy-MM-dd}T00:00:00.000Z\n" +
+        "Preferred-Languages: en, da\n" +
+        $"Canonical: {Absolute(baseUrl, ".well-known/security.txt")}\n" +
+        $"Policy: {RepositoryUrl}/blob/master/SECURITY.md\n";
 }
