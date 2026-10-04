@@ -13,7 +13,7 @@
 <SiteHeader Active="metrics" />
 
 <div class="flex-1 min-h-0 overflow-y-auto">
-<main class="max-w-7xl mx-auto px-4 sm:px-6 py-6 font-sans text-gray-800 space-y-6">
+<main id="main" tabindex="-1" class="max-w-7xl mx-auto px-4 sm:px-6 py-6 font-sans text-gray-800 space-y-6">
     <div>
         <h1 class="ui-h2">Run quality metrics</h1>
         <p class="text-xs text-gray-600 mt-1 max-w-3xl">
@@ -81,8 +81,8 @@
                     <thead class="bg-gray-50 text-gray-600 text-left">
                         <tr>
                             <th class="p-1.5">Version</th><th class="p-1.5">Settings</th><th class="p-1.5">Runs</th><th class="p-1.5">Studies cited</th>
-                            <th class="p-1.5">Supported (before)</th><th class="p-1.5">Partly</th><th class="p-1.5">Not supported</th><th class="p-1.5">Abstract only</th>
-                            <th class="p-1.5">Full text</th><th class="p-1.5">Coding kappa</th><th class="p-1.5">Calls / run</th><th class="p-1.5">Minutes / run</th>
+                            <th class="p-1.5">Supported (before)</th><th class="p-1.5">Partly</th><th class="p-1.5">Not supported</th><th class="p-1.5"><Term Key="abstract-only" Below="true">Abstract only</Term></th>
+                            <th class="p-1.5">Full text</th><th class="p-1.5"><Term Key="kappa" Below="true">Coding kappa</Term></th><th class="p-1.5">Calls / run</th><th class="p-1.5">Minutes / run</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -93,9 +93,9 @@
                                 <td class="p-1.5 font-mono" title="@g.SettingsText">@g.Fingerprint</td>
                                 <td class="p-1.5">@g.Runs</td>
                                 <td class="p-1.5">@Pct(g.Coverage)</td>
-                                <td class="p-1.5">@Pct(g.Final.SupportedShare) <span class="text-gray-400">(@Pct(g.Initial.SupportedShare))</span></td>
-                                <td class="p-1.5">@Pct(g.Final.PartialShare) <span class="text-gray-400">(@Pct(g.Initial.PartialShare))</span></td>
-                                <td class="p-1.5">@Pct(g.Final.NotSupportedShare) <span class="text-gray-400">(@Pct(g.Initial.NotSupportedShare))</span></td>
+                                <td class="p-1.5">@Pct(g.Final.SupportedShare) <span class="text-gray-500">(@Pct(g.Initial.SupportedShare))</span></td>
+                                <td class="p-1.5">@Pct(g.Final.PartialShare) <span class="text-gray-500">(@Pct(g.Initial.PartialShare))</span></td>
+                                <td class="p-1.5">@Pct(g.Final.NotSupportedShare) <span class="text-gray-500">(@Pct(g.Initial.NotSupportedShare))</span></td>
                                 <td class="p-1.5">@Pct(g.Final.InsufficientShare)</td>
                                 <td class="p-1.5">@Pct(g.FullText)</td>
                                 <td class="p-1.5">@(g.CodingKappa is double k ? k.ToString("0.00", CultureInfo.InvariantCulture) : "-")</td>
@@ -145,7 +145,7 @@
                                     }
                                     else
                                     {
-                                        <span class="text-gray-400" title="Run reports are private to the person who ran them">–</span>
+                                        <span class="text-gray-500" title="Run reports are private to the person who ran them">–</span>
                                     }
                                 </td>
                             </tr>
@@ -185,7 +185,7 @@
             </section>
         }
 
-        <p class="text-[10px] text-gray-400">Stored in @Store.FilePath (one JSON object per line); each run's own copy is run-metrics.json in its archive.</p>
+        <p class="text-[10px] text-gray-500">Stored in @Store.FilePath (one JSON object per line); each run's own copy is run-metrics.json in its archive.</p>
     }
 </main>
 </div>

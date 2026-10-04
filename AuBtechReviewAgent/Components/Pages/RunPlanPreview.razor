@@ -2,18 +2,18 @@
    end, so the empty space next to the form explains the tool instead of showing an idle JSON box. *@
 
 @{
-    var steps = new List<(string Title, string Text)>
+    var steps = new List<(string Title, string Text, string? Key)>
     {
-        ("Protocol", "Your question and criteria are written down before anything is searched, with a fingerprint."),
-        ("Search", $"{SourceCount} source{(SourceCount == 1 ? "" : "s")}, your query plus up to three extra phrasings{(YearFrom > 0 ? $", {YearFrom}–{YearTo}" : "")}."),
-        ("Screening", DualScreening ? "Every record is screened twice by independent prompts; disagreements are kept and flagged." : "Every record is screened against your criteria."),
+        ("Protocol", "Your question and criteria are written down before anything is searched, with a fingerprint.", "protocol"),
+        ("Search", $"{SourceCount} source{(SourceCount == 1 ? "" : "s")}, your query plus up to three extra phrasings{(YearFrom > 0 ? $", {YearFrom}–{YearTo}" : "")}.", "records"),
+        ("Screening", DualScreening ? "Every record is screened twice by independent prompts; disagreements are kept and flagged." : "Every record is screened against your criteria.", DualScreening ? "dual-screening" : "screening"),
     };
-    if (CitationChaining) steps.Add(("Citation chaining", "References and citing papers of the included studies are screened too."));
-    if (HumanReview) steps.Add(("Your check", "The run pauses so you can include or exclude papers yourself."));
-    steps.Add(("Evidence", "Open-access full texts are read; each study is extracted and appraised, every value with a verified quote."));
-    steps.Add(("Writing", "Findings are coded into themes and written up theme by theme, then discussed."));
-    if (ArtifactLabel != null) steps.Add(("Artifact", $"{ArtifactLabel}, built only from the findings."));
-    steps.Add(("Checking", "Every citation is compared with the cited paper; weak ones get a second check and are repaired."));
+    if (CitationChaining) steps.Add(("Citation chaining", "References and citing papers of the included studies are screened too.", "citation-chaining"));
+    if (HumanReview) steps.Add(("Your check", "The run pauses so you can include or exclude papers yourself.", null));
+    steps.Add(("Evidence", "Open-access full texts are read; each study is extracted and appraised, every value with a verified quote.", "mmat"));
+    steps.Add(("Writing", "Findings are coded into themes and written up theme by theme, then discussed.", "thematic-synthesis"));
+    if (ArtifactLabel != null) steps.Add(("Artifact", $"{ArtifactLabel}, built only from the findings.", "artifact"));
+    steps.Add(("Checking", "Every citation is compared with the cited paper; weak ones get a second check and are repaired.", "supported"));
 }
 
 <div class="flex-1 min-h-0 overflow-y-auto p-5 space-y-5 text-left font-sans">
@@ -25,11 +25,12 @@
     <ol class="space-y-3">
         @for (int i = 0; i < steps.Count; i++)
         {
+            var step = steps[i]; // a copy: the tooltip content renders later, after the loop has moved on
             <li class="flex gap-3">
                 <span class="flex-none w-6 h-6 rounded-full bg-brand/10 text-brand text-[11px] font-semibold flex items-center justify-center">@(i + 1)</span>
                 <span class="text-xs leading-snug">
-                    <span class="font-semibold text-gray-900">@steps[i].Title</span>
-                    <span class="text-gray-600"> · @steps[i].Text</span>
+                    <span class="font-semibold text-gray-900">@if (step.Key is { } key) { <Term Key="@key" Below="true">@step.Title</Term> } else { @step.Title }</span>
+                    <span class="text-gray-600"> · @step.Text</span>
                 </span>
             </li>
         }

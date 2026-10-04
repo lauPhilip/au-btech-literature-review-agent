@@ -32,6 +32,7 @@ public static class SiteSeo
         ("/", "monthly", "1.0"),
         ("/review", "monthly", "0.8"),
         ("/metrics", "daily", "0.5"),
+        ("/glossary", "monthly", "0.4"),
     };
 
     /// <summary>

@@ -18,14 +18,14 @@
 
 <SiteHeader Active="dashboard" DashboardHref="@(hasRun ? $"/review/{currentSessionId}" : "/review")" OutputHref="@(hasRun ? $"/spec-matrix/{currentSessionId}" : "/spec-matrix")" />
 
-<div class="flex-1 min-h-0 overflow-y-auto" id="dashboard-scroll">
+<main id="main" tabindex="-1" class="flex-1 min-h-0 overflow-y-auto">
 <div class="max-w-7xl w-full mx-auto p-4 lg:p-6 space-y-4">
 
     @* Toolbar: what this page is, and the account details in small print (they matter less than the question). *@
     <div class="flex flex-wrap items-end justify-between gap-3">
         <div>
             <h1 class="ui-h2">@(Composing ? "New review" : "Your review")</h1>
-            <p class="text-sm text-gray-500 mt-1">A PRISMA 2020 review in which every citation is checked against the paper it cites.</p>
+            <p class="text-sm text-gray-500 mt-1">A <Term Key="prisma" Below="true">PRISMA 2020</Term> review in which every citation is checked against the paper it cites. <a href="/glossary" class="text-brand underline underline-offset-2">Glossary</a></p>
         </div>
         <div class="flex items-center gap-2">
             @{
@@ -102,44 +102,44 @@
                                     <button type="button" @onclick="LoadExample" class="text-xs text-brand font-medium hover:underline">Try an example</button>
                                 </div>
                                 <div>
-                                    <label for="f-query" class="@LabelClass">Search query</label>
-                                    <input id="f-query" type="text" maxlength="@AuBtechReviewAgent.ReviewInputGuard.MaxQuery" @bind="searchQuery" @bind:event="oninput"
+                                    <label for="f-query" class="@LabelClass">Search query <span class="font-normal text-gray-500">(required)</span></label>
+                                    <input id="f-query" type="text" aria-required="true" aria-describedby="h-query" aria-invalid="@Invalid("Search query")" maxlength="@AuBtechReviewAgent.ReviewInputGuard.MaxQuery" @bind="searchQuery" @bind:event="oninput"
                                            placeholder="e.g. agentic AI software frameworks" class="@InputClass" />
-                                    @Help("The words sent to the databases. Short and specific works best.", searchQuery, AuBtechReviewAgent.ReviewInputGuard.MaxQuery)
+                                    @Help("h-query", "The words sent to the databases. Short and specific works best.", searchQuery, AuBtechReviewAgent.ReviewInputGuard.MaxQuery)
                                 </div>
                                 <div>
                                     <label for="f-objective" class="@LabelClass">Review objective</label>
-                                    <textarea id="f-objective" rows="3" maxlength="@AuBtechReviewAgent.ReviewInputGuard.MaxObjective" @bind="reviewObjective" @bind:event="oninput"
+                                    <textarea id="f-objective" rows="3" aria-describedby="h-objective" aria-invalid="@Invalid("Review objective")" maxlength="@AuBtechReviewAgent.ReviewInputGuard.MaxObjective" @bind="reviewObjective" @bind:event="oninput"
                                               placeholder="e.g. Which safety mechanisms do agent frameworks use, and how are they evaluated?" class="@InputClass resize-y"></textarea>
-                                    @Help("The question the review answers. It guides the themes and the discussion.", reviewObjective, AuBtechReviewAgent.ReviewInputGuard.MaxObjective)
+                                    @Help("h-objective", "The question the review answers. It guides the themes and the discussion.", reviewObjective, AuBtechReviewAgent.ReviewInputGuard.MaxObjective)
                                 </div>
                                 break;
 
                             case 2:
                                 <div>
-                                    <label for="f-inclusion" class="@LabelClass">Include studies that…</label>
-                                    <textarea id="f-inclusion" rows="3" maxlength="@AuBtechReviewAgent.ReviewInputGuard.MaxCriteria" @bind="inclusionCriteria" @bind:event="oninput"
+                                    <label for="f-inclusion" class="@LabelClass">Include studies that… <span class="font-normal text-gray-500">(required)</span></label>
+                                    <textarea id="f-inclusion" rows="3" aria-required="true" aria-describedby="h-inclusion" aria-invalid="@Invalid("Inclusion criteria")" maxlength="@AuBtechReviewAgent.ReviewInputGuard.MaxCriteria" @bind="inclusionCriteria" @bind:event="oninput"
                                               placeholder="e.g. describe or evaluate an agent framework, with some form of evaluation" class="@InputClass resize-y"></textarea>
-                                    @Help("What a study must be about or contain.", inclusionCriteria, AuBtechReviewAgent.ReviewInputGuard.MaxCriteria)
+                                    @Help("h-inclusion", "What a study must be about or contain.", inclusionCriteria, AuBtechReviewAgent.ReviewInputGuard.MaxCriteria)
                                 </div>
                                 <div>
                                     <label for="f-exclusion" class="@LabelClass">Exclude studies that…</label>
-                                    <textarea id="f-exclusion" rows="2" maxlength="@AuBtechReviewAgent.ReviewInputGuard.MaxCriteria" @bind="exclusionCriteria" @bind:event="oninput"
+                                    <textarea id="f-exclusion" rows="2" aria-describedby="h-exclusion" aria-invalid="@Invalid("Exclusion criteria")" maxlength="@AuBtechReviewAgent.ReviewInputGuard.MaxCriteria" @bind="exclusionCriteria" @bind:event="oninput"
                                               placeholder="e.g. are about agriculture or marketing, or are opinion pieces without evidence" class="@InputClass resize-y"></textarea>
-                                    @Help("What rules a study out. Optional.", exclusionCriteria, AuBtechReviewAgent.ReviewInputGuard.MaxCriteria)
+                                    @Help("h-exclusion", "What rules a study out. Optional.", exclusionCriteria, AuBtechReviewAgent.ReviewInputGuard.MaxCriteria)
                                 </div>
                                 <fieldset>
                                     <legend class="@LabelClass">Publication years</legend>
                                     <div class="flex items-center gap-2">
                                         <input type="number" aria-label="From year" min="1900" max="@DateTime.UtcNow.Year" @bind="yearFrom" class="@InputClass w-28" />
-                                        <span class="text-gray-400" aria-hidden="true">–</span>
+                                        <span class="text-gray-500" aria-hidden="true">–</span>
                                         <input type="number" aria-label="To year" min="1900" max="@DateTime.UtcNow.Year" @bind="yearTo" class="@InputClass w-28" />
                                     </div>
                                     <div class="flex flex-wrap gap-1.5 mt-2">
                                         @foreach (var (label, from) in YearPresets)
                                         {
                                             <button type="button" @onclick="() => SetYears(from)"
-                                                    class="text-[11px] rounded-full border px-2.5 py-0.5 @(yearFrom == from && yearTo == DateTime.UtcNow.Year ? "border-brand bg-brand/10 text-brand" : "border-gray-300 text-gray-600 hover:bg-gray-50")">@label</button>
+                                                    class="text-xs rounded-full border px-3 py-1 min-h-[24px] @(yearFrom == from && yearTo == DateTime.UtcNow.Year ? "border-brand bg-brand/10 text-brand" : "border-gray-300 text-gray-600 hover:bg-gray-50")">@label</button>
                                         }
                                     </div>
                                 </fieldset>
@@ -147,7 +147,7 @@
 
                             default:
                                 <div>
-                                    <label for="f-artifact" class="@LabelClass">Artifact built from the findings</label>
+                                    <label for="f-artifact" class="@LabelClass">Artifact built from the findings <Term Key="artifact" Icon="true" /></label>
                                     <select id="f-artifact" value="@State.ArtifactKind" @onchange="HandleArtifactKind" class="@InputClass">
                                         @foreach (var kind in AuBtechReviewAgent.ArtifactKinds.All)
                                         {
@@ -156,19 +156,19 @@
                                     </select>
                                     @if (State.ArtifactKind != AuBtechReviewAgent.ArtifactKinds.None)
                                     {
-                                        <textarea rows="2" aria-label="What the artifact should show" maxlength="@AuBtechReviewAgent.ReviewInputGuard.MaxDirective" @bind="synthesisTargetDirective" @bind:event="oninput"
+                                        <textarea id="f-directive" rows="2" aria-label="What the artifact should show" aria-describedby="h-directive" aria-invalid="@Invalid("Artifact target")" maxlength="@AuBtechReviewAgent.ReviewInputGuard.MaxDirective" @bind="synthesisTargetDirective" @bind:event="oninput"
                                                   placeholder="e.g. a flowchart of how the studies evaluate agent safety, from threat to mitigation" class="@InputClass resize-y mt-2"></textarea>
-                                        @Help("Built after the analysis, only from what the review found; what it cites is checked like the text.", synthesisTargetDirective, AuBtechReviewAgent.ReviewInputGuard.MaxDirective)
+                                        @Help("h-directive", "Built after the analysis, only from what the review found; what it cites is checked like the text.", synthesisTargetDirective, AuBtechReviewAgent.ReviewInputGuard.MaxDirective)
                                     }
                                 </div>
 
-                                <fieldset>
-                                    <legend class="@LabelClass">Sources</legend>
+                                <fieldset id="f-sources" tabindex="-1">
+                                    <legend class="@LabelClass">Sources <span class="font-normal text-gray-500">(at least one)</span></legend>
                                     <div class="grid grid-cols-2 gap-x-3 gap-y-1.5">
                                         @foreach (var source in AuBtechReviewAgent.SourceCatalog.All)
                                         {
                                             bool available = sourceAvailability.TryGetValue(source.Key, out var ok) && ok;
-                                            <label class="flex items-center gap-2 text-sm select-none @(available ? "text-gray-800 cursor-pointer" : "text-gray-400 cursor-not-allowed")"
+                                            <label class="flex items-center gap-2 text-sm select-none @(available ? "text-gray-800 cursor-pointer" : "text-gray-500 cursor-not-allowed")"
                                                    title="@(available ? "" : $"Needs an {source.KeyLabel}. Add one under API keys.")">
                                                 <input type="checkbox" class="w-4 h-4 accent-brand"
                                                        checked="@(available && State.SelectedSources.Contains(source.Key))"
@@ -191,10 +191,10 @@
                                         <span class="text-[11px] text-gray-500">@AdvancedSummary()</span>
                                     </summary>
                                     <div class="px-3 pb-3 space-y-3 border-t border-gray-100 pt-3">
-                                        @Option("Screen every record twice", "Two independent screening prompts; disagreements are kept and flagged, and the agreement (Cohen's kappa) is reported.", State.DualScreening, v => State.DualScreening = v)
-                                        @Option("Citation chaining", "Also screen the papers the included studies cite and the papers citing them (one round, via OpenAlex).", State.CitationChaining, v => State.CitationChaining = v)
-                                        @Option("Let me check the screening decisions", "The run pauses after screening so you can include or exclude papers yourself.", State.ReviewScreeningFirst, v => State.ReviewScreeningFirst = v)
-                                        @Option("Peer-reviewed only", "Leave out preprints and working papers before screening.", requirePeerReview, v => requirePeerReview = v)
+                                        @Option("o-dual", "dual-screening", "Screen every record twice", "Two independent screening prompts; disagreements are kept and flagged, and the agreement (Cohen's kappa) is reported.", State.DualScreening, v => State.DualScreening = v)
+                                        @Option("o-chaining", "citation-chaining", "Citation chaining", "Also screen the papers the included studies cite and the papers citing them (one round, via OpenAlex).", State.CitationChaining, v => State.CitationChaining = v)
+                                        @Option("o-check", "screening", "Let me check the screening decisions", "The run pauses after screening so you can include or exclude papers yourself.", State.ReviewScreeningFirst, v => State.ReviewScreeningFirst = v)
+                                        @Option("o-peer", null, "Peer-reviewed only", "Leave out preprints and working papers before screening.", requirePeerReview, v => requirePeerReview = v)
                                         <div class="flex items-center justify-between gap-3">
                                             <label for="f-max" class="text-sm text-gray-800">Records per source
                                                 <span class="block text-xs text-gray-500">@(quotaStatus.Tier == AuBtechReviewAgent.QuotaTier.Free ? $"Free tier: at most {maxResultsCeiling}." : "More records take longer.")</span>
@@ -236,7 +236,14 @@
                         <p class="text-[11px] text-gray-500 truncate" title="@SettingsLine()">@SettingsLine()</p>
                         @if (StartBlocker() is { } blocker)
                         {
-                            <p class="text-[11px] text-amber-800">@blocker</p>
+                            @if (BlockerTarget() != null)
+                            {
+                                <button type="button" @onclick="GoToProblem" class="block text-left text-xs text-amber-800 underline decoration-dotted underline-offset-2 hover:text-amber-900">@blocker</button>
+                            }
+                            else
+                            {
+                                <p class="text-xs text-amber-800">@blocker</p>
+                            }
                         }
                         <div class="flex items-center gap-2">
                             @if (formStep > 1)
@@ -254,7 +261,7 @@
                             }
                             else
                             {
-                                <button type="button" @onclick="StartReviewProcess" disabled="@(isSearching || StartBlocker() != null)"
+                                <button type="button" @onclick="StartOrShowProblem" disabled="@isSearching"
                                         class="ui-btn-primary">Start review</button>
                             }
                         </div>
@@ -306,18 +313,21 @@
         </section>
 
         @* The right side follows the run: what will happen, then the progress, then the result. *@
-        <section id="run-panel" class="lg:col-span-7 lg:sticky lg:top-4 min-w-0 bg-white border border-gray-200 shadow-sm overflow-hidden flex flex-col lg:max-h-[calc(100vh-8rem)]" aria-live="polite">
+        <section id="run-panel" class="lg:col-span-7 lg:sticky lg:top-4 min-w-0 bg-white border border-gray-200 shadow-sm overflow-hidden flex flex-col lg:max-h-[calc(100vh-8rem)]" aria-labelledby="run-panel-title">
+            @* Screen readers hear the step changes and the end of the run, not every percent (WCAG 4.1.3). *@
+            <p class="sr-only" role="status" aria-live="polite">@Announcement()</p>
+            <h2 id="run-panel-title" class="sr-only">@PanelTitle()</h2>
             <div class="flex items-center justify-between border-b border-gray-200 px-3 flex-none">
-                <div class="flex" role="tablist">
-                    <button type="button" role="tab" aria-selected="@(panelTab == "overview")" @onclick="@(() => panelTab = "overview")"
+                <div class="flex" role="group" aria-label="Show">
+                    <button type="button" aria-pressed="@(panelTab == "overview" ? "true" : "false")" @onclick="@(() => panelTab = "overview")"
                             class="px-3 py-2.5 text-xs border-b-2 -mb-px @(panelTab == "overview" ? "border-brand text-brand font-semibold" : "border-transparent text-gray-500 hover:text-gray-800")">@PanelTitle()</button>
                     @if (hasRun && !Composing)
                     {
-                        <button type="button" role="tab" aria-selected="@(panelTab == "ledger")" @onclick="@(() => panelTab = "ledger")"
+                        <button type="button" aria-pressed="@(panelTab == "ledger" ? "true" : "false")" @onclick="@(() => panelTab = "ledger")"
                                 class="px-3 py-2.5 text-xs border-b-2 -mb-px @(panelTab == "ledger" ? "border-brand text-brand font-semibold" : "border-transparent text-gray-500 hover:text-gray-800")">Ledger (JSON)</button>
                     }
                 </div>
-                <span class="text-[10px] text-gray-400 font-mono">@ReviewEngine.Llm.Model</span>
+                <span class="text-[10px] text-gray-500 font-mono">@ReviewEngine.Llm.Model</span>
             </div>
 
             @if (panelTab == "ledger" && hasRun && !Composing)
@@ -354,50 +364,52 @@
         </section>
     </div>
 </div>
-</div>
+</main>
 
 @if (showKeyModal)
 {
-    <div class="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-[100] p-4 font-sans animate-fadeIn">
-        <div class="bg-white border border-gray-200 w-full max-w-md shadow-2xl overflow-hidden flex flex-col text-left">
-            <div class="bg-brand text-white p-4 flex justify-between items-center">
+    @* A modal dialog: Escape closes it, Tab stays inside it, and focus returns to the "API keys" button. *@
+    <div class="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-[100] p-4 font-sans animate-fadeIn" @onkeydown="KeyDialogKeyDown">
+        <div id="key-dialog" role="dialog" aria-modal="true" aria-labelledby="key-dialog-title" aria-describedby="key-dialog-note"
+             class="bg-white border border-gray-200 w-full max-w-md shadow-lift overflow-hidden flex flex-col text-left">
+            <div class="bg-brand text-white px-5 py-4 flex justify-between items-center">
                 <div>
-                    <h3 class="text-sm font-bold tracking-tight uppercase">API keys</h3>
-                    <p class="text-[10px] opacity-70 mt-0.5">Kept only in this browser tab</p>
+                    <h2 id="key-dialog-title" class="text-base font-semibold">API keys</h2>
+                    <p class="text-xs text-white/75 mt-0.5">Kept only in this browser tab</p>
                 </div>
-                <button @onclick="CloseKeyModal" class="text-white/60 hover:text-white transition-colors">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                <button type="button" @onclick="CloseKeyModal" aria-label="Close" class="ui-btn ui-btn-sm text-white/80 hover:text-white hover:bg-white/10 px-2">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
                 </button>
             </div>
-            <div class="p-4 space-y-3 overflow-y-auto text-xs text-gray-700">
-                <div class="bg-blue-50 border border-blue-100 text-blue-800 p-2.5 text-[11px] leading-normal font-light">
+            <div class="p-5 space-y-4 overflow-y-auto text-sm text-gray-700">
+                <p id="key-dialog-note" class="bg-brand-50 border border-brand-100 text-gray-700 p-3 text-xs leading-relaxed">
                     Your keys are kept encrypted in this browser tab only. They are not written to the server's disk or logs, and they are gone when you close the tab. With your own Mistral key the free-tier daily limit does not apply.
+                </p>
+                <div>
+                    <label for="k-mistral" class="ui-label text-xs">Mistral API key</label>
+                    <input id="k-mistral" type="password" autocomplete="off" placeholder="Uses the server key when empty" @bind="modalMistral" class="ui-input font-mono text-xs" />
                 </div>
                 <div>
-                    <label class="block font-bold text-gray-600 mb-1 uppercase text-[10px]">Mistral API key</label>
-                    <input type="password" placeholder="Defaults to server standard key if blank..." @bind="modalMistral" class="w-full p-2 border border-gray-300 font-mono focus:outline-none focus:border-brand" />
+                    <label for="k-elsevier" class="ui-label text-xs">Elsevier (Scopus / ScienceDirect) API key</label>
+                    <input id="k-elsevier" type="password" autocomplete="off" placeholder="Uses the server key when empty" @bind="modalElsevier" class="ui-input font-mono text-xs" />
                 </div>
                 <div>
-                    <label class="block font-bold text-gray-600 mb-1 uppercase text-[10px]">Elsevier (Scopus / ScienceDirect) API key</label>
-                    <input type="password" placeholder="Defaults to server standard key if blank..." @bind="modalElsevier" class="w-full p-2 border border-gray-300 font-mono focus:outline-none focus:border-brand" />
+                    <label for="k-ieee" class="ui-label text-xs">IEEE Xplore API key</label>
+                    <input id="k-ieee" type="password" autocomplete="off" placeholder="Optional" @bind="modalIeee" class="ui-input font-mono text-xs" />
                 </div>
                 <div>
-                    <label class="block font-bold text-gray-600 mb-1 uppercase text-[10px]">IEEE Xplore API key</label>
-                    <input type="password" placeholder="Optional..." @bind="modalIeee" class="w-full p-2 border border-gray-300 font-mono focus:outline-none focus:border-brand" />
+                    <label for="k-scholar" class="ui-label text-xs">Semantic Scholar API key</label>
+                    <input id="k-scholar" type="password" autocomplete="off" placeholder="Optional" @bind="modalScholar" class="ui-input font-mono text-xs" />
                 </div>
-                <div>
-                    <label class="block font-bold text-gray-600 mb-1 uppercase text-[10px]">Semantic Scholar API Key</label>
-                    <input type="password" placeholder="Optional..." @bind="modalScholar" class="w-full p-2 border border-gray-300 font-mono focus:outline-none focus:border-brand" />
-                </div>
-                <div class="pt-2 border-t border-gray-100">
-                    <label class="block font-bold text-gray-600 mb-1 uppercase text-[10px]">Developer Access Token</label>
-                    <input type="password" placeholder="Only for the maintainers of this deployment" @bind="modalAdminToken" class="w-full p-2 border border-gray-300 font-mono focus:outline-none focus:border-brand" />
-                    <p class="text-[10px] text-gray-400 mt-1">Removes the daily run limit. Set with Quota:AdminToken on the server.</p>
+                <div class="pt-3 border-t border-gray-100">
+                    <label for="k-admin" class="ui-label text-xs">Developer access token</label>
+                    <input id="k-admin" type="password" autocomplete="off" aria-describedby="k-admin-help" placeholder="Only for the maintainers of this deployment" @bind="modalAdminToken" class="ui-input font-mono text-xs" />
+                    <p id="k-admin-help" class="text-xs text-gray-500 mt-1">Removes the daily run limit. Set with Quota:AdminToken on the server.</p>
                 </div>
             </div>
-            <div class="bg-gray-50 px-4 py-3 border-t border-gray-200 flex justify-end gap-2">
-                <button @onclick="ClearVault" class="ui-btn ui-btn-sm text-red-700 hover:bg-red-50">Clear session</button>
-                <button @onclick="SaveSessionKeys" class="ui-btn-primary ui-btn-sm">Apply to session</button>
+            <div class="bg-gray-50 px-5 py-3 border-t border-gray-200 flex justify-end gap-2">
+                <button type="button" @onclick="ClearVault" class="ui-btn ui-btn-sm text-red-700 hover:bg-red-50">Clear session</button>
+                <button type="button" @onclick="SaveSessionKeys" class="ui-btn-primary ui-btn-sm">Apply to session</button>
             </div>
         </div>
     </div>
@@ -536,6 +548,67 @@
         return null;
     }
 
+    /// <summary>The form step and field to go to for the current blocker, or null when no field can fix it (quota).</summary>
+    private (int Step, string FieldId)? BlockerTarget()
+    {
+        if (!quotaStatus.Allowed) return null;
+        if (string.IsNullOrWhiteSpace(searchQuery)) return (1, "f-query");
+        if (string.IsNullOrWhiteSpace(inclusionCriteria)) return (2, "f-inclusion");
+        if (SelectedAvailableSources().Count == 0) return (3, "f-sources");
+        return null;
+    }
+
+    // Field to focus after the next render (the step it is on has to be shown first).
+    private string? pendingFocus;
+
+    private void FocusField(int step, string fieldId)
+    {
+        formStep = step;
+        pendingFocus = fieldId;
+    }
+
+    private void GoToProblem()
+    {
+        if (BlockerTarget() is { } target) FocusField(target.Step, target.FieldId);
+    }
+
+    /// <summary>"Start review" is never silently disabled: when something is missing it takes you there instead.</summary>
+    private async Task StartOrShowProblem()
+    {
+        if (StartBlocker() != null)
+        {
+            GoToProblem();
+            return;
+        }
+        await StartReviewProcess();
+    }
+
+    /// <summary>"true" when the last start attempt reported a problem with this field (for aria-invalid).</summary>
+    private string? Invalid(string fieldName) =>
+        inputCheck is { IsValid: false } && inputCheck.Errors.Any(e => e.StartsWith(fieldName, StringComparison.Ordinal)) ? "true" : null;
+
+    // The input guard names fields by these labels; this is where each one lives in the form.
+    private static readonly (string Name, int Step, string FieldId)[] FieldsByName =
+    {
+        ("Search query", 1, "f-query"), ("Review objective", 1, "f-objective"),
+        ("Inclusion criteria", 2, "f-inclusion"), ("Exclusion criteria", 2, "f-exclusion"),
+        ("Artifact target", 3, "f-directive"),
+    };
+
+    private void FocusFirstInvalidField()
+    {
+        if (inputCheck is not { IsValid: false }) return;
+        foreach (var error in inputCheck.Errors)
+        {
+            var field = FieldsByName.FirstOrDefault(f => error.StartsWith(f.Name, StringComparison.Ordinal));
+            if (field.FieldId != null)
+            {
+                FocusField(field.Step, field.FieldId);
+                return;
+            }
+        }
+    }
+
     private string SettingsLine()
     {
         int sources = SelectedAvailableSources().Count;
@@ -558,6 +631,18 @@
 
     private string? ArtifactLabel() => State.ArtifactKind == AuBtechReviewAgent.ArtifactKinds.None
         ? null : AuBtechReviewAgent.ArtifactKinds.All.FirstOrDefault(k => k.Key == State.ArtifactKind).Label;
+
+    /// <summary>One short sentence for the live region: changes only when the step or the outcome changes.</summary>
+    private string Announcement()
+    {
+        if (Composing || !hasRun) return "";
+        if (stage == AuBtechReviewAgent.PrismaReviewEngine.StageComplete) return "The review is complete. The report is ready.";
+        if (stage == AuBtechReviewAgent.PrismaReviewEngine.StageFailed) return "The run failed. " + (failureMessage ?? "");
+        if (stage == AuBtechReviewAgent.PrismaReviewEngine.StageInterrupted) return "The run was interrupted.";
+        if (awaitingReview) return "The run is waiting for you to check the screening decisions.";
+        if (stage == AuBtechReviewAgent.PrismaReviewEngine.StageQueued) return "The run is waiting for a free slot.";
+        return AuBtechReviewAgent.RunProgress.Steps.TryGetValue(State.Stats.ProgressStep, out var step) ? $"Now: {step.Label}." : "The run has started.";
+    }
 
     private string PanelTitle() =>
         Composing ? "Preview"
@@ -775,6 +860,24 @@
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
+        if (pendingFocus is { } fieldId)
+        {
+            pendingFocus = null;
+            try { await JS.InvokeVoidAsync("traceableReview.focus", fieldId); }
+            catch (Exception ex) when (ex is JSException or InvalidOperationException or TaskCanceledException)
+            {
+                Logger.LogDebug("Could not move focus to {Field}: {Message}", fieldId, ex.Message);
+            }
+        }
+        if (keyModalJustOpened)
+        {
+            keyModalJustOpened = false;
+            try { await JS.InvokeVoidAsync("traceableReview.trapFocus", "key-dialog"); }
+            catch (Exception ex) when (ex is JSException or InvalidOperationException or TaskCanceledException)
+            {
+                Logger.LogDebug("Could not move focus into the key dialog: {Message}", ex.Message);
+            }
+        }
         if (firstRender)
         {
             try
@@ -809,8 +912,34 @@
         }
     }
 
-    private void OpenKeyModal() => showKeyModal = true;
-    private void CloseKeyModal() => showKeyModal = false;
+    // Set when the dialog opens, so the next render moves focus into it (OnAfterRenderAsync).
+    private bool keyModalJustOpened;
+
+    private void OpenKeyModal()
+    {
+        showKeyModal = true;
+        keyModalJustOpened = true;
+    }
+
+    private async Task CloseKeyModal()
+    {
+        showKeyModal = false;
+        await ReturnFocusFromDialog();
+    }
+
+    private async Task KeyDialogKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Escape") await CloseKeyModal();
+    }
+
+    private async Task ReturnFocusFromDialog()
+    {
+        try { await JS.InvokeVoidAsync("traceableReview.releaseFocus"); }
+        catch (Exception ex) when (ex is JSException or InvalidOperationException or TaskCanceledException)
+        {
+            Logger.LogDebug("Could not return focus after the key dialog: {Message}", ex.Message);
+        }
+    }
 
     private async Task SaveSessionKeys()
     {
@@ -832,6 +961,7 @@
 
         RefreshQuotaAndSources();
         showKeyModal = false;
+        await ReturnFocusFromDialog();
         StateHasChanged();
     }
 
@@ -844,6 +974,7 @@
         quotaNotice = "";
         RefreshQuotaAndSources();
         showKeyModal = false;
+        await ReturnFocusFromDialog();
         StateHasChanged();
     }
 
@@ -879,11 +1010,14 @@
         if (untouched) synthesisTargetDirective = AuBtechReviewAgent.ArtifactKinds.DefaultInstruction(State.ArtifactKind);
     }
 
-    /// <summary>A short help line under a field; the character count only appears when the text gets near the limit.</summary>
-    private RenderFragment Help(string help, string? value, int max) => __builder =>
+    /// <summary>
+    /// A short help line under a field; the character count only appears when the text gets near the limit.
+    /// The id is what the field's aria-describedby points to, so screen readers read the help with the field.
+    /// </summary>
+    private RenderFragment Help(string id, string help, string? value, int max) => __builder =>
     {
         int length = value?.Length ?? 0;
-        <div class="flex justify-between gap-2 mt-1 text-xs leading-snug">
+        <div id="@id" class="flex justify-between gap-2 mt-1 text-xs leading-snug">
             <span class="text-gray-500">@help</span>
             @if (length > max * 0.8)
             {
@@ -893,14 +1027,24 @@
     };
 
     /// <summary>One switch in the advanced options: label, one line of help, and the checkbox.</summary>
-    private RenderFragment Option(string label, string help, bool value, Action<bool> set) => __builder =>
+    /// <summary>
+    /// One switch in the advanced options: the checkbox, its label, a "?" with the glossary explanation (outside
+    /// the label, so it does not toggle the box) and one line of help that screen readers read with the box.
+    /// </summary>
+    private RenderFragment Option(string id, string? glossaryKey, string label, string help, bool value, Action<bool> set) => __builder =>
     {
-        <label class="flex items-start gap-3 cursor-pointer select-none">
-            <input type="checkbox" checked="@value" disabled="@isSearching" @onchange="e => set(e.Value is true)" class="w-4 h-4 mt-0.5 accent-brand" />
-            <span class="text-sm text-gray-800">@label
-                <span class="block text-xs text-gray-500">@help</span>
-            </span>
-        </label>
+        <div class="flex items-start gap-3">
+            <input id="@id" type="checkbox" checked="@value" disabled="@isSearching" aria-describedby="@($"{id}-help")"
+                   @onchange="e => set(e.Value is true)" class="w-4 h-4 mt-0.5 accent-brand cursor-pointer" />
+            <div class="text-sm text-gray-800">
+                <label for="@id" class="cursor-pointer select-none">@label</label>
+                @if (glossaryKey != null)
+                {
+                    <Term Key="@glossaryKey" Icon="true" />
+                }
+                <span id="@($"{id}-help")" class="block text-xs text-gray-500">@help</span>
+            </div>
+        </div>
     };
 
     private static RenderFragment SettingRow(string label, string? value) => __builder =>
@@ -920,7 +1064,11 @@
         var draft = new AuBtechReviewAgent.ReviewRequest(searchQuery, reviewObjective, inclusionCriteria, exclusionCriteria, maxResults,
             SynthesisDirective: synthesisTargetDirective, ArtifactKind: State.ArtifactKind);
         inputCheck = AuBtechReviewAgent.ReviewInputGuard.Check(draft);
-        if (!inputCheck.IsValid) return;
+        if (!inputCheck.IsValid)
+        {
+            FocusFirstInvalidField();
+            return;
+        }
         string flagSignature = string.Join("|", inputCheck.Flags.Select(f => f.ToString()));
         if (inputCheck.Flags.Count > 0 && confirmedFlagSignature != flagSignature)
         {

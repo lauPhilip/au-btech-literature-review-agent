@@ -45,13 +45,57 @@ public static class LlmJson
         throw new LlmOutputException(lastProblem);
     }
 
-    /// <summary>The first {...} object in a reply, without code fences or surrounding prose.</summary>
+    /// <summary>
+    /// The first complete {...} object in a reply, without code fences or surrounding prose, made parseable:
+    /// <list type="bullet">
+    /// <item>Models often put real line breaks and tabs inside JSON strings (long prose fields), which JSON does
+    /// not allow ("'0x0A' is invalid within a JSON string"). Inside strings they are written as \n, \t etc.,
+    /// which is exactly what the model meant, so nothing is guessed.</item>
+    /// <item>The object ends at its matching closing brace (braces inside strings do not count), so a second
+    /// object or text after the first is ignored ("'{' is invalid after a single JSON value").</item>
+    /// </list>
+    /// When the braces never balance (a cut-off answer), the text up to the last "}" is returned and the
+    /// parser reports the problem as before.
+    /// </summary>
     public static string ExtractObject(string raw)
     {
-        string text = (raw ?? "").Replace("```json", "").Replace("```", "").Trim();
+        string text = raw ?? "";
         int start = text.IndexOf('{');
-        int end = text.LastIndexOf('}');
-        return start >= 0 && end > start ? text.Substring(start, end - start + 1) : text;
+        if (start < 0) return text.Trim();
+
+        var result = new System.Text.StringBuilder(text.Length - start + 16);
+        int depth = 0;
+        bool inString = false, escaped = false;
+        for (int i = start; i < text.Length; i++)
+        {
+            char c = text[i];
+            if (inString)
+            {
+                if (escaped) { escaped = false; result.Append(c); continue; }
+                switch (c)
+                {
+                    case '\\': escaped = true; result.Append(c); break;
+                    case '"': inString = false; result.Append(c); break;
+                    case '\n': result.Append("\\n"); break;
+                    case '\r': result.Append("\\r"); break;
+                    case '\t': result.Append("\\t"); break;
+                    default:
+                        if (c < ' ') result.Append("\\u").Append(((int)c).ToString("x4", System.Globalization.CultureInfo.InvariantCulture));
+                        else result.Append(c);
+                        break;
+                }
+                continue;
+            }
+            result.Append(c);
+            if (c == '"') inString = true;
+            else if (c == '{') depth++;
+            else if (c == '}' && --depth == 0) return result.ToString();
+        }
+
+        // Unbalanced: keep the old behaviour (up to the last brace) so the error message stays meaningful.
+        string escapedText = result.ToString();
+        int end = escapedText.LastIndexOf('}');
+        return end > 0 ? escapedText.Substring(0, end + 1) : escapedText;
     }
 
     public static bool OneOf(string? value, params string[] allowed) =>

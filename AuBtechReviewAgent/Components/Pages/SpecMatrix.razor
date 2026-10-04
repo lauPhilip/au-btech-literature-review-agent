@@ -27,7 +27,7 @@
 
 <div class="print:hidden"><SiteHeader Active="output" DashboardHref="@(State.CurrentSessionId != Guid.Empty ? $"/review/{State.CurrentSessionId}" : "/review")" OutputHref="@(State.CurrentSessionId != Guid.Empty ? $"/spec-matrix/{State.CurrentSessionId}" : "/spec-matrix")" /></div>
 
-<div class="w-full bg-gray-100 p-4 md:p-8 flex flex-col items-center justify-start min-h-screen overflow-y-auto print:bg-white print:p-0 pb-16">
+<main id="main" tabindex="-1" class="w-full bg-gray-100 p-4 md:p-8 flex flex-col items-center justify-start min-h-screen overflow-y-auto print:bg-white print:p-0 pb-16">
 
     @if (HasReport)
     {
@@ -101,7 +101,7 @@
                 <div class="text-xs font-medium text-gray-600 font-sans">
                     Department of Business Development and Technology, Aarhus University
                 </div>
-                <div class="text-[10px] text-gray-400 font-mono">
+                <div class="text-[10px] text-gray-500 font-mono">
                     Protocol Hash: @(string.IsNullOrWhiteSpace(report.ProtocolHash) ? "not recorded" : report.ProtocolHash) | Generated: @report.GeneratedAt
                 </div>
                 <hr class="border-gray-300 my-4" />
@@ -275,7 +275,7 @@
                                     <div class="flex items-center gap-1"><div class="w-2.5 h-2.5 @share.Color "></div> @share.Label (@share.Count)</div>
                                 }
                             </div>
-                            <p class="text-[9px] text-gray-400">Quartiles from SCImago Journal Rank (SJR), exact title match only.</p>
+                            <p class="text-[9px] text-gray-500">Quartiles from SCImago Journal Rank (SJR), exact title match only.</p>
                         </div>
                     </div>
                 </div>
@@ -340,7 +340,7 @@
                                             }
                                             else
                                             {
-                                                <td class="p-2 border-r border-gray-150 align-top">@e.StudyType<span class="block text-[9px] text-gray-400">@e.EvidenceBasis</span></td>
+                                                <td class="p-2 border-r border-gray-150 align-top">@e.StudyType<span class="block text-[9px] text-gray-500">@e.EvidenceBasis</span></td>
                                                 <td class="p-2 border-r border-gray-150 align-top">@Evidence(e.Method)</td>
                                                 <td class="p-2 border-r border-gray-150 align-top">@Evidence(e.Sample)</td>
                                                 <td class="p-2 align-top space-y-1">
@@ -383,7 +383,7 @@
                                                 @for (int i = 0; i < 5; i++)
                                                 {
                                                     var a = i < e.Appraisal.Count ? e.Appraisal[i] : null;
-                                                    <td class="p-2 border-r border-gray-150 text-center font-mono @(a?.Answer switch { "yes" => "text-green-700", "no" => "text-red-700", _ => "text-gray-400" })"
+                                                    <td class="p-2 border-r border-gray-150 text-center font-mono @(a?.Answer switch { "yes" => "text-green-700", "no" => "text-red-700", _ => "text-gray-500" })"
                                                         title="@(a == null ? "" : $"{a.Id} {a.Criterion}{(string.IsNullOrEmpty(a.Quote) ? "" : $" — \"{a.Quote}\"")}")">
                                                         @(a?.Answer switch { "yes" => "Yes", "no" => "No", null => "–", _ => "?" })
                                                     </td>
@@ -410,7 +410,7 @@
                     <span class="font-sans font-bold text-[10px] text-gray-500 uppercase block">4.1 Dataset Characteristics & Synthesis Outcomes (Item 20a)</span>
                     @if (auditChecks.Count > 0)
                     {
-                        <p class="font-sans text-[10px] text-gray-400 print:hidden">Click a citation number to see what the automated check found in the cited paper.</p>
+                        <p class="font-sans text-[10px] text-gray-500 print:hidden">Click a citation number to see what the automated check found in the cited paper.</p>
                     }
                     @CitedText("synthesisResultsItem", ScrubAnchors(report.SynthesisResultsItem))
 
@@ -523,7 +523,7 @@
                     else if (!string.IsNullOrEmpty(mermaidDiagramCode))
                     {
                         <div class="mt-4 border border-gray-200 p-4 bg-gray-50 flex flex-col items-center justify-center font-sans print:hidden">
-                            <span class="text-[9px] font-bold text-gray-400 block mb-3 uppercase tracking-widest">Diagram</span>
+                            <span class="text-[9px] font-bold text-gray-500 block mb-3 uppercase tracking-widest">Diagram</span>
                             @* Older runs: the diagram the report draft wrote. *@
                             <div id="mermaid-preview" class="w-full flex flex-col items-center justify-center text-center"></div>
                         </div>
@@ -574,7 +574,7 @@
                 <h2 class="font-sans font-bold text-sm text-brand uppercase tracking-wide mb-3">References</h2>
                 @if (includedCitations.Count == 0)
                 {
-                    <p class="text-xs italic text-gray-400 font-sans">No sources were included in this run.</p>
+                    <p class="text-xs italic text-gray-500 font-sans">No sources were included in this run.</p>
                 }
                 else
                 {
@@ -589,13 +589,13 @@
                 }
             </div>
 
-            <div class="mt-12 pt-4 border-t border-gray-200 text-center font-sans text-[9px] text-gray-400 uppercase tracking-widest">
+            <div class="mt-12 pt-4 border-t border-gray-200 text-center font-sans text-[9px] text-gray-500 uppercase tracking-widest">
                 OSSYM 2026 - 8th International Open Search Symposium
             </div>
 
         </article>
     }
-</div>
+</main>
 
 @code {
     [Inject] private UiStateContainer State { get; set; } = default!;
@@ -682,7 +682,7 @@
     private RenderFragment Evidence(AuBtechReviewAgent.EvidencedValue v) => __builder =>
     {
         bool notReported = v.Value.Equals("not reported", StringComparison.OrdinalIgnoreCase);
-        <span class="@(notReported ? "text-gray-400 italic" : "")" title="@(string.IsNullOrEmpty(v.Quote) ? "" : $"\"{v.Quote}\"")">@v.Value</span>
+        <span class="@(notReported ? "text-gray-500 italic" : "")" title="@(string.IsNullOrEmpty(v.Quote) ? "" : $"\"{v.Quote}\"")">@v.Value</span>
         @if (!notReported && !v.QuoteVerified)
         {
             <span class="text-amber-700" title="The supporting quote was not found in the paper's text">†</span>
@@ -732,6 +732,8 @@
                         bool isOpen = openCitation == (field, sentenceIndex, reference);
                         <button type="button" id="@CiteId(field, sentenceIndex, reference)" class="font-mono underline decoration-dotted @VerdictText(check?.Verdict) @(isOpen ? "bg-yellow-100" : "")"
                                 title="@(check == null ? "Not checked" : VerdictLabel(check.Verdict))"
+                                aria-label="@($"Reference {reference}: {(check == null ? "not checked" : VerdictLabel(check.Verdict).ToLowerInvariant())}")"
+                                aria-expanded="@(isOpen ? "true" : "false")" aria-controls="@($"verdict-{field}")"
                                 @onclick="() => ToggleCitation(field, sentenceIndex, reference)">@reference</button>
                         @(r < refs.Count - 1 ? ", " : "")
                     }
@@ -744,10 +746,12 @@
         {
             var check = FindCheck(open.Field, open.Sentence, open.Reference);
             var paper = tableRecords.FirstOrDefault(t => t.ReferenceNumber == open.Reference);
-            <div class="font-sans text-[11px] border border-gray-200 bg-gray-50 p-3 mt-2 space-y-1 print:hidden">
+            @* Opening a citation moves focus here; Escape or Close returns it to the citation number (WCAG 2.4.3). *@
+            <div id="@($"verdict-{field}")" tabindex="-1" role="region" aria-label="@($"What the check found for reference {open.Reference}")"
+                 class="font-sans text-[11px] border border-gray-200 bg-gray-50 p-3 mt-2 space-y-1 print:hidden" @onkeydown="VerdictKeyDown">
                 <div class="flex justify-between gap-2">
                     <span class="font-bold text-brand">[@open.Reference] @(paper?.Title ?? "Unknown reference")</span>
-                    <button type="button" class="text-gray-400 hover:text-gray-700" @onclick="() => openCitation = null">Close</button>
+                    <button type="button" class="ui-btn ui-btn-sm py-0.5 text-gray-700 hover:bg-gray-200" @onclick="CloseCitation">Close</button>
                 </div>
                 @if (check == null)
                 {
@@ -820,8 +824,26 @@
         catch (JSDisconnectedException) { }
     }
 
-    private void ToggleCitation(string field, int sentence, int reference) =>
-        openCitation = openCitation == (field, sentence, reference) ? null : (field, sentence, reference);
+    // Element to focus after the next render: the verdict box when a citation opens, the number when it closes.
+    private string? pendingFocus;
+
+    private void ToggleCitation(string field, int sentence, int reference)
+    {
+        bool closing = openCitation == (field, sentence, reference);
+        openCitation = closing ? null : (field, sentence, reference);
+        pendingFocus = closing ? null : $"verdict-{field}";
+    }
+
+    private void CloseCitation()
+    {
+        if (openCitation is { } open) pendingFocus = CiteId(open.Field, open.Sentence, open.Reference);
+        openCitation = null;
+    }
+
+    private void VerdictKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Escape") CloseCitation();
+    }
 
     private static string VerdictLabel(string? verdict) => verdict switch
     {
@@ -844,6 +866,13 @@
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
+        if (pendingFocus is { } focusId)
+        {
+            pendingFocus = null;
+            try { await JS.InvokeAsync<bool>("traceableReview.focus", focusId); }
+            catch (JSException) { /* moving focus is a convenience; the page works without it */ }
+            catch (JSDisconnectedException) { /* the tab was closed */ }
+        }
         if (!string.IsNullOrEmpty(mermaidDiagramCode))
         {
             try

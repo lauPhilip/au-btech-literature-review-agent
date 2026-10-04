@@ -443,11 +443,10 @@ public static class CitationSupportChecker
     public static Dictionary<int, ParsedVerdict> ParseVerdicts(string raw)
     {
         var map = new Dictionary<int, ParsedVerdict>();
-        string json = raw.Replace("```json", "").Replace("```", "").Trim();
-        int start = json.IndexOf('{'), end = json.LastIndexOf('}');
-        if (start < 0 || end <= start) return map;
+        if (string.IsNullOrEmpty(raw) || !raw.Contains('{')) return map;
 
-        using var doc = JsonDocument.Parse(json.Substring(start, end - start + 1));
+        // Same reading as LlmJson: the first complete object, with line breaks inside quotes made valid.
+        using var doc = JsonDocument.Parse(LlmJson.ExtractObject(raw));
         if (!doc.RootElement.TryGetProperty("results", out var arr) || arr.ValueKind != JsonValueKind.Array) return map;
         foreach (var item in arr.EnumerateArray())
         {
