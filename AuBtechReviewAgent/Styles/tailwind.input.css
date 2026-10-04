@@ -102,6 +102,45 @@
     to { transform: translateY(1200%); }
 }
 
+/* The reconnect banner (Components/Layout/ReconnectModal.razor). Blazor sets one state class on the dialog;
+   each text and button says in which states it shows. */
+#components-reconnect-modal {
+    position: fixed; inset: auto 1rem 1rem auto; margin: 0; z-index: 300;
+    width: min(32rem, calc(100vw - 2rem)); padding: 1rem 1.25rem;
+    background: #ffffff; color: #111827; border: 1px solid #e5e7eb; border-left: 4px solid #003B5C;
+    box-shadow: 0 12px 32px -12px rgba(0, 41, 63, 0.35), 0 2px 6px rgba(16, 24, 40, 0.08);
+    font-family: inherit;
+}
+#components-reconnect-modal[open] { animation: reconnect-in 0.25s ease-out; }
+#components-reconnect-modal .components-reconnect-first-attempt-visible,
+#components-reconnect-modal .components-reconnect-repeated-attempt-visible,
+#components-reconnect-modal .components-reconnect-failed-visible,
+#components-reconnect-modal .components-pause-visible,
+#components-reconnect-modal .components-resume-failed-visible { display: none; }
+#components-reconnect-modal.components-reconnect-show .components-reconnect-first-attempt-visible,
+#components-reconnect-modal.components-reconnect-retrying .components-reconnect-repeated-attempt-visible,
+#components-reconnect-modal.components-reconnect-failed .components-reconnect-failed-visible,
+#components-reconnect-modal.components-reconnect-paused .components-pause-visible,
+#components-reconnect-modal.components-reconnect-resume-failed .components-resume-failed-visible { display: inline; }
+#components-reconnect-modal button.components-reconnect-failed-visible,
+#components-reconnect-modal button.components-pause-visible,
+#components-reconnect-modal button.components-resume-failed-visible { display: none; }
+#components-reconnect-modal.components-reconnect-failed button.components-reconnect-failed-visible,
+#components-reconnect-modal.components-reconnect-paused button.components-pause-visible,
+#components-reconnect-modal.components-reconnect-resume-failed button.components-resume-failed-visible { display: inline-flex; }
+.reconnect-spinner {
+    flex: none; width: 0.875rem; height: 0.875rem; border-radius: 9999px;
+    border: 2px solid #D7E5EE; border-top-color: #003B5C; animation: reconnect-spin 0.9s linear infinite;
+}
+#components-reconnect-modal.components-reconnect-failed .reconnect-spinner,
+#components-reconnect-modal.components-reconnect-paused .reconnect-spinner,
+#components-reconnect-modal.components-reconnect-resume-failed .reconnect-spinner { animation: none; border-color: #B45309; }
+@keyframes reconnect-spin { to { transform: rotate(360deg); } }
+@keyframes reconnect-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) {
+    .reconnect-spinner, #components-reconnect-modal[open] { animation: none; }
+}
+
 /* Printing (Review Output: "Print or save as PDF"). The app's frame scrolls inside a fixed-height window on
    screen; on paper everything has to flow over pages, so heights and overflow are released, and tables,
    figures and headings do not split across a page break. */

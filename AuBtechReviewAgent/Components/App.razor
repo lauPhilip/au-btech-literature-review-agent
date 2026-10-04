@@ -5,11 +5,13 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <base href="/" />
-    <link rel="stylesheet" href="app.css" />
+    @* @Assets[...] gives each file a fingerprinted address (it changes when the file changes), so browsers may
+       keep it for a year instead of asking again on every visit; MapStaticAssets serves it Brotli-compressed. *@
+    <link rel="stylesheet" href="@Assets["app.css"]" />
     @* Tailwind is compiled ahead of time (npm run build:css) instead of loaded from a CDN, so the page needs no
        third-party scripts and can run under a strict Content-Security-Policy. It comes after app.css, as the
        CDN version did, so its reset (e.g. links inherit their colour) still wins over app.css. *@
-    <link rel="stylesheet" href="css/tailwind.css" />
+    <link rel="stylesheet" href="@Assets["css/tailwind.css"]" />
     <link rel="icon" href="favicon.ico" sizes="any" />
     <link rel="icon" type="image/png" sizes="192x192" href="favicon.png" />
     <link rel="apple-touch-icon" href="apple-touch-icon.png" />
@@ -20,9 +22,10 @@
 
 <body class="h-full w-full m-0 p-0 bg-gray-100 overflow-hidden text-gray-900 font-sans">
     <Routes />
-    <script src="js/mermaid-render.js"></script>
-    <script src="js/review-output.js"></script>
-    <script src="_framework/blazor.web.js"></script>
+    <ReconnectModal />
+    <script src="@Assets["js/mermaid-render.js"]"></script>
+    <script src="@Assets["js/review-output.js"]"></script>
+    <script src="@Assets["_framework/blazor.web.js"]"></script>
 </body>
 
 </html>
