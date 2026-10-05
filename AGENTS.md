@@ -25,6 +25,7 @@ CI fails when `wwwroot/css/tailwind.css` is out of date, so rebuild and commit i
 | How citations are checked or repaired | `Verification/` (repair: `Synthesis/PrismaReviewEngine.Thematic.cs`) |
 | The methods text, flow diagram, references, archive | `Report/` |
 | Edit keys, notes, metrics, clean-up | `Runs/` |
+| The kinds of review on the start page | `Pipeline/ReviewMethod.cs` (set `Available` only when the engine supports the method) |
 | Model access or JSON parsing | `Llm/` |
 | Pages and the dashboard | `Components/Pages/`, `Components/Dashboard/` |
 
