@@ -61,6 +61,9 @@ public class ReviewState
     // Where each included paper's full text came from (arXiv, open-access link, Unpaywall) or why there is none.
     public Dictionary<string, string> FullTextSources { get; set; } = new();
 
+    // The address of each included paper's open-access full text, when one was downloaded (linked from the report).
+    public Dictionary<string, string> FullTextUrls { get; set; } = new();
+
     // Data extraction and MMAT appraisal per included study (also written to extraction.json).
     public List<StudyExtraction> Extractions { get; set; } = new();
 

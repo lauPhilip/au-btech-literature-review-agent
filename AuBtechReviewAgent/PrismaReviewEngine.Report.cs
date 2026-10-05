@@ -58,6 +58,7 @@ public partial class PrismaReviewEngine
             ReportProgress(ctx.RunId, ctx.State, RunProgress.FullText, (double)(i + 1) / included.Count, Of(i + 1, included.Count, "papers"));
             ctx.Chunks[included[i].Id] = result.Chunks.ToList();
             ctx.State.FullTextSources[included[i].Id] = result.Source;
+            if (IsWebAddress(result.Url)) ctx.State.FullTextUrls[included[i].Id] = result.Url!;
             if (result.Chunks.Count > 0) ctx.State.Stats.FullTextRetrieved++;
         }
         await PublishAsync(ctx);
