@@ -18,6 +18,12 @@ public class RunsOptions
 
     /// <summary>How long a run waits for the user to confirm screening decisions before it continues with the model's decisions.</summary>
     public int ScreeningReviewTimeoutHours { get; set; } = 24;
+
+    /// <summary>
+    /// The id of a finished run shown as "See an example report" on the landing page. That run is never deleted by
+    /// the clean-up job and can be read by anyone but changed by no one. Empty: no example is shown.
+    /// </summary>
+    public string DemoRunId { get; set; } = "";
 }
 
 /// <summary>A human reviewer's decision on one screened record.</summary>
