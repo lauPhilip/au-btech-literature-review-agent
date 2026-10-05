@@ -17,6 +17,8 @@ Every run has a folder `WorkspaceStore/{runId}/`, where the run id is a GUID wri
 | `thematic-codebook.json` | report generation | during synthesis | Codes with their anchors, themes, second coding and kappa, coverage per theme, studies not cited and why |
 | `peer-review-feedback.json` | report generation | during synthesis | Reviewer comments; text before and after revision; each section revision and whether the guard kept it |
 | `stylistic-transformation-ledger.json` | report generation | during synthesis | Each stylistic rewrite, before and after |
+| `reviewer-notes.json` | Review Output page | when the reviewer saves a note | The reviewer's own notes on citations and included studies (`ReviewerNote`), never sent to the model |
+| `owner.json` | dashboard | when the run starts | The SHA-256 of the run's edit key; not part of the archive |
 | `citation-audit.json` | report generation | during synthesis | Removed markers; verdict and quote per cited sentence and artifact element; repairs with before/after; summary before and after repair; studies not cited; Markdown removed from the prose |
 | `prisma-report.json` | report generation | at the end | The PRISMA items shown on Review Output |
 | `llm-calls.json` | `finally` block of `RunReviewAsync` | at the end | Every model call; run settings |
@@ -24,7 +26,7 @@ Every run has a folder `WorkspaceStore/{runId}/`, where the run id is a GUID wri
 
 The ledger is written with `SafeFile.WriteAllTextAsync`: a temporary copy is written and moved into place, so a reader never sees half a file. On Windows that move can briefly fail with "Access to the path is denied" while an antivirus scanner or the search indexer holds the previous version, which stopped runs that save many times a second (screening served from the cache). The move is therefore retried a few times, then the file is overwritten in place, and only if that also fails does the run stop.
 
-`main.tex`, `references.bib`, `references.ris` and `manifest.json` are not stored in the folder. They are built when someone downloads the archive, from the files above.
+`main.tex`, `references.bib`, `references.ris`, `screened.ris` and `manifest.json` are not stored in the folder. They are built when someone downloads the archive, from the files above.
 
 Outside the run folders, `App_Data/metrics/runs.jsonl` (`RunMetricsStore`) keeps one line of `RunMetrics` per completed run. It is not removed by the run clean-up, so quality can be compared across months of runs and app versions. It holds no research question (only a hash of it) and no paper text. `ConfigFingerprint` is a hash of the model, the app version and the settings that shape the output; runs with the same fingerprint were produced the same way. The prompt fingerprint in `llm-calls.json` cannot serve for this, because it hashes the prompts with their paper excerpts and so differs between any two reviews.
 
