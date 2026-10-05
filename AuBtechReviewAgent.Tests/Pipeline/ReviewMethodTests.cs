@@ -13,7 +13,7 @@ public class ReviewMethodTests : IDisposable
     [Fact]
     public void OnlyTheSystematicReviewIsAvailableForNow()
     {
-        Assert.Equal(new[] { "systematic", "multivocal", "scoping" }, ReviewMethods.All.Select(m => m.Key));
+        Assert.Equal(new[] { "systematic", "multivocal", "rapid", "living", "grey" }, ReviewMethods.All.Select(m => m.Key));
         Assert.Equal(new[] { "systematic" }, ReviewMethods.All.Where(m => m.Available).Select(m => m.Key));
         Assert.All(ReviewMethods.All, m =>
         {
@@ -26,7 +26,7 @@ public class ReviewMethodTests : IDisposable
     [Theory]
     [InlineData(null, "systematic")]
     [InlineData("SYSTEMATIC", "systematic")]
-    [InlineData("scoping", "systematic")]   // coming soon: the form falls back to what can run
+    [InlineData("living", "systematic")]   // coming soon: the form falls back to what can run
     [InlineData("narrative", "systematic")] // unknown
     public void TheFormAlwaysGetsAMethodThatCanRun(string? key, string expected) =>
         Assert.Equal(expected, ReviewMethods.AvailableOrDefault(key).Key);
