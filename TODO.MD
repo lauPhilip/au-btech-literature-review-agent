@@ -86,3 +86,6 @@ Implement dedicated API client adapters implementing the `IAcademicSource` inter
 * [X] **Live check of the open-source adapters** (2026-09-28): OpenAlex search and citation lookups, Semantic Scholar, Crossref and Unpaywall answered in the formats the parsers expect. Fixes from it: longer back-off for Semantic Scholar's 429s, escaped HTML in Crossref abstracts, family-first author names from OpenAlex.
 * [ ] **Docker image in releases** (Dockerfile exists; not needed for the Simply deployment).
 * [ ] **Second model for dual screening** (currently two prompts to the same model).
+
+## 9. Multivocal Literature Review
+* [ ] Plan and step-by-step to-do, mapped to the Garousi et al. (2019) guidelines: [docs/roadmap/mlr-todo.md](docs/roadmap/mlr-todo.md)
