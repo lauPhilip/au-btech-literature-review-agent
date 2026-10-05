@@ -144,6 +144,9 @@ public static class ProtocolWriter
         sb.AppendLine();
         sb.AppendLine($"Run {runId} — written {createdUtc:yyyy-MM-dd HH:mm:ss} UTC, before any search was run.");
         sb.AppendLine();
+        var method = ReviewMethods.Find(request.Method) ?? ReviewMethods.Default;
+        sb.AppendLine($"Review type: {method.Name}, reported following {method.Standard} ({method.StandardReference}).");
+        sb.AppendLine();
         sb.AppendLine("## Question");
         sb.AppendLine();
         sb.AppendLine($"- Search query: \"{request.Query}\"");
