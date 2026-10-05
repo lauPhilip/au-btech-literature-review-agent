@@ -1,0 +1,3 @@
+# Synthesis
+
+Turning the evidence into text. `PrismaReviewEngine.Thematic.cs` and `ThematicSynthesis.cs` code the verified findings, group them into themes and write one cited subsection per theme, with guards in code so no study and no citation is lost on the way. `GroundingContextBuilder.cs` chooses which excerpts each paper contributes. `ReviewArtifact.cs` builds the diagram, table or list from the finished text, and `MermaidSanitizer.cs` keeps its diagram code safe. `StylisticRefinerUtility.cs` copy-edits the free prose, and `ProseCleaner.cs` turns any Markdown the model wrote back into plain prose before the citations are checked.
