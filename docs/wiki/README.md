@@ -19,20 +19,33 @@ The wiki describes the design as it is in the repository. When you change how so
 
 ## The project in one paragraph
 
-TraceableAI is a .NET 10 Blazor Server application. A user enters a research question and eligibility criteria; the app writes a review protocol, searches open scholarly databases, screens every record twice with a language model, follows the citations of the included studies, extracts and appraises each study, codes their findings into themes, writes a PRISMA 2020 report with one cited subsection per theme, and checks every cited sentence against a verbatim quote from the paper it cites, repairing the ones that fail. Everything the model decides is written to a per-run ledger, and the whole run can be downloaded as an archive whose files are fingerprinted in a manifest. Almost all of the logic lives in one class, `PrismaReviewEngine`, split over five files by stage; the rest are small, single-purpose helpers around it.
+TraceableAI is a .NET 10 Blazor Server application. A user enters a research question and eligibility criteria; the app writes a review protocol, searches open scholarly databases, screens every record twice with a language model, follows the citations of the included studies, extracts and appraises each study, codes their findings into themes, writes a PRISMA 2020 report with one cited subsection per theme, and checks every cited sentence against a verbatim quote from the paper it cites, repairing the ones that fail. Everything the model decides is written to a per-run ledger, and the whole run can be downloaded as an archive whose files are fingerprinted in a manifest. Almost all of the logic lives in one class, `PrismaReviewEngine`, split into partial files that sit in the folder of the stage they belong to; the rest are small, single-purpose helpers around it.
 
 ## Where the code is
+
+The source is grouped by pipeline stage, so the folders read in the same order as a review runs. [ARCHITECTURE.md](https://github.com/lauPhilip/au-btech-literature-review-agent/blob/master/ARCHITECTURE.md) at the repository root explains the layout, and every folder has a short README of its own.
 
 ```
 AuBtechReviewAgent/                 the web app
   Program.cs                        start-up: configuration, services, endpoints
-  PrismaReviewEngine*.cs            the pipeline (one partial class, five files)
-  *Source.cs, IAcademicSource.cs    one class per bibliographic source
-  Components/Pages/*.razor          the pages (landing, dashboard, review output)
+  Pipeline/                         the engine core: one run from start to finish, models, progress, cache
+  Sources/                          one class per bibliographic database, and how they are called
+  Search/                           search strings, de-duplication, saturation
+  Screening/                        two independent screenings, exclusion reasons, the human review
+  Evidence/                         full texts, data extraction, quality appraisal
+  Synthesis/                        themes, grounded writing, the artifact
+  Verification/                     citation range and support checks, repair, re-checks
+  Report/                           methods text, PRISMA flow, references, archive and manifest
+  Runs/                             what happens after a run: ownership, notes, metrics, clean-up
+  Llm/                              model access, JSON answers, prompt safety, the call ledger
+  Web/                              site pages' helpers: SEO, health, security headers, quota, glossary
+  Components/Pages/*.razor          the routable pages (landing, dashboard, review output, ...)
+  Components/Dashboard/*.razor      parts of the dashboard (funnel, progress, run summary, ...)
+  Components/Layout/*.razor         header, footer, SEO tags, help terms
   wwwroot/                          static files (compiled Tailwind CSS, scripts, images)
-AuBtechReviewAgent.Tests/           xUnit tests, all offline
+AuBtechReviewAgent.Tests/           xUnit tests, all offline, in the same folders as the code they test
 tools/ScreeningEval/                command-line tool: screening accuracy against a labelled dataset
 deploy/app_offline.htm              the page shown while a new version is uploaded
-.github/workflows/                  CI, CodeQL, release
+.github/workflows/                  CI, CodeQL, release, wiki sync
 docs/wiki/                          this wiki
 ```

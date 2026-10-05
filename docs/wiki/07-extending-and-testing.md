@@ -41,7 +41,7 @@ Start the app (`dotnet watch` in `AuBtechReviewAgent`), then in `tools/a11y` run
 
 ## Tests
 
-All tests are in `AuBtechReviewAgent.Tests` and run offline: no API keys, no network. Run them from the repository root with `dotnet test`; CI runs the same command.
+All tests are in `AuBtechReviewAgent.Tests` and run offline: no API keys, no network. Run them from the repository root with `dotnet test`; CI runs the same command. The tests sit in the same folders as the code they test (`Screening/`, `Verification/` and so on), with whole runs in `Pipeline/` and the fakes in `Support/`; the table below lists them by file name.
 
 The engine has test hooks so a whole review can run against fakes. `ChatFactory` replaces the language model (usually with `FakeChatService`, which answers by matching text in the prompt), `SourceFactory` replaces the sources (`PipelineTests.FakeSource`), `CitationGraphFactory` replaces OpenAlex for chaining, `FullTextFetcher` replaces PDF downloads, `Cache` replaces the cache (`ReviewCache.Disabled` by default in tests), and `WorkspaceRoot` points the run folders at a temporary directory, which `TestFolders.TryDelete` removes afterwards.
 

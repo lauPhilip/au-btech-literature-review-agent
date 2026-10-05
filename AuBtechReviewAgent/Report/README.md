@@ -1,0 +1,3 @@
+# Report
+
+Everything the run hands over. `PrismaReviewEngine.Report.cs` assembles the PRISMA 2020 report. `MethodsSectionWriter.cs`, `PrismaFlowDiagram.cs` and `AiUseStatement.cs` write the methods, the flow diagram and the statement on AI use in code, from what the run actually did, never by the model. `ApaCitationBuilder.cs` and `JournalRankingMatcher.cs` build the references and venue ranks from the database metadata, and `BibliographyExporter.cs` writes BibTeX and RIS. `PrismaReviewEngine.Archive.cs` builds the downloadable archive and `main.tex`, and `RunManifest.cs` fingerprints every file in it.

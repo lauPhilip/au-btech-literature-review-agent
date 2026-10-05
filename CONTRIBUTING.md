@@ -53,7 +53,7 @@ If you change the Tailwind classes in a component, rebuild the CSS in the `AuBte
 ## Making a change
 
 1. Create a branch for your work: `git checkout -b short-description-of-change`
-2. Make your change. Try to keep each pull request focused on one thing — it's much easier to review a small, clear change than a large mixed one.
+2. Make your change. [ARCHITECTURE.md](ARCHITECTURE.md) shows which folder each part of the review lives in; put new code in the folder of its stage and its tests in the matching test folder. Try to keep each pull request focused on one thing — it's much easier to review a small, clear change than a large mixed one.
 3. Build the project and run the tests before submitting, to make sure it still compiles and nothing broke:
    ```bash
    dotnet build
