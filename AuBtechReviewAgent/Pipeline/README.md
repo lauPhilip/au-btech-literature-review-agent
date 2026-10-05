@@ -1,0 +1,5 @@
+# Pipeline
+
+This folder holds the engine core: what happens to one review from "Start review" to a finished report. `PrismaReviewEngine.cs` runs a review end to end (`RunReviewAsync`) and calls the stages in the other folders in order. `PrismaReviewEngine` is one partial class; the part for each stage lives in that stage's folder, so `Screening/PrismaReviewEngine.Screening.cs` is where screening happens.
+
+The rest are the pieces every stage shares. `ReviewModels.cs` defines the ledger (`ReviewState`), the request and the records. `RunCoordinator.cs` limits how many runs call the model at once and holds a run while it waits for a human review. `RunProgress.cs` turns the work done into the progress bar. `ReviewInputGuard.cs` cleans and checks what the user typed. `ReviewCache.cs` reuses database answers and screening decisions. `SafeFile.cs` writes files so a reader never sees half a file, and `AppLog.cs` gives classes outside dependency injection a logger.
