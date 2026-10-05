@@ -1,0 +1,153 @@
+# Multivocal Literature Review (MLR): plan and to-do
+
+This file plans the second review type on the start page, the Multivocal Literature Review, following the guidelines of Garousi, Felderer and Mäntylä (2019), *Guidelines for including grey literature and conducting multivocal literature reviews in software engineering*, Information and Software Technology 106, 101–121, https://doi.org/10.1016/j.infsof.2018.09.006. Page numbers below refer to that paper.
+
+An MLR is not a systematic review with a few extra sources. It asks different questions (state of the art *and* state of the practice), searches differently, judges its sources by a different checklist, builds a systematic map before it synthesises, and reports to a different audience. So in TraceableAI it is its own path: choosing it on the start page opens its own planning form, its own run view and its own report, laid out the way Garousi et al. describe the method, not the way PRISMA describes a systematic review.
+
+What the two paths share is the core that makes TraceableAI what it is: every statement in the report is traced to a quote from the source it cites, every model answer is checked in code, and every decision is on file. That core is reused; everything else is built for the MLR.
+
+This file first explains what an MLR is and how its path through the app differs, then maps every step of the guidelines to what has to be built, and ends with the to-do list and the decisions to make before starting.
+
+## 1. What an MLR is
+
+An MLR is a systematic review that includes grey literature (GL) as well as the formal, peer-reviewed literature (p. 101–102). Garousi et al. use the Luxembourg definition of grey literature: material "produced on all levels of government, academics, business and industry in print and electronic formats, but which is not controlled by commercial publishers" (p. 102). An MLR therefore covers both the state of the art and the state of the practice (p. 104).
+
+Grey literature is graded in three tiers by how well its expertise and its outlet control are known (Fig. 1, p. 103). The tiers matter because the quality checklist later scores them.
+
+| Tier | Outlet control and credibility | Examples | Score in the checklist (Table 7) |
+|---|---|---|---|
+| White literature | Known expertise, full outlet control | Journal papers, conference papers, books | Not scored here; handled as in an SLR |
+| 1st tier GL | High | Books, magazines, theses, government reports, white papers | 1 |
+| 2nd tier GL | Moderate | Annual reports, news articles, presentations, videos, Q&A sites such as Stack Overflow, wiki articles | 0.5 |
+| 3rd tier GL | Low | Blogs, e-mails, tweets | 0 |
+
+The guidelines take the three phases of Kitchenham and Charters' SLR guidelines (planning, conducting, reporting; Table 3, p. 107) and only add guidance where grey literature makes a step different (p. 107). Fig. 7 (p. 108) shows the whole process: establish the need and the goal, raise the research questions, search formal and grey sources, snowball, select by voting, build a classification map, extract data, synthesise, and report to the target audience. One step in that figure has no counterpart in TraceableAI today: the systematic map (an attribute scheme per research question, refined iteratively; Table 10, p. 116).
+
+## 2. Its own path through the app
+
+| | Systematic review (today) | Multivocal review (to build) |
+|---|---|---|
+| Start | Card "Systematic Literature Review" opens `/review` | Card "Multivocal Literature Review" opens `/mlr` |
+| Planning | One form: question, objective, criteria, sources, options | A planning form in the order of the guidelines: need and audience (G2), whether to include grey literature with the seven questions of Table 4 (G3), research questions with their types (G4, G5), grey-literature types and producers (G6), search engines and sites (G7), stopping rule (G8), quality threshold (G11) |
+| Run view | One pipeline: search, screening, full text, extraction, synthesis, check | Two pools side by side, formal and grey literature, each with its own counts; a step for the quality checklist; a step for the systematic map, which the reviewer can edit before extraction |
+| Report | PRISMA 2020 items, numbered as in the checklist | Structured as the guidelines are: planning, conducting (search, selection, quality, map, extraction, synthesis), reporting; a table showing how each guideline G1–G14 was followed; a practitioner summary next to the full research report |
+| Sources in the report | Studies with MMAT appraisal | Every source with its type, grey-literature tier and quality score; findings labelled by the kind of source they rest on |
+| Flow diagram | PRISMA 2020 | Two arms, formal and grey, with quality as an exclusion reason |
+| Run ledger | `transparent-process.json` (`ReviewState`) | Its own ledger type, with the method recorded, so the two kinds of run cannot be confused |
+
+The look stays the same (the shared design, header, verdict colours and citation popup), so the site still feels like one tool. The structure of each page follows the method.
+
+### Shared core and MLR-only parts
+
+```
+Shared core (used by both paths)               MLR only (new)
+  Sources/       databases and web sources       Multivocal/                 the MLR engine, its ledger and stages
+  Llm/           model access, JSON, safety        MultivocalReviewEngine      planning → search → selection → quality
+  Verification/  citation range and support         MultivocalState             → map → extraction → synthesis → report
+  Runs/          edit keys, notes, metrics,          GreyQualityChecklist        Table 7, scored with quotes
+                 clean-up                            SystematicMap               attributes, refinement, classification
+  Report/        manifest, archive, references       MultivocalReportWriter     the report sections in code
+  Pipeline/      run coordinator, progress, cache  Components/Multivocal/      planning form, run view, report page
+```
+
+Today most of the pipeline is written as parts of `PrismaReviewEngine`. Before the MLR engine can reuse the core, the parts it needs (screening one record, the citation check of a text, the archive and manifest, the run folder) have to become services that do not depend on the systematic review. That is block A below, and it changes nothing a user can see.
+
+## 3. Every step, and what it needs
+
+The fourteen guidelines (G1–G14) are the concrete rules. For each step the table says what the MLR can reuse from the shared core and what has to be built for it.
+
+| Phase and step | Guideline (page) | What it asks | Reused from the shared core | Built for the MLR |
+|---|---|---|---|---|
+| **Planning** · process | G1 (p. 108) | Use the typical MLR process (Fig. 7) or the SLR protocol structure as a template for the protocol | Writing a protocol before any search, and its fingerprint | An MLR protocol: the planning form's answers in Fig. 7's order, with GL types, stopping rule and quality threshold |
+| Planning · need | G2 (p. 108) | Find existing reviews first; plan the MLR to be useful to its audience (researchers and/or practitioners) | – | Audience and existing-reviews fields in the planning form; the audience decides the report's practitioner summary |
+| Planning · include GL? | G3 (p. 109, Table 4) | Decide systematically whether to include GL, with seven yes/no questions; one or more "yes" suggests an MLR | – | The seven questions as the first step of the planning form; the answers in the protocol and the report |
+| Planning · questions | G4 (p. 109) | Research questions tied to the goal and audience, objective and measurable | – | Several RQs with sub-RQs (as in Table 5), each driving search, extraction and synthesis |
+| Planning · question types | G5 (p. 110, Table 6) | Consider all RQ types (existence, description, comparison, frequency, process, relationship, causality, design), knowing the sources may not answer all | – | Each RQ classified by type; a warning for types the sources are unlikely to answer |
+| **Conducting** · search: what | G6 (p. 111) | Decide early which GL types and producers to cover (white papers, blogs, videos, Q&A sites, company reports, government) | – | GL types and producers chosen in the planning form and listed in the protocol |
+| Conducting · search: where | G7 (p. 111) | Use general web search engines, specialised databases and websites, backlinks (snowballing for GL) and contacting people | Academic database sources, OpenAlex citation chaining, `SourceStatus` | A web search source, Stack Exchange, websites named by the reviewer, link snowballing; sources added by hand after contacting people, marked as such |
+| Conducting · search: terms | p. 111 | Run an informal pre-search for synonyms, since GL terminology is unstandardised; consult glossaries (SWEBOK, ISTQB) | Search-string preview and approval | Separate search strings for formal and grey sources, both previewed and approved |
+| Conducting · search: when to stop | G8 (p. 112) | Choose one of three stopping rules: theoretical saturation, effort bounded (top N hits), or evidence exhaustion | `SearchSaturation` | The rule chosen in planning; effort bounded by default (top 100, continuing while the last page still adds relevant hits, as in MLR-AutoTest); saturation shown per grey string |
+| Conducting · selection criteria | G9 (p. 112) | Combine inclusion and exclusion criteria for GL with the quality criteria of Table 7 | Screening one record with two independent prompts, exclusion reasons | MLR screening prompts for both pools; no peer-review filter; selection may use quality items such as date and outlet |
+| Conducting · selection process | G10 (p. 112) | Integrate the GL and formal selection; same effort and criteria for both; settle disagreements (voting) | Dual screening, flagged disagreements, the human review step | Both pools screened by the same criteria and shown side by side in the run view |
+| Conducting · quality assessment | G11 (p. 112–114, Tables 7–9) | Score each GL source on authority, methodology, objectivity, date, position w.r.t. related sources, novelty, impact and outlet type; 20 items, each 1, 0.5 or 0; normalise to 0–1; a threshold decides inclusion (the example uses 10 of 20) | Quote-verified answers (as for MMAT) | The GL checklist with every model answer backed by a quote; computable items decided in code; the score table in the report |
+| Conducting · extraction | G12 (p. 115, Table 10, Figs. 8–9) | Traceability links from every extracted item to the place in the source; enough data for each RQ; each GL document's purpose and coverage | Quote-verified extraction | An extraction form per RQ (attributes with single or multiple values), plus purpose and coverage for each GL source |
+| Conducting · systematic map | Fig. 7, Table 10 (p. 108, 116) | Identify attributes, generalise and refine them iteratively into a classification map | – | A map stage the reviewer can edit before extraction; later reused by the scoping review |
+| Conducting · synthesis | G13 (p. 118) | Fit the synthesis to the data: qualitative coding (open and axial) for most GL, limited quantitative synthesis for surveys, argumentation theory (expertise, field, opinion, trustworthiness, consistency, backup evidence) to weigh opinions; balance evidence of different rigour | Coding of quote-verified findings into themes | MLR synthesis: each finding labelled with its source type and quality score; state of the art and state of the practice side by side; argumentation questions in the quality record |
+| **Reporting** · style and audience | G14 (p. 118) | Match the writing to the audience; a short plain version for practitioners and a transparent version for researchers; implications; an online repository of sources | Citation check and repair, archive and manifest, reviewer notes, RIS export | The MLR report page and report writer: guideline table G1–G14, practitioner summary with a checklist like Table 12, the source repository with tiers and scores |
+| Reporting · flow diagram | (not in the guidelines) | Show how many sources were found, screened and included | The flow-diagram drawing code | Two arms, formal and grey, with quality as an exclusion reason |
+
+## 4. To-do
+
+Each block is meant to be one pull request. The MLR card stays "coming soon" until block G is done; until then `/mlr` is only reachable in Development, so nothing half-built is shown to users.
+
+### Block A: Free the shared core from the systematic review (no visible change)
+
+- [ ] Turn the parts of `PrismaReviewEngine` the MLR needs into services that take a generic source record: screening one record with two prompts (`Screening/`), checking the citations of a text against its sources (`Verification/`), building the archive and manifest of a run folder (`Report/`), the run folder, edit key and notes (`Runs/`).
+- [ ] A common source record that can describe a paper or a web page (title, authors or producer, date, venue or site, URL, DOI, source kind, text), so screening and the citation check do not need to know which it is.
+- [ ] The systematic review uses the new services; all its tests still pass unchanged. This is the proof that nothing changed for users.
+
+### Block B: The MLR skeleton
+
+- [ ] `Multivocal/MultivocalReviewEngine.cs` with its stages as empty steps, and `MultivocalState` as its own ledger type (method recorded, formal and grey pools kept apart).
+- [ ] Pages under `Components/Multivocal/`: `/mlr` (planning form), `/mlr/{runId}` (run view), `/mlr-report/{runId}` (report). Available in Development only.
+- [ ] The MLR card on the start page links to `/mlr` once block G is done (`Available: true`); until then it stays "coming soon".
+- [ ] Tests: an MLR run and a systematic run cannot be opened by each other's pages; the ledger records the method.
+
+### Block C: Planning (G1–G5)
+
+- [ ] Planning form in the order of the guidelines, one step per screen: need and existing reviews, audience (G2); the seven questions of Table 4 (G3), with a note when every answer is "no" that a systematic review may be enough; research questions with sub-RQs (G4), each with a type from Table 6 (G5) and a warning for types the sources are unlikely to answer.
+- [ ] The MLR protocol (G1): the form's answers in the order of Fig. 7, written and fingerprinted before any search, with GL types, search engines and sites, stopping rule and quality threshold.
+- [ ] Tests: the protocol contains every planning answer; an empty Table 4 is refused.
+
+### Block D: Searching formal and grey literature (G6–G8)
+
+- [ ] GL types and producers chosen in planning (G6) and recorded in the protocol.
+- [ ] A web search source behind the same source interface (G7): raw answers saved with SHA-256, cached, timed in `SourceStatus`. See decision 1.
+- [ ] A Stack Exchange source for Q&A sites, keeping score and views for the impact item of the quality checklist.
+- [ ] Websites named by the reviewer, searched through the web source with a site filter.
+- [ ] Two sets of search strings, formal and grey, previewed and approved in planning.
+- [ ] Stopping rule (G8): effort bounded by default (top N per string; one more page while the last page still adds relevant sources); saturation per grey string with `SearchSaturation`; where each string stopped goes into the methods text.
+- [ ] Link snowballing for grey sources, through the same duplicate check as citation chaining.
+- [ ] A snapshot of each fetched page: extracted text, URL, access date, SHA-256. See decision 2.
+- [ ] `robots.txt`, rate limits and site terms respected; nothing behind a login.
+- [ ] Tests: offline fakes for the web and Stack Exchange sources; the same page fetched twice gives the same snapshot; the stopping rule stops where it says.
+
+### Block E: Selection and quality (G9–G11)
+
+- [ ] MLR screening prompts for both pools with the same criteria (G9, G10), using the shared two-prompt screening; disagreements flagged as today.
+- [ ] `Multivocal/GreyQualityChecklist.cs`: the 20 items of Table 7 (authority 4, methodology 6, objectivity 4, date 1, position 1, novelty 2, impact 1, outlet type 1), scored 1, 0.5 or 0 and normalised to 0–1 (G11).
+- [ ] Every model answer in the checklist backed by a quote found in the snapshot; date present, outlet tier and links to related sources decided in code.
+- [ ] Impact from what is available (Stack Exchange score and views, citation counts for theses); otherwise "not available", scored 0 as in the paper, and said so in the report.
+- [ ] The threshold from the protocol (default 0.5); sources under it excluded with reason "quality" and their score.
+- [ ] Argumentation questions for opinion pieces (G13, p. 117–118) in the quality record; "trustworthiness" left to the reviewer, since the paper notes it cannot be judged reliably.
+- [ ] Tests: the checklist ranks the five example sources of Table 8 in the order of Table 9 (GL2, GL3, GL4, GL1, GL5) from saved snapshots; a source under the threshold is excluded with its score.
+
+### Block F: Map, extraction and synthesis (G12, G13)
+
+- [ ] `Multivocal/SystematicMap.cs`: initial attributes from the RQs, generalised and refined over the sources, then edited by the reviewer before extraction; each version kept in the ledger.
+- [ ] An extraction form per RQ (Table 10): attributes with their allowed values and single or multiple choice; every value with its verified quote; purpose and coverage for each grey source (G12).
+- [ ] MLR synthesis (G13): coding of quote-verified findings into themes, each finding labelled with its source type and quality score; for every theme, what the formal and the grey literature say and where they disagree.
+- [ ] The shared citation check against the stored snapshots; "abstract only" becomes "page text"; a quote must be in the snapshot, not on the live page.
+- [ ] Tests: a finding from 3rd-tier grey literature only is labelled as such; a quote that is on the live page but not in the snapshot fails.
+
+### Block G: The MLR report and run view (G14), then switch it on
+
+- [ ] Run view: formal and grey pools side by side with their counts, the quality step with scores, the map step the reviewer can edit.
+- [ ] `Multivocal/MultivocalReportWriter.cs`: report sections written in code from the ledger, following the guidelines' phases; a table showing how each guideline G1–G14 was followed; the methods text with the Table 4 answers, GL types, engines and sites, stopping rule and where it stopped, checklist and threshold, sources per tier.
+- [ ] Flow diagram with two arms, formal and grey, quality as an exclusion reason.
+- [ ] Practitioner summary for the audience chosen in planning (G14): implications in plain language and, where the RQs allow, a checklist like Table 12.
+- [ ] The source repository: every source with type, tier, quality score, link and access date, in the report, the archive and the RIS export.
+- [ ] Statement on AI use, model card, privacy page and wiki: web pages are fetched and stored as snapshots.
+- [ ] Switch the card on (`Available: true`) after one real MLR has been checked by hand.
+
+## 5. Decisions to make first
+
+1. **Which web search provider.** General web search APIs differ a lot in price, quotas and terms of use (whether results may be stored and shown). The choice decides block D. Before choosing, check each candidate's current terms on storing results and citing them in a published report.
+2. **What goes into the archive.** Storing the full text of web pages makes the citation check repeatable, but republishing other people's pages in a downloadable archive raises copyright questions. A middle way: keep the snapshot text on the server for the run's lifetime, put only the URL, access date, SHA-256 and the quoted passages in the archive, and offer a Wayback Machine link for each page.
+3. **Videos and talks.** The paper counts them as 2nd-tier GL (Fig. 1). Using them means relying on transcripts. Start without them and say so in the protocol, or include them only when a transcript is published with the video?
+4. **The quality threshold.** The paper's example uses 0.5 (10 of 20). Make it a protocol setting with 0.5 as the default, or fix it?
+5. **Contacting people (G7).** The guidelines suggest asking practitioners and authors directly. That cannot be automated honestly; the planning form could take sources the reviewer adds by hand, marked as such in the flow diagram.
+
+## 6. What not to change
+
+The rules in `AGENTS.md` hold for the MLR path too: model answers are validated in code, every value from a source needs a quote found in that source's text, the method is described by code and not by the model, and every decision is on file. Grey literature makes these rules more important, not less, because its sources are less controlled.
