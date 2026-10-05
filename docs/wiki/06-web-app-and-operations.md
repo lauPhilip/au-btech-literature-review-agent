@@ -26,6 +26,7 @@ The request pipeline then adds, in order: forwarded headers (for a reverse proxy
 | `humans.txt` | `wwwroot/humans.txt` | Who built the site and with what |
 | component | `Components/Layout/SiteFooter.razor` | The footer of the public pages, with the about, privacy, model card, verify and project links |
 | component | `Components/Layout/Term.razor` | A term with its explanation on hover and focus: `<Term Key="kappa" />` |
+| `/start` | `Components/Pages/Start.razor` | Choose the kind of review: one card per method in `ReviewMethods` (systematic review available; multivocal and scoping reviews coming soon), each naming the reporting standard it follows. "Start a review" on the landing page opens it |
 | `/review`, `/review/{runId}` | `Components/Pages/Home.razor` | Dashboard: the review form in three steps with its input check, a summary of the settings once a run starts, and a run panel that follows the run (preview, progress, result, ledger, the human screening review) |
 | component | `RunPlanPreview.razor` | Shown in the run panel before a run: the steps the review will take with the current settings, and what it produces |
 | component | `RunProgressPanel.razor` | The progress bar, current step with detail, elapsed time and the list of steps |
