@@ -89,6 +89,11 @@
                     </nav>
 
                     <div class="p-4 space-y-4">
+                        <p class="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-gray-600">
+                            <span class="ui-chip border-brand-100 bg-brand-50 text-brand">@ReviewMethod.Name</span>
+                            <span>follows @ReviewMethod.Standard</span>
+                            <a href="/start" class="text-brand font-medium hover:underline">Change review type</a>
+                        </p>
                         @if (prefillNotice != null)
                         {
                             <div class="bg-blue-50 border border-blue-100 text-blue-900 p-2 text-xs flex flex-wrap items-center justify-between gap-2">
@@ -620,6 +625,10 @@
 
     /// <summary>/review?from={runId}: start a new review with the settings of an earlier run.</summary>
     [SupplyParameterFromQuery(Name = "from")] public Guid? From { get; set; }
+
+    /// <summary>The kind of review chosen on the start page (/start); unknown or not-yet-available kinds fall back to the systematic review.</summary>
+    [SupplyParameterFromQuery(Name = "method")] public string? MethodKey { get; set; }
+    private AuBtechReviewAgent.ReviewMethod ReviewMethod => AuBtechReviewAgent.ReviewMethods.AvailableOrDefault(MethodKey);
     private Guid? prefilledFrom;
     private string? prefillNotice;
     private string panelTab = "overview";
@@ -1374,7 +1383,8 @@
         // Check the text fields before anything is reserved or spent: too-long fields are errors, and
         // instruction-like phrases must be confirmed once (they are then recorded in the protocol).
         var draft = new AuBtechReviewAgent.ReviewRequest(searchQuery, reviewObjective, inclusionCriteria, exclusionCriteria, maxResults,
-            SynthesisDirective: synthesisTargetDirective, ArtifactKind: State.ArtifactKind, SearchStrings: reviewedSearchStrings);
+            SynthesisDirective: synthesisTargetDirective, ArtifactKind: State.ArtifactKind, SearchStrings: reviewedSearchStrings,
+            Method: ReviewMethod.Key);
         inputCheck = AuBtechReviewAgent.ReviewInputGuard.Check(draft);
         if (!inputCheck.IsValid)
         {
@@ -1458,7 +1468,7 @@
             cleanQuery, cleanObjective, cleanInclusion, cleanExclusion, runMaxResults,
             requirePeerReview, cleanDirective, sessionKeys, runSources, yearFrom, yearTo, State.ReviewScreeningFirst,
             DualScreening: State.DualScreening, CitationChaining: State.CitationChaining, ArtifactKind: State.ArtifactKind,
-            SearchStrings: inputCheck.Request.SearchStrings);
+            SearchStrings: inputCheck.Request.SearchStrings, Method: ReviewMethod.Key);
 
         Subscribe();
 
