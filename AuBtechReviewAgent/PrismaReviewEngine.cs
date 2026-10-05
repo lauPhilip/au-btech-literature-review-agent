@@ -141,9 +141,9 @@ public partial class PrismaReviewEngine
     /// <summary>True while the run is queued, running or waiting for a screening review in this process.</summary>
     public bool IsRunActive(Guid runId) => Coordinator.IsActive(runId);
 
-    /// <summary>Hands the reviewer's screening decisions to a run that is waiting for them.</summary>
-    public bool SubmitScreeningReview(Guid runId, IReadOnlyList<ScreeningOverride> decisions) =>
-        Coordinator.SubmitScreeningReview(runId, decisions);
+    /// <summary>Hands the reviewer's screening decisions to a run that is waiting for them (only with the run's edit key).</summary>
+    public bool SubmitScreeningReview(Guid runId, IReadOnlyList<ScreeningOverride> decisions, string? editKey = null) =>
+        CanEdit(runId, editKey) && Coordinator.SubmitScreeningReview(runId, decisions);
 
     public bool IsAwaitingScreeningReview(Guid runId) => Coordinator.IsAwaitingScreeningReview(runId);
 
@@ -518,11 +518,11 @@ public partial class PrismaReviewEngine
 
     /// <summary>
     /// Deletes a finished run's folder (ledger, report, source PDFs). Anyone with the run link can open a
-    /// run, so its owner must be able to remove it. Refuses while the run is still active.
+    /// run, but only the browser that started it (with its edit key) can remove it. Refuses while the run is still active.
     /// </summary>
-    public bool DeleteRun(Guid runId)
+    public bool DeleteRun(Guid runId, string? editKey = null)
     {
-        if (IsRunActive(runId)) return false;
+        if (IsRunActive(runId) || !CanEdit(runId, editKey)) return false;
         string folder = GetWorkspaceFolderPath(runId);
         if (!Directory.Exists(folder)) return false;
         try

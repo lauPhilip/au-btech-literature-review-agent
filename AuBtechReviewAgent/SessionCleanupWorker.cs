@@ -36,7 +36,8 @@ public class SessionCleanupWorker : BackgroundService
             try
             {
                 PurgeExpiredRuns(_engine.WorkspaceRoot,
-                    TimeSpan.FromDays(Math.Max(1, _engine.RunsOptions.RetentionDays)), DateTime.UtcNow, _engine.IsRunActive, _logger);
+                    TimeSpan.FromDays(Math.Max(1, _engine.RunsOptions.RetentionDays)), DateTime.UtcNow,
+                    id => _engine.IsRunActive(id) || _engine.IsDemoRun(id), _logger); // the example run is kept
                 int pruned = _cache?.Prune() ?? 0;
                 if (pruned > 0) _logger.LogInformation("Removed {Count} expired cache file(s).", pruned);
             }

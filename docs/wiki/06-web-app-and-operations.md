@@ -29,7 +29,8 @@ The request pipeline then adds, in order: forwarded headers (for a reverse proxy
 | `/review`, `/review/{runId}` | `Components/Pages/Home.razor` | Dashboard: the review form in three steps with its input check, a summary of the settings once a run starts, and a run panel that follows the run (preview, progress, result, ledger, the human screening review) |
 | component | `RunPlanPreview.razor` | Shown in the run panel before a run: the steps the review will take with the current settings, and what it produces |
 | component | `RunProgressPanel.razor` | The progress bar, current step with detail, elapsed time and the list of steps |
-| `/spec-matrix`, `/spec-matrix/{runId}` | `Components/Pages/SpecMatrix.razor` | Review Output: the report with clickable citations, tables, charts, downloads, "Delete run" |
+| `/spec-matrix`, `/spec-matrix/{runId}` | `Components/Pages/SpecMatrix.razor` | Review Output: the report with clickable citations, tables, charts, downloads, notes, "Copy link" and (for the browser that started the run) "Delete run" |
+| `GET /api/workspace/{id}/screened.ris` | `Program.cs` | Every screened record, tagged with its decision, for Zotero |
 | `/metrics` | `Components/Pages/Metrics.razor` | Run quality metrics across runs: verdict shares per run, groups by app version and settings, and where a run's citations fail. Public, like the code; the links to individual run reports are shown only with the developer token (`Quota:AdminToken`) or in Development, because a run's link opens its report |
 | `/review?from={runId}` | `Components/Pages/Home.razor` | A new review with the question, criteria, artifact and options of an earlier run filled in (from "New review from these settings") |
 | component | `RunSummaryCard.razor` | What a finished run produced: counts, themes, studies cited, the citation verdicts, and the way into the report; shown at the top of the run panel when a run is complete |
@@ -42,6 +43,24 @@ The request pipeline then adds, in order: forwarded headers (for a reverse proxy
 The dashboard subscribes to `ReviewEngine.OnProgressUpdated` while it is open and unsubscribes when it is disposed. Progress is set by the engine through `ReportProgress` (`RunProgress.cs`): the run's step plan (`ProgressPlan`, with citation chaining and the human review only when asked for), the current step, how far it is from 0 to 1 and a short detail such as "16 of 40 records screened" are kept in `ReviewStats`. `RunProgress.Percent` turns them into an overall percentage using a rough weight per step, and within a step the value never goes back. Updates inside a step are sent at most every 400 ms and do not write the ledger, so loops can report freely. The dashboard also re-reads the saved ledger every few seconds, which can be a little behind the live events; `RunProgress.KeepFurthest` keeps whichever is further along for the same run, so the bar never moves back.
 
 On the Review Output page, a bar above the report counts the citations that need attention (partly supported or not supported) and steps through them in reading order with Previous and Next: each step opens the citation's verdict and scrolls it into view (`wwwroot/js/review-output.js`). The Review Output page does not follow a run live; it reads the finished files from the run folder each time it loads. Anyone with a run's link can open it, which is why run ids are random GUIDs and runs are deleted after `Runs:RetentionDays`.
+
+### Read-only links and the edit key
+
+Anyone with a run's link can read it, but only the browser that started the run can change it: delete it, submit its screening review, check a citation again or write notes. When the dashboard starts a run it calls `ClaimRun` (`PrismaReviewEngine.Ownership.cs`), which creates a 32-byte random edit key. The browser keeps the key in its local storage (`traceableReview.saveEditKey` in `review-output.js`) and the server keeps only its SHA-256 in `owner.json` in the run folder, which is left out of the archive. Every changing method (`DeleteRun`, `SubmitScreeningReview`, `RecheckCitationAsync`, `SaveNoteAsync`) takes the key and checks it with `CanEdit`, which compares the hashes in constant time. The pages read the key when they open a run and hide the buttons that would change it when the key is missing; the engine refuses either way.
+
+There is deliberately no way to see, copy or restore the key. A key that can be saved can also be forwarded or leaked, and losing it costs little: the run stays readable and expires on its own. Keys older than 30 days are dropped from the browser's storage. Runs started before edit keys existed have no `owner.json` and stay editable by anyone with the link until they expire. A "Copy link" button on the dashboard and the Review Output page copies the run's address for sharing.
+
+### The example run
+
+`Runs:DemoRunId` names a finished run that the landing page links as "See an example report". `SessionCleanupWorker` never deletes it, and `CanEdit` refuses every change to it, even with its key, so the example stays the same for everyone. To set one up, run a review on the server, copy its id from the address bar, and put it in `Runs:DemoRunId` in `web.config` or `appsettings.json`. To retire it, clear the setting; the run then expires like any other.
+
+### Reviewer notes, links and Zotero
+
+On the Review Output page, the reviewer can add a note to any citation (in its popup) and to any included study (in Table 3.1). Notes are kept in `reviewer-notes.json` (`PrismaReviewEngine.Notes.cs`), at most 1,000 characters each, cleaned like the form fields, shown to every reader, and included in the archive. They are never sent to the model.
+
+Table 3.1 links each study's DOI (or its source page when it has no DOI) and, when an open-access copy was downloaded, the PDF; the address is kept as `ReviewState.FullTextUrls`. Only `http` and `https` addresses are linked (`IsWebAddress`), so metadata from a source cannot inject a script link.
+
+`references.ris` tags the included studies with `included`. `GET /api/workspace/{id}/screened.ris` (also in the archive) exports every screened record, tagged `included`, `excluded: <reason>` with the exclusion group, or `not screened`, plus `checked by reviewer` where the reviewer looked at the decision. Imported into Zotero, the whole screening can be filtered by tag.
 
 ### Health, database status and logs
 

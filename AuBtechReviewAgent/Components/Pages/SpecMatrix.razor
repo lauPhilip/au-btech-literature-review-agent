@@ -39,6 +39,7 @@
             <a href="@($"/review?from={State.CurrentSessionId}")" class="ui-btn-secondary ui-btn-sm" title="Open the dashboard with this run's question, criteria and options filled in">New review from these settings</a>
             <a href="@($"/api/workspace/{State.CurrentSessionId}/references.bib")" target="_blank" class="ui-btn-secondary ui-btn-sm">BibTeX</a>
             <a href="@($"/api/workspace/{State.CurrentSessionId}/references.ris")" target="_blank" class="ui-btn-secondary ui-btn-sm">RIS (Zotero / EndNote)</a>
+            <a href="@($"/api/workspace/{State.CurrentSessionId}/screened.ris")" target="_blank" class="ui-btn-secondary ui-btn-sm" title="Every screened record, tagged included or excluded with the reason, for a Zotero library of the screening">RIS, all screened</a>
             <button type="button" @onclick="PrintReport" class="ui-btn-secondary ui-btn-sm" title="Print the report, or choose Save as PDF in the print window">Print or save as PDF</button>
             <button @onclick="TriggerZipArchiveDownload" class="ui-btn-primary ui-btn-sm">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -46,7 +47,12 @@
                 </svg>
                 <span>Download archive (.zip)</span>
             </button>
-            @if (!ReviewEngine.IsRunActive(State.CurrentSessionId))
+            <button type="button" @onclick="CopyLink" class="ui-btn-secondary ui-btn-sm" title="Anyone with the link can read this report; only the browser that started the run can change it">@(linkCopied ? "Link copied" : "Copy link")</button>
+            @if (!canEdit)
+            {
+                <span class="text-xs text-gray-600 self-center">Read-only</span>
+            }
+            else if (!ReviewEngine.IsRunActive(State.CurrentSessionId))
             {
                 @if (!confirmDelete)
                 {
@@ -301,7 +307,11 @@
                                     string badgeClass = platformShares.FirstOrDefault(p => p.Category == paperRow.Category)?.Badge ?? "text-gray-800 bg-gray-50";
                                     <tr class="hover:bg-gray-50/40" id="@($"ref-{paperRow.ReferenceNumber}")">
                                         <td class="p-2 font-mono text-brand font-bold border-r border-gray-150 align-top">[@paperRow.ReferenceNumber]</td>
-                                        <td class="p-2 font-semibold text-gray-900 border-r border-gray-150 align-top break-words">@paperRow.Title</td>
+                                        <td class="p-2 border-r border-gray-150 align-top break-words">
+                                            <span class="font-semibold text-gray-900">@paperRow.Title</span>
+                                            @StudyLinks(paperRow)
+                                            @StudyNote(paperRow.ReferenceNumber)
+                                        </td>
                                         <td class="p-2 text-gray-600 border-r border-gray-150 align-top font-light break-words">@paperRow.Summary</td>
                                         <td class="p-2 text-gray-600 border-r border-gray-150 align-top font-light text-[9.5px] break-words">@paperRow.InclusionRationale</td>
                                         <td class="p-2 border-r border-gray-150 align-top text-center font-mono font-medium text-[9.5px]">
@@ -693,7 +703,7 @@
     private void DeleteRun()
     {
         confirmDelete = false;
-        if (ReviewEngine.DeleteRun(State.CurrentSessionId))
+        if (ReviewEngine.DeleteRun(State.CurrentSessionId, editKey))
         {
             deleted = true;
             State.CurrentSessionId = Guid.Empty;
@@ -835,11 +845,12 @@
                             @(check.ResolvedBy == "second check" ? " The second check found a verbatim quote, so its verdict is shown." : "")
                         </p>
                     }
+                    @CitationNote(open)
                     @if (RecheckOf(open) is { } done)
                     {
                         <p class="text-[10px] text-gray-600">Checked again @done.CheckedUtc.ToString("yyyy-MM-dd HH:mm") UTC: was @VerdictLabel(done.VerdictBefore) (@done.EvidenceBefore), now @VerdictLabel(done.VerdictAfter) (@done.EvidenceAfter).</p>
                     }
-                    @if (check.Verdict is AuBtechReviewAgent.CitationSupportChecker.Partial or AuBtechReviewAgent.CitationSupportChecker.NotSupported)
+                    @if (canEdit && check.Verdict is AuBtechReviewAgent.CitationSupportChecker.Partial or AuBtechReviewAgent.CitationSupportChecker.NotSupported)
                     {
                         <div class="pt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
                             <button type="button" class="ui-btn ui-btn-sm py-0.5 border border-gray-300 bg-white text-gray-800 hover:border-brand disabled:opacity-50"
@@ -861,6 +872,101 @@
             </div>
         }
     };
+
+    // ── Links and reviewer notes ─────────────────────────────────────────────────────────────────
+    private Dictionary<string, string> fullTextUrls = new();
+    private List<AuBtechReviewAgent.ReviewerNote> notes = new();
+    private string? editingNote;     // which note is open for editing: "study-3" or "citation-field-2-3"
+    private string noteDraft = "";
+    private string? noteMessage;
+
+    private static string? DoiUrl(string? doi) =>
+        string.IsNullOrWhiteSpace(doi) ? null : "https://doi.org/" + Uri.EscapeDataString(doi.Trim()).Replace("%2F", "/");
+
+    /// <summary>DOI and open-access PDF links under a study's title (only http(s) addresses are linked).</summary>
+    private RenderFragment StudyLinks(IncludedPaperMetricRow row) => __builder =>
+    {
+        string? doi = DoiUrl(row.Doi);
+        string? sourcePage = doi == null && AuBtechReviewAgent.PrismaReviewEngine.IsWebAddress(row.Url) ? row.Url : null;
+        string? pdf = fullTextUrls.TryGetValue(row.PaperId, out var u) ? u : null;
+        if (doi == null && sourcePage == null && pdf == null) return;
+        <span class="mt-1 flex flex-wrap gap-x-2 text-[9.5px] print:hidden">
+            @if (doi != null)
+            {
+                <a href="@doi" target="_blank" rel="noopener" class="text-brand underline underline-offset-2">DOI</a>
+            }
+            @if (sourcePage != null)
+            {
+                <a href="@sourcePage" target="_blank" rel="noopener" class="text-brand underline underline-offset-2">Source page</a>
+            }
+            @if (pdf != null)
+            {
+                <a href="@pdf" target="_blank" rel="noopener" class="text-brand underline underline-offset-2">Open-access PDF</a>
+            }
+        </span>
+    };
+
+    private RenderFragment StudyNote(int reference) => __builder =>
+    {
+        var note = notes.FirstOrDefault(n => n.IsFor(AuBtechReviewAgent.ReviewerNote.Study, reference));
+        @NoteBlock($"study-{reference}", note, AuBtechReviewAgent.ReviewerNote.Study, reference, "", -1)
+    };
+
+    private RenderFragment CitationNote((string Field, int Sentence, int Reference) c) => __builder =>
+    {
+        var note = notes.FirstOrDefault(n => n.IsFor(AuBtechReviewAgent.ReviewerNote.Citation, c.Reference, c.Field, c.Sentence));
+        @NoteBlock($"citation-{c.Field}-{c.Sentence}-{c.Reference}", note, AuBtechReviewAgent.ReviewerNote.Citation, c.Reference, c.Field, c.Sentence)
+    };
+
+    /// <summary>A note as text for every reader; with the edit key, an Add/Edit button and a small form.</summary>
+    private RenderFragment NoteBlock(string id, AuBtechReviewAgent.ReviewerNote? note, string kind, int reference, string field, int sentence) => __builder =>
+    {
+        if (editingNote == id)
+        {
+            <div class="mt-1.5 font-sans">
+                <label for="@($"note-{id}")" class="block text-[10px] font-semibold text-gray-700">Your note</label>
+                <textarea id="@($"note-{id}")" rows="2" maxlength="@AuBtechReviewAgent.PrismaReviewEngine.MaxNoteLength" @bind="noteDraft"
+                          class="mt-0.5 w-full border border-gray-300 p-1.5 text-[11px] font-normal text-gray-800 focus:border-brand focus:outline-none"></textarea>
+                <div class="mt-1 flex gap-2">
+                    <button type="button" class="ui-btn-primary ui-btn-sm py-0.5" @onclick="() => SaveNoteAsync(kind, reference, field, sentence)">Save note</button>
+                    <button type="button" class="ui-btn-secondary ui-btn-sm py-0.5" @onclick="() => editingNote = null">Cancel</button>
+                </div>
+                @if (noteMessage != null)
+                {
+                    <p class="mt-1 text-[10px] text-red-700" role="alert">@noteMessage</p>
+                }
+            </div>
+        }
+        else
+        {
+            if (note != null)
+            {
+                <p class="mt-1.5 border-l-2 border-brand pl-2 text-[10px] font-normal text-gray-700 whitespace-pre-line">
+                    <span class="font-semibold text-gray-900">Reviewer's note:</span> @note.Text
+                </p>
+            }
+            if (canEdit)
+            {
+                <button type="button" class="mt-1 text-[10px] font-medium text-brand hover:underline print:hidden"
+                        @onclick="() => { editingNote = id; noteDraft = note?.Text ?? string.Empty; noteMessage = null; }">@(note == null ? "Add a note" : "Edit note")</button>
+            }
+        }
+    };
+
+    private async Task SaveNoteAsync(string kind, int reference, string field, int sentence)
+    {
+        bool saved = await ReviewEngine.SaveNoteAsync(State.CurrentSessionId, editKey, kind, reference, noteDraft, field, sentence);
+        if (saved)
+        {
+            notes = ReviewEngine.LoadNotes(State.CurrentSessionId).ToList();
+            editingNote = null;
+            noteMessage = null;
+        }
+        else
+        {
+            noteMessage = "The note could not be saved. Only the browser that started this run can add notes.";
+        }
+    }
 
     // Re-checking one citation after the run (PrismaReviewEngine.RecheckCitationAsync).
     private List<AuBtechReviewAgent.CitationRecheck> rechecks = new();
@@ -912,7 +1018,7 @@
         recheckFailed = false;
         try
         {
-            var result = await ReviewEngine.RecheckCitationAsync(State.CurrentSessionId, c.Field, c.Sentence, c.Reference);
+            var result = await ReviewEngine.RecheckCitationAsync(State.CurrentSessionId, c.Field, c.Sentence, c.Reference, editKey: editKey);
             await LoadAuditAsync(Path.Join(ReviewEngine.WorkspaceRoot, State.CurrentSessionId.ToString("N")));
             recheckMessage = $"Checked again: {VerdictLabel(result.Verdict).ToLowerInvariant()}, against the {result.EvidenceBasis}.";
         }
@@ -1026,8 +1132,28 @@
         _ => "text-gray-500",
     };
 
+    // The run's edit key from this browser's storage: only the browser that started the run can change it.
+    private string? editKey;
+    private Guid editKeyFor;
+    private bool canEdit;
+    private bool linkCopied;
+
+    private async Task CopyLink()
+    {
+        try { linkCopied = await JS.InvokeAsync<bool>("traceableReview.copyLink"); }
+        catch (Exception ex) when (ex is JSException or JSDisconnectedException or TaskCanceledException) { linkCopied = false; }
+    }
+
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
+        if (State.CurrentSessionId != Guid.Empty && editKeyFor != State.CurrentSessionId)
+        {
+            editKeyFor = State.CurrentSessionId;
+            try { editKey = await JS.InvokeAsync<string?>("traceableReview.getEditKey", State.CurrentSessionId.ToString()); }
+            catch (Exception ex) when (ex is JSException or JSDisconnectedException or TaskCanceledException) { editKey = null; }
+            bool allowed = ReviewEngine.CanEdit(State.CurrentSessionId, editKey);
+            if (allowed != canEdit) { canEdit = allowed; StateHasChanged(); }
+        }
         if (pendingFocus is { } focusId)
         {
             pendingFocus = null;
@@ -1096,6 +1222,8 @@
 
         // Older runs have ReferenceNumber = 0 everywhere; OrderBy is stable, so they keep their order.
         tableRecords = state.SynthesizedRecords.OrderBy(r => r.ReferenceNumber).ToList();
+        fullTextUrls = state.FullTextUrls ?? new();
+        notes = ReviewEngine.LoadNotes(State.CurrentSessionId).ToList();
         includedCitations = tableRecords.Select(r => r.ApaCitation.Trim().TrimEnd('.')).ToList();
 
         platformShares = tableRecords

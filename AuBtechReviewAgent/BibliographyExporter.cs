@@ -68,6 +68,48 @@ public static class BibliographyExporter
             if (!string.IsNullOrWhiteSpace(r.Url)) sb.AppendLine($"UR  - {r.Url}");
             if (!string.IsNullOrWhiteSpace(r.Summary)) sb.AppendLine($"N1  - {OneLine(r.Summary)}");
             sb.AppendLine($"N1  - Reference [{r.ReferenceNumber}] in the TraceableAI review");
+            sb.AppendLine("KW  - TraceableAI");
+            sb.AppendLine("KW  - included");
+            sb.AppendLine("ER  - ");
+            sb.AppendLine();
+        }
+        return sb.ToString();
+    }
+
+    /// <summary>
+    /// Every screened record as RIS, tagged for a reference manager: "included", or "excluded: reason" with the
+    /// exclusion group, so a Zotero library of the whole screening can be filtered by decision. Included records
+    /// carry their reference number. Records that could not be screened are tagged "not screened".
+    /// </summary>
+    public static string ToScreenedRis(IEnumerable<ScreeningLog> screening, IReadOnlyDictionary<string, int>? referenceNumbers = null)
+    {
+        var sb = new StringBuilder();
+        foreach (var l in screening)
+        {
+            string type = l.VenueType switch
+            {
+                "Journals" or "Transactions" => "JOUR",
+                "Conferences" => "CONF",
+                _ => "GEN",
+            };
+            sb.AppendLine($"TY  - {type}");
+            foreach (var a in l.Authors ?? new List<string>()) sb.AppendLine($"AU  - {RisAuthor(a)}");
+            sb.AppendLine($"TI  - {OneLine(l.Title)}");
+            if (!string.IsNullOrWhiteSpace(l.VenueName)) sb.AppendLine($"T2  - {OneLine(l.VenueName)}");
+            if (l.Year > 0) sb.AppendLine($"PY  - {l.Year}");
+            if (!string.IsNullOrWhiteSpace(l.Doi)) sb.AppendLine($"DO  - {l.Doi}");
+            if (!string.IsNullOrWhiteSpace(l.Url)) sb.AppendLine($"UR  - {l.Url}");
+            sb.AppendLine("KW  - TraceableAI");
+            sb.AppendLine("KW  - " + l.Decision switch
+            {
+                "Included" => "included",
+                "Excluded" => "excluded: " + ExclusionReasons.Label(l.ExclusionReason).ToLowerInvariant(),
+                _ => "not screened",
+            });
+            if (l.HumanReviewed) sb.AppendLine("KW  - checked by reviewer");
+            if (l.Decision == "Included" && referenceNumbers != null && referenceNumbers.TryGetValue(l.PaperId, out int n))
+                sb.AppendLine($"N1  - Reference [{n}] in the TraceableAI review");
+            if (!string.IsNullOrWhiteSpace(l.Reasoning)) sb.AppendLine($"N1  - Screening: {OneLine(l.Reasoning)}");
             sb.AppendLine("ER  - ");
             sb.AppendLine();
         }

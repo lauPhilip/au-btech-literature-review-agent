@@ -89,6 +89,8 @@
     [Parameter, EditorRequired] public Guid RunId { get; set; }
     [Parameter, EditorRequired] public IReadOnlyList<AuBtechReviewAgent.ScreeningLog> Logs { get; set; } = Array.Empty<AuBtechReviewAgent.ScreeningLog>();
     [Parameter] public EventCallback OnSubmitted { get; set; }
+    /// <summary>The run's edit key from this browser; without it the engine refuses the review.</summary>
+    [Parameter] public string? EditKey { get; set; }
 
     private List<Row> rows = new();
     private bool submitting;
@@ -154,7 +156,7 @@
         submitting = true;
         error = "";
         var decisions = rows.Select(r => new AuBtechReviewAgent.ScreeningOverride(r.PaperId, r.Decision, r.Note)).ToList();
-        if (ReviewEngine.SubmitScreeningReview(RunId, decisions))
+        if (ReviewEngine.SubmitScreeningReview(RunId, decisions, EditKey))
         {
             await OnSubmitted.InvokeAsync();
         }

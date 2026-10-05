@@ -184,6 +184,14 @@ app.MapGet("/api/workspace/{sessionId:guid}/references.{format}", (Guid sessionI
     return Results.File(System.Text.Encoding.UTF8.GetBytes(content), mime, $"references.{format}");
 }).RequireRateLimiting("ArchiveDownloadPolicy");
 
+// Every screened record as RIS, tagged "included" or "excluded: reason", for a Zotero library of the screening.
+app.MapGet("/api/workspace/{sessionId:guid}/screened.ris", (Guid sessionId) =>
+{
+    string? content = reviewEngine.ExportReferences(sessionId, "screened");
+    return content == null ? Results.NotFound()
+        : Results.File(System.Text.Encoding.UTF8.GetBytes(content), "application/x-research-info-systems", "screened.ris");
+}).RequireRateLimiting("ArchiveDownloadPolicy");
+
 // The protocol written before the search (PRISMA item 24), linked from the Review Output page.
 app.MapGet("/api/workspace/{sessionId:guid}/protocol.md", (Guid sessionId) =>
 {

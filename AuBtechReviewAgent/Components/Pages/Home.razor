@@ -345,10 +345,15 @@
                         @SettingRow("Sources", string.Join(", ", (runInfo?.SelectedSources ?? State.SelectedSources.ToList()).Select(AuBtechReviewAgent.SourceCatalog.DisplayNameFor)))
                     </dl>
                     <p class="text-[11px] text-gray-500 leading-snug border-t border-gray-100 pt-2">
-                        Link to this run: <a class="text-brand underline break-all" href="@($"/review/{currentSessionId}")">@($"/review/{currentSessionId}")</a>.
-                        Anyone with the link can open it; results are kept for @RunsOptions.RetentionDays days@(completedUtc.HasValue ? $" (until {completedUtc.Value.AddDays(RunsOptions.RetentionDays):yyyy-MM-dd} UTC)" : "").
+                        Link to this run: <a class="text-brand underline break-all" href="@($"/review/{currentSessionId}")">@($"/review/{currentSessionId}")</a>
+                        <button type="button" @onclick="CopyRunLink" class="ml-1 text-brand font-medium hover:underline">@(linkCopied ? "Copied" : "Copy link")</button>.
+                        Anyone with the link can read the run@(canEdit ? "; only this browser can change or delete it" : ""). Results are kept for @RunsOptions.RetentionDays days@(completedUtc.HasValue ? $" (until {completedUtc.Value.AddDays(RunsOptions.RetentionDays):yyyy-MM-dd} UTC)" : "").
                     </p>
-                    @if (!isSearching && AuBtechReviewAgent.PrismaReviewEngine.IsFinishedStage(stage))
+                    @if (!isSearching && AuBtechReviewAgent.PrismaReviewEngine.IsFinishedStage(stage) && !canEdit)
+                    {
+                        <p class="text-[11px] text-gray-600">Read-only: only the browser that started this run can delete it.</p>
+                    }
+                    else if (!isSearching && AuBtechReviewAgent.PrismaReviewEngine.IsFinishedStage(stage))
                     {
                         <div class="flex items-center gap-2 text-[11px]">
                             @if (!confirmDelete)
@@ -391,7 +396,14 @@
             }
             else if (awaitingReview && reviewLogs != null && !Composing)
             {
-                <ScreeningReviewPanel RunId="currentSessionId" Logs="reviewLogs" OnSubmitted="OnScreeningReviewSubmitted" />
+                @if (canEdit)
+                {
+                    <ScreeningReviewPanel RunId="currentSessionId" EditKey="@editKey" Logs="reviewLogs" OnSubmitted="OnScreeningReviewSubmitted" />
+                }
+                else
+                {
+                    <p class="p-4 text-sm text-gray-700">This run is waiting for the person who started it to check the screening decisions. Only the browser that started a run can do that.</p>
+                }
             }
             else if (Composing)
             {
@@ -1116,6 +1128,7 @@
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         await SaveDraftAsync();
+        await RefreshEditAccessAsync();
         if (pendingFocus is { } fieldId)
         {
             pendingFocus = null;
@@ -1243,12 +1256,44 @@
         StateHasChanged();
     }
 
+    // The run's edit key, read from this browser's storage; only the browser that started a run has it.
+    private string? editKey;
+    private Guid editKeyFor;
+    private bool canEdit;
+
+    /// <summary>Looks up this browser's edit key for the run on the page, once per run.</summary>
+    private async Task RefreshEditAccessAsync()
+    {
+        if (!hasRun || currentSessionId == Guid.Empty || editKeyFor == currentSessionId) return;
+        editKeyFor = currentSessionId;
+        try { editKey = await JS.InvokeAsync<string?>("traceableReview.getEditKey", currentSessionId.ToString()); }
+        catch (Exception ex) when (ex is JSException or InvalidOperationException or TaskCanceledException)
+        {
+            Logger.LogDebug("Could not read the edit key: {Message}", ex.Message);
+            editKey = null;
+        }
+        bool allowed = ReviewEngine.CanEdit(currentSessionId, editKey);
+        if (allowed != canEdit)
+        {
+            canEdit = allowed;
+            StateHasChanged();
+        }
+    }
+
+    private bool linkCopied;
+
+    private async Task CopyRunLink()
+    {
+        try { linkCopied = await JS.InvokeAsync<bool>("traceableReview.copyLink"); }
+        catch (Exception ex) when (ex is JSException or InvalidOperationException or TaskCanceledException) { linkCopied = false; }
+    }
+
     /// <summary>Deletes the finished run shown on this page (its folder, report and downloaded papers).</summary>
     private void DeleteRun()
     {
         confirmDelete = false;
         var id = currentSessionId;
-        if (!ReviewEngine.DeleteRun(id))
+        if (!ReviewEngine.DeleteRun(id, editKey))
         {
             failureMessage = "The run could not be deleted (it may still be running or already be gone).";
             return;
@@ -1395,6 +1440,16 @@
 
         var runId = Guid.NewGuid();
         currentSessionId = runId;
+        // Only this browser gets the run's edit key (kept in its local storage, never shown), so the run link
+        // can be shared to read the report without letting anyone else delete or change the run.
+        editKey = ReviewEngine.ClaimRun(runId);
+        editKeyFor = runId;
+        canEdit = true;
+        try { await JS.InvokeAsync<bool>("traceableReview.saveEditKey", runId.ToString(), editKey); }
+        catch (Exception ex) when (ex is JSException or InvalidOperationException or TaskCanceledException)
+        {
+            Logger.LogDebug("Could not keep the edit key in this browser: {Message}", ex.Message);
+        }
         await ClearDraftAsync();
         editingNew = false;
         formStep = 1;

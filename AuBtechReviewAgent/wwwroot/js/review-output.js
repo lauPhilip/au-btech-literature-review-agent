@@ -61,6 +61,37 @@ window.traceableReview = {
     clearDraft: function () {
         try { window.localStorage.removeItem('traceable-review-draft'); return true; } catch { return false; }
     },
+    // Edit keys: the browser that started a run keeps its key here, and only that browser can change the run
+    // (delete it, submit its screening review, check a citation again). The key is never shown on the page.
+    // Keys older than 30 days are dropped; runs are deleted long before that.
+    saveEditKey: function (runId, key) {
+        try {
+            const all = JSON.parse(window.localStorage.getItem('traceable-edit-keys') || '{}');
+            const cutoff = Date.now() - 30 * 24 * 3600 * 1000;
+            for (const id of Object.keys(all)) if (!all[id] || all[id].t < cutoff) delete all[id];
+            all[runId] = { k: key, t: Date.now() };
+            window.localStorage.setItem('traceable-edit-keys', JSON.stringify(all));
+            return true;
+        } catch { return false; }
+    },
+    getEditKey: function (runId) {
+        try {
+            const all = JSON.parse(window.localStorage.getItem('traceable-edit-keys') || '{}');
+            return all[runId] ? all[runId].k : null;
+        } catch { return null; }
+    },
+    forgetEditKey: function (runId) {
+        try {
+            const all = JSON.parse(window.localStorage.getItem('traceable-edit-keys') || '{}');
+            delete all[runId];
+            window.localStorage.setItem('traceable-edit-keys', JSON.stringify(all));
+            return true;
+        } catch { return false; }
+    },
+    // copyLink: puts the address of the current page on the clipboard.
+    copyLink: async function () {
+        try { await navigator.clipboard.writeText(window.location.href); return true; } catch { return false; }
+    },
     // Browser notifications for a finished run: only when the person asked for them, and only while the tab is
     // in the background (in the foreground the page itself shows it).
     notifyPermission: function () {

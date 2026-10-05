@@ -45,6 +45,14 @@ In the finished report, every citation number is clickable. Click it and you see
 
 TraceableAI is a co-pilot for a human reviewer, not a replacement. Its checks make errors findable; they do not make them impossible. The [developer wiki](docs/wiki/08-setup-and-configuration.md#what-the-checks-do-and-do-not-catch) is precise about what the checks catch and what they miss.
 
+## How it compares
+
+![TraceableAI and other literature-review tools placed by autonomy (how much of the review the tool does by itself) and traceability (audit trail, citations checked against the paper, PRISMA flow). TraceableAI is alone in the high-autonomy, high-traceability corner.](docs/img/tools-2x2.svg)
+
+Tools that keep a careful record, such as ASReview and Rayyan, leave the screening to you. Tools that do the work for you, such as the deep-research assistants, give you an answer you cannot easily check. TraceableAI aims for the corner where it does the work and keeps the receipts.
+
+*The positions are the authors' qualitative assessment of each tool's documented features as of October 2026, not a measured benchmark. Tools change quickly; corrections are welcome as an issue.*
+
 ## Try it
 
 You need the [.NET 10 SDK](https://dotnet.microsoft.com/en-us/download/dotnet/10.0) and a [Mistral](https://mistral.ai/) API key, or a local model through Ollama.
