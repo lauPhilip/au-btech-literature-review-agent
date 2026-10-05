@@ -103,7 +103,7 @@
             "everything the run produces: the protocol, the search results, every screening decision, the downloaded open-access papers, the " +
             "report and a record of every model call. This is what makes the review checkable.",
             $"A run is kept for {RunsOptions.RetentionDays} days after it is created and then deleted automatically, files and all. Anyone who has " +
-            "the link to a run can open it; the links contain a random identifier that cannot be guessed, and they are not listed anywhere or shown to search engines.",
+            "the link to a run can read it, but only the browser that started it can change or delete it; the links contain a random identifier that cannot be guessed, and they are not listed anywhere or shown to search engines.",
         }),
         ("keys", "Your API keys", new[]
         {
@@ -115,6 +115,9 @@
             "While you fill in the review form, an unfinished draft (the question, criteria and options, never your keys) is kept in your browser's " +
             "local storage, so closing the tab does not lose it. It stays on your device until you start the review or press Start empty, and is " +
             "ignored after 30 days. If you ask to be notified when a review is ready, your browser shows the notification; nothing is sent anywhere else.",
+            "When you start a review, your browser also keeps a random edit key for that run. Only the browser that has it can delete the run, " +
+            "change its screening, check a citation again or write notes; anyone else with the link can only read it. The server stores only a " +
+            "fingerprint of the key, and the key is dropped from your browser after 30 days.",
         }),
         ("reuse", "What is kept longer", new[]
         {
