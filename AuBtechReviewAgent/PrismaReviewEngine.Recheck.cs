@@ -50,8 +50,9 @@ public partial class PrismaReviewEngine
         }
     }
 
-    public async Task<CitationSupportResult> RecheckCitationAsync(Guid runId, string field, int sentenceIndex, int reference, UserApiKeys? userKeys = null)
+    public async Task<CitationSupportResult> RecheckCitationAsync(Guid runId, string field, int sentenceIndex, int reference, UserApiKeys? userKeys = null, string? editKey = null)
     {
+        if (!CanEdit(runId, editKey)) throw new RecheckException("Only the browser that started this run can check its citations again.");
         var gate = RecheckLocks.GetOrAdd(runId, _ => new SemaphoreSlim(1, 1));
         if (!await gate.WaitAsync(TimeSpan.Zero)) throw new RecheckException("A citation of this run is being checked again already. Try again in a moment.");
         try
@@ -94,7 +95,10 @@ public partial class PrismaReviewEngine
                 fullText = new FullTextResult(Array.Empty<DocumentChunk>(), "none", null);
             }
             if (fullText.Chunks.Count > 0 && (!state.FullTextSources.TryGetValue(record.PaperId, out var had) || had.StartsWith("none", StringComparison.Ordinal)))
+            {
                 state.FullTextSources[record.PaperId] = $"{fullText.Source} (fetched for a re-check after the run)";
+                if (IsWebAddress(fullText.Url)) state.FullTextUrls[record.PaperId] = fullText.Url!;
+            }
 
             var referenced = new ReferencedPaper(reference, record.PaperId, record.Title, paper.Abstract, fullText.Chunks);
             var extraction = state.Extractions?.FirstOrDefault(e => e.ReferenceNumber == reference);

@@ -76,12 +76,21 @@ public partial class PrismaReviewEngine
         return GenerateWorkspaceArchive(sessionId, report, state.SynthesizedRecords, state);
     }
 
-    /// <summary>references.bib / references.ris for a run, or null if the run does not exist.</summary>
+    /// <summary>
+    /// references.bib / references.ris (the included studies) or screened.ris (every screened record, tagged with
+    /// its decision) for a run, or null if the run does not exist.
+    /// </summary>
     public string? ExportReferences(Guid sessionId, string format)
     {
         var state = LoadState(sessionId);
         if (state == null) return null;
-        return format == "ris" ? BibliographyExporter.ToRis(state.SynthesizedRecords) : BibliographyExporter.ToBibTeX(state.SynthesizedRecords);
+        return format switch
+        {
+            "ris" => BibliographyExporter.ToRis(state.SynthesizedRecords),
+            "screened" => BibliographyExporter.ToScreenedRis(state.Phases.Screening,
+                state.SynthesizedRecords.GroupBy(r => r.PaperId).ToDictionary(g => g.Key, g => g.First().ReferenceNumber)),
+            _ => BibliographyExporter.ToBibTeX(state.SynthesizedRecords),
+        };
     }
 
     // NOTE: historically named GenerateManuscriptPdf, but it never compiled a PDF - it always returned a
@@ -405,13 +414,16 @@ public partial class PrismaReviewEngine
         AddText("main.tex", sb.ToString());
         AddText("references.bib", BibliographyExporter.ToBibTeX(records));
         AddText("references.ris", BibliographyExporter.ToRis(records));
+        if (state != null)
+            AddText("screened.ris", BibliographyExporter.ToScreenedRis(state.Phases.Screening,
+                records.GroupBy(r => r.PaperId).ToDictionary(g => g.Key, g => g.First().ReferenceNumber)));
 
         string isolatedFolder = GetWorkspaceFolderPath(sessionId);
         // Audit files kept at the archive root, in this order.
         string[] rootFiles =
         {
             "protocol.md", "transparent-process.json", "prisma-report.json", "llm-calls.json", "extraction.json",
-            "citation-audit.json", "thematic-codebook.json", "run-metrics.json", "peer-review-feedback.json", "stylistic-transformation-ledger.json", "grounded-outline.txt",
+            "citation-audit.json", "reviewer-notes.json", "thematic-codebook.json", "run-metrics.json", "peer-review-feedback.json", "stylistic-transformation-ledger.json", "grounded-outline.txt",
         };
         foreach (var name in rootFiles)
         {
