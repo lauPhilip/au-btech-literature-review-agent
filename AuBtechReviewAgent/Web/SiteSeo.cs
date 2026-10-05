@@ -30,7 +30,8 @@ public static class SiteSeo
     public static readonly IReadOnlyList<(string Path, string ChangeFrequency, string Priority)> IndexedPages = new[]
     {
         ("/", "monthly", "1.0"),
-        ("/review", "monthly", "0.8"),
+        ("/start", "monthly", "0.8"),
+        ("/review", "monthly", "0.7"),
         ("/metrics", "daily", "0.5"),
         ("/glossary", "monthly", "0.4"),
         ("/about", "monthly", "0.6"),
