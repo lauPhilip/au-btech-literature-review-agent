@@ -1,50 +1,256 @@
 @page "/mlr"
 @page "/mlr/{RunId:guid}"
+@rendermode InteractiveServer
 @inject AuBtechReviewAgent.ReviewModulesOptions ModuleOptions
 @inject AuBtechReviewAgent.RunStore Runs
+@inject AuBtechReviewAgent.MultivocalPlanner Planner
 @inject NavigationManager Nav
+@inject IJSRuntime JS
 
-@* The multivocal review's own entry page. While the module is being built it is a preview: visible only where
-   ReviewModules:Preview lists "multivocal" (Development), and "not found" everywhere else. It shows the steps of the
-   Garousi et al. (2019) guidelines the module will follow and which of them are built. *@
+@* The multivocal review's planning form (MLR block C): the steps of the Garousi et al. (2019) guidelines before any
+   search, one step per screen, ending in the protocol (G1). While the module is being built it is a preview: visible
+   only where ReviewModules:Preview lists "multivocal" (Development), and "not found" everywhere else. /mlr/{id} shows
+   a planned run and its protocol. *@
 
-<SeoHead Title="Multivocal literature review (preview)" Path="/mlr" NoIndex="true"
+<SeoHead Title="@(GreyOnly ? "Grey literature review (preview)" : "Multivocal literature review (preview)")" Path="/mlr" NoIndex="true"
          Description="Preview of the multivocal literature review, following the Garousi et al. (2019) guidelines." />
 
 <SiteHeader />
 
 <main id="main" tabindex="-1" class="flex-1 min-h-0 overflow-y-auto bg-gray-50 text-gray-900 font-sans">
-    <div class="ui-container py-14 lg:py-20 max-w-4xl">
+    <div class="ui-container py-12 lg:py-16 max-w-4xl">
         <p class="ui-eyebrow">Preview, not available yet</p>
-        <h1 class="ui-h1 mt-3">Multivocal Literature Review</h1>
-        <p class="ui-lead mt-4">
-            A multivocal review adds grey literature, such as reports, documentation and practitioner articles, to the
-            academic studies. It follows the guidelines of
-            <a href="@Method.StandardUrl" target="_blank" rel="noopener" class="text-brand underline underline-offset-2">Garousi, Felderer and Mäntylä (2019)</a>,
-            and, like every review here, each statement in its report will be traced to a quote from the source it cites.
-        </p>
+        <h1 class="ui-h1 mt-3">@(GreyOnly ? "Grey Literature Review" : "Multivocal Literature Review")</h1>
 
-        @if (RunId != null)
+        @if (planned != null)
         {
-            <p class="ui-card mt-8 p-5 text-sm text-gray-700">Multivocal runs cannot be opened yet: this part is not built.</p>
+            <p class="ui-lead mt-4">The plan is written. Its protocol below was fixed before any search, with this fingerprint:</p>
+            <p class="mt-3 font-mono text-xs text-gray-700 break-all">SHA-256 @planned.ProtocolSha256</p>
+            <div class="ui-card mt-6 p-5">
+                <h2 class="font-semibold">Next: searching</h2>
+                <p class="text-sm text-gray-700 mt-1">Searching grey and formal literature is the next part to be built (block D). This run stops at the plan until then.</p>
+                <a href="@($"/api/workspace/{planned.RunId:N}/protocol.md")" class="ui-btn-secondary ui-btn-sm mt-4">Download the protocol</a>
+            </div>
+            <h2 class="text-lg font-semibold mt-10">The protocol</h2>
+            <pre class="ui-card mt-3 p-5 text-xs leading-relaxed whitespace-pre-wrap break-words" tabindex="0">@protocolText</pre>
         }
+        else if (RunId != null)
+        {
+            <p class="ui-card mt-8 p-5 text-sm text-gray-700">This run could not be found. It may have expired and been deleted.</p>
+        }
+        else
+        {
+            <p class="ui-lead mt-4">
+                Plan the review step by step, following the guidelines of
+                <a href="@Method.StandardUrl" target="_blank" rel="noopener" class="text-brand underline underline-offset-2">Garousi, Felderer and Mäntylä (2019)</a>.
+                The answers become the protocol, which is fixed before anything is searched.
+            </p>
 
-        <h2 class="text-lg font-semibold mt-12">The steps it will follow</h2>
-        <p class="ui-muted mt-2">Each step names the guideline it implements. None of them runs yet; they are built one block at a time.</p>
-        <ol class="mt-6 space-y-3">
-            @foreach (var step in Steps)
-            {
-                var s = step;
-                <li class="ui-card p-5 flex flex-col sm:flex-row sm:items-start gap-3 sm:gap-6">
-                    <div class="sm:w-44 flex-none">
-                        <p class="text-xs font-medium text-gray-500">@s.Phase</p>
-                        <p class="font-semibold text-gray-950">@s.Name</p>
+            <nav aria-label="Planning steps" class="mt-8">
+                <ol class="flex flex-wrap gap-2 text-xs">
+                    @for (int i = 0; i < StepNames.Length; i++)
+                    {
+                        int index = i;
+                        <li>
+                            <button type="button" class="@(index == step ? "ui-chip border-brand bg-brand text-white" : "ui-chip border-gray-300 bg-white text-gray-700 hover:border-brand")"
+                                    aria-current="@(index == step ? "step" : null)" @onclick="() => GoTo(index)">
+                                @(index + 1). @StepNames[index]
+                            </button>
+                        </li>
+                    }
+                </ol>
+            </nav>
+
+            <section class="ui-card mt-6 p-6" aria-labelledby="step-title">
+                <h2 id="step-title" class="text-lg font-semibold" tabindex="-1">@StepNames[step]</h2>
+
+                @if (step == 0)
+                {
+                    <p class="ui-muted mt-1">G2: find existing reviews first, and plan the review to be useful for its audience.</p>
+                    <button type="button" class="ui-btn-ghost ui-btn-sm mt-3" @onclick="FillExample">Fill in an example</button>
+                    <div class="mt-5 space-y-5">
+                        <div>
+                            <label for="p-topic" class="ui-label">Topic</label>
+                            <input id="p-topic" class="ui-input" maxlength="@AuBtechReviewAgent.MultivocalPlan.MaxText" @bind="plan.Topic" @bind:event="oninput" placeholder="e.g. context engineering for LLM agents" />
+                        </div>
+                        <div>
+                            <label for="p-goal" class="ui-label">Goal of the review</label>
+                            <textarea id="p-goal" rows="3" class="ui-input" maxlength="@AuBtechReviewAgent.MultivocalPlan.MaxText" @bind="plan.Goal" @bind:event="oninput"></textarea>
+                        </div>
+                        <div>
+                            <label for="p-existing" class="ui-label">Existing reviews on the topic</label>
+                            <textarea id="p-existing" rows="3" class="ui-input" maxlength="@AuBtechReviewAgent.MultivocalPlan.MaxText" @bind="plan.ExistingReviews" @bind:event="oninput" aria-describedby="h-existing"></textarea>
+                            <p id="h-existing" class="ui-muted mt-1">Name them, and say what this review adds. Leave empty if you found none.</p>
+                        </div>
+                        <fieldset>
+                            <legend class="ui-label">Who is the review for?</legend>
+                            <div class="flex flex-wrap gap-4 mt-1 text-sm">
+                                @foreach (var audience in Enum.GetValues<AuBtechReviewAgent.ReviewAudience>())
+                                {
+                                    var a = audience;
+                                    <label class="inline-flex items-center gap-2">
+                                        <input type="radio" name="audience" checked="@(plan.Audience == a)" @onchange="() => plan.Audience = a" />
+                                        @AudienceLabel(a)
+                                    </label>
+                                }
+                            </div>
+                        </fieldset>
                     </div>
-                    <p class="text-sm text-gray-700 flex-1">@s.What</p>
-                    <span class="ui-chip border-gray-200 bg-gray-50 text-gray-600 whitespace-nowrap self-start">@s.Guidelines · not built</span>
-                </li>
-            }
-        </ol>
+                }
+                else if (step == 1)
+                {
+                    <p class="ui-muted mt-1">G3, Table 4: one or more "yes" answers suggest including grey literature.</p>
+                    <ol class="mt-5 space-y-4">
+                        @for (int i = 0; i < AuBtechReviewAgent.MultivocalGuidelines.IncludeGreyQuestions.Count; i++)
+                        {
+                            int q = i;
+                            <li>
+                                <fieldset>
+                                    <legend class="text-sm text-gray-800">@(q + 1). @AuBtechReviewAgent.MultivocalGuidelines.IncludeGreyQuestions[q]</legend>
+                                    <div class="flex gap-5 mt-1 text-sm">
+                                        <label class="inline-flex items-center gap-2"><input type="radio" name="@($"g3-{q}")" checked="@(plan.IncludeGrey[q] == true)" @onchange="() => plan.IncludeGrey[q] = true" /> Yes</label>
+                                        <label class="inline-flex items-center gap-2"><input type="radio" name="@($"g3-{q}")" checked="@(plan.IncludeGrey[q] == false)" @onchange="() => plan.IncludeGrey[q] = false" /> No</label>
+                                    </div>
+                                </fieldset>
+                            </li>
+                        }
+                    </ol>
+                    @if (plan.IncludeGrey.All(a => a == false))
+                    {
+                        <p class="ui-chip-partial mt-5" role="status">Every answer is "no": by the guidelines, a systematic review may be enough. You can still go on.</p>
+                    }
+                }
+                else if (step == 2)
+                {
+                    <p class="ui-muted mt-1">G4 and G5: questions tied to the goal and the audience, each with its type from Table 6.</p>
+                    <ol class="mt-5 space-y-4">
+                        @foreach (var (number, question) in plan.Numbered())
+                        {
+                            var q = question;
+                            int index = plan.Questions.IndexOf(q);
+                            var type = AuBtechReviewAgent.MultivocalGuidelines.FindType(q.Type);
+                            <li class="@(q.Parent != null ? "ml-6 sm:ml-10" : "")">
+                                <div class="flex flex-col sm:flex-row gap-3">
+                                    <div class="flex-1">
+                                        <label for="@($"rq-{index}")" class="ui-label">@number</label>
+                                        <textarea id="@($"rq-{index}")" rows="2" class="ui-input" maxlength="@AuBtechReviewAgent.MultivocalPlan.MaxText" @bind="q.Text" @bind:event="oninput"></textarea>
+                                    </div>
+                                    <div class="sm:w-64">
+                                        <label for="@($"rqt-{index}")" class="ui-label">Type</label>
+                                        <select id="@($"rqt-{index}")" class="ui-input" @bind="q.Type">
+                                            <option value="">Choose a type</option>
+                                            @foreach (var t in AuBtechReviewAgent.MultivocalGuidelines.QuestionTypes)
+                                            {
+                                                <option value="@t.Key">@t.Name: @t.Pattern</option>
+                                            }
+                                        </select>
+                                    </div>
+                                </div>
+                                @if (type is { HardForSources: true })
+                                {
+                                    <p class="text-xs text-verdict-partial mt-1">Sources may not allow a question of this type to be answered (p. 110).</p>
+                                }
+                                <div class="flex gap-3 mt-2">
+                                    @if (q.Parent == null && plan.Questions.Count < AuBtechReviewAgent.MultivocalPlan.MaxQuestions)
+                                    {
+                                        <button type="button" class="ui-btn-ghost ui-btn-sm" @onclick="() => plan.AddQuestion(index)">Add a sub-question to @number</button>
+                                    }
+                                    @if (plan.Questions.Count > 1)
+                                    {
+                                        <button type="button" class="ui-btn-ghost ui-btn-sm" @onclick="() => plan.RemoveQuestion(index)">Remove @number</button>
+                                    }
+                                </div>
+                            </li>
+                        }
+                    </ol>
+                    @if (plan.Questions.Count < AuBtechReviewAgent.MultivocalPlan.MaxQuestions)
+                    {
+                        <button type="button" class="ui-btn-secondary ui-btn-sm mt-5" @onclick="() => plan.AddQuestion(null)">Add a research question</button>
+                    }
+                }
+                else if (step == 3)
+                {
+                    <p class="ui-muted mt-1">G6 to G8 and G11: what to search, where, when to stop, and how good a grey source must be.</p>
+                    <fieldset class="mt-5">
+                        <legend class="ui-label">Kinds of grey literature (G6)</legend>
+                        <div class="grid sm:grid-cols-2 gap-2 mt-1 text-sm">
+                            @foreach (var (key, label) in AuBtechReviewAgent.MultivocalGuidelines.GreyTypes)
+                            {
+                                var k = key;
+                                <label class="inline-flex items-start gap-2"><input type="checkbox" class="mt-1" checked="@plan.GreyTypes.Contains(k)" @onchange="e => plan.GreyTypes = Toggle(plan.GreyTypes, k, e, AuBtechReviewAgent.MultivocalGuidelines.GreyTypes.Select(t => t.Key))" /> @label</label>
+                            }
+                        </div>
+                    </fieldset>
+                    <fieldset class="mt-6">
+                        <legend class="ui-label">Where to search (G7)</legend>
+                        <div class="grid sm:grid-cols-2 gap-2 mt-1 text-sm">
+                            @foreach (var search in AuBtechReviewAgent.MultivocalGuidelines.GreySearches)
+                            {
+                                var s = search;
+                                <label class="inline-flex items-start gap-2"><input type="checkbox" class="mt-1" checked="@plan.GreySearches.Contains(s.Key)" @onchange="e => plan.GreySearches = Toggle(plan.GreySearches, s.Key, e, AuBtechReviewAgent.MultivocalGuidelines.GreySearches.Select(t => t.Key))" /> @s.Label</label>
+                            }
+                        </div>
+                        <p class="ui-muted mt-2">No general web search engine is used unless you add your own Brave Search API key. Practitioners and authors are not contacted.</p>
+                    </fieldset>
+                    <fieldset class="mt-6">
+                        <legend class="ui-label">When to stop searching (G8)</legend>
+                        <div class="space-y-1 mt-1 text-sm">
+                            @foreach (var (key, label) in AuBtechReviewAgent.MultivocalGuidelines.StoppingRules)
+                            {
+                                var k = key;
+                                <label class="flex items-start gap-2"><input type="radio" name="stopping" class="mt-1" checked="@(plan.StoppingRule == k)" @onchange="() => plan.StoppingRule = k" /> @label</label>
+                            }
+                        </div>
+                        @if (plan.StoppingRule == "effort")
+                        {
+                            <label for="p-top" class="ui-label mt-3">Top hits per search string</label>
+                            <input id="p-top" type="number" min="10" max="500" class="ui-input w-32" @bind="plan.TopHits" />
+                        }
+                    </fieldset>
+                    <div class="mt-6">
+                        <label for="p-threshold" class="ui-label">Quality threshold (G11)</label>
+                        <div class="flex items-center gap-2 text-sm">
+                            <input id="p-threshold" type="number" min="1" max="@AuBtechReviewAgent.MultivocalGuidelines.QualityPointsMax" class="ui-input w-24" aria-describedby="h-threshold" @bind="plan.QualityThreshold" />
+                            <span>of @AuBtechReviewAgent.MultivocalGuidelines.QualityPointsMax points</span>
+                        </div>
+                        <p id="h-threshold" class="ui-muted mt-1">A grey source scoring below this on the quality checklist (Table 7) is excluded. The paper's example uses 10.</p>
+                    </div>
+                }
+                else
+                {
+                    <p class="ui-muted mt-1">G1: the protocol below is written from your answers and fixed before any search.</p>
+                    @if (Problems.Count > 0)
+                    {
+                        <div class="mt-5 border border-amber-200 bg-verdict-partialBg p-4 text-sm" role="alert">
+                            <p class="font-semibold">Before the protocol can be written:</p>
+                            <ul class="list-disc ml-5 mt-1">
+                                @foreach (var problem in Problems) { <li>@problem</li> }
+                            </ul>
+                        </div>
+                    }
+                    <pre class="mt-5 border border-gray-200 bg-gray-50 p-4 text-xs leading-relaxed whitespace-pre-wrap break-words" tabindex="0" aria-label="Protocol preview">@ProtocolPreview</pre>
+                    @if (error != null)
+                    {
+                        <p class="text-sm text-red-700 mt-3" role="alert">@error</p>
+                    }
+                }
+
+                <div class="flex flex-wrap gap-3 mt-8">
+                    @if (step > 0)
+                    {
+                        <button type="button" class="ui-btn-secondary" @onclick="() => GoTo(step - 1)">Back</button>
+                    }
+                    @if (step < StepNames.Length - 1)
+                    {
+                        <button type="button" class="ui-btn-primary" @onclick="() => GoTo(step + 1)">Next</button>
+                    }
+                    else
+                    {
+                        <button type="button" class="ui-btn-primary" disabled="@(Problems.Count > 0 || saving)" @onclick="WriteProtocolAsync">Write the protocol</button>
+                    }
+                </div>
+            </section>
+        }
 
         <p class="ui-muted mt-10">
             The plan, step by step, is in
@@ -58,31 +264,95 @@
 @code {
     [Parameter] public Guid? RunId { get; set; }
 
+    /// <summary>"grey" when started from the Grey Literature Review card.</summary>
+    [SupplyParameterFromQuery(Name = "card")] public string? CardKey { get; set; }
+
     private static readonly AuBtechReviewAgent.ReviewMethod Method = AuBtechReviewAgent.ReviewMethods.Find("multivocal")!;
+    private static readonly string[] StepNames = { "Need and audience", "Include grey literature?", "Research questions", "Search and quality", "Protocol" };
 
-    private sealed record Step(string Phase, string Name, string What, string Guidelines);
+    private AuBtechReviewAgent.MultivocalPlan plan = new();
+    private AuBtechReviewAgent.PlannedRun? planned;
+    private string protocolText = "";
+    private int step;
+    private bool saving;
+    private string? error;
 
-    private static readonly Step[] Steps =
-    {
-        new("Planning", "Need and audience", "Look for existing reviews first, and decide who the review is for: researchers, practitioners or both.", "G1–G2"),
-        new("Planning", "Include grey literature?", "Answer the seven questions that show whether grey literature is needed.", "G3"),
-        new("Planning", "Research questions", "Write the questions, each tied to the goal and the audience, and choose their types.", "G4–G5"),
-        new("Search", "What and where", "Choose the kinds of grey literature and their producers, then the search engines, sites and backlinks to use.", "G6–G7"),
-        new("Search", "When to stop", "Choose a stopping rule: saturation, a fixed number of hits, or all the evidence.", "G8"),
-        new("Selection", "Criteria and process", "Screen grey and academic sources with the same criteria and the same care.", "G9–G10"),
-        new("Selection", "Quality", "Score each grey source on authority, method, objectivity, date and the other criteria, each answer with a quote.", "G11"),
-        new("Analysis", "Map and extraction", "Build a systematic map of the sources and extract the data, every item linked to its place in the source.", "G12"),
-        new("Analysis", "Synthesis", "Code the findings and write the synthesis, every statement checked against its source.", "G13"),
-        new("Reporting", "Report", "A report for researchers and a short version for practitioners, structured by the guidelines.", "G14"),
-    };
+    private bool GreyOnly => planned?.Plan.IsGreyOnly ?? plan.IsGreyOnly;
+    private IReadOnlyList<string> Problems => plan.Problems();
+    private string ProtocolPreview =>
+        AuBtechReviewAgent.MultivocalProtocol.Write(plan, Guid.Empty, DateTime.UtcNow).Replace(Guid.Empty.ToString(), "assigned when the protocol is written");
 
     protected override void OnParametersSet()
     {
         var module = AuBtechReviewAgent.ReviewModules.Find("multivocal")!;
         if (!ModuleOptions.CanOpen(module)) { Nav.NotFound(); return; }
 
-        // A systematic run opened here goes to its own page.
-        if (RunId is Guid id && AuBtechReviewAgent.ReviewModules.ElsewhereFor(Runs.LoadHeader(id), module.Key) is string elsewhere)
-            Nav.NavigateTo(elsewhere, replace: true);
+        if (RunId is Guid id)
+        {
+            // A systematic run opened here goes to its own page.
+            if (AuBtechReviewAgent.ReviewModules.ElsewhereFor(Runs.LoadHeader(id), module.Key) is string elsewhere)
+            {
+                Nav.NavigateTo(elsewhere, replace: true);
+                return;
+            }
+            planned = Planner.Load(id);
+            protocolText = Runs.ReadProtocol(id) ?? "";
+            return;
+        }
+        plan.Card = CardKey == "grey" ? "grey" : "multivocal";
+    }
+
+    private async Task GoTo(int index)
+    {
+        step = Math.Clamp(index, 0, StepNames.Length - 1);
+        error = null;
+        try { await JS.InvokeVoidAsync("traceableReview.focus", "step-title"); }
+        catch (JSException) { }
+        catch (JSDisconnectedException) { }
+    }
+
+    // Ticks or unticks one key, keeping the guidelines' order so the protocol lists them the same way every time.
+    private static List<string> Toggle(List<string> list, string key, ChangeEventArgs e, IEnumerable<string> order)
+    {
+        bool on = e.Value is bool b && b;
+        var chosen = list.Where(k => k != key).Concat(on ? new[] { key } : Array.Empty<string>()).ToHashSet();
+        return order.Where(chosen.Contains).ToList();
+    }
+
+    // Fills every step with a complete example (preview only), so the form and the protocol can be tried quickly.
+    private void FillExample()
+    {
+        plan = AuBtechReviewAgent.MultivocalPlan.Example(plan.Card);
+        error = null;
+    }
+
+    private static string AudienceLabel(AuBtechReviewAgent.ReviewAudience audience) => audience switch
+    {
+        AuBtechReviewAgent.ReviewAudience.Researchers => "Researchers",
+        AuBtechReviewAgent.ReviewAudience.Practitioners => "Practitioners",
+        _ => "Both",
+    };
+
+    private async Task WriteProtocolAsync()
+    {
+        if (saving) return;
+        saving = true;
+        error = null;
+        try
+        {
+            var (runId, editKey) = await Planner.CreateAsync(plan);
+            // Only this browser keeps the run's edit key, as for a systematic review.
+            try { await JS.InvokeVoidAsync("traceableReview.saveEditKey", runId.ToString(), editKey); }
+            catch (JSException) { }
+            Nav.NavigateTo($"/mlr/{runId}");
+        }
+        catch (ArgumentException ex)
+        {
+            error = ex.Message;
+        }
+        finally
+        {
+            saving = false;
+        }
     }
 }

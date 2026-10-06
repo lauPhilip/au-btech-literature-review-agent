@@ -59,7 +59,7 @@
                         }
                         else if (preview)
                         {
-                            <a href="@owner.RoutePrefix" class="ui-btn-secondary w-full" aria-describedby="@titleId">Open the preview</a>
+                            <a href="@($"{owner.RoutePrefix}?card={m.Key}")" class="ui-btn-secondary w-full" aria-describedby="@titleId">Open the preview</a>
                             <p class="text-xs text-gray-500 mt-2">Shown here only while it is being built; not available to others yet.</p>
                         }
                         else
