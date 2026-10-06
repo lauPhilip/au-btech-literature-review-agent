@@ -43,6 +43,7 @@ public sealed class RunStore
     private readonly RunsOptions _options;
     private readonly Func<Guid, bool> _isActive;
 
+    /// <summary>Creates the store for the run folders under <paramref name="workspaceRoot"/>.</summary>
     /// <param name="workspaceRoot">Folder holding one sub-folder per run.</param>
     /// <param name="options">Run settings (the demo run id).</param>
     /// <param name="isActive">Whether a run is still going; a running review cannot be changed or deleted.</param>
