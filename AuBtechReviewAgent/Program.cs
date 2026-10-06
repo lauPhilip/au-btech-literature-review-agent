@@ -110,7 +110,7 @@ builder.Services.AddSingleton(reviewEngine);
 builder.Services.AddSingleton(reviewEngine.Store); // the run folders, shared by every kind of review
 var multivocalPlanner = new AuBtechReviewAgent.MultivocalPlanner(reviewEngine.Store);
 builder.Services.AddSingleton(multivocalPlanner); // multivocal planning (preview)
-builder.Services.AddSingleton(new AuBtechReviewAgent.MultivocalSearcher(reviewEngine.Store, multivocalPlanner)); // multivocal grey searches (preview)
+builder.Services.AddSingleton(new AuBtechReviewAgent.MultivocalSearcher(reviewEngine.Store, multivocalPlanner, key => AuBtechReviewAgent.GreySourceCatalog.Create(key, openSources.ContactEmail))); // multivocal grey searches (preview)
 // Modules shown as a preview while they are being built (Development only; see ReviewModulesOptions).
 builder.Services.AddSingleton(AuBtechReviewAgent.ReviewModulesOptions.From(builder.Configuration, builder.Environment.IsDevelopment()));
 
