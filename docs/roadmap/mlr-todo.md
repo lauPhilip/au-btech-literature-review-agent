@@ -103,12 +103,15 @@ Block A is now the module design in [review-modules.md](review-modules.md), step
 
 - [x] GL types and producers chosen in planning (G6) and recorded in the protocol (block C).
 - [x] The free site sources (G7) behind one interface, `IGreySource` in `Modules/Multivocal/GreySources/`: Stack Exchange (keeping score, views and answers for the impact item of the quality checklist), GitHub (stars, forks) and Hacker News (points, comments), plus Zenodo reports, theses and white papers. Each keeps its raw answers and is timed in `SourceStatus`; only http(s) addresses are kept. dev.to is dropped: its public API has no search. Tested offline against the answer shapes the APIs document; the first live run must confirm them.
-- [ ] Saving the raw answers with SHA-256 in the run folder, and caching them, when the search runs (with the run contract).
+- [x] Running the grey searches of a planned run (`Multivocal/MultivocalSearch.cs`): every chosen search that is built, with every grey search string, from the run page's "Search now" button (only the browser that planned the run). Each raw answer is saved as received in `SourceResponses/` with its SHA-256; the sources found are de-duplicated by address and each keeps the searches that found it; a failing search is recorded and the others still run; searches not built yet are listed as skipped. All of it goes into `multivocal-ledger.json`, which is in the run archive. The run moves from "Planned" to "Searched".
+- [ ] Caching the raw answers between runs, and the run contract (`RunAsync`, `StagesFor`) with the multivocal entry in the module test kit.
 - [ ] Grey literature in OpenAlex (reports, theses, other), through the existing adapter with a type filter. Zenodo is done (above).
 - [ ] Brave web search as an optional source, used only when the reviewer adds their own key (kept with the other personal keys, never stored on the server).
 - [ ] Videos only with a published transcript (decision 3).
-- [ ] Two sets of search strings, formal and grey, previewed and approved in planning.
-- [ ] Stopping rule (G8): effort bounded by default (top N per string; one more page while the last page still adds relevant sources); saturation per grey string with `SearchSaturation`; where each string stopped goes into the methods text.
+- [x] Grey search strings (up to five) planned in step 4 and written into the protocol; without any, the topic is the search string.
+- [ ] Formal search strings for the formal pool, previewed and approved in planning.
+- [x] Stopping rule (G8), first version: effort bounded asks for the top N hits of each string (at most one page of 100), exhaustion takes the whole first page, and saturation stops a search once a string adds no new source. The rule as applied is written in words into the ledger for the methods text.
+- [ ] Stopping rule, next: one more page while the last page still adds relevant sources, which needs screening (block E).
 - [ ] Link snowballing from the included grey sources (backlinks, G7), through the same duplicate check as citation chaining.
 - [ ] A snapshot of each fetched page: extracted text, URL, access date, SHA-256. See decision 2.
 - [ ] `robots.txt`, rate limits and site terms respected; nothing behind a login.

@@ -77,6 +77,10 @@ public static class MultivocalProtocol
             sb.AppendLine("- A talk or video counts only when its transcript is published with it; quotes are checked against that transcript.");
         sb.AppendLine("- Practitioners and authors are not contacted for sources; only sources found by the searches are reviewed.");
         sb.AppendLine();
+        sb.AppendLine(plan.GreySearchStrings.Count > 0 ? "Search strings for grey literature (G7):" : "Search string for grey literature (G7), the topic:");
+        foreach (var text in plan.EffectiveGreySearchStrings)
+            sb.AppendLine($"- {text}");
+        sb.AppendLine();
         var rule = MultivocalGuidelines.StoppingRules.First(r => r.Key == plan.StoppingRule);
         sb.AppendLine($"Stopping rule (G8): {rule.Label}{(plan.StoppingRule == "effort" ? $", the top {plan.TopHits} hits of each search string" : "")}.");
         sb.AppendLine();

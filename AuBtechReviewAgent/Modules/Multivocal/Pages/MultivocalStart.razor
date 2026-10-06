@@ -4,6 +4,7 @@
 @inject AuBtechReviewAgent.ReviewModulesOptions ModuleOptions
 @inject AuBtechReviewAgent.RunStore Runs
 @inject AuBtechReviewAgent.MultivocalPlanner Planner
+@inject AuBtechReviewAgent.MultivocalSearcher Searcher
 @inject NavigationManager Nav
 @inject IJSRuntime JS
 @inject ILogger<MultivocalStart> Logger
@@ -44,7 +45,7 @@
                 <div class="bg-white border border-gray-200 shadow-sm p-4 space-y-3">
                     <div>
                         <h2 class="text-sm font-semibold text-gray-900">Review settings</h2>
-                        <p class="text-xs font-medium text-brand">Planned: the protocol is written; searching is the next part to be built</p>
+                        <p class="text-xs font-medium text-brand">@StageLine()</p>
                     </div>
                     <dl class="text-xs space-y-2">
                         @SettingRow("Topic", planned.Plan.Topic)
@@ -52,8 +53,35 @@
                         @SettingRow("Audience", AudienceLabel(planned.Plan.Audience))
                         @SettingRow("Questions", string.Join(" ", planned.Plan.Numbered().Select(q => q.Number)))
                         @SettingRow("Searches", string.Join(", ", planned.Plan.GreySearches.Select(k => AuBtechReviewAgent.MultivocalGuidelines.GreySearches.First(s => s.Key == k).Label)))
+                        @SettingRow("Strings", string.Join("; ", planned.Plan.EffectiveGreySearchStrings))
                         @SettingRow("Threshold", $"{planned.Plan.QualityThreshold} of {AuBtechReviewAgent.MultivocalGuidelines.QualityPointsMax} points")
+                        @if (ledger != null)
+                        {
+                            @SettingRow("Found", $"{ledger.Sources.Count} grey source{(ledger.Sources.Count == 1 ? "" : "s")} from {ledger.Searches.Count} search{(ledger.Searches.Count == 1 ? "" : "es")}")
+                        }
                     </dl>
+                    @if (ledger == null && stage == AuBtechReviewAgent.MultivocalPlanner.StagePlanned)
+                    {
+                        <div class="border-t border-gray-100 pt-3 space-y-2">
+                            @if (canEdit)
+                            {
+                                <p class="text-xs text-gray-600">Run the grey literature searches of this plan. Their raw answers are saved with fingerprints; nothing is screened yet.</p>
+                                <button type="button" class="ui-btn-primary ui-btn-sm" disabled="@searching" @onclick="SearchAsync">@(searching ? "Searching…" : "Search now")</button>
+                                @if (searchProgress != null)
+                                {
+                                    <p class="text-[11px] text-gray-500" role="status" aria-live="polite">@searchProgress</p>
+                                }
+                            }
+                            else
+                            {
+                                <p class="text-xs text-gray-600">Only the browser that planned this run can start its search.</p>
+                            }
+                            @if (searchError != null)
+                            {
+                                <p class="bg-red-50 border border-red-200 text-red-800 p-2 text-xs" role="alert">@searchError</p>
+                            }
+                        </div>
+                    }
                     <p class="text-[11px] text-gray-500 leading-snug border-t border-gray-100 pt-2">
                         Link to this run: <a class="text-brand underline break-all" href="@($"/mlr/{planned.RunId}")">@($"/mlr/{planned.RunId}")</a>.
                         Protocol fingerprint (SHA-256): <span class="font-mono break-all">@planned.ProtocolSha256</span>
@@ -228,6 +256,26 @@
                                 </div>
                                 <p class="text-xs text-gray-600 mt-1.5">No general web search engine is used unless you add your own Brave Search API key. Practitioners and authors are not contacted.</p>
                             </fieldset>
+                            <fieldset>
+                                <legend class="ui-label">Search strings for grey literature</legend>
+                                <p class="text-xs text-gray-600 mb-1.5">Practitioners use their own words; try the terms they use. Each string is sent to every search. Empty means the topic is used.</p>
+                                <ol class="space-y-1.5">
+                                    @for (int i = 0; i < plan.GreySearchStrings.Count; i++)
+                                    {
+                                        int index = i;
+                                        <li class="flex items-center gap-2">
+                                            <span class="w-4 text-right text-xs text-gray-500">@(index + 1)</span>
+                                            <input type="text" aria-label="@($"Search string {index + 1}")" maxlength="@AuBtechReviewAgent.MultivocalPlan.MaxSearchStringLength"
+                                                   value="@plan.GreySearchStrings[index]" @onchange="e => plan.GreySearchStrings[index] = e.Value?.ToString() ?? string.Empty" class="ui-input py-1" />
+                                            <button type="button" @onclick="() => plan.GreySearchStrings.RemoveAt(index)" class="ui-btn ui-btn-sm px-2 text-gray-600 hover:text-red-700" aria-label="@($"Remove search string {index + 1}")">✕</button>
+                                        </li>
+                                    }
+                                </ol>
+                                @if (plan.GreySearchStrings.Count < AuBtechReviewAgent.MultivocalPlan.MaxSearchStrings)
+                                {
+                                    <button type="button" class="text-xs text-brand font-medium hover:underline mt-1.5" @onclick="AddSearchString">Add a search string</button>
+                                }
+                            </fieldset>
                             <details class="group border border-gray-200" open>
                                 <summary class="cursor-pointer select-none px-3 py-2 text-sm text-gray-800 flex items-center justify-between">
                                     <span>Stopping rule and quality</span>
@@ -319,11 +367,67 @@
                             class="px-3 py-2.5 text-xs border-b-2 -mb-px @(panelTab == "plan" ? "border-brand text-brand font-semibold" : "border-transparent text-gray-500 hover:text-gray-800")">Preview</button>
                     <button type="button" aria-pressed="@(panelTab == "protocol" ? "true" : "false")" @onclick="@(() => panelTab = "protocol")"
                             class="px-3 py-2.5 text-xs border-b-2 -mb-px @(panelTab == "protocol" ? "border-brand text-brand font-semibold" : "border-transparent text-gray-500 hover:text-gray-800")">Protocol</button>
+                    @if (ledger != null)
+                    {
+                        <button type="button" aria-pressed="@(panelTab == "sources" ? "true" : "false")" @onclick="@(() => panelTab = "sources")"
+                                class="px-3 py-2.5 text-xs border-b-2 -mb-px @(panelTab == "sources" ? "border-brand text-brand font-semibold" : "border-transparent text-gray-500 hover:text-gray-800")">Sources found (@ledger.Sources.Count)</button>
+                    }
                 </div>
                 <span class="text-[10px] text-gray-500 font-mono">Garousi et al. 2019</span>
             </div>
 
-            @if (panelTab == "protocol")
+            @if (panelTab == "sources" && ledger != null)
+            {
+                <div class="flex-1 min-h-0 overflow-y-auto p-5 space-y-5 text-left">
+                    <div>
+                        <h3 class="text-base font-semibold text-gray-900">Grey sources found</h3>
+                        <p class="text-xs text-gray-600 mt-0.5">@ledger.StoppingApplied Not screened yet: selection and the quality check come next.</p>
+                    </div>
+                    <table class="w-full text-xs">
+                        <caption class="sr-only">Searches and what they returned</caption>
+                        <thead class="text-left text-gray-500"><tr><th class="py-1 pr-2 font-medium">Search</th><th class="py-1 pr-2 font-medium">String</th><th class="py-1 pr-2 font-medium text-right">Hits</th><th class="py-1 font-medium text-right">New</th></tr></thead>
+                        <tbody>
+                            @foreach (var search in ledger.Searches)
+                            {
+                                <tr class="border-t border-gray-100">
+                                    <td class="py-1 pr-2">@SearchLabel(search.Source)</td>
+                                    <td class="py-1 pr-2 text-gray-700">@search.SearchString</td>
+                                    @if (search.Error != null)
+                                    {
+                                        <td class="py-1 text-red-700" colspan="2" title="@search.Error">failed</td>
+                                    }
+                                    else
+                                    {
+                                        <td class="py-1 pr-2 text-right">@search.Returned</td>
+                                        <td class="py-1 text-right">@search.New</td>
+                                    }
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                    @if (ledger.Skipped.Count > 0)
+                    {
+                        <p class="text-[11px] text-gray-500">Not run: @string.Join("; ", ledger.Skipped.Select(x => $"{SearchLabel(x.Source)} ({x.Reason.TrimEnd('.').ToLowerInvariant()})")).</p>
+                    }
+                    <ol class="space-y-3">
+                        @foreach (var found in ledger.Sources)
+                        {
+                            var r = found.Record;
+                            <li class="border-t border-gray-100 pt-3">
+                                <a href="@r.Url" target="_blank" rel="noopener noreferrer" class="text-sm font-medium text-brand hover:underline">@r.Title</a>
+                                <p class="text-[11px] text-gray-500 mt-0.5">
+                                    @r.Site · @KindLabel(r.Kind)@(r.Producer.Length > 0 ? $" · {r.Producer}" : "")@(r.Published is DateTime d ? $" · {d:yyyy-MM-dd}" : "")@(r.Signals.Count > 0 ? " · " + string.Join(", ", r.Signals.Select(x => $"{x.Key} {x.Value}")) : "")
+                                </p>
+                                @if (r.Summary.Length > 0)
+                                {
+                                    <p class="text-xs text-gray-700 mt-1 line-clamp-3">@r.Summary</p>
+                                }
+                            </li>
+                        }
+                    </ol>
+                </div>
+            }
+            else if (panelTab == "protocol")
             {
                 <pre class="flex-1 min-h-[20rem] overflow-y-auto p-5 text-xs leading-relaxed text-gray-800 whitespace-pre-wrap break-words font-mono" tabindex="0" aria-label="Protocol">@(planned != null ? protocolText : ProtocolPreview)</pre>
             }
@@ -386,6 +490,13 @@
     private AuBtechReviewAgent.MultivocalPlan plan = new();
     private AuBtechReviewAgent.PlannedRun? planned;
     private string protocolText = "";
+    private AuBtechReviewAgent.MultivocalLedger? ledger;
+    private string stage = "";
+    private bool canEdit;
+    private string? editKey;
+    private bool searching;
+    private string? searchProgress;
+    private string? searchError;
     private int step;
     private string panelTab = "plan";
     private bool saving;
@@ -412,7 +523,9 @@
             }
             planned = Planner.Load(id);
             protocolText = Runs.ReadProtocol(id) ?? "";
-            panelTab = "protocol";
+            ledger = Searcher.LoadLedger(id);
+            stage = Runs.LoadHeader(id)?.Stage ?? "";
+            panelTab = ledger != null ? "sources" : "protocol";
             return;
         }
         plan.Card = CardKey == "grey" ? "grey" : "multivocal";
@@ -523,6 +636,61 @@
         plan = AuBtechReviewAgent.MultivocalPlan.Example(plan.Card);
         error = null;
     }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        // The edit key lives only in the browser that planned the run.
+        if (!firstRender || planned == null) return;
+        try { editKey = await JS.InvokeAsync<string?>("traceableReview.getEditKey", planned.RunId.ToString()); }
+        catch (Exception ex) when (ex is JSException or JSDisconnectedException or InvalidOperationException or TaskCanceledException)
+        {
+            Logger.LogDebug("Could not read the edit key: {Message}", ex.Message);
+        }
+        canEdit = Runs.CanEdit(planned.RunId, editKey);
+        StateHasChanged();
+    }
+
+    private async Task SearchAsync()
+    {
+        if (planned == null || searching) return;
+        searching = true;
+        searchError = null;
+        var progress = new Progress<string>(line => { searchProgress = line; _ = InvokeAsync(StateHasChanged); });
+        try
+        {
+            ledger = await Searcher.SearchAsync(planned.RunId, editKey, progress);
+            stage = AuBtechReviewAgent.MultivocalSearcher.StageSearched;
+            panelTab = "sources";
+        }
+        catch (InvalidOperationException ex)
+        {
+            searchError = ex.Message;
+        }
+        finally
+        {
+            searching = false;
+            searchProgress = null;
+        }
+    }
+
+    private string StageLine() => stage switch
+    {
+        AuBtechReviewAgent.MultivocalSearcher.StageSearched => "Searched: the grey sources are found; selection and the quality check are the next parts to be built",
+        AuBtechReviewAgent.MultivocalSearcher.StageSearching => "Searching…",
+        _ => "Planned: the protocol is written; the search can start",
+    };
+
+    private void AddSearchString()
+    {
+        // The first string starts as the topic, so the reviewer edits it instead of typing it again.
+        plan.GreySearchStrings.Add(plan.GreySearchStrings.Count == 0 ? plan.Topic.Trim() : "");
+    }
+
+    private static string SearchLabel(string key) =>
+        AuBtechReviewAgent.GreySourceCatalog.Create(key)?.Name ?? AuBtechReviewAgent.MultivocalGuidelines.GreySearches.FirstOrDefault(s => s.Key == key)?.Label ?? key;
+
+    private static string KindLabel(string key) =>
+        AuBtechReviewAgent.MultivocalGuidelines.GreyTypes.FirstOrDefault(t => t.Key == key).Label ?? key;
 
     private static string AudienceLabel(AuBtechReviewAgent.ReviewAudience? audience) => audience switch
     {
