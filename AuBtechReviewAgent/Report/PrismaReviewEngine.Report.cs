@@ -705,27 +705,21 @@ public partial class PrismaReviewEngine
             // extraction quotes are given to the check as evidence too: they are what the synthesis was written from.
             var verifiedFindings = (finalState.Extractions ?? new List<StudyExtraction>())
                 .ToDictionary(e => e.ReferenceNumber, e => (IReadOnlyList<string>)ThematicSynthesis.VerifiedFindings(e).Select(f => f.Finding.Quote).ToList());
-            var citedSentences = fields.SelectMany(f => CitationSupportChecker.ExtractCitedSentences(f.Text, f.Field)).ToList();
-            List<CitationSupportResult> supportChecks;
-            ReportProgress(sessionId, finalState, RunProgress.Checking, 0, $"Checking {citedSentences.Sum(c => c.References.Count)} citations");
-            using (LlmStage.Begin("citation-check"))
-                supportChecks = await CitationSupportChecker.CheckAsync(chat, citedSentences, papersForCheck,
-                    verifiedFindings: verifiedFindings, parallelism: Llm.ScreeningParallelism, secondCheck: Synthesis.SecondCitationCheck,
-                    progress: (second, done, total) => ReportProgress(sessionId, finalState, RunProgress.Checking,
-                        RunProgress.Phase(RunProgress.CheckingPhases, second ? 1 : 0, (double)done / total),
-                        second ? $"Second check: {Of(done, total, "papers")}" : $"First check: {Of(done, total, "papers")}"));
-            var initialSummary = CitationSupportSummary.From(supportChecks);
-
             // Repair: sentences whose citation was rejected are rewritten once from the cited paper's evidence
-            // (or lose that citation) and checked again. Before and after go into citation-audit.json.
-            var repairs = new List<CitationRepair>();
-            if (Synthesis.RepairCitations && supportChecks.Any(NeedsRepair))
-            {
-                ReportProgress(sessionId, finalState, RunProgress.Checking, RunProgress.Phase(RunProgress.CheckingPhases, 2, 0),
-                    $"Repairing {supportChecks.Count(NeedsRepair)} citations and checking them again");
-                using (LlmStage.Begin("citation-repair"))
-                    (fields, supportChecks, repairs) = await RepairCitationsAsync(chat, fields, supportChecks, papersForCheck, verifiedFindings, referenceCount);
-            }
+            // (or lose that citation) and checked again. Before and after go into citation-audit.json. The check
+            // and the repair are shared by every kind of review (Verification/Grounding.cs).
+            var grounding = await Grounding.CheckAndRepairAsync(chat, fields, papersForCheck, verifiedFindings, referenceCount,
+                new GroundingOptions(Llm.ScreeningParallelism, Synthesis.SecondCitationCheck, Synthesis.RepairCitations),
+                checking: count => ReportProgress(sessionId, finalState, RunProgress.Checking, 0, $"Checking {count} citations"),
+                checkProgress: (second, done, total) => ReportProgress(sessionId, finalState, RunProgress.Checking,
+                    RunProgress.Phase(RunProgress.CheckingPhases, second ? 1 : 0, (double)done / total),
+                    second ? $"Second check: {Of(done, total, "papers")}" : $"First check: {Of(done, total, "papers")}"),
+                repairing: count => ReportProgress(sessionId, finalState, RunProgress.Checking, RunProgress.Phase(RunProgress.CheckingPhases, 2, 0),
+                    $"Repairing {count} citations and checking them again"));
+            fields = grounding.Fields;
+            var supportChecks = grounding.Checks;
+            var initialSummary = grounding.BeforeRepair;
+            var repairs = grounding.Repairs;
             finalState.Stats.CitationsRepaired = repairs.Count(r => r.Action is "rewrite" or "drop_citation" or "delete");
 
             // Theme consistency: a subsection citing a study that was not coded under its theme is flagged (not removed).
