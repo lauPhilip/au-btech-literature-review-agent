@@ -8,6 +8,7 @@ Every run has a folder `WorkspaceStore/{runId}/`, where the run id is a GUID wri
 
 | File | Written by | When | Contents |
 |---|---|---|---|
+| `run.json` | `RunHeader.WriteAsync` | first, when the run starts; again when it ends or is marked interrupted | The **header**: run id, module, card, start time, final stage, end time. A folder without it is an older systematic run |
 | `protocol.md` | `WriteProtocolAsync`, `ProtocolWriter` | before the search; amendment after the search strings are known | Question, criteria, sources, limits, screening set-up; dated amendments |
 | `transparent-process.json` | `SaveStateAsync` (via `PublishAsync`) | after every step | The **ledger**: the whole `ReviewState` |
 | `SourceResponses/*.json`, `*.xml` | `SaveRawResponses` | during search and chaining | Each source response exactly as received |
