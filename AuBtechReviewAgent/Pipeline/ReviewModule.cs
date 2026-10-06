@@ -10,9 +10,9 @@ namespace AuBtechReviewAgent;
 /// start page; a card is the module with preset options, so five cards need only two modules. See
 /// docs/roadmap/review-modules.md for the design.
 ///
-/// This first version only describes a module. Running a review through the module, its stages and its archive
-/// files are added in later steps (M2 to M4); until then the systematic module's runs go through
-/// <see cref="PrismaReviewEngine"/> as before.
+/// The contract grows step by step (docs/roadmap/review-modules.md). Today a module describes itself and lists its
+/// archive files; running a review through the module comes with the multivocal module. Until then the systematic
+/// module's runs go through <see cref="PrismaReviewEngine"/> as before.
 /// </summary>
 public interface IReviewModule
 {
@@ -27,6 +27,12 @@ public interface IReviewModule
 
     /// <summary>The cards this module offers on the start page.</summary>
     IReadOnlyList<ReviewMethod> Cards { get; }
+
+    /// <summary>
+    /// The module's own files in the run folder that go into the archive, in this order: its ledger and audit
+    /// files. The files every run has (<see cref="RunArchive.CoreFiles"/>) are added by the core.
+    /// </summary>
+    IReadOnlyList<string> ArchiveFiles { get; }
 }
 
 /// <summary>Every module the app knows. Adding a kind of review means adding a module here.</summary>

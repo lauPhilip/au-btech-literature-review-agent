@@ -22,7 +22,7 @@ public partial class PrismaReviewEngine
     /// <summary>Test hook: the citation index used for citation chaining (default: OpenAlex).</summary>
     public Func<ICitationGraph>? CitationGraphFactory { get; init; }
 
-    public const string RawResponsesFolder = "SourceResponses";
+    public const string RawResponsesFolder = RunArchive.RawResponsesFolder;
     public const string OriginDatabase = "database search";
     public const string OriginCitations = "citation chaining";
 

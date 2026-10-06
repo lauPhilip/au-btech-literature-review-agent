@@ -12,6 +12,14 @@ public sealed class SystematicModule : IReviewModule
     public string Name => "Systematic review";
     public string RoutePrefix => "/review";
 
+    /// <summary>The ledger and audit files of a systematic review, in the order they appear in the archive.</summary>
+    public IReadOnlyList<string> ArchiveFiles { get; } = new[]
+    {
+        RunHeader.FileName, RunStore.ProtocolFile, "transparent-process.json", "prisma-report.json", "llm-calls.json", "extraction.json",
+        "citation-audit.json", RunStore.NotesFile, "thematic-codebook.json", "run-metrics.json", "peer-review-feedback.json",
+        "stylistic-transformation-ledger.json", "grounded-outline.txt",
+    };
+
     public IReadOnlyList<ReviewMethod> Cards { get; } = new[]
     {
         new ReviewMethod(

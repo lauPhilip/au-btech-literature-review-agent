@@ -402,14 +402,10 @@ public partial class PrismaReviewEngine
         sb.AppendLine(@"\end{thebibliography}");
         sb.AppendLine(@"\end{document}");
 
-        // Everything is collected first so manifest.json can list the SHA-256 of every file in the archive.
-        var entries = new List<(string Path, byte[] Content)>();
-        void AddText(string name, string content) => entries.Add((name, new UTF8Encoding(false).GetBytes(content)));
-        void AddFile(string path, string name)
-        {
-            var bytes = ReadShared(path);
-            if (bytes != null) entries.Add((name, bytes));
-        }
+        // The files only a systematic review generates; the core (Report/RunArchive.cs) adds the run folder's
+        // files, the source texts and answers, and manifest.json with the SHA-256 of everything.
+        var generated = new List<(string Path, byte[] Content)>();
+        void AddText(string name, string content) => generated.Add((name, new UTF8Encoding(false).GetBytes(content)));
 
         AddText("main.tex", sb.ToString());
         AddText("references.bib", BibliographyExporter.ToBibTeX(records));
@@ -418,49 +414,9 @@ public partial class PrismaReviewEngine
             AddText("screened.ris", BibliographyExporter.ToScreenedRis(state.Phases.Screening,
                 records.GroupBy(r => r.PaperId).ToDictionary(g => g.Key, g => g.First().ReferenceNumber)));
 
-        string isolatedFolder = GetWorkspaceFolderPath(sessionId);
-        // Audit files kept at the archive root, in this order.
-        string[] rootFiles =
-        {
-            "run.json", "protocol.md", "transparent-process.json", "prisma-report.json", "llm-calls.json", "extraction.json",
-            "citation-audit.json", "reviewer-notes.json", "thematic-codebook.json", "run-metrics.json", "peer-review-feedback.json", "stylistic-transformation-ledger.json", "grounded-outline.txt",
-        };
-        foreach (var name in rootFiles)
-        {
-            string path = Path.Join(isolatedFolder, name);
-            if (File.Exists(path)) AddFile(path, name);
-        }
-
-        if (Directory.Exists(isolatedFolder))
-        {
-            // Downloaded full texts.
-            foreach (var file in Directory.GetFiles(isolatedFolder).OrderBy(f => f, StringComparer.Ordinal))
-            {
-                string filename = Path.GetFileName(file);
-                if (rootFiles.Contains(filename, StringComparer.OrdinalIgnoreCase)) continue;
-                if (filename.EndsWith(".json", StringComparison.OrdinalIgnoreCase) || filename.EndsWith(".tmp", StringComparison.OrdinalIgnoreCase)) continue;
-                AddFile(file, $"SourcePapers/{filename}");
-            }
-            // What each source returned, exactly as received.
-            string rawFolder = Path.Join(isolatedFolder, RawResponsesFolder);
-            if (Directory.Exists(rawFolder))
-                foreach (var file in Directory.GetFiles(rawFolder).OrderBy(f => f, StringComparer.Ordinal))
-                    AddFile(file, $"{RawResponsesFolder}/{Path.GetFileName(file)}");
-        }
-
-        AddText("manifest.json", RunManifest.Build(sessionId, state, entries));
-
-        using var memoryStream = new MemoryStream();
-        using (var archive = new ZipArchive(memoryStream, ZipArchiveMode.Create, true))
-        {
-            foreach (var (name, content) in entries)
-            {
-                var entry = archive.CreateEntry(name, CompressionLevel.Optimal);
-                using var target = entry.Open();
-                target.Write(content, 0, content.Length);
-            }
-        }
-        return memoryStream.ToArray();
+        var module = ReviewModules.Find(ReviewMethod.SystematicKey)!;
+        return RunArchive.Build(sessionId, GetWorkspaceFolderPath(sessionId), generated, module.ArchiveFiles,
+            state?.ProtocolHash, state?.RunSettings?.Model);
     }
 
     /// <summary>The artifact as a TikZ figure, a table or a list, outside the two-column layout.</summary>
@@ -610,21 +566,4 @@ public partial class PrismaReviewEngine
     }
 
     private static string EscapeLatexLabel(string s) => s.Replace("&", @"\&").Replace("_", @"\_").Replace("%", @"\%").Replace("#", @"\#");
-
-    // Reads with FileShare.ReadWrite so a download never fails because the run is writing its ledger.
-    private byte[]? ReadShared(string path)
-    {
-        try
-        {
-            using var source = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
-            using var copy = new MemoryStream();
-            source.CopyTo(copy);
-            return copy.ToArray();
-        }
-        catch (IOException ex)
-        {
-            _log.LogWarning("Archive: skipped {File}: {Message}", SanitizeLogMessage(Path.GetFileName(path)), SanitizeLogMessage(ex.Message));
-            return null;
-        }
-    }
 }
