@@ -8,6 +8,7 @@
 module.exports = {
   content: [
     './Components/**/*.{razor,cs,html,cshtml}',
+    './Modules/**/*.{razor,cs,html,cshtml}',
     './wwwroot/js/**/*.js',
     './Styles/**/*.css',
   ],
