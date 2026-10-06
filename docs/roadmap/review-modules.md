@@ -15,7 +15,7 @@ The table below sorts the code by how tied it is to the systematic review. The l
 | `Verification/CitationSupportChecker` (a static service) | Re-checking a citation (`Verification/PrismaReviewEngine.Recheck.cs`) | `PrismaFlowDiagram`, `MethodsSectionWriter` (PRISMA and MMAT wording) |
 | `Evidence/DocumentRAGUtility`, `StudyExtractor` | Screening one record with a prompt (`ScreenPaperAsync` is already static) | The LaTeX report and the PRISMA checklist in `Report/` |
 | `RunCoordinator`, `ReviewCache`, `RunMetricsStore` | The citation repair loop (`Synthesis/PrismaReviewEngine.Thematic.cs`; moved to `Verification/` in M3) | `PrismaFunnel`, `ScreeningReviewPanel` |
-| `RunManifest`, `ApaCitationBuilder`, `BibliographyExporter` | Building the archive: zip, manifest, hashes (`Report/PrismaReviewEngine.Archive.cs`) | `Home.razor` (1,579 lines) and `SpecMatrix.razor` (1,258 lines) |
+| `RunManifest`, `ApaCitationBuilder`, `BibliographyExporter` | Building the archive: zip, manifest, hashes (`Report/PrismaReviewEngine.Archive.cs`; moved to `Report/RunArchive.cs` in M4) | `Home.razor` (1,579 lines) and `SpecMatrix.razor` (1,258 lines) |
 
 Two things follow from this. First, every page that only wants to open a run, check an edit key or save a note has to inject the whole `PrismaReviewEngine`, so a second engine would have to copy those parts or depend on the first. Second, `ReviewMethods.All` is a list of cards with no link to code: a card says what a method is, but nothing says which code runs it.
 
@@ -66,7 +66,7 @@ public interface IReviewModule
 }
 ```
 
-M1 builds the first part of this contract: `Key`, `Name`, `RoutePrefix` and `Cards`, in `Pipeline/ReviewModule.cs`, with the two modules in `Modules/`. `StagesFor`, `RunAsync` and `ArchiveFiles` follow in M2 to M4, once the run services, the grounding check and the archive no longer live inside `PrismaReviewEngine`.
+M1 builds the first part of this contract: `Key`, `Name`, `RoutePrefix` and `Cards`, in `Pipeline/ReviewModule.cs`, with the two modules in `Modules/`. `ArchiveFiles` followed in M4 (as a list of file names, since the files a module keeps do not depend on the run). `StagesFor` and `RunAsync` come with the multivocal module in M6: they need a request that both modules understand, and designing it against one engine only would fit it to the systematic review.
 
 Each run folder gets a small header file, `run.json`, written by the core before anything else: the run ID, the module key, the card key, when it started, its stage and when it finished. The core reads only this header to list, open, clean up or redirect a run, so it never needs to understand a module's ledger. Opening `/review/{id}` for an MLR run sends the user to `/mlr/{id}`. Runs made before this change have no header and are treated as systematic runs, the same way runs without `owner.json` stay editable today.
 
@@ -118,7 +118,7 @@ Each step is one small pull request, changes nothing a user can see, and keeps a
 | M1 (done) | The contract and the registry: `IReviewModule`, `run.json`, a `SystematicModule` that calls the existing engine; the start page reads its cards from the registry | `Pipeline/` |
 | M2 (done) | Run services out of the engine: the run folder, ledger loading, edit keys, notes and deletion become a `RunStore` that pages use instead of the engine | `Runs/`, the pages that inject the engine |
 | M3 (done) | Grounding as a service: the citation check, the repair loop and the re-check work on any text and any set of sources (`Verification/Grounding.cs`). A web page's text uses the same `ReferencedPaper` record as a paper; the prompts name the kind of review, and their word "paper" is adapted for grey sources in MLR block D | `Verification/`, `Synthesis/` |
-| M4 | The archive split: the core builds the zip, manifest and hashes; each module adds its own files and report | `Report/` |
+| M4 (done) | The archive split: the core builds the zip, manifest and hashes; each module adds its own files and report | `Report/` |
 | M5 | The module test kit, run for the systematic module | `AuBtechReviewAgent.Tests/Modules/` |
 | M6 | The preview setting and an empty `Modules/Multivocal/` that passes the test kit with placeholder steps (MLR block B) | `Modules/Multivocal/`, settings |
 
