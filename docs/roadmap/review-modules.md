@@ -66,6 +66,8 @@ public interface IReviewModule
 }
 ```
 
+M1 builds the first part of this contract: `Key`, `Name`, `RoutePrefix` and `Cards`, in `Pipeline/ReviewModule.cs`, with the two modules in `Modules/`. `StagesFor`, `RunAsync` and `ArchiveFiles` follow in M2 to M4, once the run services, the grounding check and the archive no longer live inside `PrismaReviewEngine`.
+
 Each run folder gets a small header file, `run.json`, written by the core before anything else: the run ID, the module key, the card key, when it started, its stage and when it finished. The core reads only this header to list, open, clean up or redirect a run, so it never needs to understand a module's ledger. Opening `/review/{id}` for an MLR run sends the user to `/mlr/{id}`. Runs made before this change have no header and are treated as systematic runs, the same way runs without `owner.json` stay editable today.
 
 Each module keeps its own ledger next to the header. The systematic module keeps `transparent-process.json` with exactly its current shape, so old runs, the demo run and downloaded archives still open and their hashes still match. The multivocal module gets its own ledger file with the formal and grey pools kept apart.
@@ -113,7 +115,7 @@ Each step is one small pull request, changes nothing a user can see, and keeps a
 
 | Step | Pull request | Main files |
 |---|---|---|
-| M1 | The contract and the registry: `IReviewModule`, `run.json`, a `SystematicModule` that calls the existing engine; the start page reads its cards from the registry | `Pipeline/` |
+| M1 (done) | The contract and the registry: `IReviewModule`, `run.json`, a `SystematicModule` that calls the existing engine; the start page reads its cards from the registry | `Pipeline/` |
 | M2 | Run services out of the engine: the run folder, ledger loading, edit keys, notes and deletion become a `RunStore` that pages use instead of the engine | `Runs/`, the pages that inject the engine |
 | M3 | Grounding as a service: the citation check, the repair loop and the re-check work on any text and any set of sources | `Verification/`, `Synthesis/` |
 | M4 | The archive split: the core builds the zip, manifest and hashes; each module adds its own files and report | `Report/` |
