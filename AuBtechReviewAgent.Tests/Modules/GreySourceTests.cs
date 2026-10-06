@@ -97,6 +97,48 @@ public class GreySourceTests
         Assert.Equal("https://zenodo.org/records/112", records[1].Url);
     }
 
+    [Fact]
+    public void OpenAlexKeepsReportsThesesAndStandardsWithTheirCitations()
+    {
+        const string json = """
+            {"meta":{"count":4},"results":[
+              {"id":"https://openalex.org/W1","doi":"https://doi.org/10.1/rep","display_name":"Context engineering for agents: a report","type":"report",
+               "publication_date":"2025-04-02","cited_by_count":7,
+               "authorships":[{"author":{"display_name":"K. Lee"}}],
+               "primary_location":{"landing_page_url":"https://example.org/reports/ce","source":{"display_name":"Example Institute"}},
+               "abstract_inverted_index":{"Agents":[0],"forget":[1],"tools.":[2]}},
+              {"id":"https://openalex.org/W2","doi":null,"display_name":"Memory in LLM agents","type":"dissertation","cited_by_count":0,
+               "authorships":[],"primary_location":{"landing_page_url":"javascript:alert(1)","source":{"display_name":"Aarhus University"}}},
+              {"id":"https://openalex.org/W3","display_name":"A journal article","type":"article"},
+              {"id":"https://openalex.org/W4","display_name":"","type":"report"}
+            ]}
+            """;
+
+        var records = OpenAlexGreySource.Parse(json);
+
+        Assert.Equal(new[] { "openalex:W1", "openalex:W2" }, records.Select(r => r.Id));
+        Assert.Equal("https://example.org/reports/ce", records[0].Url);
+        Assert.Equal("example.org", records[0].Site);
+        Assert.Equal("white-papers", records[0].Kind);
+        Assert.Equal("K. Lee", records[0].Producer);
+        Assert.Equal("Agents forget tools.", records[0].Summary);
+        Assert.Equal(7, records[0].Signals["citations"]);
+        Assert.Equal(new DateTime(2025, 4, 2, 0, 0, 0, DateTimeKind.Utc), records[0].Published);
+        Assert.Equal("https://openalex.org/W2", records[1].Url); // no landing page that is a web address, no DOI
+        Assert.Equal("theses", records[1].Kind);
+        Assert.Equal("Aarhus University", records[1].Producer);
+    }
+
+    [Fact]
+    public void OpenAlexIsSearchedForGreyWorkTypesOnly()
+    {
+        string url = OpenAlexGreySource.SearchUrl("context engineering", 500, "me@example.org");
+        Assert.Contains("search=context%20engineering", url);
+        Assert.Contains("filter=type:report|dissertation|standard", url);
+        Assert.Contains("per-page=100", url);
+        Assert.Contains("mailto=me%40example.org", url);
+    }
+
     [Theory]
     [InlineData("context engineering", "q=%22context%20engineering%22")]
     [InlineData("agents", "q=agents")]
@@ -117,7 +159,7 @@ public class GreySourceTests
     [Fact]
     public void EveryBuiltSearchIsOneThePlanCanChoose()
     {
-        foreach (var key in new[] { "stackexchange", "github", "hackernews", "zenodo" })
+        foreach (var key in new[] { "stackexchange", "github", "hackernews", "openalex-grey", "zenodo" })
         {
             Assert.True(GreySourceCatalog.IsBuilt(key));
             Assert.Equal(key, GreySourceCatalog.Create(key)!.Key);

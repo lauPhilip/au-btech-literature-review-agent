@@ -66,7 +66,7 @@ public static class MultivocalGuidelines
         new GreySearch("stackexchange", "Stack Exchange sites (Stack Overflow and others)", false),
         new GreySearch("github", "GitHub repositories", false),
         new GreySearch("hackernews", "Hacker News", false),
-        new GreySearch("openalex-grey", "Reports, theses and other grey literature in OpenAlex", false),
+        new GreySearch("openalex-grey", "Reports, theses and standards in OpenAlex", false),
         new GreySearch("zenodo", "Reports and documents on Zenodo", false),
         new GreySearch("backlinks", "Links in the included grey sources (backlink snowballing)", false),
         new GreySearch("brave", "The general web through Brave Search, with your own API key", true),
