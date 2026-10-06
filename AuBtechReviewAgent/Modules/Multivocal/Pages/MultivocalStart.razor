@@ -1,0 +1,88 @@
+@page "/mlr"
+@page "/mlr/{RunId:guid}"
+@inject AuBtechReviewAgent.ReviewModulesOptions ModuleOptions
+@inject AuBtechReviewAgent.RunStore Runs
+@inject NavigationManager Nav
+
+@* The multivocal review's own entry page. While the module is being built it is a preview: visible only where
+   ReviewModules:Preview lists "multivocal" (Development), and "not found" everywhere else. It shows the steps of the
+   Garousi et al. (2019) guidelines the module will follow and which of them are built. *@
+
+<SeoHead Title="Multivocal literature review (preview)" Path="/mlr" NoIndex="true"
+         Description="Preview of the multivocal literature review, following the Garousi et al. (2019) guidelines." />
+
+<SiteHeader />
+
+<main id="main" tabindex="-1" class="flex-1 min-h-0 overflow-y-auto bg-gray-50 text-gray-900 font-sans">
+    <div class="ui-container py-14 lg:py-20 max-w-4xl">
+        <p class="ui-eyebrow">Preview, not available yet</p>
+        <h1 class="ui-h1 mt-3">Multivocal Literature Review</h1>
+        <p class="ui-lead mt-4">
+            A multivocal review adds grey literature, such as reports, documentation and practitioner articles, to the
+            academic studies. It follows the guidelines of
+            <a href="@Method.StandardUrl" target="_blank" rel="noopener" class="text-brand underline underline-offset-2">Garousi, Felderer and Mäntylä (2019)</a>,
+            and, like every review here, each statement in its report will be traced to a quote from the source it cites.
+        </p>
+
+        @if (RunId != null)
+        {
+            <p class="ui-card mt-8 p-5 text-sm text-gray-700">Multivocal runs cannot be opened yet: this part is not built.</p>
+        }
+
+        <h2 class="text-lg font-semibold mt-12">The steps it will follow</h2>
+        <p class="ui-muted mt-2">Each step names the guideline it implements. None of them runs yet; they are built one block at a time.</p>
+        <ol class="mt-6 space-y-3">
+            @foreach (var step in Steps)
+            {
+                var s = step;
+                <li class="ui-card p-5 flex flex-col sm:flex-row sm:items-start gap-3 sm:gap-6">
+                    <div class="sm:w-44 flex-none">
+                        <p class="text-xs font-medium text-gray-500">@s.Phase</p>
+                        <p class="font-semibold text-gray-950">@s.Name</p>
+                    </div>
+                    <p class="text-sm text-gray-700 flex-1">@s.What</p>
+                    <span class="ui-chip border-gray-200 bg-gray-50 text-gray-600 whitespace-nowrap self-start">@s.Guidelines · not built</span>
+                </li>
+            }
+        </ol>
+
+        <p class="ui-muted mt-10">
+            The plan, step by step, is in
+            <a href="@($"{AuBtechReviewAgent.SiteSeo.RepositoryUrl}/blob/master/docs/roadmap/mlr-todo.md")" class="text-brand underline underline-offset-2">docs/roadmap/mlr-todo.md</a>.
+            <a href="/start" class="text-brand underline underline-offset-2">Back to the kinds of review</a>.
+        </p>
+    </div>
+    <SiteFooter />
+</main>
+
+@code {
+    [Parameter] public Guid? RunId { get; set; }
+
+    private static readonly AuBtechReviewAgent.ReviewMethod Method = AuBtechReviewAgent.ReviewMethods.Find("multivocal")!;
+
+    private sealed record Step(string Phase, string Name, string What, string Guidelines);
+
+    private static readonly Step[] Steps =
+    {
+        new("Planning", "Need and audience", "Look for existing reviews first, and decide who the review is for: researchers, practitioners or both.", "G1–G2"),
+        new("Planning", "Include grey literature?", "Answer the seven questions that show whether grey literature is needed.", "G3"),
+        new("Planning", "Research questions", "Write the questions, each tied to the goal and the audience, and choose their types.", "G4–G5"),
+        new("Search", "What and where", "Choose the kinds of grey literature and their producers, then the search engines, sites and backlinks to use.", "G6–G7"),
+        new("Search", "When to stop", "Choose a stopping rule: saturation, a fixed number of hits, or all the evidence.", "G8"),
+        new("Selection", "Criteria and process", "Screen grey and academic sources with the same criteria and the same care.", "G9–G10"),
+        new("Selection", "Quality", "Score each grey source on authority, method, objectivity, date and the other criteria, each answer with a quote.", "G11"),
+        new("Analysis", "Map and extraction", "Build a systematic map of the sources and extract the data, every item linked to its place in the source.", "G12"),
+        new("Analysis", "Synthesis", "Code the findings and write the synthesis, every statement checked against its source.", "G13"),
+        new("Reporting", "Report", "A report for researchers and a short version for practitioners, structured by the guidelines.", "G14"),
+    };
+
+    protected override void OnParametersSet()
+    {
+        var module = AuBtechReviewAgent.ReviewModules.Find("multivocal")!;
+        if (!ModuleOptions.CanOpen(module)) { Nav.NotFound(); return; }
+
+        // A systematic run opened here goes to its own page.
+        if (RunId is Guid id && AuBtechReviewAgent.ReviewModules.ElsewhereFor(Runs.LoadHeader(id), module.Key) is string elsewhere)
+            Nav.NavigateTo(elsewhere, replace: true);
+    }
+}
