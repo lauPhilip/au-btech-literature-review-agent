@@ -49,8 +49,11 @@ All tests are in `AuBtechReviewAgent.Tests` and run offline: no API keys, no net
 
 The engine has test hooks so a whole review can run against fakes. `ChatFactory` replaces the language model (usually with `FakeChatService`, which answers by matching text in the prompt), `SourceFactory` replaces the sources (`PipelineTests.FakeSource`), `CitationGraphFactory` replaces OpenAlex for chaining, `FullTextFetcher` replaces PDF downloads, `Cache` replaces the cache (`ReviewCache.Disabled` by default in tests), and `WorkspaceRoot` points the run folders at a temporary directory, which `TestFolders.TryDelete` removes afterwards.
 
+The **module test kit** (`Modules/ModuleKit.cs` and `Modules/ModuleKitTests.cs`) checks the rules of `AGENTS.md` for every kind of review. `ModuleKit` runs each module once end to end with a fake model and a poisoned fake source: the source carries an instruction aimed at the model and a `javascript:` link, and the server key is a distinctive value. The tests then check that every accepted citation rests on a verified quote, that the code-written parts of the report equal what the code writes from the ledger, that `run.json` names the module and every file of the run folder is in the archive, that the injected text reached the model only inside the untrusted-text markers, that no key is in the archive, and that the report links no address that is not http(s). Every module in `ReviewModules.All` must have an entry in `ModuleKit.Runners`; a module with an available card must be runnable, and its key goes into the `InlineData` of each rule. Rule 4 (prompt versions) is left to the module's own tests, since only the module knows which prompts decide.
+
 | Test file | What it covers |
 |---|---|
+| `ModuleKit.cs`, `ModuleKitTests.cs` | The rules of `AGENTS.md`, checked for every kind of review on a poisoned fake run |
 | `PipelineTests.cs` | Whole runs end to end: archive contents, manifest verification, protocol, human review pause, interrupted runs |
 | `PipelineFeatureTests.cs` | Dual screening and disagreements, injection flags, citation chaining, cache reuse, deleting a run, parallel screening order |
 | `RealRunRegressionTests.cs` | Cases taken from real runs that once went wrong |

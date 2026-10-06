@@ -4,4 +4,6 @@ One folder per kind of review. A module is the recipe for one kind of review: th
 
 `Systematic/` is the PRISMA 2020 systematic review. Its runs are still done by `PrismaReviewEngine`, and its PRISMA-only files move into this folder step by step. `Multivocal/` is the multivocal literature review (Garousi et al., 2019). It is not built yet, so its cards say "coming soon".
 
+A module is done only when it passes the module test kit in `AuBtechReviewAgent.Tests/Modules/`, which runs it end to end on a poisoned fake run and checks the rules of `AGENTS.md`.
+
 The rule for where a file goes: if more than one kind of review uses it, it belongs in a shared folder (`Search/`, `Screening/`, `Verification/` and so on); otherwise it belongs in its module's folder. The design is in [docs/roadmap/review-modules.md](../../docs/roadmap/review-modules.md).

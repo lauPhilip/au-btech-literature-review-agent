@@ -45,4 +45,6 @@ Put a new file in the folder of the stage it belongs to, or in `Modules/<Name>/`
 
 The site uses a strict Content-Security-Policy (`script-src 'self'`): no inline scripts and no scripts, fonts or images from other sites. Shared styles are the `ui-*` classes in `Styles/tailwind.input.css`; only buttons have rounded corners. Write user-facing text in plain English, short sentences, no jargon (see `Web/Glossary.cs` for the terms the app explains). In Razor, copy a loop variable into a local before using it in a lambda or a `RenderFragment`, and render ARIA booleans as the strings `"true"` and `"false"`. When you change how something works, update the matching page in `docs/wiki/` in the same pull request.
 
+A kind of review is done only when its module passes the module test kit (`AuBtechReviewAgent.Tests/Modules/ModuleKitTests.cs`), which checks rules 1, 2, 3, 5, 6 and 7 on a complete fake run.
+
 Commits are small and focused (a few files each) and every commit builds and passes the tests on its own.

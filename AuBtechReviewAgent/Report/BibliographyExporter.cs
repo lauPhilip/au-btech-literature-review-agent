@@ -37,7 +37,7 @@ public static class BibliographyExporter
                 fields.Add(("howpublished", "arXiv"));
             if (r.Year > 0) fields.Add(("year", r.Year.ToString(CultureInfo.InvariantCulture)));
             if (!string.IsNullOrWhiteSpace(r.Doi)) fields.Add(("doi", r.Doi!));
-            if (!string.IsNullOrWhiteSpace(r.Url)) fields.Add(("url", r.Url!));
+            if (PrismaReviewEngine.IsWebAddress(r.Url)) fields.Add(("url", r.Url!)); // only http(s): a source can return any scheme
             fields.Add(("note", Bib($"Included in TraceableAI review as reference [{r.ReferenceNumber}]")));
 
             sb.AppendLine($"@{type}{{{key},");
@@ -65,7 +65,7 @@ public static class BibliographyExporter
             if (!string.IsNullOrWhiteSpace(r.VenueName)) sb.AppendLine($"T2  - {OneLine(r.VenueName)}");
             if (r.Year > 0) sb.AppendLine($"PY  - {r.Year}");
             if (!string.IsNullOrWhiteSpace(r.Doi)) sb.AppendLine($"DO  - {r.Doi}");
-            if (!string.IsNullOrWhiteSpace(r.Url)) sb.AppendLine($"UR  - {r.Url}");
+            if (PrismaReviewEngine.IsWebAddress(r.Url)) sb.AppendLine($"UR  - {r.Url}");
             if (!string.IsNullOrWhiteSpace(r.Summary)) sb.AppendLine($"N1  - {OneLine(r.Summary)}");
             sb.AppendLine($"N1  - Reference [{r.ReferenceNumber}] in the TraceableAI review");
             sb.AppendLine("KW  - TraceableAI");
@@ -98,7 +98,7 @@ public static class BibliographyExporter
             if (!string.IsNullOrWhiteSpace(l.VenueName)) sb.AppendLine($"T2  - {OneLine(l.VenueName)}");
             if (l.Year > 0) sb.AppendLine($"PY  - {l.Year}");
             if (!string.IsNullOrWhiteSpace(l.Doi)) sb.AppendLine($"DO  - {l.Doi}");
-            if (!string.IsNullOrWhiteSpace(l.Url)) sb.AppendLine($"UR  - {l.Url}");
+            if (PrismaReviewEngine.IsWebAddress(l.Url)) sb.AppendLine($"UR  - {l.Url}");
             sb.AppendLine("KW  - TraceableAI");
             sb.AppendLine("KW  - " + l.Decision switch
             {
