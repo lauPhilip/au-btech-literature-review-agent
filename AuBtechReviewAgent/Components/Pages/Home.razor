@@ -7,6 +7,7 @@
 @using System.Text.Json
 @using Microsoft.AspNetCore.Components.Server.ProtectedBrowserStorage
 @inject AuBtechReviewAgent.PrismaReviewEngine ReviewEngine
+@inject AuBtechReviewAgent.RunStore Runs
 @inject ProtectedSessionStorage SessionStorage
 @inject IJSRuntime JS
 @inject AuBtechReviewAgent.RunQuotaService Quota
@@ -1045,7 +1046,7 @@
     }
 
     private string StatePath(Guid id) =>
-        Path.Join(ReviewEngine.WorkspaceRoot, id.ToString("N"), "transparent-process.json");
+        Path.Join(Runs.FolderOf(id), "transparent-process.json");
 
     private static string? SafeRead(string path)
     {
@@ -1281,7 +1282,7 @@
             Logger.LogDebug("Could not read the edit key: {Message}", ex.Message);
             editKey = null;
         }
-        bool allowed = ReviewEngine.CanEdit(currentSessionId, editKey);
+        bool allowed = Runs.CanEdit(currentSessionId, editKey);
         if (allowed != canEdit)
         {
             canEdit = allowed;
@@ -1302,7 +1303,7 @@
     {
         confirmDelete = false;
         var id = currentSessionId;
-        if (!ReviewEngine.DeleteRun(id, editKey))
+        if (!Runs.DeleteRun(id, editKey))
         {
             failureMessage = "The run could not be deleted (it may still be running or already be gone).";
             return;
@@ -1452,7 +1453,7 @@
         currentSessionId = runId;
         // Only this browser gets the run's edit key (kept in its local storage, never shown), so the run link
         // can be shared to read the report without letting anyone else delete or change the run.
-        editKey = ReviewEngine.ClaimRun(runId);
+        editKey = Runs.ClaimRun(runId);
         editKeyFor = runId;
         canEdit = true;
         try { await JS.InvokeAsync<bool>("traceableReview.saveEditKey", runId.ToString(), editKey); }
