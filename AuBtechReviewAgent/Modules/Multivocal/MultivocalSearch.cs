@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -102,12 +102,11 @@ public sealed class MultivocalSearcher
     {
         if (!_runs.CanEdit(runId, editKey)) throw new InvalidOperationException("Only the browser that planned this run can start its search.");
         var planned = _planner.Load(runId) ?? throw new InvalidOperationException("This run has no plan.");
-        var header = _runs.LoadHeader(runId) ?? throw new InvalidOperationException("This run could not be found.");
 
         await Gate.WaitAsync();
         try
         {
-            header = _runs.LoadHeader(runId)!;
+            var header = _runs.LoadHeader(runId) ?? throw new InvalidOperationException("This run could not be found.");
             if (header.Stage != MultivocalPlanner.StagePlanned) throw new InvalidOperationException("This run has been searched already.");
             string folder = _runs.FolderOf(runId);
             await RunHeader.WriteAsync(folder, header with { Stage = StageSearching });
