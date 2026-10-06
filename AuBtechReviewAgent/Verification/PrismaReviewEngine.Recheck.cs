@@ -108,11 +108,8 @@ public partial class PrismaReviewEngine
             var (activeMistral, _, _, _) = ResolveKeys(userKeys);
             IChatCompletionService chat = ChatFactory != null ? ChatFactory(activeMistral) : LlmFactory.Create(Llm, activeMistral);
             var cited = new CitedSentence(field, sentenceIndex, before.Sentence, new[] { reference });
-            List<CitationSupportResult> result;
-            using (LlmStage.Begin("citation-recheck"))
-                result = await CitationSupportChecker.CheckAsync(chat, new[] { cited }, new[] { referenced },
-                    excerptsPerReference: 8, verifiedFindings: findings, parallelism: 1, secondCheck: true);
-            var after = result.FirstOrDefault() ?? throw new RecheckException("The check gave no answer. Try again later.");
+            var after = await Grounding.RecheckAsync(chat, cited, referenced, findings)
+                ?? throw new RecheckException("The check gave no answer. Try again later.");
             after.ThemeNote = before.ThemeNote;
             checks[index] = after;
 
