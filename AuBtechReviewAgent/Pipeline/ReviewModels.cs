@@ -37,6 +37,9 @@ public class ReviewState
     // actually issued against every source, kept here so the run is auditable end-to-end.
     public List<string> SearchPerspectives { get; set; } = new();
 
+    // The kind of review this run is (see ReviewMethods). Older runs have none and were systematic reviews.
+    public string Method { get; set; } = ReviewMethod.SystematicKey;
+
     // True when the reviewer saw and approved (or edited) the extra search strings before the run.
     public bool SearchStringsReviewed { get; set; }
 
@@ -336,7 +339,9 @@ public record ReviewRequest(
     string ArtifactKind = ArtifactKinds.ConceptMap, // what to build from the findings (see ArtifactKinds)
     // The extra search strings the reviewer saw and approved before the run (the primary query is not repeated
     // here). null: the model proposes them during the run; an empty list: only the primary query is searched.
-    IReadOnlyList<string>? SearchStrings = null
+    IReadOnlyList<string>? SearchStrings = null,
+    // The kind of review (ReviewMethods); only available methods can be run.
+    string Method = "systematic"
 );
 
 /// <summary>A record that was found but removed before screening, and why (written to the run ledger).</summary>

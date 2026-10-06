@@ -19,7 +19,7 @@ public class SiteSeoTests
         XNamespace ns = "http://www.sitemaps.org/schemas/sitemap/0.9";
         var locs = doc.Descendants(ns + "loc").Select(e => e.Value).ToList();
 
-        Assert.Equal(new[] { "/", "/review", "/metrics", "/glossary", "/about", "/model-card", "/privacy", "/verify" }.Select(p => Base + p), locs);
+        Assert.Equal(new[] { "/", "/start", "/review", "/metrics", "/glossary", "/about", "/model-card", "/privacy", "/verify" }.Select(p => Base + p), locs);
         Assert.Equal("urlset", doc.Root!.Name.LocalName);
     }
 

@@ -225,6 +225,7 @@ public partial class PrismaReviewEngine
                 InclusionCriteria = request.Inclusion,
                 ExclusionCriteria = request.Exclusion,
                 ArtifactKind = ArtifactKinds.Normalize(request.ArtifactKind),
+                Method = ReviewMethods.Find(request.Method)?.Key ?? ReviewMethod.SystematicKey,
                 SelectedSources = selectedKeys,
                 MaxResultsPerSource = request.MaxResultsPerSource,
                 YearFrom = yearFrom,

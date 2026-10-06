@@ -95,6 +95,10 @@ public static class ReviewInputGuard
             Exclusion = Field("Exclusion criteria", request.Exclusion, MaxCriteria, singleLine: false, required: false),
             SynthesisDirective = Field("Artifact target", request.SynthesisDirective, MaxDirective, singleLine: false, required: false),
         };
+        // Only review methods the engine supports can be run; "coming soon" methods are shown but refused here too.
+        if (ReviewMethods.Find(request.Method) is not { Available: true })
+            errors.Add($"The review type \"{request.Method}\" is not available yet.");
+
         if (request.SearchStrings != null)
         {
             var strings = request.SearchStrings
