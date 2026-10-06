@@ -47,6 +47,7 @@ public sealed class PageFetcher
 
     static PageFetcher() => Encoding.RegisterProvider(CodePagesEncodingProvider.Instance); // windows-1252 and other page charsets
 
+    /// <summary>A fetcher with its own robots.txt cache and pacing; the app keeps one for all runs.</summary>
     /// <param name="handler">For tests; by default a handler that connects to public addresses only.</param>
     /// <param name="delay">For tests; by default <see cref="Task.Delay(TimeSpan)"/>.</param>
     public PageFetcher(HttpMessageHandler? handler = null, Func<TimeSpan, Task>? delay = null)
@@ -262,6 +263,27 @@ public sealed class PageFetcher
         },
     };
 
+    /// <summary>IPv4 ranges that are not on the public internet, as network and mask.</summary>
+    private static readonly (uint Network, uint Mask)[] NonPublicIPv4 = new[]
+    {
+        Range(0, 0, 8), // "this" network
+        Range(10, 0, 8), // private
+        Range(100, 64, 10), // shared address space (carrier NAT)
+        Range(127, 0, 8), // loopback
+        Range(169, 254, 16), // link-local, including cloud metadata services
+        Range(172, 16, 12), // private
+        Range(192, 0, 24), // IETF protocol assignments
+        Range(192, 168, 16), // private
+        Range(198, 18, 15), // benchmarking
+        Range(224, 0, 3), // multicast and reserved
+    };
+
+    private static (uint Network, uint Mask) Range(byte first, byte second, int prefixLength)
+    {
+        uint mask = uint.MaxValue << (32 - prefixLength);
+        return (((uint)first << 24 | (uint)second << 16) & mask, mask);
+    }
+
     /// <summary>Whether an address is on the public internet: not this machine, a private network, link-local or multicast.</summary>
     public static bool IsPublic(IPAddress address)
     {
@@ -271,14 +293,8 @@ public sealed class PageFetcher
         if (address.AddressFamily == AddressFamily.InterNetwork)
         {
             byte[] b = address.GetAddressBytes();
-            return !(b[0] == 0 || b[0] == 10 || b[0] == 127
-                || (b[0] == 100 && b[1] >= 64 && b[1] <= 127) // shared address space (carrier NAT)
-                || (b[0] == 169 && b[1] == 254) // link-local, including cloud metadata services
-                || (b[0] == 172 && b[1] >= 16 && b[1] <= 31)
-                || (b[0] == 192 && b[1] == 168)
-                || (b[0] == 192 && b[1] == 0 && b[2] == 0)
-                || (b[0] == 198 && (b[1] == 18 || b[1] == 19)) // benchmarking
-                || b[0] >= 224); // multicast and reserved
+            uint value = (uint)(b[0] << 24 | b[1] << 16 | b[2] << 8 | b[3]);
+            return !NonPublicIPv4.Any(range => (value & range.Mask) == range.Network);
         }
         if (address.AddressFamily == AddressFamily.InterNetworkV6)
         {

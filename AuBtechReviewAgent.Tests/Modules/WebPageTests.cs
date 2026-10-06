@@ -31,10 +31,15 @@ public class WebPageTests : IDisposable
             string url = request.RequestUri!.ToString();
             Requested.Add(url);
             var (status, type, body, location) = _pages.TryGetValue(url, out var page) ? page : (404, "text/plain", "", null);
-            var response = new HttpResponseMessage((HttpStatusCode)status) { Content = new StringContent(body, Encoding.UTF8, type) };
-            if (location != null) response.Headers.Location = new Uri(location, UriKind.RelativeOrAbsolute);
-            return Task.FromResult(response);
+            return Task.FromResult(Response(status, type, body, location));
         }
+
+        // The HttpClient that called the handler owns and disposes the response.
+        private static HttpResponseMessage Response(int status, string type, string body, string? location) => new((HttpStatusCode)status)
+        {
+            Content = new StringContent(body, Encoding.UTF8, type),
+            Headers = { Location = location == null ? null : new Uri(location, UriKind.RelativeOrAbsolute) },
+        };
     }
 
     private const string Article = """
