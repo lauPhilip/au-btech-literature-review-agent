@@ -95,6 +95,8 @@ public class GreySourceTests
         Assert.Equal("A report.", records[0].Summary);
         Assert.Equal("theses", records[1].Kind);
         Assert.Equal("https://zenodo.org/records/112", records[1].Url);
+        Assert.Equal(5, ZenodoSource.HitsOnPage(json)); // grey or not: decides whether there is a next page
+        Assert.Equal(0, ZenodoSource.HitsOnPage("{\"status\":400}"));
     }
 
     [Fact]
@@ -144,7 +146,7 @@ public class GreySourceTests
     [InlineData("agents", "q=agents")]
     [InlineData("\"agent memory\" OR context", "q=%22agent%20memory%22%20OR%20context")]
     public void ZenodoSearchesSeveralPlainWordsAsAPhrase(string query, string expected) =>
-        Assert.Contains(expected, ZenodoSource.SearchUrl(query, 10));
+        Assert.Contains(expected, ZenodoSource.SearchUrl(query));
 
     [Fact]
     public void SearchAddressesEscapeTheQueryAndCapTheNumberOfHits()
@@ -153,7 +155,7 @@ public class GreySourceTests
         Assert.Contains("pagesize=100", new StackExchangeSource().SearchUrl("x", 500));
         Assert.Contains("hitsPerPage=1", HackerNewsSource.SearchUrl("x", 0));
         Assert.StartsWith("https://api.github.com/search/repositories?q=a%2Bb", GitHubSource.SearchUrl("a+b", 10));
-        Assert.Contains("size=40", ZenodoSource.SearchUrl("x", 20)); // twice as many: non-grey records are dropped
+        Assert.Contains("size=25&page=3", ZenodoSource.SearchUrl("x", 3)); // Zenodo refuses more than 25 a page without a key
     }
 
     [Fact]
