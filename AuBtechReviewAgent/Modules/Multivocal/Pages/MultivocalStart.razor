@@ -5,6 +5,7 @@
 @inject AuBtechReviewAgent.RunStore Runs
 @inject AuBtechReviewAgent.MultivocalPlanner Planner
 @inject AuBtechReviewAgent.MultivocalSearcher Searcher
+@inject AuBtechReviewAgent.MultivocalPages Pages
 @inject NavigationManager Nav
 @inject IJSRuntime JS
 @inject ILogger<MultivocalStart> Logger
@@ -409,6 +410,14 @@
                     {
                         <p class="text-[11px] text-gray-500">Not run: @string.Join("; ", ledger.Skipped.Select(x => $"{SearchLabel(x.Source)} ({x.Reason.TrimEnd('.').ToLowerInvariant()})")).</p>
                     }
+                    @if (canEdit)
+                    {
+                        <p class="text-[11px] text-gray-500">"Keep page text" fetches the page once, if the site's robots.txt allows it, and keeps its text with this run so quotes can be checked against it. Only the address, date and fingerprint go into the archive.</p>
+                    }
+                    @if (keepError != null)
+                    {
+                        <p class="bg-red-50 border border-red-200 text-red-800 p-2 text-xs" role="alert">@keepError</p>
+                    }
                     <ol class="space-y-3">
                         @foreach (var found in ledger.Sources)
                         {
@@ -421,6 +430,24 @@
                                 @if (r.Summary.Length > 0)
                                 {
                                     <p class="text-xs text-gray-700 mt-1 line-clamp-3">@r.Summary</p>
+                                }
+                                @{ var snapshot = SnapshotOf(r.Url); }
+                                @if (snapshot is { NotKept: null })
+                                {
+                                    <p class="text-[11px] text-gray-600 mt-1">
+                                        Page text kept @snapshot.AccessedUtc.ToString("yyyy-MM-dd HH:mm") UTC · @snapshot.Characters.ToString("N0") characters · SHA-256 @snapshot.TextSha256[..12]… ·
+                                        <a href="@snapshot.WaybackUrl" target="_blank" rel="noopener noreferrer" class="text-brand hover:underline">Wayback Machine</a>
+                                    </p>
+                                }
+                                else if (snapshot != null)
+                                {
+                                    <p class="text-[11px] text-amber-800 mt-1">Page text not kept: @snapshot.NotKept.</p>
+                                }
+                                @if (canEdit && (snapshot == null || snapshot.NotKept != null))
+                                {
+                                    bool busy = keeping.Contains(r.Url);
+                                    <button type="button" class="ui-btn-secondary ui-btn-sm mt-1.5" disabled="@busy" @onclick="() => KeepPageAsync(r.Url)"
+                                            aria-label="@($"Keep the page text of {r.Title}")">@(busy ? "Fetching…" : snapshot == null ? "Keep page text" : "Try again")</button>
                                 }
                             </li>
                         }
@@ -495,6 +522,9 @@
     private bool canEdit;
     private string? editKey;
     private bool searching;
+    private Dictionary<string, AuBtechReviewAgent.PageSnapshot> snapshots = new();
+    private readonly HashSet<string> keeping = new();
+    private string? keepError;
     private string? searchProgress;
     private string? searchError;
     private int step;
@@ -524,6 +554,7 @@
             planned = Planner.Load(id);
             protocolText = Runs.ReadProtocol(id) ?? "";
             ledger = Searcher.LoadLedger(id);
+            snapshots = Pages.Load(id).Pages.ToDictionary(p => AuBtechReviewAgent.MultivocalSearcher.AddressKey(p.Url));
             stage = Runs.LoadHeader(id)?.Stage ?? "";
             panelTab = ledger != null ? "sources" : "protocol";
             return;
@@ -670,6 +701,29 @@
         {
             searching = false;
             searchProgress = null;
+        }
+    }
+
+    private AuBtechReviewAgent.PageSnapshot? SnapshotOf(string url) =>
+        snapshots.TryGetValue(AuBtechReviewAgent.MultivocalSearcher.AddressKey(url), out var snapshot) ? snapshot : null;
+
+    private async Task KeepPageAsync(string url)
+    {
+        if (planned == null || !keeping.Add(url)) return;
+        keepError = null;
+        try
+        {
+            var snapshot = await Pages.KeepAsync(planned.RunId, editKey, url);
+            snapshots[AuBtechReviewAgent.MultivocalSearcher.AddressKey(url)] = snapshot;
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or HttpRequestException or TaskCanceledException)
+        {
+            keepError = ex.Message;
+            Logger.LogInformation("Keeping a page failed: {Message}", ex.Message.Replace("\r", " ").Replace("\n", " "));
+        }
+        finally
+        {
+            keeping.Remove(url);
         }
     }
 

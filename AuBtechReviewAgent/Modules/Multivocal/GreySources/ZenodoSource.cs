@@ -21,24 +21,52 @@ public sealed class ZenodoSource : IGreySource
     public IReadOnlyList<string> LastRawResponses => _raw;
 
     /// <summary>
-    /// The search address. A query of several plain words is searched as a phrase: Zenodo matches words in any
-    /// field, so "context engineering" unquoted also finds records whose creator is called "context" (seen in a
-    /// live check). Asks for more hits than needed, because records that are not grey literature are dropped.
+    /// Zenodo answers anonymous searches with at most 25 records a page, and refuses a larger page with 400
+    /// (since November 2025; seen in a live run).
     /// </summary>
-    public static string SearchUrl(string query, int maxResults)
+    public const int PageSize = 25;
+
+    /// <summary>At most this many pages per search: 100 records, of which the grey literature is kept.</summary>
+    public const int MaxPages = 4;
+
+    /// <summary>
+    /// The search address for one page. A query of several plain words is searched as a phrase: Zenodo matches
+    /// words in any field, so "context engineering" unquoted also finds records whose creator is called "context"
+    /// (seen in a live check).
+    /// </summary>
+    public static string SearchUrl(string query, int page = 1)
     {
         string q = query.Trim();
         if (q.Contains(' ') && !q.Contains('"') && !System.Text.RegularExpressions.Regex.IsMatch(q, @"\b(AND|OR|NOT)\b|[:()*]"))
             q = $"\"{q}\"";
-        return $"{Api}/records?q={Uri.EscapeDataString(q)}&size={Math.Clamp(maxResults * 2, 2, 100)}&sort=bestmatch";
+        return $"{Api}/records?q={Uri.EscapeDataString(q)}&size={PageSize}&page={Math.Max(page, 1)}&sort=bestmatch";
     }
 
+    /// <summary>
+    /// Reads pages until there are enough grey records, the results run out or <see cref="MaxPages"/> is reached;
+    /// records that are not grey literature are dropped, so more records are read than are kept.
+    /// </summary>
     public async Task<List<GreyRecord>> SearchAsync(string query, int maxResults)
     {
         _raw.Clear();
-        string json = await GreySourceHttp.GetAsync(SearchUrl(query, maxResults));
-        _raw.Add(json);
-        return Parse(json).Take(maxResults).ToList();
+        var records = new List<GreyRecord>();
+        for (int page = 1; page <= MaxPages && records.Count < maxResults; page++)
+        {
+            string json = await GreySourceHttp.GetAsync(SearchUrl(query, page));
+            _raw.Add(json);
+            records.AddRange(Parse(json));
+            if (HitsOnPage(json) < PageSize) break;
+        }
+        return records.Take(maxResults).ToList();
+    }
+
+    /// <summary>How many records a page held, grey or not.</summary>
+    public static int HitsOnPage(string json)
+    {
+        using var doc = JsonDocument.Parse(json);
+        return doc.RootElement.TryGetProperty("hits", out var outer) && outer.TryGetProperty("hits", out var hits) && hits.ValueKind == JsonValueKind.Array
+            ? hits.GetArrayLength()
+            : 0;
     }
 
     public static List<GreyRecord> Parse(string json)
