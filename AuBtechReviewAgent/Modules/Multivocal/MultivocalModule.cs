@@ -12,6 +12,9 @@ public sealed class MultivocalModule : IReviewModule
     public string Name => "Multivocal review";
     public string RoutePrefix => "/mlr";
 
+    /// <summary>None yet: the multivocal ledger and audit files come with the module (MLR block B onwards).</summary>
+    public IReadOnlyList<string> ArchiveFiles { get; } = System.Array.Empty<string>();
+
     public IReadOnlyList<ReviewMethod> Cards { get; } = new[]
     {
         new ReviewMethod(
