@@ -87,9 +87,10 @@ Block A is now the module design in [review-modules.md](review-modules.md), step
 ### Block B: The MLR skeleton
 
 - [ ] `Modules/Multivocal/MultivocalModule.cs` (step M6 of the module design) with its stages as empty steps, and `MultivocalState` as its own ledger type (method recorded, formal and grey pools kept apart).
-- [ ] Pages under `Modules/Multivocal/`: `/mlr` (planning form), `/mlr/{runId}` (run view), `/mlr-report/{runId}` (report). Visible only where the `ReviewModules:Preview` setting lists the module (Development).
+- [x] The preview: `/mlr` and `/mlr/{runId}` in `Modules/Multivocal/Pages/`, visible only where the `ReviewModules:Preview` setting lists the module (Development), "not found" elsewhere. Today `/mlr` shows the steps to come.
+- [ ] `/mlr` becomes the planning form (block C), `/mlr/{runId}` the run view and `/mlr-report/{runId}` the report.
 - [ ] The MLR card on the start page links to `/mlr` once block G is done (`Available: true`); until then it stays "coming soon".
-- [ ] Tests: an MLR run and a systematic run cannot be opened by each other's pages; the ledger records the method.
+- [x] Tests: an MLR run and a systematic run open on their own module's pages (`ReviewModules.ElsewhereFor`); `run.json` records the module and card.
 
 ### Block C: Planning (G1–G5)
 
