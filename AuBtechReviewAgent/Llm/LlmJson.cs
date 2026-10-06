@@ -5,6 +5,9 @@ using System.Threading.Tasks;
 using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.ChatCompletion;
 
+#pragma warning disable SKEXP0070
+using Microsoft.SemanticKernel.Connectors.MistralAI;
+
 namespace AuBtechReviewAgent;
 
 /// <summary>
@@ -16,6 +19,15 @@ namespace AuBtechReviewAgent;
 public static class LlmJson
 {
     private static readonly JsonSerializerOptions Options = new() { PropertyNameCaseInsensitive = true };
+
+    /// <summary>Settings for a prompt that must answer with a JSON object.</summary>
+    public static MistralAIPromptExecutionSettings JsonMode(double temperature)
+    {
+        var settings = new MistralAIPromptExecutionSettings { Temperature = temperature };
+        settings.ExtensionData ??= new Dictionary<string, object>();
+        settings.ExtensionData["response_format"] = new { type = "json_object" };
+        return settings;
+    }
 
     public static async Task<T> GetAsync<T>(
         IChatCompletionService chat, string prompt, PromptExecutionSettings? settings,
