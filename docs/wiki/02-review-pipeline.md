@@ -71,7 +71,7 @@ The `LlmStage` names below are what `llm-calls.json` records for each call, and 
 | `cited-sections` | `GenerateCitedSectionsAsync` | Report | Fallback only: synthesis and discussion in one call |
 | `automated-peer-review` | `PeerReviewSectionsAsync` (fallback: `PeerReviewAndReviseAsync`) | Thematic / Report | Critique and revision; `peer-review-feedback.json` |
 | `citation-check` | `CitationSupportChecker.CheckAsync` | `CitationSupportChecker.cs` | Verdict and quote per citation, judged on the attributed part of the sentence, with a second check for partly and not supported ones; `citation-audit.json` |
-| `citation-repair` | `RepairCitationsAsync` | Thematic | Rewrites or drops rejected citations, which are then checked again |
+| `citation-repair` | `CitationRepairer.RepairAsync` | `CitationRepairer.cs` | Rewrites or drops rejected citations, which are then checked again |
 
 Not everything in the report comes from the model. The methods sections (eligibility, information sources, search strategy, selection process, data collection and appraisal, protocol) are written in code by `MethodsSectionWriter` from the run's own numbers, so they can never disagree with what actually happened.
 

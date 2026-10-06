@@ -14,7 +14,7 @@ The table below sorts the code by how tied it is to the systematic review. The l
 | `Llm/` (`LlmJson`, `PromptSafety`, the call recorder) | Edit keys, reviewer notes, deleting a run (`Runs/PrismaReviewEngine.*.cs`) | `ReviewState` and `ReviewStats` as they are |
 | `Verification/CitationSupportChecker` (a static service) | Re-checking a citation (`Verification/PrismaReviewEngine.Recheck.cs`) | `PrismaFlowDiagram`, `MethodsSectionWriter` (PRISMA and MMAT wording) |
 | `Evidence/DocumentRAGUtility`, `StudyExtractor` | Screening one record with a prompt (`ScreenPaperAsync` is already static) | The LaTeX report and the PRISMA checklist in `Report/` |
-| `RunCoordinator`, `ReviewCache`, `RunMetricsStore` | The citation repair loop (`Synthesis/PrismaReviewEngine.Thematic.cs`) | `PrismaFunnel`, `ScreeningReviewPanel` |
+| `RunCoordinator`, `ReviewCache`, `RunMetricsStore` | The citation repair loop (`Synthesis/PrismaReviewEngine.Thematic.cs`; moved to `Verification/` in M3) | `PrismaFunnel`, `ScreeningReviewPanel` |
 | `RunManifest`, `ApaCitationBuilder`, `BibliographyExporter` | Building the archive: zip, manifest, hashes (`Report/PrismaReviewEngine.Archive.cs`) | `Home.razor` (1,579 lines) and `SpecMatrix.razor` (1,258 lines) |
 
 Two things follow from this. First, every page that only wants to open a run, check an edit key or save a note has to inject the whole `PrismaReviewEngine`, so a second engine would have to copy those parts or depend on the first. Second, `ReviewMethods.All` is a list of cards with no link to code: a card says what a method is, but nothing says which code runs it.
@@ -117,7 +117,7 @@ Each step is one small pull request, changes nothing a user can see, and keeps a
 |---|---|---|
 | M1 (done) | The contract and the registry: `IReviewModule`, `run.json`, a `SystematicModule` that calls the existing engine; the start page reads its cards from the registry | `Pipeline/` |
 | M2 (done) | Run services out of the engine: the run folder, ledger loading, edit keys, notes and deletion become a `RunStore` that pages use instead of the engine | `Runs/`, the pages that inject the engine |
-| M3 | Grounding as a service: the citation check, the repair loop and the re-check work on any text and any set of sources | `Verification/`, `Synthesis/` |
+| M3 (done) | Grounding as a service: the citation check, the repair loop and the re-check work on any text and any set of sources (`Verification/Grounding.cs`). A web page's text uses the same `ReferencedPaper` record as a paper; the prompts name the kind of review, and their word "paper" is adapted for grey sources in MLR block D | `Verification/`, `Synthesis/` |
 | M4 | The archive split: the core builds the zip, manifest and hashes; each module adds its own files and report | `Report/` |
 | M5 | The module test kit, run for the systematic module | `AuBtechReviewAgent.Tests/Modules/` |
 | M6 | The preview setting and an empty `Modules/Multivocal/` that passes the test kit with placeholder steps (MLR block B) | `Modules/Multivocal/`, settings |

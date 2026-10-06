@@ -27,7 +27,7 @@ flowchart LR
 | `Screening/` | Two independent screenings, the peer-review filter, exclusion reasons, the human review | `PrismaReviewEngine.Screening.cs` |
 | `Evidence/` | Open-access full texts, data extraction and quality appraisal, each value with a verified quote | `StudyExtractor.cs` |
 | `Synthesis/` | Coding findings into themes and writing one cited section per theme; the artifact | `PrismaReviewEngine.Thematic.cs` |
-| `Verification/` | Citation range check, citation support check against the paper, re-checks | `CitationSupportChecker.cs` |
+| `Verification/` | The grounding check shared by every kind of review: citation range, support against the source, repair, re-checks | `Grounding.cs` |
 | `Report/` | The report, the methods text and flow diagram written in code, references, archive and manifest | `PrismaReviewEngine.Report.cs` |
 | `Runs/` | The run folders for every kind of review: edit keys, reviewer notes, deleting, metrics, clean-up | `RunStore.cs` |
 | `Llm/` | Talking to the model, reading JSON answers, recording every call, prompt safety | `LlmJson.cs` |

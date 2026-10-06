@@ -259,11 +259,12 @@ public static class CitationSupportChecker
         IReadOnlyDictionary<int, IReadOnlyList<string>>? verifiedFindings = null,
         int parallelism = 1,
         bool secondCheck = false,
-        Action<bool, int, int>? progress = null)
+        Action<bool, int, int>? progress = null,
+        string review = CitationRepairer.DefaultReview)
     {
         var byReference = papers.ToDictionary(p => p.ReferenceNumber);
         var pairs = citedSentences.SelectMany(s => s.References.Select(r => (Ref: r, Sentence: s))).ToList();
-        var results = await RunPassAsync(chat, pairs, byReference, excerptsPerReference, verifiedFindings, parallelism, second: false, progress);
+        var results = await RunPassAsync(chat, pairs, byReference, excerptsPerReference, verifiedFindings, parallelism, second: false, progress, review);
         foreach (var r in results) r.FirstVerdict = r.Verdict;
 
         // Second, independent check for what the first did not find fully supported. It does not see the first
@@ -277,7 +278,7 @@ public static class CitationSupportChecker
             {
                 var sentenceOf = citedSentences.ToDictionary(s => (s.Field, s.SentenceIndex));
                 var secondPairs = doubtful.Select(r => (Ref: r.Reference, Sentence: sentenceOf[(r.Field, r.SentenceIndex)])).ToList();
-                var second = await RunPassAsync(chat, secondPairs, byReference, excerptsPerReference * 2, verifiedFindings, parallelism, second: true, progress);
+                var second = await RunPassAsync(chat, secondPairs, byReference, excerptsPerReference * 2, verifiedFindings, parallelism, second: true, progress, review);
                 var secondOf = second.ToDictionary(r => (r.Field, r.SentenceIndex, r.Reference));
                 foreach (var r in doubtful)
                 {
@@ -305,7 +306,7 @@ public static class CitationSupportChecker
         IChatCompletionService chat, List<(int Ref, CitedSentence Sentence)> pairs,
         IReadOnlyDictionary<int, ReferencedPaper> byReference, int excerptsPerReference,
         IReadOnlyDictionary<int, IReadOnlyList<string>>? verifiedFindings, int parallelism, bool second,
-        Action<bool, int, int>? progress = null)
+        Action<bool, int, int>? progress = null, string review = CitationRepairer.DefaultReview)
     {
         // References are checked a few at a time; the results are sorted afterwards, so the order of the
         // answers does not matter.
@@ -317,7 +318,7 @@ public static class CitationSupportChecker
             await throttle.WaitAsync();
             try
             {
-                var checkedRef = await CheckReferenceAsync(chat, group.Key, group.Select(x => x.Sentence).ToList(), byReference, excerptsPerReference, verifiedFindings, second);
+                var checkedRef = await CheckReferenceAsync(chat, group.Key, group.Select(x => x.Sentence).ToList(), byReference, excerptsPerReference, verifiedFindings, second, review);
                 progress?.Invoke(second, Interlocked.Increment(ref finished), groups.Count);
                 return checkedRef;
             }
@@ -331,7 +332,7 @@ public static class CitationSupportChecker
     private static async Task<List<CitationSupportResult>> CheckReferenceAsync(
         IChatCompletionService chat, int reference, List<CitedSentence> sentences,
         IReadOnlyDictionary<int, ReferencedPaper> byReference, int excerptsPerReference,
-        IReadOnlyDictionary<int, IReadOnlyList<string>>? verifiedFindings, bool second = false)
+        IReadOnlyDictionary<int, IReadOnlyList<string>>? verifiedFindings, bool second = false, string review = CitationRepairer.DefaultReview)
     {
         var results = new List<CitationSupportResult>();
         var group = (Key: reference, Count: sentences.Count);
@@ -363,8 +364,8 @@ public static class CitationSupportChecker
 
             var prompt = new StringBuilder();
             prompt.AppendLine(second
-                ? "You are checking citations in a systematic literature review as an independent second reviewer. For each numbered sentence below, decide whether the EXCERPTS from the cited paper support the part of the sentence attributed to this paper. Read all excerpts before deciding: the support may be in any of them."
-                : "You are checking citations in a systematic literature review. For each numbered sentence below, decide whether the EXCERPTS from the cited paper support the part of the sentence attributed to this paper.");
+                ? $"You are checking citations in a {review} as an independent second reviewer. For each numbered sentence below, decide whether the EXCERPTS from the cited paper support the part of the sentence attributed to this paper. Read all excerpts before deciding: the support may be in any of them."
+                : $"You are checking citations in a {review}. For each numbered sentence below, decide whether the EXCERPTS from the cited paper support the part of the sentence attributed to this paper.");
             prompt.AppendLine("The full sentence is given for context only. Other papers cited in it are checked separately, and the review's own interpretation (text not attributed to any paper) is not checked against this paper.");
             prompt.AppendLine();
             prompt.AppendLine($"CITED PAPER [{group.Key}]: {paper.Title}");
