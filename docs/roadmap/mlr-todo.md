@@ -113,9 +113,10 @@ Block A is now the module design in [review-modules.md](review-modules.md), step
 - [x] Stopping rule (G8), first version: effort bounded asks for the top N hits of each string (at most one page of 100), exhaustion takes the whole first page, and saturation stops a search once a string adds no new source. The rule as applied is written in words into the ledger for the methods text.
 - [ ] Stopping rule, next: one more page while the last page still adds relevant sources, which needs screening (block E).
 - [ ] Link snowballing from the included grey sources (backlinks, G7), through the same duplicate check as citation chaining.
-- [ ] A snapshot of each fetched page: extracted text, URL, access date, SHA-256. See decision 2.
-- [ ] `robots.txt`, rate limits and site terms respected; nothing behind a login.
-- [ ] Tests: offline fakes for the web and Stack Exchange sources; the same page fetched twice gives the same snapshot; the stopping rule stops where it says.
+- [x] A snapshot of a found source's page (`MultivocalPages.cs`, `WebPages/`): the page's main text (HTML, plain text or PDF), its address after redirects, the access date, the SHA-256 of the text and a Wayback Machine link. The text stays in the run folder (`PageText/`) and is not in the archive; `multivocal-pages.json` is (decision 2). Only pages the searches found can be fetched. For now the reviewer keeps a page from the Sources found tab; block E will keep the pages of the included sources.
+- [x] `robots.txt` read as RFC 9309 says for our product token "TraceableAI" (an unreadable one means nothing is fetched), one request a second per site or its Crawl-delay (above 30 seconds the site is skipped), nothing behind a sign-in (401, 403, sign-in addresses), at most 10 MB, and only public addresses: an address that resolves to the server or its private network is refused when connecting.
+- [ ] Site terms beyond robots.txt: not readable by code, so the methods text will say that only robots.txt was checked.
+- [x] Tests: offline fakes for the web and Stack Exchange sources; the same page fetched twice gives the same snapshot; the stopping rule stops where it says.
 
 ### Block E: Selection and quality (G9–G11)
 
