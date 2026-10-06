@@ -64,7 +64,7 @@ The fourteen guidelines (G1–G14) are the concrete rules. For each step the tab
 | Planning · questions | G4 (p. 109) | Research questions tied to the goal and audience, objective and measurable | – | Several RQs with sub-RQs (as in Table 5), each driving search, extraction and synthesis |
 | Planning · question types | G5 (p. 110, Table 6) | Consider all RQ types (existence, description, comparison, frequency, process, relationship, causality, design), knowing the sources may not answer all | – | Each RQ classified by type; a warning for types the sources are unlikely to answer |
 | **Conducting** · search: what | G6 (p. 111) | Decide early which GL types and producers to cover (white papers, blogs, videos, Q&A sites, company reports, government) | – | GL types and producers chosen in the planning form and listed in the protocol |
-| Conducting · search: where | G7 (p. 111) | Use general web search engines, specialised databases and websites, backlinks (snowballing for GL) and contacting people | Academic database sources, OpenAlex citation chaining, `SourceStatus` | A web search source, Stack Exchange, websites named by the reviewer, link snowballing; sources added by hand after contacting people, marked as such |
+| Conducting · search: where | G7 (p. 111) | Use general web search engines, specialised databases and websites, backlinks (snowballing for GL) and contacting people | Academic database sources, OpenAlex citation chaining, `SourceStatus` | The free site APIs (Stack Exchange, GitHub, Hacker News, dev.to), grey literature in OpenAlex and Zenodo, backlink snowballing from included sources, and Brave web search only with the reviewer's own key (decision 1); no contacting people (decision 5) |
 | Conducting · search: terms | p. 111 | Run an informal pre-search for synonyms, since GL terminology is unstandardised; consult glossaries (SWEBOK, ISTQB) | Search-string preview and approval | Separate search strings for formal and grey sources, both previewed and approved |
 | Conducting · search: when to stop | G8 (p. 112) | Choose one of three stopping rules: theoretical saturation, effort bounded (top N hits), or evidence exhaustion | `SearchSaturation` | The rule chosen in planning; effort bounded by default (top 100, continuing while the last page still adds relevant hits, as in MLR-AutoTest); saturation shown per grey string |
 | Conducting · selection criteria | G9 (p. 112) | Combine inclusion and exclusion criteria for GL with the quality criteria of Table 7 | Screening one record with two independent prompts, exclusion reasons | MLR screening prompts for both pools; no peer-review filter; selection may use quality items such as date and outlet |
@@ -94,19 +94,21 @@ Block A is now the module design in [review-modules.md](review-modules.md), step
 
 ### Block C: Planning (G1–G5)
 
-- [ ] Planning form in the order of the guidelines, one step per screen: need and existing reviews, audience (G2); the seven questions of Table 4 (G3), with a note when every answer is "no" that a systematic review may be enough; research questions with sub-RQs (G4), each with a type from Table 6 (G5) and a warning for types the sources are unlikely to answer.
-- [ ] The MLR protocol (G1): the form's answers in the order of Fig. 7, written and fingerprinted before any search, with GL types, search engines and sites, stopping rule and quality threshold.
-- [ ] Tests: the protocol contains every planning answer; an empty Table 4 is refused.
+- [x] Planning form in the order of the guidelines, one step per screen (`Modules/Multivocal/Pages/MultivocalStart.razor`): need and existing reviews, audience (G2); the seven questions of Table 4 (G3), with a note when every answer is "no" that a systematic review may be enough; research questions with sub-RQs (G4), each with a type from Table 6 (G5) and a warning for types the sources are unlikely to answer.
+- [x] The MLR protocol (G1): the form's answers in the order of Fig. 7, written and fingerprinted before any search, with GL types, search engines and sites, stopping rule and quality threshold in points (`MultivocalProtocol.cs`). A planned run is written by `MultivocalPlanner` (run.json at stage "Planned", protocol.md, multivocal-plan.json) and shown at `/mlr/{runId}`.
+- [ ] The run contract (`RunAsync`, `StagesFor`) and the multivocal entry in the test kit, once the first search runs (block D).
+- [x] Tests: the protocol contains every planning answer; an empty Table 4 is refused (`MultivocalPlanTests.cs`).
 
 ### Block D: Searching formal and grey literature (G6–G8)
 
 - [ ] GL types and producers chosen in planning (G6) and recorded in the protocol.
-- [ ] A web search source behind the same source interface (G7): raw answers saved with SHA-256, cached, timed in `SourceStatus`. See decision 1.
-- [ ] A Stack Exchange source for Q&A sites, keeping score and views for the impact item of the quality checklist.
-- [ ] Websites named by the reviewer, searched through the web source with a site filter.
+- [ ] The free site sources behind the same source interface (G7): Stack Exchange (keeping score and views for the impact item of the quality checklist), GitHub, Hacker News and dev.to; raw answers saved with SHA-256, cached, timed in `SourceStatus`. See decision 1.
+- [ ] Grey literature in OpenAlex and Zenodo (reports, theses, white papers, documentation), through the existing source adapters with a type filter.
+- [ ] Brave web search as an optional source, used only when the reviewer adds their own key (kept with the other personal keys, never stored on the server).
+- [ ] Videos only with a published transcript (decision 3).
 - [ ] Two sets of search strings, formal and grey, previewed and approved in planning.
 - [ ] Stopping rule (G8): effort bounded by default (top N per string; one more page while the last page still adds relevant sources); saturation per grey string with `SearchSaturation`; where each string stopped goes into the methods text.
-- [ ] Link snowballing for grey sources, through the same duplicate check as citation chaining.
+- [ ] Link snowballing from the included grey sources (backlinks, G7), through the same duplicate check as citation chaining.
 - [ ] A snapshot of each fetched page: extracted text, URL, access date, SHA-256. See decision 2.
 - [ ] `robots.txt`, rate limits and site terms respected; nothing behind a login.
 - [ ] Tests: offline fakes for the web and Stack Exchange sources; the same page fetched twice gives the same snapshot; the stopping rule stops where it says.
@@ -139,13 +141,13 @@ Block A is now the module design in [review-modules.md](review-modules.md), step
 - [ ] Statement on AI use, model card, privacy page and wiki: web pages are fetched and stored as snapshots.
 - [ ] Switch the card on (`Available: true`) after one real MLR has been checked by hand.
 
-## 5. Decisions to make first
+## 5. Decisions (made on 6 October 2026)
 
-1. **Which web search provider.** General web search APIs differ a lot in price, quotas and terms of use (whether results may be stored and shown). The choice decides block D. Before choosing, check each candidate's current terms on storing results and citing them in a published report.
-2. **What goes into the archive.** Storing the full text of web pages makes the citation check repeatable, but republishing other people's pages in a downloadable archive raises copyright questions. A middle way: keep the snapshot text on the server for the run's lifetime, put only the URL, access date, SHA-256 and the quoted passages in the archive, and offer a Wayback Machine link for each page.
-3. **Videos and talks.** The paper counts them as 2nd-tier GL (Fig. 1). Using them means relying on transcripts. Start without them and say so in the protocol, or include them only when a transcript is published with the video?
-4. **The quality threshold.** The paper's example uses 0.5 (10 of 20). Make it a protocol setting with 0.5 as the default, or fix it?
-5. **Contacting people (G7).** The guidelines suggest asking practitioners and authors directly. That cannot be automated honestly; the planning form could take sources the reviewer adds by hand, marked as such in the flow diagram.
+1. **Searching the web: a free mix that lasts, no general web search engine by default.** No general web search API is both free and stable: Brave replaced its free plan with a monthly credit in February 2026 (card and attribution required, stored results need a paid storage plan), Google's Custom Search JSON API closes on 1 January 2027, and Marginalia has no public API. The MLR therefore searches (a) the free APIs of the large practitioner sites (Stack Exchange, GitHub, Hacker News, dev.to), (b) grey literature in free open indexes (OpenAlex and Zenodo: reports, theses, white papers, documentation) and (c) the links of the sources already included (backlink snowballing, G7). A reviewer who has a Brave Search API key can add it like the other personal keys, and the general web is then searched too. The protocol always states which of these were used, and that no general web search engine was used when none was.
+2. **The archive: the middle way.** The text of each web page is kept on the server for the run's lifetime, so the citation check can be repeated. The archive holds the URL, the access date, the SHA-256 of the text, the quoted passages and a Wayback Machine link, not other people's pages.
+3. **Videos and talks: only with a published transcript.** A video counts only when its transcript is published with it; quotes are checked against that transcript. Videos without one are left out, and the protocol says so.
+4. **The quality threshold: a setting in points.** Each grey source is scored out of 20 points on the criteria of Table 7, and the reviewer sets the threshold in the planning form (default 10 of 20, as in the paper's example). Points are easier to read than a fraction; the value goes into the protocol.
+5. **Contacting people (G7): not done.** The planning form takes no sources by hand; only sources found by the searches are reviewed, and the protocol states that practitioners and authors were not contacted.
 
 ## 6. What not to change
 

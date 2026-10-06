@@ -1,88 +1,561 @@
 @page "/mlr"
 @page "/mlr/{RunId:guid}"
+@rendermode InteractiveServer
 @inject AuBtechReviewAgent.ReviewModulesOptions ModuleOptions
 @inject AuBtechReviewAgent.RunStore Runs
+@inject AuBtechReviewAgent.MultivocalPlanner Planner
 @inject NavigationManager Nav
+@inject IJSRuntime JS
+@inject ILogger<MultivocalStart> Logger
 
-@* The multivocal review's own entry page. While the module is being built it is a preview: visible only where
-   ReviewModules:Preview lists "multivocal" (Development), and "not found" everywhere else. It shows the steps of the
-   Garousi et al. (2019) guidelines the module will follow and which of them are built. *@
+@* The multivocal review's planning form (MLR block C), laid out like the systematic review's dashboard: the steps
+   on the left with one primary action at the bottom, and on the right what the review will do and its protocol.
+   The steps themselves follow the Garousi et al. (2019) guidelines, not PRISMA. While the module is being built it
+   is a preview: visible only where ReviewModules:Preview lists "multivocal" (Development), "not found" elsewhere.
+   /mlr/{id} shows a planned run and its protocol. *@
 
-<SeoHead Title="Multivocal literature review (preview)" Path="/mlr" NoIndex="true"
+<SeoHead Title="@(GreyOnly ? "Grey literature review (preview)" : "Multivocal literature review (preview)")" Path="/mlr" NoIndex="true"
          Description="Preview of the multivocal literature review, following the Garousi et al. (2019) guidelines." />
 
-<SiteHeader />
+<SiteHeader Active="dashboard" DashboardHref="@(planned != null ? $"/mlr/{planned.RunId}" : "/mlr")" />
 
-<main id="main" tabindex="-1" class="flex-1 min-h-0 overflow-y-auto bg-gray-50 text-gray-900 font-sans">
-    <div class="ui-container py-14 lg:py-20 max-w-4xl">
-        <p class="ui-eyebrow">Preview, not available yet</p>
-        <h1 class="ui-h1 mt-3">Multivocal Literature Review</h1>
-        <p class="ui-lead mt-4">
-            A multivocal review adds grey literature, such as reports, documentation and practitioner articles, to the
-            academic studies. It follows the guidelines of
-            <a href="@Method.StandardUrl" target="_blank" rel="noopener" class="text-brand underline underline-offset-2">Garousi, Felderer and Mäntylä (2019)</a>,
-            and, like every review here, each statement in its report will be traced to a quote from the source it cites.
-        </p>
+<main id="main" tabindex="-1" class="flex-1 min-h-0 overflow-y-auto">
+<div class="max-w-7xl w-full mx-auto p-4 lg:p-6 space-y-4">
 
-        @if (RunId != null)
-        {
-            <p class="ui-card mt-8 p-5 text-sm text-gray-700">Multivocal runs cannot be opened yet: this part is not built.</p>
-        }
-
-        <h2 class="text-lg font-semibold mt-12">The steps it will follow</h2>
-        <p class="ui-muted mt-2">Each step names the guideline it implements. None of them runs yet; they are built one block at a time.</p>
-        <ol class="mt-6 space-y-3">
-            @foreach (var step in Steps)
-            {
-                var s = step;
-                <li class="ui-card p-5 flex flex-col sm:flex-row sm:items-start gap-3 sm:gap-6">
-                    <div class="sm:w-44 flex-none">
-                        <p class="text-xs font-medium text-gray-500">@s.Phase</p>
-                        <p class="font-semibold text-gray-950">@s.Name</p>
-                    </div>
-                    <p class="text-sm text-gray-700 flex-1">@s.What</p>
-                    <span class="ui-chip border-gray-200 bg-gray-50 text-gray-600 whitespace-nowrap self-start">@s.Guidelines · not built</span>
-                </li>
-            }
-        </ol>
-
-        <p class="ui-muted mt-10">
-            The plan, step by step, is in
-            <a href="@($"{AuBtechReviewAgent.SiteSeo.RepositoryUrl}/blob/master/docs/roadmap/mlr-todo.md")" class="text-brand underline underline-offset-2">docs/roadmap/mlr-todo.md</a>.
-            <a href="/start" class="text-brand underline underline-offset-2">Back to the kinds of review</a>.
-        </p>
+    <div class="flex flex-wrap items-end justify-between gap-3">
+        <div>
+            <h1 class="ui-h2">@(planned != null ? "Your review" : "New review")</h1>
+            <p class="text-sm text-gray-500 mt-1">
+                A @(GreyOnly ? "grey literature" : "multivocal") review following
+                <a href="@Method.StandardUrl" target="_blank" rel="noopener" class="underline decoration-dotted underline-offset-2" title="@Method.StandardReference">Garousi et al. (2019)</a>,
+                in which every citation will be checked against its source. <a href="/glossary" class="text-brand underline underline-offset-2">Glossary</a>
+            </p>
+        </div>
+        <span class="bg-amber-50 border-amber-200 text-amber-800 border px-2.5 py-1 text-[11px] flex items-center gap-1.5" title="Visible only in Development while it is being built">
+            <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>Preview · not available yet
+        </span>
     </div>
-    <SiteFooter />
+
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
+
+        <section class="lg:col-span-5 space-y-4 min-w-0" aria-label="Review settings">
+            @if (planned != null)
+            {
+                <div class="bg-white border border-gray-200 shadow-sm p-4 space-y-3">
+                    <div>
+                        <h2 class="text-sm font-semibold text-gray-900">Review settings</h2>
+                        <p class="text-xs font-medium text-brand">Planned: the protocol is written; searching is the next part to be built</p>
+                    </div>
+                    <dl class="text-xs space-y-2">
+                        @SettingRow("Topic", planned.Plan.Topic)
+                        @SettingRow("Goal", planned.Plan.Goal)
+                        @SettingRow("Audience", AudienceLabel(planned.Plan.Audience))
+                        @SettingRow("Questions", string.Join(" ", planned.Plan.Numbered().Select(q => q.Number)))
+                        @SettingRow("Searches", string.Join(", ", planned.Plan.GreySearches.Select(k => AuBtechReviewAgent.MultivocalGuidelines.GreySearches.First(s => s.Key == k).Label)))
+                        @SettingRow("Threshold", $"{planned.Plan.QualityThreshold} of {AuBtechReviewAgent.MultivocalGuidelines.QualityPointsMax} points")
+                    </dl>
+                    <p class="text-[11px] text-gray-500 leading-snug border-t border-gray-100 pt-2">
+                        Link to this run: <a class="text-brand underline break-all" href="@($"/mlr/{planned.RunId}")">@($"/mlr/{planned.RunId}")</a>.
+                        Protocol fingerprint (SHA-256): <span class="font-mono break-all">@planned.ProtocolSha256</span>
+                    </p>
+                    <div class="flex flex-wrap gap-2">
+                        <a href="@($"/api/workspace/{planned.RunId:N}/protocol.md")" class="ui-btn-secondary ui-btn-sm">Download the protocol</a>
+                        <a href="@($"/mlr?card={planned.Plan.Card}")" class="ui-btn-primary ui-btn-sm">New review</a>
+                    </div>
+                </div>
+            }
+            else if (RunId != null)
+            {
+                <div class="bg-white border border-gray-200 shadow-sm p-4 text-sm text-gray-700">This run could not be found. It may have expired and been deleted.</div>
+            }
+            else
+            {
+                <div class="bg-white border border-gray-200 shadow-sm">
+                    <nav class="flex border-b border-gray-200 overflow-x-auto" aria-label="Steps">
+                        @for (int i = 0; i < Steps.Length; i++)
+                        {
+                            int number = i;
+                            bool active = step == number;
+                            bool done = StepProblem(number) == null;
+                            <button type="button" @onclick="() => GoTo(number)" aria-current="@(active ? "step" : null)" title="@Steps[number].Guideline"
+                                    class="flex-1 flex items-center justify-center gap-1.5 px-2 py-3 text-xs whitespace-nowrap border-b-2 -mb-px transition-colors @(active ? "border-brand text-brand font-semibold" : "border-transparent text-gray-500 hover:text-gray-800")">
+                                @if (done && !active)
+                                {
+                                    <svg class="w-3.5 h-3.5 text-green-600" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M16.7 5.3a1 1 0 010 1.4l-8 8a1 1 0 01-1.4 0l-4-4a1 1 0 111.4-1.4L8 12.6l7.3-7.3a1 1 0 011.4 0z" clip-rule="evenodd" /></svg>
+                                }
+                                else
+                                {
+                                    <span class="w-4 h-4 rounded-full text-[10px] flex items-center justify-center @(active ? "bg-brand text-white" : "bg-gray-200 text-gray-600")">@(number + 1)</span>
+                                }
+                                @Steps[number].Title
+                            </button>
+                        }
+                    </nav>
+
+                    <div class="p-4 space-y-4">
+                        <p class="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-gray-600">
+                            <span class="ui-chip border-brand-100 bg-brand-50 text-brand">@(GreyOnly ? "Grey Literature Review" : "Multivocal Literature Review")</span>
+                            <span>follows @Method.Standard</span>
+                            <a href="/start" class="text-brand font-medium hover:underline">Change review type</a>
+                        </p>
+
+                        <div class="flex items-center justify-between gap-2">
+                            <h2 id="step-title" class="text-sm text-gray-600" tabindex="-1">@Steps[step].Question <span class="text-gray-500">(@Steps[step].Guideline)</span></h2>
+                            @if (step == 0)
+                            {
+                                <button type="button" @onclick="FillExample" class="text-xs text-brand font-medium hover:underline whitespace-nowrap">Try an example</button>
+                            }
+                        </div>
+
+                        @if (step == 0)
+                        {
+                            <div>
+                                <label for="p-topic" class="ui-label">Topic <span class="font-normal text-gray-500">(required)</span></label>
+                                <input id="p-topic" class="ui-input" maxlength="@AuBtechReviewAgent.MultivocalPlan.MaxText" @bind="plan.Topic" @bind:event="oninput" placeholder="e.g. context engineering for LLM agents" aria-describedby="h-topic" />
+                                <p id="h-topic" class="text-xs text-gray-600 mt-1">What the review is about, in a few words.</p>
+                            </div>
+                            <div>
+                                <label for="p-goal" class="ui-label">Goal <span class="font-normal text-gray-500">(required)</span></label>
+                                <textarea id="p-goal" rows="3" class="ui-input resize-y" maxlength="@AuBtechReviewAgent.MultivocalPlan.MaxText" @bind="plan.Goal" @bind:event="oninput" aria-describedby="h-goal"
+                                          placeholder="e.g. Map the practices developers use to decide what goes into an agent's context window."></textarea>
+                                <p id="h-goal" class="text-xs text-gray-600 mt-1">What the review is for. It guides the research questions.</p>
+                            </div>
+                            <div>
+                                <label for="p-existing" class="ui-label">Existing reviews</label>
+                                <textarea id="p-existing" rows="2" class="ui-input resize-y" maxlength="@AuBtechReviewAgent.MultivocalPlan.MaxText" @bind="plan.ExistingReviews" @bind:event="oninput" aria-describedby="h-existing"></textarea>
+                                <p id="h-existing" class="text-xs text-gray-600 mt-1">Name the reviews you found and what this one adds. Leave empty if you found none.</p>
+                            </div>
+                            <fieldset>
+                                <legend class="ui-label">Who is the review for? <span class="font-normal text-gray-500">(required)</span></legend>
+                                <div class="flex flex-wrap gap-x-5 gap-y-1.5 text-sm text-gray-800">
+                                    @foreach (var audience in Enum.GetValues<AuBtechReviewAgent.ReviewAudience>())
+                                    {
+                                        var a = audience;
+                                        <label class="inline-flex items-center gap-2 cursor-pointer">
+                                            <input type="radio" name="audience" class="w-4 h-4 accent-brand" checked="@(plan.Audience == a)" @onchange="() => plan.Audience = a" />
+                                            @AudienceLabel(a)
+                                        </label>
+                                    }
+                                </div>
+                            </fieldset>
+                        }
+                        else if (step == 1)
+                        {
+                            <p class="text-xs text-gray-600">One or more "yes" answers suggest including grey literature (Table 4).</p>
+                            <ol class="space-y-3">
+                                @for (int i = 0; i < AuBtechReviewAgent.MultivocalGuidelines.IncludeGreyQuestions.Count; i++)
+                                {
+                                    int q = i;
+                                    <li>
+                                        <fieldset class="flex flex-col sm:flex-row sm:items-start gap-2 sm:gap-4">
+                                            <legend class="sr-only">Question @(q + 1)</legend>
+                                            <span class="text-sm text-gray-800 flex-1"><span class="text-gray-500">@(q + 1).</span> @AuBtechReviewAgent.MultivocalGuidelines.IncludeGreyQuestions[q]</span>
+                                            <span class="flex gap-4 text-sm flex-none">
+                                                <label class="inline-flex items-center gap-1.5 cursor-pointer"><input type="radio" name="@($"g3-{q}")" class="w-4 h-4 accent-brand" checked="@(plan.IncludeGrey[q] == true)" @onchange="() => plan.IncludeGrey[q] = true" /> Yes</label>
+                                                <label class="inline-flex items-center gap-1.5 cursor-pointer"><input type="radio" name="@($"g3-{q}")" class="w-4 h-4 accent-brand" checked="@(plan.IncludeGrey[q] == false)" @onchange="() => plan.IncludeGrey[q] = false" /> No</label>
+                                            </span>
+                                        </fieldset>
+                                    </li>
+                                }
+                            </ol>
+                            @if (plan.IncludeGrey.All(a => a == false))
+                            {
+                                <p class="bg-amber-50 border border-amber-200 text-amber-900 p-2 text-xs" role="status">Every answer is "no": by the guidelines, a systematic review may be enough. You can still go on.</p>
+                            }
+                        }
+                        else if (step == 2)
+                        {
+                            <p class="text-xs text-gray-600">Tie each question to the goal and the audience, and give it a type from Table 6.</p>
+                            <ol class="space-y-4">
+                                @foreach (var (number, question) in plan.Numbered())
+                                {
+                                    var q = question;
+                                    int index = plan.Questions.IndexOf(q);
+                                    var type = AuBtechReviewAgent.MultivocalGuidelines.FindType(q.Type);
+                                    <li class="@(q.Parent != null ? "ml-5 pl-3 border-l-2 border-gray-200" : "")">
+                                        <label for="@($"rq-{index}")" class="ui-label">@number</label>
+                                        <textarea id="@($"rq-{index}")" rows="2" class="ui-input resize-y" maxlength="@AuBtechReviewAgent.MultivocalPlan.MaxText" @bind="q.Text" @bind:event="oninput"></textarea>
+                                        <label for="@($"rqt-{index}")" class="sr-only">Type of @number</label>
+                                        <select id="@($"rqt-{index}")" class="ui-input mt-2" @bind="q.Type">
+                                            <option value="">Choose a type</option>
+                                            @foreach (var t in AuBtechReviewAgent.MultivocalGuidelines.QuestionTypes)
+                                            {
+                                                <option value="@t.Key">@t.Name: @t.Pattern</option>
+                                            }
+                                        </select>
+                                        @if (type is { HardForSources: true })
+                                        {
+                                            <p class="text-[11px] text-amber-800 mt-1">Sources may not allow a question of this type to be answered (p. 110).</p>
+                                        }
+                                        <div class="mt-1.5 flex flex-wrap gap-x-3 gap-y-1 text-xs">
+                                            @if (q.Parent == null && plan.Questions.Count < AuBtechReviewAgent.MultivocalPlan.MaxQuestions)
+                                            {
+                                                <button type="button" class="text-brand font-medium hover:underline" @onclick="() => plan.AddQuestion(index)">Add a sub-question</button>
+                                            }
+                                            @if (plan.Questions.Count > 1)
+                                            {
+                                                <button type="button" class="text-gray-600 hover:text-red-700 hover:underline" @onclick="() => plan.RemoveQuestion(index)">Remove @number</button>
+                                            }
+                                        </div>
+                                    </li>
+                                }
+                            </ol>
+                            @if (plan.Questions.Count < AuBtechReviewAgent.MultivocalPlan.MaxQuestions)
+                            {
+                                <button type="button" class="text-xs text-brand font-medium hover:underline" @onclick="() => plan.AddQuestion(null)">Add a research question</button>
+                            }
+                        }
+                        else if (step == 3)
+                        {
+                            <fieldset>
+                                <legend class="ui-label">Kinds of grey literature <span class="font-normal text-gray-500">(at least one)</span></legend>
+                                <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-3 gap-y-1.5">
+                                    @foreach (var (key, label) in AuBtechReviewAgent.MultivocalGuidelines.GreyTypes)
+                                    {
+                                        var k = key;
+                                        <label class="flex items-start gap-2 text-sm text-gray-800 cursor-pointer select-none"><input type="checkbox" class="w-4 h-4 mt-0.5 accent-brand" checked="@plan.GreyTypes.Contains(k)" @onchange="e => plan.GreyTypes = Toggle(plan.GreyTypes, k, e, AuBtechReviewAgent.MultivocalGuidelines.GreyTypes.Select(t => t.Key))" /> <span>@label</span></label>
+                                    }
+                                </div>
+                            </fieldset>
+                            <fieldset>
+                                <legend class="ui-label">Where to search <span class="font-normal text-gray-500">(at least one)</span></legend>
+                                <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-3 gap-y-1.5">
+                                    @foreach (var search in AuBtechReviewAgent.MultivocalGuidelines.GreySearches)
+                                    {
+                                        var s = search;
+                                        <label class="flex items-start gap-2 text-sm text-gray-800 cursor-pointer select-none"><input type="checkbox" class="w-4 h-4 mt-0.5 accent-brand" checked="@plan.GreySearches.Contains(s.Key)" @onchange="e => plan.GreySearches = Toggle(plan.GreySearches, s.Key, e, AuBtechReviewAgent.MultivocalGuidelines.GreySearches.Select(t => t.Key))" /> <span>@s.Label</span></label>
+                                    }
+                                </div>
+                                <p class="text-xs text-gray-600 mt-1.5">No general web search engine is used unless you add your own Brave Search API key. Practitioners and authors are not contacted.</p>
+                            </fieldset>
+                            <details class="group border border-gray-200" open>
+                                <summary class="cursor-pointer select-none px-3 py-2 text-sm text-gray-800 flex items-center justify-between">
+                                    <span>Stopping rule and quality</span>
+                                    <span class="text-[11px] text-gray-500">@StoppingSummary() · threshold @plan.QualityThreshold/@AuBtechReviewAgent.MultivocalGuidelines.QualityPointsMax</span>
+                                </summary>
+                                <div class="px-3 pb-3 space-y-3 border-t border-gray-100 pt-3">
+                                    <fieldset>
+                                        <legend class="text-sm text-gray-800">When to stop searching (G8)</legend>
+                                        <div class="space-y-1 mt-1 text-sm text-gray-800">
+                                            @foreach (var (key, label) in AuBtechReviewAgent.MultivocalGuidelines.StoppingRules)
+                                            {
+                                                var k = key;
+                                                <label class="flex items-start gap-2 cursor-pointer"><input type="radio" name="stopping" class="w-4 h-4 mt-0.5 accent-brand" checked="@(plan.StoppingRule == k)" @onchange="() => plan.StoppingRule = k" /> <span>@label</span></label>
+                                            }
+                                        </div>
+                                    </fieldset>
+                                    @if (plan.StoppingRule == "effort")
+                                    {
+                                        <div class="flex items-center justify-between gap-3">
+                                            <label for="p-top" class="text-sm text-gray-800">Top hits per search string<span class="block text-xs text-gray-500">The paper looks at the first 100.</span></label>
+                                            <input id="p-top" type="number" min="10" max="500" class="ui-input w-20 text-center" @bind="plan.TopHits" />
+                                        </div>
+                                    }
+                                    <div class="flex items-center justify-between gap-3">
+                                        <label for="p-threshold" class="text-sm text-gray-800">Quality threshold, of @AuBtechReviewAgent.MultivocalGuidelines.QualityPointsMax points (G11)<span class="block text-xs text-gray-500">A grey source scoring below this is excluded. The paper's example uses 10.</span></label>
+                                        <input id="p-threshold" type="number" min="1" max="@AuBtechReviewAgent.MultivocalGuidelines.QualityPointsMax" class="ui-input w-20 text-center" @bind="plan.QualityThreshold" />
+                                    </div>
+                                </div>
+                            </details>
+                        }
+                        else
+                        {
+                            <p class="text-xs text-gray-600">The protocol on the right is written from your answers. It is fixed, with a fingerprint, before anything is searched.</p>
+                            @if (Problems.Count > 0)
+                            {
+                                <div class="bg-amber-50 border border-amber-200 text-amber-900 p-2 text-xs space-y-0.5" role="alert">
+                                    <p class="font-semibold">Before the protocol can be written:</p>
+                                    <ul class="list-disc pl-4 space-y-0.5">
+                                        @foreach (var item in Problems)
+                                        {
+                                            <li>@item</li>
+                                        }
+                                    </ul>
+                                </div>
+                            }
+                            else
+                            {
+                                <p class="bg-green-50 border border-green-200 text-green-800 p-2 text-xs">Everything is filled in. Check the protocol, then write it.</p>
+                            }
+                        }
+                    </div>
+
+                    @if (error != null)
+                    {
+                        <div class="mx-4 mb-3 bg-red-50 border border-red-200 text-red-800 p-2 text-xs" role="alert">@error</div>
+                    }
+
+                    <div class="sticky bottom-0 bg-white/95 backdrop-blur border-t border-gray-200 px-4 py-3 space-y-2">
+                        <p class="text-[11px] text-gray-500 truncate" title="@SettingsLine()">@SettingsLine()</p>
+                        @if (FirstProblem() is { } problem)
+                        {
+                            <button type="button" @onclick="() => GoTo(problem.Step)" class="block text-left text-xs text-amber-800 underline decoration-dotted underline-offset-2 hover:text-amber-900">@problem.Text</button>
+                        }
+                        <div class="flex items-center gap-2">
+                            @if (step > 0)
+                            {
+                                <button type="button" @onclick="() => GoTo(step - 1)" class="ui-btn-ghost">Back</button>
+                            }
+                            <span class="flex-1"></span>
+                            @if (step < Steps.Length - 1)
+                            {
+                                <button type="button" @onclick="() => GoTo(step + 1)" class="ui-btn-primary">Next: @Steps[step + 1].NextLabel</button>
+                            }
+                            else
+                            {
+                                <button type="button" class="ui-btn-primary" disabled="@(Problems.Count > 0 || saving)" @onclick="WriteProtocolAsync">Write the protocol</button>
+                            }
+                        </div>
+                    </div>
+                </div>
+            }
+        </section>
+
+        <section class="lg:col-span-7 lg:sticky lg:top-4 min-w-0 bg-white border border-gray-200 shadow-sm overflow-hidden flex flex-col lg:max-h-[calc(100vh-8rem)]" aria-labelledby="panel-title">
+            <h2 id="panel-title" class="sr-only">@(panelTab == "protocol" ? "Protocol" : "What this review will do")</h2>
+            <div class="flex items-center justify-between border-b border-gray-200 px-3 flex-none">
+                <div class="flex" role="group" aria-label="Show">
+                    <button type="button" aria-pressed="@(panelTab == "plan" ? "true" : "false")" @onclick="@(() => panelTab = "plan")"
+                            class="px-3 py-2.5 text-xs border-b-2 -mb-px @(panelTab == "plan" ? "border-brand text-brand font-semibold" : "border-transparent text-gray-500 hover:text-gray-800")">Preview</button>
+                    <button type="button" aria-pressed="@(panelTab == "protocol" ? "true" : "false")" @onclick="@(() => panelTab = "protocol")"
+                            class="px-3 py-2.5 text-xs border-b-2 -mb-px @(panelTab == "protocol" ? "border-brand text-brand font-semibold" : "border-transparent text-gray-500 hover:text-gray-800")">Protocol</button>
+                </div>
+                <span class="text-[10px] text-gray-500 font-mono">Garousi et al. 2019</span>
+            </div>
+
+            @if (panelTab == "protocol")
+            {
+                <pre class="flex-1 min-h-[20rem] overflow-y-auto p-5 text-xs leading-relaxed text-gray-800 whitespace-pre-wrap break-words font-mono" tabindex="0" aria-label="Protocol">@(planned != null ? protocolText : ProtocolPreview)</pre>
+            }
+            else
+            {
+                <div class="flex-1 min-h-0 overflow-y-auto p-5 space-y-5 text-left font-sans">
+                    <div>
+                        <h3 class="text-base font-semibold text-gray-900">What this review will do</h3>
+                        <p class="text-xs text-gray-600 mt-0.5">With your current answers. Only the protocol is built so far; the other steps follow one block at a time.</p>
+                    </div>
+                    <ol class="space-y-3">
+                        @for (int i = 0; i < PlanSteps.Count; i++)
+                        {
+                            var s = PlanSteps[i];
+                            <li class="flex gap-3">
+                                <span class="flex-none w-6 h-6 rounded-full bg-brand/10 text-brand text-[11px] font-semibold flex items-center justify-center">@(i + 1)</span>
+                                <span class="text-xs leading-snug flex-1">
+                                    <span class="font-semibold text-gray-900">@s.Title</span>
+                                    <span class="text-gray-600"> · @s.Text</span>
+                                </span>
+                                <span class="@(s.Built ? "ui-chip border-green-200 bg-green-50 text-green-800" : "ui-chip border-gray-200 bg-gray-50 text-gray-600") text-[10px] self-start whitespace-nowrap">@(s.Built ? "built" : "not built yet")</span>
+                            </li>
+                        }
+                    </ol>
+                    <div class="border-t border-gray-100 pt-4">
+                        <h3 class="text-xs font-semibold text-gray-900 mb-2">What you will get</h3>
+                        <div class="grid grid-cols-2 gap-2 text-[11px] text-gray-700">
+                            <div class="border border-gray-200 p-2"><span class="font-semibold block text-gray-900">Review report</span>structured by the guidelines, every citation clickable to its quote</div>
+                            <div class="border border-gray-200 p-2"><span class="font-semibold block text-gray-900">Practitioner summary</span>a short version for the people who use the results</div>
+                            <div class="border border-gray-200 p-2"><span class="font-semibold block text-gray-900">Systematic map</span>the sources classified, grey and formal side by side</div>
+                            <div class="border border-gray-200 p-2"><span class="font-semibold block text-gray-900">Verifiable archive</span>protocol, sources' fingerprints and every model call</div>
+                        </div>
+                    </div>
+                </div>
+            }
+        </section>
+    </div>
+</div>
 </main>
 
 @code {
     [Parameter] public Guid? RunId { get; set; }
 
+    /// <summary>"grey" when started from the Grey Literature Review card.</summary>
+    [SupplyParameterFromQuery(Name = "card")] public string? CardKey { get; set; }
+
     private static readonly AuBtechReviewAgent.ReviewMethod Method = AuBtechReviewAgent.ReviewMethods.Find("multivocal")!;
 
-    private sealed record Step(string Phase, string Name, string What, string Guidelines);
+    private sealed record Step(string Title, string Question, string Guideline, string NextLabel);
 
     private static readonly Step[] Steps =
     {
-        new("Planning", "Need and audience", "Look for existing reviews first, and decide who the review is for: researchers, practitioners or both.", "G1–G2"),
-        new("Planning", "Include grey literature?", "Answer the seven questions that show whether grey literature is needed.", "G3"),
-        new("Planning", "Research questions", "Write the questions, each tied to the goal and the audience, and choose their types.", "G4–G5"),
-        new("Search", "What and where", "Choose the kinds of grey literature and their producers, then the search engines, sites and backlinks to use.", "G6–G7"),
-        new("Search", "When to stop", "Choose a stopping rule: saturation, a fixed number of hits, or all the evidence.", "G8"),
-        new("Selection", "Criteria and process", "Screen grey and academic sources with the same criteria and the same care.", "G9–G10"),
-        new("Selection", "Quality", "Score each grey source on authority, method, objectivity, date and the other criteria, each answer with a quote.", "G11"),
-        new("Analysis", "Map and extraction", "Build a systematic map of the sources and extract the data, every item linked to its place in the source.", "G12"),
-        new("Analysis", "Synthesis", "Code the findings and write the synthesis, every statement checked against its source.", "G13"),
-        new("Reporting", "Report", "A report for researchers and a short version for practitioners, structured by the guidelines.", "G14"),
+        new("Need", "What is the review for, and who reads it?", "G2", "Need and audience"),
+        new("Grey", "Is grey literature needed?", "G3", "Grey literature"),
+        new("Questions", "What should the review answer?", "G4–G5", "Questions"),
+        new("Search", "What, where and how much to search?", "G6–G8, G11", "Search"),
+        new("Protocol", "Check the plan before anything is searched.", "G1", "Protocol"),
     };
+
+    private AuBtechReviewAgent.MultivocalPlan plan = new();
+    private AuBtechReviewAgent.PlannedRun? planned;
+    private string protocolText = "";
+    private int step;
+    private string panelTab = "plan";
+    private bool saving;
+    private string? error;
+
+    private bool GreyOnly => planned?.Plan.IsGreyOnly ?? plan.IsGreyOnly;
+    private AuBtechReviewAgent.MultivocalPlan Shown => planned?.Plan ?? plan;
+    private IReadOnlyList<string> Problems => plan.Problems();
+    private string ProtocolPreview =>
+        AuBtechReviewAgent.MultivocalProtocol.Write(plan, Guid.Empty, DateTime.UtcNow).Replace(Guid.Empty.ToString(), "assigned when the protocol is written");
 
     protected override void OnParametersSet()
     {
         var module = AuBtechReviewAgent.ReviewModules.Find("multivocal")!;
         if (!ModuleOptions.CanOpen(module)) { Nav.NotFound(); return; }
 
-        // A systematic run opened here goes to its own page.
-        if (RunId is Guid id && AuBtechReviewAgent.ReviewModules.ElsewhereFor(Runs.LoadHeader(id), module.Key) is string elsewhere)
-            Nav.NavigateTo(elsewhere, replace: true);
+        if (RunId is Guid id)
+        {
+            // A systematic run opened here goes to its own page.
+            if (AuBtechReviewAgent.ReviewModules.ElsewhereFor(Runs.LoadHeader(id), module.Key) is string elsewhere)
+            {
+                Nav.NavigateTo(elsewhere, replace: true);
+                return;
+            }
+            planned = Planner.Load(id);
+            protocolText = Runs.ReadProtocol(id) ?? "";
+            panelTab = "protocol";
+            return;
+        }
+        plan.Card = CardKey == "grey" ? "grey" : "multivocal";
+    }
+
+    /// <summary>What the review will do, with the current answers; only the protocol is built so far.</summary>
+    private IReadOnlyList<(string Title, string Text, bool Built)> PlanSteps
+    {
+        get
+        {
+            var p = Shown;
+            int searches = p.GreySearches.Count;
+            int questions = p.Numbered().Count;
+            string stop = p.StoppingRule switch
+            {
+                "effort" => $"the top {p.TopHits} hits of each search string",
+                "saturation" => "until new sources add nothing new",
+                _ => "every hit of every search string",
+            };
+            return new List<(string, string, bool)>
+            {
+                ("Protocol", "Your plan is written down before anything is searched, with a fingerprint.", true),
+                ("Search", p.IsGreyOnly
+                    ? $"{searches} grey literature search{(searches == 1 ? "" : "es")}, {stop}."
+                    : $"{searches} grey literature search{(searches == 1 ? "" : "es")} and the academic databases, {stop}.", false),
+                ("Selection", p.IsGreyOnly ? "Every source is screened against your questions." : "Grey and academic sources are screened with the same criteria and the same care.", false),
+                ("Quality", $"Each grey source is scored on Table 7; below {p.QualityThreshold} of {AuBtechReviewAgent.MultivocalGuidelines.QualityPointsMax} points it is left out. Every score rests on a quote.", false),
+                ("Map and extraction", "The sources are classified in a systematic map; every extracted item links to its place in the source.", false),
+                ("Synthesis", $"The findings are coded and written up to answer {questions} research question{(questions == 1 ? "" : "s")}.", false),
+                ("Checking", "Every citation is compared with its source; weak ones get a second check and are repaired.", false),
+            };
+        }
+    }
+
+    /// <summary>The first thing missing in a step, worded for the link above the buttons; null when the step is complete.</summary>
+    private string? StepProblem(int index)
+    {
+        switch (index)
+        {
+            case 0:
+                if (string.IsNullOrWhiteSpace(plan.Topic)) return "Add the topic (step 1).";
+                if (string.IsNullOrWhiteSpace(plan.Goal)) return "Add the goal (step 1).";
+                if (plan.Audience == null) return "Choose who the review is for (step 1).";
+                return null;
+            case 1:
+                return plan.IncludeGrey.Any(a => a == null) ? "Answer all seven questions on grey literature (step 2)." : null;
+            case 2:
+                if (plan.Questions.Any(q => string.IsNullOrWhiteSpace(q.Text))) return "Fill in or remove empty research questions (step 3).";
+                if (plan.Questions.Any(q => AuBtechReviewAgent.MultivocalGuidelines.FindType(q.Type) == null)) return "Choose a type for every research question (step 3).";
+                return null;
+            case 3:
+                if (plan.GreyTypes.Count == 0) return "Choose at least one kind of grey literature (step 4).";
+                if (plan.GreySearches.Count == 0) return "Choose at least one place to search (step 4).";
+                if (plan.QualityThreshold is < 1 or > AuBtechReviewAgent.MultivocalGuidelines.QualityPointsMax) return "Set the quality threshold between 1 and 20 points (step 4).";
+                if (plan.StoppingRule == "effort" && plan.TopHits is < 10 or > 500) return "Look at between 10 and 500 top hits per search string (step 4).";
+                return null;
+            default:
+                return Problems.Count > 0 ? Problems[0] : null;
+        }
+    }
+
+    private (int Step, string Text)? FirstProblem()
+    {
+        for (int i = 0; i < Steps.Length; i++)
+            if (StepProblem(i) is { } text) return (i, text);
+        return null;
+    }
+
+    private string SettingsLine()
+    {
+        int questions = plan.Numbered().Count;
+        return $"{(plan.IsGreyOnly ? "Grey only" : "Grey and academic")} · {questions} research question{(questions == 1 ? "" : "s")} · {plan.GreySearches.Count} search{(plan.GreySearches.Count == 1 ? "" : "es")} · {StoppingSummary()} · threshold {plan.QualityThreshold}/{AuBtechReviewAgent.MultivocalGuidelines.QualityPointsMax}";
+    }
+
+    private string StoppingSummary() => plan.StoppingRule switch
+    {
+        "effort" => $"top {plan.TopHits} hits",
+        "saturation" => "until saturation",
+        _ => "every hit",
+    };
+
+    private RenderFragment SettingRow(string label, string value) =>
+        @<div class="flex gap-2"><dt class="w-20 flex-none text-gray-500">@label</dt><dd class="text-gray-800 min-w-0 break-words">@value</dd></div>;
+
+    private async Task GoTo(int index)
+    {
+        step = Math.Clamp(index, 0, Steps.Length - 1);
+        error = null;
+        if (step == Steps.Length - 1) panelTab = "protocol";
+        try { await JS.InvokeVoidAsync("traceableReview.focus", "step-title"); }
+        catch (Exception ex) when (ex is JSException or JSDisconnectedException or InvalidOperationException or TaskCanceledException)
+        {
+            Logger.LogDebug("Could not move focus to the step title: {Message}", ex.Message);
+        }
+    }
+
+    // Ticks or unticks one key, keeping the guidelines' order so the protocol lists them the same way every time.
+    private static List<string> Toggle(List<string> list, string key, ChangeEventArgs e, IEnumerable<string> order)
+    {
+        bool on = e.Value is bool b && b;
+        var chosen = list.Where(k => k != key).Concat(on ? new[] { key } : Array.Empty<string>()).ToHashSet();
+        return order.Where(chosen.Contains).ToList();
+    }
+
+    // Fills every step with a complete example (preview only), so the form and the protocol can be tried quickly.
+    private void FillExample()
+    {
+        plan = AuBtechReviewAgent.MultivocalPlan.Example(plan.Card);
+        error = null;
+    }
+
+    private static string AudienceLabel(AuBtechReviewAgent.ReviewAudience? audience) => audience switch
+    {
+        AuBtechReviewAgent.ReviewAudience.Researchers => "Researchers",
+        AuBtechReviewAgent.ReviewAudience.Practitioners => "Practitioners",
+        AuBtechReviewAgent.ReviewAudience.Both => "Both",
+        _ => "not set",
+    };
+
+    private async Task WriteProtocolAsync()
+    {
+        if (saving) return;
+        saving = true;
+        error = null;
+        try
+        {
+            var (runId, editKey) = await Planner.CreateAsync(plan);
+            // Only this browser keeps the run's edit key, as for a systematic review.
+            try { await JS.InvokeVoidAsync("traceableReview.saveEditKey", runId.ToString(), editKey); }
+            catch (Exception ex) when (ex is JSException or JSDisconnectedException or InvalidOperationException or TaskCanceledException)
+            {
+                // The run is written either way; without the key this browser cannot change it later, as for a systematic review.
+                Logger.LogDebug("Could not keep the edit key in this browser: {Message}", ex.Message);
+            }
+            Nav.NavigateTo($"/mlr/{runId}");
+        }
+        catch (ArgumentException ex)
+        {
+            error = ex.Message;
+        }
+        finally
+        {
+            saving = false;
+        }
     }
 }

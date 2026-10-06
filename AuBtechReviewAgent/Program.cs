@@ -108,6 +108,7 @@ var reviewEngine = new AuBtechReviewAgent.PrismaReviewEngine(mistralApiKey, else
 };
 builder.Services.AddSingleton(reviewEngine);
 builder.Services.AddSingleton(reviewEngine.Store); // the run folders, shared by every kind of review
+builder.Services.AddSingleton(new AuBtechReviewAgent.MultivocalPlanner(reviewEngine.Store)); // multivocal planning (preview)
 // Modules shown as a preview while they are being built (Development only; see ReviewModulesOptions).
 builder.Services.AddSingleton(AuBtechReviewAgent.ReviewModulesOptions.From(builder.Configuration, builder.Environment.IsDevelopment()));
 
