@@ -13,7 +13,7 @@ public sealed class MultivocalModule : IReviewModule
     public string RoutePrefix => "/mlr";
 
     /// <summary>The plan with its protocol fingerprint, and the ledger of the searches (the raw answers are core files).</summary>
-    public IReadOnlyList<string> ArchiveFiles { get; } = new[] { RunHeader.FileName, RunStore.ProtocolFile, MultivocalPlanner.PlanFile, MultivocalSearcher.LedgerFile };
+    public IReadOnlyList<string> ArchiveFiles { get; } = new[] { RunHeader.FileName, RunStore.ProtocolFile, MultivocalPlanner.PlanFile, MultivocalSearcher.LedgerFile, MultivocalPages.PagesFile };
 
     public IReadOnlyList<ReviewMethod> Cards { get; } = new[]
     {
