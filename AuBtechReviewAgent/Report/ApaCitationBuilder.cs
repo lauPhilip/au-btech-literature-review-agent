@@ -142,8 +142,9 @@ public static class ApaCitationBuilder
             // Never print placeholder DOIs such as "XXX" - only something that looks like a real DOI.
             if (Regex.IsMatch(doi, @"^10\.\d{4,9}/\S+$")) return $"https://doi.org/{doi}";
         }
-        if (!string.IsNullOrWhiteSpace(paper.Url) && Uri.TryCreate(paper.Url, UriKind.Absolute, out _))
-            return paper.Url.Trim();
+        // Only http(s): a source can return any address, and a javascript: one must never reach the reference list.
+        if (PrismaReviewEngine.IsWebAddress(paper.Url?.Trim()))
+            return paper.Url!.Trim();
         return "";
     }
 
