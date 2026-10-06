@@ -89,3 +89,4 @@ Implement dedicated API client adapters implementing the `IAcademicSource` inter
 
 ## 9. Multivocal Literature Review
 * [ ] Plan and step-by-step to-do, mapped to the Garousi et al. (2019) guidelines: [docs/roadmap/mlr-todo.md](docs/roadmap/mlr-todo.md)
+* [ ] First, one module per kind of review (steps M1 to M6): [docs/roadmap/review-modules.md](docs/roadmap/review-modules.md)

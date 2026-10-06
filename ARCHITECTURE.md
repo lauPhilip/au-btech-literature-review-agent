@@ -32,6 +32,7 @@ flowchart LR
 | `Runs/` | After a run has started: edit keys, reviewer notes, metrics, clean-up | `PrismaReviewEngine.Ownership.cs` |
 | `Llm/` | Talking to the model, reading JSON answers, recording every call, prompt safety | `LlmJson.cs` |
 | `Web/` | The website around the review: SEO, `/health`, security headers, quota, glossary | `SiteSeo.cs` |
+| `Modules/` | One folder per kind of review: its recipe of steps, ledger, pages and report; each declares its cards on the start page | `README.md`, `Systematic/SystematicModule.cs` |
 | `Components/` | The Blazor UI: `Pages/` (routable pages), `Dashboard/` (parts of the run view), `Layout/` (shared) | `Pages/Home.razor` |
 
 Every folder has a short `README.md` that says what lives there. The tests in `AuBtechReviewAgent.Tests/` use the same folders, so the tests for screening are in `AuBtechReviewAgent.Tests/Screening/`. Test helpers (the fake model, temporary folders) are in `Support/`.
@@ -41,6 +42,10 @@ Every folder has a short `README.md` that says what lives there. The tests in `A
 Almost all of the logic is in one class, `PrismaReviewEngine`, because a review is one sequence of steps that share a lot of state (the run's ledger, the papers, the chat with the model). The class is declared `partial` and split into files named `PrismaReviewEngine.<Stage>.cs`, and each file lives in the folder of its stage. The class is one unit for the compiler and many small files for a reader.
 
 All code uses the single namespace `AuBtechReviewAgent`. The folders organise the files; they are not namespaces, so moving a file never changes how it is referenced. `.editorconfig` switches off the analyzer rule that would ask for one namespace per folder.
+
+## One module per kind of review
+
+The stage folders hold the core and the steps that every kind of review shares. Each kind of review is a module in `Modules/<Name>/`: it implements `IReviewModule`, declares its cards on the start page, and keeps everything only it uses. Every run folder starts with `run.json`, which names the module that made the run, so the shared code can list, open and clean up runs without reading a module's ledger. Today the systematic module still runs through `PrismaReviewEngine`; the steps that free the shared core from it, and the plan for the multivocal module, are in [docs/roadmap/review-modules.md](docs/roadmap/review-modules.md).
 
 ## The rules the design protects
 

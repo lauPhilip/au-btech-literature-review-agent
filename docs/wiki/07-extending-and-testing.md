@@ -23,6 +23,10 @@ The screening prompt lives only in `ScreenPaperAsync`, which the evaluation tool
 
 Wrap the call in `using (LlmStage.Begin("your-stage"))`, so it is recorded under its own name in `llm-calls.json`. If the stage takes noticeable time, call `ReportProgress` with the step it belongs to, so the dashboard's progress bar keeps moving. If its prompt contains the reviewer's query, objective or criteria, include `PromptSafety.ReviewerInputNotice`. If the answer is structured, use `LlmJson.GetAsync<T>` with a validation function and `JsonMode(temperature)`: it asks for JSON, checks the answer, and gives the model one chance to fix a bad answer. Put any text from papers inside `PromptSafety.Wrap(...)` and add `PromptSafety.DataOnlyNotice` to the prompt. If the model is asked to back something with a quote, check the quote with `CitationSupportChecker.QuoteOccursIn` rather than trusting it. Use temperature 0 for anything that decides or extracts. Save what the step produced to the run folder, and add the file to `rootFiles` in `BuildWorkspaceArchive` so it lands in the archive and the manifest.
 
+### Adding a kind of review
+
+Each kind of review is a module in `Modules/<Name>/` that implements `IReviewModule` (`Pipeline/ReviewModule.cs`) and is listed in `ReviewModules.All`. The module declares its cards for the start page; give a new card a place in `StartPageOrder` in `Pipeline/ReviewMethod.cs`, and keep `Available: false` until the module can run it. A variant of an existing review, such as the rapid review, is a new card on that module rather than a new module. Files that only one module uses go in its folder; anything two modules share goes in a stage folder. The order of the work is in [docs/roadmap/review-modules.md](../roadmap/review-modules.md).
+
 ### Adding a field to the ledger or the report
 
 Add a property to `ReviewState`, `ReviewStats`, `ScreeningLog` or `PrismaReport`. Do not rename or remove existing ones: the ledger is read back from JSON, and older runs would lose that data. If the field is a count that should appear in the PRISMA flow, update `PrismaFlowCounts` and make sure `IsConsistent` still holds.

@@ -41,16 +41,16 @@ The look stays the same (the shared design, header, verdict colours and citation
 
 ```
 Shared core (used by both paths)               MLR only (new)
-  Sources/       databases and web sources       Multivocal/                 the MLR engine, its ledger and stages
-  Llm/           model access, JSON, safety        MultivocalReviewEngine      planning → search → selection → quality
+  Sources/       databases and web sources       Modules/Multivocal/         the MLR module, its ledger and stages
+  Llm/           model access, JSON, safety        MultivocalModule            planning → search → selection → quality
   Verification/  citation range and support         MultivocalState             → map → extraction → synthesis → report
   Runs/          edit keys, notes, metrics,          GreyQualityChecklist        Table 7, scored with quotes
                  clean-up                            SystematicMap               attributes, refinement, classification
   Report/        manifest, archive, references       MultivocalReportWriter     the report sections in code
-  Pipeline/      run coordinator, progress, cache  Components/Multivocal/      planning form, run view, report page
+  Pipeline/      run coordinator, progress, cache    Pages/                    planning form, run view, report page
 ```
 
-Today most of the pipeline is written as parts of `PrismaReviewEngine`. Before the MLR engine can reuse the core, the parts it needs (screening one record, the citation check of a text, the archive and manifest, the run folder) have to become services that do not depend on the systematic review. That is block A below, and it changes nothing a user can see.
+Today most of the pipeline is written as parts of `PrismaReviewEngine`. Before the MLR engine can reuse the core, the parts it needs (screening one record, the citation check of a text, the archive and manifest, the run folder) have to become services that do not depend on the systematic review. That is block A below (the module design in [review-modules.md](review-modules.md)), and it changes nothing a user can see.
 
 ## 3. Every step, and what it needs
 
@@ -82,14 +82,12 @@ Each block is meant to be one pull request. The MLR card stays "coming soon" unt
 
 ### Block A: Free the shared core from the systematic review (no visible change)
 
-- [ ] Turn the parts of `PrismaReviewEngine` the MLR needs into services that take a generic source record: screening one record with two prompts (`Screening/`), checking the citations of a text against its sources (`Verification/`), building the archive and manifest of a run folder (`Report/`), the run folder, edit key and notes (`Runs/`).
-- [ ] A common source record that can describe a paper or a web page (title, authors or producer, date, venue or site, URL, DOI, source kind, text), so screening and the citation check do not need to know which it is.
-- [ ] The systematic review uses the new services; all its tests still pass unchanged. This is the proof that nothing changed for users.
+Block A is now the module design in [review-modules.md](review-modules.md), steps M1 to M5: a module contract and registry, the run services and the grounding check as shared services, the archive split, and a test kit every module must pass. A common source record that can describe a paper or a web page (title, authors or producer, date, venue or site, URL, DOI, source kind, text) is part of M3, so screening and the citation check do not need to know which it is. The systematic review keeps passing all its tests unchanged throughout.
 
 ### Block B: The MLR skeleton
 
-- [ ] `Multivocal/MultivocalReviewEngine.cs` with its stages as empty steps, and `MultivocalState` as its own ledger type (method recorded, formal and grey pools kept apart).
-- [ ] Pages under `Components/Multivocal/`: `/mlr` (planning form), `/mlr/{runId}` (run view), `/mlr-report/{runId}` (report). Available in Development only.
+- [ ] `Modules/Multivocal/MultivocalModule.cs` (step M6 of the module design) with its stages as empty steps, and `MultivocalState` as its own ledger type (method recorded, formal and grey pools kept apart).
+- [ ] Pages under `Modules/Multivocal/`: `/mlr` (planning form), `/mlr/{runId}` (run view), `/mlr-report/{runId}` (report). Visible only where the `ReviewModules:Preview` setting lists the module (Development).
 - [ ] The MLR card on the start page links to `/mlr` once block G is done (`Available: true`); until then it stays "coming soon".
 - [ ] Tests: an MLR run and a systematic run cannot be opened by each other's pages; the ledger records the method.
 
