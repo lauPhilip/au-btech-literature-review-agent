@@ -18,9 +18,10 @@ public class ModuleKitTests
     {
         foreach (var module in ReviewModules.All)
         {
-            Assert.True(ModuleKit.Runners.ContainsKey(module.Key), $"The {module.Key} module has no entry in ModuleKit.Runners.");
+            bool listed = ModuleKit.Runners.TryGetValue(module.Key, out var runner);
+            Assert.True(listed, $"The {module.Key} module has no entry in ModuleKit.Runners.");
             if (module.Cards.Any(c => c.Available))
-                Assert.True(ModuleKit.Runners[module.Key] != null, $"The {module.Key} module offers a card but cannot be run by the test kit.");
+                Assert.True(runner != null, $"The {module.Key} module offers a card but cannot be run by the test kit.");
         }
     }
 
