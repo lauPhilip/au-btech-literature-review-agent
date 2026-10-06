@@ -4,7 +4,7 @@ Traceability is the point of the tool, so what it saves matters as much as what 
 
 ## The run folder
 
-Every run has a folder `WorkspaceStore/{runId}/`, where the run id is a GUID written as 32 hex digits. The folder path is built in exactly one place, `GetWorkspaceFolderPath`, which also refuses any path that would fall outside the workspace.
+Every run has a folder `WorkspaceStore/{runId}/`, where the run id is a GUID written as 32 hex digits. The folder path is built in exactly one place, `RunStore.FolderOf`, which also refuses any path that would fall outside the workspace. `RunStore` (in `Runs/`) is shared by every kind of review: it reads the header, checks edit keys, keeps notes and deletes runs.
 
 | File | Written by | When | Contents |
 |---|---|---|---|
