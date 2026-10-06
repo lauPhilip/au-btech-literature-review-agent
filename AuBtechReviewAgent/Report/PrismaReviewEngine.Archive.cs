@@ -422,7 +422,7 @@ public partial class PrismaReviewEngine
         // Audit files kept at the archive root, in this order.
         string[] rootFiles =
         {
-            "protocol.md", "transparent-process.json", "prisma-report.json", "llm-calls.json", "extraction.json",
+            "run.json", "protocol.md", "transparent-process.json", "prisma-report.json", "llm-calls.json", "extraction.json",
             "citation-audit.json", "reviewer-notes.json", "thematic-codebook.json", "run-metrics.json", "peer-review-feedback.json", "stylistic-transformation-ledger.json", "grounded-outline.txt",
         };
         foreach (var name in rootFiles)

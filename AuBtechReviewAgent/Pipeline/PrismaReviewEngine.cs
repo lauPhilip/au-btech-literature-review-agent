@@ -257,8 +257,12 @@ public partial class PrismaReviewEngine
         }
 
         Directory.CreateDirectory(ctx.Workspace);
+        var header = new RunHeader(sessionId, ReviewModules.ForCard(ctx.State.Method).Key, ctx.State.Method, ctx.State.Stats.RunStartedUtc ?? DateTime.UtcNow, StageQueued);
         try
         {
+            // run.json comes first: it names the module that owns this folder.
+            await RunHeader.WriteAsync(ctx.Workspace, header);
+
             // The protocol is written before anything is searched, so its timestamp and fingerprint predate
             // every result (PRISMA 2020 item 24).
             await WriteProtocolAsync(ctx);
@@ -315,6 +319,7 @@ public partial class PrismaReviewEngine
             {
                 ctx.State.RunSettings = chat.Summarize(RecordingChatCompletionService.AppVersion);
                 await SaveStateAsync(sessionId, ctx.State);
+                await RunHeader.WriteAsync(ctx.Workspace, header with { Stage = ctx.State.Stats.ProcessingStage, CompletedUtc = ctx.State.CompletedUtc });
                 await File.WriteAllTextAsync(Path.Join(ctx.Workspace, "llm-calls.json"),
                     JsonSerializer.Serialize(new { ctx.State.RunSettings, Calls = chat.Calls }, new JsonSerializerOptions { WriteIndented = true }));
             }
@@ -425,7 +430,14 @@ public partial class PrismaReviewEngine
             state.Stats.QueuePosition = 0;
             state.FailureMessage = "The server restarted while this run was in progress, so it could not finish. Please start it again.";
             state.CompletedUtc = DateTime.UtcNow;
-            try { File.WriteAllText(GetStateFilePath(runId), JsonSerializer.Serialize(state, new JsonSerializerOptions { WriteIndented = true })); marked++; }
+            try
+            {
+                File.WriteAllText(GetStateFilePath(runId), JsonSerializer.Serialize(state, new JsonSerializerOptions { WriteIndented = true }));
+                string headerPath = Path.Join(dir, RunHeader.FileName);
+                if (File.Exists(headerPath) && RunHeader.Read(dir, runId) is { } header)
+                    File.WriteAllText(headerPath, (header with { Stage = StageInterrupted, CompletedUtc = state.CompletedUtc }).ToJson());
+                marked++;
+            }
             catch (Exception ex)
             {
                 _log.LogWarning("Could not mark an interrupted run: {Message}", SanitizeLogMessage(ex.Message));
@@ -433,6 +445,9 @@ public partial class PrismaReviewEngine
         }
         return marked;
     }
+
+    /// <summary>The run's header (run.json): its module, card and stage; null when the run does not exist.</summary>
+    public RunHeader? LoadHeader(Guid runId) => RunHeader.Read(GetWorkspaceFolderPath(runId), runId);
 
     /// <summary>Reads a run's ledger from disk, or null if there is none (e.g. expired and deleted).</summary>
     public ReviewState? LoadState(Guid runId)
