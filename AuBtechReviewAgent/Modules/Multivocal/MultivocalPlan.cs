@@ -122,6 +122,22 @@ public sealed class MultivocalPlan
 
     public List<string> GreyTypes { get; set; } = new() { "white-papers", "documentation", "blogs", "qa" };
     public List<string> GreySearches { get; set; } = new() { "stackexchange", "github", "openalex-grey", "zenodo", "backlinks" };
+
+    /// <summary>
+    /// The search strings sent to the grey literature searches, in this order. Grey literature uses its own words
+    /// (G7: run an informal pre-search for synonyms), so these are separate from the formal search strings. Empty
+    /// means the topic is used; older plans have none.
+    /// </summary>
+    public List<string> GreySearchStrings { get; set; } = new();
+
+    public const int MaxSearchStrings = 5;
+    public const int MaxSearchStringLength = 200;
+
+    /// <summary>The strings the searches use: the ones given, or the topic when none are given.</summary>
+    public IReadOnlyList<string> EffectiveGreySearchStrings =>
+        GreySearchStrings.Any(s => !string.IsNullOrWhiteSpace(s))
+            ? GreySearchStrings.Where(s => !string.IsNullOrWhiteSpace(s)).Select(s => s.Trim()).ToList()
+            : new[] { Topic.Trim() };
     public string StoppingRule { get; set; } = "effort";
 
     /// <summary>For the effort-bounded rule: how many top hits of each search string are looked at (the paper uses 100).</summary>
@@ -175,6 +191,7 @@ public sealed class MultivocalPlan
         },
         GreyTypes = new List<string> { "white-papers", "documentation", "blogs", "qa", "code" },
         GreySearches = new List<string> { "stackexchange", "github", "hackernews", "openalex-grey", "zenodo", "backlinks" },
+        GreySearchStrings = new List<string> { "context engineering", "LLM agent context window", "agent memory management" },
         StoppingRule = "effort",
         TopHits = 100,
         QualityThreshold = 10,
@@ -226,6 +243,7 @@ public sealed class MultivocalPlan
         Goal = Clean(Goal);
         ExistingReviews = Clean(ExistingReviews);
         foreach (var q in Questions) q.Text = Clean(q.Text);
+        GreySearchStrings = GreySearchStrings.Select(t => ReviewInputGuard.Normalize(t ?? "", singleLine: true)).Where(t => t.Length > 0).ToList();
         return this;
     }
 
@@ -256,6 +274,8 @@ public sealed class MultivocalPlan
         if (GreySearches.Count == 0 || GreySearches.Any(s => MultivocalGuidelines.GreySearches.All(g => g.Key != s)))
             problems.Add("Choose at least one place to search.");
         if (MultivocalGuidelines.StoppingRules.All(r => r.Key != StoppingRule)) problems.Add("Choose a stopping rule.");
+        if (GreySearchStrings.Count > MaxSearchStrings) problems.Add($"Use at most {MaxSearchStrings} search strings.");
+        if (GreySearchStrings.Any(t => t.Length > MaxSearchStringLength)) problems.Add($"Keep every search string under {MaxSearchStringLength} characters.");
         if (StoppingRule == "effort" && TopHits is < 10 or > 500) problems.Add("Look at between 10 and 500 top hits per search string.");
         if (QualityThreshold is < 1 or > MultivocalGuidelines.QualityPointsMax)
             problems.Add($"Set the quality threshold between 1 and {MultivocalGuidelines.QualityPointsMax} points.");
