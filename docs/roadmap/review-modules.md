@@ -66,7 +66,7 @@ public interface IReviewModule
 }
 ```
 
-M1 builds the first part of this contract: `Key`, `Name`, `RoutePrefix` and `Cards`, in `Pipeline/ReviewModule.cs`, with the two modules in `Modules/`. `ArchiveFiles` followed in M4 (as a list of file names, since the files a module keeps do not depend on the run). `StagesFor` and `RunAsync` come with the multivocal module in M6: they need a request that both modules understand, and designing it against one engine only would fit it to the systematic review.
+M1 builds the first part of this contract: `Key`, `Name`, `RoutePrefix` and `Cards`, in `Pipeline/ReviewModule.cs`, with the two modules in `Modules/`. `ArchiveFiles` followed in M4 (as a list of file names, since the files a module keeps do not depend on the run). `StagesFor` and `RunAsync` come with the first multivocal stage (MLR block C): they need a request that both modules understand, and its shape follows from the MLR's planning form, so designing it earlier would fit it to the systematic review alone. The multivocal module joins the test kit at the same point; the kit already refuses any card that is switched on before its module can run.
 
 Each run folder gets a small header file, `run.json`, written by the core before anything else: the run ID, the module key, the card key, when it started, its stage and when it finished. The core reads only this header to list, open, clean up or redirect a run, so it never needs to understand a module's ledger. Opening `/review/{id}` for an MLR run sends the user to `/mlr/{id}`. Runs made before this change have no header and are treated as systematic runs, the same way runs without `owner.json` stay editable today.
 
@@ -120,7 +120,7 @@ Each step is one small pull request, changes nothing a user can see, and keeps a
 | M3 (done) | Grounding as a service: the citation check, the repair loop and the re-check work on any text and any set of sources (`Verification/Grounding.cs`). A web page's text uses the same `ReferencedPaper` record as a paper; the prompts name the kind of review, and their word "paper" is adapted for grey sources in MLR block D | `Verification/`, `Synthesis/` |
 | M4 (done) | The archive split: the core builds the zip, manifest and hashes; each module adds its own files and report | `Report/` |
 | M5 (done) | The module test kit, run for the systematic module | `AuBtechReviewAgent.Tests/Modules/` |
-| M6 | The preview setting and an empty `Modules/Multivocal/` that passes the test kit with placeholder steps (MLR block B) | `Modules/Multivocal/`, settings |
+| M6 (done) | The preview setting (`ReviewModules:Preview`, Development only), the multivocal preview page at `/mlr`, and runs that open on their own module's pages. The run contract and the kit entry follow with MLR block C (see section 3) | `Modules/Multivocal/`, settings |
 
 After M6 the MLR blocks C to G in [mlr-todo.md](mlr-todo.md) are built inside the multivocal module, and the rapid and living cards become settings on the systematic module.
 

@@ -51,6 +51,15 @@ public static class ReviewModules
     public static IReviewModule? Find(string? key) =>
         All.FirstOrDefault(m => m.Key.Equals(key?.Trim() ?? "", StringComparison.OrdinalIgnoreCase));
 
+    /// <summary>
+    /// The page of a run that belongs to another module than the page asking, or null when the run is the page's
+    /// own (or does not exist). A systematic review's page sends a multivocal run to the multivocal pages, and back.
+    /// </summary>
+    public static string? ElsewhereFor(RunHeader? header, string pageModule) =>
+        header is { } h && !h.Module.Equals(pageModule, StringComparison.OrdinalIgnoreCase) && Find(h.Module) is { } owner
+            ? $"{owner.RoutePrefix}/{h.RunId}"
+            : null;
+
     /// <summary>The module that offers this card; the default module for an unknown card.</summary>
     public static IReviewModule ForCard(string? cardKey) =>
         All.FirstOrDefault(m => m.Cards.Any(c => c.Key.Equals(cardKey?.Trim() ?? "", StringComparison.OrdinalIgnoreCase))) ?? Default;

@@ -1175,7 +1175,16 @@
 
     protected override async Task OnParametersSetAsync()
     {
-        if (RunId is Guid id && id != Guid.Empty) State.CurrentSessionId = id;
+        if (RunId is Guid id && id != Guid.Empty)
+        {
+            // A run made by another kind of review has its own report page.
+            if (AuBtechReviewAgent.ReviewModules.ElsewhereFor(Runs.LoadHeader(id), AuBtechReviewAgent.ReviewMethod.SystematicKey) is string elsewhere)
+            {
+                Nav.NavigateTo(elsewhere, replace: true);
+                return;
+            }
+            State.CurrentSessionId = id;
+        }
 
         report = new PrismaReport();
         includedCitations = new();

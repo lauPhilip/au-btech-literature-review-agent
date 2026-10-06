@@ -982,6 +982,12 @@
         // that run. Opening plain /review keeps whatever run this tab already shows.
         if (RunId is Guid id && id != Guid.Empty && (id != currentSessionId || !subscribed))
         {
+            // A run made by another kind of review opens on that module's own pages.
+            if (AuBtechReviewAgent.ReviewModules.ElsewhereFor(Runs.LoadHeader(id), AuBtechReviewAgent.ReviewMethod.SystematicKey) is string elsewhere)
+            {
+                Nav.NavigateTo(elsewhere, replace: true);
+                return;
+            }
             AttachToRun(id);
         }
         else if (hasRun && !subscribed)
