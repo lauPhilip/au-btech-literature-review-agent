@@ -22,7 +22,7 @@ CI fails when `wwwroot/css/tailwind.css` is out of date, so rebuild and commit i
 | The screening prompt or decisions | `Screening/PrismaReviewEngine.Screening.cs`, and raise `ScreeningPromptVersion` |
 | Full texts, extraction, MMAT | `Evidence/` |
 | Themes, the written sections, the artifact | `Synthesis/` |
-| How citations are checked or repaired | `Verification/` (repair: `Synthesis/PrismaReviewEngine.Thematic.cs`) |
+| How citations are checked or repaired | `Verification/` (start at `Grounding.cs`; the repair is `CitationRepairer.cs`) |
 | The methods text, flow diagram, references, archive | `Report/` |
 | Edit keys, notes, metrics, clean-up | `Runs/` |
 | A kind of review, or its cards on the start page | `Modules/<Name>/<Name>Module.cs` (a card's `Available` is set only when the module can run it; the contract is `Pipeline/ReviewModule.cs`) |
