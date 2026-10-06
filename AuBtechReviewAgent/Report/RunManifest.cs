@@ -18,7 +18,11 @@ public static class RunManifest
 {
     public record Entry(string Path, long Bytes, string Sha256);
 
-    public static string Build(Guid runId, ReviewState? state, IReadOnlyList<(string Path, byte[] Content)> files)
+    public static string Build(Guid runId, ReviewState? state, IReadOnlyList<(string Path, byte[] Content)> files) =>
+        Build(runId, state?.ProtocolHash, state?.RunSettings?.Model, files);
+
+    /// <summary>The manifest for any kind of review: the run id, its protocol hash and model, and every file's fingerprint.</summary>
+    public static string Build(Guid runId, string? protocolHash, string? model, IReadOnlyList<(string Path, byte[] Content)> files)
     {
         var entries = files
             .OrderBy(f => f.Path, StringComparer.Ordinal)
@@ -28,9 +32,9 @@ public static class RunManifest
         var body = new Dictionary<string, object?>
         {
             ["RunId"] = runId.ToString(),
-            ["ProtocolHash"] = state?.ProtocolHash,
+            ["ProtocolHash"] = protocolHash,
             ["AppVersion"] = RecordingChatCompletionService.AppVersion,
-            ["Model"] = state?.RunSettings?.Model,
+            ["Model"] = model,
             ["CreatedUtc"] = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ssZ"),
             ["HashAlgorithm"] = "SHA-256",
             ["Files"] = entries,
