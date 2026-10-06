@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -82,7 +82,7 @@ public sealed class MultivocalSearcher
     {
         _runs = runs;
         _planner = planner;
-        _sources = sources ?? GreySourceCatalog.Create;
+        _sources = sources ?? (key => GreySourceCatalog.Create(key));
     }
 
     /// <summary>The ledger of a searched run, or null.</summary>
