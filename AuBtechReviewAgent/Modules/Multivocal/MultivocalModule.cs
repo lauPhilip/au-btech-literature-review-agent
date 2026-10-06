@@ -12,8 +12,8 @@ public sealed class MultivocalModule : IReviewModule
     public string Name => "Multivocal review";
     public string RoutePrefix => "/mlr";
 
-    /// <summary>None yet: the multivocal ledger and audit files come with the module (MLR block B onwards).</summary>
-    public IReadOnlyList<string> ArchiveFiles { get; } = System.Array.Empty<string>();
+    /// <summary>The plan and its protocol fingerprint; the ledger and audit files follow with the searches (MLR block D).</summary>
+    public IReadOnlyList<string> ArchiveFiles { get; } = new[] { RunHeader.FileName, RunStore.ProtocolFile, MultivocalPlanner.PlanFile };
 
     public IReadOnlyList<ReviewMethod> Cards { get; } = new[]
     {
