@@ -107,6 +107,7 @@ var reviewEngine = new AuBtechReviewAgent.PrismaReviewEngine(mistralApiKey, else
     MetricsStore = metricsStore,
 };
 builder.Services.AddSingleton(reviewEngine);
+builder.Services.AddSingleton(reviewEngine.Store); // the run folders, shared by every kind of review
 
 // Register the storage cleanup background worker
 builder.Services.AddHostedService<AuBtechReviewAgent.SessionCleanupWorker>();
@@ -195,7 +196,7 @@ app.MapGet("/api/workspace/{sessionId:guid}/screened.ris", (Guid sessionId) =>
 // The protocol written before the search (PRISMA item 24), linked from the Review Output page.
 app.MapGet("/api/workspace/{sessionId:guid}/protocol.md", (Guid sessionId) =>
 {
-    string? text = reviewEngine.ReadProtocol(sessionId);
+    string? text = reviewEngine.Store.ReadProtocol(sessionId);
     return text == null ? Results.NotFound() : Results.Text(text, "text/markdown; charset=utf-8");
 }).RequireRateLimiting("ArchiveDownloadPolicy");
 
@@ -220,4 +221,4 @@ app.MapGet("/.well-known/security.txt", (HttpRequest request) =>
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
 
-app.Run();
+app.Run();
