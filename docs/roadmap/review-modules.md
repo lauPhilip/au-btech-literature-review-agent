@@ -116,7 +116,7 @@ Each step is one small pull request, changes nothing a user can see, and keeps a
 | Step | Pull request | Main files |
 |---|---|---|
 | M1 (done) | The contract and the registry: `IReviewModule`, `run.json`, a `SystematicModule` that calls the existing engine; the start page reads its cards from the registry | `Pipeline/` |
-| M2 | Run services out of the engine: the run folder, ledger loading, edit keys, notes and deletion become a `RunStore` that pages use instead of the engine | `Runs/`, the pages that inject the engine |
+| M2 (done) | Run services out of the engine: the run folder, ledger loading, edit keys, notes and deletion become a `RunStore` that pages use instead of the engine | `Runs/`, the pages that inject the engine |
 | M3 | Grounding as a service: the citation check, the repair loop and the re-check work on any text and any set of sources | `Verification/`, `Synthesis/` |
 | M4 | The archive split: the core builds the zip, manifest and hashes; each module adds its own files and report | `Report/` |
 | M5 | The module test kit, run for the systematic module | `AuBtechReviewAgent.Tests/Modules/` |

@@ -29,7 +29,7 @@ flowchart LR
 | `Synthesis/` | Coding findings into themes and writing one cited section per theme; the artifact | `PrismaReviewEngine.Thematic.cs` |
 | `Verification/` | Citation range check, citation support check against the paper, re-checks | `CitationSupportChecker.cs` |
 | `Report/` | The report, the methods text and flow diagram written in code, references, archive and manifest | `PrismaReviewEngine.Report.cs` |
-| `Runs/` | After a run has started: edit keys, reviewer notes, metrics, clean-up | `PrismaReviewEngine.Ownership.cs` |
+| `Runs/` | The run folders for every kind of review: edit keys, reviewer notes, deleting, metrics, clean-up | `RunStore.cs` |
 | `Llm/` | Talking to the model, reading JSON answers, recording every call, prompt safety | `LlmJson.cs` |
 | `Web/` | The website around the review: SEO, `/health`, security headers, quota, glossary | `SiteSeo.cs` |
 | `Modules/` | One folder per kind of review: its recipe of steps, ledger, pages and report; each declares its cards on the start page | `README.md`, `Systematic/SystematicModule.cs` |

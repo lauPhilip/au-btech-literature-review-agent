@@ -8,6 +8,7 @@
 @inject IJSRuntime JS
 @inject NavigationManager Nav
 @inject AuBtechReviewAgent.PrismaReviewEngine ReviewEngine
+@inject AuBtechReviewAgent.RunStore Runs
 
 <SeoHead Title="Review output" Path="/spec-matrix" NoIndex="true" Description="A PRISMA 2020 review report with every citation checked against the cited paper." />
 
@@ -703,7 +704,7 @@
     private void DeleteRun()
     {
         confirmDelete = false;
-        if (ReviewEngine.DeleteRun(State.CurrentSessionId, editKey))
+        if (Runs.DeleteRun(State.CurrentSessionId, editKey))
         {
             deleted = true;
             State.CurrentSessionId = Guid.Empty;
@@ -925,7 +926,7 @@
         {
             <div class="mt-1.5 font-sans">
                 <label for="@($"note-{id}")" class="block text-[10px] font-semibold text-gray-700">Your note</label>
-                <textarea id="@($"note-{id}")" rows="2" maxlength="@AuBtechReviewAgent.PrismaReviewEngine.MaxNoteLength" @bind="noteDraft"
+                <textarea id="@($"note-{id}")" rows="2" maxlength="@AuBtechReviewAgent.RunStore.MaxNoteLength" @bind="noteDraft"
                           class="mt-0.5 w-full border border-gray-300 p-1.5 text-[11px] font-normal text-gray-800 focus:border-brand focus:outline-none"></textarea>
                 <div class="mt-1 flex gap-2">
                     <button type="button" class="ui-btn-primary ui-btn-sm py-0.5" @onclick="() => SaveNoteAsync(kind, reference, field, sentence)">Save note</button>
@@ -955,10 +956,10 @@
 
     private async Task SaveNoteAsync(string kind, int reference, string field, int sentence)
     {
-        bool saved = await ReviewEngine.SaveNoteAsync(State.CurrentSessionId, editKey, kind, reference, noteDraft, field, sentence);
+        bool saved = await Runs.SaveNoteAsync(State.CurrentSessionId, editKey, kind, reference, noteDraft, field, sentence);
         if (saved)
         {
-            notes = ReviewEngine.LoadNotes(State.CurrentSessionId).ToList();
+            notes = Runs.LoadNotes(State.CurrentSessionId).ToList();
             editingNote = null;
             noteMessage = null;
         }
@@ -1019,7 +1020,7 @@
         try
         {
             var result = await ReviewEngine.RecheckCitationAsync(State.CurrentSessionId, c.Field, c.Sentence, c.Reference, editKey: editKey);
-            await LoadAuditAsync(Path.Join(ReviewEngine.WorkspaceRoot, State.CurrentSessionId.ToString("N")));
+            await LoadAuditAsync(Runs.FolderOf(State.CurrentSessionId));
             recheckMessage = $"Checked again: {VerdictLabel(result.Verdict).ToLowerInvariant()}, against the {result.EvidenceBasis}.";
         }
         catch (AuBtechReviewAgent.PrismaReviewEngine.RecheckException ex)
@@ -1151,7 +1152,7 @@
             editKeyFor = State.CurrentSessionId;
             try { editKey = await JS.InvokeAsync<string?>("traceableReview.getEditKey", State.CurrentSessionId.ToString()); }
             catch (Exception ex) when (ex is JSException or JSDisconnectedException or TaskCanceledException) { editKey = null; }
-            bool allowed = ReviewEngine.CanEdit(State.CurrentSessionId, editKey);
+            bool allowed = Runs.CanEdit(State.CurrentSessionId, editKey);
             if (allowed != canEdit) { canEdit = allowed; StateHasChanged(); }
         }
         if (pendingFocus is { } focusId)
@@ -1193,7 +1194,7 @@
         openCitation = null;
         deleted = false;
 
-        string folder = Path.Join(ReviewEngine.WorkspaceRoot, State.CurrentSessionId.ToString("N"));
+        string folder = Runs.FolderOf(State.CurrentSessionId);
         string reportPath = Path.Join(folder, "prisma-report.json");
         hasProtocol = File.Exists(Path.Join(folder, "protocol.md"));
 
@@ -1223,7 +1224,7 @@
         // Older runs have ReferenceNumber = 0 everywhere; OrderBy is stable, so they keep their order.
         tableRecords = state.SynthesizedRecords.OrderBy(r => r.ReferenceNumber).ToList();
         fullTextUrls = state.FullTextUrls ?? new();
-        notes = ReviewEngine.LoadNotes(State.CurrentSessionId).ToList();
+        notes = Runs.LoadNotes(State.CurrentSessionId).ToList();
         includedCitations = tableRecords.Select(r => r.ApaCitation.Trim().TrimEnd('.')).ToList();
 
         platformShares = tableRecords

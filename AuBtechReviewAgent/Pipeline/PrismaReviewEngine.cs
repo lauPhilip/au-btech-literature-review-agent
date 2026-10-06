@@ -38,22 +38,14 @@ public partial class PrismaReviewEngine
     public const string DefaultSupportStatement =
         "No funding statement has been declared for this review. The funding and support text can be set in the Report:SupportStatement configuration value.";
 
-    /// <summary>
-    /// The folder of one run. The run id comes from the URL, but as a Guid its "N" form is 32 hex digits, so it
-    /// cannot contain a separator or "..". Path.GetFileName and the containment check below make that guarantee
-    /// explicit, so the folder can never resolve outside the workspace even if this method is changed later.
-    /// </summary>
-    private string GetWorkspaceFolderPath(Guid sessionId)
-    {
-        string root = Path.TrimEndingDirectorySeparator(Path.GetFullPath(WorkspaceRoot));
-        string folder = Path.GetFullPath(Path.Join(root, Path.GetFileName(sessionId.ToString("N"))));
-        if (!folder.StartsWith(root + Path.DirectorySeparatorChar, StringComparison.Ordinal))
-            throw new InvalidOperationException("A run folder resolved outside the workspace.");
-        return folder;
-    }
+    /// <summary>The folder of one run (see <see cref="RunStore.FolderOf"/>).</summary>
+    private string GetWorkspaceFolderPath(Guid sessionId) => Store.FolderOf(sessionId);
+
+    /// <summary>The run folders: header, edit keys, notes and deleting, shared by every kind of review.</summary>
+    public RunStore Store { get; }
 
     /// <summary>Folder holding one sub-folder per run. Defaults to ./WorkspaceStore.</summary>
-    public string WorkspaceRoot { get; init; } = Path.Join(Directory.GetCurrentDirectory(), "WorkspaceStore");
+    public string WorkspaceRoot { get => Store.WorkspaceRoot; init => Store.WorkspaceRoot = value; }
 
     /// <summary>Test hook: builds the chat service from an API key (default: Mistral via Semantic Kernel).</summary>
     public Func<string, IChatCompletionService>? ChatFactory { get; init; }
@@ -93,6 +85,7 @@ public partial class PrismaReviewEngine
     {
         _runsOptions = runsOptions ?? new RunsOptions();
         Coordinator = new RunCoordinator(_runsOptions.MaxConcurrentRuns);
+        Store = new RunStore(Path.Join(Directory.GetCurrentDirectory(), "WorkspaceStore"), _runsOptions, Coordinator.IsActive);
         _globalMistralKey = mistralApiKey;
         _globalElsevierKey = elsevierApiKey;
         _globalIeeeKey = ieeeApiKey;
@@ -447,7 +440,7 @@ public partial class PrismaReviewEngine
     }
 
     /// <summary>The run's header (run.json): its module, card and stage; null when the run does not exist.</summary>
-    public RunHeader? LoadHeader(Guid runId) => RunHeader.Read(GetWorkspaceFolderPath(runId), runId);
+    public RunHeader? LoadHeader(Guid runId) => Store.LoadHeader(runId);
 
     /// <summary>Reads a run's ledger from disk, or null if there is none (e.g. expired and deleted).</summary>
     public ReviewState? LoadState(Guid runId)
@@ -536,30 +529,10 @@ public partial class PrismaReviewEngine
     /// Deletes a finished run's folder (ledger, report, source PDFs). Anyone with the run link can open a
     /// run, but only the browser that started it (with its edit key) can remove it. Refuses while the run is still active.
     /// </summary>
-    public bool DeleteRun(Guid runId, string? editKey = null)
-    {
-        if (IsRunActive(runId) || !CanEdit(runId, editKey)) return false;
-        string folder = GetWorkspaceFolderPath(runId);
-        if (!Directory.Exists(folder)) return false;
-        try
-        {
-            Directory.Delete(folder, recursive: true);
-            _log.LogInformation("Run {RunId} deleted by its user.", runId);
-            return true;
-        }
-        catch (Exception ex)
-        {
-            _log.LogWarning("Run {RunId} could not be deleted: {Message}", runId, ex.Message);
-            return false;
-        }
-    }
+    public bool DeleteRun(Guid runId, string? editKey = null) => Store.DeleteRun(runId, editKey);
 
     /// <summary>The run's protocol.md, or null when there is none.</summary>
-    public string? ReadProtocol(Guid runId)
-    {
-        string path = Path.Join(GetWorkspaceFolderPath(runId), "protocol.md");
-        return File.Exists(path) ? File.ReadAllText(path) : null;
-    }
+    public string? ReadProtocol(Guid runId) => Store.ReadProtocol(runId);
 
     /// <summary>Writes protocol.md before the search starts and records its fingerprint in the ledger.</summary>
     private async Task WriteProtocolAsync(RunContext ctx)

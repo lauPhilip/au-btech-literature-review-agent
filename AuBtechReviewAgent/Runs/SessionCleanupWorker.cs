@@ -16,28 +16,30 @@ namespace AuBtechReviewAgent;
 public class SessionCleanupWorker : BackgroundService
 {
     private readonly ILogger<SessionCleanupWorker> _logger;
-    private readonly PrismaReviewEngine _engine;
+    private readonly RunStore _runs;
+    private readonly RunsOptions _options;
     private readonly ReviewCache? _cache;
     private readonly TimeSpan _cleanupInterval = TimeSpan.FromHours(1);
 
-    public SessionCleanupWorker(ILogger<SessionCleanupWorker> logger, PrismaReviewEngine engine, ReviewCache? cache = null)
+    public SessionCleanupWorker(ILogger<SessionCleanupWorker> logger, RunStore runs, RunsOptions options, ReviewCache? cache = null)
     {
         _logger = logger;
-        _engine = engine;
+        _runs = runs;
+        _options = options;
         _cache = cache;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        _logger.LogInformation("Run retention: results are kept for {Days} days.", _engine.RunsOptions.RetentionDays);
+        _logger.LogInformation("Run retention: results are kept for {Days} days.", _options.RetentionDays);
 
         while (!stoppingToken.IsCancellationRequested)
         {
             try
             {
-                PurgeExpiredRuns(_engine.WorkspaceRoot,
-                    TimeSpan.FromDays(Math.Max(1, _engine.RunsOptions.RetentionDays)), DateTime.UtcNow,
-                    id => _engine.IsRunActive(id) || _engine.IsDemoRun(id), _logger); // the example run is kept
+                PurgeExpiredRuns(_runs.WorkspaceRoot,
+                    TimeSpan.FromDays(Math.Max(1, _options.RetentionDays)), DateTime.UtcNow,
+                    id => _runs.IsActive(id) || _runs.IsDemoRun(id), _logger); // the example run is kept
                 int pruned = _cache?.Prune() ?? 0;
                 if (pruned > 0) _logger.LogInformation("Removed {Count} expired cache file(s).", pruned);
             }
