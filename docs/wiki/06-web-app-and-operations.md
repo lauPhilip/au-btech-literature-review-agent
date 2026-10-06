@@ -47,7 +47,7 @@ On the Review Output page, a bar above the report counts the citations that need
 
 ### Read-only links and the edit key
 
-Anyone with a run's link can read it, but only the browser that started the run can change it: delete it, submit its screening review, check a citation again or write notes. When the dashboard starts a run it calls `ClaimRun` (`PrismaReviewEngine.Ownership.cs`), which creates a 32-byte random edit key. The browser keeps the key in its local storage (`traceableReview.saveEditKey` in `review-output.js`) and the server keeps only its SHA-256 in `owner.json` in the run folder, which is left out of the archive. Every changing method (`DeleteRun`, `SubmitScreeningReview`, `RecheckCitationAsync`, `SaveNoteAsync`) takes the key and checks it with `CanEdit`, which compares the hashes in constant time. The pages read the key when they open a run and hide the buttons that would change it when the key is missing; the engine refuses either way.
+Anyone with a run's link can read it, but only the browser that started the run can change it: delete it, submit its screening review, check a citation again or write notes. When the dashboard starts a run it calls `ClaimRun` (`Runs/RunStore.cs`), which creates a 32-byte random edit key. The browser keeps the key in its local storage (`traceableReview.saveEditKey` in `review-output.js`) and the server keeps only its SHA-256 in `owner.json` in the run folder, which is left out of the archive. Every changing method (`DeleteRun`, `SubmitScreeningReview`, `RecheckCitationAsync`, `SaveNoteAsync`) takes the key and checks it with `CanEdit`, which compares the hashes in constant time. The pages read the key when they open a run and hide the buttons that would change it when the key is missing; the engine refuses either way.
 
 There is deliberately no way to see, copy or restore the key. A key that can be saved can also be forwarded or leaked, and losing it costs little: the run stays readable and expires on its own. Keys older than 30 days are dropped from the browser's storage. Runs started before edit keys existed have no `owner.json` and stay editable by anyone with the link until they expire. A "Copy link" button on the dashboard and the Review Output page copies the run's address for sharing.
 
@@ -57,7 +57,7 @@ There is deliberately no way to see, copy or restore the key. A key that can be 
 
 ### Reviewer notes, links and Zotero
 
-On the Review Output page, the reviewer can add a note to any citation (in its popup) and to any included study (in Table 3.1). Notes are kept in `reviewer-notes.json` (`PrismaReviewEngine.Notes.cs`), at most 1,000 characters each, cleaned like the form fields, shown to every reader, and included in the archive. They are never sent to the model.
+On the Review Output page, the reviewer can add a note to any citation (in its popup) and to any included study (in Table 3.1). Notes are kept in `reviewer-notes.json` (`RunStore.SaveNoteAsync`), at most 1,000 characters each, cleaned like the form fields, shown to every reader, and included in the archive. They are never sent to the model.
 
 Table 3.1 links each study's DOI (or its source page when it has no DOI) and, when an open-access copy was downloaded, the PDF; the address is kept as `ReviewState.FullTextUrls`. Only `http` and `https` addresses are linked (`IsWebAddress`), so metadata from a source cannot inject a script link.
 
