@@ -25,11 +25,11 @@ CI fails when `wwwroot/css/tailwind.css` is out of date, so rebuild and commit i
 | How citations are checked or repaired | `Verification/` (repair: `Synthesis/PrismaReviewEngine.Thematic.cs`) |
 | The methods text, flow diagram, references, archive | `Report/` |
 | Edit keys, notes, metrics, clean-up | `Runs/` |
-| The kinds of review on the start page | `Pipeline/ReviewMethod.cs` (set `Available` only when the engine supports the method) |
+| A kind of review, or its cards on the start page | `Modules/<Name>/<Name>Module.cs` (a card's `Available` is set only when the module can run it; the contract is `Pipeline/ReviewModule.cs`) |
 | Model access or JSON parsing | `Llm/` |
 | Pages and the dashboard | `Components/Pages/`, `Components/Dashboard/` |
 
-Put a new file in the folder of the stage it belongs to, and its tests in the matching folder of `AuBtechReviewAgent.Tests/`. Keep the single namespace `AuBtechReviewAgent`; folders are not namespaces.
+Put a new file in the folder of the stage it belongs to, or in `Modules/<Name>/` when only one kind of review uses it, and its tests in the matching folder of `AuBtechReviewAgent.Tests/`. Keep the single namespace `AuBtechReviewAgent`; folders are not namespaces.
 
 ## Rules that must not be broken
 
