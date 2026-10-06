@@ -2,7 +2,7 @@
 
 One folder per kind of review. A module is the recipe for one kind of review: the order of its steps, its own ledger, its pages and its report, built on the shared core and steps in the other folders. Each module implements `IReviewModule` (in `Pipeline/ReviewModule.cs`) and is listed in `ReviewModules.All`. The cards on the start page are declared by the module that runs them, so five cards need only two modules: the rapid and living reviews are variants of the systematic review, and the grey literature review is the multivocal review with only grey sources.
 
-`Systematic/` is the PRISMA 2020 systematic review. Its runs are still done by `PrismaReviewEngine`, and its PRISMA-only files move into this folder step by step. `Multivocal/` is the multivocal literature review (Garousi et al., 2019). It is not built yet, so its cards say "coming soon".
+`Systematic/` is the PRISMA 2020 systematic review. Its runs are still done by `PrismaReviewEngine`, and its PRISMA-only files move into this folder step by step. `Multivocal/` is the multivocal literature review (Garousi et al., 2019). It is not built yet, so its cards say "coming soon". Listing it in `ReviewModules:Preview` (read only in Development) opens its preview page at `/mlr`, which shows the steps it will follow; in production that page is "not found". Pages in a module folder get their usings from `Modules/_Imports.razor`.
 
 A module is done only when it passes the module test kit in `AuBtechReviewAgent.Tests/Modules/`, which runs it end to end on a poisoned fake run and checks the rules of `AGENTS.md`.
 
