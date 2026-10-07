@@ -112,6 +112,8 @@ var multivocalPlanner = new AuBtechReviewAgent.MultivocalPlanner(reviewEngine.St
 builder.Services.AddSingleton(multivocalPlanner); // multivocal planning (preview)
 var multivocalSearcher = new AuBtechReviewAgent.MultivocalSearcher(reviewEngine.Store, multivocalPlanner, key => AuBtechReviewAgent.GreySourceCatalog.Create(key, openSources.ContactEmail));
 builder.Services.AddSingleton(multivocalSearcher); // multivocal grey searches (preview)
+builder.Services.AddSingleton(new AuBtechReviewAgent.MultivocalScreener(reviewEngine.Store, multivocalPlanner, multivocalSearcher,
+    () => AuBtechReviewAgent.LlmFactory.Create(llmOptions, mistralApiKey), reviewEngine.Cache, llmOptions.Model, llmOptions.ScreeningParallelism)); // grey screening (preview)
 builder.Services.AddSingleton(new AuBtechReviewAgent.MultivocalPages(reviewEngine.Store, multivocalSearcher, new AuBtechReviewAgent.PageFetcher())); // page snapshots (preview)
 // Modules shown as a preview while they are being built (Development only; see ReviewModulesOptions).
 builder.Services.AddSingleton(AuBtechReviewAgent.ReviewModulesOptions.From(builder.Configuration, builder.Environment.IsDevelopment()));
