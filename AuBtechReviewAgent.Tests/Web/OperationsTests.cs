@@ -75,7 +75,7 @@ public class OperationsTests
     [InlineData(50L, "unhealthy", "Almost no disk space")]
     public void DiskSpaceDecidesTheStorageStatus(long freeMb, string expected, string words)
     {
-        string root = Path.Combine(Path.GetTempPath(), $"health-{Guid.NewGuid():N}");
+        string root = Path.Join(Path.GetTempPath(), $"health-{Guid.NewGuid():N}");
         try
         {
             var check = SiteHealth.Disk(root, _ => freeMb * 1024 * 1024);
@@ -90,7 +90,7 @@ public class OperationsTests
     [Fact]
     public void UnknownFreeSpaceIsStillHealthyWhenTheFolderIsWritable()
     {
-        string root = Path.Combine(Path.GetTempPath(), $"health-{Guid.NewGuid():N}");
+        string root = Path.Join(Path.GetTempPath(), $"health-{Guid.NewGuid():N}");
         try
         {
             var check = SiteHealth.Disk(root, _ => null);
