@@ -668,7 +668,7 @@
     private Dictionary<string, int> publicationsByYear = new();
     private List<IncludedPaperMetricRow> tableRecords = new();
     private List<AuBtechReviewAgent.StudyExtraction> extractions = new();
-    private List<AuBtechReviewAgent.CitationSupportResult> auditChecks = new();
+    private readonly List<AuBtechReviewAgent.CitationSupportResult> auditChecks = new();
     private AuBtechReviewAgent.ThematicCodebook? codebook;
     private int journalCount, conferenceCount, transactionsCount, proceedingsCount, preprintCount;
 
@@ -980,7 +980,7 @@
     private async Task LoadAuditAsync(string folder, bool reloadReport = true)
     {
         string auditPath = Path.Join(folder, "citation-audit.json");
-        auditChecks = new();
+        auditChecks.Clear();
         rechecks = new();
         if (File.Exists(auditPath))
         {
@@ -988,11 +988,11 @@
             {
                 using var doc = JsonDocument.Parse(await File.ReadAllTextAsync(auditPath));
                 if (doc.RootElement.TryGetProperty("SupportChecks", out var checks))
-                    auditChecks = JsonSerializer.Deserialize<List<AuBtechReviewAgent.CitationSupportResult>>(checks.GetRawText()) ?? new();
+                    auditChecks.AddRange(JsonSerializer.Deserialize<List<AuBtechReviewAgent.CitationSupportResult>>(checks.GetRawText()) ?? new());
                 if (doc.RootElement.TryGetProperty("Rechecks", out var done))
                     rechecks = JsonSerializer.Deserialize<List<AuBtechReviewAgent.CitationRecheck>>(done.GetRawText()) ?? new();
             }
-            catch (Exception ex) when (ex is JsonException or IOException) { auditChecks = new(); rechecks = new(); }
+            catch (Exception ex) when (ex is JsonException or IOException) { auditChecks.Clear(); rechecks = new(); }
         }
         rechecksLeft = auditChecks.Count == 0 ? 0 : Math.Max(0, AuBtechReviewAgent.PrismaReviewEngine.MaxRechecksPerRun - rechecks.Count);
 
@@ -1190,7 +1190,7 @@
         includedCitations = new();
         tableRecords = new();
         extractions = new();
-        auditChecks = new();
+        auditChecks.Clear();
         codebook = null;
         publicationsByYear = new();
         platformShares = new();
