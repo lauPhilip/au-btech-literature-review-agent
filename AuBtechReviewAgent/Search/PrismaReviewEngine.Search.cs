@@ -97,7 +97,7 @@ public partial class PrismaReviewEngine
             }
         }
         reviewState.SearchStringYields = SearchSaturation.Compute(searchPerspectives,
-            fetches.SelectMany(f => f).Select(pass => (pass.StringIndex, (IReadOnlyList<AcademicPaper>)pass.Papers)));
+            fetches.SelectMany(f => f).Select<SearchPass, (int, IReadOnlyList<AcademicPaper>)>(pass => (pass.StringIndex, pass.Papers)));
         OnProgressUpdated?.Invoke(ctx.RunId, reviewState.Stats);
         await SaveStateAsync(ctx.RunId, reviewState);
 
