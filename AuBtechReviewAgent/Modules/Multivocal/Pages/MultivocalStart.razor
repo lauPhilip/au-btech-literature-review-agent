@@ -919,15 +919,15 @@
         error = null;
         try
         {
-            var (runId, editKey) = await Planner.CreateAsync(plan);
+            var (newRunId, newEditKey) = await Planner.CreateAsync(plan);
             // Only this browser keeps the run's edit key, as for a systematic review.
-            try { await JS.InvokeVoidAsync("traceableReview.saveEditKey", runId.ToString(), editKey); }
+            try { await JS.InvokeVoidAsync("traceableReview.saveEditKey", newRunId.ToString(), newEditKey); }
             catch (Exception ex) when (ex is JSException or JSDisconnectedException or InvalidOperationException or TaskCanceledException)
             {
                 // The run is written either way; without the key this browser cannot change it later, as for a systematic review.
                 Logger.LogDebug("Could not keep the edit key in this browser: {Message}", ex.Message);
             }
-            Nav.NavigateTo($"/mlr/{runId}");
+            Nav.NavigateTo($"/mlr/{newRunId}");
         }
         catch (ArgumentException ex)
         {
