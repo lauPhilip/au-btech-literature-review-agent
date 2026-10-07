@@ -50,6 +50,18 @@ public class ModelOutputAndFullTextTests
     }
 
     [Fact]
+    public void ALoneBackslashCopiedFromAPageIsKeptAsABackslash()
+    {
+        // Seen in a live run: a quote from a README with a Windows path and a regex broke the whole answer.
+        const string raw = """{"answers":[{"id":"2.2","quote":"Put it in C:\agents\memory and match \d+ items.","escaped":"line\nbreak \u00e9 \"q\""}]}""";
+
+        var node = System.Text.Json.Nodes.JsonNode.Parse(LlmJson.ExtractObject(raw))!["answers"]![0]!;
+
+        Assert.Equal("Put it in C:\\agents\\memory and match \\d+ items.", node["quote"]!.GetValue<string>());
+        Assert.Equal("line\nbreak é \"q\"", node["escaped"]!.GetValue<string>()); // valid escapes are left alone
+    }
+
+    [Fact]
     public void ACutOffAnswerIsStillReportedAsInvalid()
     {
         string extracted = LlmJson.ExtractObject("{\"text\": \"the answer stops here");

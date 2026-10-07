@@ -63,6 +63,8 @@ public static class LlmJson
     /// <item>Models often put real line breaks and tabs inside JSON strings (long prose fields), which JSON does
     /// not allow ("'0x0A' is invalid within a JSON string"). Inside strings they are written as \n, \t etc.,
     /// which is exactly what the model meant, so nothing is guessed.</item>
+    /// <item>A backslash that does not start a JSON escape (a path or regex the model copied from a page, seen
+    /// in a live run: "'a' is an invalid escapable character") is kept as a literal backslash.</item>
     /// <item>The object ends at its matching closing brace (braces inside strings do not count), so a second
     /// object or text after the first is ignored ("'{' is invalid after a single JSON value").</item>
     /// </list>
@@ -86,7 +88,10 @@ public static class LlmJson
                 if (escaped) { escaped = false; result.Append(c); continue; }
                 switch (c)
                 {
-                    case '\\': escaped = true; result.Append(c); break;
+                    case '\\':
+                        if (IsEscape(text, i + 1)) { escaped = true; result.Append(c); }
+                        else result.Append("\\\\"); // a lone backslash copied from a page: keep it as a backslash
+                        break;
                     case '"': inString = false; result.Append(c); break;
                     case '\n': result.Append("\\n"); break;
                     case '\r': result.Append("\\r"); break;
@@ -108,6 +113,17 @@ public static class LlmJson
         string escapedText = result.ToString();
         int end = escapedText.LastIndexOf('}');
         return end > 0 ? escapedText.Substring(0, end + 1) : escapedText;
+    }
+
+    /// <summary>Whether text[at] starts a valid JSON escape after a backslash: one of "\/bfnrt, or u and four hex digits.</summary>
+    private static bool IsEscape(string text, int at)
+    {
+        if (at >= text.Length) return false;
+        char c = text[at];
+        if (c is '"' or '\\' or '/' or 'b' or 'f' or 'n' or 'r' or 't') return true;
+        if (c != 'u' || at + 4 >= text.Length) return false;
+        for (int k = 1; k <= 4; k++) if (!Uri.IsHexDigit(text[at + k])) return false;
+        return true;
     }
 
     public static bool OneOf(string? value, params string[] allowed) =>
