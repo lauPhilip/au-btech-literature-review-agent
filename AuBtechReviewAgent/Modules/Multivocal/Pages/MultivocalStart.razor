@@ -7,6 +7,7 @@
 @inject AuBtechReviewAgent.MultivocalSearcher Searcher
 @inject AuBtechReviewAgent.MultivocalPages Pages
 @inject AuBtechReviewAgent.MultivocalScreener Screener
+@inject AuBtechReviewAgent.MultivocalQualityAssessor Quality
 @inject NavigationManager Nav
 @inject IJSRuntime JS
 @inject ILogger<MultivocalStart> Logger
@@ -65,7 +66,34 @@
                         {
                             @SettingRow("Screened", ScreeningLine(screening))
                         }
+                        @if (quality != null)
+                        {
+                            @SettingRow("Quality", QualityLine(quality))
+                        }
                     </dl>
+                    @if (screening != null && quality == null && stage is AuBtechReviewAgent.MultivocalScreener.StageScreened or AuBtechReviewAgent.MultivocalQualityAssessor.StageAssessing)
+                    {
+                        <div class="border-t border-gray-100 pt-3 space-y-2">
+                            @if (assessing || AuBtechReviewAgent.MultivocalQualityAssessor.IsRunning(planned.RunId))
+                            {
+                                <p class="text-xs text-gray-700" role="status" aria-live="polite">Scoring… @qualityProgress</p>
+                                <p class="text-[11px] text-gray-500">Each page is fetched first, one request a second per site. Closing the page does not stop it.</p>
+                            }
+                            else if (canEdit)
+                            {
+                                <p class="text-xs text-gray-600">Score the @screening.Count("Included") included sources on the 20 items of the quality checklist (Table 7). Each page is kept first; every point the model gives must rest on a quote from it. Below @planned.Plan.QualityThreshold points a source is left out.</p>
+                                <button type="button" class="ui-btn-primary ui-btn-sm" @onclick="AssessAsync">Score the quality</button>
+                            }
+                            else
+                            {
+                                <p class="text-xs text-gray-600">Only the browser that planned this run can score it.</p>
+                            }
+                            @if (qualityError != null)
+                            {
+                                <p class="bg-red-50 border border-red-200 text-red-800 p-2 text-xs" role="alert">@qualityError</p>
+                            }
+                        </div>
+                    }
                     @if (ledger != null && screening == null && stage is AuBtechReviewAgent.MultivocalSearcher.StageSearched or AuBtechReviewAgent.MultivocalScreener.StageScreening)
                     {
                         <div class="border-t border-gray-100 pt-3 space-y-2">
@@ -468,6 +496,12 @@
                         <div class="flex items-center justify-between gap-3">
                             <label for="source-filter" class="text-xs text-gray-700">Show</label>
                             <select id="source-filter" class="ui-input py-1 text-xs w-auto" @bind="sourceFilter">
+                                @if (quality != null)
+                                {
+                                    <option value="passed">Passed the quality check (@quality.Count("Passed"))</option>
+                                    <option value="below">Below the threshold (@quality.Count("Below threshold"))</option>
+                                    <option value="unassessed">Not assessed (@quality.Count("Not assessed"))</option>
+                                }
                                 <option value="included">Included (@screening.Count("Included"))</option>
                                 <option value="look">To look at (@screening.Sources.Count(x => x.Uncertain))</option>
                                 <option value="excluded">Excluded (@screening.Count("Excluded"))</option>
@@ -499,6 +533,46 @@
                                 @if (r.Summary.Length > 0)
                                 {
                                     <p class="text-xs text-gray-700 mt-1 line-clamp-3">@r.Summary</p>
+                                }
+                                @{ var score = QualityOf(r.Url); }
+                                @if (score != null)
+                                {
+                                    <details class="mt-1 text-[11px] text-gray-700">
+                                        <summary class="cursor-pointer select-none">
+                                            <span class="@QualityChip(score.Outcome) text-[10px]">@(score.Outcome == "Not assessed" ? "Quality not assessed" : $"Quality {score.Points:0.#} of {AuBtechReviewAgent.GreyQualityChecklist.MaxPoints}")</span>
+                                        </summary>
+                                        @if (score.NotAssessed != null)
+                                        {
+                                            <p class="mt-1">Not assessed: @score.NotAssessed.</p>
+                                        }
+                                        else
+                                        {
+                                            <table class="w-full mt-1">
+                                                <caption class="sr-only">@($"Quality checklist answers for {r.Title}")</caption>
+                                                <tbody>
+                                                    @foreach (var item in AuBtechReviewAgent.GreyQualityChecklist.Items)
+                                                    {
+                                                        var answer = score.Answers.FirstOrDefault(x => x.Id == item.Id);
+                                                        <tr class="border-t border-gray-100 align-top">
+                                                            <th scope="row" class="py-1 pr-2 font-normal text-gray-500 w-8">@item.Id</th>
+                                                            <td class="py-1 pr-2">
+                                                                <span class="text-gray-800">@item.Question</span>
+                                                                @if (answer != null)
+                                                                {
+                                                                    <span class="block text-gray-600">@answer.Reason</span>
+                                                                    @if (answer.Quote != null && answer.Basis == "model")
+                                                                    {
+                                                                        <q class="block text-gray-500 italic">@answer.Quote</q>
+                                                                    }
+                                                                }
+                                                            </td>
+                                                            <td class="py-1 text-right font-medium whitespace-nowrap">@(answer?.Score.ToString("0.#") ?? "–")@(answer?.Basis == "code" ? " (code)" : "")</td>
+                                                        </tr>
+                                                    }
+                                                </tbody>
+                                            </table>
+                                        }
+                                    </details>
                                 }
                                 @if (decision != null && decision.Reasoning.Length > 0)
                                 {
@@ -608,6 +682,11 @@
     private string? screenProgress;
     private string? screenError;
     private string sourceFilter = "all";
+    private AuBtechReviewAgent.MultivocalQualityFile? quality;
+    private Dictionary<string, AuBtechReviewAgent.GreyQuality> qualities = new();
+    private bool assessing;
+    private string? qualityProgress;
+    private string? qualityError;
     private Dictionary<string, AuBtechReviewAgent.PageSnapshot> snapshots = new();
     private readonly HashSet<string> keeping = new();
     private string? keepError;
@@ -642,6 +721,9 @@
             ledger = Searcher.LoadLedger(id);
             snapshots = Pages.Load(id).Pages.ToDictionary(p => AuBtechReviewAgent.MultivocalSearcher.AddressKey(p.Url));
             SetScreening(Screener.Load(id));
+            SetQuality(Quality.Load(id));
+            if (quality != null) sourceFilter = "passed";
+            else if (screening != null) sourceFilter = "included";
             stage = Runs.LoadHeader(id)?.Stage ?? "";
             panelTab = ledger != null ? "sources" : "protocol";
             return;
@@ -670,7 +752,7 @@
                     ? $"{searches} grey literature search{(searches == 1 ? "" : "es")}, {stop}."
                     : $"{searches} grey literature search{(searches == 1 ? "" : "es")} and the academic databases, {stop}.", true),
                 ("Selection", p.IsGreyOnly ? "Every source is screened twice against your criteria." : "Grey and academic sources are screened twice, with the same criteria and the same care.", true),
-                ("Quality", $"Each grey source is scored on Table 7; below {p.QualityThreshold} of {AuBtechReviewAgent.MultivocalGuidelines.QualityPointsMax} points it is left out. Every score rests on a quote.", false),
+                ("Quality", $"Each grey source is scored on Table 7; below {p.QualityThreshold} of {AuBtechReviewAgent.MultivocalGuidelines.QualityPointsMax} points it is left out. Every score rests on a quote.", true),
                 ("Map and extraction", "The sources are classified in a systematic map; every extracted item links to its place in the source.", false),
                 ("Synthesis", $"The findings are coded and written up to answer {questions} research question{(questions == 1 ? "" : "s")}.", false),
                 ("Checking", "Every citation is compared with its source; weak ones get a second check and are repaired.", false),
@@ -823,11 +905,60 @@
         }
     }
 
+    private void SetQuality(AuBtechReviewAgent.MultivocalQualityFile? file)
+    {
+        quality = file;
+        qualities = new();
+        if (file == null) return;
+        foreach (var q in file.Sources) qualities.TryAdd(q.Address, q);
+    }
+
+    private async Task AssessAsync()
+    {
+        if (planned == null || assessing) return;
+        assessing = true;
+        qualityError = null;
+        var progress = new Progress<string>(line => { qualityProgress = line; _ = InvokeAsync(StateHasChanged); });
+        try
+        {
+            SetQuality(await Quality.AssessAsync(planned.RunId, editKey, progress));
+            snapshots = Pages.Load(planned.RunId).Pages.ToDictionary(p => AuBtechReviewAgent.MultivocalSearcher.AddressKey(p.Url));
+            stage = AuBtechReviewAgent.MultivocalQualityAssessor.StageAssessed;
+            sourceFilter = "passed";
+        }
+        catch (InvalidOperationException ex)
+        {
+            qualityError = ex.Message;
+        }
+        finally
+        {
+            assessing = false;
+            qualityProgress = null;
+        }
+    }
+
+    private AuBtechReviewAgent.GreyQuality? QualityOf(string url) =>
+        qualities.TryGetValue(AuBtechReviewAgent.MultivocalSearcher.AddressKey(url), out var q) ? q : null;
+
+    private static string QualityLine(AuBtechReviewAgent.MultivocalQualityFile f) =>
+        $"{f.Count("Passed")} passed, {f.Count("Below threshold")} below {f.Threshold} points" +
+        (f.Count("Not assessed") > 0 ? $", {f.Count("Not assessed")} not assessed (no readable page)" : "");
+
+    private static string QualityChip(string outcome) => outcome switch
+    {
+        "Passed" => "ui-chip border-green-200 bg-green-50 text-green-800",
+        "Below threshold" => "ui-chip border-amber-200 bg-amber-50 text-amber-800",
+        _ => "ui-chip border-gray-200 bg-gray-50 text-gray-600",
+    };
+
     private AuBtechReviewAgent.GreyScreening? DecisionOf(string url) =>
         decisions.TryGetValue(AuBtechReviewAgent.MultivocalSearcher.AddressKey(url), out var d) ? d : null;
 
     private IEnumerable<AuBtechReviewAgent.FoundGreySource> ShownSources() => sourceFilter switch
     {
+        "passed" => ledger!.Sources.Where(f => QualityOf(f.Record.Url)?.Outcome == "Passed"),
+        "below" => ledger!.Sources.Where(f => QualityOf(f.Record.Url)?.Outcome == "Below threshold"),
+        "unassessed" => ledger!.Sources.Where(f => QualityOf(f.Record.Url)?.Outcome == "Not assessed"),
         "included" => ledger!.Sources.Where(f => DecisionOf(f.Record.Url)?.Decision == "Included"),
         "excluded" => ledger!.Sources.Where(f => DecisionOf(f.Record.Url)?.Decision == "Excluded"),
         "look" => ledger!.Sources.Where(f => DecisionOf(f.Record.Url) is { Uncertain: true }),
@@ -885,7 +1016,9 @@
 
     private string StageLine() => stage switch
     {
-        AuBtechReviewAgent.MultivocalScreener.StageScreened => "Screened: the grey sources are selected; the quality check is the next part to be built",
+        AuBtechReviewAgent.MultivocalQualityAssessor.StageAssessed => "Assessed: the included sources are scored for quality; the map and extraction are the next parts to be built",
+        AuBtechReviewAgent.MultivocalQualityAssessor.StageAssessing => "Scoring the quality…",
+        AuBtechReviewAgent.MultivocalScreener.StageScreened => "Screened: the grey sources are selected and can be scored for quality",
         AuBtechReviewAgent.MultivocalScreener.StageScreening => "Screening…",
         AuBtechReviewAgent.MultivocalSearcher.StageSearched => "Searched: the grey sources are found and can be screened",
         AuBtechReviewAgent.MultivocalSearcher.StageSearching => "Searching…",
