@@ -58,19 +58,24 @@ public static class MultivocalGuidelines
         ("talks", "Talks and videos, only with a published transcript"),
     };
 
-    /// <summary>A search the module can run (G7). Brave runs only with the reviewer's own key (decision 1).</summary>
-    public sealed record GreySearch(string Key, string Label, bool NeedsOwnKey);
+    /// <summary>
+    /// A search the module can run (G7). There is no general web search engine among them (decision 1): none is both
+    /// free and allows its results to be kept, and Brave's terms forbid storing them.
+    /// </summary>
+    public sealed record GreySearch(string Key, string Label);
 
     public static readonly IReadOnlyList<GreySearch> GreySearches = new[]
     {
-        new GreySearch("stackexchange", "Stack Exchange sites (Stack Overflow and others)", false),
-        new GreySearch("github", "GitHub repositories", false),
-        new GreySearch("hackernews", "Hacker News", false),
-        new GreySearch("openalex-grey", "Reports, theses and standards in OpenAlex", false),
-        new GreySearch("zenodo", "Reports and documents on Zenodo", false),
-        new GreySearch("backlinks", "Links in the included grey sources (backlink snowballing)", false),
-        new GreySearch("brave", "The general web through Brave Search, with your own API key", true),
+        new GreySearch("stackexchange", "Stack Exchange sites (Stack Overflow and others)"),
+        new GreySearch("github", "GitHub repositories"),
+        new GreySearch("hackernews", "Hacker News"),
+        new GreySearch("openalex-grey", "Reports, theses and standards in OpenAlex"),
+        new GreySearch("zenodo", "Reports and documents on Zenodo"),
+        new GreySearch("backlinks", "Links in the included grey sources (backlink snowballing)"),
     };
+
+    /// <summary>The label of a search, or its key when the search is no longer offered (a plan made before it was dropped).</summary>
+    public static string SearchLabel(string key) => GreySearches.FirstOrDefault(s => s.Key == key)?.Label ?? key;
 
     /// <summary>The three stopping rules of G8.</summary>
     public static readonly IReadOnlyList<(string Key, string Label)> StoppingRules = new[]
@@ -140,6 +145,16 @@ public sealed class MultivocalPlan
             : new[] { Topic.Trim() };
     public string StoppingRule { get; set; } = "effort";
 
+    /// <summary>
+    /// The selection criteria (G9): what a source must be about to be included, and what excludes it. Formal and grey
+    /// sources are screened with the same criteria (G10). Older plans have none, and cannot be screened.
+    /// </summary>
+    public string InclusionCriteria { get; set; } = "";
+    public string ExclusionCriteria { get; set; } = "";
+
+    /// <summary>True when the plan has the criteria screening needs.</summary>
+    public bool HasCriteria => InclusionCriteria.Trim().Length > 0;
+
     /// <summary>For the effort-bounded rule: how many top hits of each search string are looked at (the paper uses 100).</summary>
     public int TopHits { get; set; } = 100;
 
@@ -192,6 +207,8 @@ public sealed class MultivocalPlan
         GreyTypes = new List<string> { "white-papers", "documentation", "blogs", "qa", "code" },
         GreySearches = new List<string> { "stackexchange", "github", "hackernews", "openalex-grey", "zenodo", "backlinks" },
         GreySearchStrings = new List<string> { "context engineering", "LLM agent context window", "agent memory management" },
+        InclusionCriteria = "Sources about engineering the context given to LLM agents (what goes into the context window, memory, retrieval, tool descriptions, compression or summarisation), with practical experience, guidance, an evaluation or a tool.",
+        ExclusionCriteria = "Sources only about the wording of prompts for single chat requests; marketing pages without technical content; sources not in English.",
         StoppingRule = "effort",
         TopHits = 100,
         QualityThreshold = 10,
@@ -242,6 +259,8 @@ public sealed class MultivocalPlan
         Topic = Clean(Topic);
         Goal = Clean(Goal);
         ExistingReviews = Clean(ExistingReviews);
+        InclusionCriteria = Clean(InclusionCriteria);
+        ExclusionCriteria = Clean(ExclusionCriteria);
         foreach (var q in Questions) q.Text = Clean(q.Text);
         GreySearchStrings = GreySearchStrings.Select(t => ReviewInputGuard.Normalize(t ?? "", singleLine: true)).Where(t => t.Length > 0).ToList();
         return this;
@@ -255,7 +274,7 @@ public sealed class MultivocalPlan
         if (Topic.Length == 0) problems.Add("Give the topic of the review.");
         if (Goal.Length == 0) problems.Add("Say what the review is for (its goal).");
         if (Audience == null) problems.Add("Choose who the review is for.");
-        if (new[] { Topic, Goal, ExistingReviews }.Any(t => t.Length > MaxText) || Questions.Any(q => q.Text.Length > MaxText))
+        if (new[] { Topic, Goal, ExistingReviews, InclusionCriteria, ExclusionCriteria }.Any(t => t.Length > MaxText) || Questions.Any(q => q.Text.Length > MaxText))
             problems.Add($"Keep every answer under {MaxText} characters.");
         if (IncludeGrey.Count != MultivocalGuidelines.IncludeGreyQuestions.Count || IncludeGrey.Any(a => a == null))
             problems.Add("Answer all seven questions on including grey literature.");
@@ -274,6 +293,7 @@ public sealed class MultivocalPlan
         if (GreySearches.Count == 0 || GreySearches.Any(s => MultivocalGuidelines.GreySearches.All(g => g.Key != s)))
             problems.Add("Choose at least one place to search.");
         if (MultivocalGuidelines.StoppingRules.All(r => r.Key != StoppingRule)) problems.Add("Choose a stopping rule.");
+        if (!HasCriteria) problems.Add("Say what a source must be about to be included (the inclusion criteria).");
         if (GreySearchStrings.Count > MaxSearchStrings) problems.Add($"Use at most {MaxSearchStrings} search strings.");
         if (GreySearchStrings.Any(t => t.Length > MaxSearchStringLength)) problems.Add($"Keep every search string under {MaxSearchStringLength} characters.");
         if (StoppingRule == "effort" && TopHits is < 10 or > 500) problems.Add("Look at between 10 and 500 top hits per search string.");

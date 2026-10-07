@@ -64,13 +64,12 @@ public static class MultivocalProtocol
         sb.AppendLine();
         sb.AppendLine("Where grey literature is searched (G7):");
         foreach (var key in plan.GreySearches)
-            sb.AppendLine($"- {MultivocalGuidelines.GreySearches.First(s => s.Key == key).Label}");
+            sb.AppendLine($"- {MultivocalGuidelines.SearchLabel(key)}");
         if (!plan.IsGreyOnly)
             sb.AppendLine("- Formal literature: the bibliographic databases of the systematic review, searched with their own search strings");
         sb.AppendLine();
         sb.AppendLine("Not done, by design:");
-        if (!plan.GreySearches.Contains("brave"))
-            sb.AppendLine("- No general web search engine is used: no general web search API is both free and stable, so the searches above take its place.");
+        sb.AppendLine("- No general web search engine is used: none offers a search API that is free and allows its results to be kept, which a traceable review needs, so the searches above take its place.");
         if (!plan.GreyTypes.Contains("talks"))
             sb.AppendLine("- Talks and videos are not covered.");
         else
@@ -87,7 +86,10 @@ public static class MultivocalProtocol
 
         sb.AppendLine("## 5. Selection and quality (G9–G11)");
         sb.AppendLine();
-        sb.AppendLine("Formal and grey sources are screened with the same criteria and the same care (G10).");
+        sb.AppendLine($"Inclusion criteria (G9): {plan.InclusionCriteria}");
+        sb.AppendLine($"Exclusion criteria (G9): {(plan.ExclusionCriteria.Length > 0 ? plan.ExclusionCriteria : "none")}");
+        sb.AppendLine();
+        sb.AppendLine("Formal and grey sources are screened with the same criteria and the same care (G10): each source is screened twice by the language model, independently and with the steps in a different order, and a source the two screenings disagree on is kept and flagged for the reviewer. Sources found twice under different addresses (the same title) are screened once.");
         sb.AppendLine($"Each grey source is scored on the quality checklist of Table 7, out of {MultivocalGuidelines.QualityPointsMax} points; sources scoring below {plan.QualityThreshold} points are excluded (G11). Every score rests on a quote from the source.");
         sb.AppendLine();
 

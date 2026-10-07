@@ -55,7 +55,7 @@ public class MultivocalSearchTests : IDisposable
     public async Task EverySearchIsOnFileWithItsRawAnswerAndTheSourcesAreFoundOnce()
     {
         var (store, planner) = Services();
-        var (runId, key) = await planner.CreateAsync(Plan("stackexchange", "github", "brave"));
+        var (runId, key) = await planner.CreateAsync(Plan("stackexchange", "github", "backlinks"));
         var se = new FakeGreySource("stackexchange", (q, _) => q == "context engineering"
             ? new() { Record("https://stackoverflow.com/q/1"), Record("https://www.example.org/post/") }
             : new() { Record("https://stackoverflow.com/q/1") });
@@ -69,7 +69,7 @@ public class MultivocalSearchTests : IDisposable
         Assert.Equal(2, ledger.Sources.Count);
         Assert.Equal(new[] { "stackexchange: context engineering", "github: context engineering", "github: agent memory" },
             ledger.Sources.Single(s => s.Record.Url.Contains("example.org")).FoundBy);
-        Assert.Equal("brave", Assert.Single(ledger.Skipped).Source);
+        Assert.Equal("backlinks", Assert.Single(ledger.Skipped).Source);
 
         string folder = store.FolderOf(runId);
         foreach (var search in ledger.Searches)
