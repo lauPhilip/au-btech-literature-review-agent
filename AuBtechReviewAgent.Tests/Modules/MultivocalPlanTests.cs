@@ -29,6 +29,8 @@ public class MultivocalPlanTests : IDisposable
                 new() { Text = "Do these practices reduce agent failures?", Type = "causality" },
             },
             QualityThreshold = 12,
+            InclusionCriteria = "Sources on context engineering practice for LLM agents.",
+            ExclusionCriteria = "Marketing pages.",
             TopHits = 50,
         };
         return plan;
@@ -61,20 +63,27 @@ public class MultivocalPlanTests : IDisposable
         Assert.Contains("Practitioners and authors are not contacted", protocol);
         Assert.Contains("Talks and videos are not covered.", protocol);
         Assert.Contains("Formal literature:", protocol);
+        Assert.Contains("Inclusion criteria (G9): Sources on context engineering practice for LLM agents.", protocol);
+        Assert.Contains("Exclusion criteria (G9): Marketing pages.", protocol);
+        Assert.Contains("screened twice", protocol);
+
+        plan.InclusionCriteria = " ";
+        Assert.Contains("Say what a source must be about to be included (the inclusion criteria).", plan.Problems());
     }
 
     [Fact]
-    public void TheReviewersOwnWebSearchKeyAndTranscriptsAreStatedWhenChosen()
+    public void TranscriptsAreStatedWhenTalksAreChosenAndADroppedSearchIsNamedNotFatal()
     {
         var plan = Complete();
-        plan.GreySearches.Add("brave");
         plan.GreyTypes.Add("talks");
+        plan.GreySearches.Add("brave"); // a plan made before Brave was dropped
 
         string protocol = MultivocalProtocol.Write(plan, Guid.NewGuid(), DateTime.UtcNow);
 
-        Assert.DoesNotContain("No general web search engine is used", protocol);
-        Assert.Contains("The general web through Brave Search, with your own API key", protocol);
         Assert.Contains("only when its transcript is published", protocol);
+        Assert.Contains("No general web search engine is used", protocol);
+        Assert.Contains("- brave", protocol);
+        Assert.Contains(plan.Problems(), p => p.Contains("search", StringComparison.OrdinalIgnoreCase));
     }
 
     [Theory]

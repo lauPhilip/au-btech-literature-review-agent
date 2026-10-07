@@ -58,12 +58,7 @@
                     @if (r.HasManifest)
                     {
                         <p class="mt-1 text-sm text-gray-700">
-                            @(r.ManifestIntact switch
-                            {
-                                true => "The manifest itself is also unchanged.",
-                                false => "The manifest itself was edited: its own fingerprint no longer matches, so the list of fingerprints cannot be trusted.",
-                                null => "This manifest is from an older version without a fingerprint of itself.",
-                            })
+                            @ManifestLine(r.ManifestIntact)
                         </p>
                     }
                 </div>
@@ -100,6 +95,15 @@
 </main>
 
 @code {
+    /// <summary>What the manifest's own fingerprint says: unchanged, edited, or from a version that had none.</summary>
+    private static string ManifestLine(bool? intact)
+    {
+        if (intact is null) return "This manifest is from an older version without a fingerprint of itself.";
+        return intact.Value
+            ? "The manifest itself is also unchanged."
+            : "The manifest itself was edited: its own fingerprint no longer matches, so the list of fingerprints cannot be trusted.";
+    }
+
     private const int MaxUploadMb = 200;
 
     private bool checking;

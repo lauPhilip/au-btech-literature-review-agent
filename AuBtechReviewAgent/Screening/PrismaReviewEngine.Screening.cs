@@ -249,21 +249,7 @@ public partial class PrismaReviewEngine
             - Abstract: {paper.Abstract}
             """;
 
-        string procedure = secondScreener
-            ? """
-              You are the SECOND, INDEPENDENT screener. Work in this order:
-              1. Check each exclusion threshold. If one clearly applies, the decision is Excluded.
-              2. Otherwise decide Included only if the record gives positive evidence that it meets the inclusion thresholds.
-              3. If the title and abstract are too thin to judge, decide on what is there and set confidence to "low".
-              4. If Excluded, name the main reason: "exclusion-matched", "off-topic", "inclusion-not-met" or "too-little-information".
-              """
-            : """
-              TASK:
-              1. Determine if it should be Included or Excluded.
-              2. Create a brief 1-2 sentence executive summary of the paper.
-              3. Say how confident you are: "high", "medium" or "low" (low when the abstract is too thin to judge).
-              4. If Excluded, name the main reason: "off-topic" (not about the review's subject), "inclusion-not-met" (on topic but misses an inclusion threshold), "exclusion-matched" (an exclusion threshold applies) or "too-little-information" (the record is too thin to show it qualifies).
-              """;
+        string procedure = ScreeningProcedure(secondScreener);
 
         var prompt = $$"""
             Evaluate the following academic paper against the provided systematically structured PRISMA parameters.
@@ -282,13 +268,38 @@ public partial class PrismaReviewEngine
             {{procedure}}
             (The reference string is built separately from the source metadata - do not write one.)
 
-            Respond ONLY with a valid minified JSON object matching this structure exactly:
-            {"decision":"Included or Excluded","reasoning":"Why it meets inclusion or hits exclusion parameters.","briefSummary":"The 1-2 sentence executive summary.","confidence":"high, medium or low","exclusionReason":"only when Excluded: off-topic, inclusion-not-met, exclusion-matched or too-little-information"}
+            {{ScreeningAnswerFormat}}
             """;
 
         var answer = await LlmJson.GetAsync<ScreeningAnswer>(chatService, prompt, JsonMode(0.0), ScreeningAnswer.Validate);
         return answer.Normalized();
     }
+
+    /// <summary>
+    /// The screening steps, shared by the systematic and the multivocal review so both screen with the same care
+    /// (Garousi et al. G10). The second screener works through the criteria in a different order.
+    /// </summary>
+    public static string ScreeningProcedure(bool secondScreener) => secondScreener
+        ? """
+              You are the SECOND, INDEPENDENT screener. Work in this order:
+              1. Check each exclusion threshold. If one clearly applies, the decision is Excluded.
+              2. Otherwise decide Included only if the record gives positive evidence that it meets the inclusion thresholds.
+              3. If the title and abstract are too thin to judge, decide on what is there and set confidence to "low".
+              4. If Excluded, name the main reason: "exclusion-matched", "off-topic", "inclusion-not-met" or "too-little-information".
+              """
+        : """
+              TASK:
+              1. Determine if it should be Included or Excluded.
+              2. Create a brief 1-2 sentence executive summary of the paper.
+              3. Say how confident you are: "high", "medium" or "low" (low when the abstract is too thin to judge).
+              4. If Excluded, name the main reason: "off-topic" (not about the review's subject), "inclusion-not-met" (on topic but misses an inclusion threshold), "exclusion-matched" (an exclusion threshold applies) or "too-little-information" (the record is too thin to show it qualifies).
+              """;
+
+    /// <summary>The answer format of a screening, shared by the systematic and the multivocal review.</summary>
+    public const string ScreeningAnswerFormat = """
+        Respond ONLY with a valid minified JSON object matching this structure exactly:
+        {"decision":"Included or Excluded","reasoning":"Why it meets inclusion or hits exclusion parameters.","briefSummary":"The 1-2 sentence executive summary.","confidence":"high, medium or low","exclusionReason":"only when Excluded: off-topic, inclusion-not-met, exclusion-matched or too-little-information"}
+        """;
 
     private async Task<bool> IsPeerReviewedAsync(IChatCompletionService chatService, string sourceName, AcademicPaper paper)
     {

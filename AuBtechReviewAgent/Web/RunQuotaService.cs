@@ -41,6 +41,7 @@ public class QuotaOptions
 
 public enum QuotaTier { Free, OwnKey, Developer }
 
+/// <summary>Whether a new run is allowed for this browser, how many are used and left, and what to tell the reviewer.</summary>
 /// <param name="ResetsUtc">When the next run becomes available again, if the limit is reached (shown as "in 5 h 12 min").</param>
 public record QuotaStatus(QuotaTier Tier, bool Allowed, int Used, int Limit, string Message, DateTime? ResetsUtc = null)
 {

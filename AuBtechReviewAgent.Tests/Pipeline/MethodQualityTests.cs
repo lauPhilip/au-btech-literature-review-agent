@@ -234,7 +234,7 @@ public class MethodQualityTests : IDisposable
     [Fact]
     public async Task OnlyOrangeAndRedCitationsCanBeCheckedAgain()
     {
-        var (engine, runId, marked) = await RunWithOneRedCitation();
+        var (engine, runId, _) = await RunWithOneRedCitation();
         var state = engine.LoadState(runId)!;
         string auditPath = Path.Join(_root, runId.ToString("N"), "citation-audit.json");
         var green = System.Text.Json.JsonSerializer.Deserialize<List<CitationSupportResult>>(

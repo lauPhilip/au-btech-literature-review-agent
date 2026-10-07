@@ -6,6 +6,7 @@
 @inject AuBtechReviewAgent.MultivocalPlanner Planner
 @inject AuBtechReviewAgent.MultivocalSearcher Searcher
 @inject AuBtechReviewAgent.MultivocalPages Pages
+@inject AuBtechReviewAgent.MultivocalScreener Screener
 @inject NavigationManager Nav
 @inject IJSRuntime JS
 @inject ILogger<MultivocalStart> Logger
@@ -53,14 +54,46 @@
                         @SettingRow("Goal", planned.Plan.Goal)
                         @SettingRow("Audience", AudienceLabel(planned.Plan.Audience))
                         @SettingRow("Questions", string.Join(" ", planned.Plan.Numbered().Select(q => q.Number)))
-                        @SettingRow("Searches", string.Join(", ", planned.Plan.GreySearches.Select(k => AuBtechReviewAgent.MultivocalGuidelines.GreySearches.First(s => s.Key == k).Label)))
+                        @SettingRow("Searches", string.Join(", ", planned.Plan.GreySearches.Select(AuBtechReviewAgent.MultivocalGuidelines.SearchLabel)))
                         @SettingRow("Strings", string.Join("; ", planned.Plan.EffectiveGreySearchStrings))
                         @SettingRow("Threshold", $"{planned.Plan.QualityThreshold} of {AuBtechReviewAgent.MultivocalGuidelines.QualityPointsMax} points")
                         @if (ledger != null)
                         {
                             @SettingRow("Found", $"{ledger.Sources.Count} grey source{(ledger.Sources.Count == 1 ? "" : "s")} from {ledger.Searches.Count} search{(ledger.Searches.Count == 1 ? "" : "es")}")
                         }
+                        @if (screening != null)
+                        {
+                            @SettingRow("Screened", ScreeningLine(screening))
+                        }
                     </dl>
+                    @if (ledger != null && screening == null && stage is AuBtechReviewAgent.MultivocalSearcher.StageSearched or AuBtechReviewAgent.MultivocalScreener.StageScreening)
+                    {
+                        <div class="border-t border-gray-100 pt-3 space-y-2">
+                            @if (!planned.Plan.HasCriteria)
+                            {
+                                <p class="text-xs text-gray-600">This plan was made before the form asked for inclusion criteria, so its sources cannot be screened. Plan a new run to screen.</p>
+                            }
+                            else if (screeningNow || AuBtechReviewAgent.MultivocalScreener.IsRunning(planned.RunId))
+                            {
+                                <p class="text-xs text-gray-700" role="status" aria-live="polite">Screening… @screenProgress</p>
+                                <p class="text-[11px] text-gray-500">This takes a while. Closing the page does not stop it; open the run again later.</p>
+                            }
+                            else if (canEdit)
+                            {
+                                int toScreen = ledger.Sources.Count;
+                                <p class="text-xs text-gray-600">Screen every found source twice against the plan's criteria, as the systematic review does. About @((2 * toScreen).ToString("N0")) model calls; decisions made before come from the cache.</p>
+                                <button type="button" class="ui-btn-primary ui-btn-sm" @onclick="ScreenAsync">Screen the sources</button>
+                            }
+                            else
+                            {
+                                <p class="text-xs text-gray-600">Only the browser that planned this run can screen it.</p>
+                            }
+                            @if (screenError != null)
+                            {
+                                <p class="bg-red-50 border border-red-200 text-red-800 p-2 text-xs" role="alert">@screenError</p>
+                            }
+                        </div>
+                    }
                     @if (ledger == null && stage == AuBtechReviewAgent.MultivocalPlanner.StagePlanned)
                     {
                         <div class="border-t border-gray-100 pt-3 space-y-2">
@@ -255,7 +288,7 @@
                                         <label class="flex items-start gap-2 text-sm text-gray-800 cursor-pointer select-none"><input type="checkbox" class="w-4 h-4 mt-0.5 accent-brand" checked="@plan.GreySearches.Contains(s.Key)" @onchange="e => plan.GreySearches = Toggle(plan.GreySearches, s.Key, e, AuBtechReviewAgent.MultivocalGuidelines.GreySearches.Select(t => t.Key))" /> <span>@s.Label</span></label>
                                     }
                                 </div>
-                                <p class="text-xs text-gray-600 mt-1.5">No general web search engine is used unless you add your own Brave Search API key. Practitioners and authors are not contacted.</p>
+                                <p class="text-xs text-gray-600 mt-1.5">No general web search engine is used: none is free and allows its results to be kept. Practitioners and authors are not contacted.</p>
                             </fieldset>
                             <fieldset>
                                 <legend class="ui-label">Search strings for grey literature</legend>
@@ -276,6 +309,18 @@
                                 {
                                     <button type="button" class="text-xs text-brand font-medium hover:underline mt-1.5" @onclick="AddSearchString">Add a search string</button>
                                 }
+                            </fieldset>
+                            <fieldset class="space-y-2">
+                                <legend class="ui-label">What to include (G9)</legend>
+                                <p class="text-xs text-gray-600">Every source found is screened against these, twice. Formal and grey sources get the same criteria (G10), so write them about the subject, not about where a source was published.</p>
+                                <div>
+                                    <label for="p-include" class="text-sm text-gray-800">A source is included when it is about</label>
+                                    <textarea id="p-include" rows="3" class="ui-input resize-y mt-1" maxlength="@AuBtechReviewAgent.MultivocalPlan.MaxText" @bind="plan.InclusionCriteria" @bind:event="oninput"></textarea>
+                                </div>
+                                <div>
+                                    <label for="p-exclude" class="text-sm text-gray-800">A source is excluded when <span class="text-gray-500">(optional)</span></label>
+                                    <textarea id="p-exclude" rows="2" class="ui-input resize-y mt-1" maxlength="@AuBtechReviewAgent.MultivocalPlan.MaxText" @bind="plan.ExclusionCriteria" @bind:event="oninput"></textarea>
+                                </div>
                             </fieldset>
                             <details class="group border border-gray-200" open>
                                 <summary class="cursor-pointer select-none px-3 py-2 text-sm text-gray-800 flex items-center justify-between">
@@ -382,7 +427,7 @@
                 <div class="flex-1 min-h-0 overflow-y-auto p-5 space-y-5 text-left">
                     <div>
                         <h3 class="text-base font-semibold text-gray-900">Grey sources found</h3>
-                        <p class="text-xs text-gray-600 mt-0.5">@ledger.StoppingApplied Not screened yet: selection and the quality check come next.</p>
+                        <p class="text-xs text-gray-600 mt-0.5">@ledger.StoppingApplied @(screening == null ? "Not screened yet." : $"Screened twice with the plan's criteria ({screening.Model}); the quality check comes next.")</p>
                     </div>
                     <table class="w-full text-xs">
                         <caption class="sr-only">Searches and what they returned</caption>
@@ -418,11 +463,35 @@
                     {
                         <p class="bg-red-50 border border-red-200 text-red-800 p-2 text-xs" role="alert">@keepError</p>
                     }
+                    @if (screening != null)
+                    {
+                        <div class="flex items-center justify-between gap-3">
+                            <label for="source-filter" class="text-xs text-gray-700">Show</label>
+                            <select id="source-filter" class="ui-input py-1 text-xs w-auto" @bind="sourceFilter">
+                                <option value="included">Included (@screening.Count("Included"))</option>
+                                <option value="look">To look at (@screening.Sources.Count(x => x.Uncertain))</option>
+                                <option value="excluded">Excluded (@screening.Count("Excluded"))</option>
+                                <option value="duplicates">Duplicates (@screening.Count("Duplicate"))</option>
+                                <option value="all">All (@ledger.Sources.Count)</option>
+                            </select>
+                        </div>
+                    }
                     <ol class="space-y-3">
-                        @foreach (var found in ledger.Sources)
+                        @foreach (var found in ShownSources())
                         {
                             var r = found.Record;
+                            var decision = DecisionOf(r.Url);
                             <li class="border-t border-gray-100 pt-3">
+                                @if (decision != null)
+                                {
+                                    <p class="flex flex-wrap items-center gap-1.5 mb-1">
+                                        <span class="@DecisionChip(decision.Decision) text-[10px]">@DecisionLabel(decision)</span>
+                                        @if (decision.Uncertain && decision.Decision != "Error")
+                                        {
+                                            <span class="ui-chip border-amber-200 bg-amber-50 text-amber-800 text-[10px]">look at this</span>
+                                        }
+                                    </p>
+                                }
                                 <a href="@r.Url" target="_blank" rel="noopener noreferrer" class="text-sm font-medium text-brand hover:underline">@r.Title</a>
                                 <p class="text-[11px] text-gray-500 mt-0.5">
                                     @r.Site · @KindLabel(r.Kind)@(r.Producer.Length > 0 ? $" · {r.Producer}" : "")@(r.Published is DateTime d ? $" · {d:yyyy-MM-dd}" : "")@(r.Signals.Count > 0 ? " · " + string.Join(", ", r.Signals.Select(x => $"{x.Key} {x.Value}")) : "")
@@ -430,6 +499,17 @@
                                 @if (r.Summary.Length > 0)
                                 {
                                     <p class="text-xs text-gray-700 mt-1 line-clamp-3">@r.Summary</p>
+                                }
+                                @if (decision != null && decision.Reasoning.Length > 0)
+                                {
+                                    <details class="mt-1 text-[11px] text-gray-600">
+                                        <summary class="cursor-pointer select-none text-gray-500">Why</summary>
+                                        <p class="mt-1">@decision.Reasoning</p>
+                                        @if (decision.Second != null && decision.First != null && decision.First.Decision != decision.Second.Decision)
+                                        {
+                                            <p class="mt-1">Second screening: @decision.Second.Reasoning</p>
+                                        }
+                                    </details>
                                 }
                                 @{ var snapshot = SnapshotOf(r.Url); }
                                 @if (snapshot is { NotKept: null })
@@ -463,7 +543,7 @@
                 <div class="flex-1 min-h-0 overflow-y-auto p-5 space-y-5 text-left font-sans">
                     <div>
                         <h3 class="text-base font-semibold text-gray-900">What this review will do</h3>
-                        <p class="text-xs text-gray-600 mt-0.5">With your current answers. Only the protocol is built so far; the other steps follow one block at a time.</p>
+                        <p class="text-xs text-gray-600 mt-0.5">With your current answers. The steps marked as built work in this preview; the others follow one block at a time.</p>
                     </div>
                     <ol class="space-y-3">
                         @for (int i = 0; i < PlanSteps.Count; i++)
@@ -510,7 +590,7 @@
         new("Need", "What is the review for, and who reads it?", "G2", "Need and audience"),
         new("Grey", "Is grey literature needed?", "G3", "Grey literature"),
         new("Questions", "What should the review answer?", "G4–G5", "Questions"),
-        new("Search", "What, where and how much to search?", "G6–G8, G11", "Search"),
+        new("Search", "What to search, where, how much, and what to include?", "G6–G9, G11", "Search"),
         new("Protocol", "Check the plan before anything is searched.", "G1", "Protocol"),
     };
 
@@ -522,6 +602,12 @@
     private bool canEdit;
     private string? editKey;
     private bool searching;
+    private AuBtechReviewAgent.MultivocalScreeningFile? screening;
+    private Dictionary<string, AuBtechReviewAgent.GreyScreening> decisions = new();
+    private bool screeningNow;
+    private string? screenProgress;
+    private string? screenError;
+    private string sourceFilter = "all";
     private Dictionary<string, AuBtechReviewAgent.PageSnapshot> snapshots = new();
     private readonly HashSet<string> keeping = new();
     private string? keepError;
@@ -555,6 +641,7 @@
             protocolText = Runs.ReadProtocol(id) ?? "";
             ledger = Searcher.LoadLedger(id);
             snapshots = Pages.Load(id).Pages.ToDictionary(p => AuBtechReviewAgent.MultivocalSearcher.AddressKey(p.Url));
+            SetScreening(Screener.Load(id));
             stage = Runs.LoadHeader(id)?.Stage ?? "";
             panelTab = ledger != null ? "sources" : "protocol";
             return;
@@ -562,7 +649,7 @@
         plan.Card = CardKey == "grey" ? "grey" : "multivocal";
     }
 
-    /// <summary>What the review will do, with the current answers; only the protocol is built so far.</summary>
+    /// <summary>What the review will do, with the current answers, and which of its steps are built.</summary>
     private IReadOnlyList<(string Title, string Text, bool Built)> PlanSteps
     {
         get
@@ -581,8 +668,8 @@
                 ("Protocol", "Your plan is written down before anything is searched, with a fingerprint.", true),
                 ("Search", p.IsGreyOnly
                     ? $"{searches} grey literature search{(searches == 1 ? "" : "es")}, {stop}."
-                    : $"{searches} grey literature search{(searches == 1 ? "" : "es")} and the academic databases, {stop}.", false),
-                ("Selection", p.IsGreyOnly ? "Every source is screened against your questions." : "Grey and academic sources are screened with the same criteria and the same care.", false),
+                    : $"{searches} grey literature search{(searches == 1 ? "" : "es")} and the academic databases, {stop}.", true),
+                ("Selection", p.IsGreyOnly ? "Every source is screened twice against your criteria." : "Grey and academic sources are screened twice, with the same criteria and the same care.", true),
                 ("Quality", $"Each grey source is scored on Table 7; below {p.QualityThreshold} of {AuBtechReviewAgent.MultivocalGuidelines.QualityPointsMax} points it is left out. Every score rests on a quote.", false),
                 ("Map and extraction", "The sources are classified in a systematic map; every extracted item links to its place in the source.", false),
                 ("Synthesis", $"The findings are coded and written up to answer {questions} research question{(questions == 1 ? "" : "s")}.", false),
@@ -610,6 +697,7 @@
             case 3:
                 if (plan.GreyTypes.Count == 0) return "Choose at least one kind of grey literature (step 4).";
                 if (plan.GreySearches.Count == 0) return "Choose at least one place to search (step 4).";
+                if (!plan.HasCriteria) return "Say what a source must be about to be included (step 4).";
                 if (plan.QualityThreshold is < 1 or > AuBtechReviewAgent.MultivocalGuidelines.QualityPointsMax) return "Set the quality threshold between 1 and 20 points (step 4).";
                 if (plan.StoppingRule == "effort" && plan.TopHits is < 10 or > 500) return "Look at between 10 and 500 top hits per search string (step 4).";
                 return null;
@@ -704,6 +792,74 @@
         }
     }
 
+    private void SetScreening(AuBtechReviewAgent.MultivocalScreeningFile? file)
+    {
+        screening = file;
+        decisions = new();
+        if (file == null) return;
+        foreach (var s in file.Sources) decisions.TryAdd(s.Address, s);
+    }
+
+    private async Task ScreenAsync()
+    {
+        if (planned == null || screeningNow) return;
+        screeningNow = true;
+        screenError = null;
+        var progress = new Progress<string>(line => { screenProgress = line; _ = InvokeAsync(StateHasChanged); });
+        try
+        {
+            SetScreening(await Screener.ScreenAsync(planned.RunId, editKey, progress));
+            stage = AuBtechReviewAgent.MultivocalScreener.StageScreened;
+            sourceFilter = "included";
+        }
+        catch (InvalidOperationException ex)
+        {
+            screenError = ex.Message;
+        }
+        finally
+        {
+            screeningNow = false;
+            screenProgress = null;
+        }
+    }
+
+    private AuBtechReviewAgent.GreyScreening? DecisionOf(string url) =>
+        decisions.TryGetValue(AuBtechReviewAgent.MultivocalSearcher.AddressKey(url), out var d) ? d : null;
+
+    private IEnumerable<AuBtechReviewAgent.FoundGreySource> ShownSources() => sourceFilter switch
+    {
+        "included" => ledger!.Sources.Where(f => DecisionOf(f.Record.Url)?.Decision == "Included"),
+        "excluded" => ledger!.Sources.Where(f => DecisionOf(f.Record.Url)?.Decision == "Excluded"),
+        "look" => ledger!.Sources.Where(f => DecisionOf(f.Record.Url) is { Uncertain: true }),
+        "duplicates" => ledger!.Sources.Where(f => DecisionOf(f.Record.Url)?.Decision == "Duplicate"),
+        _ => ledger!.Sources,
+    };
+
+    private static string ScreeningLine(AuBtechReviewAgent.MultivocalScreeningFile f)
+    {
+        int look = f.Sources.Count(s => s.Uncertain);
+        string line = $"{f.Count("Included")} included, {f.Count("Excluded")} excluded, {f.Count("Duplicate")} duplicates";
+        if (f.Count("Error") > 0) line += $", {f.Count("Error")} not screened";
+        if (look > 0) line += $"; {look} to look at";
+        return f.Kappa is double k ? $"{line}; agreement κ = {k:0.00}" : line;
+    }
+
+    private static string DecisionLabel(AuBtechReviewAgent.GreyScreening d) => d.Decision switch
+    {
+        "Included" => "Included",
+        "Excluded" => d.ExclusionReason is { } reason ? $"Excluded: {reason.Replace('-', ' ')}" : "Excluded",
+        "Duplicate" => "Duplicate",
+        _ => "Not screened",
+    };
+
+    private static string DecisionChip(string decision) => decision switch
+    {
+        "Included" => "ui-chip border-green-200 bg-green-50 text-green-800",
+        "Excluded" => "ui-chip border-gray-200 bg-gray-50 text-gray-600",
+        "Duplicate" => "ui-chip border-gray-200 bg-white text-gray-500",
+        _ => "ui-chip border-red-200 bg-red-50 text-red-800",
+    };
+
     private AuBtechReviewAgent.PageSnapshot? SnapshotOf(string url) =>
         snapshots.TryGetValue(AuBtechReviewAgent.MultivocalSearcher.AddressKey(url), out var snapshot) ? snapshot : null;
 
@@ -729,7 +885,9 @@
 
     private string StageLine() => stage switch
     {
-        AuBtechReviewAgent.MultivocalSearcher.StageSearched => "Searched: the grey sources are found; selection and the quality check are the next parts to be built",
+        AuBtechReviewAgent.MultivocalScreener.StageScreened => "Screened: the grey sources are selected; the quality check is the next part to be built",
+        AuBtechReviewAgent.MultivocalScreener.StageScreening => "Screening…",
+        AuBtechReviewAgent.MultivocalSearcher.StageSearched => "Searched: the grey sources are found and can be screened",
         AuBtechReviewAgent.MultivocalSearcher.StageSearching => "Searching…",
         _ => "Planned: the protocol is written; the search can start",
     };
@@ -741,7 +899,7 @@
     }
 
     private static string SearchLabel(string key) =>
-        AuBtechReviewAgent.GreySourceCatalog.Create(key)?.Name ?? AuBtechReviewAgent.MultivocalGuidelines.GreySearches.FirstOrDefault(s => s.Key == key)?.Label ?? key;
+        AuBtechReviewAgent.GreySourceCatalog.Create(key)?.Name ?? AuBtechReviewAgent.MultivocalGuidelines.SearchLabel(key);
 
     private static string KindLabel(string key) =>
         AuBtechReviewAgent.MultivocalGuidelines.GreyTypes.FirstOrDefault(t => t.Key == key).Label ?? key;
@@ -761,15 +919,15 @@
         error = null;
         try
         {
-            var (runId, editKey) = await Planner.CreateAsync(plan);
+            var (newRunId, newEditKey) = await Planner.CreateAsync(plan);
             // Only this browser keeps the run's edit key, as for a systematic review.
-            try { await JS.InvokeVoidAsync("traceableReview.saveEditKey", runId.ToString(), editKey); }
+            try { await JS.InvokeVoidAsync("traceableReview.saveEditKey", newRunId.ToString(), newEditKey); }
             catch (Exception ex) when (ex is JSException or JSDisconnectedException or InvalidOperationException or TaskCanceledException)
             {
                 // The run is written either way; without the key this browser cannot change it later, as for a systematic review.
                 Logger.LogDebug("Could not keep the edit key in this browser: {Message}", ex.Message);
             }
-            Nav.NavigateTo($"/mlr/{runId}");
+            Nav.NavigateTo($"/mlr/{newRunId}");
         }
         catch (ArgumentException ex)
         {

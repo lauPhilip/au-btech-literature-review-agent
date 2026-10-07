@@ -156,9 +156,9 @@ public sealed class MultivocalSearcher
             var source = _sources(key);
             if (source == null)
             {
-                ledger.Skipped.Add(new SkippedSearch(key, key == "brave"
-                    ? "Needs the reviewer's own Brave Search API key; not built yet."
-                    : "Not built yet."));
+                ledger.Skipped.Add(new SkippedSearch(key, MultivocalGuidelines.GreySearches.Any(s => s.Key == key)
+                    ? "Not built yet."
+                    : "No longer offered."));
                 continue;
             }
 

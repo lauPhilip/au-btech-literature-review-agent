@@ -5,8 +5,7 @@ namespace AuBtechReviewAgent;
 
 /// <summary>
 /// The grey literature searches that are built, by their key in the plan (<see cref="MultivocalGuidelines.GreySearches"/>).
-/// The others (backlink snowballing, Brave with the reviewer's own key) follow in MLR block D; until then
-/// <see cref="Create"/> returns null for them.
+/// Backlink snowballing follows once sources are included (block E); until then <see cref="Create"/> returns null for it.
 /// </summary>
 public static class GreySourceCatalog
 {

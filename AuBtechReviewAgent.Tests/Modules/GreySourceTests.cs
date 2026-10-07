@@ -167,7 +167,8 @@ public class GreySourceTests
             Assert.Equal(key, GreySourceCatalog.Create(key)!.Key);
             Assert.Contains(MultivocalGuidelines.GreySearches, s => s.Key == key);
         }
-        Assert.Null(GreySourceCatalog.Create("brave"));
+        Assert.Null(GreySourceCatalog.Create("backlinks")); // needs included sources first
+        Assert.DoesNotContain(MultivocalGuidelines.GreySearches, s => s.Key == "brave"); // its terms forbid keeping results
         Assert.DoesNotContain(MultivocalGuidelines.GreySearches, s => s.Key == "devto");
     }
 }

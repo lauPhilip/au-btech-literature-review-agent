@@ -22,6 +22,8 @@ public static class SearchSaturation
     /// <summary>Below this share of new records, the last string counts as adding little.</summary>
     public const double LowShare = 0.10;
 
+    /// <summary>How many new records each search string added, in the order the strings were run.</summary>
+    /// <param name="searchStrings">The search strings of the review, in order.</param>
     /// <param name="passes">One entry per search actually run: which string, and the records it returned.</param>
     public static List<SearchStringYield> Compute(IReadOnlyList<string> searchStrings, IEnumerable<(int StringIndex, IReadOnlyList<AcademicPaper> Papers)> passes)
     {
