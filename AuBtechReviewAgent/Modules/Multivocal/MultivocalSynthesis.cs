@@ -188,6 +188,7 @@ public sealed class MultivocalSynthesiser
                 }
                 progress?.Report($"{question}: grouping {findings.Count} findings");
                 var answer = await AskAsync(chat, planned.Plan.Topic, question, q.Text, findings);
+                file.Notes.AddRange(ModelSynthesis.Tidy(answer, findings.ToDictionary(f => f.Id, f => f.Address)).Select(n => $"{question}: {n}"));
                 foreach (var theme in answer.Themes)
                     file.Themes.Add(Count(new SynthesisTheme
                     {
@@ -291,7 +292,7 @@ public sealed class MultivocalSynthesiser
             {{AnswerShape}}
             """;
         var ids = findings.ToDictionary(f => f.Id, f => f.Address);
-        return await LlmJson.GetAsync<ModelSynthesis>(chat, prompt, LlmJson.JsonMode(0.2), a => ModelSynthesis.Problem(a, ids));
+        return await LlmJson.GetAsync<ModelSynthesis>(chat, prompt, LlmJson.JsonMode(0.2), a => ModelSynthesis.Problem(a, ids), repairAttempts: 2);
     }
 
     private const string AnswerShape = """
@@ -307,8 +308,10 @@ public sealed class ModelSynthesis
     public List<UnassignedFinding> Unassigned { get; set; } = new();
 
     /// <summary>
-    /// Null when the answer can be used: one to six named themes, known finding ids only, every finding in a theme or
-    /// unassigned with a reason, and every tension between two findings of the theme from different sources.
+    /// Null when the answer can be used: one to six named themes, each with at least one real finding, and every
+    /// finding in a theme or unassigned with a reason. Mistakes in the extras (an unknown finding id, a tension that
+    /// names a finding outside its theme or stays within one source) do not fail the answer; <see cref="Tidy"/>
+    /// removes them in code and says so (seen in a live run: one bad tension failed the whole synthesis).
     /// </summary>
     public static string? Problem(ModelSynthesis a, IReadOnlyDictionary<string, string> findingSources)
     {
@@ -316,23 +319,43 @@ public sealed class ModelSynthesis
         foreach (var theme in a.Themes)
         {
             if (string.IsNullOrWhiteSpace(theme.Name)) return "every theme needs a name.";
-            if (theme.Findings.Count == 0) return $"theme \"{theme.Name}\" has no findings.";
-            var unknown = theme.Findings.Select(f => f.Trim()).FirstOrDefault(f => !findingSources.ContainsKey(f));
-            if (unknown != null) return $"\"{unknown}\" is not one of the findings.";
-            foreach (var t in theme.Tensions)
-            {
-                string fa = t.FindingA.Trim(), fb = t.FindingB.Trim();
-                if (!theme.Findings.Select(f => f.Trim()).Contains(fa) || !theme.Findings.Select(f => f.Trim()).Contains(fb))
-                    return $"a tension in \"{theme.Name}\" names a finding that is not in the theme.";
-                if (findingSources.GetValueOrDefault(fa) == findingSources.GetValueOrDefault(fb))
-                    return $"a tension in \"{theme.Name}\" is between two findings of the same source; a tension is between sources.";
-            }
+            if (!theme.Findings.Any(f => findingSources.ContainsKey(f.Trim()))) return $"theme \"{theme.Name}\" has none of the findings.";
         }
         var placed = a.Themes.SelectMany(t => t.Findings.Select(f => f.Trim())).Concat(a.Unassigned.Select(u => u.Finding.Trim())).ToHashSet();
         var missing = findingSources.Keys.Where(id => !placed.Contains(id)).ToList();
         if (missing.Count > 0) return $"findings {string.Join(", ", missing.Take(10))} are in no theme; put each in a theme or list it as unassigned with the reason.";
         if (a.Unassigned.Any(u => string.IsNullOrWhiteSpace(u.Reason))) return "every unassigned finding needs a reason.";
         return null;
+    }
+
+    /// <summary>
+    /// Removes what does not hold from an accepted answer, in place, and says what was removed: finding ids that do not
+    /// exist, and tensions that name a finding outside their theme or set two findings of one source against each other.
+    /// </summary>
+    public static List<string> Tidy(ModelSynthesis a, IReadOnlyDictionary<string, string> findingSources)
+    {
+        var notes = new List<string>();
+        foreach (var theme in a.Themes)
+        {
+            var findings = theme.Findings.Select(f => f.Trim()).Distinct().ToList();
+            var unknown = findings.Where(f => !findingSources.ContainsKey(f)).ToList();
+            if (unknown.Count > 0) notes.Add($"\"{theme.Name}\" named {string.Join(", ", unknown)}, which are not findings; left out.");
+            theme.Findings = findings.Where(findingSources.ContainsKey).ToList();
+
+            var kept = new List<SynthesisTension>();
+            foreach (var t in theme.Tensions)
+            {
+                string fa = t.FindingA.Trim(), fb = t.FindingB.Trim();
+                if (!theme.Findings.Contains(fa) || !theme.Findings.Contains(fb))
+                    notes.Add($"a tension in \"{theme.Name}\" ({fa}, {fb}) named a finding outside the theme; left out.");
+                else if (findingSources[fa] == findingSources[fb])
+                    notes.Add($"a tension in \"{theme.Name}\" ({fa}, {fb}) was within one source; left out.");
+                else
+                    kept.Add(new SynthesisTension { FindingA = fa, FindingB = fb, Description = t.Description.Trim() });
+            }
+            theme.Tensions = kept;
+        }
+        return notes;
     }
 }
 

@@ -46,25 +46,36 @@ public class MultivocalSynthesisTests : IDisposable
     }
 
     [Fact]
-    public void TheModelsThemesMustUseTheFindingsAndPlaceEveryOne()
+    public void TheModelsThemesMustPlaceEveryFindingAndItsExtrasAreTidiedInCode()
     {
         var sources = new Dictionary<string, string> { ["F1.1"] = "a", ["F1.2"] = "a", ["F2.1"] = "b" };
         ModelSynthesis Answer(params ModelTheme[] themes) => new() { Themes = themes.ToList() };
         ModelTheme Theme(string name, params string[] findings) => new() { Name = name, Description = "d", Findings = findings.ToList() };
 
+        // The core is strict: every finding placed, every theme with a real finding.
         Assert.Null(ModelSynthesis.Problem(Answer(Theme("Summaries", "F1.1", "F2.1"), Theme("Notes", "F1.2")), sources));
-        Assert.Contains("is not one of the findings", ModelSynthesis.Problem(Answer(Theme("X", "F9.9", "F1.1", "F1.2", "F2.1")), sources));
         Assert.Contains("F1.2 are in no theme", ModelSynthesis.Problem(Answer(Theme("X", "F1.1", "F2.1")), sources));
-
+        Assert.Contains("has none of the findings", ModelSynthesis.Problem(Answer(Theme("X", "F1.1", "F1.2", "F2.1"), Theme("Y", "F9.9")), sources));
         var withUnassigned = Answer(Theme("X", "F1.1", "F2.1"));
         withUnassigned.Unassigned.Add(new UnassignedFinding { Finding = "F1.2", Reason = "Off the question." });
         Assert.Null(ModelSynthesis.Problem(withUnassigned, sources));
 
-        var sameSource = Theme("X", "F1.1", "F1.2", "F2.1");
-        sameSource.Tensions.Add(new SynthesisTension { FindingA = "F1.1", FindingB = "F1.2", Description = "d" });
-        Assert.Contains("same source", ModelSynthesis.Problem(Answer(sameSource), sources));
-        sameSource.Tensions[0] = new SynthesisTension { FindingA = "F1.1", FindingB = "F2.1", Description = "They disagree." };
-        Assert.Null(ModelSynthesis.Problem(Answer(sameSource), sources));
+        // The extras are tidied in code (seen in a live run: one bad tension failed the whole synthesis).
+        var theme = Theme("Prompt and instruction design", "F1.1", "F1.2", "F2.1", "F9.9");
+        theme.Tensions.Add(new SynthesisTension { FindingA = "F1.1", FindingB = "F1.2", Description = "Same source." });
+        theme.Tensions.Add(new SynthesisTension { FindingA = "F1.1", FindingB = "F3.1", Description = "Outside the theme." });
+        theme.Tensions.Add(new SynthesisTension { FindingA = "F1.1", FindingB = "F2.1", Description = "They disagree." });
+        var answer = Answer(theme);
+        Assert.Null(ModelSynthesis.Problem(answer, sources));
+
+        var notes = ModelSynthesis.Tidy(answer, sources);
+
+        Assert.Equal(new[] { "F1.1", "F1.2", "F2.1" }, theme.Findings);
+        Assert.Equal("They disagree.", Assert.Single(theme.Tensions).Description);
+        Assert.Equal(3, notes.Count);
+        Assert.Contains(notes, n => n.Contains("F9.9, which are not findings"));
+        Assert.Contains(notes, n => n.Contains("within one source"));
+        Assert.Contains(notes, n => n.Contains("named a finding outside the theme"));
     }
 
     private const string KeptWords = "We keep a running summary of the conversation. Retrieval brings in only the documents the agent needs.";
