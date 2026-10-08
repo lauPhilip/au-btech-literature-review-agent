@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Microsoft.SemanticKernel.ChatCompletion;
 
@@ -92,6 +93,21 @@ public sealed class MultivocalSynthesisFile
 
     /// <summary>A note per question, such as that no formal source has been searched yet.</summary>
     public List<string> Notes { get; set; } = new();
+
+    /// <summary>
+    /// Findings whose value is the map's "Other": the map had no value for them. They are listed in code, not themed by
+    /// the model, as a sign that the map may need a new value (G12: the map is refined iteratively).
+    /// </summary>
+    public List<NotCodedValue> NotCoded { get; set; } = new();
+}
+
+/// <summary>The findings of one question with the map's "Other" value for one attribute.</summary>
+public sealed class NotCodedValue
+{
+    public string Question { get; set; } = "";
+    public string Attribute { get; set; } = "";
+    public List<string> Findings { get; set; } = new();
+    public int Sources { get; set; }
 }
 
 /// <summary>
@@ -105,7 +121,7 @@ public sealed class MultivocalSynthesiser
 {
     public const string SynthesisFile = "multivocal-synthesis.json";
     public const string StageSynthesised = "Synthesised";
-    public const string PromptVersion = "grey-synthesis-v2";
+    public const string PromptVersion = "grey-synthesis-v3";
     public const int MaxThemesPerQuestion = 6;
 
     private static readonly JsonSerializerOptions Json = new() { WriteIndented = true };
@@ -172,9 +188,14 @@ public sealed class MultivocalSynthesiser
             // Every quote is checked again against the kept page text before it is used; one that is no longer there
             // (the kept text was changed or removed) is left out, and the note says how many.
             var extracted = Findings(extraction, fixedMap, records, points);
-            file.Findings = extracted.Where(f => _pages.CheckQuote(runId, f.Address, f.Quote) == "found").ToList();
-            if (file.Findings.Count < extracted.Count)
-                file.Notes.Add($"{extracted.Count - file.Findings.Count} extracted value(s) were left out because their quote is no longer in the kept page text.");
+            var checkedFindings = extracted.Where(f => _pages.CheckQuote(runId, f.Address, f.Quote) == "found").ToList();
+            if (checkedFindings.Count < extracted.Count)
+                file.Notes.Add($"{extracted.Count - checkedFindings.Count} extracted value(s) were left out because their quote is no longer in the kept page text.");
+            // A value that only says the source does not state it ("Not addressed") is not a finding.
+            file.Findings = checkedFindings.Where(f => !IsNotStated(f.Value)).ToList();
+            if (file.Findings.Count < checkedFindings.Count)
+                file.Notes.Add($"{checkedFindings.Count - file.Findings.Count} extracted value(s) only say the source does not address the question, so they are not findings.");
+            var open = fixedMap.Attributes.Where(a => a.Open).Select(a => a.Name).ToHashSet(StringComparer.OrdinalIgnoreCase);
             file.Notes.Add("No formal (academic) literature has been searched yet, so every theme rests on grey literature only.");
 
             var chat = _chat();
@@ -187,8 +208,11 @@ public sealed class MultivocalSynthesiser
                     continue;
                 }
                 var groups = ValueGroups(findings);
+                file.NotCoded.AddRange(groups.Where(IsOther).Select(g => new NotCodedValue { Question = question, Attribute = g.Attribute, Findings = g.Findings, Sources = g.Sources }));
+                groups = groups.Where(g => !IsOther(g)).ToList();
+                if (groups.Count == 0) continue;
                 progress?.Report($"{question}: {findings.Count} findings in {groups.Count} values; naming the themes");
-                await SynthesiseQuestionAsync(chat, planned.Plan.Topic, question, q.Text, groups, findings, file, progress);
+                await SynthesiseQuestionAsync(chat, planned.Plan.Topic, question, q.Text, groups, findings, open, file, progress);
             }
 
             string folder = _runs.FolderOf(runId);
@@ -238,6 +262,16 @@ public sealed class MultivocalSynthesiser
         return findings;
     }
 
+    /// <summary>Whether a value only says the source does not state it, such as "Not addressed".</summary>
+    public static bool IsNotStated(string value)
+    {
+        string v = value.Trim().TrimEnd('.');
+        return MultivocalMapper.NotStatedValues.Contains(v) || v.Equals("not addressed", StringComparison.OrdinalIgnoreCase) || v.Equals("not discussed", StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>Whether a value group is the map's "Other", which the model does not theme.</summary>
+    public static bool IsOther(ValueGroup group) => group.Value.Equals("Other", StringComparison.OrdinalIgnoreCase);
+
     /// <summary>The outlet tier (1, 2 or 3) of a kind of source, from the score of checklist item 8.1.</summary>
     public static int TierOf(string kind) => GreyQualityChecklist.OutletTier(kind).Score switch { 1 => 1, 0.5 => 2, _ => 3 };
 
@@ -262,14 +296,18 @@ public sealed class MultivocalSynthesiser
     /// <summary>How many value groups are placed in one call: few enough that the model places every one.</summary>
     public const int GroupsPerCall = 30;
 
+    /// <summary>A value group's id ("V12") in the model's text.</summary>
+    private static readonly Regex ValueId = new(@"\bV\d+\b", RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1));
+
     /// <summary>
     /// One question, in three steps that each stay small: the model names the themes from the question's value groups;
     /// it places the groups in the themes a batch at a time (every group placed, or a batch that still fails after two
-    /// retries is listed as not placed, with a note); and for each theme with groups from two sources or more it names
-    /// the tensions, from sample quotes. Every finding of a group goes into its group's themes.
+    /// retries is listed as not placed, with a note); and for each theme with claims from two sources or more it names
+    /// the tensions, from sample quotes. Values of an open attribute (a tool's name, say) are names, not claims, so they
+    /// are never asked about tensions. Every finding of a group goes into its group's themes.
     /// </summary>
     public static async Task SynthesiseQuestionAsync(IChatCompletionService chat, string topic, string question, string questionText,
-        List<ValueGroup> groups, List<SynthesisFinding> findings, MultivocalSynthesisFile file, IProgress<string>? progress)
+        List<ValueGroup> groups, List<SynthesisFinding> findings, IReadOnlySet<string> openAttributes, MultivocalSynthesisFile file, IProgress<string>? progress)
     {
         var named = await AskThemesAsync(chat, topic, question, questionText, groups);
         var placement = named.Themes.ToDictionary(t => t.Name.Trim(), _ => new List<ValueGroup>(), StringComparer.OrdinalIgnoreCase);
@@ -311,12 +349,14 @@ public sealed class MultivocalSynthesiser
                 Description = theme.Description.Trim(),
                 Findings = inTheme.SelectMany(g => g.Findings).Distinct().ToList(),
             }, findings);
-            if (inTheme.Count >= 2 && result.Sources >= 2)
+            var claims = inTheme.Where(g => !openAttributes.Contains(g.Attribute)).ToList();
+            var claimSources = findings.Where(f => claims.Any(g => g.Findings.Contains(f.Id))).Select(f => f.Address).Distinct().Count();
+            if (claims.Count >= 2 && claimSources >= 2)
             {
                 try
                 {
-                    var tensions = await AskTensionsAsync(chat, question, questionText, result.Name, inTheme, findings);
-                    result.Tensions = TensionsFor(tensions, inTheme, findings, out var notes);
+                    var tensions = await AskTensionsAsync(chat, question, questionText, result.Name, claims, findings);
+                    result.Tensions = TensionsFor(tensions, claims, findings, out var notes);
                     file.Notes.AddRange(notes.Select(n => $"{question}, \"{result.Name}\": {n}"));
                 }
                 catch (LlmOutputException ex)
@@ -362,7 +402,7 @@ public sealed class MultivocalSynthesiser
             WHAT THE SOURCES SAY (attribute: value, and how many sources say it):
             {{PromptSafety.Wrap(list, "values")}}
 
-            Name one to {{MaxThemesPerQuestion}} themes that together answer the question from these values. Name each theme in a few plain words and describe it in one sentence. Do not judge the sources: that is done separately.
+            Name one to {{MaxThemesPerQuestion}} themes that together answer the question from these values. Name each theme in a few plain words and describe in one sentence what it covers. Do not say how many sources support a theme, or whether it is true: that is counted and judged separately.
 
             Respond ONLY with a valid minified JSON object of this shape:
             {"themes":[{"name":"Theme name","description":"One sentence."}]}
@@ -410,7 +450,7 @@ public sealed class MultivocalSynthesiser
             VALUES IN THIS THEME (id, attribute: value, sources, example quotes):
             {{PromptSafety.Wrap(list, "values")}}
 
-            Name the tensions: pairs of values that disagree or contradict each other, with one sentence on how. Only real disagreements; none is fine.
+            Name the tensions: pairs of values whose sources disagree or contradict each other about how to do something or what works, with one sentence on how, using the values' names, not their ids. Values that are merely different, or different options, are not tensions. Only real disagreements; none is fine.
 
             Respond ONLY with a valid minified JSON object of this shape:
             {"tensions":[{"groupA":"V1","groupB":"V4","description":"One sentence."}]}
@@ -428,21 +468,26 @@ public sealed class MultivocalSynthesiser
         var byId = groups.ToDictionary(g => g.Id);
         var byFinding = findings.ToDictionary(f => f.Id);
         var tensions = new List<SynthesisTension>();
+        int outside = 0, oneSource = 0;
         foreach (var t in answer.Tensions)
         {
             if (!byId.TryGetValue(t.GroupA.Trim(), out var a) || !byId.TryGetValue(t.GroupB.Trim(), out var b) || a == b)
             {
-                notes.Add($"a tension ({t.GroupA}, {t.GroupB}) named a value outside the theme; left out.");
+                outside++;
                 continue;
             }
             var pair = a.Findings.SelectMany(fa => b.Findings.Select(fb => (A: byFinding[fa], B: byFinding[fb]))).FirstOrDefault(x => x.A.Address != x.B.Address);
             if (pair.A == null)
             {
-                notes.Add($"a tension between \"{a.Value}\" and \"{b.Value}\" was within one source; left out.");
+                oneSource++;
                 continue;
             }
-            tensions.Add(new SynthesisTension { FindingA = pair.A.Id, FindingB = pair.B.Id, Description = $"{a.Attribute}: {a.Value} against {b.Attribute}: {b.Value}. {t.Description.Trim()}" });
+            // The model sees the values by id; the reader sees their names.
+            string description = ValueId.Replace(t.Description.Trim(), m => byId.TryGetValue(m.Value, out var g) ? $"\"{g.Value}\"" : "another value");
+            tensions.Add(new SynthesisTension { FindingA = pair.A.Id, FindingB = pair.B.Id, Description = $"{a.Value} against {b.Value}. {description}" });
         }
+        if (outside > 0) notes.Add($"{outside} tension(s) named a value outside the theme; left out.");
+        if (oneSource > 0) notes.Add($"{oneSource} tension(s) were between values of one source only; left out.");
         return tensions;
     }
 }
@@ -471,8 +516,15 @@ public sealed class ModelThemeList
         if (a.Themes.Count is 0 or > MultivocalSynthesiser.MaxThemesPerQuestion) return $"give one to {MultivocalSynthesiser.MaxThemesPerQuestion} themes.";
         if (a.Themes.Any(t => string.IsNullOrWhiteSpace(t.Name))) return "every theme needs a name.";
         var repeated = a.Themes.GroupBy(t => t.Name.Trim(), StringComparer.OrdinalIgnoreCase).FirstOrDefault(g => g.Count() > 1);
-        return repeated != null ? $"two themes are called \"{repeated.Key}\"." : null;
+        if (repeated != null) return $"two themes are called \"{repeated.Key}\".";
+        var counting = a.Themes.FirstOrDefault(t => Counts.IsMatch(t.Name) || Counts.IsMatch(t.Description));
+        return counting != null ? $"the theme \"{counting.Name.Trim()}\" says how many sources support it; describe only what it covers, the sources are counted in code." : null;
     }
+
+    /// <summary>How many sources say something ("the majority of sources", "most practitioners", "12 sources"): counted in code, never by the model.</summary>
+    private static readonly Regex Counts = new(
+        @"\b(majority|minority|consensus)\b|\b(most|many|few|several|all|some|\d+)\s+(of\s+the\s+)?(sources|studies|authors|practitioners|papers|posts|repositories|articles)\b",
+        RegexOptions.IgnoreCase | RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1));
 }
 
 /// <summary>One theme's name and description.</summary>
