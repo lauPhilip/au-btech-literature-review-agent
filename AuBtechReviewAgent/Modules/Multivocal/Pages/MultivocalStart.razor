@@ -498,6 +498,16 @@
                             <li>Version @version.Number · @(version.By == "model" ? "proposed by the model" : "edited by you") · @version.CreatedUtc.ToString("yyyy-MM-dd HH:mm") UTC · @version.Attributes.Count attributes@(map.FixedVersion == version.Number ? " · fixed" : "")</li>
                         }
                     </ol>
+                    <div class="border border-gray-200 bg-gray-50 p-3 text-[11px] text-gray-700">
+                        <p class="font-medium text-gray-800">Recorded by code for every source, not by the model</p>
+                        <ul class="mt-1 space-y-0.5">
+                            @foreach (var (factName, factDescription) in AuBtechReviewAgent.MultivocalMapper.KnownFacts)
+                            {
+                                <li><span class="font-medium">@factName</span>: @factDescription</li>
+                            }
+                        </ul>
+                        <p class="mt-1">Every attribute can also be "not stated" for a source, so values such as "Not specified" are left out of the map.</p>
+                    </div>
                     @if (mapDraft != null)
                     {
                         @for (int i = 0; i < mapDraft.Count; i++)
