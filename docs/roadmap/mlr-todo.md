@@ -132,7 +132,7 @@ Block A is now the module design in [review-modules.md](review-modules.md), step
 
 ### Block F: Map, extraction and synthesis (G12, G13)
 
-- [ ] `Multivocal/SystematicMap.cs`: initial attributes from the RQs, generalised and refined over the sources, then edited by the reviewer before extraction; each version kept in the ledger.
+- [x] The systematic map (`Multivocal/MultivocalMap.cs`): the model proposes attributes from the RQs, each tied to one RQ, with values generalised over the sources that passed the quality check (single or multiple choice, or open text); the reviewer edits it on the Map tab, each saved edit kept as a new version in `multivocal-map.json` (in the archive), and fixes it before extraction. The run goes from "Assessed" through "Mapping" to "Mapped".
 - [ ] An extraction form per RQ (Table 10): attributes with their allowed values and single or multiple choice; every value with its verified quote; purpose and coverage for each grey source (G12).
 - [ ] MLR synthesis (G13): coding of quote-verified findings into themes, each finding labelled with its source type and quality score; for every theme, what the formal and the grey literature say and where they disagree.
 - [ ] The shared citation check against the stored snapshots; "abstract only" becomes "page text"; a quote must be in the snapshot, not on the live page.
