@@ -89,8 +89,10 @@ public static class MultivocalProtocol
         sb.AppendLine($"Inclusion criteria (G9): {plan.InclusionCriteria}");
         sb.AppendLine($"Exclusion criteria (G9): {(plan.ExclusionCriteria.Length > 0 ? plan.ExclusionCriteria : "none")}");
         sb.AppendLine();
-        sb.AppendLine("Formal and grey sources are screened with the same criteria and the same care (G10): each source is screened twice by the language model, independently and with the steps in a different order, and a source the two screenings disagree on is kept and flagged for the reviewer. Sources found twice under different addresses (the same title) are screened once.");
+        sb.AppendLine("Formal and grey sources are screened with the same criteria and the same care (G10): each source is screened twice by the language model, independently and with the steps in a different order, and a source the two screenings disagree on is kept and flagged for the reviewer. Sources found twice under different addresses (the same title) are screened once. The reviewer looks at the flagged decisions and may confirm or change any decision before the quality is scored; the model's decision stays on file.");
         sb.AppendLine($"Each grey source is scored on the quality checklist of Table 7, out of {MultivocalGuidelines.QualityPointsMax} points; sources scoring below {plan.QualityThreshold} points are excluded (G11). Each item scores 1, 0.5 or 0. The language model answers the items that need reading the source, and every point it gives rests on a quote found in the kept text of the source's page; the date, the impact and the outlet type are decided in code. Impact uses the counts the search returned: {GreyQualityChecklist.ImpactRule}.");
+        sb.AppendLine();
+        sb.AppendLine("For an opinion piece, its main claim is recorded word for word with the critical questions for an expert opinion that the guidelines take from Rainer (G13): the writer's expertise, field, assertion and evidence are answered from the page with quotes; the writer's trustworthiness is left to the reviewer, since it cannot be judged reliably, and the claim's consistency with other experts is judged in the synthesis.");
         sb.AppendLine();
 
         sb.AppendLine("## 6. Keeping the evidence");
