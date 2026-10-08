@@ -99,6 +99,38 @@ public sealed class MultivocalSynthesisFile
     /// the model, as a sign that the map may need a new value (G12: the map is refined iteratively).
     /// </summary>
     public List<NotCodedValue> NotCoded { get; set; } = new();
+
+    /// <summary>
+    /// Values whose quote is on the page but does not say what the value claims, with the check's reason; they are
+    /// left out of the findings (the support check, as the systematic review checks a citation).
+    /// </summary>
+    public List<UnsupportedValue> Unsupported { get; set; } = new();
+
+    /// <summary>Per research question, how well a second, independent placement of the values agreed with the first.</summary>
+    public List<PlacementAgreement> SecondPlacements { get; set; } = new();
+}
+
+/// <summary>The agreement of the second, independent placement of one question's values with the first.</summary>
+public sealed class PlacementAgreement
+{
+    public string Question { get; set; } = "";
+    public double? Kappa { get; set; }
+    public int CellsCompared { get; set; }
+    public int Agreements { get; set; }
+    public List<string> Disagreements { get; set; } = new();
+
+    /// <summary>Why (part of) the second placement could not be done; null when it was.</summary>
+    public string? Error { get; set; }
+}
+
+/// <summary>An extracted value the support check left out, with its quote and why.</summary>
+public sealed class UnsupportedValue
+{
+    public string Finding { get; set; } = "";
+    public string Attribute { get; set; } = "";
+    public string Value { get; set; } = "";
+    public string Quote { get; set; } = "";
+    public string Reason { get; set; } = "";
 }
 
 /// <summary>The findings of one question with the map's "Other" value for one attribute.</summary>
@@ -121,7 +153,7 @@ public sealed class MultivocalSynthesiser
 {
     public const string SynthesisFile = "multivocal-synthesis.json";
     public const string StageSynthesised = "Synthesised";
-    public const string PromptVersion = "grey-synthesis-v3";
+    public const string PromptVersion = "grey-synthesis-v4";
     public const int MaxThemesPerQuestion = 6;
 
     private static readonly JsonSerializerOptions Json = new() { WriteIndented = true };
@@ -196,9 +228,19 @@ public sealed class MultivocalSynthesiser
             if (file.Findings.Count < checkedFindings.Count)
                 file.Notes.Add($"{checkedFindings.Count - file.Findings.Count} extracted value(s) only say the source does not address the question, so they are not findings.");
             var open = fixedMap.Attributes.Where(a => a.Open).Select(a => a.Name).ToHashSet(StringComparer.OrdinalIgnoreCase);
-            file.Notes.Add("No formal (academic) literature has been searched yet, so every theme rests on grey literature only.");
 
             var chat = _chat();
+            // A quote can be on the page without saying what its value claims (seen in a live run: a forecast of
+            // cancelled projects coded as evidence on retrieval). Every value is checked against its quote, one call
+            // per source; a value judged not supported is left out of the findings and listed with the reason.
+            progress?.Report($"Checking that each of {file.Findings.Count} quotes supports its value");
+            var (supported, unsupported, uncheckedCount) = await CheckSupportAsync(chat, file.Findings, open);
+            file.Findings = supported;
+            file.Unsupported = unsupported;
+            if (unsupported.Count > 0)
+                file.Notes.Add($"{unsupported.Count} extracted value(s) were left out because their quote does not support the value; they are listed with the reason.");
+            if (uncheckedCount > 0)
+                file.Notes.Add($"The support of {uncheckedCount} extracted value(s) could not be checked (the model's answer failed); they are kept.");
             foreach (var (question, q) in planned.Plan.Numbered())
             {
                 var findings = file.Findings.Where(f => f.Question == question).ToList();
@@ -311,6 +353,7 @@ public sealed class MultivocalSynthesiser
     {
         var named = await AskThemesAsync(chat, topic, question, questionText, groups);
         var placement = named.Themes.ToDictionary(t => t.Name.Trim(), _ => new List<ValueGroup>(), StringComparer.OrdinalIgnoreCase);
+        var firstPlacement = new Dictionary<string, HashSet<string>>();
 
         for (int at = 0; at < groups.Count; at += GroupsPerCall)
         {
@@ -331,11 +374,43 @@ public sealed class MultivocalSynthesiser
                 if (p.Themes.Count == 0)
                     file.Unassigned.Add(new UnassignedFinding { Finding = group.Label, Reason = string.IsNullOrWhiteSpace(p.Reason) ? "In no theme." : p.Reason.Trim() });
                 foreach (var name in p.Themes) placement[name.Trim()].Add(group);
+                firstPlacement[group.Id] = p.Themes.Select(t => t.Trim()).ToHashSet(StringComparer.OrdinalIgnoreCase);
             }
         }
 
+        // A second, independent placement with the values in the other order, as the systematic review's second
+        // coding: it does not change the themes, and its agreement with the first is reported as Cohen's kappa.
+        var secondPlacement = new Dictionary<string, HashSet<string>>();
+        string? secondError = null;
+        for (int at = 0; at < groups.Count; at += GroupsPerCall)
+        {
+            var batch = groups.Skip(at).Take(GroupsPerCall).Where(g => firstPlacement.ContainsKey(g.Id)).Reverse().ToList();
+            if (batch.Count == 0) continue;
+            progress?.Report($"{question}: second placement of values {at + 1}–{at + batch.Count}");
+            try
+            {
+                var again = await AskPlacementAsync(chat, question, questionText, named, batch);
+                foreach (var p in again.Placements) secondPlacement[p.Group.Trim()] = p.Themes.Select(t => t.Trim()).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            }
+            catch (LlmOutputException ex)
+            {
+                secondError = ex.Message;
+            }
+        }
+        var agreement = ComparePlacements(question, named.Themes.Select(t => t.Name.Trim()).ToList(), firstPlacement, secondPlacement);
+        agreement.Error = secondError;
+        file.SecondPlacements.Add(agreement);
+
+        // Two themes holding exactly the same values say the same thing twice (seen in a live run: two pairs of RQ3
+        // themes with the same sources and quotes); the later one is merged into the first, with a note.
+        var merged = MergeIdenticalThemes(named.Themes.Select(t => (t.Name.Trim(), placement[t.Name.Trim()].Select(g => g.Id).ToList())).ToList());
+        foreach (var (kept, dropped) in merged)
+            file.Notes.Add($"{question}: the theme \"{dropped}\" held exactly the same values as \"{kept}\" and was merged into it.");
+        var droppedNames = merged.Select(m => m.Dropped).ToHashSet(StringComparer.OrdinalIgnoreCase);
+
         foreach (var theme in named.Themes)
         {
+            if (droppedNames.Contains(theme.Name.Trim())) continue;
             var inTheme = placement[theme.Name.Trim()];
             if (inTheme.Count == 0)
             {
@@ -367,6 +442,133 @@ public sealed class MultivocalSynthesiser
             }
             file.Themes.Add(result);
         }
+    }
+
+    private sealed class SupportAnswer { public List<SupportVerdict>? Verdicts { get; set; } }
+    private sealed class SupportVerdict { public string Finding { get; set; } = ""; public string Verdict { get; set; } = ""; public string? Reason { get; set; } }
+
+    /// <summary>How many sources' values are checked at the same time.</summary>
+    public const int SupportParallelism = 4;
+
+    /// <summary>
+    /// Checks every extracted value against its own quote, one call per source: "supported", "partially_supported" or
+    /// "not_supported". Values judged not supported are returned apart, with the reason; when a source's answer fails
+    /// the check, its values are kept and counted as unchecked. Values of an open attribute (a tool's name, say) are
+    /// names the source mentions, so only that the quote names them is checked.
+    /// </summary>
+    public static async Task<(List<SynthesisFinding> Supported, List<UnsupportedValue> Unsupported, int Unchecked)> CheckSupportAsync(
+        IChatCompletionService chat, IReadOnlyList<SynthesisFinding> findings, IReadOnlySet<string> openAttributes)
+    {
+        using var throttle = new System.Threading.SemaphoreSlim(SupportParallelism);
+        var work = findings.GroupBy(f => f.Address).Select(source => Task.Run(async () =>
+        {
+            await throttle.WaitAsync();
+            try { return (Findings: source.ToList(), Verdicts: await AskSupportAsync(chat, source.ToList(), openAttributes)); }
+            finally { throttle.Release(); }
+        })).ToList();
+
+        var supported = new List<SynthesisFinding>();
+        var unsupported = new List<UnsupportedValue>();
+        int unchecked_ = 0;
+        foreach (var task in work)
+        {
+            var (sourceFindings, verdicts) = await task;
+            foreach (var f in sourceFindings)
+            {
+                if (verdicts == null) { unchecked_++; supported.Add(f); continue; }
+                var v = verdicts[f.Id];
+                if (v.Verdict == CitationSupportChecker.NotSupported)
+                    unsupported.Add(new UnsupportedValue { Finding = f.Id, Attribute = f.Attribute, Value = f.Value, Quote = f.Quote, Reason = (v.Reason ?? "").Trim() });
+                else supported.Add(f);
+            }
+        }
+        // Keep the findings in their own order (by source, then by id), whatever order the calls finished in.
+        var order = findings.Select((f, i) => (f.Id, i)).ToDictionary(x => x.Id, x => x.i);
+        return (supported.OrderBy(f => order[f.Id]).ToList(), unsupported.OrderBy(u => order[u.Finding]).ToList(), unchecked_);
+    }
+
+    private static async Task<Dictionary<string, SupportVerdict>?> AskSupportAsync(IChatCompletionService chat, List<SynthesisFinding> findings, IReadOnlySet<string> openAttributes)
+    {
+        string list = string.Join("\n", findings.Select(f =>
+            $"{f.Id} | {f.Attribute}{(openAttributes.Contains(f.Attribute) ? " (a name the source mentions)" : "")}: {f.Value} | quote: \"{f.Quote}\""));
+        var prompt = $$"""
+            You are checking the data extraction of a grey literature review: does each quote, taken from the source's own page, support the value it was extracted for?
+
+            Source: {{PromptSafety.Wrap(findings[0].Title, "source title")}}
+
+            {{PromptSafety.DataOnlyNotice}}
+
+            VALUES AND THEIR QUOTES (id | attribute: value | quote):
+            {{PromptSafety.Wrap(list, "extracted values")}}
+
+            For each value give a verdict: "supported" when the quote says what the value claims, "partially_supported" when it says part of it or only implies it, "not_supported" when it is about something else. For a name the source mentions, "supported" means the quote names it. Give a one-sentence reason for every verdict that is not "supported".
+
+            Respond ONLY with a valid minified JSON object, one entry per value:
+            {"verdicts":[{"finding":"F1.1","verdict":"supported","reason":""}]}
+            """;
+        var ids = findings.Select(f => f.Id).ToHashSet();
+        try
+        {
+            using (LlmStage.Begin("extraction-support"))
+            {
+                var answer = await LlmJson.GetAsync<SupportAnswer>(chat, prompt, LlmJson.JsonMode(0.0), a =>
+                {
+                    if (a.Verdicts == null) return "verdicts must be a list.";
+                    var unknown = a.Verdicts.Select(v => v.Finding.Trim()).FirstOrDefault(id => !ids.Contains(id));
+                    if (unknown != null) return $"\"{unknown}\" is not one of the values listed.";
+                    var missing = ids.Where(id => a.Verdicts.All(v => v.Finding.Trim() != id)).ToList();
+                    if (missing.Count > 0) return $"values {string.Join(", ", missing)} have no verdict; give one for every value.";
+                    var bad = a.Verdicts.FirstOrDefault(v => v.Verdict.Trim() is not (CitationSupportChecker.Supported or CitationSupportChecker.Partial or CitationSupportChecker.NotSupported));
+                    if (bad != null) return $"\"{bad.Verdict}\" is not a verdict; use supported, partially_supported or not_supported.";
+                    return a.Verdicts.Any(v => v.Verdict.Trim() == CitationSupportChecker.NotSupported && string.IsNullOrWhiteSpace(v.Reason)) ? "a value that is not supported needs the reason." : null;
+                }, repairAttempts: 2);
+                return answer.Verdicts!.GroupBy(v => v.Finding.Trim()).ToDictionary(g => g.Key, g => new SupportVerdict { Finding = g.Key, Verdict = g.First().Verdict.Trim(), Reason = g.First().Reason });
+            }
+        }
+        catch (LlmOutputException)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// The agreement of two placements of a question's values, over every value placed both times and every theme:
+    /// Cohen's kappa, and each value and theme the two placements disagree on.
+    /// </summary>
+    public static PlacementAgreement ComparePlacements(string question, IReadOnlyList<string> themes,
+        IReadOnlyDictionary<string, HashSet<string>> first, IReadOnlyDictionary<string, HashSet<string>> second)
+    {
+        var result = new PlacementAgreement { Question = question };
+        var pairs = new List<(bool, bool)>();
+        foreach (var group in first.Keys.Where(second.ContainsKey).OrderBy(g => int.TryParse(g.TrimStart('V'), out int n) ? n : int.MaxValue))
+            foreach (var theme in themes)
+            {
+                bool a = first[group].Contains(theme), b = second[group].Contains(theme);
+                pairs.Add((a, b));
+                if (a != b) result.Disagreements.Add($"{group}, \"{theme}\": {(a ? "first placement only" : "second placement only")}");
+            }
+        result.CellsCompared = pairs.Count;
+        result.Agreements = pairs.Count(p => p.Item1 == p.Item2);
+        result.Kappa = pairs.Count == 0 ? null : Math.Round(ScreeningConfusion.From(pairs).CohensKappa, 3);
+        return result;
+    }
+
+    /// <summary>
+    /// The themes that hold exactly the same values as an earlier theme, each with the earlier theme it is merged into.
+    /// Themes without values are left to the caller.
+    /// </summary>
+    public static List<(string Kept, string Dropped)> MergeIdenticalThemes(IReadOnlyList<(string Name, List<string> Groups)> themes)
+    {
+        var merged = new List<(string, string)>();
+        var seen = new Dictionary<string, string>();
+        foreach (var (name, groups) in themes)
+        {
+            if (groups.Count == 0) continue;
+            string key = string.Join(",", groups.Distinct().OrderBy(g => g, StringComparer.Ordinal));
+            if (seen.TryGetValue(key, out var kept)) merged.Add((kept, name));
+            else seen[key] = name;
+        }
+        return merged;
     }
 
     /// <summary>

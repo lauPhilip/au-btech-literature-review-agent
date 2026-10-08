@@ -138,6 +138,37 @@ public class MultivocalSynthesisTests : IDisposable
     }
 
     [Fact]
+    public void TheSecondPlacementsAgreementIsCountedOverEveryValueAndTheme()
+    {
+        var themes = new[] { "Summaries", "Retrieval" };
+        HashSet<string> In(params string[] names) => new(names, StringComparer.OrdinalIgnoreCase);
+        var first = new Dictionary<string, HashSet<string>> { ["V1"] = In("Summaries"), ["V2"] = In("Retrieval"), ["V3"] = In("Summaries", "Retrieval"), ["V4"] = In() };
+        var second = new Dictionary<string, HashSet<string>> { ["V1"] = In("summaries"), ["V2"] = In("Summaries"), ["V3"] = In("Summaries", "Retrieval") }; // V4 not placed the second time
+
+        var agreement = MultivocalSynthesiser.ComparePlacements("RQ1", themes, first, second);
+
+        Assert.Equal((6, 4), (agreement.CellsCompared, agreement.Agreements)); // V4 is left out of the comparison
+        Assert.Equal(new[] { "V2, \"Summaries\": second placement only", "V2, \"Retrieval\": first placement only" }, agreement.Disagreements);
+        Assert.Equal(0.25, agreement.Kappa!.Value); // 4 of 6 cells agree, 4 of 6 are "in the theme" both times: (4/6 - 20/36) / (1 - 20/36)
+    }
+
+    [Fact]
+    public void ThemesHoldingTheSameValuesAreMerged()
+    {
+        var merged = MultivocalSynthesiser.MergeIdenticalThemes(new List<(string, List<string>)>
+        {
+            ("Retrieval improves reliability", new() { "V1", "V2" }),
+            ("Conditional benefits", new() { "V3" }),
+            ("Quality of retrieved context", new() { "V2", "V1" }), // the same values in another order
+            ("Evaluation differences", new() { "V3" }),
+            ("Empty", new()),
+            ("Also empty", new()),
+        });
+
+        Assert.Equal(new[] { ("Retrieval improves reliability", "Quality of retrieved context"), ("Conditional benefits", "Evaluation differences") }, merged);
+    }
+
+    [Fact]
     public void NotStatedAndOtherValuesAreDecidedInCode()
     {
         Assert.True(MultivocalSynthesiser.IsNotStated("Not addressed."));
@@ -160,8 +191,10 @@ public class MultivocalSynthesisTests : IDisposable
         await MultivocalSynthesiser.SynthesiseQuestionAsync(model, "topic", "RQ1.1", "Which tools?", MultivocalSynthesiser.ValueGroups(findings), findings,
             new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "tool" }, file, null);
 
-        Assert.Equal(2, model.Prompts.Count);
+        Assert.Equal(3, model.Prompts.Count); // themes, placement, second placement; no tensions
         Assert.Empty(Assert.Single(file.Themes).Tensions);
+        var agreement = Assert.Single(file.SecondPlacements);
+        Assert.Equal((2, 2, 1.0), (agreement.CellsCompared, agreement.Agreements, agreement.Kappa!.Value));
     }
 
     [Fact]
@@ -209,6 +242,16 @@ public class MultivocalSynthesisTests : IDisposable
         {
             new("x:1", "Managing agent context", "A post.", "https://blog.example.org/post", "Ana", "blog.example.org", "blogs", null, new Dictionary<string, long>()),
         });
+    }
+
+    /// <summary>The fake model's support check: every value supported, except "Retrieval" quoted from a sentence about summaries.</summary>
+    private static string SupportAnswer(string prompt)
+    {
+        var verdicts = System.Text.RegularExpressions.Regex.Matches(prompt, @"^(F\d+\.\d+) \| [^:]+: (.*?) \| quote: ""(.*)""$", System.Text.RegularExpressions.RegexOptions.Multiline)
+            .Select(m => m.Groups[2].Value == "Retrieval" && m.Groups[3].Value.Contains("summary")
+                ? $$"""{"finding":"{{m.Groups[1].Value}}","verdict":"not_supported","reason":"The quote is about summaries."}"""
+                : $$"""{"finding":"{{m.Groups[1].Value}}","verdict":"supported","reason":""}""");
+        return $$"""{"verdicts":[{{string.Join(",", verdicts)}}]}""";
     }
 
     [Fact]
@@ -267,6 +310,7 @@ public class MultivocalSynthesisTests : IDisposable
                                 new ExtractedValue { Value = "Retrieval", Quote = "Agents should never summarise." }, // only on the live page
                                 new ExtractedValue { Value = "Other", Quote = "Retrieval brings in only the documents the agent needs." },
                                 new ExtractedValue { Value = "Not addressed", Quote = "Retrieval brings in only the documents the agent needs." },
+                                new ExtractedValue { Value = "Retrieval", Quote = "We keep a running summary of the conversation." }, // on the page, but about something else
                             },
                         },
                         new ExtractedAttribute { Attribute = "Tool or framework" },
@@ -277,7 +321,8 @@ public class MultivocalSynthesisTests : IDisposable
         await RunHeader.WriteAsync(folder, store.LoadHeader(runId)! with { Stage = MultivocalExtractor.StageExtracted });
 
         var model = new FakeChatService().RespondsWith(prompt =>
-            prompt.Contains("Name one to") ? """{"themes":[{"name":"Summaries keep the context short","description":"Sources keep running summaries."}]}"""
+            prompt.Contains("does each quote") ? SupportAnswer(prompt)
+            : prompt.Contains("Name one to") ? """{"themes":[{"name":"Summaries keep the context short","description":"Sources keep running summaries."}]}"""
             : prompt.Contains("VALUES TO PLACE") ? """{"placements":[{"group":"V1","themes":["Summaries keep the context short"],"reason":""}]}"""
             : """{"tensions":[]}""");
         var screener = new MultivocalScreener(store, planner, searcher, () => model);
@@ -297,7 +342,10 @@ public class MultivocalSynthesisTests : IDisposable
         Assert.Contains(file.Notes, n => n.Contains("1 extracted value(s) only say the source does not address"));
         var notCoded = Assert.Single(file.NotCoded); // "Other" is listed in code, not themed by the model
         Assert.Equal(("RQ1", "Practice", 1), (notCoded.Question, notCoded.Attribute, notCoded.Sources));
-        Assert.Equal(2, model.Prompts.Count); // RQ1 only (themes, then placement; one source has no tensions): the other questions have no findings
+        Assert.Equal(4, model.Prompts.Count); // the support check of the one source, then RQ1 only (themes, placement and the second placement; one source has no tensions)
+        var unsupported = Assert.Single(file.Unsupported); // the quote is on the page but is not about retrieval
+        Assert.Equal(("Retrieval", "We keep a running summary of the conversation.", "The quote is about summaries."), (unsupported.Value, unsupported.Quote, unsupported.Reason));
+        Assert.Contains(file.Notes, n => n.Contains("1 extracted value(s) were left out because their quote does not support the value"));
         Assert.Equal(new[] { "RQ1.1", "RQ1.2", "RQ2", "RQ3" }, file.Unanswered);
 
         var theme = Assert.Single(file.Themes);

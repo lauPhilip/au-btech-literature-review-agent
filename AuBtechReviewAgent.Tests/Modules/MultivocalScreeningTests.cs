@@ -114,6 +114,20 @@ public class MultivocalScreeningTests : IDisposable
     }
 
     [Fact]
+    public void ALongTitleIsTheSameSourceWhoeverIsNamedAsItsProducer()
+    {
+        GreyRecord R(string title, string producer, string url) => new("x", title, "", url, producer, "", "white-papers", null, new Dictionary<string, long>());
+
+        // Seen in a live run: one white paper at a DOI in OpenAlex and at its Zenodo record, its producer written differently.
+        string title = "The 2026 AI Inflection Series, Chapter 18: Context Engineering Replaces Prompt Engineering";
+        Assert.Equal(MultivocalScreener.SameSourceKey(R(title, "J. Doe", "https://doi.org/10.5281/zenodo.22713976")),
+                     MultivocalScreener.SameSourceKey(R(title, "Doe, Jane", "https://zenodo.org/records/22713977")));
+        // A short title needs its producer too: two blogs can both be called "Context engineering".
+        Assert.NotEqual(MultivocalScreener.SameSourceKey(R("Context engineering", "Ana", "https://a.example.org")),
+                        MultivocalScreener.SameSourceKey(R("Context engineering", "Bo", "https://b.example.org")));
+    }
+
+    [Fact]
     public async Task OnlyASearchedRunWithCriteriaCanBeScreenedByThePlannerAndOnlyOnce()
     {
         var (store, runId, key, screener, _) = await SearchedRun(MultivocalPlan.Example(), ("https://a.example.org/1", "Memory for agents", "Ana"));

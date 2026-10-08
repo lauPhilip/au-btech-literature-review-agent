@@ -174,7 +174,7 @@ public sealed class MultivocalReporter
     public static MultivocalReport Write(MultivocalReportInput input)
     {
         var plan = input.Planned.Plan;
-        string kind = plan.IsGreyOnly ? "grey literature review" : "multivocal literature review";
+        string kind = plan.ReviewKind;
         var report = new MultivocalReport { Title = $"{plan.Topic}: a {kind}" };
         report.Meta.Add($"Run {input.Planned.RunId}, planned {input.Planned.CreatedUtc:yyyy-MM-dd}, synthesised {input.Synthesis.SynthesisedUtc:yyyy-MM-dd} (UTC)");
         report.Meta.Add($"Method: {MultivocalGuidelines.Reference}");
@@ -235,7 +235,6 @@ public sealed class MultivocalReporter
         notDone.AddRange(ledger.Skipped.Select(s => $"{MultivocalGuidelines.SearchLabel(s.Source)}: not run ({Lower(s.Reason.TrimEnd('.'))})."));
         notDone.Add("No general web search engine was used: none offers a search API that is free and allows its results to be kept, which a traceable review needs.");
         notDone.Add("Practitioners and authors were not contacted for sources; only sources found by the searches were reviewed.");
-        if (!plan.IsGreyOnly) notDone.Add("The formal (academic) literature has not been searched yet in this tool, so this review rests on grey literature only.");
         section.Blocks.Add(ReportBlock.Paragraph("Not done, and why:"));
         section.Blocks.Add(ReportBlock.List(notDone));
         return section;
@@ -310,8 +309,12 @@ public sealed class MultivocalReporter
         var section = new ReportSection { Heading = "6. Synthesis (G13)" };
         int notCoded = s.NotCoded.Sum(n => n.Findings.Count);
         section.Blocks.Add(ReportBlock.Paragraph(
-            $"Each extracted value with its quote became a finding; {Count(s.Findings.Count, "finding")} remained after every quote was checked again against the kept page text, never the live page. " +
+            $"Each extracted value with its quote became a finding; {Count(s.Findings.Count, "finding")} remained after every quote was checked again against the kept page text, never the live page, and checked by the language model for whether it supports its value" +
+            (s.Unsupported.Count > 0 ? $" ({Count(s.Unsupported.Count, "value")} left out as not supported)" : "") + ". " +
             "For each research question, the findings were grouped in code by attribute and value, the map's values serving as the first codes; the language model then named the themes, placed the values in them, and named the tensions between sources within a theme. " +
+            (s.SecondPlacements.Any(a => a.Kappa != null)
+                ? $"A second, independent placement of the values in the other order agreed with the first with Cohen's κ = {string.Join(", ", s.SecondPlacements.Where(a => a.Kappa != null).Select(a => $"{a.Kappa!.Value.ToString("0.00", CultureInfo.InvariantCulture)} for {a.Question}"))}; it did not change the themes. "
+                : "") +
             $"The review produced {Count(s.Themes.Count, "theme")}. What each theme rests on (how many sources, their outlet tiers and quality points, grey or formal literature) was counted in code, never by the model." +
             (notCoded > 0 ? $" {Count(notCoded, "finding")} had the map's \"Other\" value; they are listed under their question as not coded by the map, not themed." : "") +
             (s.Unassigned.Count > 0 ? $" {Count(s.Unassigned.Count, "value")} fit no theme; they are listed with the reason." : "")));
@@ -407,7 +410,6 @@ public sealed class MultivocalReporter
             "Grey literature is not peer reviewed. Each theme says which outlet tiers it rests on, and a theme resting on 3rd-tier sources only (such as blog posts and code repositories) is labelled as such.",
             "Only robots.txt was checked before a page was fetched; other terms of a site cannot be read by code.",
         };
-        if (!plan.IsGreyOnly) limits.Insert(1, "This is meant to be a multivocal review, but the formal literature has not been searched yet, so every theme rests on grey literature only.");
         section.Blocks.Add(ReportBlock.List(limits));
         return section;
     }

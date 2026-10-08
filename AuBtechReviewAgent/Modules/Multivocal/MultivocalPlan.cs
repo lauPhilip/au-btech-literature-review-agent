@@ -163,6 +163,20 @@ public sealed class MultivocalPlan
 
     public bool IsGreyOnly => Card == "grey";
 
+    /// <summary>
+    /// Whether the formal (academic) pool is built (decision 6 in docs/roadmap/mlr-todo.md). Until it is, every review
+    /// searches and uses grey literature only, whichever card planned it, and says so; block I builds the formal pool.
+    /// </summary>
+    public static readonly bool FormalPoolBuilt = false;
+
+    /// <summary>Whether this review searches and uses formal (academic) literature too.</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public bool UsesFormalPool => !IsGreyOnly && FormalPoolBuilt;
+
+    /// <summary>What the review is, in lower case: "multivocal literature review" with both pools, otherwise "grey literature review".</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public string ReviewKind => UsesFormalPool ? "multivocal literature review" : "grey literature review";
+
     /// <summary>True when at least one Table 4 answer is "yes", which suggests including grey literature.</summary>
     public bool GreyLiteratureIndicated => IncludeGrey.Any(a => a == true);
 

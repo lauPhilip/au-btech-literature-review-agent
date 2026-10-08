@@ -11,9 +11,11 @@
 @inject AuBtechReviewAgent.MultivocalMapper Mapper
 @inject AuBtechReviewAgent.MultivocalExtractor Extractor
 @inject AuBtechReviewAgent.MultivocalSynthesiser Synthesiser
+@inject AuBtechReviewAgent.MultivocalRunner Runner
 @inject NavigationManager Nav
 @inject IJSRuntime JS
 @inject ILogger<MultivocalStart> Logger
+@implements IDisposable
 
 @* The multivocal review's planning form (MLR block C), laid out like the systematic review's dashboard: the steps
    on the left with one primary action at the bottom, and on the right what the review will do and its protocol.
@@ -86,141 +88,43 @@
                             @SettingRow("Synthesis", $"{synthesis.Themes.Count} themes from {synthesis.Findings.Count} findings" + (synthesis.Unanswered.Count > 0 ? $"; no findings for {string.Join(", ", synthesis.Unanswered)}" : ""))
                         }
                     </dl>
-                    @if (synthesis != null && stage == AuBtechReviewAgent.MultivocalSynthesiser.StageSynthesised)
+                    @if (stage == AuBtechReviewAgent.MultivocalSynthesiser.StageSynthesised)
                     {
                         <div class="border-t border-gray-100 pt-3 space-y-2">
                             <p class="text-xs text-gray-600">The report is written in code from the run's files (G14): the methods, how each guideline was followed, the themes with what they rest on, and the source repository.</p>
                             <a href="@($"/mlr-report/{planned.RunId}")" class="ui-btn-primary ui-btn-sm inline-block">Read the report</a>
                         </div>
                     }
-                    @if (extraction != null && synthesis == null && stage == AuBtechReviewAgent.MultivocalExtractor.StageExtracted)
+                    else
                     {
+                        var status = Runner.StatusOf(planned.RunId);
                         <div class="border-t border-gray-100 pt-3 space-y-2">
-                            @if (synthesising || AuBtechReviewAgent.MultivocalSynthesiser.IsRunning(planned.RunId))
+                            @if (status is { Running: true })
                             {
-                                <p class="text-xs text-gray-700" role="status" aria-live="polite">Synthesising… @synthesisProgress</p>
-                            }
-                            else if (canEdit)
-                            {
-                                <p class="text-xs text-gray-600">Group the findings of each research question into themes (G13). Every quote is checked again against the kept page text first; what each theme rests on is counted in code.</p>
-                                <button type="button" class="ui-btn-primary ui-btn-sm" @onclick="SynthesiseAsync">Synthesise</button>
-                            }
-                            @if (synthesisError != null)
-                            {
-                                <p class="bg-red-50 border border-red-200 text-red-800 p-2 text-xs" role="alert">@synthesisError</p>
-                            }
-                        </div>
-                    }
-                    @if (map?.FixedVersion != null && extraction == null && stage is AuBtechReviewAgent.MultivocalMapper.StageMapped or AuBtechReviewAgent.MultivocalExtractor.StageExtracting)
-                    {
-                        <div class="border-t border-gray-100 pt-3 space-y-2">
-                            @if (extracting || AuBtechReviewAgent.MultivocalExtractor.IsRunning(planned.RunId))
-                            {
-                                <p class="text-xs text-gray-700" role="status" aria-live="polite">Extracting… @extractProgress</p>
-                            }
-                            else if (canEdit)
-                            {
-                                <p class="text-xs text-gray-600">Extract every source that passed the quality check against the fixed map. Every value needs a quote found in the kept page; what a page does not state is recorded as "not stated".</p>
-                                <button type="button" class="ui-btn-primary ui-btn-sm" @onclick="ExtractAsync">Extract the sources</button>
-                            }
-                            @if (extractError != null)
-                            {
-                                <p class="bg-red-50 border border-red-200 text-red-800 p-2 text-xs" role="alert">@extractError</p>
-                            }
-                        </div>
-                    }
-                    @if (quality != null && map == null && stage == AuBtechReviewAgent.MultivocalQualityAssessor.StageAssessed)
-                    {
-                        <div class="border-t border-gray-100 pt-3 space-y-2">
-                            @if (mapping || AuBtechReviewAgent.MultivocalMapper.IsRunning(planned.RunId))
-                            {
-                                <p class="text-xs text-gray-700" role="status" aria-live="polite">Proposing the map…</p>
-                            }
-                            else if (canEdit && quality.Count("Passed") > 0)
-                            {
-                                <p class="text-xs text-gray-600">Propose the systematic map (G12): the attributes to record for every source, from your research questions, with values generalised over the @quality.Count("Passed") sources that passed. You can edit it before it is fixed.</p>
-                                <button type="button" class="ui-btn-primary ui-btn-sm" @onclick="ProposeMapAsync">Propose the map</button>
-                            }
-                            else if (canEdit)
-                            {
-                                <p class="text-xs text-gray-600">No source passed the quality check, so there is nothing to map.</p>
-                            }
-                            @if (mapError != null)
-                            {
-                                <p class="bg-red-50 border border-red-200 text-red-800 p-2 text-xs" role="alert">@mapError</p>
-                            }
-                        </div>
-                    }
-                    @if (screening != null && quality == null && stage is AuBtechReviewAgent.MultivocalScreener.StageScreened or AuBtechReviewAgent.MultivocalQualityAssessor.StageAssessing)
-                    {
-                        <div class="border-t border-gray-100 pt-3 space-y-2">
-                            @if (assessing || AuBtechReviewAgent.MultivocalQualityAssessor.IsRunning(planned.RunId))
-                            {
-                                <p class="text-xs text-gray-700" role="status" aria-live="polite">Scoring… @qualityProgress</p>
-                                <p class="text-[11px] text-gray-500">Each page is fetched first, one request a second per site. Closing the page does not stop it.</p>
-                            }
-                            else if (canEdit)
-                            {
-                                <p class="text-xs text-gray-600">Score the @screening.Count("Included") included sources on the 20 items of the quality checklist (Table 7). Each page is kept first; every point the model gives must rest on a quote from it. Below @planned.Plan.QualityThreshold points a source is left out.</p>
-                                <button type="button" class="ui-btn-primary ui-btn-sm" @onclick="AssessAsync">Score the quality</button>
+                                <p class="text-xs text-gray-700" role="status" aria-live="polite">@status.Step… @status.Progress</p>
+                                <p class="text-[11px] text-gray-500">The review runs on its own, one step after another, and the tabs on the right fill as each step finishes. Closing the page does not stop it; open the run again later.</p>
                             }
                             else
                             {
-                                <p class="text-xs text-gray-600">Only the browser that planned this run can score it.</p>
-                            }
-                            @if (qualityError != null)
-                            {
-                                <p class="bg-red-50 border border-red-200 text-red-800 p-2 text-xs" role="alert">@qualityError</p>
-                            }
-                        </div>
-                    }
-                    @if (ledger != null && screening == null && stage is AuBtechReviewAgent.MultivocalSearcher.StageSearched or AuBtechReviewAgent.MultivocalScreener.StageScreening)
-                    {
-                        <div class="border-t border-gray-100 pt-3 space-y-2">
-                            @if (!planned.Plan.HasCriteria)
-                            {
-                                <p class="text-xs text-gray-600">This plan was made before the form asked for inclusion criteria, so its sources cannot be screened. Plan a new run to screen.</p>
-                            }
-                            else if (screeningNow || AuBtechReviewAgent.MultivocalScreener.IsRunning(planned.RunId))
-                            {
-                                <p class="text-xs text-gray-700" role="status" aria-live="polite">Screening… @screenProgress</p>
-                                <p class="text-[11px] text-gray-500">This takes a while. Closing the page does not stop it; open the run again later.</p>
-                            }
-                            else if (canEdit)
-                            {
-                                int toScreen = ledger.Sources.Count;
-                                <p class="text-xs text-gray-600">Screen every found source twice against the plan's criteria, as the systematic review does. About @((2 * toScreen).ToString("N0")) model calls; decisions made before come from the cache.</p>
-                                <button type="button" class="ui-btn-primary ui-btn-sm" @onclick="ScreenAsync">Screen the sources</button>
-                            }
-                            else
-                            {
-                                <p class="text-xs text-gray-600">Only the browser that planned this run can screen it.</p>
-                            }
-                            @if (screenError != null)
-                            {
-                                <p class="bg-red-50 border border-red-200 text-red-800 p-2 text-xs" role="alert">@screenError</p>
-                            }
-                        </div>
-                    }
-                    @if (ledger == null && stage == AuBtechReviewAgent.MultivocalPlanner.StagePlanned)
-                    {
-                        <div class="border-t border-gray-100 pt-3 space-y-2">
-                            @if (canEdit)
-                            {
-                                <p class="text-xs text-gray-600">Run the grey literature searches of this plan. Their raw answers are saved with fingerprints; nothing is screened yet.</p>
-                                <button type="button" class="ui-btn-primary ui-btn-sm" disabled="@searching" @onclick="SearchAsync">@(searching ? "Searching…" : "Search now")</button>
-                                @if (searchProgress != null)
+                                @if (status?.Error is { } runError)
                                 {
-                                    <p class="text-[11px] text-gray-500" role="status" aria-live="polite">@searchProgress</p>
+                                    <p class="bg-red-50 border border-red-200 text-red-800 p-2 text-xs" role="alert">@runError</p>
                                 }
-                            }
-                            else
-                            {
-                                <p class="text-xs text-gray-600">Only the browser that planned this run can start its search.</p>
-                            }
-                            @if (searchError != null)
-                            {
-                                <p class="bg-red-50 border border-red-200 text-red-800 p-2 text-xs" role="alert">@searchError</p>
+                                @if (!planned.Plan.HasCriteria)
+                                {
+                                    <p class="text-xs text-gray-600">This plan was made before the form asked for inclusion criteria, so its sources cannot be screened. Plan a new run to screen.</p>
+                                }
+                                else if (!canEdit)
+                                {
+                                    <p class="text-xs text-gray-600">The review is not finished. Only the browser that planned this run can continue it.</p>
+                                }
+                                else if (status is not { Step: "Stopped" })
+                                {
+                                    <p class="text-xs text-gray-600">@(status?.Error != null
+                                        ? "Continue to try the step again; decisions already made come from the cache."
+                                        : "The review stopped before it was finished, for example because the server restarted. It continues from where it stopped.")</p>
+                                    <button type="button" class="ui-btn-primary ui-btn-sm" @onclick="ContinueRun">Continue the review</button>
+                                }
                             }
                         </div>
                     }
@@ -420,7 +324,7 @@
                             </fieldset>
                             <fieldset class="space-y-2">
                                 <legend class="ui-label">What to include (G9)</legend>
-                                <p class="text-xs text-gray-600">Every source found is screened against these, twice. Formal and grey sources get the same criteria (G10), so write them about the subject, not about where a source was published.</p>
+                                <p class="text-xs text-gray-600">Every source found is screened against these, twice, with the same care for every source (G10), so write them about the subject, not about where a source was published.</p>
                                 <div>
                                     <label for="p-include" class="text-sm text-gray-800">A source is included when it is about</label>
                                     <textarea id="p-include" rows="3" class="ui-input resize-y mt-1" maxlength="@AuBtechReviewAgent.MultivocalPlan.MaxText" @bind="plan.InclusionCriteria" @bind:event="oninput"></textarea>
@@ -505,7 +409,7 @@
                             }
                             else
                             {
-                                <button type="button" class="ui-btn-primary" disabled="@(Problems.Count > 0 || saving)" @onclick="WriteProtocolAsync">Write the protocol</button>
+                                <button type="button" class="ui-btn-primary" disabled="@(Problems.Count > 0 || saving)" @onclick="WriteProtocolAsync">Start the review</button>
                             }
                         </div>
                     </div>
@@ -517,23 +421,23 @@
             <h2 id="panel-title" class="sr-only">@(panelTab == "protocol" ? "Protocol" : "What this review will do")</h2>
             <div class="flex items-center justify-between border-b border-gray-200 px-3 flex-none">
                 <div class="flex" role="group" aria-label="Show">
-                    <button type="button" aria-pressed="@(panelTab == "plan" ? "true" : "false")" @onclick="@(() => panelTab = "plan")"
+                    <button type="button" aria-pressed="@(panelTab == "plan" ? "true" : "false")" @onclick="@(() => ChooseTab("plan"))"
                             class="px-3 py-2.5 text-xs border-b-2 -mb-px @(panelTab == "plan" ? "border-brand text-brand font-semibold" : "border-transparent text-gray-500 hover:text-gray-800")">Preview</button>
-                    <button type="button" aria-pressed="@(panelTab == "protocol" ? "true" : "false")" @onclick="@(() => panelTab = "protocol")"
+                    <button type="button" aria-pressed="@(panelTab == "protocol" ? "true" : "false")" @onclick="@(() => ChooseTab("protocol"))"
                             class="px-3 py-2.5 text-xs border-b-2 -mb-px @(panelTab == "protocol" ? "border-brand text-brand font-semibold" : "border-transparent text-gray-500 hover:text-gray-800")">Protocol</button>
                     @if (ledger != null)
                     {
-                        <button type="button" aria-pressed="@(panelTab == "sources" ? "true" : "false")" @onclick="@(() => panelTab = "sources")"
+                        <button type="button" aria-pressed="@(panelTab == "sources" ? "true" : "false")" @onclick="@(() => ChooseTab("sources"))"
                                 class="px-3 py-2.5 text-xs border-b-2 -mb-px @(panelTab == "sources" ? "border-brand text-brand font-semibold" : "border-transparent text-gray-500 hover:text-gray-800")">Sources found (@ledger.Sources.Count)</button>
                     }
                     @if (map != null)
                     {
-                        <button type="button" aria-pressed="@(panelTab == "map" ? "true" : "false")" @onclick="@(() => panelTab = "map")"
+                        <button type="button" aria-pressed="@(panelTab == "map" ? "true" : "false")" @onclick="@(() => ChooseTab("map"))"
                                 class="px-3 py-2.5 text-xs border-b-2 -mb-px @(panelTab == "map" ? "border-brand text-brand font-semibold" : "border-transparent text-gray-500 hover:text-gray-800")">Map</button>
                     }
                     @if (synthesis != null)
                     {
-                        <button type="button" aria-pressed="@(panelTab == "themes" ? "true" : "false")" @onclick="@(() => panelTab = "themes")"
+                        <button type="button" aria-pressed="@(panelTab == "themes" ? "true" : "false")" @onclick="@(() => ChooseTab("themes"))"
                                 class="px-3 py-2.5 text-xs border-b-2 -mb-px @(panelTab == "themes" ? "border-brand text-brand font-semibold" : "border-transparent text-gray-500 hover:text-gray-800")">Themes</button>
                     }
                 </div>
@@ -595,6 +499,10 @@
                                     </details>
                                 </div>
                             }
+                            @if (synthesis.SecondPlacements.FirstOrDefault(a => a.Question == number) is { Kappa: double placementKappa } placementAgreement)
+                            {
+                                <p class="text-[11px] text-gray-600">Second, independent placement of the values: Cohen's κ = @placementKappa.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture) over @placementAgreement.CellsCompared value–theme decisions (@placementAgreement.Disagreements.Count disagreement@(placementAgreement.Disagreements.Count == 1 ? "" : "s")).</p>
+                            }
                             @foreach (var other in synthesis.NotCoded.Where(n => n.Question == number))
                             {
                                 var notCoded = other;
@@ -618,6 +526,19 @@
                             }
                         </section>
                     }
+                    @if (synthesis.Unsupported.Count > 0)
+                    {
+                        <section>
+                            <h4 class="text-sm font-semibold text-gray-900">Values left out by the support check</h4>
+                            <p class="text-xs text-gray-600 mt-0.5">Their quote is on the source's page but does not say what the value claims.</p>
+                            <ul class="text-xs text-gray-700 list-disc pl-4 mt-1 space-y-1">
+                                @foreach (var item in synthesis.Unsupported)
+                                {
+                                    <li><span class="font-medium">@item.Finding</span> @item.Attribute: @item.Value <q class="italic text-gray-500">@item.Quote</q> <span class="text-gray-600">@item.Reason</span></li>
+                                }
+                            </ul>
+                        </section>
+                    }
                     @if (synthesis.Unassigned.Count > 0)
                     {
                         <section>
@@ -639,7 +560,7 @@
                         <h3 class="text-base font-semibold text-gray-900">Systematic map</h3>
                         <p class="text-xs text-gray-600 mt-0.5">
                             The attributes recorded for every source (G12, Table 10). Version 1 was proposed by the model from your research questions, with values generalised over @map.SourcesSeen sources that passed.
-                            @(map.FixedVersion is int fixedNumber ? $"Version {fixedNumber} is fixed and is used for the extraction." : "Edit it, save, and fix it when it fits; every saved version is kept.")
+                            @(map.FixedVersion is int fixedNumber ? $"Version {fixedNumber} is fixed as proposed and is used for the extraction, so every source is extracted against the same attributes." : "It is fixed as proposed when the run continues.")
                         </p>
                     </div>
                     <ol class="text-[11px] text-gray-500 space-y-0.5">
@@ -662,57 +583,7 @@
                         </ul>
                         <p class="mt-1">Every attribute can also be "not stated" for a source, so values such as "Not specified" are left out of the map.</p>
                     </div>
-                    @if (mapDraft != null)
-                    {
-                        @for (int i = 0; i < mapDraft.Count; i++)
-                        {
-                            var mapAttribute = mapDraft[i];
-                            int index = i;
-                            <fieldset class="border border-gray-200 p-3 space-y-2">
-                                <legend class="px-1 text-xs font-medium text-gray-700">Attribute @(index + 1)</legend>
-                                <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                                    <label class="text-[11px] text-gray-600 sm:col-span-2">Name
-                                        <input type="text" class="ui-input py-1 text-xs mt-0.5" maxlength="@AuBtechReviewAgent.MultivocalMapper.MaxText" @bind="mapAttribute.Name" />
-                                    </label>
-                                    <label class="text-[11px] text-gray-600">For
-                                        <select class="ui-input py-1 text-xs mt-0.5" @bind="mapAttribute.Question">
-                                            @foreach (var (number, _) in planned.Plan.Numbered())
-                                            {
-                                                <option value="@number">@number</option>
-                                            }
-                                        </select>
-                                    </label>
-                                </div>
-                                <label class="block text-[11px] text-gray-600">What it records
-                                    <input type="text" class="ui-input py-1 text-xs mt-0.5" maxlength="@AuBtechReviewAgent.MultivocalMapper.MaxText" @bind="mapAttribute.Description" />
-                                </label>
-                                @if (!mapAttribute.Open)
-                                {
-                                    <label class="block text-[11px] text-gray-600">Values, one per line
-                                        <textarea rows="@Math.Max(3, mapAttribute.Values.Count + 1)" class="ui-input py-1 text-xs mt-0.5 resize-y"
-                                                  value="@string.Join("\n", mapAttribute.Values)" @onchange="e => mapAttribute.Values = (e.Value?.ToString() ?? string.Empty).Split('\n').Select(v => v.Trim()).Where(v => v.Length > 0).ToList()"></textarea>
-                                    </label>
-                                }
-                                <div class="flex flex-wrap items-center gap-4 text-[11px] text-gray-700">
-                                    <label class="flex items-center gap-1.5"><input type="checkbox" class="w-3.5 h-3.5 accent-brand" @bind="mapAttribute.Multiple" /> A source can have several values</label>
-                                    <label class="flex items-center gap-1.5"><input type="checkbox" class="w-3.5 h-3.5 accent-brand" @bind="mapAttribute.Open" /> Open text (values cannot be listed)</label>
-                                    <button type="button" class="ml-auto text-red-700 hover:underline" @onclick="() => mapDraft.RemoveAt(index)">Remove</button>
-                                </div>
-                            </fieldset>
-                        }
-                        <button type="button" class="text-xs text-brand font-medium hover:underline" @onclick="AddAttribute">Add an attribute</button>
-                        @if (mapError != null)
-                        {
-                            <p class="bg-red-50 border border-red-200 text-red-800 p-2 text-xs" role="alert">@mapError</p>
-                        }
-                        <div class="flex flex-wrap gap-2">
-                            <button type="button" class="ui-btn-secondary ui-btn-sm" disabled="@mapping" @onclick="SaveMapAsync">Save as version @(map.Versions.Count + 1)</button>
-                            <button type="button" class="ui-btn-primary ui-btn-sm" disabled="@mapping" @onclick="FixMapAsync">Fix the map</button>
-                        </div>
-                        <p class="text-[11px] text-gray-500">Fixing keeps your current edits as a new version first. After that the map does not change, so every source is extracted against the same attributes.</p>
-                    }
-                    else
-                    {
+                    @{
                         var shown = map.FixedVersion is int f ? map.Versions.First(v => v.Number == f) : map.Latest;
                         <table class="w-full text-xs">
                             <caption class="sr-only">The attributes of the map</caption>
@@ -862,7 +733,7 @@
                                         @if (score.NotAssessed != null)
                                         {
                                             <p class="mt-1">Not assessed: @score.NotAssessed.</p>
-                                            @if (canEdit && stage == AuBtechReviewAgent.MultivocalQualityAssessor.StageAssessed)
+                                            @if (canEdit && stage == AuBtechReviewAgent.MultivocalQualityAssessor.StageAssessed && !Runner.IsRunning(planned!.RunId))
                                             {
                                                 string address = score.Address;
                                                 <button type="button" class="ui-btn-secondary ui-btn-sm mt-1" disabled="@(retrying == address)" @onclick="() => RetryAsync(address)">@(retrying == address ? "Assessing…" : "Try again")</button>
@@ -975,7 +846,7 @@
                                         }
                                     </details>
                                 }
-                                @if (canEdit && decision != null && decision.Decision != "Duplicate" && stage == AuBtechReviewAgent.MultivocalScreener.StageScreened)
+                                @if (canEdit && decision != null && decision.Decision != "Duplicate" && stage == AuBtechReviewAgent.MultivocalScreener.StageScreened && !Runner.IsRunning(planned.RunId))
                                 {
                                     string address = decision.Address;
                                     <div class="mt-1.5 flex flex-wrap items-center gap-1.5">
@@ -1043,9 +914,9 @@
                     <div class="border-t border-gray-100 pt-4">
                         <h3 class="text-xs font-semibold text-gray-900 mb-2">What you will get</h3>
                         <div class="grid grid-cols-2 gap-2 text-[11px] text-gray-700">
-                            <div class="border border-gray-200 p-2"><span class="font-semibold block text-gray-900">Review report</span>structured by the guidelines, every citation clickable to its quote</div>
-                            <div class="border border-gray-200 p-2"><span class="font-semibold block text-gray-900">Practitioner summary</span>a short version for the people who use the results</div>
-                            <div class="border border-gray-200 p-2"><span class="font-semibold block text-gray-900">Systematic map</span>the sources classified, grey and formal side by side</div>
+                            <div class="border border-gray-200 p-2"><span class="font-semibold block text-gray-900">Review paper</span>structured by the guidelines, with a summary for practitioners; every citation clickable to its quote</div>
+                            <div class="border border-gray-200 p-2"><span class="font-semibold block text-gray-900">LaTeX manuscript</span>plus BibTeX and RIS for your reference manager</div>
+                            <div class="border border-gray-200 p-2"><span class="font-semibold block text-gray-900">Systematic map</span>the sources classified by your research questions, each value with its quote</div>
                             <div class="border border-gray-200 p-2"><span class="font-semibold block text-gray-900">Verifiable archive</span>protocol, sources' fingerprints and every model call</div>
                         </div>
                     </div>
@@ -1072,7 +943,7 @@
         new("Grey", "Is grey literature needed?", "G3", "Grey literature"),
         new("Questions", "What should the review answer?", "G4–G5", "Questions"),
         new("Search", "What to search, where, how much, and what to include?", "G6–G9, G11", "Search"),
-        new("Protocol", "Check the plan before anything is searched.", "G1", "Protocol"),
+        new("Protocol", "Check the plan. Starting the review writes it down, then runs every step on its own.", "G1", "Protocol"),
     };
 
     private AuBtechReviewAgent.MultivocalPlan plan = new();
@@ -1082,45 +953,32 @@
     private string stage = "";
     private bool canEdit;
     private string? editKey;
-    private bool searching;
     private AuBtechReviewAgent.MultivocalScreeningFile? screening;
     private Dictionary<string, AuBtechReviewAgent.GreyScreening> decisions = new();
-    private bool screeningNow;
-    private string? screenProgress;
     private string? screenError;
     private string sourceFilter = "all";
     private AuBtechReviewAgent.MultivocalQualityFile? quality;
     private Dictionary<string, AuBtechReviewAgent.GreyQuality> qualities = new();
-    private bool assessing;
-    private string? qualityProgress;
     private string? qualityError;
     private readonly Dictionary<string, string> reviewNotes = new();
     private AuBtechReviewAgent.MultivocalMapFile? map;
     private AuBtechReviewAgent.MultivocalExtractionFile? extraction;
     private AuBtechReviewAgent.MultivocalSynthesisFile? synthesis;
-    private bool synthesising;
-    private string? synthesisProgress;
-    private string? synthesisError;
     private Dictionary<string, AuBtechReviewAgent.GreyExtraction> extractions = new();
-    private bool extracting;
-    private string? extractProgress;
-    private string? extractError;
-    private List<AuBtechReviewAgent.MapAttribute>? mapDraft;
-    private bool mapping;
-    private string? mapError;
     private string? reviewing;
     private string? retrying;
     private Dictionary<string, AuBtechReviewAgent.PageSnapshot> snapshots = new();
     private readonly HashSet<string> keeping = new();
     private string? keepError;
-    private string? searchProgress;
-    private string? searchError;
     private int step;
     private string panelTab = "plan";
+    private bool tabChosen; // once the reviewer picks a tab, the panel stops following the run
+    private string? shownStep;
     private bool saving;
     private string? error;
 
-    private bool GreyOnly => planned?.Plan.IsGreyOnly ?? plan.IsGreyOnly;
+    // Grey literature only while the formal pool is not built (decision 6), whichever card planned the review.
+    private bool GreyOnly => !(planned?.Plan.UsesFormalPool ?? plan.UsesFormalPool);
     private AuBtechReviewAgent.MultivocalPlan Shown => planned?.Plan ?? plan;
     private IReadOnlyList<string> Problems => plan.Problems();
     private string ProtocolPreview =>
@@ -1139,22 +997,63 @@
                 Nav.NavigateTo(elsewhere, replace: true);
                 return;
             }
-            planned = Planner.Load(id);
-            protocolText = Runs.ReadProtocol(id) ?? "";
-            ledger = Searcher.LoadLedger(id);
-            snapshots = Pages.Load(id).Pages.ToDictionary(p => AuBtechReviewAgent.MultivocalSearcher.AddressKey(p.Url));
-            SetScreening(Screener.Load(id));
-            SetQuality(Quality.Load(id));
-            SetMap(Mapper.Load(id));
-            SetExtraction(Extractor.Load(id));
-            synthesis = Synthesiser.Load(id);
-            if (quality != null) sourceFilter = "passed";
-            else if (screening != null) sourceFilter = "included";
-            stage = Runs.LoadHeader(id)?.Stage ?? "";
-            panelTab = ledger != null ? "sources" : "protocol";
+            Reload(id);
             return;
         }
         plan.Card = CardKey == "grey" ? "grey" : "multivocal";
+    }
+
+    protected override void OnInitialized() => Runner.Changed += OnRunChanged;
+
+    public void Dispose() => Runner.Changed -= OnRunChanged;
+
+    /// <summary>Reads every file of the run again; the panel shows the latest step unless the reviewer chose a tab.</summary>
+    private void Reload(Guid id)
+    {
+        planned = Planner.Load(id);
+        protocolText = Runs.ReadProtocol(id) ?? "";
+        ledger = Searcher.LoadLedger(id);
+        snapshots = Pages.Load(id).Pages.ToDictionary(p => AuBtechReviewAgent.MultivocalSearcher.AddressKey(p.Url));
+        string oldDefault = DefaultFilter();
+        SetScreening(Screener.Load(id));
+        SetQuality(Quality.Load(id));
+        map = Mapper.Load(id);
+        SetExtraction(Extractor.Load(id));
+        synthesis = Synthesiser.Load(id);
+        if (sourceFilter == oldDefault) sourceFilter = DefaultFilter();
+        stage = Runs.LoadHeader(id)?.Stage ?? "";
+        if (!tabChosen) panelTab = synthesis != null ? "themes" : map != null ? "map" : ledger != null ? "sources" : "protocol";
+    }
+
+    private string DefaultFilter() => quality != null ? "passed" : screening != null ? "included" : "all";
+
+    private void ChooseTab(string tab)
+    {
+        panelTab = tab;
+        tabChosen = true;
+    }
+
+    // The runner reports from its own thread: progress lines only redraw, a new step or the end reads the files again.
+    private void OnRunChanged(Guid id)
+    {
+        if (planned?.RunId != id) return;
+        _ = InvokeAsync(() =>
+        {
+            var status = Runner.StatusOf(id);
+            if (status == null || status.Step != shownStep || !status.Running)
+            {
+                Reload(id);
+                shownStep = status?.Step;
+            }
+            StateHasChanged();
+        });
+    }
+
+    private void ContinueRun()
+    {
+        if (planned == null) return;
+        tabChosen = false;
+        Runner.Start(planned.RunId, editKey);
     }
 
     /// <summary>What the review will do, with the current answers, and which of its steps are built.</summary>
@@ -1171,17 +1070,19 @@
                 "saturation" => "until new sources add nothing new",
                 _ => "every hit of every search string",
             };
+            // The same stages as the systematic review's preview, in the guidelines' words; built ones are marked.
             return new List<(string, string, bool)>
             {
                 ("Protocol", "Your plan is written down before anything is searched, with a fingerprint.", true),
-                ("Search", p.IsGreyOnly
-                    ? $"{searches} grey literature search{(searches == 1 ? "" : "es")}, {stop}."
-                    : $"{searches} grey literature search{(searches == 1 ? "" : "es")} and the academic databases, {stop}.", true),
-                ("Selection", p.IsGreyOnly ? "Every source is screened twice against your criteria." : "Grey and academic sources are screened twice, with the same criteria and the same care.", true),
-                ("Quality", $"Each grey source is scored on Table 7; below {p.QualityThreshold} of {AuBtechReviewAgent.MultivocalGuidelines.QualityPointsMax} points it is left out. Every score rests on a quote.", true),
-                ("Map and extraction", "The sources are classified in a systematic map; every extracted value rests on a quote from the source's page.", true),
+                ("Search", p.UsesFormalPool
+                    ? $"{searches} grey literature search{(searches == 1 ? "" : "es")} and the academic databases, {stop}."
+                    : $"{searches} grey literature search{(searches == 1 ? "" : "es")}, {stop}.", true),
+                ("Selection", p.UsesFormalPool ? "Grey and academic sources are screened twice, with the same criteria and the same care." : "Every source is screened twice against your criteria; a source the two screenings disagree on is kept and marked for you to look at.", true),
+                ("Quality", $"Each source is scored on Table 7; below {p.QualityThreshold} of {AuBtechReviewAgent.MultivocalGuidelines.QualityPointsMax} points it is left out. Every score rests on a quote.", true),
+                ("Map and extraction", "The sources are classified in a systematic map proposed from your research questions; every extracted value rests on a quote from the source's page.", true),
                 ("Synthesis", $"The findings are grouped into themes to answer {questions} research question{(questions == 1 ? "" : "s")}, each theme labelled with the kind and quality of the sources it rests on.", true),
-                ("Checking", "Every citation is compared with its source; weak ones get a second check and are repaired.", false),
+                ("Writing", "The paper is written from the findings: an outline, one section per theme, the discussion, a summary for practitioners and an automated peer review; the title and abstract last.", false),
+                ("Checking", "Every citation is compared with the kept text of the page it cites; weak ones get a second check and are repaired.", false),
             };
         }
     }
@@ -1224,7 +1125,7 @@
     private string SettingsLine()
     {
         int questions = plan.Numbered().Count;
-        return $"{(plan.IsGreyOnly ? "Grey only" : "Grey and academic")} · {questions} research question{(questions == 1 ? "" : "s")} · {plan.GreySearches.Count} search{(plan.GreySearches.Count == 1 ? "" : "es")} · {StoppingSummary()} · threshold {plan.QualityThreshold}/{AuBtechReviewAgent.MultivocalGuidelines.QualityPointsMax}";
+        return $"{(plan.UsesFormalPool ? "Grey and academic" : "Grey only")} · {questions} research question{(questions == 1 ? "" : "s")} · {plan.GreySearches.Count} search{(plan.GreySearches.Count == 1 ? "" : "es")} · {StoppingSummary()} · threshold {plan.QualityThreshold}/{AuBtechReviewAgent.MultivocalGuidelines.QualityPointsMax}";
     }
 
     private string StoppingSummary() => plan.StoppingRule switch
@@ -1274,31 +1175,7 @@
             Logger.LogDebug("Could not read the edit key: {Message}", ex.Message);
         }
         canEdit = Runs.CanEdit(planned.RunId, editKey);
-        SetMap(map); // the map is editable only in this browser
         StateHasChanged();
-    }
-
-    private async Task SearchAsync()
-    {
-        if (planned == null || searching) return;
-        searching = true;
-        searchError = null;
-        var progress = new Progress<string>(line => { searchProgress = line; _ = InvokeAsync(StateHasChanged); });
-        try
-        {
-            ledger = await Searcher.SearchAsync(planned.RunId, editKey, progress);
-            stage = AuBtechReviewAgent.MultivocalSearcher.StageSearched;
-            panelTab = "sources";
-        }
-        catch (InvalidOperationException ex)
-        {
-            searchError = ex.Message;
-        }
-        finally
-        {
-            searching = false;
-            searchProgress = null;
-        }
     }
 
     private void SetScreening(AuBtechReviewAgent.MultivocalScreeningFile? file)
@@ -1309,59 +1186,12 @@
         foreach (var s in file.Sources) decisions.TryAdd(s.Address, s);
     }
 
-    private async Task ScreenAsync()
-    {
-        if (planned == null || screeningNow) return;
-        screeningNow = true;
-        screenError = null;
-        var progress = new Progress<string>(line => { screenProgress = line; _ = InvokeAsync(StateHasChanged); });
-        try
-        {
-            SetScreening(await Screener.ScreenAsync(planned.RunId, editKey, progress));
-            stage = AuBtechReviewAgent.MultivocalScreener.StageScreened;
-            sourceFilter = "included";
-        }
-        catch (InvalidOperationException ex)
-        {
-            screenError = ex.Message;
-        }
-        finally
-        {
-            screeningNow = false;
-            screenProgress = null;
-        }
-    }
-
     private void SetQuality(AuBtechReviewAgent.MultivocalQualityFile? file)
     {
         quality = file;
         qualities = new();
         if (file == null) return;
         foreach (var q in file.Sources) qualities.TryAdd(q.Address, q);
-    }
-
-    private async Task AssessAsync()
-    {
-        if (planned == null || assessing) return;
-        assessing = true;
-        qualityError = null;
-        var progress = new Progress<string>(line => { qualityProgress = line; _ = InvokeAsync(StateHasChanged); });
-        try
-        {
-            SetQuality(await Quality.AssessAsync(planned.RunId, editKey, progress));
-            snapshots = Pages.Load(planned.RunId).Pages.ToDictionary(p => AuBtechReviewAgent.MultivocalSearcher.AddressKey(p.Url));
-            stage = AuBtechReviewAgent.MultivocalQualityAssessor.StageAssessed;
-            sourceFilter = "passed";
-        }
-        catch (InvalidOperationException ex)
-        {
-            qualityError = ex.Message;
-        }
-        finally
-        {
-            assessing = false;
-            qualityProgress = null;
-        }
     }
 
     private void SetExtraction(AuBtechReviewAgent.MultivocalExtractionFile? file)
@@ -1372,120 +1202,8 @@
         foreach (var x in file.Sources) extractions.TryAdd(x.Address, x);
     }
 
-    private async Task SynthesiseAsync()
-    {
-        if (planned == null || synthesising) return;
-        synthesising = true;
-        synthesisError = null;
-        var progress = new Progress<string>(line => { synthesisProgress = line; _ = InvokeAsync(StateHasChanged); });
-        try
-        {
-            synthesis = await Synthesiser.SynthesiseAsync(planned.RunId, editKey, progress);
-            stage = AuBtechReviewAgent.MultivocalSynthesiser.StageSynthesised;
-            panelTab = "themes";
-        }
-        catch (Exception ex) when (ex is InvalidOperationException or AuBtechReviewAgent.LlmOutputException or HttpRequestException)
-        {
-            synthesisError = ex.Message;
-        }
-        finally
-        {
-            synthesising = false;
-            synthesisProgress = null;
-        }
-    }
-
     private AuBtechReviewAgent.GreyExtraction? ExtractionOf(string url) =>
         extractions.TryGetValue(AuBtechReviewAgent.MultivocalSearcher.AddressKey(url), out var x) ? x : null;
-
-    private async Task ExtractAsync()
-    {
-        if (planned == null || extracting) return;
-        extracting = true;
-        extractError = null;
-        var progress = new Progress<string>(line => { extractProgress = line; _ = InvokeAsync(StateHasChanged); });
-        try
-        {
-            SetExtraction(await Extractor.ExtractAsync(planned.RunId, editKey, progress));
-            stage = AuBtechReviewAgent.MultivocalExtractor.StageExtracted;
-            panelTab = "map";
-        }
-        catch (InvalidOperationException ex)
-        {
-            extractError = ex.Message;
-        }
-        finally
-        {
-            extracting = false;
-            extractProgress = null;
-        }
-    }
-
-    private void SetMap(AuBtechReviewAgent.MultivocalMapFile? file)
-    {
-        map = file;
-        // An editable copy while the map is not fixed; the page shows the fixed version otherwise.
-        mapDraft = file is { FixedVersion: null } && stage == AuBtechReviewAgent.MultivocalMapper.StageMapping && canEdit
-            ? AuBtechReviewAgent.MultivocalMapper.Clean(file.Latest.Attributes)
-            : null;
-    }
-
-    private void AddAttribute()
-    {
-        if (mapDraft == null || planned == null) return;
-        mapDraft.Add(new AuBtechReviewAgent.MapAttribute { Question = planned.Plan.Numbered().First().Number, Values = new() { "", "" } });
-    }
-
-    private async Task ProposeMapAsync()
-    {
-        if (planned == null || mapping) return;
-        mapping = true;
-        mapError = null;
-        try
-        {
-            var file = await Mapper.ProposeAsync(planned.RunId, editKey);
-            stage = AuBtechReviewAgent.MultivocalMapper.StageMapping;
-            SetMap(file);
-            panelTab = "map";
-        }
-        catch (Exception ex) when (ex is InvalidOperationException or AuBtechReviewAgent.LlmOutputException or HttpRequestException)
-        {
-            mapError = ex.Message;
-        }
-        finally
-        {
-            mapping = false;
-        }
-    }
-
-    private async Task SaveMapAsync()
-    {
-        if (planned == null || mapDraft == null || mapping) return;
-        mapping = true;
-        mapError = null;
-        try { SetMap(await Mapper.SaveAsync(planned.RunId, editKey, mapDraft)); }
-        catch (Exception ex) when (ex is InvalidOperationException or ArgumentException) { mapError = ex.Message; }
-        finally { mapping = false; }
-    }
-
-    private async Task FixMapAsync()
-    {
-        if (planned == null || map == null || mapDraft == null || mapping) return;
-        mapping = true;
-        mapError = null;
-        try
-        {
-            // Unsaved edits are kept as a version first, so the fixed map is always one of the saved versions.
-            var cleaned = AuBtechReviewAgent.MultivocalMapper.Clean(mapDraft);
-            bool changed = System.Text.Json.JsonSerializer.Serialize(cleaned) != System.Text.Json.JsonSerializer.Serialize(map.Latest.Attributes);
-            if (changed) await Mapper.SaveAsync(planned.RunId, editKey, cleaned);
-            var file = await Mapper.FixAsync(planned.RunId, editKey);
-            stage = AuBtechReviewAgent.MultivocalMapper.StageMapped;
-            SetMap(file);
-        }
-        catch (Exception ex) when (ex is InvalidOperationException or ArgumentException) { mapError = ex.Message; }
-        finally { mapping = false; }
-    }
 
     private async Task ReviewAsync(string address, bool include)
     {
@@ -1611,21 +1329,13 @@
         }
     }
 
-    private string StageLine() => stage switch
+    private string StageLine()
     {
-        AuBtechReviewAgent.MultivocalSynthesiser.StageSynthesised => "Synthesised: the findings are grouped into themes; the report can be read",
-        AuBtechReviewAgent.MultivocalExtractor.StageExtracted => "Extracted: every source that passed is mapped and can be synthesised",
-        AuBtechReviewAgent.MultivocalExtractor.StageExtracting => "Extracting…",
-        AuBtechReviewAgent.MultivocalMapper.StageMapped => "Mapped: the systematic map is fixed and the sources can be extracted",
-        AuBtechReviewAgent.MultivocalMapper.StageMapping => "Mapping: edit the map and fix it",
-        AuBtechReviewAgent.MultivocalQualityAssessor.StageAssessed => "Assessed: the included sources are scored for quality and can be mapped",
-        AuBtechReviewAgent.MultivocalQualityAssessor.StageAssessing => "Scoring the quality…",
-        AuBtechReviewAgent.MultivocalScreener.StageScreened => "Screened: the grey sources are selected and can be scored for quality",
-        AuBtechReviewAgent.MultivocalScreener.StageScreening => "Screening…",
-        AuBtechReviewAgent.MultivocalSearcher.StageSearched => "Searched: the grey sources are found and can be screened",
-        AuBtechReviewAgent.MultivocalSearcher.StageSearching => "Searching…",
-        _ => "Planned: the protocol is written; the search can start",
-    };
+        if (stage == AuBtechReviewAgent.MultivocalSynthesiser.StageSynthesised) return "Finished: the findings are grouped into themes and the report can be read";
+        var status = planned == null ? null : Runner.StatusOf(planned.RunId);
+        if (status is { Running: true }) return $"Running: {status.Step.ToLowerInvariant()}…";
+        return $"Not finished: stopped before {AuBtechReviewAgent.MultivocalRunner.StepFor(stage).ToLowerInvariant()}";
+    }
 
     private void AddSearchString()
     {
@@ -1655,6 +1365,8 @@
         try
         {
             var (newRunId, newEditKey) = await Planner.CreateAsync(plan);
+            // The protocol is written; the rest runs on the server, one step after another, without a click.
+            Runner.Start(newRunId, newEditKey);
             // Only this browser keeps the run's edit key, as for a systematic review.
             try { await JS.InvokeVoidAsync("traceableReview.saveEditKey", newRunId.ToString(), newEditKey); }
             catch (Exception ex) when (ex is JSException or JSDisconnectedException or InvalidOperationException or TaskCanceledException)

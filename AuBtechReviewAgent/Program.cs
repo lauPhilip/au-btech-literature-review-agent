@@ -133,6 +133,8 @@ builder.Services.AddSingleton(multivocalSynthesiser); // synthesis (preview)
 var multivocalReporter = new AuBtechReviewAgent.MultivocalReporter(reviewEngine.Store, multivocalPlanner, multivocalSearcher, multivocalScreener, multivocalPages,
     multivocalQuality, multivocalMapper, multivocalExtractor, multivocalSynthesiser);
 builder.Services.AddSingleton(multivocalReporter); // report, written in code (preview)
+builder.Services.AddSingleton(new AuBtechReviewAgent.MultivocalRunner(reviewEngine.Store, multivocalSearcher, multivocalScreener, multivocalQuality,
+    multivocalMapper, multivocalExtractor, multivocalSynthesiser)); // runs the steps one after another (preview)
 // Modules shown as a preview while they are being built (Development only; see ReviewModulesOptions).
 builder.Services.AddSingleton(AuBtechReviewAgent.ReviewModulesOptions.From(builder.Configuration, builder.Environment.IsDevelopment()));
 

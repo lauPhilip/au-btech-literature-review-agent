@@ -15,13 +15,13 @@ public static class MultivocalProtocol
     public static string Write(MultivocalPlan plan, Guid runId, DateTime createdUtc)
     {
         var sb = new StringBuilder();
-        string kind = plan.IsGreyOnly ? "Grey Literature Review" : "Multivocal Literature Review";
+        string kind = plan.UsesFormalPool ? "Multivocal Literature Review" : "Grey Literature Review";
         sb.AppendLine($"# Review protocol: {kind}");
         sb.AppendLine();
         sb.AppendLine($"- Run: {runId}");
         sb.AppendLine($"- Written: {createdUtc:yyyy-MM-dd HH:mm} UTC, before any search");
         sb.AppendLine($"- Review type: {kind}, following {MultivocalGuidelines.Reference}");
-        sb.AppendLine($"- Sources reviewed: {(plan.IsGreyOnly ? "grey literature only" : "formal (academic) and grey literature, kept apart in two pools")}");
+        sb.AppendLine($"- Sources reviewed: {(plan.UsesFormalPool ? "formal (academic) and grey literature, kept apart in two pools" : "grey literature only")}");
         sb.AppendLine();
 
         sb.AppendLine("## 1. Need and audience (G2)");
@@ -65,7 +65,7 @@ public static class MultivocalProtocol
         sb.AppendLine("Where grey literature is searched (G7):");
         foreach (var key in plan.GreySearches)
             sb.AppendLine($"- {MultivocalGuidelines.SearchLabel(key)}");
-        if (!plan.IsGreyOnly)
+        if (plan.UsesFormalPool)
             sb.AppendLine("- Formal literature: the bibliographic databases of the systematic review, searched with their own search strings");
         sb.AppendLine();
         sb.AppendLine("Not done, by design:");
@@ -89,7 +89,7 @@ public static class MultivocalProtocol
         sb.AppendLine($"Inclusion criteria (G9): {plan.InclusionCriteria}");
         sb.AppendLine($"Exclusion criteria (G9): {(plan.ExclusionCriteria.Length > 0 ? plan.ExclusionCriteria : "none")}");
         sb.AppendLine();
-        sb.AppendLine("Formal and grey sources are screened with the same criteria and the same care (G10): each source is screened twice by the language model, independently and with the steps in a different order, and a source the two screenings disagree on is kept and flagged for the reviewer. Sources found twice under different addresses (the same title) are screened once. The reviewer looks at the flagged decisions and may confirm or change any decision before the quality is scored; the model's decision stays on file.");
+        sb.AppendLine((plan.UsesFormalPool ? "Formal and grey sources are screened with the same criteria and the same care (G10): each source" : "Every source is screened with the same criteria and the same care (G10): it")+" is screened twice by the language model, independently and with the steps in a different order, and a source the two screenings disagree on is kept and flagged for the reviewer. Sources found twice under different addresses (the same title) are screened once. The reviewer looks at the flagged decisions and may confirm or change any decision before the quality is scored; the model's decision stays on file.");
         sb.AppendLine($"Each grey source is scored on the quality checklist of Table 7, out of {MultivocalGuidelines.QualityPointsMax} points; sources scoring below {plan.QualityThreshold} points are excluded (G11). Each item scores 1, 0.5 or 0. The language model answers the items that need reading the source, and every point it gives rests on a quote found in the kept text of the source's page; the date, the impact and the outlet type are decided in code. Impact uses the counts the search returned: {GreyQualityChecklist.ImpactRule}.");
         sb.AppendLine();
         sb.AppendLine("For an opinion piece, its main claim is recorded word for word with the critical questions for an expert opinion that the guidelines take from Rainer (G13): the writer's expertise, field, assertion and evidence are answered from the page with quotes; the writer's trustworthiness is left to the reviewer, since it cannot be judged reliably, and the claim's consistency with other experts is judged in the synthesis.");
@@ -102,7 +102,7 @@ public static class MultivocalProtocol
 
         sb.AppendLine("## 7. Synthesis (G13)");
         sb.AppendLine();
-        sb.AppendLine("For each research question, the language model groups the extracted findings into themes by qualitative coding; every finding goes into a theme or is listed with the reason it fits none, and tensions between sources are named. Every quote is checked again against the kept page text, never the live page. What each theme rests on (how many sources, their outlet tiers and quality points, grey or formal literature) is counted in code, so a theme that rests on 3rd-tier grey literature only is labelled as such.");
+        sb.AppendLine("Before the synthesis, every extracted value is checked against its own quote: a value whose quote does not say what it claims is left out and listed with the reason. For each research question, the language model groups the extracted findings into themes by qualitative coding, and a second, independent placement of the values is compared with the first (Cohen's kappa); every finding goes into a theme or is listed with the reason it fits none, and tensions between sources are named. Every quote is checked again against the kept page text, never the live page. What each theme rests on (how many sources, their outlet tiers and quality points, grey or formal literature) is counted in code, so a theme that rests on 3rd-tier grey literature only is labelled as such.");
         sb.AppendLine();
 
         sb.AppendLine("## 8. Keeping the evidence");
