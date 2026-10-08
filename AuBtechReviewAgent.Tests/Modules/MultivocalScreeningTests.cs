@@ -132,4 +132,41 @@ public class MultivocalScreeningTests : IDisposable
         var ex = await Assert.ThrowsAsync<InvalidOperationException>(() => screener.ScreenAsync(oldRun, oldKey));
         Assert.Contains("no inclusion criteria", ex.Message);
     }
+
+    [Fact]
+    public async Task TheReviewerCanConfirmOrChangeADecisionAndTheModelsStaysOnFile()
+    {
+        var (store, runId, key, screener, _) = await SearchedRun(MultivocalPlan.Example(),
+            ("https://a.example.org/1", "Disputed post", "Ana"),
+            ("https://b.example.org/2", "Baking bread", "Bo"),
+            ("https://b.example.org/3", "Baking bread", "Bo")); // a duplicate of the second
+        var file = await screener.ScreenAsync(runId, key);
+        Assert.True(file.Sources[0].NeedsLook);
+
+        var confirmed = await screener.ReviewAsync(runId, key, "a.example.org/1", include: true, note: "  Relevant to RQ2.  ");
+        Assert.Equal("Included", confirmed.Decision);
+        Assert.Equal("Included", confirmed.ModelDecision);
+        Assert.False(confirmed.NeedsLook);
+        Assert.Equal("Relevant to RQ2.", confirmed.ReviewerNote);
+
+        var changed = await screener.ReviewAsync(runId, key, "b.example.org/2", include: true, note: null);
+        Assert.Equal("Included", changed.Decision);
+        Assert.Equal("Excluded", changed.ModelDecision);
+        Assert.Null(changed.ExclusionReason);
+        var back = await screener.ReviewAsync(runId, key, "b.example.org/2", include: false, note: null);
+        Assert.Equal(ExclusionReasons.ByReviewer, back.ExclusionReason);
+        Assert.Equal("Excluded", back.ModelDecision); // the model's first decision, not the reviewer's earlier one
+
+        var saved = screener.Load(runId)!;
+        Assert.True(saved.Sources[0].Reviewed);
+        Assert.Equal("Excluded", saved.Sources[1].Decision);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => screener.ReviewAsync(runId, key, "b.example.org/3", true, null)); // a duplicate
+        await Assert.ThrowsAsync<InvalidOperationException>(() => screener.ReviewAsync(runId, "wrong-key", "a.example.org/1", false, null));
+
+        // Once the quality is being scored, the decisions are fixed.
+        string folder = store.FolderOf(runId);
+        await RunHeader.WriteAsync(folder, store.LoadHeader(runId)! with { Stage = MultivocalQualityAssessor.StageAssessed });
+        await Assert.ThrowsAsync<InvalidOperationException>(() => screener.ReviewAsync(runId, key, "a.example.org/1", false, null));
+    }
 }
