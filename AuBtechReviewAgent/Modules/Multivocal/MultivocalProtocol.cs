@@ -100,7 +100,12 @@ public static class MultivocalProtocol
         sb.AppendLine("The language model proposes the attributes of the systematic map from the research questions, with values generalised over the sources that passed the quality check. The reviewer edits the map, every version is kept, and the map is fixed before any source is extracted against it. Every source that passed the quality check is then extracted against the fixed map: each value must rest on a quote found in the kept text of the source's page, and what the page does not state is recorded as not stated. The kind of source, whether it is grey or formal literature, its site, date and quality points, and the research questions it covers are recorded in code.");
         sb.AppendLine();
 
-        sb.AppendLine("## 7. Keeping the evidence");
+        sb.AppendLine("## 7. Synthesis (G13)");
+        sb.AppendLine();
+        sb.AppendLine("For each research question, the language model groups the extracted findings into themes by qualitative coding; every finding goes into a theme or is listed with the reason it fits none, and tensions between sources are named. Every quote is checked again against the kept page text, never the live page. What each theme rests on (how many sources, their outlet tiers and quality points, grey or formal literature) is counted in code, so a theme that rests on 3rd-tier grey literature only is labelled as such.");
+        sb.AppendLine();
+
+        sb.AppendLine("## 8. Keeping the evidence");
         sb.AppendLine();
         sb.AppendLine("The text of each web source is kept on the server for the run's lifetime, so every citation check can be repeated. The run archive holds each source's address, access date, SHA-256 fingerprint, the quoted passages and a Wayback Machine link, not the pages themselves.");
         return sb.ToString();
