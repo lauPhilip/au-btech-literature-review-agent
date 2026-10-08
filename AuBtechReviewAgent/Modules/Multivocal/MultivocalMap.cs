@@ -69,9 +69,12 @@ public sealed class MultivocalMapper
     public const string MapFile = "multivocal-map.json";
     public const string StageMapping = "Mapping";
     public const string StageMapped = "Mapped";
-    public const string PromptVersion = "grey-map-v1";
+    public const string PromptVersion = "grey-map-v2";
 
     public const int MaxAttributes = 20;
+
+    /// <summary>The model may propose at most this many attributes per research question; the reviewer may add more.</summary>
+    public const int MaxModelAttributesPerQuestion = 3;
     public const int MaxValues = 15;
     public const int MaxText = 300;
 
@@ -190,17 +193,61 @@ public sealed class MultivocalMapper
         }
     }
 
-    /// <summary>Trims every text, drops empty and repeated values, and keeps no values on an open attribute.</summary>
+    /// <summary>
+    /// Values that only say the source does not state it. Every attribute can be "not stated" for a source, decided in
+    /// code during extraction, so these are never values of their own (seen in a live run: seven attributes had one).
+    /// </summary>
+    public static readonly IReadOnlySet<string> NotStatedValues = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+    {
+        "not specified", "unspecified", "not stated", "not mentioned", "not given", "not reported", "not applicable", "unknown", "n/a", "na", "none specified",
+    };
+
+    /// <summary>
+    /// The facts the run already knows about every source, recorded by code for each one at extraction; the map never
+    /// asks the model for them.
+    /// </summary>
+    public static readonly IReadOnlyList<(string Name, string Description)> KnownFacts = new[]
+    {
+        ("Kind of source", "Blog post, Q&A, code repository, report, thesis …, from the search."),
+        ("Literature", "Grey or formal (academic), from the pool the source was found in."),
+        ("Site", "Where it was published."),
+        ("Date", "When it was published, when the search gave a date."),
+        ("Quality points", "Its score on the quality checklist, out of 20."),
+    };
+
+    /// <summary>The known facts of one source, in the order of <see cref="KnownFacts"/>.</summary>
+    public static IReadOnlyList<(string Name, string Value)> KnownFactsFor(GreyRecord record, GreyQuality? quality) => new[]
+    {
+        ("Kind of source", MultivocalGuidelines.GreyTypes.FirstOrDefault(t => t.Key == record.Kind).Label ?? record.Kind),
+        ("Literature", "Grey"),
+        ("Site", record.Site),
+        ("Date", record.Published is DateTime d ? d.ToString("yyyy-MM-dd") : "not given"),
+        ("Quality points", quality is { Outcome: not "Not assessed" } q ? $"{q.Points:0.#} of {GreyQualityChecklist.MaxPoints}" : "not assessed"),
+    };
+
+    /// <summary>"ToolOrFramework" becomes "Tool or framework"; a name with spaces is kept as written.</summary>
+    public static string PlainName(string name)
+    {
+        string n = name.Trim();
+        if (n.Contains(' ') || !System.Text.RegularExpressions.Regex.IsMatch(n, "^[A-Z][a-z]+([A-Z][a-z]+)+$", System.Text.RegularExpressions.RegexOptions.None, TimeSpan.FromSeconds(1))) return n;
+        var words = System.Text.RegularExpressions.Regex.Matches(n, "[A-Z][a-z]+", System.Text.RegularExpressions.RegexOptions.None, TimeSpan.FromSeconds(1)).Select(m => m.Value).ToList();
+        return string.Join(" ", words.Select((w, i) => i == 0 ? w : w.ToLowerInvariant()));
+    }
+
+    /// <summary>
+    /// Trims every text, makes names plain words, drops empty and repeated values and values that only say "not stated",
+    /// and keeps no values on an open attribute.
+    /// </summary>
     public static List<MapAttribute> Clean(IEnumerable<MapAttribute> attributes) => attributes.Select(a => new MapAttribute
     {
-        Name = ReviewInputGuard.Normalize(a.Name ?? "", singleLine: true),
+        Name = PlainName(ReviewInputGuard.Normalize(a.Name ?? "", singleLine: true)),
         Question = (a.Question ?? "").Trim().ToUpperInvariant(),
         Description = ReviewInputGuard.Normalize(a.Description ?? "", singleLine: true),
         Open = a.Open,
         Multiple = a.Multiple,
         Values = a.Open ? new() : (a.Values ?? new())
             .Select(v => ReviewInputGuard.Normalize(v ?? "", singleLine: true))
-            .Where(v => v.Length > 0)
+            .Where(v => v.Length > 0 && !NotStatedValues.Contains(v.TrimEnd('.')))
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList(),
     }).ToList();
@@ -223,7 +270,27 @@ public sealed class MultivocalMapper
         return repeated != null ? $"Two attributes are called \"{repeated.Key}\"." : null;
     }
 
-    /// <summary>The map prompt: initial attributes from the questions, values generalised over the sources.</summary>
+    /// <summary>
+    /// What is wrong with the model's map, beyond <see cref="Problem"/>: more than three attributes for one question, a
+    /// value that is also another attribute's value, or an attribute for a fact the run already knows.
+    /// </summary>
+    public static string? ModelProblem(IReadOnlyList<MapAttribute> attributes, MultivocalPlan plan)
+    {
+        if (Problem(attributes, plan) is { } problem) return problem;
+        var crowded = attributes.GroupBy(a => a.Question).FirstOrDefault(g => g.Count() > MaxModelAttributesPerQuestion);
+        if (crowded != null) return $"{crowded.Key} has {crowded.Count()} attributes; give each question at most {MaxModelAttributesPerQuestion}.";
+        var shared = attributes
+            .SelectMany(a => a.Values.Where(v => !v.Equals("Other", StringComparison.OrdinalIgnoreCase)).Select(v => (Value: v, a.Name)))
+            .GroupBy(x => x.Value, StringComparer.OrdinalIgnoreCase)
+            .FirstOrDefault(g => g.Select(x => x.Name).Distinct().Count() > 1);
+        if (shared != null) return $"\"{shared.Key}\" is a value of both {string.Join(" and ", shared.Select(x => $"\"{x.Name}\"").Distinct())}; keep each value in one attribute.";
+        var known = attributes.FirstOrDefault(a => System.Text.RegularExpressions.Regex.IsMatch(a.Name,
+            @"^(source ?type|type of source|kind of source|grey or academic|literature( type)?|publication (date|site|year)|date|site|quality( points| score)?)$",
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase, TimeSpan.FromSeconds(1)));
+        return known != null ? $"\"{known.Name}\" is already known for every source and is recorded by code; leave it out." : null;
+    }
+
+    /// <summary>The map prompt: attributes from the questions, values generalised over the sources.</summary>
     public static async Task<ModelMapAnswer> AskAsync(IChatCompletionService chat, MultivocalPlan plan, IReadOnlyList<GreyRecord> sources)
     {
         string questions = string.Join("\n", plan.Numbered().Select(q => $"{q.Number} ({MultivocalGuidelines.FindType(q.Question.Type)?.Name ?? "not set"}): {q.Question.Text}"));
@@ -242,15 +309,19 @@ public sealed class MultivocalMapper
             {{PromptSafety.Wrap(list, "source list")}}
 
             Propose the attributes to record for every source:
-            1. Start from the research questions: give each question one to four attributes that its answer needs.
-            2. Generalise the values of each attribute over the sources above, as in keyword or open coding: short values that cover what the sources discuss, merged where they mean the same, with "Other" last when not every source will fit.
-            3. Say whether a source can have several values (multiple) or exactly one.
-            4. When the values cannot be listed in advance (names of tools, say), mark the attribute as open text and give no values.
-            Use two to {{MaxValues}} values per attribute and at most {{MaxAttributes}} attributes in all.
+            1. The attributes come from the research questions: give each question one to {{MaxModelAttributesPerQuestion}} attributes, only what its answer needs. Do not add attributes for other topics the sources happen to discuss.
+            2. The values come from the sources: generalise them over the sources above, as in keyword or open coding, with short values merged where they mean the same, and "Other" last when not every source will fit.
+            3. Each value belongs to one attribute only: do not make an attribute out of what is already a value of another (if "Memory" is a practice, do not add a separate memory attribute).
+            4. Say whether a source can have several values (multiple) or exactly one.
+            5. When the values cannot be listed in advance (names of tools, say), mark the attribute as open text and give no values.
+            6. Do not add "Not specified", "Unknown" or similar values: "not stated" is recorded for every attribute automatically.
+            7. Do not add attributes for what is already known about every source: {{string.Join(", ", KnownFacts.Select(f => f.Name.ToLowerInvariant()))}}, and the source's producer.
+            8. Name each attribute in plain words with spaces ("Tool or framework", not "ToolOrFramework").
+            Use two to {{MaxValues}} values per attribute.
 
             {{AnswerShape}}
             """;
-        return await LlmJson.GetAsync<ModelMapAnswer>(chat, prompt, LlmJson.JsonMode(0.2), a => Problem(Clean(a.Attributes), plan));
+        return await LlmJson.GetAsync<ModelMapAnswer>(chat, prompt, LlmJson.JsonMode(0.2), a => ModelProblem(Clean(a.Attributes), plan));
     }
 
     private const string AnswerShape = """

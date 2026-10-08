@@ -137,4 +137,59 @@ public class MultivocalMapTests : IDisposable
         var (_, run2, _, mapper2, _) = await AssessedRun(new FakeChatService().Returns(GoodMap));
         await Assert.ThrowsAsync<InvalidOperationException>(() => mapper2.ProposeAsync(run2, "wrong-key"));
     }
+
+    [Fact]
+    public void NotStatedValuesAndCamelCaseNamesAreCleanedAway()
+    {
+        var cleaned = MultivocalMapper.Clean(new[]
+        {
+            new MapAttribute { Name = "ToolOrFramework", Question = "rq1.1", Open = true, Values = new() { "LangChain" } },
+            new MapAttribute { Name = "Retrieval use", Question = "RQ3", Values = new() { "Yes", "No", "Not specified", "Unknown", "N/A." } },
+        });
+
+        Assert.Equal("Tool or framework", cleaned[0].Name);
+        Assert.Equal("RQ1.1", cleaned[0].Question);
+        Assert.Empty(cleaned[0].Values); // open text keeps no values
+        Assert.Equal(new[] { "Yes", "No" }, cleaned[1].Values);
+        Assert.Equal("Context window", MultivocalMapper.PlainName("Context window"));
+        Assert.Equal("RAG", MultivocalMapper.PlainName("RAG"));
+    }
+
+    [Fact]
+    public void TheModelsMapStaysWithTheQuestionsAndLeavesOutWhatIsKnown()
+    {
+        var plan = MultivocalPlan.Example();
+        MapAttribute A(string name, string question, params string[] values) => new() { Name = name, Question = question, Values = values.ToList() };
+
+        // As in the first live run: four attributes for RQ1, with "Memory" both a practice and an attribute of its own.
+        var crowded = MultivocalMapper.Clean(new[]
+        {
+            A("Practice", "RQ1", "Retrieval", "Memory management", "Other"), A("Memory type", "RQ1", "Short-term", "Long-term"),
+            A("Domain", "RQ1", "Coding", "Research"), A("Security focus", "RQ1", "Yes", "No"),
+        });
+        Assert.Contains("RQ1 has 4 attributes", MultivocalMapper.ModelProblem(crowded, plan));
+        Assert.Null(MultivocalMapper.Problem(crowded, plan)); // the reviewer may still keep four
+
+        var shared = MultivocalMapper.Clean(new[] { A("Practice", "RQ1", "Retrieval", "Memory", "Other"), A("Stage", "RQ1.2", "Design", "Memory", "Other") });
+        Assert.Contains("\"Memory\" is a value of both", MultivocalMapper.ModelProblem(shared, plan));
+
+        var known = MultivocalMapper.Clean(new[] { A("Practice", "RQ1", "Retrieval", "Other"), A("SourceType", "RQ2", "Grey", "Academic") });
+        Assert.Contains("\"Source type\" is already known", MultivocalMapper.ModelProblem(known, plan));
+
+        var fine = MultivocalMapper.Clean(new[] { A("Practice", "RQ1", "Retrieval", "Other"), A("Code quality practice", "RQ1", "Linting", "Review") });
+        Assert.Null(MultivocalMapper.ModelProblem(fine, plan)); // "quality" inside a longer name is fine
+    }
+
+    [Fact]
+    public void TheKnownFactsComeFromTheRecordAndTheScore()
+    {
+        var record = new GreyRecord("x:1", "Memory for LLM agents", "s", "https://a.example.org/1", "Ana", "a.example.org", "qa", new DateTime(2025, 3, 1), new Dictionary<string, long>());
+        var facts = MultivocalMapper.KnownFactsFor(record, new GreyQuality { Points = 13.5, Outcome = "Passed" });
+
+        Assert.Equal(MultivocalMapper.KnownFacts.Select(f => f.Name), facts.Select(f => f.Name));
+        Assert.Equal("Grey", facts.Single(f => f.Name == "Literature").Value);
+        Assert.Equal("2025-03-01", facts.Single(f => f.Name == "Date").Value);
+        Assert.Equal("13.5 of 20", facts.Single(f => f.Name == "Quality points").Value);
+        Assert.Equal("not given", MultivocalMapper.KnownFactsFor(record with { Published = null }, null).Single(f => f.Name == "Date").Value);
+    }
 }
