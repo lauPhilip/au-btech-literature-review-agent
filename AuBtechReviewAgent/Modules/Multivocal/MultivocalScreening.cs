@@ -36,6 +36,17 @@ public sealed class GreyScreening
     public ScreeningAnswer? Second { get; set; }
     public List<string>? InjectionFlags { get; set; }
     public bool FromCache { get; set; }
+
+    /// <summary>The model's decision, kept when the reviewer changes or confirms it.</summary>
+    public string? ModelDecision { get; set; }
+
+    /// <summary>The reviewer looked at this decision (and possibly changed it); <see cref="Decision"/> is then theirs.</summary>
+    public bool Reviewed { get; set; }
+    public string? ReviewerNote { get; set; }
+    public DateTime? ReviewedUtc { get; set; }
+
+    /// <summary>Still waiting for the reviewer: flagged and not yet looked at.</summary>
+    public bool NeedsLook => Uncertain && !Reviewed;
 }
 
 /// <summary>The screening of a multivocal run's grey sources (multivocal-screening.json), which is in the run archive.</summary>
@@ -74,6 +85,7 @@ public sealed class MultivocalScreener
 
     private static readonly JsonSerializerOptions Json = new() { WriteIndented = true };
     private static readonly ConcurrentDictionary<Guid, bool> Running = new();
+    private static readonly SemaphoreSlim ReviewGate = new(1, 1);
     private static ILogger _log => AppLog.For("AuBtechReviewAgent.MultivocalScreener");
 
     private readonly RunStore _runs;
@@ -103,6 +115,38 @@ public sealed class MultivocalScreener
         if (!File.Exists(path)) return null;
         try { return JsonSerializer.Deserialize<MultivocalScreeningFile>(File.ReadAllText(path), Json); }
         catch (JsonException) { return null; }
+    }
+
+    /// <summary>
+    /// The reviewer's decision on one source, as in the systematic review's human review step: it confirms or changes
+    /// the model's decision, with an optional note, and the model's decision stays on file. Possible only while the
+    /// run is screened and its quality not yet scored, since the quality step uses the included sources.
+    /// </summary>
+    public async Task<GreyScreening> ReviewAsync(Guid runId, string? editKey, string address, bool include, string? note)
+    {
+        if (!_runs.CanEdit(runId, editKey)) throw new InvalidOperationException("Only the browser that planned this run can change its decisions.");
+        await ReviewGate.WaitAsync();
+        try
+        {
+            if (_runs.LoadHeader(runId)?.Stage != StageScreened)
+                throw new InvalidOperationException("Decisions can be changed only after screening and before the quality is scored.");
+            var file = Load(runId) ?? throw new InvalidOperationException("This run has not been screened.");
+            var entry = file.Sources.FirstOrDefault(s => s.Address == address) ?? throw new InvalidOperationException("This source was not screened in this run.");
+            if (entry.Decision == "Duplicate") throw new InvalidOperationException("A duplicate follows the source it duplicates.");
+
+            entry.ModelDecision ??= entry.Decision;
+            entry.Decision = include ? "Included" : "Excluded";
+            entry.ExclusionReason = include ? null : ExclusionReasons.ByReviewer;
+            entry.Reviewed = true;
+            entry.ReviewerNote = string.IsNullOrWhiteSpace(note) ? null : ReviewInputGuard.Normalize(note, singleLine: true);
+            entry.ReviewedUtc = DateTime.UtcNow;
+            await SafeFile.WriteAllTextAsync(Path.Join(_runs.FolderOf(runId), ScreeningFile), JsonSerializer.Serialize(file, Json));
+            return entry;
+        }
+        finally
+        {
+            ReviewGate.Release();
+        }
     }
 
     /// <summary>Whether this server is screening the run right now.</summary>

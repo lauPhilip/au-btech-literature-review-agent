@@ -491,6 +491,14 @@
                     {
                         <p class="bg-red-50 border border-red-200 text-red-800 p-2 text-xs" role="alert">@keepError</p>
                     }
+                    @if (screening != null && (screenError ?? (quality != null ? qualityError : null)) is { } tabError)
+                    {
+                        <p class="bg-red-50 border border-red-200 text-red-800 p-2 text-xs" role="alert">@tabError</p>
+                    }
+                    @if (canEdit && screening != null && stage == AuBtechReviewAgent.MultivocalScreener.StageScreened)
+                    {
+                        <p class="text-[11px] text-gray-500">Look at the flagged decisions before scoring the quality: keep or change each one, with a note if you like. The model's decision stays on file next to yours.</p>
+                    }
                     @if (screening != null)
                     {
                         <div class="flex items-center justify-between gap-3">
@@ -503,7 +511,7 @@
                                     <option value="unassessed">Not assessed (@quality.Count("Not assessed"))</option>
                                 }
                                 <option value="included">Included (@screening.Count("Included"))</option>
-                                <option value="look">To look at (@screening.Sources.Count(x => x.Uncertain))</option>
+                                <option value="look">To look at (@screening.Sources.Count(x => x.NeedsLook))</option>
                                 <option value="excluded">Excluded (@screening.Count("Excluded"))</option>
                                 <option value="duplicates">Duplicates (@screening.Count("Duplicate"))</option>
                                 <option value="all">All (@ledger.Sources.Count)</option>
@@ -520,9 +528,13 @@
                                 {
                                     <p class="flex flex-wrap items-center gap-1.5 mb-1">
                                         <span class="@DecisionChip(decision.Decision) text-[10px]">@DecisionLabel(decision)</span>
-                                        @if (decision.Uncertain && decision.Decision != "Error")
+                                        @if (decision.NeedsLook && decision.Decision != "Error")
                                         {
                                             <span class="ui-chip border-amber-200 bg-amber-50 text-amber-800 text-[10px]">look at this</span>
+                                        }
+                                        @if (decision.Reviewed)
+                                        {
+                                            <span class="ui-chip border-blue-200 bg-blue-50 text-blue-800 text-[10px]">@(decision.ModelDecision == decision.Decision ? "confirmed by you" : "changed by you")</span>
                                         }
                                     </p>
                                 }
@@ -544,6 +556,11 @@
                                         @if (score.NotAssessed != null)
                                         {
                                             <p class="mt-1">Not assessed: @score.NotAssessed.</p>
+                                            @if (canEdit && stage == AuBtechReviewAgent.MultivocalQualityAssessor.StageAssessed)
+                                            {
+                                                string address = score.Address;
+                                                <button type="button" class="ui-btn-secondary ui-btn-sm mt-1" disabled="@(retrying == address)" @onclick="() => RetryAsync(address)">@(retrying == address ? "Assessing…" : "Try again")</button>
+                                            }
                                         }
                                         else
                                         {
@@ -571,6 +588,30 @@
                                                     }
                                                 </tbody>
                                             </table>
+                                            @if (score.Argument is { } argument)
+                                            {
+                                                <div class="mt-2 border-t border-gray-100 pt-2">
+                                                    <p class="font-medium text-gray-800">Opinion piece: its claim and the critical questions (G13)</p>
+                                                    <q class="block italic text-gray-600 mt-0.5">@argument.Claim</q>
+                                                    @if (!argument.ClaimFound)
+                                                    {
+                                                        <p class="text-amber-800">This claim was not found word for word in the page.</p>
+                                                    }
+                                                    <dl class="mt-1 space-y-1">
+                                                        @foreach (var question in argument.Questions)
+                                                        {
+                                                            <div>
+                                                                <dt class="text-gray-800">@question.Question</dt>
+                                                                <dd class="text-gray-600">@question.Answer</dd>
+                                                                @if (question.Quote != null && question.Basis == "model")
+                                                                {
+                                                                    <dd><q class="italic text-gray-500">@question.Quote</q></dd>
+                                                                }
+                                                            </div>
+                                                        }
+                                                    </dl>
+                                                </div>
+                                            }
                                         }
                                     </details>
                                 }
@@ -583,7 +624,28 @@
                                         {
                                             <p class="mt-1">Second screening: @decision.Second.Reasoning</p>
                                         }
+                                        @if (decision.Reviewed)
+                                        {
+                                            <p class="mt-1">You decided: @decision.Decision@(decision.ReviewerNote != null ? $" ({decision.ReviewerNote})" : "")@(decision.ModelDecision != decision.Decision ? $"; the model had decided {decision.ModelDecision}" : "").</p>
+                                        }
                                     </details>
+                                }
+                                @if (canEdit && decision != null && decision.Decision != "Duplicate" && stage == AuBtechReviewAgent.MultivocalScreener.StageScreened)
+                                {
+                                    string address = decision.Address;
+                                    <div class="mt-1.5 flex flex-wrap items-center gap-1.5">
+                                        <label class="sr-only" for="@($"note-{address.GetHashCode():x}")">@($"Your note on {r.Title}")</label>
+                                        <input id="@($"note-{address.GetHashCode():x}")" type="text" maxlength="300" placeholder="Note (optional)" class="ui-input py-0.5 text-[11px] w-40"
+                                               value="@(reviewNotes.GetValueOrDefault(address) ?? "")" @onchange="e => reviewNotes[address] = e.Value?.ToString() ?? string.Empty" />
+                                        @if (decision.Decision != "Included" || decision.NeedsLook)
+                                        {
+                                            <button type="button" class="ui-btn-secondary ui-btn-sm py-0.5" disabled="@(reviewing == address)" @onclick="() => ReviewAsync(address, true)">@(decision.Decision == "Included" ? "Keep it" : "Include")</button>
+                                        }
+                                        @if (decision.Decision != "Excluded" || decision.NeedsLook)
+                                        {
+                                            <button type="button" class="ui-btn-secondary ui-btn-sm py-0.5" disabled="@(reviewing == address)" @onclick="() => ReviewAsync(address, false)">@(decision.Decision == "Excluded" ? "Keep it out" : "Exclude")</button>
+                                        }
+                                    </div>
                                 }
                                 @{ var snapshot = SnapshotOf(r.Url); }
                                 @if (snapshot is { NotKept: null })
@@ -687,6 +749,9 @@
     private bool assessing;
     private string? qualityProgress;
     private string? qualityError;
+    private readonly Dictionary<string, string> reviewNotes = new();
+    private string? reviewing;
+    private string? retrying;
     private Dictionary<string, AuBtechReviewAgent.PageSnapshot> snapshots = new();
     private readonly HashSet<string> keeping = new();
     private string? keepError;
@@ -937,6 +1002,51 @@
         }
     }
 
+    private async Task ReviewAsync(string address, bool include)
+    {
+        if (planned == null || screening == null || reviewing != null) return;
+        reviewing = address;
+        screenError = null;
+        try
+        {
+            var entry = await Screener.ReviewAsync(planned.RunId, editKey, address, include, reviewNotes.GetValueOrDefault(address));
+            int index = screening.Sources.FindIndex(s => s.Address == address);
+            if (index >= 0) screening.Sources[index] = entry;
+            decisions[address] = entry;
+        }
+        catch (InvalidOperationException ex)
+        {
+            screenError = ex.Message;
+        }
+        finally
+        {
+            reviewing = null;
+        }
+    }
+
+    private async Task RetryAsync(string address)
+    {
+        if (planned == null || quality == null || retrying != null) return;
+        retrying = address;
+        qualityError = null;
+        try
+        {
+            var again = await Quality.RetryAsync(planned.RunId, editKey, address);
+            int index = quality.Sources.FindIndex(q => q.Address == address);
+            if (index >= 0) quality.Sources[index] = again;
+            qualities[address] = again;
+            snapshots = Pages.Load(planned.RunId).Pages.ToDictionary(p => AuBtechReviewAgent.MultivocalSearcher.AddressKey(p.Url));
+        }
+        catch (InvalidOperationException ex)
+        {
+            qualityError = ex.Message;
+        }
+        finally
+        {
+            retrying = null;
+        }
+    }
+
     private AuBtechReviewAgent.GreyQuality? QualityOf(string url) =>
         qualities.TryGetValue(AuBtechReviewAgent.MultivocalSearcher.AddressKey(url), out var q) ? q : null;
 
@@ -961,17 +1071,19 @@
         "unassessed" => ledger!.Sources.Where(f => QualityOf(f.Record.Url)?.Outcome == "Not assessed"),
         "included" => ledger!.Sources.Where(f => DecisionOf(f.Record.Url)?.Decision == "Included"),
         "excluded" => ledger!.Sources.Where(f => DecisionOf(f.Record.Url)?.Decision == "Excluded"),
-        "look" => ledger!.Sources.Where(f => DecisionOf(f.Record.Url) is { Uncertain: true }),
+        "look" => ledger!.Sources.Where(f => DecisionOf(f.Record.Url) is { NeedsLook: true }),
         "duplicates" => ledger!.Sources.Where(f => DecisionOf(f.Record.Url)?.Decision == "Duplicate"),
         _ => ledger!.Sources,
     };
 
     private static string ScreeningLine(AuBtechReviewAgent.MultivocalScreeningFile f)
     {
-        int look = f.Sources.Count(s => s.Uncertain);
+        int look = f.Sources.Count(s => s.NeedsLook);
+        int reviewed = f.Sources.Count(s => s.Reviewed);
         string line = $"{f.Count("Included")} included, {f.Count("Excluded")} excluded, {f.Count("Duplicate")} duplicates";
         if (f.Count("Error") > 0) line += $", {f.Count("Error")} not screened";
         if (look > 0) line += $"; {look} to look at";
+        if (reviewed > 0) line += $"; {reviewed} looked at by you";
         return f.Kappa is double k ? $"{line}; agreement κ = {k:0.00}" : line;
     }
 

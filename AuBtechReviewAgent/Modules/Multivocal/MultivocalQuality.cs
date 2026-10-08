@@ -43,6 +43,45 @@ public sealed class GreyQuality
     public string Outcome { get; set; } = "";
     public string? NotAssessed { get; set; }
     public bool FromCache { get; set; }
+
+    /// <summary>For an opinion piece: its main claim and the critical questions for an expert opinion (G13); null otherwise.</summary>
+    public GreyArgument? Argument { get; set; }
+}
+
+/// <summary>One critical question about an opinion piece, and its answer.</summary>
+public sealed class ArgumentAnswer
+{
+    public string Id { get; set; } = "";
+    public string Question { get; set; } = "";
+    public string Answer { get; set; } = "";
+    public string? Quote { get; set; }
+
+    /// <summary>"model" (its quote found in the page), "unsupported" (the quote was not found), "reviewer" or "synthesis".</summary>
+    public string Basis { get; set; } = "";
+}
+
+/// <summary>
+/// The argument of an opinion piece (G13): the source's main claim P, as written, and the six critical questions for
+/// an expert opinion that Garousi et al. take from Rainer's work. The model answers expertise, field, opinion and
+/// backup evidence from the page; trustworthiness is left to the reviewer, as the paper notes it cannot be judged
+/// reliably, and consistency with other experts is judged in the synthesis, where the sources are compared.
+/// </summary>
+public sealed class GreyArgument
+{
+    public string Claim { get; set; } = "";
+    public bool ClaimFound { get; set; }
+    public List<ArgumentAnswer> Questions { get; set; } = new();
+
+    /// <summary>The six questions, in the paper's order; P is the claim and W its writer.</summary>
+    public static readonly IReadOnlyList<(string Id, string Question)> CriticalQuestions = new[]
+    {
+        ("expertise", "How credible is the writer as an expert source?"),
+        ("field", "Is the writer an expert in the field the claim belongs to?"),
+        ("opinion", "What did the writer assert that implies the claim?"),
+        ("trustworthiness", "Is the writer personally reliable as a source?"),
+        ("consistency", "Does the claim agree with what other experts say?"),
+        ("backup", "Is the writer's assertion based on evidence?"),
+    };
 }
 
 /// <summary>The quality assessment of a multivocal run (multivocal-quality.json), which is in the run archive.</summary>
@@ -75,7 +114,7 @@ public sealed class MultivocalQualityAssessor
     public const string StageAssessed = "Assessed";
 
     /// <summary>Part of the cache key: raise it whenever the quality prompt changes.</summary>
-    public const string PromptVersion = "grey-quality-v1";
+    public const string PromptVersion = "grey-quality-v2";
 
     /// <summary>At most this much of a page is sent to the model; a quote must come from this part.</summary>
     public const int MaxTextForModel = 40_000;
@@ -118,6 +157,35 @@ public sealed class MultivocalQualityAssessor
     }
 
     public static bool IsRunning(Guid runId) => Running.ContainsKey(runId);
+
+    /// <summary>
+    /// Assesses one source again whose quality could not be assessed (its page could not be read, or the model call
+    /// failed), so one failure does not mean planning the run again. A source that was assessed keeps its score.
+    /// </summary>
+    public async Task<GreyQuality> RetryAsync(Guid runId, string? editKey, string address)
+    {
+        if (!_runs.CanEdit(runId, editKey)) throw new InvalidOperationException("Only the browser that planned this run can assess its sources.");
+        var planned = _planner.Load(runId) ?? throw new InvalidOperationException("This run has no plan.");
+        var record = _searcher.LoadLedger(runId)?.Sources.Select(s => s.Record).FirstOrDefault(r => MultivocalSearcher.AddressKey(r.Url) == address)
+            ?? throw new InvalidOperationException("This source was not found in this run.");
+        if (!Running.TryAdd(runId, true)) throw new InvalidOperationException("This run is being assessed already.");
+        try
+        {
+            var file = Load(runId) ?? throw new InvalidOperationException("Score the quality first.");
+            int index = file.Sources.FindIndex(q => q.Address == address);
+            if (index < 0) throw new InvalidOperationException("This source was not assessed in this run.");
+            if (file.Sources[index].Outcome != "Not assessed") throw new InvalidOperationException("This source has a score already.");
+
+            var again = await AssessOneAsync(runId, editKey, _chat(), planned.Plan, record);
+            file.Sources[index] = again;
+            await SafeFile.WriteAllTextAsync(Path.Join(_runs.FolderOf(runId), QualityFile), JsonSerializer.Serialize(file, Json));
+            return again;
+        }
+        finally
+        {
+            Running.TryRemove(runId, out _);
+        }
+    }
 
     /// <summary>Assesses every included source of a screened run. Needs the run's edit key.</summary>
     public async Task<MultivocalQualityFile> AssessAsync(Guid runId, string? editKey, IProgress<string>? progress = null)
@@ -208,7 +276,8 @@ public sealed class MultivocalQualityAssessor
         {
             var (answers, fromCache) = await AnswerCachedAsync(chat, plan, record, forModel, snapshot.TextSha256);
             result.FromCache = fromCache;
-            result.Answers = Score(record, answers, forModel);
+            result.Answers = Score(record, answers.Answers, forModel);
+            result.Argument = Argument(answers.Opinion, forModel);
         }
         catch (Exception ex) when (ex is not OutOfMemoryException)
         {
@@ -271,22 +340,68 @@ public sealed class MultivocalQualityAssessor
 
     private static double Snap(double score) => score >= 0.75 ? 1 : score >= 0.25 ? 0.5 : 0;
 
-    private async Task<(IReadOnlyList<ModelQualityAnswer> Answers, bool FromCache)> AnswerCachedAsync(
+    /// <summary>
+    /// The argument record of an opinion piece, with every quote checked against the page: a claim or answer whose
+    /// quote is not in the page is kept but marked as unsupported. Null when the source is not an opinion piece.
+    /// </summary>
+    public static GreyArgument? Argument(ModelOpinion? opinion, string text)
+    {
+        if (opinion is not { IsOpinion: true }) return null;
+        var argument = new GreyArgument
+        {
+            Claim = opinion.Claim?.Trim() ?? "",
+            ClaimFound = CitationSupportChecker.QuoteOccursIn(opinion.Claim, text),
+        };
+        foreach (var (id, question) in GreyArgument.CriticalQuestions)
+        {
+            var answer = new ArgumentAnswer { Id = id, Question = question };
+            if (id == "trustworthiness")
+            {
+                answer.Answer = "Left to the reviewer: Garousi et al. note that this cannot be judged reliably.";
+                answer.Basis = "reviewer";
+            }
+            else if (id == "consistency")
+            {
+                answer.Answer = "Judged in the synthesis, where the claim is compared with the other sources; experts may also disagree for good reasons.";
+                answer.Basis = "synthesis";
+            }
+            else
+            {
+                var given = id switch { "expertise" => opinion.Expertise, "field" => opinion.Field, "opinion" => opinion.Assertion, _ => opinion.Evidence };
+                answer.Answer = given?.Answer?.Trim() ?? "No answer.";
+                answer.Quote = string.IsNullOrWhiteSpace(given?.Quote) ? null : given!.Quote!.Trim();
+                bool found = answer.Quote != null && CitationSupportChecker.QuoteOccursIn(answer.Quote, text);
+                answer.Basis = found ? "model" : "unsupported";
+                if (!found) answer.Answer = "(No quote from the page backs this.) " + answer.Answer;
+            }
+            argument.Questions.Add(answer);
+        }
+        return argument;
+    }
+
+    private async Task<(ModelQualityAnswers Answers, bool FromCache)> AnswerCachedAsync(
         IChatCompletionService chat, MultivocalPlan plan, GreyRecord record, string text, string textSha)
     {
         string topic = TopicLine(plan);
         string key = ReviewCache.Key(PromptVersion, _model, topic, record.Title, record.Producer, record.Site, record.Kind, textSha);
         if (_cache.TryGet<ModelQualityAnswers>("grey-quality", key, out var cached) && cached != null && ModelQualityAnswers.Validate(cached) == null)
-            return (cached.Answers, true);
+            return (cached, true);
         var answer = await AskAsync(chat, topic, record, text);
         _cache.Set("grey-quality", key, answer);
-        return (answer.Answers, false);
+        return (answer, false);
     }
 
     private static string TopicLine(MultivocalPlan plan) =>
         $"{plan.Topic}. Research questions: {string.Join(" ", plan.Numbered().Select(q => $"{q.Number}: {q.Question.Text}"))}";
 
-    /// <summary>The quality prompt: the 17 items read from the page, each scored 1, 0.5 or 0 with a verbatim quote.</summary>
+    private const string AnswerShape = """
+        {"answers":[{"id":"1.1","score":1,"reason":"One sentence.","quote":"Word for word from the page."}],"opinion":{"isOpinion":true,"claim":"Word for word from the page.","expertise":{"answer":"One sentence.","quote":"Word for word."},"field":{"answer":"...","quote":"..."},"assertion":{"answer":"...","quote":"..."},"evidence":{"answer":"...","quote":"..."}}}
+        """;
+
+    /// <summary>
+    /// The quality prompt: the 17 items read from the page, each scored 1, 0.5 or 0 with a verbatim quote, and for an
+    /// opinion piece its main claim and four of the critical questions for an expert opinion (G13).
+    /// </summary>
     public static async Task<ModelQualityAnswers> AskAsync(IChatCompletionService chat, string topic, GreyRecord record, string text)
     {
         string items = string.Join("\n", GreyQualityChecklist.ModelItems.Select(i => $"{i.Id} ({i.Group}) {i.Question}"));
@@ -316,8 +431,16 @@ public sealed class MultivocalQualityAssessor
             ITEMS:
             {{items}}
 
+            Then decide whether the source is an OPINION PIECE: it mainly argues for a view from the writer's own experience or judgement, rather than reporting data, a study or documentation.
+            If it is, copy its main claim word for word from the page, and answer these questions about the claim and its writer, each in one sentence with a word-for-word quote from the page:
+            - expertise: How credible is the writer as an expert source?
+            - field: Is the writer an expert in the field the claim belongs to?
+            - assertion: What did the writer assert that implies the claim?
+            - evidence: Is the writer's assertion based on evidence (data, examples, measurements, references)?
+            If it is not an opinion piece, set isOpinion to false and leave the rest out.
+
             Respond ONLY with a valid minified JSON object of this shape, with one entry per item, in order:
-            {"answers":[{"id":"1.1","score":1,"reason":"One sentence.","quote":"Word for word from the page."}]}
+            {{AnswerShape}}
             """;
         return await LlmJson.GetAsync<ModelQualityAnswers>(chat, prompt, LlmJson.JsonMode(0.0), ModelQualityAnswers.Validate);
     }
@@ -337,6 +460,9 @@ public sealed class ModelQualityAnswers
 {
     public List<ModelQualityAnswer> Answers { get; set; } = new();
 
+    /// <summary>For an opinion piece, its claim and the answers to four critical questions; older answers have none.</summary>
+    public ModelOpinion? Opinion { get; set; }
+
     /// <summary>Null when the answer is usable: every model item answered once, with a score of 1, 0.5 or 0 and a reason.</summary>
     public static string? Validate(ModelQualityAnswers a)
     {
@@ -346,6 +472,30 @@ public sealed class ModelQualityAnswers
         if (missing.Count > 0) return $"answers are missing for items {string.Join(", ", missing)}.";
         if (a.Answers.Any(x => x.Score is not (0 or 0.5 or 1))) return "every score must be 1, 0.5 or 0.";
         if (a.Answers.Any(x => string.IsNullOrWhiteSpace(x.Reason))) return "every answer needs a reason.";
+        if (a.Opinion is { IsOpinion: true } o)
+        {
+            if (string.IsNullOrWhiteSpace(o.Claim)) return "an opinion piece needs its main claim, word for word.";
+            if (new[] { o.Expertise, o.Field, o.Assertion, o.Evidence }.Any(x => string.IsNullOrWhiteSpace(x?.Answer)))
+                return "an opinion piece needs answers to expertise, field, assertion and evidence.";
+        }
         return null;
     }
+}
+
+/// <summary>The model's reading of an opinion piece: its claim and the answers to four critical questions.</summary>
+public sealed class ModelOpinion
+{
+    public bool IsOpinion { get; set; }
+    public string? Claim { get; set; }
+    public ModelOpinionAnswer? Expertise { get; set; }
+    public ModelOpinionAnswer? Field { get; set; }
+    public ModelOpinionAnswer? Assertion { get; set; }
+    public ModelOpinionAnswer? Evidence { get; set; }
+}
+
+/// <summary>One answer about an opinion piece, with its quote from the page.</summary>
+public sealed class ModelOpinionAnswer
+{
+    public string? Answer { get; set; }
+    public string? Quote { get; set; }
 }
