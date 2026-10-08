@@ -19,33 +19,8 @@ namespace AuBtechReviewAgent;
 /// <summary>The downloadable archive: main.tex, bibliography, ledgers, manifest and source files.</summary>
 public partial class PrismaReviewEngine
 {
-    private string EscapeLatexText(string input)
-    {
-        if (string.IsNullOrEmpty(input)) return string.Empty;
-        string cleanInput = input.Replace("https://doi.org/XXXX-XXXXXX", "")
-                                 .Replace("https://doi.org/XXXXXXX.XXXXXXX", "")
-                                 .Replace("https://doi.org/XX.XXXX/", "")
-                                 .Replace("https://doi.org/XXXX", "")
-                                 .Replace("https://doi.org/XXX", "")
-                                 .Replace("XXXXXX.XXXXX", "")
-                                 .TrimEnd(' ', ',', '.', '/');
+    private static string EscapeLatexText(string input) => PaperLatex.Escape(input);
 
-        string escaped = cleanInput.Replace(@"\", @"\textbackslash ")
-                         .Replace("&", @"\&")
-                         .Replace("%", @"\%")
-                         .Replace("$", @"\$")
-                         .Replace("_", @"\_")
-                         .Replace("#", @"\#")
-                         .Replace("{", @"\{")
-                         .Replace("}", @"\}")
-                         .Replace("~", @"\textasciitilde ")
-                         .Replace("^", @"\textasciicircum ");
-        // Straight double quotes print as two closing quotes in LaTeX; use proper ``opening'' and closing quotes.
-        escaped = Regex.Replace(escaped, "\"([^\"\n]*)\"", "``$1''");
-        // Markdown-style *italics* (used for venues in the APA references) -> real LaTeX italics.
-        return Regex.Replace(escaped, @"\*([^*\n]+)\*", @"\textit{$1}");
-    }
-    
     /// <summary>
     /// Loads the persisted report + synthesized records for a session straight off disk and builds the
     /// workspace archive from them. Lets the download be served from a plain HTTP endpoint (Program.cs)
@@ -150,20 +125,9 @@ public partial class PrismaReviewEngine
         string yearPoints = string.Join(" ", yearKeys.Select((k, i) => $"({i + 1},{publicationsByYear[k]})"));
         int yearAxisMax = Math.Max(4, publicationsByYear.Values.DefaultIfEmpty(0).Max() + 1);
 
-        string sanitizedTitleItem = EscapeLatexText((report.TitleItem ?? "Systematic Review Manuscript").Replace("[Source Context Anchor 1]", "").Trim());
-        string sanitizedAbstractItem = EscapeLatexText(report.AbstractItem ?? "");
-        string sanitizedRationaleItem = EscapeLatexText(report.RationaleItem ?? "");
-        string sanitizedObjectivesItem = EscapeLatexText(report.ObjectivesItem ?? "");
-        string sanitizedEligibilityItem = EscapeLatexText(report.EligibilityItem ?? "");
-        string sanitizedSourcesItem = EscapeLatexText(report.SourcesItem ?? "");
-        string sanitizedSearchStrategyItem = EscapeLatexText(report.SearchStrategyItem ?? "");
-        string sanitizedSelectionProcessItem = EscapeLatexText(report.SelectionProcessItem ?? "");
-        string sanitizedBiasAssessmentItem = EscapeLatexText(report.BiasAssessmentItem ?? "");
-        
         string rawSynthesis = report.SynthesisResultsItem ?? "";
         string textSynthesisOnly = Regex.Replace(rawSynthesis, @"\[MERMAID_START\].*?\[MERMAID_END\]", "", RegexOptions.Singleline);
         textSynthesisOnly = Regex.Replace(textSynthesisOnly, @"\[TIKZ_START\].*?\[TIKZ_END\]", "", RegexOptions.Singleline).Trim();
-        string sanitizedSynthesisResultsItem = EscapeLatexText(textSynthesisOnly);
 
         string tikzDiagramCode = "";
         var tikzMatch = Regex.Match(rawSynthesis, @"\[TIKZ_START\](.*?)\[TIKZ_END\]", RegexOptions.Singleline);
@@ -174,87 +138,19 @@ public partial class PrismaReviewEngine
             tikzDiagramCode = tikzDiagramCode.Replace("-¿", "->");
         }
 
-        string sanitizedDiscussionItem = EscapeLatexText(report.DiscussionItem ?? "");
-        string sanitizedSupportItem = EscapeLatexText(report.SupportItem ?? "");
+        // The systematic review's own parts of the shared paper (Report/ReviewPaper.cs): its PRISMA method items,
+        // its data figures and tables, and the evidence map and artifact. All of it is drawn in code.
+        var methods = new List<PaperSection>
+        {
+            new("Eligibility Criteria", report.EligibilityItem ?? ""),
+            new("Information Sources", report.SourcesItem ?? ""),
+            new("Search Execution", report.SearchStrategyItem ?? ""),
+            new("Selection Automation", report.SelectionProcessItem ?? ""),
+            new("Data Collection and Quality Appraisal", report.BiasAssessmentItem ?? ""),
+        };
+        if (!string.IsNullOrWhiteSpace(report.SynthesisMethodsItem)) methods.Add(new("Synthesis Methods", report.SynthesisMethodsItem));
 
         var sb = new StringBuilder();
-        sb.AppendLine(@"\documentclass[9pt,a4paper]{article}");
-        sb.AppendLine(@"\usepackage[utf8]{inputenc}");
-        sb.AppendLine(@"\usepackage[margin=0.8in]{geometry}");
-        sb.AppendLine(@"\usepackage{amsmath,amsfonts,amssymb}");
-        sb.AppendLine(@"\usepackage{booktabs}");
-        sb.AppendLine(@"\usepackage{ltablex}"); 
-        sb.AppendLine(@"\usepackage{xcolor}");
-        sb.AppendLine(@"\usepackage{fancyhdr}");
-        sb.AppendLine(@"\usepackage{float}");
-        sb.AppendLine(@"\usepackage{pgfplots}");
-        sb.AppendLine(@"\usepgfplotslibrary{statistics}");
-        sb.AppendLine(@"\pgfplotsset{compat=1.18}");
-        sb.AppendLine(@"\usetikzlibrary{matrix,arrows.meta,positioning}");
-        
-        sb.AppendLine(@"\usepackage{tgtermes}"); 
-        sb.AppendLine(@"\usepackage{tgheros}");  
-        sb.AppendLine(@"\usepackage{tgcursor}");  
-        sb.AppendLine(@"\usepackage{multicol}");
-        
-        sb.AppendLine(@"\definecolor{auBlue}{HTML}{003B5C}");
-        sb.AppendLine(@"\definecolor{greyText}{HTML}{4B5563}");
-        sb.AppendLine(@"\definecolor{customIndigo}{HTML}{312E81}");
-        
-        sb.AppendLine(@"\pagestyle{fancy}");
-        sb.AppendLine(@"\fancyhf{}");
-        sb.AppendLine(@"\renewcommand{\headrulewidth}{0pt}");
-        sb.AppendLine(@"\fancyfoot[C]{\sffamily\scriptsize\color{greyText} Page \thepage}");
-
-        sb.AppendLine(@"\begin{document}");
-
-        sb.AppendLine(@"\begin{center}");
-        sb.AppendLine(@"    {\sffamily\bfseries\scriptsize\color{gray} AI-GENERATED SYSTEMATIC LITERATURE REVIEW  \\ \vspace{4pt}}");
-        sb.AppendLine("    {\\rmfamily\\LARGE\\bfseries " + sanitizedTitleItem + " \\\\ \\vspace{10pt}}");
-        sb.AppendLine(@"    {\sffamily\small\color{greyText} Department of Business Development and Technology, Aarhus University \\ \vspace{4pt}}");
-        string protocolHash = string.IsNullOrWhiteSpace(report.ProtocolHash) ? "not recorded" : report.ProtocolHash;
-        sb.AppendLine("    {\\ttfamily\\scriptsize\\color{gray} Protocol Hash: " + protocolHash + " | Generated: " + (report.GeneratedAt ?? DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss UTC")) + " \\\\ \\vspace{15pt}}");
-        sb.AppendLine(@"    \color{lightgray}\hrule\vspace{15pt}");
-        sb.AppendLine(@"    \color{black}");
-        sb.AppendLine(@"\end{center}");
-
-        sb.AppendLine(@"\noindent\colorbox{black!4}{");
-        sb.AppendLine(@"\parbox{\dimexpr\linewidth-2\fboxsep\relax}{");
-        sb.AppendLine(@"    \small\sffamily\bfseries\color{auBlue} ABSTRACT \\ \vspace{4pt}");
-        sb.AppendLine("    \\itshape\\rmfamily\\color{black} " + sanitizedAbstractItem);
-        sb.AppendLine(@"}}");
-        sb.AppendLine(@"\vspace{15pt}");
-
-        sb.AppendLine(@"\begin{multicols}{2}");
-
-        sb.AppendLine(@"\section{Introduction}");
-        sb.AppendLine(@"\subsection{Rationale}");
-        sb.AppendLine(sanitizedRationaleItem);
-        sb.AppendLine(@"\subsection{Objectives}");
-        sb.AppendLine(sanitizedObjectivesItem);
-
-        sb.AppendLine(@"\section{Methodology}");
-        sb.AppendLine(@"\subsection{Eligibility Criteria}");
-        sb.AppendLine(sanitizedEligibilityItem);
-        sb.AppendLine(@"\subsection{Information Sources}");
-        sb.AppendLine(sanitizedSourcesItem);
-        sb.AppendLine(@"\subsection{Search Execution}");
-        sb.AppendLine(sanitizedSearchStrategyItem);
-        sb.AppendLine(@"\subsection{Selection Automation}");
-        sb.AppendLine(sanitizedSelectionProcessItem);
-        sb.AppendLine(@"\subsection{Data Collection and Quality Appraisal}");
-        sb.AppendLine(sanitizedBiasAssessmentItem);
-        if (!string.IsNullOrWhiteSpace(report.SynthesisMethodsItem))
-        {
-            sb.AppendLine(@"\subsection{Synthesis Methods}");
-            sb.AppendLine(EscapeLatexText(report.SynthesisMethodsItem));
-        }
-
-        sb.AppendLine(@"\end{multicols}");
-        sb.AppendLine(@"\section{Data \& Collection Metrics}");
-        sb.AppendLine(EscapeLatexText(MethodsSectionWriter.IncludedSet(records)));
-        sb.AppendLine(@"\vspace{10pt}");
-
         if (state != null)
         {
             var flow = PrismaFlowCounts.From(state);
@@ -268,7 +164,7 @@ public partial class PrismaReviewEngine
 
         sb.AppendLine(@"\begin{figure}[H]");
         sb.AppendLine(@"\centering");
-        
+
         sb.AppendLine(@"\begin{minipage}{0.32\textwidth}");
         sb.AppendLine(@"\centering");
         sb.AppendLine(@"\begin{tikzpicture}[scale=0.65]");
@@ -326,88 +222,56 @@ public partial class PrismaReviewEngine
             sb.Append(ExtractionTables(extractions));
         }
         sb.AppendLine(@"\vspace{10pt}");
+        string dataLatex = sb.ToString();
 
-        sb.AppendLine(@"\begin{multicols}{2}");
-        sb.AppendLine(@"\section{Results \& Synthesis}");
-        sb.AppendLine(sanitizedSynthesisResultsItem);
-        foreach (var section in report.SynthesisSections ?? new List<SynthesisSection>())
-        {
-            sb.AppendLine($"\\subsection{{{EscapeLatexText(section.Heading)}}}");
-            sb.AppendLine(EscapeLatexText(section.Text));
-        }
-        if (!string.IsNullOrWhiteSpace(report.CoverageSummary))
-        {
-            sb.AppendLine(@"\par\smallskip\noindent\textit{" + EscapeLatexText(report.CoverageSummary) + "}");
-        }
+        var resultsLatex = new List<string>();
         if (state?.ThematicSynthesis is { Themes.Count: > 0 } book && (report.SynthesisSections?.Count ?? 0) > 0)
-        {
-            sb.AppendLine(@"\end{multicols}");
-            sb.Append(EvidenceMapTable(book));
-            sb.AppendLine(@"\begin{multicols}{2}");
-        }
+            resultsLatex.Add(EvidenceMapTable(book));
         if (report.Artifact is { Error: null } artifact)
-        {
-            sb.AppendLine(@"\end{multicols}");
-            sb.Append(ArtifactLatex(artifact));
-            sb.AppendLine(@"\begin{multicols}{2}");
-        }
-        
+            resultsLatex.Add(ArtifactLatex(artifact));
         if (!string.IsNullOrEmpty(tikzDiagramCode))
-        {
-            sb.AppendLine(@"\end{multicols}");
-            sb.AppendLine(@"\begin{figure}[H]");
-            sb.AppendLine(@"\centering");
-            sb.AppendLine(@"\resizebox{\linewidth}{!}{");
-            sb.AppendLine(tikzDiagramCode);
-            sb.AppendLine(@"}");
-            sb.AppendLine(@"\caption{Grounded Architectural Synthesis System Model Diagram}");
-            sb.AppendLine(@"\end{figure}");
-            sb.AppendLine(@"\begin{multicols}{2}");
-        }
+            resultsLatex.Add(string.Join("", new[]
+            {
+                @"\begin{figure}[H]", @"\centering", @"\resizebox{\linewidth}{!}{", tikzDiagramCode, @"}",
+                @"\caption{Grounded Architectural Synthesis System Model Diagram}", @"\end{figure}",
+            }.Select(line => line + Environment.NewLine)));
 
-        sb.AppendLine(@"\section{Discussion}");
-        sb.AppendLine(sanitizedDiscussionItem);
-        if (!string.IsNullOrWhiteSpace(report.CitationCheckSummary))
-        {
-            sb.AppendLine(@"\subsection{Automated Citation Check}");
-            sb.AppendLine(EscapeLatexText(report.CitationCheckSummary));
-        }
-        if (!string.IsNullOrWhiteSpace(state?.HumanScreeningReviewOutcome))
-        {
-            sb.AppendLine(@"\subsection{Human Screening Review}");
-            sb.AppendLine(EscapeLatexText(state!.HumanScreeningReviewOutcome!));
-        }
+        var discussionNotes = new List<PaperSection>();
+        if (!string.IsNullOrWhiteSpace(report.CitationCheckSummary)) discussionNotes.Add(new("Automated Citation Check", report.CitationCheckSummary));
+        if (!string.IsNullOrWhiteSpace(state?.HumanScreeningReviewOutcome)) discussionNotes.Add(new("Human Screening Review", state!.HumanScreeningReviewOutcome!));
 
-        sb.AppendLine(@"\section{Administrative Declarations}");
-        sb.AppendLine(@"\subsection{Support \& Funding}");
-        sb.AppendLine(sanitizedSupportItem);
-        if (!string.IsNullOrWhiteSpace(report.ProtocolItem))
-        {
-            sb.AppendLine(@"\subsection{Registration and Protocol}");
-            sb.AppendLine(EscapeLatexText(report.ProtocolItem));
-        }
-        sb.AppendLine(@"\subsection{Open Science Code Availability}");
-        sb.AppendLine((report.AvailabilityItem ?? "").Replace("_", @"\_"));
-        sb.AppendLine(@"\end{multicols}");
+        var declarations = new List<PaperSection> { new("Support & Funding", report.SupportItem ?? "") };
+        if (!string.IsNullOrWhiteSpace(report.ProtocolItem)) declarations.Add(new("Registration and Protocol", report.ProtocolItem));
+        declarations.Add(new("Open Science Code Availability", "", (report.AvailabilityItem ?? "").Replace("_", @"\_")));
 
-        sb.AppendLine(@"\clearpage");
-        sb.AppendLine(@"\begin{thebibliography}{99}");
-        int refIdx = 1;
-        foreach (var row in records)
+        var paper = new ReviewPaper
         {
-            string citation = EscapeLatexText(row.ApaCitation);
-            sb.AppendLine($"\\bibitem{{ref{refIdx}}} {citation}");
-            refIdx++;
-        }
-        sb.AppendLine(@"\end{thebibliography}");
-        sb.AppendLine(@"\end{document}");
+            KindLabel = "AI-GENERATED SYSTEMATIC LITERATURE REVIEW",
+            Title = (report.TitleItem ?? "Systematic Review Manuscript").Replace("[Source Context Anchor 1]", "").Trim(),
+            ProtocolHash = string.IsNullOrWhiteSpace(report.ProtocolHash) ? "not recorded" : report.ProtocolHash,
+            GeneratedAt = report.GeneratedAt ?? DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss UTC"),
+            Abstract = report.AbstractItem ?? "",
+            Rationale = report.RationaleItem ?? "",
+            Objectives = report.ObjectivesItem ?? "",
+            Methods = methods,
+            DataText = MethodsSectionWriter.IncludedSet(records),
+            DataLatex = dataLatex,
+            ResultsText = textSynthesisOnly,
+            Themes = (report.SynthesisSections ?? new List<SynthesisSection>()).Select(x => new PaperSection(x.Heading, x.Text)).ToList(),
+            CoverageNote = report.CoverageSummary,
+            ResultsLatex = resultsLatex,
+            Discussion = report.DiscussionItem ?? "",
+            DiscussionNotes = discussionNotes,
+            Declarations = declarations,
+            References = records.Select(r => r.ApaCitation).ToList(),
+        };
 
         // The files only a systematic review generates; the core (Report/RunArchive.cs) adds the run folder's
         // files, the source texts and answers, and manifest.json with the SHA-256 of everything.
         var generated = new List<(string Path, byte[] Content)>();
         void AddText(string name, string content) => generated.Add((name, new UTF8Encoding(false).GetBytes(content)));
 
-        AddText("main.tex", sb.ToString());
+        AddText("main.tex", PaperLatex.Build(paper));
         AddText("references.bib", BibliographyExporter.ToBibTeX(records));
         AddText("references.ris", BibliographyExporter.ToRis(records));
         if (state != null)
