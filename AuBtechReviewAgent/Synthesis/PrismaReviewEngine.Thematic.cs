@@ -99,9 +99,7 @@ public partial class PrismaReviewEngine
 
         // 4. One subsection per theme, each with its own coverage fill pass. Written in parallel, assembled
         //    in theme order.
-        var apa = state.SynthesizedRecords.ToDictionary(r => r.ReferenceNumber, r => r.ApaCitation);
-        var byRef = papers.ToDictionary(p => p.ReferenceNumber);
-        var extractionByRef = extractions.ToDictionary(e => e.ReferenceNumber);
+        var evidence = SystematicEvidence.Build(book, state.SynthesizedRecords, papers, extractions);
         using var throttle = new SemaphoreSlim(Math.Max(1, Llm.ScreeningParallelism));
         int written = 0;
         ReportProgress(runId, state, RunProgress.Synthesis, RunProgress.Phase(RunProgress.SynthesisPhases, 3, 0), $"Writing {book.Themes.Count} theme subsections");
@@ -110,7 +108,7 @@ public partial class PrismaReviewEngine
             await throttle.WaitAsync();
             try
             {
-                var written1 = await WriteThemeAsync(chat, goal, book, theme, index + 1, apa, byRef, extractionByRef, referenceCount);
+                var written1 = await WriteThemeAsync(chat, goal, evidence, theme, evidence.Themes[index], index + 1, referenceCount);
                 int n = Interlocked.Increment(ref written);
                 ReportProgress(runId, state, RunProgress.Synthesis, RunProgress.Phase(RunProgress.SynthesisPhases, 3, (double)n / book.Themes.Count), $"Theme subsections: {Of(n, book.Themes.Count, "written")}");
                 return written1;
@@ -132,55 +130,24 @@ public partial class PrismaReviewEngine
         // 5. Discussion from the subsections
         ReportProgress(runId, state, RunProgress.Synthesis, RunProgress.Phase(RunProgress.SynthesisPhases, 4, 0), "Writing the discussion");
         using (LlmStage.Begin("discussion"))
-            result.Discussion = await WriteDiscussionAsync(chat, query, goal, result.Sections, extractions, apa, referenceCount);
+            result.Discussion = await WriteDiscussionAsync(chat, query, goal, result.Sections, evidence, referenceCount);
 
         // 6. Peer review, per section, with the same coverage guard as the fill pass
         ReportProgress(runId, state, RunProgress.Synthesis, RunProgress.Phase(RunProgress.SynthesisPhases, 5, 0), "Automated peer review");
         using (LlmStage.Begin("automated-peer-review"))
-            result.PeerReview = await PeerReviewSectionsAsync(chat, result, apa, referenceCount);
+            result.PeerReview = await PeerReviewSectionsAsync(chat, result, evidence, referenceCount);
 
         return result;
     }
 
-    /// <summary>The reference-list lines of the given studies.</summary>
-    private static string ReferenceLines(IEnumerable<int> refs, IReadOnlyDictionary<int, string> apa) =>
-        string.Join("\n", refs.OrderBy(r => r).Select(r => $"[{r}] - {(apa.TryGetValue(r, out var c) ? c : "(citation unavailable)")}"));
-
-    /// <summary>What the writer gets for one study of a theme: codes, verified findings and a few excerpts.</summary>
-    private static string StudyEvidence(int reference, Theme? theme, ThematicCodebook book,
-        IReadOnlyDictionary<int, ReferencedPaper> papers, IReadOnlyDictionary<int, StudyExtraction> extractions, int excerpts)
-    {
-        var sb = new StringBuilder();
-        papers.TryGetValue(reference, out var paper);
-        extractions.TryGetValue(reference, out var e);
-        sb.AppendLine($"STUDY [{reference}] {paper?.Title}");
-        if (e != null && e.Error == null)
-            sb.AppendLine($"Study type: {e.StudyType}; evidence: {e.EvidenceBasis}; method: {e.Method.Value}");
-        var codes = book.Codes.Where(c => c.Reference == reference && (theme == null || theme.CodeIds.Contains(c.Id))).ToList();
-        if (codes.Count > 0) sb.AppendLine($"Codes{(theme == null ? "" : " in this theme")}: {string.Join("; ", codes.Select(c => c.Label))}");
-        var findings = ThematicSynthesis.VerifiedFindings(e);
-        foreach (var (id, f) in findings) sb.AppendLine($"Finding {id}: {f.Value} (verbatim: \"{f.Quote}\")");
-        if (findings.Count == 0 && paper != null && !string.IsNullOrWhiteSpace(paper.Abstract))
-            sb.AppendLine($"Abstract: {paper.Abstract.Trim()}");
-        if (paper != null && excerpts > 0)
-        {
-            var terms = TextRelevance.Terms($"{theme?.Name} {theme?.Description} {string.Join(" ", codes.Select(c => c.Label))}");
-            foreach (var chunk in GroundingContextBuilder.SelectChunks(paper.Chunks, terms, excerpts))
-                sb.AppendLine($"[{reference}, page {chunk.PageNumber}]: {chunk.Text}");
-        }
-        return sb.ToString();
-    }
-
     private async Task<(SynthesisSection? Section, ThemeCoverage Coverage)> WriteThemeAsync(
-        IChatCompletionService chat, string goal, ThematicCodebook book, Theme theme, int number,
-        IReadOnlyDictionary<int, string> apa, IReadOnlyDictionary<int, ReferencedPaper> papers,
-        IReadOnlyDictionary<int, StudyExtraction> extractions, int referenceCount)
+        IChatCompletionService chat, string goal, ReviewEvidence evidence, Theme theme, EvidenceTheme evidenceTheme, int number, int referenceCount)
     {
         string field = $"synthesis-{number}";
         var coverage = new ThemeCoverage { ThemeId = theme.Id, Field = field, Studies = theme.Studies.ToList() };
         int excerpts = theme.Studies.Count <= 12 ? 2 : 1;
-        string evidence = string.Join("\n", theme.Studies.Select(r => StudyEvidence(r, theme, book, papers, extractions, excerpts)));
-        string otherThemes = string.Join("; ", book.Themes.Where(t => t.Id != theme.Id).Select(t => t.Name));
+        string themeEvidence = string.Join("\n", theme.Studies.Select(r => evidence.SourceBlock(r, evidenceTheme, excerpts)));
+        string otherThemes = string.Join("; ", evidence.Themes.Where(t => t.Id != theme.Id).Select(t => t.Name));
         int paragraphs = ThematicSynthesis.ParagraphsFor(theme.Studies.Count);
         string studyList = string.Join(", ", theme.Studies.Select(r => $"[{r}]"));
 
@@ -193,11 +160,11 @@ public partial class PrismaReviewEngine
             OTHER THEMES (reported in their own subsections; do not cover them here): {{(otherThemes.Length == 0 ? "none" : otherThemes)}}
 
             REFERENCE LIST FOR THIS THEME (cite ONLY these numbers):
-            {{ReferenceLines(theme.Studies, apa)}}
+            {{evidence.ReferenceLines(theme.Studies)}}
 
             {{PromptSafety.DataOnlyNotice}}
 
-            {{PromptSafety.Wrap(evidence, "the evidence of the studies in this theme: codes, verified findings and excerpts")}}
+            {{PromptSafety.Wrap(themeEvidence, "the evidence of the studies in this theme: codes, verified findings and excerpts")}}
 
             REQUIREMENTS:
             1. Write about {{paragraphs}} paragraph{{(paragraphs == 1 ? "" : "s")}} of synthesis, not a list of summaries: group studies that report the same thing, compare and contrast them, and name agreements, tensions and gaps within the theme. Separate paragraphs with a blank line.
@@ -239,14 +206,14 @@ public partial class PrismaReviewEngine
         var missing = theme.Studies.Except(coverage.CitedAfterWriting).ToList();
         if (missing.Count > 0)
         {
-            string missingEvidence = string.Join("\n", missing.Select(r => StudyEvidence(r, theme, book, papers, extractions, 2)));
+            string missingEvidence = string.Join("\n", missing.Select(r => evidence.SourceBlock(r, evidenceTheme, 2)));
             string fillPrompt = $$"""
                 You are revising one theme subsection of a systematic review so that it covers every study of the theme. The studies below belong to this theme but are not yet cited in it.
 
                 THEME: {{theme.Name}}. {{theme.Description}}
 
                 REFERENCE LIST FOR THIS THEME (cite ONLY these numbers):
-                {{ReferenceLines(theme.Studies, apa)}}
+                {{evidence.ReferenceLines(theme.Studies)}}
 
                 CURRENT SUBSECTION:
                 {{text}}
@@ -287,22 +254,8 @@ public partial class PrismaReviewEngine
         return (new SynthesisSection { Field = field, ThemeId = theme.Id, Heading = heading, Text = text }, coverage);
     }
 
-    /// <summary>Facts about the evidence base for the limitations paragraph, from the extraction (not the model).</summary>
-    private static string EvidenceBaseFacts(IReadOnlyList<StudyExtraction> extractions)
-    {
-        if (extractions.Count == 0) return "(no extraction data)";
-        int fullText = extractions.Count(e => e.EvidenceBasis == "full text");
-        int notEmpirical = extractions.Count(e => e.AppraisalCategory == "not_empirical");
-        var types = extractions.Where(e => e.Error == null && !string.IsNullOrWhiteSpace(e.StudyType))
-            .GroupBy(e => e.StudyType.ToLowerInvariant()).OrderByDescending(g => g.Count()).Take(6)
-            .Select(g => $"{g.Key} ({g.Count()})");
-        return $"{extractions.Count} studies; full text was read for {fullText} and only the abstract for {extractions.Count - fullText}; " +
-               $"{notEmpirical} are not empirical (position papers, system descriptions or reviews). Most common study types: {string.Join(", ", types)}.";
-    }
-
     private async Task<string> WriteDiscussionAsync(IChatCompletionService chat, string query, string goal,
-        IReadOnlyList<SynthesisSection> sections, IReadOnlyList<StudyExtraction> extractions,
-        IReadOnlyDictionary<int, string> apa, int referenceCount)
+        IReadOnlyList<SynthesisSection> sections, ReviewEvidence evidence, int referenceCount)
     {
         int paragraphs = Math.Clamp(2 + sections.Count / 2, 3, 6);
         string synthesis = string.Join("\n\n", sections.Select(s => $"### {s.Heading}\n{s.Text}"));
@@ -314,10 +267,10 @@ public partial class PrismaReviewEngine
             {{PromptSafety.ReviewerInputNotice}}
 
             REFERENCE LIST (cite ONLY these numbers):
-            {{ReferenceLines(apa.Keys, apa)}}
+            {{evidence.ReferenceLines()}}
 
             FACTS ABOUT THE EVIDENCE BASE (from the data extraction; use them for the limitations, do not change them):
-            {{EvidenceBaseFacts(extractions)}}
+            {{evidence.BaseFacts}}
 
             RESULTS BY THEME:
             {{synthesis}}
@@ -353,7 +306,7 @@ public partial class PrismaReviewEngine
     /// cites outside the reference list is rejected, and the original is kept.
     /// </summary>
     private async Task<PeerReviewLog> PeerReviewSectionsAsync(IChatCompletionService chat, ThematicResult result,
-        IReadOnlyDictionary<int, string> apa, int referenceCount)
+        ReviewEvidence evidence, int referenceCount)
     {
         string AllSynthesis() => string.Join("\n\n", result.Sections.Select(s => $"### {s.Heading}\n{s.Text}"));
         var log = new PeerReviewLog
@@ -371,7 +324,7 @@ public partial class PrismaReviewEngine
             You are a strict but constructive peer reviewer for a systematic literature review. Review each section below (theme subsections of the results, and the discussion) for: (a) depth: does it synthesise and compare rather than list, (b) whether each specific claim carries an inline [n] citation, (c) over-claiming beyond what a study could show, (d) coherence and overlap between sections, (e) whether the discussion interprets rather than repeats.
 
             REFERENCE LIST (valid citation numbers):
-            {{ReferenceLines(apa.Keys, apa)}}
+            {{evidence.ReferenceLines()}}
 
             SECTIONS (the id in brackets is the section id):
             {{sectionsText}}
@@ -416,7 +369,7 @@ public partial class PrismaReviewEngine
                     You are the author revising one section of a systematic review in response to peer-review feedback. Apply the feedback. Keep every existing inline [n] citation, cite ONLY numbers from the reference list, and do not invent claims, numbers or studies.
 
                     REFERENCE LIST (valid citation numbers):
-                    {{ReferenceLines(apa.Keys, apa)}}
+                    {{evidence.ReferenceLines()}}
 
                     PEER-REVIEW FEEDBACK:
                     {{feedback}}
