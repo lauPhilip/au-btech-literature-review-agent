@@ -184,4 +184,74 @@ public class MultivocalQualityTests : IDisposable
         Assert.Contains(archive.Entries, e => e.FullName == MultivocalQualityAssessor.QualityFile);
         Assert.DoesNotContain(archive.Entries, e => e.FullName.StartsWith(MultivocalPages.TextFolder));
     }
+
+    [Fact]
+    public void AnOpinionPieceGetsItsClaimAndTheCriticalQuestions()
+    {
+        var opinion = new ModelOpinion
+        {
+            IsOpinion = true,
+            Claim = "Agents forget their tools when the context window fills up.",
+            Expertise = new() { Answer = "The writer ran the measurements.", Quote = "We measured this on forty agent runs." },
+            Field = new() { Answer = "They work on agents.", Quote = "The writer is a famous expert in agents." }, // not in the page
+            Assertion = new() { Answer = "That tools drop out.", Quote = "Agents forget their tools when the context window fills up." },
+            Evidence = new() { Answer = "Forty runs.", Quote = "We measured this on forty agent runs." },
+        };
+
+        var argument = MultivocalQualityAssessor.Argument(opinion, PageWords)!;
+
+        Assert.True(argument.ClaimFound);
+        Assert.Equal(new[] { "expertise", "field", "opinion", "trustworthiness", "consistency", "backup" }, argument.Questions.Select(q => q.Id));
+        Assert.Equal("model", argument.Questions.Single(q => q.Id == "expertise").Basis);
+        Assert.Equal("unsupported", argument.Questions.Single(q => q.Id == "field").Basis);
+        Assert.StartsWith("(No quote from the page backs this.)", argument.Questions.Single(q => q.Id == "field").Answer);
+        Assert.Equal("reviewer", argument.Questions.Single(q => q.Id == "trustworthiness").Basis);
+        Assert.Equal("synthesis", argument.Questions.Single(q => q.Id == "consistency").Basis);
+
+        Assert.Null(MultivocalQualityAssessor.Argument(new ModelOpinion { IsOpinion = false }, PageWords));
+        Assert.Null(MultivocalQualityAssessor.Argument(null, PageWords));
+
+        var noClaim = new ModelQualityAnswers { Answers = AllItems(0, null), Opinion = new ModelOpinion { IsOpinion = true } };
+        Assert.Contains("main claim", ModelQualityAnswers.Validate(noClaim));
+    }
+
+    [Fact]
+    public async Task ASourceThatCouldNotBeAssessedCanBeTriedAgain()
+    {
+        var store = new RunStore(_root);
+        var planner = new MultivocalPlanner(store);
+        var plan = MultivocalPlan.Example();
+        plan.GreySearches = new List<string> { "stackexchange" };
+        plan.GreySearchStrings = new List<string> { "context engineering" };
+        var (runId, key) = await planner.CreateAsync(plan);
+        var searcher = new MultivocalSearcher(store, planner, _ => new Source());
+        await searcher.SearchAsync(runId, key);
+
+        bool modelDown = true;
+        var model = new FakeChatService().RespondsWith(prompt =>
+        {
+            if (prompt.Contains("SOURCE TARGET DATA"))
+                return prompt.Contains("Context engineering for agents")
+                    ? """{"decision":"Included","reasoning":"On topic.","briefSummary":"A post.","confidence":"high"}"""
+                    : """{"decision":"Excluded","reasoning":"Off topic.","briefSummary":"A post.","confidence":"high","exclusionReason":"off-topic"}""";
+            if (modelDown) throw new HttpRequestException("api.mistral.ai answered 503");
+            var answers = AllItems(1, "Agents forget their tools when the context window fills up.");
+            return System.Text.Json.JsonSerializer.Serialize(new { answers = answers.Select(a => new { id = a.Id, score = a.Score, reason = a.Reason, quote = a.Quote }) });
+        });
+        var screener = new MultivocalScreener(store, planner, searcher, () => model, parallelism: 1);
+        await screener.ScreenAsync(runId, key);
+        var web = new FakeWeb(new() { ["https://blog.example.org/good"] = (200, $"<html><body><main><p>{PageWords}</p></main></body></html>") });
+        var pages = new MultivocalPages(store, searcher, new PageFetcher(web, _ => Task.CompletedTask));
+        var assessor = new MultivocalQualityAssessor(store, planner, searcher, screener, pages, () => model, parallelism: 1);
+
+        var first = Assert.Single((await assessor.AssessAsync(runId, key)).Sources);
+        Assert.Equal("Not assessed", first.Outcome);
+        Assert.Contains("503", first.NotAssessed);
+
+        modelDown = false;
+        var again = await assessor.RetryAsync(runId, key, first.Address);
+        Assert.Equal("Passed", again.Outcome);
+        Assert.Equal("Passed", Assert.Single(assessor.Load(runId)!.Sources).Outcome);
+        await Assert.ThrowsAsync<InvalidOperationException>(() => assessor.RetryAsync(runId, key, first.Address)); // it has a score now
+    }
 }
