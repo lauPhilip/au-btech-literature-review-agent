@@ -9,6 +9,7 @@
 @inject AuBtechReviewAgent.MultivocalScreener Screener
 @inject AuBtechReviewAgent.MultivocalQualityAssessor Quality
 @inject AuBtechReviewAgent.MultivocalMapper Mapper
+@inject AuBtechReviewAgent.MultivocalExtractor Extractor
 @inject NavigationManager Nav
 @inject IJSRuntime JS
 @inject ILogger<MultivocalStart> Logger
@@ -75,7 +76,29 @@
                         {
                             @SettingRow("Map", $"{map.Latest.Attributes.Count} attributes, version {map.Latest.Number}{(map.FixedVersion != null ? ", fixed" : ", not fixed yet")}")
                         }
+                        @if (extraction != null)
+                        {
+                            @SettingRow("Extracted", $"{extraction.Sources.Count(x => x.Error == null)} sources" + (extraction.Sources.Any(x => x.Error != null) ? $", {extraction.Sources.Count(x => x.Error != null)} could not be extracted" : ""))
+                        }
                     </dl>
+                    @if (map?.FixedVersion != null && extraction == null && stage is AuBtechReviewAgent.MultivocalMapper.StageMapped or AuBtechReviewAgent.MultivocalExtractor.StageExtracting)
+                    {
+                        <div class="border-t border-gray-100 pt-3 space-y-2">
+                            @if (extracting || AuBtechReviewAgent.MultivocalExtractor.IsRunning(planned.RunId))
+                            {
+                                <p class="text-xs text-gray-700" role="status" aria-live="polite">Extracting… @extractProgress</p>
+                            }
+                            else if (canEdit)
+                            {
+                                <p class="text-xs text-gray-600">Extract every source that passed the quality check against the fixed map. Every value needs a quote found in the kept page; what a page does not state is recorded as "not stated".</p>
+                                <button type="button" class="ui-btn-primary ui-btn-sm" @onclick="ExtractAsync">Extract the sources</button>
+                            }
+                            @if (extractError != null)
+                            {
+                                <p class="bg-red-50 border border-red-200 text-red-800 p-2 text-xs" role="alert">@extractError</p>
+                            }
+                        </div>
+                    }
                     @if (quality != null && map == null && stage == AuBtechReviewAgent.MultivocalQualityAssessor.StageAssessed)
                     {
                         <div class="border-t border-gray-100 pt-3 space-y-2">
@@ -574,6 +597,31 @@
                                 }
                             </tbody>
                         </table>
+                        @if (extraction != null)
+                        {
+                            <div>
+                                <h4 class="text-sm font-semibold text-gray-900">How many sources have each value</h4>
+                                <p class="text-xs text-gray-600 mt-0.5">From the @extraction.Sources.Count(x => x.Error == null) extracted sources; a source with several values counts once for each. Only values backed by a quote from the page count.</p>
+                            </div>
+                            @foreach (var mapAttribute in shown.Attributes)
+                            {
+                                var counts = extraction.Counts(mapAttribute.Name);
+                                int most = Math.Max(1, counts.Select(c => c.Sources).DefaultIfEmpty(0).Max());
+                                <table class="w-full text-xs">
+                                    <caption class="text-left font-medium text-gray-800 pb-1">@mapAttribute.Name <span class="font-normal text-gray-500">(@mapAttribute.Question)</span></caption>
+                                    <tbody>
+                                        @foreach (var (value, sources) in counts)
+                                        {
+                                            <tr class="border-t border-gray-100">
+                                                <th scope="row" class="py-0.5 pr-2 font-normal text-left @(value == "not stated" ? "text-gray-500" : "text-gray-800") w-1/2">@value</th>
+                                                <td class="py-0.5 pr-2 w-1/3"><span class="block h-2 bg-brand/60" style="width:@((100 * sources / most).ToString(System.Globalization.CultureInfo.InvariantCulture))%"></span></td>
+                                                <td class="py-0.5 text-right">@sources</td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            }
+                        }
                     }
                 </div>
             }
@@ -742,6 +790,45 @@
                                         }
                                     </details>
                                 }
+                                @{ var extracted = ExtractionOf(r.Url); }
+                                @if (extracted != null)
+                                {
+                                    <details class="mt-1 text-[11px] text-gray-700">
+                                        <summary class="cursor-pointer select-none"><span class="ui-chip border-brand/30 bg-white text-brand text-[10px]">@(extracted.Error != null ? "Not extracted" : $"Extracted · covers {(extracted.Coverage.Count > 0 ? string.Join(", ", extracted.Coverage) : "no question")}")</span></summary>
+                                        @if (extracted.Error != null)
+                                        {
+                                            <p class="mt-1">@extracted.Error</p>
+                                        }
+                                        else
+                                        {
+                                            @if (extracted.Purpose != null)
+                                            {
+                                                <p class="mt-1"><span class="font-medium">Purpose:</span> @extracted.Purpose.Value <q class="italic text-gray-500">@extracted.Purpose.Quote</q></p>
+                                            }
+                                            <p class="mt-1 text-gray-500">@string.Join(" · ", extracted.Known.Select(k => $"{k.Name}: {k.Value}"))</p>
+                                            <dl class="mt-1 space-y-1">
+                                                @foreach (var item in extracted.Attributes)
+                                                {
+                                                    <div>
+                                                        <dt class="font-medium text-gray-800">@item.Attribute</dt>
+                                                        @if (item.NotStated)
+                                                        {
+                                                            <dd class="text-gray-500">not stated</dd>
+                                                        }
+                                                        @foreach (var value in item.Values)
+                                                        {
+                                                            <dd>@value.Value <q class="italic text-gray-500">@value.Quote</q></dd>
+                                                        }
+                                                        @if (item.Unsupported.Count > 0)
+                                                        {
+                                                            <dd class="text-amber-800">Left out, as the quote was not found in the page: @string.Join(", ", item.Unsupported.Select(u => u.Value))</dd>
+                                                        }
+                                                    </div>
+                                                }
+                                            </dl>
+                                        }
+                                    </details>
+                                }
                                 @if (decision != null && decision.Reasoning.Length > 0)
                                 {
                                     <details class="mt-1 text-[11px] text-gray-600">
@@ -878,6 +965,11 @@
     private string? qualityError;
     private readonly Dictionary<string, string> reviewNotes = new();
     private AuBtechReviewAgent.MultivocalMapFile? map;
+    private AuBtechReviewAgent.MultivocalExtractionFile? extraction;
+    private Dictionary<string, AuBtechReviewAgent.GreyExtraction> extractions = new();
+    private bool extracting;
+    private string? extractProgress;
+    private string? extractError;
     private List<AuBtechReviewAgent.MapAttribute>? mapDraft;
     private bool mapping;
     private string? mapError;
@@ -919,6 +1011,7 @@
             SetScreening(Screener.Load(id));
             SetQuality(Quality.Load(id));
             SetMap(Mapper.Load(id));
+            SetExtraction(Extractor.Load(id));
             if (quality != null) sourceFilter = "passed";
             else if (screening != null) sourceFilter = "included";
             stage = Runs.LoadHeader(id)?.Stage ?? "";
@@ -950,7 +1043,7 @@
                     : $"{searches} grey literature search{(searches == 1 ? "" : "es")} and the academic databases, {stop}.", true),
                 ("Selection", p.IsGreyOnly ? "Every source is screened twice against your criteria." : "Grey and academic sources are screened twice, with the same criteria and the same care.", true),
                 ("Quality", $"Each grey source is scored on Table 7; below {p.QualityThreshold} of {AuBtechReviewAgent.MultivocalGuidelines.QualityPointsMax} points it is left out. Every score rests on a quote.", true),
-                ("Map and extraction", "The sources are classified in a systematic map; every extracted item links to its place in the source.", false),
+                ("Map and extraction", "The sources are classified in a systematic map; every extracted value rests on a quote from the source's page.", true),
                 ("Synthesis", $"The findings are coded and written up to answer {questions} research question{(questions == 1 ? "" : "s")}.", false),
                 ("Checking", "Every citation is compared with its source; weak ones get a second check and are repaired.", false),
             };
@@ -1132,6 +1225,40 @@
         {
             assessing = false;
             qualityProgress = null;
+        }
+    }
+
+    private void SetExtraction(AuBtechReviewAgent.MultivocalExtractionFile? file)
+    {
+        extraction = file;
+        extractions = new();
+        if (file == null) return;
+        foreach (var x in file.Sources) extractions.TryAdd(x.Address, x);
+    }
+
+    private AuBtechReviewAgent.GreyExtraction? ExtractionOf(string url) =>
+        extractions.TryGetValue(AuBtechReviewAgent.MultivocalSearcher.AddressKey(url), out var x) ? x : null;
+
+    private async Task ExtractAsync()
+    {
+        if (planned == null || extracting) return;
+        extracting = true;
+        extractError = null;
+        var progress = new Progress<string>(line => { extractProgress = line; _ = InvokeAsync(StateHasChanged); });
+        try
+        {
+            SetExtraction(await Extractor.ExtractAsync(planned.RunId, editKey, progress));
+            stage = AuBtechReviewAgent.MultivocalExtractor.StageExtracted;
+            panelTab = "map";
+        }
+        catch (InvalidOperationException ex)
+        {
+            extractError = ex.Message;
+        }
+        finally
+        {
+            extracting = false;
+            extractProgress = null;
         }
     }
 
@@ -1327,7 +1454,9 @@
 
     private string StageLine() => stage switch
     {
-        AuBtechReviewAgent.MultivocalMapper.StageMapped => "Mapped: the systematic map is fixed; the extraction is the next part to be built",
+        AuBtechReviewAgent.MultivocalExtractor.StageExtracted => "Extracted: every source that passed is mapped; the synthesis is the next part to be built",
+        AuBtechReviewAgent.MultivocalExtractor.StageExtracting => "Extracting…",
+        AuBtechReviewAgent.MultivocalMapper.StageMapped => "Mapped: the systematic map is fixed and the sources can be extracted",
         AuBtechReviewAgent.MultivocalMapper.StageMapping => "Mapping: edit the map and fix it",
         AuBtechReviewAgent.MultivocalQualityAssessor.StageAssessed => "Assessed: the included sources are scored for quality and can be mapped",
         AuBtechReviewAgent.MultivocalQualityAssessor.StageAssessing => "Scoring the quality…",
