@@ -97,7 +97,7 @@ public static class MultivocalProtocol
 
         sb.AppendLine("## 6. Systematic map and extraction (G12)");
         sb.AppendLine();
-        sb.AppendLine("The language model proposes the attributes of the systematic map from the research questions, with values generalised over the sources that passed the quality check. The reviewer edits the map, every version is kept, and the map is fixed before any source is extracted against it.");
+        sb.AppendLine("The language model proposes the attributes of the systematic map from the research questions, with values generalised over the sources that passed the quality check. The reviewer edits the map, every version is kept, and the map is fixed before any source is extracted against it. Every source that passed the quality check is then extracted against the fixed map: each value must rest on a quote found in the kept text of the source's page, and what the page does not state is recorded as not stated. The kind of source, whether it is grey or formal literature, its site, date and quality points, and the research questions it covers are recorded in code.");
         sb.AppendLine();
 
         sb.AppendLine("## 7. Keeping the evidence");
