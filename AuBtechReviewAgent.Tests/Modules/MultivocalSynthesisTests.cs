@@ -45,37 +45,112 @@ public class MultivocalSynthesisTests : IDisposable
         Assert.Equal((1, 2, 3), (MultivocalSynthesiser.TierOf("theses"), MultivocalSynthesiser.TierOf("qa"), MultivocalSynthesiser.TierOf("blogs")));
     }
 
-    [Fact]
-    public void TheModelsThemesMustPlaceEveryFindingAndItsExtrasAreTidiedInCode()
+    private static SynthesisFinding Coded(string id, string address, string attribute, string value) => new()
     {
-        var sources = new Dictionary<string, string> { ["F1.1"] = "a", ["F1.2"] = "a", ["F2.1"] = "b" };
-        ModelSynthesis Answer(params ModelTheme[] themes) => new() { Themes = themes.ToList() };
-        ModelTheme Theme(string name, params string[] findings) => new() { Name = name, Description = "d", Findings = findings.ToList() };
+        Id = id, Address = address, Attribute = attribute, Value = value, Quote = "Quote " + id, Title = "Page " + address,
+        Kind = "blogs", Tier = 3, Question = "RQ1",
+    };
 
-        // The core is strict: every finding placed, every theme with a real finding.
-        Assert.Null(ModelSynthesis.Problem(Answer(Theme("Summaries", "F1.1", "F2.1"), Theme("Notes", "F1.2")), sources));
-        Assert.Contains("F1.2 are in no theme", ModelSynthesis.Problem(Answer(Theme("X", "F1.1", "F2.1")), sources));
-        Assert.Contains("has none of the findings", ModelSynthesis.Problem(Answer(Theme("X", "F1.1", "F1.2", "F2.1"), Theme("Y", "F9.9")), sources));
-        var withUnassigned = Answer(Theme("X", "F1.1", "F2.1"));
-        withUnassigned.Unassigned.Add(new UnassignedFinding { Finding = "F1.2", Reason = "Off the question." });
-        Assert.Null(ModelSynthesis.Problem(withUnassigned, sources));
+    [Fact]
+    public void FindingsAreGroupedByAttributeAndValueInCode()
+    {
+        var findings = new List<SynthesisFinding>
+        {
+            Coded("F1.1", "a", "Practice", "Retrieval"), Coded("F2.1", "b", "Practice", " retrieval "),
+            Coded("F2.2", "b", "Practice", "Retrieval"), Coded("F3.1", "c", "Practice", "Summarisation"),
+            Coded("F3.2", "c", "Tool", "Retrieval"),
+        };
 
-        // The extras are tidied in code (seen in a live run: one bad tension failed the whole synthesis).
-        var theme = Theme("Prompt and instruction design", "F1.1", "F1.2", "F2.1", "F9.9");
-        theme.Tensions.Add(new SynthesisTension { FindingA = "F1.1", FindingB = "F1.2", Description = "Same source." });
-        theme.Tensions.Add(new SynthesisTension { FindingA = "F1.1", FindingB = "F3.1", Description = "Outside the theme." });
-        theme.Tensions.Add(new SynthesisTension { FindingA = "F1.1", FindingB = "F2.1", Description = "They disagree." });
-        var answer = Answer(theme);
-        Assert.Null(ModelSynthesis.Problem(answer, sources));
+        var groups = MultivocalSynthesiser.ValueGroups(findings);
 
-        var notes = ModelSynthesis.Tidy(answer, sources);
+        Assert.Equal(new[] { "V1", "V2", "V3" }, groups.Select(g => g.Id));
+        var retrieval = groups[0];
+        Assert.Equal(("Practice", "Retrieval"), (retrieval.Attribute, retrieval.Value)); // case and spaces do not split a value
+        Assert.Equal(new[] { "F1.1", "F2.1", "F2.2" }, retrieval.Findings);
+        Assert.Equal(2, retrieval.Sources);
+        Assert.Equal(2, retrieval.Samples.Count); // one sample quote per source
+        Assert.Equal("Practice: Retrieval (3 findings)", retrieval.Label);
+        Assert.Equal("Tool", groups[2].Attribute); // the same value under another attribute is its own group
+    }
 
-        Assert.Equal(new[] { "F1.1", "F1.2", "F2.1" }, theme.Findings);
-        Assert.Equal("They disagree.", Assert.Single(theme.Tensions).Description);
-        Assert.Equal(3, notes.Count);
-        Assert.Contains(notes, n => n.Contains("F9.9, which are not findings"));
-        Assert.Contains(notes, n => n.Contains("within one source"));
-        Assert.Contains(notes, n => n.Contains("named a finding outside the theme"));
+    [Fact]
+    public void TheThemesAndThePlacementAreCheckedInCode()
+    {
+        ModelThemeList Themes(params string[] names) => new() { Themes = names.Select(n => new ModelThemeName { Name = n, Description = "d" }).ToList() };
+        Assert.Null(ModelThemeList.Problem(Themes("Summaries", "Retrieval")));
+        Assert.Contains("one to 6 themes", ModelThemeList.Problem(Themes()));
+        Assert.Contains("one to 6 themes", ModelThemeList.Problem(Themes("a", "b", "c", "d", "e", "f", "g")));
+        Assert.Contains("needs a name", ModelThemeList.Problem(Themes("a", " ")));
+        Assert.Contains("two themes are called", ModelThemeList.Problem(Themes("Summaries", "summaries ")));
+
+        var groups = new HashSet<string> { "V1", "V2" };
+        var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "Summaries", "Retrieval" };
+        ModelPlacement Placed(params ModelPlaced[] p) => new() { Placements = p.ToList() };
+        ModelPlaced In(string group, params string[] themes) => new() { Group = group, Themes = themes.ToList() };
+
+        Assert.Null(ModelPlacement.Problem(Placed(In("V1", "summaries"), In("V2", "Retrieval", "Summaries")), groups, names));
+        Assert.Contains("\"V9\" is not one of the values", ModelPlacement.Problem(Placed(In("V1", "Summaries"), In("V2", "Retrieval"), In("V9", "Retrieval")), groups, names));
+        Assert.Contains("values V2 are not placed", ModelPlacement.Problem(Placed(In("V1", "Summaries")), groups, names));
+        Assert.Contains("\"Memory\" is not one of the themes", ModelPlacement.Problem(Placed(In("V1", "Memory"), In("V2", "Retrieval")), groups, names));
+        Assert.Contains("needs the reason", ModelPlacement.Problem(Placed(In("V1", "Summaries"), In("V2")), groups, names));
+        var withReason = Placed(In("V1", "Summaries"), In("V2"));
+        withReason.Placements[1].Reason = "Off the question.";
+        Assert.Null(ModelPlacement.Problem(withReason, groups, names));
+    }
+
+    [Fact]
+    public void ATensionIsKeptOnlyBetweenTwoSourcesOfTheTheme()
+    {
+        var findings = new List<SynthesisFinding>
+        {
+            Coded("F1.1", "a", "Practice", "Summarise"), Coded("F1.2", "a", "Practice", "Never summarise"),
+            Coded("F2.1", "b", "Practice", "Never summarise"),
+        };
+        var groups = MultivocalSynthesiser.ValueGroups(findings);
+        var answer = new ModelTensions
+        {
+            Tensions =
+            {
+                new ModelTension { GroupA = "V1", GroupB = "V2", Description = "They disagree." },
+                new ModelTension { GroupA = "V1", GroupB = "V7", Description = "Outside the theme." },
+                new ModelTension { GroupA = "V1", GroupB = "V1", Description = "With itself." },
+            },
+        };
+
+        var tensions = MultivocalSynthesiser.TensionsFor(answer, groups, findings, out var notes);
+
+        var kept = Assert.Single(tensions);
+        Assert.Equal(("F1.1", "F2.1"), (kept.FindingA, kept.FindingB)); // F1.2 is from the same source as F1.1, so F2.1 is chosen
+        Assert.Contains("They disagree.", kept.Description);
+        Assert.Equal(2, notes.Count);
+        Assert.All(notes, n => Assert.Contains("outside the theme", n));
+
+        var oneSource = MultivocalSynthesiser.TensionsFor(answer, MultivocalSynthesiser.ValueGroups(findings.Take(2).ToList()), findings.Take(2).ToList(), out var oneNotes);
+        Assert.Empty(oneSource);
+        Assert.Contains(oneNotes, n => n.Contains("within one source"));
+    }
+
+    [Fact]
+    public async Task ABatchTheModelCannotPlaceIsKeptAsNotPlacedAndTheRestGoOn()
+    {
+        // 31 values: the first batch of 30 never passes the check, the last one is placed.
+        var findings = Enumerable.Range(1, 31).Select(i => Coded($"F{i}.1", $"s{i}", "Practice", $"Value {i}")).ToList();
+        var groups = MultivocalSynthesiser.ValueGroups(findings);
+        var model = new FakeChatService().RespondsWith(prompt =>
+            prompt.Contains("Name one to") ? """{"themes":[{"name":"Context","description":"How sources keep context."},{"name":"Unused","description":"Nothing."}]}"""
+            : prompt.Contains("V31 Practice") ? """{"placements":[{"group":"V31","themes":["Context"],"reason":""}]}"""
+            : prompt.Contains("VALUES TO PLACE") ? """{"placements":[{"group":"V1","themes":["Context"],"reason":""}]}"""
+            : """{"tensions":[]}""");
+        var file = new MultivocalSynthesisFile();
+
+        await MultivocalSynthesiser.SynthesiseQuestionAsync(model, "topic", "RQ1", "How?", groups, findings, file, null);
+
+        Assert.Equal(30, file.Unassigned.Count);
+        Assert.All(file.Unassigned, u => Assert.StartsWith("Not placed", u.Reason));
+        Assert.Contains(file.Notes, n => n.Contains("30 value(s) could not be placed"));
+        Assert.Contains(file.Notes, n => n.Contains("\"Unused\" got no values"));
+        var theme = Assert.Single(file.Themes);
+        Assert.Equal(new[] { "F31.1" }, theme.Findings);
     }
 
     private const string KeptWords = "We keep a running summary of the conversation. Retrieval brings in only the documents the agent needs.";
@@ -165,7 +240,10 @@ public class MultivocalSynthesisTests : IDisposable
         }));
         await RunHeader.WriteAsync(folder, store.LoadHeader(runId)! with { Stage = MultivocalExtractor.StageExtracted });
 
-        var model = new FakeChatService().Returns("""{"themes":[{"name":"Summaries keep the context short","description":"Sources keep running summaries.","findings":["F1.1"],"tensions":[]}],"unassigned":[]}""");
+        var model = new FakeChatService().RespondsWith(prompt =>
+            prompt.Contains("Name one to") ? """{"themes":[{"name":"Summaries keep the context short","description":"Sources keep running summaries."}]}"""
+            : prompt.Contains("VALUES TO PLACE") ? """{"placements":[{"group":"V1","themes":["Summaries keep the context short"],"reason":""}]}"""
+            : """{"tensions":[]}""");
         var screener = new MultivocalScreener(store, planner, searcher, () => model);
         var assessor = new MultivocalQualityAssessor(store, planner, searcher, screener, pages, () => model);
         var mapper = new MultivocalMapper(store, planner, searcher, assessor, () => model);
@@ -179,7 +257,7 @@ public class MultivocalSynthesisTests : IDisposable
         Assert.Equal("Summarisation", finding.Value);
         Assert.Equal("page text", finding.EvidenceBasis);
         Assert.Contains(file.Notes, n => n.Contains("1 extracted value(s) were left out"));
-        Assert.Single(model.Prompts); // RQ1 only: the other questions have no findings
+        Assert.Equal(2, model.Prompts.Count); // RQ1 only (themes, then placement; one source has no tensions): the other questions have no findings
         Assert.Equal(new[] { "RQ1.1", "RQ1.2", "RQ2", "RQ3" }, file.Unanswered);
 
         var theme = Assert.Single(file.Themes);
