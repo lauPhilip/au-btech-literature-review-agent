@@ -588,6 +588,27 @@
                                     </details>
                                 </div>
                             }
+                            @foreach (var other in synthesis.NotCoded.Where(n => n.Question == number))
+                            {
+                                var notCoded = other;
+                                <div class="border border-dashed border-gray-300 p-3 text-xs space-y-1.5">
+                                    <p class="font-medium text-gray-900">Not coded by the map: @notCoded.Attribute</p>
+                                    <p class="text-gray-700">@notCoded.Findings.Count finding@(notCoded.Findings.Count == 1 ? "" : "s") from @notCoded.Sources source@(notCoded.Sources == 1 ? "" : "s") had the value "Other": the map had no value for them, so they are in no theme. The map may need a new value.</p>
+                                    <details>
+                                        <summary class="cursor-pointer select-none text-gray-500">@notCoded.Findings.Count finding@(notCoded.Findings.Count == 1 ? "" : "s")</summary>
+                                        <ul class="mt-1 space-y-1">
+                                            @foreach (var finding in synthesis.Findings.Where(f => notCoded.Findings.Contains(f.Id)))
+                                            {
+                                                <li>
+                                                    <span class="font-medium">@finding.Id</span>
+                                                    <span class="text-gray-500">@finding.Title · @KindLabel(finding.Kind), @(finding.Tier switch { 1 => "1st", 2 => "2nd", _ => "3rd" }) tier, @finding.QualityPoints.ToString("0.#") points</span>
+                                                    <q class="block italic text-gray-500">@finding.Quote</q>
+                                                </li>
+                                            }
+                                        </ul>
+                                    </details>
+                                </div>
+                            }
                         </section>
                     }
                     @if (synthesis.Unassigned.Count > 0)
