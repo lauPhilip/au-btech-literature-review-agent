@@ -245,7 +245,7 @@ public sealed class MultivocalExtractor
     public static void Verify(GreyExtraction result, ModelExtraction answer, MapVersion map, MultivocalPlan plan, string text)
     {
         if (answer.Purpose is { } purpose && !string.IsNullOrWhiteSpace(purpose.Value) && CitationSupportChecker.QuoteOccursIn(purpose.Quote, text))
-            result.Purpose = new ExtractedValue { Value = purpose.Value.Trim(), Quote = purpose.Quote?.Trim() ?? "" };
+            result.Purpose = new ExtractedValue { Value = purpose.Value.Trim(), Quote = purpose.Quote.Trim() };
 
         result.Attributes = map.Attributes.Select(attribute =>
         {
