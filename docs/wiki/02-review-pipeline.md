@@ -58,18 +58,19 @@ The `LlmStage` names below are what `llm-calls.json` records for each call, and 
 | `screening` | `ScreenPaperAsync` (first prompt) | Screening | Decision, reasoning, summary, confidence |
 | `screening-second` | `ScreenPaperAsync` (second prompt) | Screening | The independent second decision |
 | `extraction` | `StudyExtractor.ExtractAsync` | `StudyExtractor.cs` | `extraction.json`: data and MMAT answers with quotes |
-| `outline` | `GenerateGroundedOutlineAsync` | Report | `grounded-outline.txt`: themes, claims, reference numbers |
-| `report-draft` | inside `GeneratePrismaChecklistReportWithRAGAsync` | Report | Draft PRISMA items as JSON |
+| `outline` | `ReviewWriter.WriteOutlineAsync` | `ReviewWriter.cs` | `grounded-outline.txt`: themes, claims, reference numbers |
+| `report-draft` | inside `GeneratePrismaChecklistReportWithRAGAsync` | Report | Draft PRISMA items as JSON; its title, abstract, rationale and objectives are a fallback |
+| `front-matter` | `ReviewWriter.WriteFrontMatterAsync` | `ReviewWriter.cs` | Title, abstract, rationale and objectives, written last from the checked sections; numbers from code |
 | `style` | `StylisticRefinerUtility.RefineAcademicProseAsync` | `StylisticRefinerUtility.cs` | Abstract, rationale and objectives rewritten; `stylistic-transformation-ledger.json` |
 | `thematic-coding` | `ThematicSynthesis.CodeStudiesAsync` | `ThematicSynthesis.cs` | Codes per study, anchored to verified findings |
 | `thematic-codebook` | `ThematicSynthesis.BuildCodebookAsync` | `ThematicSynthesis.cs` | Themes built from the codes |
 | `thematic-coding-second` | `ThematicSynthesis.SecondCodingAsync` | `ThematicSynthesis.cs` | Independent theme assignment, kappa (with `Synthesis:DualCoding`) |
-| `theme-sections` | `WriteThemeAsync` | Thematic | One cited subsection per theme |
-| `coverage-fill` | `WriteThemeAsync` | Thematic | Revision that adds the theme's uncited studies |
-| `discussion` | `WriteDiscussionAsync` | Thematic | Discussion written from the subsections |
+| `theme-sections` | `ReviewWriter.WriteThemeAsync` | `ReviewWriter.cs` | One cited subsection per theme |
+| `coverage-fill` | `ReviewWriter.WriteThemeAsync` | `ReviewWriter.cs` | Revision that adds the theme's uncited studies |
+| `discussion` | `ReviewWriter.WriteDiscussionAsync` | `ReviewWriter.cs` | Discussion written from the subsections |
 | `artifact` | `ArtifactBuilder.BuildAsync` | `ReviewArtifact.cs` | The diagram, table or list the reviewer asked for, built from the finished results |
 | `cited-sections` | `GenerateCitedSectionsAsync` | Report | Fallback only: synthesis and discussion in one call |
-| `automated-peer-review` | `PeerReviewSectionsAsync` (fallback: `PeerReviewAndReviseAsync`) | Thematic / Report | Critique and revision; `peer-review-feedback.json` |
+| `automated-peer-review` | `ReviewWriter.PeerReviewAsync` (fallback: `PeerReviewAndReviseAsync`) | `ReviewWriter.cs` / Report | Critique and revision; `peer-review-feedback.json` |
 | `citation-check` | `CitationSupportChecker.CheckAsync` | `CitationSupportChecker.cs` | Verdict and quote per citation, judged on the attributed part of the sentence, with a second check for partly and not supported ones; `citation-audit.json` |
 | `citation-repair` | `CitationRepairer.RepairAsync` | `CitationRepairer.cs` | Rewrites or drops rejected citations, which are then checked again |
 

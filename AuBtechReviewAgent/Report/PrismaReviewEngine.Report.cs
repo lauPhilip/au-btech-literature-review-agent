@@ -182,63 +182,6 @@ public partial class PrismaReviewEngine
         };
     }
 
-    /// <summary>
-    /// STORM-style outline-before-prose stage. Asks the model to identify a handful of themes and, per
-    /// theme, the specific claims the grounded chunks actually support along with which reference numbers
-    /// back each claim - so the final synthesis prose is written against a pre-checked claim map rather
-    /// than generating everything in one uncontrolled pass. Returns an empty string (never throws) on any
-    /// failure, so the calling report generation falls back to grounding directly on the raw chunks.
-    /// </summary>
-    private async Task<string> GenerateGroundedOutlineAsync(IChatCompletionService chat, string query, string explicitObjective, string groundedChunksText, string referenceListMapping)
-    {
-        if (string.IsNullOrWhiteSpace(groundedChunksText)) return string.Empty;
-
-        var outlinePrompt = $$"""
-            You are preparing a grounded synthesis outline for a systematic literature review: before writing prose, map out the specific claims the literature supports and which sources back each claim.
-
-            REVIEW OBJECTIVE: "{{explicitObjective}}"
-            PRIMARY TOPIC: "{{query}}"
-            {{PromptSafety.ReviewerInputNotice}}
-
-            OFFICIAL ALPHABETIZED REFERENCE LIST FOR THIS RUN:
-            {{referenceListMapping}}
-
-            {{PromptSafety.DataOnlyNotice}}
-
-            GROUNDED MANUSCRIPT RAW CONTEXT DATA CHUNKS:
-            {{PromptSafety.Wrap(groundedChunksText, "excerpts from the included papers")}}
-
-            TASK: Identify 3 to 6 distinct themes that emerge across the included sources. For each theme, list 1-3 concrete, specific claims that the grounded chunks actually support, and for each claim list which reference numbers from the list above support it. Only use reference numbers that appear in the list above. If the grounded chunks are too sparse to support a claim, omit it rather than inventing one.
-
-            Respond ONLY with a valid minified JSON object matching this structure exactly:
-            { "themes": [ { "theme": "short theme label", "claims": [ { "text": "specific claim grounded in the sources", "refs": [1, 3] } ] } ] }
-            """;
-
-        try
-        {
-            var answer = await LlmJson.GetAsync<OutlineAnswer>(chat, outlinePrompt, JsonMode(0.2), a =>
-                a.Themes == null || a.Themes.Count == 0 ? "themes must be a non-empty list." :
-                a.Themes.Any(t => t.Claims == null) ? "every theme needs a claims list." : null);
-
-            var sb = new StringBuilder();
-            foreach (var theme in answer.Themes!.Where(t => !string.IsNullOrWhiteSpace(t.Theme)))
-            {
-                sb.AppendLine($"- Theme: {theme.Theme}");
-                foreach (var claim in theme.Claims!.Where(c => !string.IsNullOrWhiteSpace(c.Text)))
-                    sb.AppendLine($"    * {claim.Text} {string.Join("", (claim.Refs ?? new()).Select(r => $"[{r}]"))}");
-            }
-            return sb.ToString();
-        }
-        catch (Exception ex)
-        {
-            _log.LogWarning("Outline stage skipped: {Message}", SanitizeLogMessage(ex.Message));
-            return string.Empty;
-        }
-    }
-
-    private sealed class OutlineAnswer { public List<OutlineTheme>? Themes { get; set; } }
-    private sealed class OutlineTheme { public string Theme { get; set; } = ""; public List<OutlineClaim>? Claims { get; set; } }
-    private sealed class OutlineClaim { public string Text { get; set; } = ""; public List<int>? Refs { get; set; } }
     private sealed class SectionsAnswer { public string? Synthesis { get; set; } public string? Discussion { get; set; } }
     private sealed class CritiqueAnswer { public List<CritiqueComment>? Comments { get; set; } }
     private sealed class CritiqueComment { public string Section { get; set; } = ""; public string Severity { get; set; } = ""; public string Issue { get; set; } = ""; public string Suggestion { get; set; } = ""; }
@@ -431,7 +374,8 @@ public partial class PrismaReviewEngine
         string groundedOutline;
         ReportProgress(sessionId, finalState, RunProgress.Synthesis, 0, "Outline and report draft");
         using (LlmStage.Begin("outline"))
-            groundedOutline = await GenerateGroundedOutlineAsync(chat, query, explicitObjective, groundedChunksText, referenceListMapping);
+            groundedOutline = await ReviewWriter.WriteOutlineAsync(chat, WritingProfile.Systematic, query, explicitObjective, groundedChunksText, referenceListMapping,
+                message => _log.LogWarning("{Message}", SanitizeLogMessage(message)));
         if (!string.IsNullOrWhiteSpace(groundedOutline))
         {
             try
@@ -582,15 +526,6 @@ public partial class PrismaReviewEngine
             // Only free prose is copy-edited. The title is left alone (the refiner once turned it into a
             // five-sentence paragraph), and the methods items are generated from run data so there is nothing
             // to copy-edit - rewriting them is how a search string got silently shortened in the report.
-            string cleanTitle = CleanTitle(rawTitle, query);
-            deltas.Add(new StyleDeltaLog("Title", rawTitle, cleanTitle, Applied: false, Note: "Title is not sent through the stylistic pass."));
-            string cleanAbstract, cleanRationale, cleanObjectives;
-            using (LlmStage.Begin("style"))
-            {
-                var (a, dAbstract) = await StylisticRefinerUtility.RefineAcademicProseAsync(chat, "Abstract", rawAbstract); deltas.Add(dAbstract); cleanAbstract = a;
-                var (r, dRationale) = await StylisticRefinerUtility.RefineAcademicProseAsync(chat, "Rationale", rawRationale); deltas.Add(dRationale); cleanRationale = r;
-                var (o, dObjectives) = await StylisticRefinerUtility.RefineAcademicProseAsync(chat, "Objectives", rawObjectives); deltas.Add(dObjectives); cleanObjectives = o;
-            }
             // The Results & Synthesis (20a) and Discussion (23a) sections are NOT run through the generic
             // stylistic refiner - that rewrite step tends to drop the inline [n] citation markers. They are
             // written by the thematic synthesis (one cited subsection per theme, then the discussion), or, when
@@ -654,6 +589,31 @@ public partial class PrismaReviewEngine
                 _log.LogWarning("Could not save peer-review-feedback.json: {Message}", SanitizeLogMessage(ex.Message));
             }
 
+            // The title, abstract, rationale and objectives are written last, from the finished sections, by the step
+            // every kind of review shares (Synthesis/ReviewWriter.cs): the abstract may only use numbers counted in code
+            // or stated in the results, and the rationale's citations are checked below like every other sentence. The
+            // first draft's versions are kept only for when that step fails.
+            ReportProgress(sessionId, finalState, RunProgress.Synthesis, RunProgress.Phase(RunProgress.SynthesisPhases, 5, 1), "Title, abstract and introduction");
+            var resultSections = sections.Count > 0 ? (IReadOnlyList<SynthesisSection>)sections
+                : new[] { new SynthesisSection { Field = "synthesisResultsItem", Heading = "Results", Text = synthesisProse } };
+            var front = await ReviewWriter.WriteFrontMatterAsync(chat, WritingProfile.Systematic, query, explicitObjective,
+                FrontMatterFacts(finalState, useThematic ? thematic!.Codebook : null, includedFacts, screeningFacts), resultSections, discussionText,
+                referenceListMapping, referenceCount, message => _log.LogWarning("{Message}", SanitizeLogMessage(message)));
+            string frontNote = front == null ? "The front-matter step failed; the first draft's text was used." : "";
+            string titleText = front?.Title ?? rawTitle;
+            string cleanTitle = CleanTitle(titleText, query);
+            deltas.Add(new StyleDeltaLog("Title", titleText, cleanTitle, Applied: false, Note: "Title is not sent through the stylistic pass." + (frontNote.Length > 0 ? " " + frontNote : "")));
+            string cleanAbstract, cleanRationale, cleanObjectives;
+            using (LlmStage.Begin("style"))
+            {
+                var (a, dAbstract) = await StylisticRefinerUtility.RefineAcademicProseAsync(chat, "Abstract", front?.Abstract ?? rawAbstract); deltas.Add(dAbstract); cleanAbstract = a;
+                var (r, dRationale) = await StylisticRefinerUtility.RefineAcademicProseAsync(chat, "Rationale", front?.Rationale ?? rawRationale); deltas.Add(dRationale); cleanRationale = r;
+                var (o, dObjectives) = await StylisticRefinerUtility.RefineAcademicProseAsync(chat, "Objectives", front?.Objectives ?? rawObjectives); deltas.Add(dObjectives); cleanObjectives = o;
+            }
+            if (string.IsNullOrWhiteSpace(cleanAbstract)) cleanAbstract = front?.Abstract ?? rawAbstract;
+            if (string.IsNullOrWhiteSpace(cleanRationale)) cleanRationale = front?.Rationale ?? rawRationale;
+            if (string.IsNullOrWhiteSpace(cleanObjectives)) cleanObjectives = front?.Objectives ?? rawObjectives;
+
             // The model sometimes writes Markdown (headings, lists, tables, **emphasis**); turn it back into plain
             // prose before the citation check, so the checked sentences are exactly the ones shown on the page
             // and in main.tex. Every change is listed under FormattingChanges in citation-audit.json.
@@ -680,7 +640,7 @@ public partial class PrismaReviewEngine
                 formattingChanges.AddRange(changes);
                 return clean;
             }
-            var fields = new List<(string Field, string Text)> { ("synthesisResultsItem", Plain(synthesisProse, "synthesisResultsItem")) };
+            var fields = new List<(string Field, string Text)> { ("rationaleItem", Plain(cleanRationale, "rationaleItem")), ("synthesisResultsItem", Plain(synthesisProse, "synthesisResultsItem")) };
             fields.AddRange(sections.Select(s => (s.Field, Plain(s.Text, s.Field))));
             fields.Add(("discussionItem", Plain(discussionText, "discussionItem")));
             if (artifact is { Error: null }) fields.AddRange(artifact.CitableTexts().ToList());
@@ -824,9 +784,9 @@ public partial class PrismaReviewEngine
             {
                 GeneratedAt = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss UTC"),
                 TitleItem = cleanTitle,
-                AbstractItem = Plain(!string.IsNullOrWhiteSpace(cleanAbstract) ? cleanAbstract : rawAbstract, "abstractItem"),
-                RationaleItem = Plain(!string.IsNullOrWhiteSpace(cleanRationale) ? cleanRationale : rawRationale, "rationaleItem"),
-                ObjectivesItem = !string.IsNullOrWhiteSpace(cleanObjectives) ? cleanObjectives : rawObjectives,
+                AbstractItem = Plain(cleanAbstract, "abstractItem"),
+                RationaleItem = textOf["rationaleItem"],
+                ObjectivesItem = cleanObjectives,
                 EligibilityItem = methodsEligibility,
                 SourcesItem = methodsSources,
                 SearchStrategyItem = methodsSearch,
@@ -873,6 +833,21 @@ public partial class PrismaReviewEngine
     /// Keeps the title a title: first line only, no trailing full stop, and if the model returned a
     /// paragraph (or nothing) fall back to a neutral title built from the query.
     /// </summary>
+    /// <summary>What the front matter may say about the run, counted in code from the ledger.</summary>
+    private static string FrontMatterFacts(ReviewState state, ThematicCodebook? book, string includedFacts, string screeningFacts)
+    {
+        var s = state.Stats;
+        var lines = new List<string>
+        {
+            $"Records identified: {s.TotalIdentified}; duplicates removed: {s.DuplicatesRemoved}; records screened: {s.Screened}; included: {s.Included}; excluded: {s.Excluded}.",
+            $"Included set: {includedFacts}",
+            $"Screening: {screeningFacts}",
+            $"Full text was read for {s.FullTextRetrieved} of the {s.Included} included studies; the others were read from their abstracts.",
+        };
+        if (book != null) lines.Add($"Thematic synthesis: {book.Themes.Count} theme{(book.Themes.Count == 1 ? "" : "s")} from {book.Codes.Count} code{(book.Codes.Count == 1 ? "" : "s")}.");
+        return string.Join("\n", lines);
+    }
+
     public static string CleanTitle(string rawTitle, string query)
     {
         string t = (rawTitle ?? "").Split('\n')[0].Trim().TrimEnd('.');
