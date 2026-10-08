@@ -50,6 +50,9 @@ public sealed class MultivocalMapFile
 
     /// <summary>How many sources the model saw when it generalised the values.</summary>
     public int SourcesSeen { get; set; }
+
+    /// <summary>What code changed in the model's proposal, such as an attribute for a known fact that was left out.</summary>
+    public List<string> Notes { get; set; } = new();
     public List<MapVersion> Versions { get; set; } = new();
 
     /// <summary>The version used for the extraction; null until the reviewer fixes the map.</summary>
@@ -134,7 +137,10 @@ public sealed class MultivocalMapper
             var shown = passed.Take(MaxSourcesShown).ToList();
             var answer = await AskAsync(_chat(), planned.Plan, shown);
             var file = new MultivocalMapFile { RunId = runId, PromptVersion = PromptVersion, Model = _model, SourcesSeen = shown.Count };
-            file.Versions.Add(new MapVersion { Number = 1, CreatedUtc = DateTime.UtcNow, By = "model", Attributes = Clean(answer.Attributes) });
+            var proposed = Clean(answer.Attributes);
+            foreach (var known in proposed.Where(IsKnownFact))
+                file.Notes.Add($"\"{known.Name}\" ({known.Question}) was left out of the model's map: it is known for every source and recorded by code.");
+            file.Versions.Add(new MapVersion { Number = 1, CreatedUtc = DateTime.UtcNow, By = "model", Attributes = proposed.Where(a => !IsKnownFact(a)).ToList() });
 
             await SafeFile.WriteAllTextAsync(Path.Join(folder, MapFile), JsonSerializer.Serialize(file, Json));
             await RunHeader.WriteAsync(folder, header with { Stage = StageMapping });
@@ -271,11 +277,22 @@ public sealed class MultivocalMapper
     }
 
     /// <summary>
-    /// What is wrong with the model's map, beyond <see cref="Problem"/>: more than three attributes for one question, a
-    /// value that is also another attribute's value, or an attribute for a fact the run already knows.
+    /// Whether an attribute only records a fact the run already knows for every source (its kind, grey or formal, site,
+    /// date or quality). Such an attribute is dropped from the model's map in code rather than sent back: a question
+    /// such as "how often in grey and in academic sources?" makes the model add one however it is told (seen in a
+    /// live run, twice in a row), and the known fact answers it anyway.
     /// </summary>
-    public static string? ModelProblem(IReadOnlyList<MapAttribute> attributes, MultivocalPlan plan)
+    public static bool IsKnownFact(MapAttribute attribute) => System.Text.RegularExpressions.Regex.IsMatch(attribute.Name,
+        @"^(source ?type|type of source|kind of source|grey or academic|grey or formal|literature( type)?|publication (date|site|year)|date|site|quality( points| score)?)$",
+        System.Text.RegularExpressions.RegexOptions.IgnoreCase, TimeSpan.FromSeconds(1));
+
+    /// <summary>
+    /// What is wrong with the model's map, beyond <see cref="Problem"/>, once the attributes for known facts are
+    /// dropped: more than three attributes for one question, or a value that is also another attribute's value.
+    /// </summary>
+    public static string? ModelProblem(IReadOnlyList<MapAttribute> proposed, MultivocalPlan plan)
     {
+        var attributes = proposed.Where(a => !IsKnownFact(a)).ToList();
         if (Problem(attributes, plan) is { } problem) return problem;
         var crowded = attributes.GroupBy(a => a.Question).FirstOrDefault(g => g.Count() > MaxModelAttributesPerQuestion);
         if (crowded != null) return $"{crowded.Key} has {crowded.Count()} attributes; give each question at most {MaxModelAttributesPerQuestion}.";
@@ -283,11 +300,7 @@ public sealed class MultivocalMapper
             .SelectMany(a => a.Values.Where(v => !v.Equals("Other", StringComparison.OrdinalIgnoreCase)).Select(v => (Value: v, a.Name)))
             .GroupBy(x => x.Value, StringComparer.OrdinalIgnoreCase)
             .FirstOrDefault(g => g.Select(x => x.Name).Distinct().Count() > 1);
-        if (shared != null) return $"\"{shared.Key}\" is a value of both {string.Join(" and ", shared.Select(x => $"\"{x.Name}\"").Distinct())}; keep each value in one attribute.";
-        var known = attributes.FirstOrDefault(a => System.Text.RegularExpressions.Regex.IsMatch(a.Name,
-            @"^(source ?type|type of source|kind of source|grey or academic|literature( type)?|publication (date|site|year)|date|site|quality( points| score)?)$",
-            System.Text.RegularExpressions.RegexOptions.IgnoreCase, TimeSpan.FromSeconds(1)));
-        return known != null ? $"\"{known.Name}\" is already known for every source and is recorded by code; leave it out." : null;
+        return shared != null ? $"\"{shared.Key}\" is a value of both {string.Join(" and ", shared.Select(x => $"\"{x.Name}\"").Distinct())}; keep each value in one attribute." : null;
     }
 
     /// <summary>The map prompt: attributes from the questions, values generalised over the sources.</summary>

@@ -174,7 +174,9 @@ public class MultivocalMapTests : IDisposable
         Assert.Contains("\"Memory\" is a value of both", MultivocalMapper.ModelProblem(shared, plan));
 
         var known = MultivocalMapper.Clean(new[] { A("Practice", "RQ1", "Retrieval", "Other"), A("SourceType", "RQ2", "Grey", "Academic") });
-        Assert.Contains("\"Source type\" is already known", MultivocalMapper.ModelProblem(known, plan));
+        Assert.Null(MultivocalMapper.ModelProblem(known, plan)); // dropped in code, not sent back to the model
+        Assert.True(MultivocalMapper.IsKnownFact(known[1]));
+        Assert.False(MultivocalMapper.IsKnownFact(known[0]));
 
         var fine = MultivocalMapper.Clean(new[] { A("Practice", "RQ1", "Retrieval", "Other"), A("Code quality practice", "RQ1", "Linting", "Review") });
         Assert.Null(MultivocalMapper.ModelProblem(fine, plan)); // "quality" inside a longer name is fine
@@ -191,5 +193,25 @@ public class MultivocalMapTests : IDisposable
         Assert.Equal("2025-03-01", facts.Single(f => f.Name == "Date").Value);
         Assert.Equal("13.5 of 20", facts.Single(f => f.Name == "Quality points").Value);
         Assert.Equal("not given", MultivocalMapper.KnownFactsFor(record with { Published = null }, null).Single(f => f.Name == "Date").Value);
+    }
+
+    private const string MapWithSourceType = """
+        {"attributes":[
+          {"name":"Practice","question":"RQ1","description":"The practice described.","values":["Retrieval","Summarisation","Other"],"multiple":true,"open":false},
+          {"name":"SourceType","question":"RQ2","description":"Grey or academic.","values":["Grey","Academic"],"multiple":false,"open":false}
+        ]}
+        """;
+
+    [Fact]
+    public async Task AnAttributeForAKnownFactIsLeftOutOfTheProposalWithANote()
+    {
+        // As in a live run: RQ2 asks how often a practice is mentioned in grey and in academic sources.
+        var (_, runId, key, mapper, model) = await AssessedRun(new FakeChatService().Returns(MapWithSourceType));
+
+        var file = await mapper.ProposeAsync(runId, key);
+
+        Assert.Single(model.Prompts); // accepted at once, not sent back
+        Assert.Equal("Practice", Assert.Single(file.Latest.Attributes).Name);
+        Assert.Contains("\"Source type\" (RQ2) was left out", Assert.Single(file.Notes));
     }
 }
