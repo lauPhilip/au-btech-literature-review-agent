@@ -1,0 +1,370 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
+using Microsoft.SemanticKernel.ChatCompletion;
+
+namespace AuBtechReviewAgent;
+
+/// <summary>
+/// How the writing prompts name a kind of review and its parts. Everything else in the prompts, and every check of
+/// the answers, is the same for every kind of review. The defaults are the systematic review's words, so its prompts
+/// stay exactly as they were.
+/// </summary>
+public sealed record WritingProfile
+{
+    /// <summary>The systematic review's words.</summary>
+    public static readonly WritingProfile Systematic = new();
+
+    /// <summary>The review, with its article, e.g. "a systematic literature review".</summary>
+    public string Review { get; init; } = "a systematic literature review";
+
+    /// <summary>The review in short, with its article, e.g. "a systematic review".</summary>
+    public string ReviewShort { get; init; } = "a systematic review";
+
+    /// <summary>Where a theme subsection goes, e.g. "the Results & Synthesis section (PRISMA 2020 Item 20a)".</summary>
+    public string ResultsSection { get; init; } = "the Results & Synthesis section (PRISMA 2020 Item 20a)";
+
+    /// <summary>The discussion, e.g. "the Discussion section (PRISMA 2020 Item 23a)".</summary>
+    public string DiscussionSection { get; init; } = "the Discussion section (PRISMA 2020 Item 23a)";
+
+    /// <summary>What the review calls one source and several, e.g. "study" and "studies".</summary>
+    public string Source { get; init; } = "study";
+    public string Sources { get; init; } = "studies";
+
+    /// <summary>Where the facts about the evidence base come from, e.g. "from the data extraction".</summary>
+    public string BaseFactsFrom { get; init; } = "from the data extraction";
+
+    /// <summary>What the discussion's paragraphs cover, in order.</summary>
+    public string DiscussionParts { get; init; } =
+        "(a) what the themes together say about the objective, (b) where the themes connect, reinforce or contradict each other, (c) gaps the literature leaves open and directions for research, (d) implications for practice, (e) the limitations of the evidence base and of this review (automated screening and synthesis by a language model).";
+}
+
+/// <summary>
+/// The writing stages every kind of review shares (module design M8): one cited subsection per theme, written from
+/// that theme's evidence only, with a fill pass for sources it does not cite yet; the discussion, written from the
+/// subsections; and an automated peer review of every section with one revision of those that got medium or high
+/// comments. The stages read only <see cref="ReviewEvidence"/>, and every answer is checked in code before it is
+/// used: citations must be in the reference list, and a revision may not drop a citation the section had.
+/// </summary>
+public static class ReviewWriter
+{
+    private sealed class SectionAnswer { public string? Heading { get; set; } public string? Text { get; set; } }
+    private sealed class TextAnswer { public string? Text { get; set; } }
+    private sealed class CritiqueAnswer { public List<CritiqueComment>? Comments { get; set; } }
+    private sealed class CritiqueComment { public string Section { get; set; } = ""; public string Severity { get; set; } = ""; public string Issue { get; set; } = ""; public string Suggestion { get; set; } = ""; }
+
+    /// <summary>
+    /// Writes one subsection per theme, at most <paramref name="parallelism"/> at a time, assembled in theme order.
+    /// A theme that cannot be written is left out and its coverage says so.
+    /// </summary>
+    public static async Task<(List<SynthesisSection> Sections, List<ThemeCoverage> Coverage)> WriteThemesAsync(
+        IChatCompletionService chat, WritingProfile profile, string goal, ReviewEvidence evidence, int referenceCount,
+        int parallelism, Action<int, int>? written = null, Action<string>? warn = null)
+    {
+        using var throttle = new SemaphoreSlim(Math.Max(1, parallelism));
+        int done = 0;
+        var work = evidence.Themes.Select((theme, index) => Task.Run(async () =>
+        {
+            await throttle.WaitAsync();
+            try
+            {
+                var result = await WriteThemeAsync(chat, profile, goal, evidence, theme, index + 1, referenceCount, warn);
+                written?.Invoke(Interlocked.Increment(ref done), evidence.Themes.Count);
+                return result;
+            }
+            finally { throttle.Release(); }
+        })).ToList();
+
+        var sections = new List<SynthesisSection>();
+        var coverage = new List<ThemeCoverage>();
+        foreach (var task in work)
+        {
+            var (section, themeCoverage) = await task;
+            coverage.Add(themeCoverage);
+            if (section != null) sections.Add(section);
+        }
+        return (sections, coverage);
+    }
+
+    /// <summary>One theme's subsection, with one fill pass for the theme's sources it does not cite yet.</summary>
+    public static async Task<(SynthesisSection? Section, ThemeCoverage Coverage)> WriteThemeAsync(
+        IChatCompletionService chat, WritingProfile profile, string goal, ReviewEvidence evidence, EvidenceTheme theme, int number,
+        int referenceCount, Action<string>? warn = null)
+    {
+        string field = $"synthesis-{number}";
+        var coverage = new ThemeCoverage { ThemeId = theme.Id, Field = field, Studies = theme.Sources.ToList() };
+        int excerpts = theme.Sources.Count <= 12 ? 2 : 1;
+        string themeEvidence = string.Join("\n", theme.Sources.Select(r => evidence.SourceBlock(r, theme, excerpts)));
+        string otherThemes = string.Join("; ", evidence.Themes.Where(t => t.Id != theme.Id).Select(t => t.Name));
+        int paragraphs = ThematicSynthesis.ParagraphsFor(theme.Sources.Count);
+        string sourceList = string.Join(", ", theme.Sources.Select(r => $"[{r}]"));
+        string s = profile.Source, ss = profile.Sources;
+
+        string prompt = $$"""
+            You are writing one subsection of {{profile.ResultsSection}} of {{profile.Review}}. The review used thematic synthesis; this subsection reports one theme.
+
+            REVIEW OBJECTIVE: "{{goal}}"
+            {{PromptSafety.ReviewerInputNotice}}
+            THEME: {{theme.Name}}. {{theme.Description}}
+            OTHER THEMES (reported in their own subsections; do not cover them here): {{(otherThemes.Length == 0 ? "none" : otherThemes)}}
+
+            REFERENCE LIST FOR THIS THEME (cite ONLY these numbers):
+            {{evidence.ReferenceLines(theme.Sources)}}
+
+            {{PromptSafety.DataOnlyNotice}}
+
+            {{PromptSafety.Wrap(themeEvidence, $"the evidence of the {ss} in this theme: codes, verified findings and excerpts")}}
+
+            REQUIREMENTS:
+            1. Write about {{paragraphs}} paragraph{{(paragraphs == 1 ? "" : "s")}} of synthesis, not a list of summaries: group {{ss}} that report the same thing, compare and contrast them, and name agreements, tensions and gaps within the theme. Separate paragraphs with a blank line.
+            2. Cite every one of these {{ss}} at least once: {{sourceList}}. A {{s}} may be cited together with others when they report the same finding ("... [3, 7, 12]").
+            3. Every sentence that states a finding, comparison or claim from the literature ends with an inline marker like [3] or [2, 5]. Attribute to a {{s}} only what its findings or excerpts above actually say; prefer the verified findings. Do not invent numbers, statistics or venue names.
+            4. "heading" is a short subsection title for the theme (at most 10 words, no numbering).
+            {{ProseCleaner.PlainProseRule}}
+            Respond ONLY with a valid minified JSON object:
+            {"heading":"...","text":"the subsection with inline [n] citations"}
+            """;
+
+        string text;
+        string heading;
+        try
+        {
+            using (LlmStage.Begin("theme-sections"))
+            {
+                var answer = await LlmJson.GetAsync<SectionAnswer>(chat, prompt, LlmJson.JsonMode(0.3), a =>
+                {
+                    if (string.IsNullOrWhiteSpace(a.Text)) return "text must not be empty.";
+                    var cited = ThematicSynthesis.CitedIn(a.Text);
+                    if (cited.Count == 0) return "the text must carry inline [n] citations.";
+                    var outside = cited.Where(r => r < 1 || r > referenceCount).ToList();
+                    return outside.Count > 0 ? $"citation numbers {string.Join(", ", outside)} are not in the reference list." : null;
+                });
+                text = MethodsSectionWriter.StripMarkdownEmphasis(answer.Text!.Trim());
+                heading = string.IsNullOrWhiteSpace(answer.Heading) ? theme.Name : answer.Heading.Trim().TrimEnd('.');
+            }
+        }
+        catch (Exception ex)
+        {
+            warn?.Invoke($"Theme {theme.Id} could not be written: {ex.Message}");
+            coverage.FillPass = "subsection could not be written";
+            coverage.NotCited = theme.Sources.ToList();
+            return (null, coverage);
+        }
+
+        coverage.CitedAfterWriting = ThematicSynthesis.CitedIn(text).Intersect(theme.Sources).ToList();
+        var missing = theme.Sources.Except(coverage.CitedAfterWriting).ToList();
+        if (missing.Count > 0)
+        {
+            string missingEvidence = string.Join("\n", missing.Select(r => evidence.SourceBlock(r, theme, 2)));
+            string fillPrompt = $$"""
+                You are revising one theme subsection of {{profile.ReviewShort}} so that it covers every {{s}} of the theme. The {{ss}} below belong to this theme but are not yet cited in it.
+
+                THEME: {{theme.Name}}. {{theme.Description}}
+
+                REFERENCE LIST FOR THIS THEME (cite ONLY these numbers):
+                {{evidence.ReferenceLines(theme.Sources)}}
+
+                CURRENT SUBSECTION:
+                {{text}}
+
+                {{PromptSafety.DataOnlyNotice}}
+
+                {{PromptSafety.Wrap(missingEvidence, $"evidence of the {ss} not yet cited")}}
+
+                TASK: Integrate the {{ss}} {{string.Join(", ", missing.Select(r => $"[{r}]"))}} where their evidence fits: add them to the comparisons that already exist, or add sentences that relate them to the {{ss}} already discussed. Attribute to them only what their evidence above says. Keep every existing citation. If the evidence of a {{s}} does not support any statement about this theme, leave it out rather than inventing one.
+                {{ProseCleaner.PlainProseRule}}
+                Respond ONLY with a valid minified JSON object:
+                {"text":"the revised subsection with inline [n] citations"}
+                """;
+            try
+            {
+                using (LlmStage.Begin("coverage-fill"))
+                {
+                    var answer = await LlmJson.GetAsync<TextAnswer>(chat, fillPrompt, LlmJson.JsonMode(0.2), a =>
+                        string.IsNullOrWhiteSpace(a.Text) ? "text must not be empty." : null);
+                    string revised = MethodsSectionWriter.StripMarkdownEmphasis(answer.Text!.Trim());
+                    string? problem = ThematicSynthesis.RevisionProblem(text, revised, referenceCount);
+                    if (problem == null)
+                    {
+                        int added = ThematicSynthesis.CitedIn(revised).Intersect(missing).Count();
+                        coverage.FillPass = $"added {added} of {missing.Count} uncited {ss}";
+                        text = revised;
+                    }
+                    else coverage.FillPass = $"revision rejected: {problem}";
+                }
+            }
+            catch (Exception ex)
+            {
+                coverage.FillPass = $"fill pass failed ({ex.GetType().Name})";
+            }
+        }
+        coverage.CitedFinal = ThematicSynthesis.CitedIn(text).Intersect(theme.Sources).ToList();
+        coverage.NotCited = theme.Sources.Except(coverage.CitedFinal).ToList();
+        return (new SynthesisSection { Field = field, ThemeId = theme.Id, Heading = heading, Text = text }, coverage);
+    }
+
+    /// <summary>The discussion, written from the theme subsections; empty when it cannot be written.</summary>
+    public static async Task<string> WriteDiscussionAsync(IChatCompletionService chat, WritingProfile profile, string topic, string goal,
+        IReadOnlyList<SynthesisSection> sections, ReviewEvidence evidence, int referenceCount, Action<string>? warn = null)
+    {
+        int paragraphs = Math.Clamp(2 + sections.Count / 2, 3, 6);
+        string synthesis = string.Join("\n\n", sections.Select(x => $"### {x.Heading}\n{x.Text}"));
+        string prompt = $$"""
+            You are writing {{profile.DiscussionSection}} of {{profile.Review}} whose results are reported theme by theme below.
+
+            REVIEW OBJECTIVE: "{{goal}}"
+            PRIMARY TOPIC: "{{topic}}"
+            {{PromptSafety.ReviewerInputNotice}}
+
+            REFERENCE LIST (cite ONLY these numbers):
+            {{evidence.ReferenceLines()}}
+
+            FACTS ABOUT THE EVIDENCE BASE ({{profile.BaseFactsFrom}}; use them for the limitations, do not change them):
+            {{evidence.BaseFacts}}
+
+            RESULTS BY THEME:
+            {{synthesis}}
+
+            REQUIREMENTS:
+            1. Write about {{paragraphs}} paragraphs, separated by a blank line: {{profile.DiscussionParts}}
+            2. Interpret, do not repeat the results. Ground every claim in the results above; every sentence that attributes something to the literature ends with an inline marker such as [3] or [2, 5], using the same {{profile.Sources}} the results cite for it.
+            3. Do not invent numbers, statistics or {{profile.Sources}}.
+            {{ProseCleaner.PlainProseRule}}
+            Respond ONLY with a valid minified JSON object:
+            {"text":"the discussion with inline [n] citations"}
+            """;
+        try
+        {
+            var answer = await LlmJson.GetAsync<TextAnswer>(chat, prompt, LlmJson.JsonMode(0.3), a =>
+            {
+                if (string.IsNullOrWhiteSpace(a.Text)) return "text must not be empty.";
+                var outside = ThematicSynthesis.CitedIn(a.Text).Where(r => r < 1 || r > referenceCount).ToList();
+                return outside.Count > 0 ? $"citation numbers {string.Join(", ", outside)} are not in the reference list." : null;
+            });
+            return MethodsSectionWriter.StripMarkdownEmphasis(answer.Text!.Trim());
+        }
+        catch (Exception ex)
+        {
+            warn?.Invoke($"Discussion could not be written: {ex.Message}");
+            return "";
+        }
+    }
+
+    /// <summary>
+    /// One critique of all subsections and the discussion, then a revision of each section that received medium or
+    /// high comments. A revision that drops a citation the section had (and so lowers coverage) or cites outside the
+    /// reference list is rejected, and the original is kept. The sections are revised in place; the revised
+    /// discussion is returned with the log.
+    /// </summary>
+    public static async Task<(PeerReviewLog Log, string Discussion)> PeerReviewAsync(IChatCompletionService chat, WritingProfile profile,
+        List<SynthesisSection> sections, string discussion, ReviewEvidence evidence, int referenceCount, int parallelism, Action<string>? warn = null)
+    {
+        string AllSynthesis() => string.Join("\n\n", sections.Select(x => $"### {x.Heading}\n{x.Text}"));
+        var log = new PeerReviewLog
+        {
+            GeneratedAt = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss UTC"),
+            SynthesisBefore = AllSynthesis(),
+            DiscussionBefore = discussion,
+            Verdict = "No changes applied",
+        };
+        var ids = sections.Select(x => x.Field).Append("discussion").ToList();
+        string sectionsText = string.Join("\n\n", sections.Select(x => $"[{x.Field}] {x.Heading}\n{x.Text}"))
+                              + $"\n\n[discussion] Discussion\n{discussion}";
+
+        string critiquePrompt = $$"""
+            You are a strict but constructive peer reviewer for {{profile.Review}}. Review each section below (theme subsections of the results, and the discussion) for: (a) depth: does it synthesise and compare rather than list, (b) whether each specific claim carries an inline [n] citation, (c) over-claiming beyond what a {{profile.Source}} could show, (d) coherence and overlap between sections, (e) whether the discussion interprets rather than repeats.
+
+            REFERENCE LIST (valid citation numbers):
+            {{evidence.ReferenceLines()}}
+
+            SECTIONS (the id in brackets is the section id):
+            {{sectionsText}}
+
+            Respond ONLY with a valid minified JSON object:
+            { "comments": [ { "section": "one of: {{string.Join(", ", ids)}}", "severity": "high, medium, or low", "issue": "what is wrong or weak", "suggestion": "how to fix it" } ] }
+            If a section is already strong, return few or no comments for it.
+            """;
+        try
+        {
+            var answer = await LlmJson.GetAsync<CritiqueAnswer>(chat, critiquePrompt, LlmJson.JsonMode(0.2), a =>
+                a.Comments == null ? "comments must be a list (it may be empty)." :
+                a.Comments.Any(c => !ids.Contains(c.Section.Trim(), StringComparer.OrdinalIgnoreCase)) ? $"each comment's section must be one of: {string.Join(", ", ids)}." : null);
+            log.Comments = answer.Comments!.Select(c => new PeerReviewComment(c.Section.Trim().ToLowerInvariant(), c.Severity, c.Issue, c.Suggestion)).ToList();
+        }
+        catch (Exception ex)
+        {
+            warn?.Invoke($"Peer-review critique skipped: {ex.Message}");
+        }
+
+        var actionable = log.Comments
+            .Where(c => !c.Severity.Equals("low", StringComparison.OrdinalIgnoreCase))
+            .GroupBy(c => c.Section).ToList();
+        if (actionable.Count == 0)
+        {
+            log.SynthesisAfter = log.SynthesisBefore;
+            log.DiscussionAfter = log.DiscussionBefore;
+            log.Verdict = log.Comments.Count == 0 ? "No revisions needed - reviewer found no actionable issues" : "Only low-severity comments; no revisions applied";
+            return (log, discussion);
+        }
+
+        using var throttle = new SemaphoreSlim(Math.Max(1, parallelism));
+        var revisions = actionable.Select(group => Task.Run(async () =>
+        {
+            await throttle.WaitAsync();
+            try
+            {
+                var section = sections.FirstOrDefault(x => x.Field == group.Key);
+                string before = section?.Text ?? discussion;
+                string feedback = string.Join("\n", group.Select(c => $"- [{c.Severity}] {c.Issue} -> {c.Suggestion}"));
+                string revisePrompt = $$"""
+                    You are the author revising one section of {{profile.ReviewShort}} in response to peer-review feedback. Apply the feedback. Keep every existing inline [n] citation, cite ONLY numbers from the reference list, and do not invent claims, numbers or {{profile.Sources}}.
+
+                    REFERENCE LIST (valid citation numbers):
+                    {{evidence.ReferenceLines()}}
+
+                    PEER-REVIEW FEEDBACK:
+                    {{feedback}}
+
+                    CURRENT SECTION ({{(section == null ? "Discussion" : section.Heading)}}):
+                    {{before}}
+
+                    {{ProseCleaner.PlainProseRule}}
+                    Respond ONLY with a valid minified JSON object:
+                    {"text":"the revised section with inline [n] citations"}
+                    """;
+                try
+                {
+                    var answer = await LlmJson.GetAsync<TextAnswer>(chat, revisePrompt, LlmJson.JsonMode(0.3), a =>
+                        string.IsNullOrWhiteSpace(a.Text) ? "text must not be empty." : null);
+                    string after = MethodsSectionWriter.StripMarkdownEmphasis(answer.Text!.Trim());
+                    string? problem = ThematicSynthesis.RevisionProblem(before, after, referenceCount);
+                    return new SectionRevision(group.Key, before, problem == null ? after : before, problem == null,
+                        problem == null ? $"Revised in response to {group.Count()} comment(s)." : $"Revision rejected: {problem}; original kept.");
+                }
+                catch (Exception ex)
+                {
+                    return new SectionRevision(group.Key, before, before, false, $"Revision failed ({ex.GetType().Name}); original kept.");
+                }
+            }
+            finally { throttle.Release(); }
+        })).ToList();
+
+        foreach (var task in revisions)
+        {
+            var revision = await task;
+            log.SectionRevisions.Add(revision);
+            if (!revision.Applied) continue;
+            var section = sections.FirstOrDefault(x => x.Field == revision.Section);
+            if (section != null) section.Text = revision.After;
+            else discussion = revision.After;
+        }
+        log.SectionRevisions = log.SectionRevisions.OrderBy(r => ids.IndexOf(r.Section)).ToList();
+        log.SynthesisAfter = AllSynthesis();
+        log.DiscussionAfter = discussion;
+        int applied = log.SectionRevisions.Count(r => r.Applied);
+        log.Verdict = $"Revisions applied to {applied} of {log.SectionRevisions.Count} section(s) with medium or high comments";
+        return (log, discussion);
+    }
+}
