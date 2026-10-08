@@ -118,8 +118,11 @@ var multivocalScreener = new AuBtechReviewAgent.MultivocalScreener(reviewEngine.
 builder.Services.AddSingleton(multivocalScreener); // grey screening (preview)
 var multivocalPages = new AuBtechReviewAgent.MultivocalPages(reviewEngine.Store, multivocalSearcher, new AuBtechReviewAgent.PageFetcher());
 builder.Services.AddSingleton(multivocalPages); // page snapshots (preview)
-builder.Services.AddSingleton(new AuBtechReviewAgent.MultivocalQualityAssessor(reviewEngine.Store, multivocalPlanner, multivocalSearcher, multivocalScreener,
-    multivocalPages, multivocalChat, reviewEngine.Cache, llmOptions.Model, llmOptions.ScreeningParallelism)); // grey quality checklist (preview)
+var multivocalQuality = new AuBtechReviewAgent.MultivocalQualityAssessor(reviewEngine.Store, multivocalPlanner, multivocalSearcher, multivocalScreener,
+    multivocalPages, multivocalChat, reviewEngine.Cache, llmOptions.Model, llmOptions.ScreeningParallelism);
+builder.Services.AddSingleton(multivocalQuality); // grey quality checklist (preview)
+builder.Services.AddSingleton(new AuBtechReviewAgent.MultivocalMapper(reviewEngine.Store, multivocalPlanner, multivocalSearcher, multivocalQuality,
+    multivocalChat, llmOptions.Model)); // systematic map (preview)
 // Modules shown as a preview while they are being built (Development only; see ReviewModulesOptions).
 builder.Services.AddSingleton(AuBtechReviewAgent.ReviewModulesOptions.From(builder.Configuration, builder.Environment.IsDevelopment()));
 
