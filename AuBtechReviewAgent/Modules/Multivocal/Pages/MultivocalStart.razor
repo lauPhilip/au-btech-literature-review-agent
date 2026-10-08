@@ -8,6 +8,7 @@
 @inject AuBtechReviewAgent.MultivocalPages Pages
 @inject AuBtechReviewAgent.MultivocalScreener Screener
 @inject AuBtechReviewAgent.MultivocalQualityAssessor Quality
+@inject AuBtechReviewAgent.MultivocalMapper Mapper
 @inject NavigationManager Nav
 @inject IJSRuntime JS
 @inject ILogger<MultivocalStart> Logger
@@ -70,7 +71,33 @@
                         {
                             @SettingRow("Quality", QualityLine(quality))
                         }
+                        @if (map != null)
+                        {
+                            @SettingRow("Map", $"{map.Latest.Attributes.Count} attributes, version {map.Latest.Number}{(map.FixedVersion != null ? ", fixed" : ", not fixed yet")}")
+                        }
                     </dl>
+                    @if (quality != null && map == null && stage == AuBtechReviewAgent.MultivocalQualityAssessor.StageAssessed)
+                    {
+                        <div class="border-t border-gray-100 pt-3 space-y-2">
+                            @if (mapping || AuBtechReviewAgent.MultivocalMapper.IsRunning(planned.RunId))
+                            {
+                                <p class="text-xs text-gray-700" role="status" aria-live="polite">Proposing the map…</p>
+                            }
+                            else if (canEdit && quality.Count("Passed") > 0)
+                            {
+                                <p class="text-xs text-gray-600">Propose the systematic map (G12): the attributes to record for every source, from your research questions, with values generalised over the @quality.Count("Passed") sources that passed. You can edit it before it is fixed.</p>
+                                <button type="button" class="ui-btn-primary ui-btn-sm" @onclick="ProposeMapAsync">Propose the map</button>
+                            }
+                            else if (canEdit)
+                            {
+                                <p class="text-xs text-gray-600">No source passed the quality check, so there is nothing to map.</p>
+                            }
+                            @if (mapError != null)
+                            {
+                                <p class="bg-red-50 border border-red-200 text-red-800 p-2 text-xs" role="alert">@mapError</p>
+                            }
+                        </div>
+                    }
                     @if (screening != null && quality == null && stage is AuBtechReviewAgent.MultivocalScreener.StageScreened or AuBtechReviewAgent.MultivocalQualityAssessor.StageAssessing)
                     {
                         <div class="border-t border-gray-100 pt-3 space-y-2">
@@ -446,11 +473,101 @@
                         <button type="button" aria-pressed="@(panelTab == "sources" ? "true" : "false")" @onclick="@(() => panelTab = "sources")"
                                 class="px-3 py-2.5 text-xs border-b-2 -mb-px @(panelTab == "sources" ? "border-brand text-brand font-semibold" : "border-transparent text-gray-500 hover:text-gray-800")">Sources found (@ledger.Sources.Count)</button>
                     }
+                    @if (map != null)
+                    {
+                        <button type="button" aria-pressed="@(panelTab == "map" ? "true" : "false")" @onclick="@(() => panelTab = "map")"
+                                class="px-3 py-2.5 text-xs border-b-2 -mb-px @(panelTab == "map" ? "border-brand text-brand font-semibold" : "border-transparent text-gray-500 hover:text-gray-800")">Map</button>
+                    }
                 </div>
                 <span class="text-[10px] text-gray-500 font-mono">Garousi et al. 2019</span>
             </div>
 
-            @if (panelTab == "sources" && ledger != null)
+            @if (panelTab == "map" && map != null && planned != null)
+            {
+                <div class="flex-1 min-h-0 overflow-y-auto p-5 space-y-4 text-left">
+                    <div>
+                        <h3 class="text-base font-semibold text-gray-900">Systematic map</h3>
+                        <p class="text-xs text-gray-600 mt-0.5">
+                            The attributes recorded for every source (G12, Table 10). Version 1 was proposed by the model from your research questions, with values generalised over @map.SourcesSeen sources that passed.
+                            @(map.FixedVersion is int fixedNumber ? $"Version {fixedNumber} is fixed and is used for the extraction." : "Edit it, save, and fix it when it fits; every saved version is kept.")
+                        </p>
+                    </div>
+                    <ol class="text-[11px] text-gray-500 space-y-0.5">
+                        @foreach (var version in map.Versions)
+                        {
+                            <li>Version @version.Number · @(version.By == "model" ? "proposed by the model" : "edited by you") · @version.CreatedUtc.ToString("yyyy-MM-dd HH:mm") UTC · @version.Attributes.Count attributes@(map.FixedVersion == version.Number ? " · fixed" : "")</li>
+                        }
+                    </ol>
+                    @if (mapDraft != null)
+                    {
+                        @for (int i = 0; i < mapDraft.Count; i++)
+                        {
+                            var mapAttribute = mapDraft[i];
+                            int index = i;
+                            <fieldset class="border border-gray-200 p-3 space-y-2">
+                                <legend class="px-1 text-xs font-medium text-gray-700">Attribute @(index + 1)</legend>
+                                <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                                    <label class="text-[11px] text-gray-600 sm:col-span-2">Name
+                                        <input type="text" class="ui-input py-1 text-xs mt-0.5" maxlength="@AuBtechReviewAgent.MultivocalMapper.MaxText" @bind="mapAttribute.Name" />
+                                    </label>
+                                    <label class="text-[11px] text-gray-600">For
+                                        <select class="ui-input py-1 text-xs mt-0.5" @bind="mapAttribute.Question">
+                                            @foreach (var (number, _) in planned.Plan.Numbered())
+                                            {
+                                                <option value="@number">@number</option>
+                                            }
+                                        </select>
+                                    </label>
+                                </div>
+                                <label class="block text-[11px] text-gray-600">What it records
+                                    <input type="text" class="ui-input py-1 text-xs mt-0.5" maxlength="@AuBtechReviewAgent.MultivocalMapper.MaxText" @bind="mapAttribute.Description" />
+                                </label>
+                                @if (!mapAttribute.Open)
+                                {
+                                    <label class="block text-[11px] text-gray-600">Values, one per line
+                                        <textarea rows="@Math.Max(3, mapAttribute.Values.Count + 1)" class="ui-input py-1 text-xs mt-0.5 resize-y"
+                                                  value="@string.Join("\n", mapAttribute.Values)" @onchange="e => mapAttribute.Values = (e.Value?.ToString() ?? string.Empty).Split('\n').Select(v => v.Trim()).Where(v => v.Length > 0).ToList()"></textarea>
+                                    </label>
+                                }
+                                <div class="flex flex-wrap items-center gap-4 text-[11px] text-gray-700">
+                                    <label class="flex items-center gap-1.5"><input type="checkbox" class="w-3.5 h-3.5 accent-brand" @bind="mapAttribute.Multiple" /> A source can have several values</label>
+                                    <label class="flex items-center gap-1.5"><input type="checkbox" class="w-3.5 h-3.5 accent-brand" @bind="mapAttribute.Open" /> Open text (values cannot be listed)</label>
+                                    <button type="button" class="ml-auto text-red-700 hover:underline" @onclick="() => mapDraft.RemoveAt(index)">Remove</button>
+                                </div>
+                            </fieldset>
+                        }
+                        <button type="button" class="text-xs text-brand font-medium hover:underline" @onclick="AddAttribute">Add an attribute</button>
+                        @if (mapError != null)
+                        {
+                            <p class="bg-red-50 border border-red-200 text-red-800 p-2 text-xs" role="alert">@mapError</p>
+                        }
+                        <div class="flex flex-wrap gap-2">
+                            <button type="button" class="ui-btn-secondary ui-btn-sm" disabled="@mapping" @onclick="SaveMapAsync">Save as version @(map.Versions.Count + 1)</button>
+                            <button type="button" class="ui-btn-primary ui-btn-sm" disabled="@mapping" @onclick="FixMapAsync">Fix the map</button>
+                        </div>
+                        <p class="text-[11px] text-gray-500">Fixing keeps your current edits as a new version first. After that the map does not change, so every source is extracted against the same attributes.</p>
+                    }
+                    else
+                    {
+                        var shown = map.FixedVersion is int f ? map.Versions.First(v => v.Number == f) : map.Latest;
+                        <table class="w-full text-xs">
+                            <caption class="sr-only">The attributes of the map</caption>
+                            <thead class="text-left text-gray-500"><tr><th class="py-1 pr-2 font-medium">Attribute</th><th class="py-1 pr-2 font-medium">For</th><th class="py-1 font-medium">Values</th></tr></thead>
+                            <tbody>
+                                @foreach (var mapAttribute in shown.Attributes)
+                                {
+                                    <tr class="border-t border-gray-100 align-top">
+                                        <td class="py-1 pr-2"><span class="font-medium text-gray-900">@mapAttribute.Name</span><span class="block text-gray-500">@mapAttribute.Description</span></td>
+                                        <td class="py-1 pr-2">@mapAttribute.Question</td>
+                                        <td class="py-1">@(mapAttribute.Open ? "open text" : string.Join(", ", mapAttribute.Values))@(mapAttribute.Multiple ? " (several)" : "")</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    }
+                </div>
+            }
+            else if (panelTab == "sources" && ledger != null)
             {
                 <div class="flex-1 min-h-0 overflow-y-auto p-5 space-y-5 text-left">
                     <div>
@@ -750,6 +867,10 @@
     private string? qualityProgress;
     private string? qualityError;
     private readonly Dictionary<string, string> reviewNotes = new();
+    private AuBtechReviewAgent.MultivocalMapFile? map;
+    private List<AuBtechReviewAgent.MapAttribute>? mapDraft;
+    private bool mapping;
+    private string? mapError;
     private string? reviewing;
     private string? retrying;
     private Dictionary<string, AuBtechReviewAgent.PageSnapshot> snapshots = new();
@@ -787,6 +908,7 @@
             snapshots = Pages.Load(id).Pages.ToDictionary(p => AuBtechReviewAgent.MultivocalSearcher.AddressKey(p.Url));
             SetScreening(Screener.Load(id));
             SetQuality(Quality.Load(id));
+            SetMap(Mapper.Load(id));
             if (quality != null) sourceFilter = "passed";
             else if (screening != null) sourceFilter = "included";
             stage = Runs.LoadHeader(id)?.Stage ?? "";
@@ -913,6 +1035,7 @@
             Logger.LogDebug("Could not read the edit key: {Message}", ex.Message);
         }
         canEdit = Runs.CanEdit(planned.RunId, editKey);
+        SetMap(map); // the map is editable only in this browser
         StateHasChanged();
     }
 
@@ -1000,6 +1123,72 @@
             assessing = false;
             qualityProgress = null;
         }
+    }
+
+    private void SetMap(AuBtechReviewAgent.MultivocalMapFile? file)
+    {
+        map = file;
+        // An editable copy while the map is not fixed; the page shows the fixed version otherwise.
+        mapDraft = file is { FixedVersion: null } && stage == AuBtechReviewAgent.MultivocalMapper.StageMapping && canEdit
+            ? AuBtechReviewAgent.MultivocalMapper.Clean(file.Latest.Attributes)
+            : null;
+    }
+
+    private void AddAttribute()
+    {
+        if (mapDraft == null || planned == null) return;
+        mapDraft.Add(new AuBtechReviewAgent.MapAttribute { Question = planned.Plan.Numbered().First().Number, Values = new() { "", "" } });
+    }
+
+    private async Task ProposeMapAsync()
+    {
+        if (planned == null || mapping) return;
+        mapping = true;
+        mapError = null;
+        try
+        {
+            var file = await Mapper.ProposeAsync(planned.RunId, editKey);
+            stage = AuBtechReviewAgent.MultivocalMapper.StageMapping;
+            SetMap(file);
+            panelTab = "map";
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or AuBtechReviewAgent.LlmOutputException or HttpRequestException)
+        {
+            mapError = ex.Message;
+        }
+        finally
+        {
+            mapping = false;
+        }
+    }
+
+    private async Task SaveMapAsync()
+    {
+        if (planned == null || mapDraft == null || mapping) return;
+        mapping = true;
+        mapError = null;
+        try { SetMap(await Mapper.SaveAsync(planned.RunId, editKey, mapDraft)); }
+        catch (Exception ex) when (ex is InvalidOperationException or ArgumentException) { mapError = ex.Message; }
+        finally { mapping = false; }
+    }
+
+    private async Task FixMapAsync()
+    {
+        if (planned == null || map == null || mapDraft == null || mapping) return;
+        mapping = true;
+        mapError = null;
+        try
+        {
+            // Unsaved edits are kept as a version first, so the fixed map is always one of the saved versions.
+            var cleaned = AuBtechReviewAgent.MultivocalMapper.Clean(mapDraft);
+            bool changed = System.Text.Json.JsonSerializer.Serialize(cleaned) != System.Text.Json.JsonSerializer.Serialize(map.Latest.Attributes);
+            if (changed) await Mapper.SaveAsync(planned.RunId, editKey, cleaned);
+            var file = await Mapper.FixAsync(planned.RunId, editKey);
+            stage = AuBtechReviewAgent.MultivocalMapper.StageMapped;
+            SetMap(file);
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or ArgumentException) { mapError = ex.Message; }
+        finally { mapping = false; }
     }
 
     private async Task ReviewAsync(string address, bool include)
@@ -1128,7 +1317,9 @@
 
     private string StageLine() => stage switch
     {
-        AuBtechReviewAgent.MultivocalQualityAssessor.StageAssessed => "Assessed: the included sources are scored for quality; the map and extraction are the next parts to be built",
+        AuBtechReviewAgent.MultivocalMapper.StageMapped => "Mapped: the systematic map is fixed; the extraction is the next part to be built",
+        AuBtechReviewAgent.MultivocalMapper.StageMapping => "Mapping: edit the map and fix it",
+        AuBtechReviewAgent.MultivocalQualityAssessor.StageAssessed => "Assessed: the included sources are scored for quality and can be mapped",
         AuBtechReviewAgent.MultivocalQualityAssessor.StageAssessing => "Scoring the quality…",
         AuBtechReviewAgent.MultivocalScreener.StageScreened => "Screened: the grey sources are selected and can be scored for quality",
         AuBtechReviewAgent.MultivocalScreener.StageScreening => "Screening…",
