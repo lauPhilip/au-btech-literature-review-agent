@@ -89,6 +89,19 @@ public sealed class MultivocalPages
         return Sha256(bytes) == snapshot.TextSha256 ? Encoding.UTF8.GetString(bytes) : null;
     }
 
+    /// <summary>
+    /// The citation check of a multivocal review: whether a quote is in the source's kept page text. It never looks at
+    /// the live page, which may have changed since the access date; a kept text whose SHA-256 no longer matches counts
+    /// as missing. Returns "found", "not found" or "no kept page".
+    /// </summary>
+    public string CheckQuote(Guid runId, string address, string quote)
+    {
+        var snapshot = Load(runId).Pages.FirstOrDefault(p => MultivocalSearcher.AddressKey(p.Url) == address);
+        string? text = snapshot is { NotKept: null } ? ReadText(runId, snapshot) : null;
+        if (text == null) return "no kept page";
+        return CitationSupportChecker.QuoteOccursIn(quote, text) ? "found" : "not found";
+    }
+
     /// <summary>Fetches one found source's page and keeps its text. Needs the run's edit key.</summary>
     public async Task<PageSnapshot> KeepAsync(Guid runId, string? editKey, string url)
     {
