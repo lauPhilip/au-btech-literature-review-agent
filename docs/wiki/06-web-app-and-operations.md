@@ -32,7 +32,7 @@ The request pipeline then adds, in order: forwarded headers (for a reverse proxy
 | `/review`, `/review/{runId}` | `Components/Pages/Home.razor` | Dashboard: the review form in three steps with its input check, a summary of the settings once a run starts, and a run panel that follows the run (preview, progress, result, ledger, the human screening review) |
 | component | `RunPlanPreview.razor` | Shown in the run panel before a run: the steps the review will take with the current settings, and what it produces |
 | component | `RunProgressPanel.razor` | The progress bar, current step with detail, elapsed time and the list of steps |
-| `/spec-matrix`, `/spec-matrix/{runId}` | `Components/Pages/SpecMatrix.razor` | Review Output: the report with clickable citations, tables, charts, downloads, notes, "Copy link" and (for the browser that started the run) "Delete run" |
+| `/spec-matrix`, `/spec-matrix/{runId}` | `Components/Pages/SpecMatrix.razor` | Review Output: the report with clickable citations (the shared `Components/Paper/` parts: `CitedProse` for the cited text, `CitationAttentionBar` for the citations that need attention), tables, charts, downloads, notes, "Copy link" and (for the browser that started the run) "Delete run" |
 | `GET /api/workspace/{id}/screened.ris` | `Program.cs` | Every screened record, tagged with its decision, for Zotero |
 | `/metrics` | `Components/Pages/Metrics.razor` | Run quality metrics across runs: verdict shares per run, groups by app version and settings, and where a run's citations fail. Public, like the code; the links to individual run reports are shown only with the developer token (`Quota:AdminToken`) or in Development, because a run's link opens its report |
 | `/review?from={runId}` | `Components/Pages/Home.razor` | A new review with the question, criteria, artifact and options of an earlier run filled in (from "New review from these settings") |
@@ -91,7 +91,7 @@ The app aims at WCAG 2.2 level AA. What that means in the code:
 | "Start review" is never silently disabled: the reason is shown next to it, and pressing it (or the reason) goes to the field that needs attention | `StartBlocker`, `BlockerTarget`, `GoToProblem` in `Home.razor` |
 | Step changes and the end of a run are announced to screen readers, not every percent | the `role="status"` element and `Announcement()` in `Home.razor` |
 | The API key window is a real modal dialog: Escape closes it, Tab stays inside, and focus returns to the button that opened it | `Home.razor`, `trapFocus`/`releaseFocus` in `review-output.js` |
-| Opening a citation on Review Output moves focus to its verdict; Escape or Close returns to the citation number, which says its verdict in words | `SpecMatrix.razor` |
+| Opening a citation on Review Output moves focus to its verdict; Escape or Close returns to the citation number, which says its verdict in words | `SpecMatrix.razor`, `Components/Paper/CitedProse.razor` |
 | Terms have plain-language explanations on hover and keyboard focus, dismissed with Escape, from one list that also feeds the `/glossary` page | `Glossary.cs`, `Components/Layout/Term.razor` |
 | Text contrast at least 4.5:1 (no `text-gray-400` for text), links inside text underlined, click targets at least 24 × 24 px, verdicts never shown by colour alone | the components and `ui-*` classes |
 | Animations stop when the system asks for reduced motion | `Styles/tailwind.input.css` |

@@ -83,23 +83,7 @@
     }
     else
     {
-        @if (AttentionList is { Count: > 0 } attention)
-        {
-            <div class="sticky top-0 z-40 w-full max-w-[8.5in] mb-3 bg-white/95 backdrop-blur border border-amber-200 shadow px-3 py-2 flex flex-wrap items-center justify-between gap-2 font-sans text-xs print:hidden">
-                <span class="text-gray-800">
-                    <span class="font-semibold text-verdict-partial">@attention.Count @(attention.Count == 1 ? "citation needs" : "citations need") your attention</span>
-                    <span class="text-gray-500"> · @attention.Count(c => c.Verdict == AuBtechReviewAgent.CitationSupportChecker.NotSupported) not supported, @attention.Count(c => c.Verdict == AuBtechReviewAgent.CitationSupportChecker.Partial) partly supported</span>
-                </span>
-                <span class="flex items-center gap-2">
-                    @if (attentionIndex >= 0)
-                    {
-                        <span class="text-gray-500 font-mono">@(attentionIndex + 1) / @attention.Count</span>
-                    }
-                    <button type="button" class="ui-btn-secondary ui-btn-sm" @onclick="() => StepAttention(-1)">Previous</button>
-                    <button type="button" class="ui-btn-primary ui-btn-sm" @onclick="() => StepAttention(1)">@(attentionIndex < 0 ? "Show the first" : "Next")</button>
-                </span>
-            </div>
-        }
+        <CitationAttentionBar Attention="AttentionList" Index="attentionIndex" OnStep="StepAttention" />
         <article class="w-full max-w-[8.5in] bg-white shadow-lift p-6 md:p-[1in] text-gray-900 font-serif text-[11pt] leading-relaxed mx-auto border border-gray-200 print:shadow-none print:border-none print:p-0 overflow-visible">
 
             <div class="text-center space-y-3 mb-8 font-sans print:space-y-2">
@@ -128,7 +112,7 @@
 
                 <div class="space-y-1">
                     <span class="font-sans font-bold text-[10px] text-gray-500 uppercase block">1.1 Rationale (Item 3)</span>
-                    <p class="text-gray-800">@ScrubAnchors(report.RationaleItem)</p>
+                    @CitedText("rationaleItem", ScrubAnchors(report.RationaleItem))
                 </div>
 
                 <div class="space-y-1">
@@ -750,127 +734,43 @@
     };
 
     /// <summary>
-    /// Renders text with every [n] as a button. Clicking it opens the citation check's verdict, quote and
-    /// location for that sentence and reference. Sentences are split exactly as the check split them.
+    /// Renders text with every [n] as a button, with the shared paper component (Components/Paper/CitedProse.razor);
+    /// this page adds its reviewer notes and the re-check to an open citation's panel.
     /// </summary>
     private RenderFragment CitedText(string field, string text) => __builder =>
     {
-        var sentences = AuBtechReviewAgent.CitationSupportChecker.SplitSentences(text);
-        int scan = 0;
-        <p class="text-gray-800">
-            @for (int i = 0; i < sentences.Count; i++)
-            {
-                int sentenceIndex = i;
-                // Keep the model's paragraph breaks: they sit in the whitespace between two sentences.
-                int at = (text ?? "").IndexOf(sentences[i], scan, StringComparison.Ordinal);
-                if (at > scan && text!.Substring(scan, at - scan).Contains("\n\n"))
-                {
-                    <br /><br />
-                }
-                if (at >= 0) scan = at + sentences[i].Length;
-                foreach (var (part, isMarker) in AuBtechReviewAgent.CitationSupportChecker.SplitMarkers(sentences[i]))
-                {
-                    if (!isMarker || auditChecks.Count == 0)
-                    {
-                        var pieces = AuBtechReviewAgent.MethodsSectionWriter.StripMarkdownEmphasis(part).Split("\n\n");
-                        for (int k = 0; k < pieces.Length; k++)
-                        {
-                            if (k > 0)
-                            {
-                                <br /><br />
-                            }
-                            @pieces[k]
-                        }
-                        continue;
-                    }
-                    <span>[</span>
-                    var refs = AuBtechReviewAgent.CitationSupportChecker.ReferencesIn(part);
-                    for (int r = 0; r < refs.Count; r++)
-                    {
-                        int reference = refs[r];
-                        var check = FindCheck(field, sentenceIndex, reference);
-                        bool isOpen = openCitation == (field, sentenceIndex, reference);
-                        <button type="button" id="@CiteId(field, sentenceIndex, reference)" class="font-mono underline decoration-dotted @VerdictText(check?.Verdict) @(isOpen ? "bg-yellow-100" : "")"
-                                title="@(check == null ? "Not checked" : VerdictLabel(check.Verdict))"
-                                aria-label="@($"Reference {reference}: {(check == null ? "not checked" : VerdictLabel(check.Verdict).ToLowerInvariant())}")"
-                                aria-expanded="@(isOpen ? "true" : "false")" aria-controls="@($"verdict-{field}")"
-                                @onclick="() => ToggleCitation(field, sentenceIndex, reference)">@reference</button>
-                        @(r < refs.Count - 1 ? ", " : "")
-                    }
-                    <span>]</span>
-                }
-                @(" ")
-            }
-        </p>
-        @if (openCitation is { } open && open.Field == field)
+        <CitedProse Field="@field" Text="@text" Checks="auditChecks" Open="openCitation"
+                    OnToggle="@(c => ToggleCitation(c.Field, c.Sentence, c.Reference))" OnClose="CloseCitation"
+                    SourceTitle="@(reference => tableRecords.FirstOrDefault(t => t.ReferenceNumber == reference)?.Title)"
+                    PanelExtras="CitationExtras" />
+    };
+
+    /// <summary>What this page adds to an open citation's panel: the reviewer's note, a past re-check and the "Check again" button.</summary>
+    private RenderFragment<AuBtechReviewAgent.CitationSupportResult> CitationExtras => check => __builder =>
+    {
+        if (openCitation is not { } open) return;
+        @CitationNote(open)
+        @if (RecheckOf(open) is { } done)
         {
-            var check = FindCheck(open.Field, open.Sentence, open.Reference);
-            var paper = tableRecords.FirstOrDefault(t => t.ReferenceNumber == open.Reference);
-            @* Opening a citation moves focus here; Escape or Close returns it to the citation number (WCAG 2.4.3). *@
-            <div id="@($"verdict-{field}")" tabindex="-1" role="region" aria-label="@($"What the check found for reference {open.Reference}")"
-                 class="font-sans text-[11px] border border-gray-200 bg-gray-50 p-3 mt-2 space-y-1 print:hidden" @onkeydown="VerdictKeyDown">
-                <div class="flex justify-between gap-2">
-                    <span class="font-bold text-brand">[@open.Reference] @(paper?.Title ?? "Unknown reference")</span>
-                    <button type="button" class="ui-btn ui-btn-sm py-0.5 text-gray-700 hover:bg-gray-200" @onclick="CloseCitation">Close</button>
-                </div>
-                @if (check == null)
-                {
-                    <p class="text-gray-600">This citation was not part of the automated check.</p>
-                }
-                else
-                {
-                    <p><span class="font-semibold @VerdictText(check.Verdict)">@VerdictLabel(check.Verdict)</span> <span class="text-gray-500">(checked against the @check.EvidenceBasis@(string.IsNullOrEmpty(check.EvidenceLocation) ? "" : $", {check.EvidenceLocation}"))</span></p>
-                    @if (!string.IsNullOrWhiteSpace(check.AttributedText))
-                    {
-                        <p class="text-gray-600">Checked part of the sentence: <span class="italic">"@check.AttributedText"</span></p>
-                    }
-                    @if (!string.IsNullOrWhiteSpace(check.Quote))
-                    {
-                        <blockquote class="border-l-2 border-gray-300 pl-2 italic text-gray-700">"@check.Quote"</blockquote>
-                        <p class="text-[10px] @(check.QuoteVerified ? "text-green-700" : "text-amber-700")">
-                            @(check.QuoteVerified ? "The quote was found in the paper's text." : "The quote could not be found in the paper's text.")
-                        </p>
-                    }
-                    @if (!string.IsNullOrWhiteSpace(check.Reason))
-                    {
-                        <p class="text-gray-600">@check.Reason</p>
-                    }
-                    @if (!string.IsNullOrWhiteSpace(check.ThemeNote))
-                    {
-                        <p class="text-amber-700">@check.ThemeNote</p>
-                    }
-                    @if (check.SecondVerdict != null)
-                    {
-                        <p class="text-gray-500 text-[10px]">
-                            First check: @VerdictLabel(check.FirstVerdict). Second, independent check with more of the paper: @VerdictLabel(check.SecondVerdict).
-                            @(check.ResolvedBy == "second check" ? " The second check found a verbatim quote, so its verdict is shown." : "")
-                        </p>
-                    }
-                    @CitationNote(open)
-                    @if (RecheckOf(open) is { } done)
-                    {
-                        <p class="text-[10px] text-gray-600">Checked again @done.CheckedUtc.ToString("yyyy-MM-dd HH:mm") UTC: was @VerdictLabel(done.VerdictBefore) (@done.EvidenceBefore), now @VerdictLabel(done.VerdictAfter) (@done.EvidenceAfter).</p>
-                    }
-                    @if (canEdit && check.Verdict is AuBtechReviewAgent.CitationSupportChecker.Partial or AuBtechReviewAgent.CitationSupportChecker.NotSupported)
-                    {
-                        <div class="pt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
-                            <button type="button" class="ui-btn ui-btn-sm py-0.5 border border-gray-300 bg-white text-gray-800 hover:border-brand disabled:opacity-50"
-                                    disabled="@(rechecking || rechecksLeft <= 0)" @onclick="() => RecheckAsync(open)">
-                                @(rechecking ? "Checking again…" : "Check again")
-                            </button>
-                            <span class="text-[10px] text-gray-500">
-                                @(rechecksLeft > 0
-                                    ? $"Runs the check once more{(check.EvidenceBasis == "abstract only" ? ", with the full text if an open-access copy can be found now" : " on the full text")}. {rechecksLeft} re-check{(rechecksLeft == 1 ? "" : "s")} left for this run."
-                                    : "This run has used its re-checks.")
-                            </span>
-                        </div>
-                    }
-                    @if (recheckMessage != null)
-                    {
-                        <p class="text-[10px] @(recheckFailed ? "text-red-700" : "text-gray-700")" role="status">@recheckMessage</p>
-                    }
-                }
+            <p class="text-[10px] text-gray-600">Checked again @done.CheckedUtc.ToString("yyyy-MM-dd HH:mm") UTC: was @VerdictLabel(done.VerdictBefore) (@done.EvidenceBefore), now @VerdictLabel(done.VerdictAfter) (@done.EvidenceAfter).</p>
+        }
+        @if (canEdit && check.Verdict is AuBtechReviewAgent.CitationSupportChecker.Partial or AuBtechReviewAgent.CitationSupportChecker.NotSupported)
+        {
+            <div class="pt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
+                <button type="button" class="ui-btn ui-btn-sm py-0.5 border border-gray-300 bg-white text-gray-800 hover:border-brand disabled:opacity-50"
+                        disabled="@(rechecking || rechecksLeft <= 0)" @onclick="() => RecheckAsync(open)">
+                    @(rechecking ? "Checking again…" : "Check again")
+                </button>
+                <span class="text-[10px] text-gray-500">
+                    @(rechecksLeft > 0
+                        ? $"Runs the check once more{(check.EvidenceBasis == "abstract only" ? ", with the full text if an open-access copy can be found now" : " on the full text")}. {rechecksLeft} re-check{(rechecksLeft == 1 ? "" : "s")} left for this run."
+                        : "This run has used its re-checks.")
+                </span>
             </div>
+        }
+        @if (recheckMessage != null)
+        {
+            <p class="text-[10px] @(recheckFailed ? "text-red-700" : "text-gray-700")" role="status">@recheckMessage</p>
         }
     };
 
@@ -1042,22 +942,12 @@
     private AuBtechReviewAgent.CitationSupportResult? FindCheck(string field, int sentence, int reference) =>
         auditChecks.FirstOrDefault(c => c.Field == field && c.SentenceIndex == sentence && c.Reference == reference);
 
-    private static string CiteId(string field, int sentence, int reference) => $"cite-{field}-{sentence}-{reference}";
+    private static string CiteId(string field, int sentence, int reference) => AuBtechReviewAgent.CitationView.CiteId(field, sentence, reference);
 
     // Citations that need a reader's attention (partly or not supported), in the order they appear in the report.
-    private List<AuBtechReviewAgent.CitationSupportResult> AttentionList => auditChecks
-        .Where(c => c.Verdict is AuBtechReviewAgent.CitationSupportChecker.Partial or AuBtechReviewAgent.CitationSupportChecker.NotSupported)
-        .OrderBy(c => FieldRank(c.Field)).ThenBy(c => c.SentenceIndex).ThenBy(c => c.Reference).ToList();
+    private List<AuBtechReviewAgent.CitationSupportResult> AttentionList =>
+        AuBtechReviewAgent.CitationView.Attention(auditChecks, f => AuBtechReviewAgent.CitationView.FieldRank(f, report.SynthesisSections.Select(x => x.Field).ToList()));
     private int attentionIndex = -1;
-
-    private int FieldRank(string field)
-    {
-        if (field == "synthesisResultsItem") return 0;
-        int section = report.SynthesisSections.FindIndex(s => s.Field == field);
-        if (section >= 0) return 1 + section;
-        if (field.StartsWith("artifact-", StringComparison.Ordinal)) return 1000;
-        return field == "discussionItem" ? 2000 : 3000;
-    }
 
     private async Task StepAttention(int delta)
     {
@@ -1109,29 +999,8 @@
         openCitation = null;
     }
 
-    private void VerdictKeyDown(KeyboardEventArgs e)
-    {
-        if (e.Key == "Escape") CloseCitation();
-    }
-
-    private static string VerdictLabel(string? verdict) => verdict switch
-    {
-        AuBtechReviewAgent.CitationSupportChecker.Supported => "Supported",
-        AuBtechReviewAgent.CitationSupportChecker.Partial => "Partly supported",
-        AuBtechReviewAgent.CitationSupportChecker.NotSupported => "Not supported",
-        AuBtechReviewAgent.CitationSupportChecker.Unverifiable => "Could not be verified",
-        AuBtechReviewAgent.CitationSupportChecker.InsufficientEvidence => "Not enough text to check (abstract only)",
-        _ => "Not checked",
-    };
-
-    private static string VerdictText(string? verdict) => verdict switch
-    {
-        AuBtechReviewAgent.CitationSupportChecker.Supported => "text-green-700",
-        AuBtechReviewAgent.CitationSupportChecker.Partial => "text-amber-700",
-        AuBtechReviewAgent.CitationSupportChecker.NotSupported => "text-red-700",
-        AuBtechReviewAgent.CitationSupportChecker.InsufficientEvidence => "text-sky-700",
-        _ => "text-gray-500",
-    };
+    private static string VerdictLabel(string? verdict) => AuBtechReviewAgent.CitationView.VerdictLabel(verdict);
+    private static string VerdictText(string? verdict) => AuBtechReviewAgent.CitationView.VerdictText(verdict);
 
     // The run's edit key from this browser's storage: only the browser that started the run can change it.
     private string? editKey;

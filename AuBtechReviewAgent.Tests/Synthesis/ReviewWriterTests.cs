@@ -33,7 +33,7 @@ public class ReviewWriterTests : IDisposable
         "You are writing the title, abstract, rationale and objectives",
     };
 
-    private static string Respond(string prompt)
+    internal static string Respond(string prompt)
     {
         if (prompt.Contains("You are coding studies"))
         {

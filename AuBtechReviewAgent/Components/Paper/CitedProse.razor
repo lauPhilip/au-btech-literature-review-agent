@@ -1,0 +1,137 @@
+@* Text of a paper with every [n] as a button (module design M9, shared by every kind of review). Clicking a number
+   opens what the citation check found for that sentence and source: its verdict, the quote and where it was found.
+   Sentences are split exactly as the check split them. The page owns which citation is open; this component shows
+   it, and the page adds its own extras to the open panel (notes, a re-check) through PanelExtras. *@
+
+@{
+    int scan = 0;
+}
+<p class="text-gray-800">
+    @for (int i = 0; i < sentences.Count; i++)
+    {
+        int sentenceIndex = i;
+        // Keep the model's paragraph breaks: they sit in the whitespace between two sentences.
+        int at = text.IndexOf(sentences[i], scan, StringComparison.Ordinal);
+        if (at > scan && text.Substring(scan, at - scan).Contains("\n\n"))
+        {
+            <br /><br />
+        }
+        if (at >= 0) scan = at + sentences[i].Length;
+        foreach (var (part, isMarker) in AuBtechReviewAgent.CitationSupportChecker.SplitMarkers(sentences[i]))
+        {
+            if (!isMarker || Checks.Count == 0)
+            {
+                var pieces = AuBtechReviewAgent.MethodsSectionWriter.StripMarkdownEmphasis(part).Split("\n\n");
+                for (int k = 0; k < pieces.Length; k++)
+                {
+                    if (k > 0)
+                    {
+                        <br /><br />
+                    }
+                    @pieces[k]
+                }
+                continue;
+            }
+            <span>[</span>
+            var refs = AuBtechReviewAgent.CitationSupportChecker.ReferencesIn(part);
+            for (int r = 0; r < refs.Count; r++)
+            {
+                int reference = refs[r];
+                var check = FindCheck(Field, sentenceIndex, reference);
+                bool isOpen = Open == (Field, sentenceIndex, reference);
+                <button type="button" id="@AuBtechReviewAgent.CitationView.CiteId(Field, sentenceIndex, reference)" class="font-mono underline decoration-dotted @AuBtechReviewAgent.CitationView.VerdictText(check?.Verdict) @(isOpen ? "bg-yellow-100" : "")"
+                        title="@(check == null ? "Not checked" : AuBtechReviewAgent.CitationView.VerdictLabel(check.Verdict))"
+                        aria-label="@($"Reference {reference}: {(check == null ? "not checked" : AuBtechReviewAgent.CitationView.VerdictLabel(check.Verdict).ToLowerInvariant())}")"
+                        aria-expanded="@(isOpen ? "true" : "false")" aria-controls="@($"verdict-{Field}")"
+                        @onclick="() => OnToggle.InvokeAsync((Field, sentenceIndex, reference))">@reference</button>
+                @(r < refs.Count - 1 ? ", " : "")
+            }
+            <span>]</span>
+        }
+        @(" ")
+    }
+</p>
+@if (Open is { } open && open.Field == Field)
+{
+    var check = FindCheck(open.Field, open.Sentence, open.Reference);
+    @* Opening a citation moves focus here; Escape or Close returns it to the citation number (WCAG 2.4.3). *@
+    <div id="@($"verdict-{Field}")" tabindex="-1" role="region" aria-label="@($"What the check found for reference {open.Reference}")"
+         class="font-sans text-[11px] border border-gray-200 bg-gray-50 p-3 mt-2 space-y-1 print:hidden" @onkeydown="KeyDown">
+        <div class="flex justify-between gap-2">
+            <span class="font-bold text-brand">[@open.Reference] @(SourceTitle(open.Reference) ?? "Unknown reference")</span>
+            <button type="button" class="ui-btn ui-btn-sm py-0.5 text-gray-700 hover:bg-gray-200" @onclick="() => OnClose.InvokeAsync()">Close</button>
+        </div>
+        @if (check == null)
+        {
+            <p class="text-gray-600">This citation was not part of the automated check.</p>
+        }
+        else
+        {
+            <p><span class="font-semibold @AuBtechReviewAgent.CitationView.VerdictText(check.Verdict)">@AuBtechReviewAgent.CitationView.VerdictLabel(check.Verdict)</span> <span class="text-gray-500">(checked against the @check.EvidenceBasis@(string.IsNullOrEmpty(check.EvidenceLocation) ? "" : $", {check.EvidenceLocation}"))</span></p>
+            @if (!string.IsNullOrWhiteSpace(check.AttributedText))
+            {
+                <p class="text-gray-600">Checked part of the sentence: <span class="italic">"@check.AttributedText"</span></p>
+            }
+            @if (!string.IsNullOrWhiteSpace(check.Quote))
+            {
+                <blockquote class="border-l-2 border-gray-300 pl-2 italic text-gray-700">"@check.Quote"</blockquote>
+                <p class="text-[10px] @(check.QuoteVerified ? "text-green-700" : "text-amber-700")">
+                    @(check.QuoteVerified ? $"The quote was found in the {SourceNoun}'s text." : $"The quote could not be found in the {SourceNoun}'s text.")
+                </p>
+            }
+            @if (!string.IsNullOrWhiteSpace(check.Reason))
+            {
+                <p class="text-gray-600">@check.Reason</p>
+            }
+            @if (!string.IsNullOrWhiteSpace(check.ThemeNote))
+            {
+                <p class="text-amber-700">@check.ThemeNote</p>
+            }
+            @if (check.SecondVerdict != null)
+            {
+                <p class="text-gray-500 text-[10px]">
+                    First check: @AuBtechReviewAgent.CitationView.VerdictLabel(check.FirstVerdict). Second, independent check with more of the @(SourceNoun): @AuBtechReviewAgent.CitationView.VerdictLabel(check.SecondVerdict).
+                    @(check.ResolvedBy == "second check" ? " The second check found a verbatim quote, so its verdict is shown." : "")
+                </p>
+            }
+            @PanelExtras?.Invoke(check)
+        }
+    </div>
+}
+
+@code {
+    /// <summary>The field the text belongs to, as the citation check named it (e.g. "synthesis-2").</summary>
+    [Parameter, EditorRequired] public string Field { get; set; } = "";
+    [Parameter] public string? Text { get; set; }
+
+    /// <summary>Every verdict of the run's citation check.</summary>
+    [Parameter] public IReadOnlyList<AuBtechReviewAgent.CitationSupportResult> Checks { get; set; } = Array.Empty<AuBtechReviewAgent.CitationSupportResult>();
+
+    /// <summary>The citation the page has open, if any.</summary>
+    [Parameter] public (string Field, int Sentence, int Reference)? Open { get; set; }
+    [Parameter] public EventCallback<(string Field, int Sentence, int Reference)> OnToggle { get; set; }
+    [Parameter] public EventCallback OnClose { get; set; }
+
+    /// <summary>The title of a source by its reference number, for the open panel.</summary>
+    [Parameter] public Func<int, string?> SourceTitle { get; set; } = _ => null;
+
+    /// <summary>What a source is, e.g. "paper" or "page".</summary>
+    [Parameter] public string SourceNoun { get; set; } = "paper";
+
+    /// <summary>What the page adds to an open citation's panel, such as reviewer notes and a re-check.</summary>
+    [Parameter] public RenderFragment<AuBtechReviewAgent.CitationSupportResult>? PanelExtras { get; set; }
+
+    private string text = "";
+    private IReadOnlyList<string> sentences = Array.Empty<string>();
+
+    protected override void OnParametersSet()
+    {
+        text = Text ?? "";
+        sentences = AuBtechReviewAgent.CitationSupportChecker.SplitSentences(text);
+    }
+
+    private AuBtechReviewAgent.CitationSupportResult? FindCheck(string field, int sentence, int reference) =>
+        Checks.FirstOrDefault(c => c.Field == field && c.SentenceIndex == sentence && c.Reference == reference);
+
+    private Task KeyDown(KeyboardEventArgs e) => e.Key == "Escape" ? OnClose.InvokeAsync() : Task.CompletedTask;
+}
