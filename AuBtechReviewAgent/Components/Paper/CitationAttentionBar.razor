@@ -1,0 +1,31 @@
+@* The bar at the top of a paper with the citations that need the reader's attention (module design M9, shared by
+   every kind of review): how many are partly or not supported, and buttons to step through them in reading order. *@
+
+@if (Attention.Count > 0)
+{
+    <div class="sticky top-0 z-40 w-full max-w-[8.5in] mb-3 bg-white/95 backdrop-blur border border-amber-200 shadow px-3 py-2 flex flex-wrap items-center justify-between gap-2 font-sans text-xs print:hidden">
+        <span class="text-gray-800">
+            <span class="font-semibold text-verdict-partial">@Attention.Count @(Attention.Count == 1 ? "citation needs" : "citations need") your attention</span>
+            <span class="text-gray-500"> · @Attention.Count(c => c.Verdict == AuBtechReviewAgent.CitationSupportChecker.NotSupported) not supported, @Attention.Count(c => c.Verdict == AuBtechReviewAgent.CitationSupportChecker.Partial) partly supported</span>
+        </span>
+        <span class="flex items-center gap-2">
+            @if (Index >= 0)
+            {
+                <span class="text-gray-500 font-mono">@(Index + 1) / @Attention.Count</span>
+            }
+            <button type="button" class="ui-btn-secondary ui-btn-sm" @onclick="() => OnStep.InvokeAsync(-1)">Previous</button>
+            <button type="button" class="ui-btn-primary ui-btn-sm" @onclick="() => OnStep.InvokeAsync(1)">@(Index < 0 ? "Show the first" : "Next")</button>
+        </span>
+    </div>
+}
+
+@code {
+    /// <summary>The citations that need attention, in reading order (<see cref="AuBtechReviewAgent.CitationView.Attention"/>).</summary>
+    [Parameter] public IReadOnlyList<AuBtechReviewAgent.CitationSupportResult> Attention { get; set; } = Array.Empty<AuBtechReviewAgent.CitationSupportResult>();
+
+    /// <summary>Which of them is shown now; -1 before the first.</summary>
+    [Parameter] public int Index { get; set; } = -1;
+
+    /// <summary>Called with -1 or 1 to step back or forward.</summary>
+    [Parameter] public EventCallback<int> OnStep { get; set; }
+}
