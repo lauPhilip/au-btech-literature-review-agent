@@ -124,8 +124,11 @@ builder.Services.AddSingleton(multivocalQuality); // grey quality checklist (pre
 var multivocalMapper = new AuBtechReviewAgent.MultivocalMapper(reviewEngine.Store, multivocalPlanner, multivocalSearcher, multivocalQuality,
     multivocalChat, llmOptions.Model);
 builder.Services.AddSingleton(multivocalMapper); // systematic map (preview)
-builder.Services.AddSingleton(new AuBtechReviewAgent.MultivocalExtractor(reviewEngine.Store, multivocalPlanner, multivocalSearcher, multivocalQuality,
-    multivocalMapper, multivocalPages, multivocalChat, reviewEngine.Cache, llmOptions.Model, llmOptions.ScreeningParallelism)); // extraction (preview)
+var multivocalExtractor = new AuBtechReviewAgent.MultivocalExtractor(reviewEngine.Store, multivocalPlanner, multivocalSearcher, multivocalQuality,
+    multivocalMapper, multivocalPages, multivocalChat, reviewEngine.Cache, llmOptions.Model, llmOptions.ScreeningParallelism);
+builder.Services.AddSingleton(multivocalExtractor); // extraction (preview)
+builder.Services.AddSingleton(new AuBtechReviewAgent.MultivocalSynthesiser(reviewEngine.Store, multivocalPlanner, multivocalSearcher, multivocalQuality,
+    multivocalMapper, multivocalExtractor, multivocalPages, multivocalChat, llmOptions.Model)); // synthesis (preview)
 // Modules shown as a preview while they are being built (Development only; see ReviewModulesOptions).
 builder.Services.AddSingleton(AuBtechReviewAgent.ReviewModulesOptions.From(builder.Configuration, builder.Environment.IsDevelopment()));
 
