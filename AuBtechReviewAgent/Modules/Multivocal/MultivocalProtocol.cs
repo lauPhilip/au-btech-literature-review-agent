@@ -95,7 +95,12 @@ public static class MultivocalProtocol
         sb.AppendLine("For an opinion piece, its main claim is recorded word for word with the critical questions for an expert opinion that the guidelines take from Rainer (G13): the writer's expertise, field, assertion and evidence are answered from the page with quotes; the writer's trustworthiness is left to the reviewer, since it cannot be judged reliably, and the claim's consistency with other experts is judged in the synthesis.");
         sb.AppendLine();
 
-        sb.AppendLine("## 6. Keeping the evidence");
+        sb.AppendLine("## 6. Systematic map and extraction (G12)");
+        sb.AppendLine();
+        sb.AppendLine("The language model proposes the attributes of the systematic map from the research questions, with values generalised over the sources that passed the quality check. The reviewer edits the map, every version is kept, and the map is fixed before any source is extracted against it.");
+        sb.AppendLine();
+
+        sb.AppendLine("## 7. Keeping the evidence");
         sb.AppendLine();
         sb.AppendLine("The text of each web source is kept on the server for the run's lifetime, so every citation check can be repeated. The run archive holds each source's address, access date, SHA-256 fingerprint, the quoted passages and a Wayback Machine link, not the pages themselves.");
         return sb.ToString();
