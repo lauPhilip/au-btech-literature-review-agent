@@ -10,6 +10,7 @@
 @inject AuBtechReviewAgent.MultivocalQualityAssessor Quality
 @inject AuBtechReviewAgent.MultivocalMapper Mapper
 @inject AuBtechReviewAgent.MultivocalExtractor Extractor
+@inject AuBtechReviewAgent.MultivocalSynthesiser Synthesiser
 @inject NavigationManager Nav
 @inject IJSRuntime JS
 @inject ILogger<MultivocalStart> Logger
@@ -80,7 +81,29 @@
                         {
                             @SettingRow("Extracted", $"{extraction.Sources.Count(x => x.Error == null)} sources" + (extraction.Sources.Any(x => x.Error != null) ? $", {extraction.Sources.Count(x => x.Error != null)} could not be extracted" : ""))
                         }
+                        @if (synthesis != null)
+                        {
+                            @SettingRow("Synthesis", $"{synthesis.Themes.Count} themes from {synthesis.Findings.Count} findings" + (synthesis.Unanswered.Count > 0 ? $"; no findings for {string.Join(", ", synthesis.Unanswered)}" : ""))
+                        }
                     </dl>
+                    @if (extraction != null && synthesis == null && stage == AuBtechReviewAgent.MultivocalExtractor.StageExtracted)
+                    {
+                        <div class="border-t border-gray-100 pt-3 space-y-2">
+                            @if (synthesising || AuBtechReviewAgent.MultivocalSynthesiser.IsRunning(planned.RunId))
+                            {
+                                <p class="text-xs text-gray-700" role="status" aria-live="polite">Synthesising… @synthesisProgress</p>
+                            }
+                            else if (canEdit)
+                            {
+                                <p class="text-xs text-gray-600">Group the findings of each research question into themes (G13). Every quote is checked again against the kept page text first; what each theme rests on is counted in code.</p>
+                                <button type="button" class="ui-btn-primary ui-btn-sm" @onclick="SynthesiseAsync">Synthesise</button>
+                            }
+                            @if (synthesisError != null)
+                            {
+                                <p class="bg-red-50 border border-red-200 text-red-800 p-2 text-xs" role="alert">@synthesisError</p>
+                            }
+                        </div>
+                    }
                     @if (map?.FixedVersion != null && extraction == null && stage is AuBtechReviewAgent.MultivocalMapper.StageMapped or AuBtechReviewAgent.MultivocalExtractor.StageExtracting)
                     {
                         <div class="border-t border-gray-100 pt-3 space-y-2">
@@ -501,11 +524,87 @@
                         <button type="button" aria-pressed="@(panelTab == "map" ? "true" : "false")" @onclick="@(() => panelTab = "map")"
                                 class="px-3 py-2.5 text-xs border-b-2 -mb-px @(panelTab == "map" ? "border-brand text-brand font-semibold" : "border-transparent text-gray-500 hover:text-gray-800")">Map</button>
                     }
+                    @if (synthesis != null)
+                    {
+                        <button type="button" aria-pressed="@(panelTab == "themes" ? "true" : "false")" @onclick="@(() => panelTab = "themes")"
+                                class="px-3 py-2.5 text-xs border-b-2 -mb-px @(panelTab == "themes" ? "border-brand text-brand font-semibold" : "border-transparent text-gray-500 hover:text-gray-800")">Themes</button>
+                    }
                 </div>
                 <span class="text-[10px] text-gray-500 font-mono">Garousi et al. 2019</span>
             </div>
 
-            @if (panelTab == "map" && map != null && planned != null)
+            @if (panelTab == "themes" && synthesis != null && planned != null)
+            {
+                <div class="flex-1 min-h-0 overflow-y-auto p-5 space-y-5 text-left">
+                    <div>
+                        <h3 class="text-base font-semibold text-gray-900">Themes</h3>
+                        <p class="text-xs text-gray-600 mt-0.5">The findings of each research question grouped into themes by the model (G13). What each theme rests on is counted in code from its sources; every quote was checked against the kept page text, not the live page.</p>
+                        @foreach (var note in synthesis.Notes)
+                        {
+                            <p class="text-[11px] text-amber-800 mt-1">@note</p>
+                        }
+                    </div>
+                    @foreach (var (number, question) in planned.Plan.Numbered())
+                    {
+                        var themes = synthesis.Themes.Where(t => t.Question == number).ToList();
+                        <section class="space-y-2">
+                            <h4 class="text-sm font-semibold text-gray-900">@number <span class="font-normal text-gray-700">@question.Text</span></h4>
+                            @if (themes.Count == 0)
+                            {
+                                <p class="text-xs text-gray-500">No finding answers this question in the extracted sources.</p>
+                            }
+                            @foreach (var theme in themes)
+                            {
+                                <div class="border border-gray-200 p-3 text-xs space-y-1.5">
+                                    <p class="font-medium text-gray-900">@theme.Name</p>
+                                    <p class="text-gray-700">@theme.Description</p>
+                                    <p class="flex flex-wrap gap-1.5">
+                                        <span class="ui-chip border-gray-200 bg-gray-50 text-gray-700 text-[10px]">@theme.Sources source@(theme.Sources == 1 ? "" : "s")</span>
+                                        <span class="ui-chip border-gray-200 bg-gray-50 text-gray-700 text-[10px]">tiers 1st @theme.FirstTier · 2nd @theme.SecondTier · 3rd @theme.ThirdTier</span>
+                                        <span class="ui-chip border-gray-200 bg-gray-50 text-gray-700 text-[10px]">mean quality @theme.MeanQuality.ToString("0.#") of @AuBtechReviewAgent.GreyQualityChecklist.MaxPoints</span>
+                                        <span class="@(theme.EvidenceLabel.StartsWith("3rd") ? "ui-chip border-amber-200 bg-amber-50 text-amber-800" : "ui-chip border-gray-200 bg-gray-50 text-gray-700") text-[10px]">@theme.EvidenceLabel</span>
+                                    </p>
+                                    @if (theme.Tensions.Count > 0)
+                                    {
+                                        <ul class="text-gray-700 list-disc pl-4">
+                                            @foreach (var tension in theme.Tensions)
+                                            {
+                                                <li>Tension (@tension.FindingA, @tension.FindingB): @tension.Description</li>
+                                            }
+                                        </ul>
+                                    }
+                                    <details>
+                                        <summary class="cursor-pointer select-none text-gray-500">@theme.Findings.Count finding@(theme.Findings.Count == 1 ? "" : "s")</summary>
+                                        <ul class="mt-1 space-y-1">
+                                            @foreach (var finding in synthesis.Findings.Where(f => theme.Findings.Contains(f.Id)))
+                                            {
+                                                <li>
+                                                    <span class="font-medium">@finding.Id</span> @finding.Attribute: @finding.Value
+                                                    <span class="text-gray-500">· @finding.Title · @KindLabel(finding.Kind), @(finding.Tier switch { 1 => "1st", 2 => "2nd", _ => "3rd" }) tier, @finding.QualityPoints.ToString("0.#") points</span>
+                                                    <q class="block italic text-gray-500">@finding.Quote</q>
+                                                </li>
+                                            }
+                                        </ul>
+                                    </details>
+                                </div>
+                            }
+                        </section>
+                    }
+                    @if (synthesis.Unassigned.Count > 0)
+                    {
+                        <section>
+                            <h4 class="text-sm font-semibold text-gray-900">Findings in no theme</h4>
+                            <ul class="text-xs text-gray-700 list-disc pl-4 mt-1">
+                                @foreach (var item in synthesis.Unassigned)
+                                {
+                                    <li>@item.Finding: @item.Reason</li>
+                                }
+                            </ul>
+                        </section>
+                    }
+                </div>
+            }
+            else if (panelTab == "map" && map != null && planned != null)
             {
                 <div class="flex-1 min-h-0 overflow-y-auto p-5 space-y-4 text-left">
                     <div>
@@ -521,6 +620,10 @@
                             <li>Version @version.Number · @(version.By == "model" ? "proposed by the model" : "edited by you") · @version.CreatedUtc.ToString("yyyy-MM-dd HH:mm") UTC · @version.Attributes.Count attributes@(map.FixedVersion == version.Number ? " · fixed" : "")</li>
                         }
                     </ol>
+                    @foreach (var note in map.Notes)
+                    {
+                        <p class="text-[11px] text-amber-800">@note</p>
+                    }
                     <div class="border border-gray-200 bg-gray-50 p-3 text-[11px] text-gray-700">
                         <p class="font-medium text-gray-800">Recorded by code for every source, not by the model</p>
                         <ul class="mt-1 space-y-0.5">
@@ -966,6 +1069,10 @@
     private readonly Dictionary<string, string> reviewNotes = new();
     private AuBtechReviewAgent.MultivocalMapFile? map;
     private AuBtechReviewAgent.MultivocalExtractionFile? extraction;
+    private AuBtechReviewAgent.MultivocalSynthesisFile? synthesis;
+    private bool synthesising;
+    private string? synthesisProgress;
+    private string? synthesisError;
     private Dictionary<string, AuBtechReviewAgent.GreyExtraction> extractions = new();
     private bool extracting;
     private string? extractProgress;
@@ -1012,6 +1119,7 @@
             SetQuality(Quality.Load(id));
             SetMap(Mapper.Load(id));
             SetExtraction(Extractor.Load(id));
+            synthesis = Synthesiser.Load(id);
             if (quality != null) sourceFilter = "passed";
             else if (screening != null) sourceFilter = "included";
             stage = Runs.LoadHeader(id)?.Stage ?? "";
@@ -1044,7 +1152,7 @@
                 ("Selection", p.IsGreyOnly ? "Every source is screened twice against your criteria." : "Grey and academic sources are screened twice, with the same criteria and the same care.", true),
                 ("Quality", $"Each grey source is scored on Table 7; below {p.QualityThreshold} of {AuBtechReviewAgent.MultivocalGuidelines.QualityPointsMax} points it is left out. Every score rests on a quote.", true),
                 ("Map and extraction", "The sources are classified in a systematic map; every extracted value rests on a quote from the source's page.", true),
-                ("Synthesis", $"The findings are coded and written up to answer {questions} research question{(questions == 1 ? "" : "s")}.", false),
+                ("Synthesis", $"The findings are grouped into themes to answer {questions} research question{(questions == 1 ? "" : "s")}, each theme labelled with the kind and quality of the sources it rests on.", true),
                 ("Checking", "Every citation is compared with its source; weak ones get a second check and are repaired.", false),
             };
         }
@@ -1234,6 +1342,29 @@
         extractions = new();
         if (file == null) return;
         foreach (var x in file.Sources) extractions.TryAdd(x.Address, x);
+    }
+
+    private async Task SynthesiseAsync()
+    {
+        if (planned == null || synthesising) return;
+        synthesising = true;
+        synthesisError = null;
+        var progress = new Progress<string>(line => { synthesisProgress = line; _ = InvokeAsync(StateHasChanged); });
+        try
+        {
+            synthesis = await Synthesiser.SynthesiseAsync(planned.RunId, editKey, progress);
+            stage = AuBtechReviewAgent.MultivocalSynthesiser.StageSynthesised;
+            panelTab = "themes";
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or AuBtechReviewAgent.LlmOutputException or HttpRequestException)
+        {
+            synthesisError = ex.Message;
+        }
+        finally
+        {
+            synthesising = false;
+            synthesisProgress = null;
+        }
     }
 
     private AuBtechReviewAgent.GreyExtraction? ExtractionOf(string url) =>
@@ -1454,7 +1585,8 @@
 
     private string StageLine() => stage switch
     {
-        AuBtechReviewAgent.MultivocalExtractor.StageExtracted => "Extracted: every source that passed is mapped; the synthesis is the next part to be built",
+        AuBtechReviewAgent.MultivocalSynthesiser.StageSynthesised => "Synthesised: the findings are grouped into themes; the report is the next part to be built",
+        AuBtechReviewAgent.MultivocalExtractor.StageExtracted => "Extracted: every source that passed is mapped and can be synthesised",
         AuBtechReviewAgent.MultivocalExtractor.StageExtracting => "Extracting…",
         AuBtechReviewAgent.MultivocalMapper.StageMapped => "Mapped: the systematic map is fixed and the sources can be extracted",
         AuBtechReviewAgent.MultivocalMapper.StageMapping => "Mapping: edit the map and fix it",
