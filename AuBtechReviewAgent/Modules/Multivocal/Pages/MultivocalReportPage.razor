@@ -1,0 +1,177 @@
+@page "/mlr-report/{RunId:guid}"
+@rendermode InteractiveServer
+@inject AuBtechReviewAgent.ReviewModulesOptions ModuleOptions
+@inject AuBtechReviewAgent.RunStore Runs
+@inject AuBtechReviewAgent.MultivocalReporter Reporter
+@inject NavigationManager Nav
+@inject IJSRuntime JS
+@inject ILogger<MultivocalReportPage> Logger
+
+@* The report of a synthesised multivocal run (MLR block G, G14), written in code from the run's files each time it is
+   opened. In the browser that planned the run it is also saved to the run folder (multivocal-report.md), so the
+   archive holds the report as it was last read. *@
+
+<SeoHead Title="Multivocal review report (preview)" Path="/mlr-report" NoIndex="true"
+         Description="The report of a multivocal literature review, following the Garousi et al. (2019) guidelines." />
+
+<SiteHeader Active="dashboard" DashboardHref="@($"/mlr/{RunId}")" />
+
+<main id="main" tabindex="-1" class="flex-1 min-h-0 overflow-y-auto">
+<div class="max-w-4xl w-full mx-auto p-4 lg:p-6 space-y-6">
+    @if (report == null)
+    {
+        <div class="ui-card p-4 text-sm text-gray-700">
+            This run has no report yet: it is written once the run is synthesised. <a href="@($"/mlr/{RunId}")" class="text-brand underline underline-offset-2">Back to the review</a>
+        </div>
+    }
+    else
+    {
+        <header class="space-y-2">
+            <p class="text-xs text-gray-500"><a href="@($"/mlr/{RunId}")" class="text-brand underline underline-offset-2">Back to the review</a></p>
+            <h1 class="ui-h2">@report.Title</h1>
+            <ul class="text-xs text-gray-600 space-y-0.5">
+                @foreach (var line in report.Meta)
+                {
+                    <li class="break-words">@line</li>
+                }
+            </ul>
+            <div class="flex flex-wrap gap-2 pt-1">
+                <a href="@($"/api/workspace/{RunId:N}/mlr-report.md")" class="ui-btn-secondary ui-btn-sm">Download the report</a>
+                <a href="@($"/api/workspace/{RunId:N}/protocol.md")" class="ui-btn-secondary ui-btn-sm">Download the protocol</a>
+            </div>
+            @if (saved)
+            {
+                <p class="text-[11px] text-gray-500" role="status">Saved with the run, so the archive holds this report.</p>
+            }
+        </header>
+
+        @foreach (var section in report.Sections)
+        {
+            var current = section;
+            <section class="space-y-3">
+                @if (current.Level == 2)
+                {
+                    <h2 class="text-lg font-semibold text-gray-900 border-b border-gray-200 pb-1">@current.Heading</h2>
+                }
+                else
+                {
+                    <h3 class="ui-h3">@current.Heading</h3>
+                }
+                @foreach (var block in current.Blocks)
+                {
+                    var b = block;
+                    @switch (b.Kind)
+                    {
+                        case "quote":
+                            <blockquote class="border-l-2 border-gray-300 pl-3 text-sm italic text-gray-700">@b.Text</blockquote>
+                            break;
+                        case "list":
+                            <ul class="list-disc pl-5 text-sm text-gray-800 space-y-1">
+                                @foreach (var item in b.Items)
+                                {
+                                    <li>@item</li>
+                                }
+                            </ul>
+                            break;
+                        case "table":
+                            <div class="overflow-x-auto" tabindex="0" role="region" aria-label="@($"Table: {current.Heading}")">
+                                <table class="min-w-full text-xs text-left border border-gray-200">
+                                    <thead class="bg-gray-50">
+                                        <tr>
+                                            @foreach (var header in b.Headers)
+                                            {
+                                                <th scope="col" class="px-2 py-1.5 font-semibold text-gray-700 border-b border-gray-200">@header</th>
+                                            }
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach (var row in b.Rows)
+                                        {
+                                            <tr class="border-b border-gray-100 align-top">
+                                                @foreach (var cell in row)
+                                                {
+                                                    <td class="px-2 py-1.5 text-gray-800 break-words">
+                                                        @if (AuBtechReviewAgent.PrismaReviewEngine.IsWebAddress(cell))
+                                                        {
+                                                            <a href="@cell" target="_blank" rel="noopener noreferrer" class="text-brand underline underline-offset-2 break-all">@cell</a>
+                                                        }
+                                                        else
+                                                        {
+                                                            @cell
+                                                        }
+                                                    </td>
+                                                }
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
+                            break;
+                        default:
+                            <p class="text-sm text-gray-800 leading-relaxed">
+                                @foreach (var (text, bold) in Parts(b.Text))
+                                {
+                                    if (bold)
+                                    {
+                                        <strong class="font-semibold text-gray-900">@text</strong>
+                                    }
+                                    else
+                                    {
+                                        @text
+                                    }
+                                }
+                            </p>
+                            break;
+                    }
+                }
+            </section>
+        }
+    }
+</div>
+</main>
+
+@code {
+    [Parameter] public Guid RunId { get; set; }
+
+    private AuBtechReviewAgent.MultivocalReport? report;
+    private bool saved;
+
+    protected override void OnParametersSet()
+    {
+        var module = AuBtechReviewAgent.ReviewModules.Find("multivocal")!;
+        if (!ModuleOptions.CanOpen(module)) { Nav.NotFound(); return; }
+        if (AuBtechReviewAgent.ReviewModules.ElsewhereFor(Runs.LoadHeader(RunId), module.Key) is string elsewhere)
+        {
+            Nav.NavigateTo(elsewhere, replace: true);
+            return;
+        }
+        report = Reporter.Build(RunId);
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        // Only the browser that planned the run holds the edit key, so only it saves the report with the run.
+        if (!firstRender || report == null) return;
+        string? editKey = null;
+        try { editKey = await JS.InvokeAsync<string?>("traceableReview.getEditKey", RunId.ToString()); }
+        catch (Exception ex) when (ex is JSException or JSDisconnectedException or InvalidOperationException or TaskCanceledException)
+        {
+            Logger.LogDebug("Could not read the edit key: {Message}", ex.Message);
+        }
+        if (!Runs.CanEdit(RunId, editKey)) return;
+        try
+        {
+            await Reporter.SaveAsync(RunId, editKey);
+            saved = true;
+            StateHasChanged();
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or IOException)
+        {
+            Logger.LogWarning("Could not save the report of {RunId}: {Message}", RunId, ex.Message);
+        }
+    }
+
+    /// <summary>A paragraph split on "**", so a theme's name can be bold without rendering markup from the text.</summary>
+    private static IEnumerable<(string Text, bool Bold)> Parts(string text) =>
+        text.Split("**").Select((part, i) => (part, i % 2 == 1)).Where(p => p.part.Length > 0);
+}

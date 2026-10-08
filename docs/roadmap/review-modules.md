@@ -121,8 +121,11 @@ Each step is one small pull request, changes nothing a user can see, and keeps a
 | M4 (done) | The archive split: the core builds the zip, manifest and hashes; each module adds its own files and report | `Report/` |
 | M5 (done) | The module test kit, run for the systematic module | `AuBtechReviewAgent.Tests/Modules/` |
 | M6 (done) | The preview setting (`ReviewModules:Preview`, Development only), the multivocal preview page at `/mlr`, and runs that open on their own module's pages. The run contract and the kit entry follow with MLR block C (see section 3) | `Modules/Multivocal/`, settings |
+| M7 | The evidence a review writes from, as one shape for every module: numbered sources with their text, quote-verified findings, themes with their sources and codes. The systematic review fills it from its extraction and codebook | `Synthesis/`, `Modules/Systematic/` |
+| M8 | The writing stages as a shared step: grounded outline, theme sections and fill pass, discussion, automated peer review and revision, introduction and abstract, style pass. A module says how to name the review and which sections it adds; the systematic review's prompts and files stay the same | `Synthesis/`, `Writing/` |
+| M9 | The paper as one shared shape, one paper component for the output pages, and one `main.tex` builder into which a module puts its method section, figures and appendices | `Report/`, `Components/` |
 
-After M6 the MLR blocks C to G in [mlr-todo.md](mlr-todo.md) are built inside the multivocal module, and the rapid and living cards become settings on the systematic module.
+After M6 the MLR blocks C to F in [mlr-todo.md](mlr-todo.md) are built inside the multivocal module. Block G then lifts the writing and checking stages out of the systematic review (M7 to M9), so every kind of review goes through one overall process and plugs its own sub-steps into it; the MLR is the second module to use it. The rapid and living cards become settings on the systematic module.
 
 ## 8. What we deliberately do not do
 

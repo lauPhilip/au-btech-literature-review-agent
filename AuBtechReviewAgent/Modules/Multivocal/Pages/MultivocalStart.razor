@@ -86,6 +86,13 @@
                             @SettingRow("Synthesis", $"{synthesis.Themes.Count} themes from {synthesis.Findings.Count} findings" + (synthesis.Unanswered.Count > 0 ? $"; no findings for {string.Join(", ", synthesis.Unanswered)}" : ""))
                         }
                     </dl>
+                    @if (synthesis != null && stage == AuBtechReviewAgent.MultivocalSynthesiser.StageSynthesised)
+                    {
+                        <div class="border-t border-gray-100 pt-3 space-y-2">
+                            <p class="text-xs text-gray-600">The report is written in code from the run's files (G14): the methods, how each guideline was followed, the themes with what they rest on, and the source repository.</p>
+                            <a href="@($"/mlr-report/{planned.RunId}")" class="ui-btn-primary ui-btn-sm inline-block">Read the report</a>
+                        </div>
+                    }
                     @if (extraction != null && synthesis == null && stage == AuBtechReviewAgent.MultivocalExtractor.StageExtracted)
                     {
                         <div class="border-t border-gray-100 pt-3 space-y-2">
@@ -1606,7 +1613,7 @@
 
     private string StageLine() => stage switch
     {
-        AuBtechReviewAgent.MultivocalSynthesiser.StageSynthesised => "Synthesised: the findings are grouped into themes; the report is the next part to be built",
+        AuBtechReviewAgent.MultivocalSynthesiser.StageSynthesised => "Synthesised: the findings are grouped into themes; the report can be read",
         AuBtechReviewAgent.MultivocalExtractor.StageExtracted => "Extracted: every source that passed is mapped and can be synthesised",
         AuBtechReviewAgent.MultivocalExtractor.StageExtracting => "Extracting…",
         AuBtechReviewAgent.MultivocalMapper.StageMapped => "Mapped: the systematic map is fixed and the sources can be extracted",

@@ -127,8 +127,12 @@ builder.Services.AddSingleton(multivocalMapper); // systematic map (preview)
 var multivocalExtractor = new AuBtechReviewAgent.MultivocalExtractor(reviewEngine.Store, multivocalPlanner, multivocalSearcher, multivocalQuality,
     multivocalMapper, multivocalPages, multivocalChat, reviewEngine.Cache, llmOptions.Model, llmOptions.ScreeningParallelism);
 builder.Services.AddSingleton(multivocalExtractor); // extraction (preview)
-builder.Services.AddSingleton(new AuBtechReviewAgent.MultivocalSynthesiser(reviewEngine.Store, multivocalPlanner, multivocalSearcher, multivocalQuality,
-    multivocalMapper, multivocalExtractor, multivocalPages, multivocalChat, llmOptions.Model)); // synthesis (preview)
+var multivocalSynthesiser = new AuBtechReviewAgent.MultivocalSynthesiser(reviewEngine.Store, multivocalPlanner, multivocalSearcher, multivocalQuality,
+    multivocalMapper, multivocalExtractor, multivocalPages, multivocalChat, llmOptions.Model);
+builder.Services.AddSingleton(multivocalSynthesiser); // synthesis (preview)
+var multivocalReporter = new AuBtechReviewAgent.MultivocalReporter(reviewEngine.Store, multivocalPlanner, multivocalSearcher, multivocalScreener, multivocalPages,
+    multivocalQuality, multivocalMapper, multivocalExtractor, multivocalSynthesiser);
+builder.Services.AddSingleton(multivocalReporter); // report, written in code (preview)
 // Modules shown as a preview while they are being built (Development only; see ReviewModulesOptions).
 builder.Services.AddSingleton(AuBtechReviewAgent.ReviewModulesOptions.From(builder.Configuration, builder.Environment.IsDevelopment()));
 
@@ -221,6 +225,14 @@ app.MapGet("/api/workspace/{sessionId:guid}/protocol.md", (Guid sessionId) =>
 {
     string? text = reviewEngine.Store.ReadProtocol(sessionId);
     return text == null ? Results.NotFound() : Results.Text(text, "text/markdown; charset=utf-8");
+}).RequireRateLimiting("ArchiveDownloadPolicy");
+
+// The report of a synthesised multivocal run, written in code from its files (MLR block G).
+app.MapGet("/api/workspace/{sessionId:guid}/mlr-report.md", (Guid sessionId) =>
+{
+    string? text = multivocalReporter.Build(sessionId)?.ToMarkdown();
+    return text == null ? Results.NotFound()
+        : Results.File(System.Text.Encoding.UTF8.GetBytes(text), "text/markdown; charset=utf-8", AuBtechReviewAgent.MultivocalReporter.ReportFile);
 }).RequireRateLimiting("ArchiveDownloadPolicy");
 
 // For search engines: which pages to crawl, and the list of public pages (see SiteSeo).
