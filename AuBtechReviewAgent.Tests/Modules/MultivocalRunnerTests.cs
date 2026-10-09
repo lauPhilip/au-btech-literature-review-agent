@@ -81,6 +81,11 @@ public class MultivocalRunnerTests : IDisposable
             Threshold = 10,
             Sources = { new GreyQuality { Address = "blog.example.org/post", Title = "Managing agent context", Url = "https://blog.example.org/post", Points = 12, Outcome = anyPassed ? "Passed" : "Below threshold" } },
         }));
+        File.WriteAllText(Path.Join(folder, MultivocalScreener.ScreeningFile), JsonSerializer.Serialize(new MultivocalScreeningFile
+        {
+            RunId = runId,
+            Sources = { new GreyScreening { Address = "blog.example.org/post", Title = "Managing agent context", Url = "https://blog.example.org/post", Decision = "Included" } },
+        }));
         await RunHeader.WriteAsync(folder, store.LoadHeader(runId)! with { Stage = MultivocalQualityAssessor.StageAssessed });
 
         var screener = new MultivocalScreener(store, planner, searcher, () => model);
@@ -88,7 +93,7 @@ public class MultivocalRunnerTests : IDisposable
         var mapper = new MultivocalMapper(store, planner, searcher, assessor, () => model);
         var extractor = new MultivocalExtractor(store, planner, searcher, assessor, mapper, pages, () => model, parallelism: 1);
         var synthesiser = new MultivocalSynthesiser(store, planner, searcher, assessor, mapper, extractor, pages, () => model);
-        return (store, runId, key, new MultivocalRunner(store, searcher, screener, assessor, mapper, extractor, synthesiser));
+        return (store, runId, key, new MultivocalRunner(store, searcher, screener, assessor, mapper, extractor, synthesiser, pages));
     }
 
     [Fact]
@@ -102,7 +107,11 @@ public class MultivocalRunnerTests : IDisposable
         await Assert.ThrowsAsync<InvalidOperationException>(() => runner.RunAsync(runId, "wrong-key"));
         await runner.RunAsync(runId, key);
 
-        Assert.Equal(new[] { "Starting", "Proposing the map", "Fixing the map", "Extracting", "Synthesising", "Done" }, steps);
+        Assert.Equal(new[] { "Starting", "Proposing the map", "Fixing the map", "Extracting", "Synthesising", "Writing the references", "Done" }, steps);
+        string folder = store.FolderOf(runId);
+        Assert.Contains("Source [1] in the TraceableAI review", File.ReadAllText(Path.Join(folder, GreyReferences.RisFile)));
+        Assert.Contains("@misc{ana2025managing,", File.ReadAllText(Path.Join(folder, GreyReferences.BibFile)));
+        Assert.Contains("KW  - included", File.ReadAllText(Path.Join(folder, GreyReferences.ScreenedFile)));
         Assert.Equal(MultivocalSynthesiser.StageSynthesised, store.LoadHeader(runId)!.Stage);
         var map = JsonSerializer.Deserialize<MultivocalMapFile>(File.ReadAllText(Path.Join(store.FolderOf(runId), MultivocalMapper.MapFile)))!;
         Assert.Equal(1, map.FixedVersion); // the model's proposal, fixed as it is

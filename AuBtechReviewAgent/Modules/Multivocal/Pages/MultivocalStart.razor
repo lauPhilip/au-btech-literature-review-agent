@@ -92,7 +92,13 @@
                     {
                         <div class="border-t border-gray-100 pt-3 space-y-2">
                             <p class="text-xs text-gray-600">The report is written in code from the run's files (G14): the methods, how each guideline was followed, the themes with what they rest on, and the source repository.</p>
-                            <a href="@($"/mlr-report/{planned.RunId}")" class="ui-btn-primary ui-btn-sm inline-block">Read the report</a>
+                            <div class="flex flex-wrap items-center gap-2">
+                                <a href="@($"/mlr-report/{planned.RunId}")" class="ui-btn-primary ui-btn-sm inline-block">Read the report</a>
+                                <a href="@($"/api/workspace/{planned.RunId:N}/references.bib")" class="ui-btn-secondary ui-btn-sm">BibTeX</a>
+                                <a href="@($"/api/workspace/{planned.RunId:N}/references.ris")" class="ui-btn-secondary ui-btn-sm">RIS</a>
+                                <a href="@($"/api/workspace/{planned.RunId:N}/screened.ris")" class="ui-btn-secondary ui-btn-sm" title="Every screened source, tagged with its decision">Screened (RIS)</a>
+                            </div>
+                            <p class="text-[11px] text-gray-500">The references of the sources the results rest on, for Zotero, EndNote or Mendeley, numbered as in the source repository; the screened file holds every screened source with its decision.</p>
                         </div>
                     }
                     else

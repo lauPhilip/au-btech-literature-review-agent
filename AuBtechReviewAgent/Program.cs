@@ -134,7 +134,7 @@ var multivocalReporter = new AuBtechReviewAgent.MultivocalReporter(reviewEngine.
     multivocalQuality, multivocalMapper, multivocalExtractor, multivocalSynthesiser);
 builder.Services.AddSingleton(multivocalReporter); // report, written in code (preview)
 builder.Services.AddSingleton(new AuBtechReviewAgent.MultivocalRunner(reviewEngine.Store, multivocalSearcher, multivocalScreener, multivocalQuality,
-    multivocalMapper, multivocalExtractor, multivocalSynthesiser)); // runs the steps one after another (preview)
+    multivocalMapper, multivocalExtractor, multivocalSynthesiser, multivocalPages)); // runs the steps one after another (preview)
 // Modules shown as a preview while they are being built (Development only; see ReviewModulesOptions).
 builder.Services.AddSingleton(AuBtechReviewAgent.ReviewModulesOptions.From(builder.Configuration, builder.Environment.IsDevelopment()));
 
@@ -204,11 +204,11 @@ app.MapGet("/api/workspace/{sessionId:guid}/archive", (Guid sessionId) =>
     return Results.File(zipBytes, "application/zip", fileName);
 }).RequireRateLimiting("ArchiveDownloadPolicy");
 
-// The included papers as BibTeX or RIS, for Zotero / EndNote / Mendeley.
+// The included papers (or a multivocal run's grey sources) as BibTeX or RIS, for Zotero / EndNote / Mendeley.
 app.MapGet("/api/workspace/{sessionId:guid}/references.{format}", (Guid sessionId, string format) =>
 {
     if (format is not ("bib" or "ris")) return Results.NotFound();
-    string? content = reviewEngine.ExportReferences(sessionId, format);
+    string? content = reviewEngine.ExportReferences(sessionId, format) ?? multivocalReporter.ExportReferences(sessionId, format);
     if (content == null) return Results.NotFound();
     string mime = format == "bib" ? "application/x-bibtex" : "application/x-research-info-systems";
     return Results.File(System.Text.Encoding.UTF8.GetBytes(content), mime, $"references.{format}");
@@ -217,7 +217,7 @@ app.MapGet("/api/workspace/{sessionId:guid}/references.{format}", (Guid sessionI
 // Every screened record as RIS, tagged "included" or "excluded: reason", for a Zotero library of the screening.
 app.MapGet("/api/workspace/{sessionId:guid}/screened.ris", (Guid sessionId) =>
 {
-    string? content = reviewEngine.ExportReferences(sessionId, "screened");
+    string? content = reviewEngine.ExportReferences(sessionId, "screened") ?? multivocalReporter.ExportReferences(sessionId, "screened");
     return content == null ? Results.NotFound()
         : Results.File(System.Text.Encoding.UTF8.GetBytes(content), "application/x-research-info-systems", "screened.ris");
 }).RequireRateLimiting("ArchiveDownloadPolicy");

@@ -149,6 +149,22 @@ public sealed class MultivocalReporter
         return report;
     }
 
+    /// <summary>
+    /// The run's references in code (G-6): "bib" or "ris" for the sources the results rest on, once the run is
+    /// extracted, or "screened" for every screened source, once it is screened; null otherwise.
+    /// </summary>
+    public string? ExportReferences(Guid runId, string format)
+    {
+        var ledger = _searcher.LoadLedger(runId);
+        var screening = _screener.Load(runId);
+        if (ledger == null || screening == null) return null;
+        var extraction = _extractor.Load(runId);
+        if (format == "screened") return GreyReferences.ToScreenedRis(ledger, screening, extraction == null ? null : SourceNumbers(extraction));
+        if (extraction == null) return null;
+        var references = GreyReferences.Build(ledger, _pages.Load(runId), extraction);
+        return format == "ris" ? GreyReferences.ToRis(references) : format == "bib" ? GreyReferences.ToBibTeX(references) : null;
+    }
+
     /// <summary>The saved report, or null when it has not been written.</summary>
     public string? ReadSaved(Guid runId)
     {
