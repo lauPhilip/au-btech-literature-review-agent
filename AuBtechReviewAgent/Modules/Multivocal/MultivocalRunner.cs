@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
 using System.Threading.Tasks;
@@ -7,8 +8,11 @@ using Microsoft.Extensions.Logging;
 
 namespace AuBtechReviewAgent;
 
-/// <summary>What the runner is doing for one run: the step it is on, its last progress line, and why it stopped.</summary>
-public sealed record MultivocalRunStatus(bool Running, string Step, string? Progress, string? Error);
+/// <summary>
+/// What the runner is doing for one run: the step it is on, its last progress line, why it stopped, and when this
+/// start of the run began and ended (for the elapsed time on the page).
+/// </summary>
+public sealed record MultivocalRunStatus(bool Running, string Step, string? Progress, string? Error, DateTime? StartedUtc = null, DateTime? EndedUtc = null);
 
 /// <summary>
 /// Runs a planned multivocal review from where it stands to the synthesis, without a click between the steps, as the
@@ -61,7 +65,7 @@ public sealed class MultivocalRunner
     public bool Start(Guid runId, string? editKey)
     {
         if (!_runs.CanEdit(runId, editKey)) return false;
-        if (!TrySet(runId, new MultivocalRunStatus(true, "Starting", null, null))) return false;
+        if (!TrySet(runId, new MultivocalRunStatus(true, "Starting", null, null, DateTime.UtcNow))) return false;
         _ = Task.Run(() => RunStepsAsync(runId, editKey));
         return true;
     }
@@ -70,7 +74,7 @@ public sealed class MultivocalRunner
     public async Task RunAsync(Guid runId, string? editKey)
     {
         if (!_runs.CanEdit(runId, editKey)) throw new InvalidOperationException("Only the browser that planned this run can run it.");
-        if (!TrySet(runId, new MultivocalRunStatus(true, "Starting", null, null))) throw new InvalidOperationException("This run is running already.");
+        if (!TrySet(runId, new MultivocalRunStatus(true, "Starting", null, null, DateTime.UtcNow))) throw new InvalidOperationException("This run is running already.");
         await RunStepsAsync(runId, editKey);
     }
 
@@ -91,7 +95,8 @@ public sealed class MultivocalRunner
 
     private void Set(Guid runId, MultivocalRunStatus status)
     {
-        _status[runId] = status;
+        var started = _status.TryGetValue(runId, out var current) ? current.StartedUtc : null;
+        _status[runId] = status with { StartedUtc = started, EndedUtc = status.Running ? null : DateTime.UtcNow };
         try { Changed?.Invoke(runId); }
         catch (Exception ex) when (ex is not OutOfMemoryException)
         {
@@ -184,4 +189,60 @@ public sealed class MultivocalRunner
         MultivocalExtractor.StageExtracted => "Synthesising",
         _ => "Done",
     };
+}
+
+/// <summary>
+/// The steps of a multivocal run as the progress panel shows them, how far a run is, and the state of each step,
+/// worked out from the run's stage and the runner's progress line ("12 of 30 sources screened"). The weights are a
+/// rough share of the run's time: the quality step fetches every page and is the longest.
+/// </summary>
+public static class MultivocalProgress
+{
+    public sealed record ProgressStep(string Key, string Label, int Weight);
+
+    public static readonly IReadOnlyList<ProgressStep> Steps = new[]
+    {
+        new ProgressStep("search", "Search", 5),
+        new ProgressStep("screening", "Screening", 25),
+        new ProgressStep("quality", "Quality", 35),
+        new ProgressStep("map", "Map", 5),
+        new ProgressStep("extraction", "Extraction", 20),
+        new ProgressStep("synthesis", "Synthesis", 10),
+    };
+
+    /// <summary>The index of the step a run at this stage is on; <see cref="Steps"/>.Count when every step is done.</summary>
+    public static int CurrentIndex(string? stage) => stage switch
+    {
+        MultivocalSearcher.StageSearched or MultivocalScreener.StageScreening => 1,
+        MultivocalScreener.StageScreened or MultivocalQualityAssessor.StageAssessing => 2,
+        MultivocalQualityAssessor.StageAssessed or MultivocalMapper.StageMapping => 3,
+        MultivocalMapper.StageMapped or MultivocalExtractor.StageExtracting => 4,
+        MultivocalExtractor.StageExtracted => 5,
+        MultivocalSynthesiser.StageSynthesised => Steps.Count,
+        _ => 0,
+    };
+
+    /// <summary>The share of a step done, from a progress line such as "12 of 30 sources screened"; 0 without one.</summary>
+    public static double Fraction(string? progress)
+    {
+        var m = System.Text.RegularExpressions.Regex.Match(progress ?? "", @"(\d+) of (\d+)");
+        if (!m.Success || !int.TryParse(m.Groups[1].Value, out int done) || !int.TryParse(m.Groups[2].Value, out int all) || all <= 0) return 0;
+        return Math.Clamp((double)done / all, 0, 1);
+    }
+
+    /// <summary>How far the run is, 0 to 100.</summary>
+    public static int Percent(string? stage, string? progress)
+    {
+        int current = CurrentIndex(stage);
+        if (current >= Steps.Count) return 100;
+        double done = Steps.Take(current).Sum(s => s.Weight) + Steps[current].Weight * Fraction(progress);
+        return (int)Math.Round(done * 100 / Steps.Sum(s => s.Weight));
+    }
+
+    /// <summary>"done", "current" or "waiting" for one step.</summary>
+    public static string StateOf(int index, string? stage)
+    {
+        int current = CurrentIndex(stage);
+        return index < current ? "done" : index == current ? "current" : "waiting";
+    }
 }

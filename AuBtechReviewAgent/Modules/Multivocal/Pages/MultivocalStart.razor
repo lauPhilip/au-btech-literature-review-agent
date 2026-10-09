@@ -101,8 +101,7 @@
                         <div class="border-t border-gray-100 pt-3 space-y-2">
                             @if (status is { Running: true })
                             {
-                                <p class="text-xs text-gray-700" role="status" aria-live="polite">@status.Step… @status.Progress</p>
-                                <p class="text-[11px] text-gray-500">The review runs on its own, one step after another, and the tabs on the right fill as each step finishes. Closing the page does not stop it; open the run again later.</p>
+                                <p class="text-xs text-gray-600">The review runs on its own, one step after another; the Progress tab shows how far it is. Closing the page does not stop it.</p>
                             }
                             else
                             {
@@ -418,11 +417,19 @@
         </section>
 
         <section class="lg:col-span-7 lg:sticky lg:top-4 min-w-0 bg-white border border-gray-200 shadow-sm overflow-hidden flex flex-col lg:max-h-[calc(100vh-8rem)]" aria-labelledby="panel-title">
-            <h2 id="panel-title" class="sr-only">@(panelTab == "protocol" ? "Protocol" : "What this review will do")</h2>
+            <h2 id="panel-title" class="sr-only">@(panelTab switch { "protocol" => "Protocol", "progress" => "Progress", "sources" => "Sources found", "map" => "Systematic map", "themes" => "Themes", _ => "What this review will do" })</h2>
             <div class="flex items-center justify-between border-b border-gray-200 px-3 flex-none">
                 <div class="flex" role="group" aria-label="Show">
-                    <button type="button" aria-pressed="@(panelTab == "plan" ? "true" : "false")" @onclick="@(() => ChooseTab("plan"))"
-                            class="px-3 py-2.5 text-xs border-b-2 -mb-px @(panelTab == "plan" ? "border-brand text-brand font-semibold" : "border-transparent text-gray-500 hover:text-gray-800")">Preview</button>
+                    @if (planned != null)
+                    {
+                        <button type="button" aria-pressed="@(panelTab == "progress" ? "true" : "false")" @onclick="@(() => ChooseTab("progress"))"
+                                class="px-3 py-2.5 text-xs border-b-2 -mb-px @(panelTab == "progress" ? "border-brand text-brand font-semibold" : "border-transparent text-gray-500 hover:text-gray-800")">Progress</button>
+                    }
+                    else
+                    {
+                        <button type="button" aria-pressed="@(panelTab == "plan" ? "true" : "false")" @onclick="@(() => ChooseTab("plan"))"
+                                class="px-3 py-2.5 text-xs border-b-2 -mb-px @(panelTab == "plan" ? "border-brand text-brand font-semibold" : "border-transparent text-gray-500 hover:text-gray-800")">Preview</button>
+                    }
                     <button type="button" aria-pressed="@(panelTab == "protocol" ? "true" : "false")" @onclick="@(() => ChooseTab("protocol"))"
                             class="px-3 py-2.5 text-xs border-b-2 -mb-px @(panelTab == "protocol" ? "border-brand text-brand font-semibold" : "border-transparent text-gray-500 hover:text-gray-800")">Protocol</button>
                     @if (ledger != null)
@@ -444,7 +451,30 @@
                 <span class="text-[10px] text-gray-500 font-mono">Garousi et al. 2019</span>
             </div>
 
-            @if (panelTab == "themes" && synthesis != null && planned != null)
+            @if (panelTab == "progress" && planned != null)
+            {
+                bool runRunning = Runner.IsRunning(planned.RunId);
+                <div class="flex-1 min-h-0 overflow-y-auto p-5 space-y-4 text-left bg-gray-50/50">
+                    <MultivocalProgressPanel Stage="@stage" Status="Runner.StatusOf(planned.RunId)" Ledger="ledger" Screening="screening" Quality="quality"
+                                             Map="map" Extraction="extraction" Synthesis="synthesis" />
+                    @if (runRunning && notifyPermission is "default" or "granted")
+                    {
+                        @* Runs take a while; people switch tabs. This asks the browser to say when the run is done, as on the systematic review's page. *@
+                        <p class="text-xs text-gray-600 flex items-center gap-2">
+                            @if (notifyPermission == "granted")
+                            {
+                                <span>You will get a browser notification when the review is ready, if this tab is in the background.</span>
+                            }
+                            else
+                            {
+                                <button type="button" @onclick="AskForNotification" class="ui-btn-secondary ui-btn-sm">Notify me when it is ready</button>
+                            }
+                        </p>
+                    }
+                    <p class="text-[11px] text-gray-500">The other tabs fill as each step finishes: the sources with every decision and score, the map with what was extracted, and the themes.</p>
+                </div>
+            }
+            else if (panelTab == "themes" && synthesis != null && planned != null)
             {
                 <div class="flex-1 min-h-0 overflow-y-auto p-5 space-y-5 text-left">
                     <div>
@@ -972,6 +1002,8 @@
     private string? keepError;
     private int step;
     private string panelTab = "plan";
+    private string notifyPermission = "unsupported";
+    private bool wasRunning;
     private bool tabChosen; // once the reviewer picks a tab, the panel stops following the run
     private string? shownStep;
     private bool saving;
@@ -1007,7 +1039,7 @@
 
     public void Dispose() => Runner.Changed -= OnRunChanged;
 
-    /// <summary>Reads every file of the run again; the panel shows the latest step unless the reviewer chose a tab.</summary>
+    /// <summary>Reads every file of the run again; the panel shows the progress, then the themes, unless the reviewer chose a tab.</summary>
     private void Reload(Guid id)
     {
         planned = Planner.Load(id);
@@ -1022,7 +1054,7 @@
         synthesis = Synthesiser.Load(id);
         if (sourceFilter == oldDefault) sourceFilter = DefaultFilter();
         stage = Runs.LoadHeader(id)?.Stage ?? "";
-        if (!tabChosen) panelTab = synthesis != null ? "themes" : map != null ? "map" : ledger != null ? "sources" : "protocol";
+        if (!tabChosen) panelTab = synthesis != null ? "themes" : "progress";
     }
 
     private string DefaultFilter() => quality != null ? "passed" : screening != null ? "included" : "all";
@@ -1045,8 +1077,33 @@
                 Reload(id);
                 shownStep = status?.Step;
             }
+            if (wasRunning && status is { Running: false })
+            {
+                bool done = stage == AuBtechReviewAgent.MultivocalSynthesiser.StageSynthesised;
+                _ = NotifyAsync(done ? "Your review is ready" : "Your review stopped",
+                    done ? "The themes and the report are ready in TraceableAI." : "Open TraceableAI to see what happened.");
+            }
+            wasRunning = status?.Running == true;
             StateHasChanged();
         });
+    }
+
+    private async Task NotifyAsync(string title, string body)
+    {
+        try { await JS.InvokeAsync<bool>("traceableReview.notifyDone", title, body); }
+        catch (Exception ex) when (ex is JSException or JSDisconnectedException or InvalidOperationException or TaskCanceledException)
+        {
+            Logger.LogDebug("Could not show the browser notification: {Message}", ex.Message);
+        }
+    }
+
+    private async Task AskForNotification()
+    {
+        try { notifyPermission = await JS.InvokeAsync<string>("traceableReview.requestNotify"); }
+        catch (Exception ex) when (ex is JSException or JSDisconnectedException or InvalidOperationException or TaskCanceledException)
+        {
+            Logger.LogDebug("Could not ask for notifications: {Message}", ex.Message);
+        }
     }
 
     private void ContinueRun()
@@ -1175,6 +1232,12 @@
             Logger.LogDebug("Could not read the edit key: {Message}", ex.Message);
         }
         canEdit = Runs.CanEdit(planned.RunId, editKey);
+        wasRunning = Runner.IsRunning(planned.RunId);
+        try { notifyPermission = await JS.InvokeAsync<string>("traceableReview.notifyPermission"); }
+        catch (Exception ex) when (ex is JSException or JSDisconnectedException or InvalidOperationException or TaskCanceledException)
+        {
+            Logger.LogDebug("Could not read the notification permission: {Message}", ex.Message);
+        }
         StateHasChanged();
     }
 

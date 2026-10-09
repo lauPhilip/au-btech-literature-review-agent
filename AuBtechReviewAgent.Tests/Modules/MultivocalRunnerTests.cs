@@ -105,7 +105,9 @@ public class MultivocalRunnerTests : IDisposable
         Assert.Equal(MultivocalSynthesiser.StageSynthesised, store.LoadHeader(runId)!.Stage);
         var map = JsonSerializer.Deserialize<MultivocalMapFile>(File.ReadAllText(Path.Join(store.FolderOf(runId), MultivocalMapper.MapFile)))!;
         Assert.Equal(1, map.FixedVersion); // the model's proposal, fixed as it is
-        Assert.Equal(new MultivocalRunStatus(false, "Done", null, null), runner.StatusOf(runId));
+        var done = runner.StatusOf(runId)!;
+        Assert.Equal((false, "Done", (string?)null), (done.Running, done.Step, done.Error));
+        Assert.True(done.StartedUtc <= done.EndedUtc); // the page shows the elapsed time
         Assert.False(MultivocalRunner.HasStepsLeft(store.LoadHeader(runId)!.Stage));
     }
 
@@ -140,5 +142,18 @@ public class MultivocalRunnerTests : IDisposable
         Assert.Equal("Stopped", status.Step);
         Assert.Contains("No source passed the quality check", status.Error);
         Assert.Equal(MultivocalQualityAssessor.StageAssessed, store.LoadHeader(runId)!.Stage);
+    }
+
+    [Fact]
+    public void TheProgressFollowsTheStageAndTheProgressLine()
+    {
+        Assert.Equal(0, MultivocalProgress.Percent(MultivocalPlanner.StagePlanned, null));
+        Assert.Equal(4, MultivocalProgress.Percent(MultivocalSearcher.StageSearching, "4 of 5 searches · Fake: \"context\"")); // four fifths of the 5 of the search
+        Assert.Equal(5 + 25 + 35, MultivocalProgress.Percent(MultivocalQualityAssessor.StageAssessed, null));
+        Assert.Equal(5 + 25 + 35 + 5 + 10, MultivocalProgress.Percent(MultivocalExtractor.StageExtracting, "15 of 30 sources extracted"));
+        Assert.Equal(100, MultivocalProgress.Percent(MultivocalSynthesiser.StageSynthesised, null));
+        Assert.Equal(0, MultivocalProgress.Fraction("RQ1: findings in 4 values; naming the themes"));
+        Assert.Equal(new[] { "done", "done", "current", "waiting", "waiting", "waiting" },
+            Enumerable.Range(0, MultivocalProgress.Steps.Count).Select(i => MultivocalProgress.StateOf(i, MultivocalQualityAssessor.StageAssessing)));
     }
 }

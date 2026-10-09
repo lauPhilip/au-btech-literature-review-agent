@@ -151,6 +151,7 @@ public sealed class MultivocalSearcher
         string rawFolder = Path.Join(folder, RunArchive.RawResponsesFolder);
         Directory.CreateDirectory(rawFolder);
 
+        int searchesInAll = plan.GreySearches.Count * strings.Count, searchNumber = 0;
         foreach (string key in plan.GreySearches)
         {
             var source = _sources(key);
@@ -165,7 +166,7 @@ public sealed class MultivocalSearcher
             for (int i = 0; i < strings.Count; i++)
             {
                 string text = strings[i];
-                progress?.Report($"{source.Name}: \"{text}\"");
+                progress?.Report($"{++searchNumber} of {searchesInAll} searches · {source.Name}: \"{text}\"");
                 var log = new GreySearchLog { Source = key, SearchString = text, Requested = perSearch, SearchedUtc = DateTime.UtcNow };
                 ledger.Searches.Add(log);
                 try
