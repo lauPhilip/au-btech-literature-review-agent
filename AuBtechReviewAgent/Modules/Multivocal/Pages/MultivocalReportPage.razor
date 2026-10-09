@@ -38,6 +38,9 @@
             <div class="flex flex-wrap gap-2 pt-1">
                 <a href="@($"/api/workspace/{RunId:N}/mlr-report.md")" class="ui-btn-secondary ui-btn-sm">Download the report</a>
                 <a href="@($"/api/workspace/{RunId:N}/protocol.md")" class="ui-btn-secondary ui-btn-sm">Download the protocol</a>
+                <a href="@($"/api/workspace/{RunId:N}/references.bib")" class="ui-btn-secondary ui-btn-sm" title="The references of the sources the results rest on, for Zotero, EndNote or Mendeley">BibTeX</a>
+                <a href="@($"/api/workspace/{RunId:N}/references.ris")" class="ui-btn-secondary ui-btn-sm" title="The references of the sources the results rest on, for Zotero, EndNote or Mendeley">RIS</a>
+                <a href="@($"/api/workspace/{RunId:N}/screened.ris")" class="ui-btn-secondary ui-btn-sm" title="Every screened source, tagged with its decision">Screened (RIS)</a>
             </div>
             @if (saved)
             {

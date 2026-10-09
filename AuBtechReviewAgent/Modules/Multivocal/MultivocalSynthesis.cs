@@ -170,9 +170,12 @@ public sealed class MultivocalSynthesiser
     private readonly string _model;
 
     /// <summary>A synthesiser that asks <paramref name="chat"/>'s model to group the findings of each question.</summary>
+    private readonly ReviewCache _cache;
+
     public MultivocalSynthesiser(RunStore runs, MultivocalPlanner planner, MultivocalSearcher searcher, MultivocalQualityAssessor quality,
-        MultivocalMapper mapper, MultivocalExtractor extractor, MultivocalPages pages, Func<IChatCompletionService> chat, string model = "")
+        MultivocalMapper mapper, MultivocalExtractor extractor, MultivocalPages pages, Func<IChatCompletionService> chat, string model = "", ReviewCache? cache = null)
     {
+        _cache = cache ?? ReviewCache.Disabled;
         _runs = runs;
         _planner = planner;
         _searcher = searcher;
@@ -234,7 +237,7 @@ public sealed class MultivocalSynthesiser
             // cancelled projects coded as evidence on retrieval). Every value is checked against its quote, one call
             // per source; a value judged not supported is left out of the findings and listed with the reason.
             progress?.Report($"Checking that each of {file.Findings.Count} quotes supports its value");
-            var (supported, unsupported, uncheckedCount) = await CheckSupportAsync(chat, file.Findings, open);
+            var (supported, unsupported, uncheckedCount) = await CheckSupportAsync(chat, file.Findings, open, _cache, _model);
             file.Findings = supported;
             file.Unsupported = unsupported;
             if (unsupported.Count > 0)
@@ -457,13 +460,13 @@ public sealed class MultivocalSynthesiser
     /// names the source mentions, so only that the quote names them is checked.
     /// </summary>
     public static async Task<(List<SynthesisFinding> Supported, List<UnsupportedValue> Unsupported, int Unchecked)> CheckSupportAsync(
-        IChatCompletionService chat, IReadOnlyList<SynthesisFinding> findings, IReadOnlySet<string> openAttributes)
+        IChatCompletionService chat, IReadOnlyList<SynthesisFinding> findings, IReadOnlySet<string> openAttributes, ReviewCache? cache = null, string model = "")
     {
         using var throttle = new System.Threading.SemaphoreSlim(SupportParallelism);
         var work = findings.GroupBy(f => f.Address).Select(source => Task.Run(async () =>
         {
             await throttle.WaitAsync();
-            try { return (Findings: source.ToList(), Verdicts: await AskSupportAsync(chat, source.ToList(), openAttributes)); }
+            try { return (Findings: source.ToList(), Verdicts: await AskSupportAsync(chat, source.ToList(), openAttributes, cache ?? ReviewCache.Disabled, model)); }
             finally { throttle.Release(); }
         })).ToList();
 
@@ -487,7 +490,11 @@ public sealed class MultivocalSynthesiser
         return (supported.OrderBy(f => order[f.Id]).ToList(), unsupported.OrderBy(u => order[u.Finding]).ToList(), unchecked_);
     }
 
-    private static async Task<Dictionary<string, SupportVerdict>?> AskSupportAsync(IChatCompletionService chat, List<SynthesisFinding> findings, IReadOnlySet<string> openAttributes)
+    /// <summary>Part of the cache key of the support check: raise it whenever its prompt changes.</summary>
+    public const string SupportPromptVersion = "grey-support-v1";
+
+    private static async Task<Dictionary<string, SupportVerdict>?> AskSupportAsync(IChatCompletionService chat, List<SynthesisFinding> findings, IReadOnlySet<string> openAttributes,
+        ReviewCache cache, string model)
     {
         string list = string.Join("\n", findings.Select(f =>
             $"{f.Id} | {f.Attribute}{(openAttributes.Contains(f.Attribute) ? " (a name the source mentions)" : "")}: {f.Value} | quote: \"{f.Quote}\""));
@@ -507,21 +514,32 @@ public sealed class MultivocalSynthesiser
             {"verdicts":[{"finding":"F1.1","verdict":"supported","reason":""}]}
             """;
         var ids = findings.Select(f => f.Id).ToHashSet();
+        // The same values with the same quotes of the same source get the verdicts they got before: the key is the whole
+        // prompt, so a changed value, quote, title or prompt asks again. A cached answer is checked like a new one.
+        string key = ReviewCache.Key(SupportPromptVersion, model, prompt);
+        string? Problem(SupportAnswer a)
+        {
+            if (a.Verdicts == null) return "verdicts must be a list.";
+            var unknown = a.Verdicts.Select(v => v.Finding.Trim()).FirstOrDefault(id => !ids.Contains(id));
+            if (unknown != null) return $"\"{unknown}\" is not one of the values listed.";
+            var missing = ids.Where(id => a.Verdicts.All(v => v.Finding.Trim() != id)).ToList();
+            if (missing.Count > 0) return $"values {string.Join(", ", missing)} have no verdict; give one for every value.";
+            var bad = a.Verdicts.FirstOrDefault(v => v.Verdict.Trim() is not (CitationSupportChecker.Supported or CitationSupportChecker.Partial or CitationSupportChecker.NotSupported));
+            if (bad != null) return $"\"{bad.Verdict}\" is not a verdict; use supported, partially_supported or not_supported.";
+            return a.Verdicts.Any(v => v.Verdict.Trim() == CitationSupportChecker.NotSupported && string.IsNullOrWhiteSpace(v.Reason)) ? "a value that is not supported needs the reason." : null;
+        }
         try
         {
             using (LlmStage.Begin("extraction-support"))
             {
-                var answer = await LlmJson.GetAsync<SupportAnswer>(chat, prompt, LlmJson.JsonMode(0.0), a =>
+                SupportAnswer answer;
+                if (cache.TryGet<SupportAnswer>("grey-support", key, out var cached) && cached != null && Problem(cached) == null)
+                    answer = cached;
+                else
                 {
-                    if (a.Verdicts == null) return "verdicts must be a list.";
-                    var unknown = a.Verdicts.Select(v => v.Finding.Trim()).FirstOrDefault(id => !ids.Contains(id));
-                    if (unknown != null) return $"\"{unknown}\" is not one of the values listed.";
-                    var missing = ids.Where(id => a.Verdicts.All(v => v.Finding.Trim() != id)).ToList();
-                    if (missing.Count > 0) return $"values {string.Join(", ", missing)} have no verdict; give one for every value.";
-                    var bad = a.Verdicts.FirstOrDefault(v => v.Verdict.Trim() is not (CitationSupportChecker.Supported or CitationSupportChecker.Partial or CitationSupportChecker.NotSupported));
-                    if (bad != null) return $"\"{bad.Verdict}\" is not a verdict; use supported, partially_supported or not_supported.";
-                    return a.Verdicts.Any(v => v.Verdict.Trim() == CitationSupportChecker.NotSupported && string.IsNullOrWhiteSpace(v.Reason)) ? "a value that is not supported needs the reason." : null;
-                }, repairAttempts: 2);
+                    answer = await LlmJson.GetAsync<SupportAnswer>(chat, prompt, LlmJson.JsonMode(0.0), Problem, repairAttempts: 2);
+                    cache.Set("grey-support", key, answer);
+                }
                 return answer.Verdicts!.GroupBy(v => v.Finding.Trim()).ToDictionary(g => g.Key, g => new SupportVerdict { Finding = g.Key, Verdict = g.First().Verdict.Trim(), Reason = g.First().Reason });
             }
         }

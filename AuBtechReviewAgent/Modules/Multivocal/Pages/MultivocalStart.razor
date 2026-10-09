@@ -12,6 +12,7 @@
 @inject AuBtechReviewAgent.MultivocalExtractor Extractor
 @inject AuBtechReviewAgent.MultivocalSynthesiser Synthesiser
 @inject AuBtechReviewAgent.MultivocalRunner Runner
+@inject AuBtechReviewAgent.MultivocalWriter Writer
 @inject NavigationManager Nav
 @inject IJSRuntime JS
 @inject ILogger<MultivocalStart> Logger
@@ -63,76 +64,7 @@
                         @SettingRow("Searches", string.Join(", ", planned.Plan.GreySearches.Select(AuBtechReviewAgent.MultivocalGuidelines.SearchLabel)))
                         @SettingRow("Strings", string.Join("; ", planned.Plan.EffectiveGreySearchStrings))
                         @SettingRow("Threshold", $"{planned.Plan.QualityThreshold} of {AuBtechReviewAgent.MultivocalGuidelines.QualityPointsMax} points")
-                        @if (ledger != null)
-                        {
-                            @SettingRow("Found", $"{ledger.Sources.Count} grey source{(ledger.Sources.Count == 1 ? "" : "s")} from {ledger.Searches.Count} search{(ledger.Searches.Count == 1 ? "" : "es")}")
-                        }
-                        @if (screening != null)
-                        {
-                            @SettingRow("Screened", ScreeningLine(screening))
-                        }
-                        @if (quality != null)
-                        {
-                            @SettingRow("Quality", QualityLine(quality))
-                        }
-                        @if (map != null)
-                        {
-                            @SettingRow("Map", $"{map.Latest.Attributes.Count} attributes, version {map.Latest.Number}{(map.FixedVersion != null ? ", fixed" : ", not fixed yet")}")
-                        }
-                        @if (extraction != null)
-                        {
-                            @SettingRow("Extracted", $"{extraction.Sources.Count(x => x.Error == null)} sources" + (extraction.Sources.Any(x => x.Error != null) ? $", {extraction.Sources.Count(x => x.Error != null)} could not be extracted" : ""))
-                        }
-                        @if (synthesis != null)
-                        {
-                            @SettingRow("Synthesis", $"{synthesis.Themes.Count} themes from {synthesis.Findings.Count} findings" + (synthesis.Unanswered.Count > 0 ? $"; no findings for {string.Join(", ", synthesis.Unanswered)}" : ""))
-                        }
                     </dl>
-                    @if (stage == AuBtechReviewAgent.MultivocalSynthesiser.StageSynthesised)
-                    {
-                        <div class="border-t border-gray-100 pt-3 space-y-2">
-                            <p class="text-xs text-gray-600">The report is written in code from the run's files (G14): the methods, how each guideline was followed, the themes with what they rest on, and the source repository.</p>
-                            <div class="flex flex-wrap items-center gap-2">
-                                <a href="@($"/mlr-report/{planned.RunId}")" class="ui-btn-primary ui-btn-sm inline-block">Read the report</a>
-                                <a href="@($"/api/workspace/{planned.RunId:N}/references.bib")" class="ui-btn-secondary ui-btn-sm">BibTeX</a>
-                                <a href="@($"/api/workspace/{planned.RunId:N}/references.ris")" class="ui-btn-secondary ui-btn-sm">RIS</a>
-                                <a href="@($"/api/workspace/{planned.RunId:N}/screened.ris")" class="ui-btn-secondary ui-btn-sm" title="Every screened source, tagged with its decision">Screened (RIS)</a>
-                            </div>
-                            <p class="text-[11px] text-gray-500">The references of the sources the results rest on, for Zotero, EndNote or Mendeley, numbered as in the source repository; the screened file holds every screened source with its decision.</p>
-                        </div>
-                    }
-                    else
-                    {
-                        var status = Runner.StatusOf(planned.RunId);
-                        <div class="border-t border-gray-100 pt-3 space-y-2">
-                            @if (status is { Running: true })
-                            {
-                                <p class="text-xs text-gray-600">The review runs on its own, one step after another; the Progress tab shows how far it is. Closing the page does not stop it.</p>
-                            }
-                            else
-                            {
-                                @if (status?.Error is { } runError)
-                                {
-                                    <p class="bg-red-50 border border-red-200 text-red-800 p-2 text-xs" role="alert">@runError</p>
-                                }
-                                @if (!planned.Plan.HasCriteria)
-                                {
-                                    <p class="text-xs text-gray-600">This plan was made before the form asked for inclusion criteria, so its sources cannot be screened. Plan a new run to screen.</p>
-                                }
-                                else if (!canEdit)
-                                {
-                                    <p class="text-xs text-gray-600">The review is not finished. Only the browser that planned this run can continue it.</p>
-                                }
-                                else if (status is not { Step: "Stopped" })
-                                {
-                                    <p class="text-xs text-gray-600">@(status?.Error != null
-                                        ? "Continue to try the step again; decisions already made come from the cache."
-                                        : "The review stopped before it was finished, for example because the server restarted. It continues from where it stopped.")</p>
-                                    <button type="button" class="ui-btn-primary ui-btn-sm" @onclick="ContinueRun">Continue the review</button>
-                                }
-                            }
-                        </div>
-                    }
                     <p class="text-[11px] text-gray-500 leading-snug border-t border-gray-100 pt-2">
                         Link to this run: <a class="text-brand underline break-all" href="@($"/mlr/{planned.RunId}")">@($"/mlr/{planned.RunId}")</a>.
                         Protocol fingerprint (SHA-256): <span class="font-mono break-all">@planned.ProtocolSha256</span>
@@ -461,8 +393,41 @@
             {
                 bool runRunning = Runner.IsRunning(planned.RunId);
                 <div class="flex-1 min-h-0 overflow-y-auto p-5 space-y-4 text-left bg-gray-50/50">
+                    @if (stage == AuBtechReviewAgent.MultivocalWriter.StageChecked)
+                    {
+                        <div class="bg-white border border-green-200 p-4 shadow-sm space-y-2">
+                            <p class="text-sm font-semibold text-gray-900">Your review is ready</p>
+                            <p class="text-xs text-gray-600">The paper is written and every citation is checked against the kept page of the source it cites. The report holds the paper's evidence, the references and the downloads.</p>
+                            <a href="@($"/mlr-report/{planned.RunId}")" class="ui-btn-primary ui-btn-sm inline-block">Read the report</a>
+                        </div>
+                    }
+                    else if (!runRunning && AuBtechReviewAgent.MultivocalRunner.HasStepsLeft(stage))
+                    {
+                        var status = Runner.StatusOf(planned.RunId);
+                        <div class="bg-white border border-gray-200 p-4 shadow-sm space-y-2">
+                            @if (status?.Error is { } runError)
+                            {
+                                <p class="bg-red-50 border border-red-200 text-red-800 p-2 text-xs" role="alert">@runError</p>
+                            }
+                            @if (!planned.Plan.HasCriteria)
+                            {
+                                <p class="text-xs text-gray-600">This plan was made before the form asked for inclusion criteria, so its sources cannot be screened. Plan a new run to screen.</p>
+                            }
+                            else if (!canEdit)
+                            {
+                                <p class="text-xs text-gray-600">The review is not finished. Only the browser that planned this run can continue it.</p>
+                            }
+                            else if (status is not { Step: "Stopped" })
+                            {
+                                <p class="text-xs text-gray-600">@(status?.Error != null
+                                    ? "Continue to try the step again; decisions already made come from the cache."
+                                    : "The review stopped before it was finished, for example because the server restarted. It continues from where it stopped.")</p>
+                                <button type="button" class="ui-btn-primary ui-btn-sm" @onclick="ContinueRun">Continue the review</button>
+                            }
+                        </div>
+                    }
                     <MultivocalProgressPanel Stage="@stage" Status="Runner.StatusOf(planned.RunId)" Ledger="ledger" Screening="screening" Quality="quality"
-                                             Map="map" Extraction="extraction" Synthesis="synthesis" />
+                                             Map="map" Extraction="extraction" Synthesis="synthesis" Paper="paper" />
                     @if (runRunning && notifyPermission is "default" or "granted")
                     {
                         @* Runs take a while; people switch tabs. This asks the browser to say when the run is done, as on the systematic review's page. *@
@@ -1008,6 +973,7 @@
     private string? keepError;
     private int step;
     private string panelTab = "plan";
+    private AuBtechReviewAgent.MultivocalPaperFile? paper;
     private string notifyPermission = "unsupported";
     private bool wasRunning;
     private bool tabChosen; // once the reviewer picks a tab, the panel stops following the run
@@ -1045,7 +1011,7 @@
 
     public void Dispose() => Runner.Changed -= OnRunChanged;
 
-    /// <summary>Reads every file of the run again; the panel shows the progress, then the themes, unless the reviewer chose a tab.</summary>
+    /// <summary>Reads every file of the run again; the panel shows the progress, with the report once it is ready, unless the reviewer chose a tab.</summary>
     private void Reload(Guid id)
     {
         planned = Planner.Load(id);
@@ -1058,9 +1024,10 @@
         map = Mapper.Load(id);
         SetExtraction(Extractor.Load(id));
         synthesis = Synthesiser.Load(id);
+        paper = Writer.Load(id);
         if (sourceFilter == oldDefault) sourceFilter = DefaultFilter();
         stage = Runs.LoadHeader(id)?.Stage ?? "";
-        if (!tabChosen) panelTab = synthesis != null ? "themes" : "progress";
+        if (!tabChosen) panelTab = "progress";
     }
 
     private string DefaultFilter() => quality != null ? "passed" : screening != null ? "included" : "all";
@@ -1085,9 +1052,9 @@
             }
             if (wasRunning && status is { Running: false })
             {
-                bool done = stage == AuBtechReviewAgent.MultivocalSynthesiser.StageSynthesised;
+                bool done = stage == AuBtechReviewAgent.MultivocalWriter.StageChecked;
                 _ = NotifyAsync(done ? "Your review is ready" : "Your review stopped",
-                    done ? "The themes and the report are ready in TraceableAI." : "Open TraceableAI to see what happened.");
+                    done ? "The paper is written and its citations are checked in TraceableAI." : "Open TraceableAI to see what happened.");
             }
             wasRunning = status?.Running == true;
             StateHasChanged();
@@ -1322,10 +1289,6 @@
     private AuBtechReviewAgent.GreyQuality? QualityOf(string url) =>
         qualities.TryGetValue(AuBtechReviewAgent.MultivocalSearcher.AddressKey(url), out var q) ? q : null;
 
-    private static string QualityLine(AuBtechReviewAgent.MultivocalQualityFile f) =>
-        $"{f.Count("Passed")} passed, {f.Count("Below threshold")} below {f.Threshold} points" +
-        (f.Count("Not assessed") > 0 ? $", {f.Count("Not assessed")} not assessed (no readable page)" : "");
-
     private static string QualityChip(string outcome) => outcome switch
     {
         "Passed" => "ui-chip border-green-200 bg-green-50 text-green-800",
@@ -1347,17 +1310,6 @@
         "duplicates" => ledger!.Sources.Where(f => DecisionOf(f.Record.Url)?.Decision == "Duplicate"),
         _ => ledger!.Sources,
     };
-
-    private static string ScreeningLine(AuBtechReviewAgent.MultivocalScreeningFile f)
-    {
-        int look = f.Sources.Count(s => s.NeedsLook);
-        int reviewed = f.Sources.Count(s => s.Reviewed);
-        string line = $"{f.Count("Included")} included, {f.Count("Excluded")} excluded, {f.Count("Duplicate")} duplicates";
-        if (f.Count("Error") > 0) line += $", {f.Count("Error")} not screened";
-        if (look > 0) line += $"; {look} to look at";
-        if (reviewed > 0) line += $"; {reviewed} looked at by you";
-        return f.Kappa is double k ? $"{line}; agreement κ = {k:0.00}" : line;
-    }
 
     private static string DecisionLabel(AuBtechReviewAgent.GreyScreening d) => d.Decision switch
     {
@@ -1400,7 +1352,7 @@
 
     private string StageLine()
     {
-        if (stage == AuBtechReviewAgent.MultivocalSynthesiser.StageSynthesised) return "Finished: the findings are grouped into themes and the report can be read";
+        if (stage == AuBtechReviewAgent.MultivocalWriter.StageChecked) return "Finished: the paper is written and every citation is checked";
         var status = planned == null ? null : Runner.StatusOf(planned.RunId);
         if (status is { Running: true }) return $"Running: {status.Step.ToLowerInvariant()}…";
         return $"Not finished: stopped before {AuBtechReviewAgent.MultivocalRunner.StepFor(stage).ToLowerInvariant()}";

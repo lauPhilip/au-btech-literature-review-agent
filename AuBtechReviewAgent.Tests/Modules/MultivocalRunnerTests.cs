@@ -58,10 +58,20 @@ public class MultivocalRunnerTests : IDisposable
             .Select(m => $$"""{"finding":"{{m.Groups[1].Value}}","verdict":"supported","reason":""}""")) + "]}"
         : prompt.Contains("Name one to") ? """{"themes":[{"name":"Summaries keep the context short","description":"Sources keep running summaries."}]}"""
         : prompt.Contains("VALUES TO PLACE") ? """{"placements":[{"group":"V1","themes":["Summaries keep the context short"],"reason":""}]}"""
-        : """{"tensions":[]}""");
+        : WritingAnswer(prompt) ?? """{"tensions":[]}""");
+
+    /// <summary>The fake model's answers for writing and checking the paper of the run's one source; null for any other prompt.</summary>
+    private static string? WritingAnswer(string prompt) =>
+        prompt.Contains("You are writing one subsection of the Results") ? """{"heading":"Summaries","text":"Sources keep a running summary of the conversation [1]."}"""
+        : prompt.Contains("You are writing the Discussion section") ? """{"text":"Running summaries keep agent contexts short [1]."}"""
+        : prompt.Contains("You are writing the summary for practitioners") ? """{"lead":"For developers.","items":["Keep a running summary [1].","Summarise old turns [1].","Keep the summary short [1]."]}"""
+        : prompt.Contains("You are writing the title") ? """{"title":"Context engineering: a grey literature review","abstract":"One source keeps running summaries.","rationale":"Agents keep a running summary [1].","objectives":"To map the practices."}"""
+        : prompt.Contains("grounded synthesis outline") || prompt.Contains("strict but constructive peer reviewer") || prompt.Contains("rigorous academic copyeditor") || prompt.Contains("You are checking citations")
+            ? MultivocalWritingTests.Respond(prompt)
+            : null;
 
     /// <summary>A run at "Assessed" with its page kept, and a runner over the module's own services.</summary>
-    private async Task<(RunStore Store, Guid RunId, string Key, MultivocalRunner Runner)> AssessedRun(FakeChatService model, bool anyPassed = true)
+    private async Task<(RunStore Store, Guid RunId, string Key, MultivocalRunner Runner)> AssessedRun(FakeChatService model, bool anyPassed = true, bool withWriter = false)
     {
         var store = new RunStore(_root);
         var planner = new MultivocalPlanner(store);
@@ -93,7 +103,13 @@ public class MultivocalRunnerTests : IDisposable
         var mapper = new MultivocalMapper(store, planner, searcher, assessor, () => model);
         var extractor = new MultivocalExtractor(store, planner, searcher, assessor, mapper, pages, () => model, parallelism: 1);
         var synthesiser = new MultivocalSynthesiser(store, planner, searcher, assessor, mapper, extractor, pages, () => model);
-        return (store, runId, key, new MultivocalRunner(store, searcher, screener, assessor, mapper, extractor, synthesiser, pages));
+        MultivocalWriter? writer = null;
+        if (withWriter)
+        {
+            var reporter = new MultivocalReporter(store, planner, searcher, screener, pages, assessor, mapper, extractor, synthesiser);
+            writer = new MultivocalWriter(store, reporter, pages, () => model, "fake-model", parallelism: 1);
+        }
+        return (store, runId, key, new MultivocalRunner(store, searcher, screener, assessor, mapper, extractor, synthesiser, pages, writer));
     }
 
     [Fact]
@@ -107,7 +123,7 @@ public class MultivocalRunnerTests : IDisposable
         await Assert.ThrowsAsync<InvalidOperationException>(() => runner.RunAsync(runId, "wrong-key"));
         await runner.RunAsync(runId, key);
 
-        Assert.Equal(new[] { "Starting", "Proposing the map", "Fixing the map", "Extracting", "Synthesising", "Writing the references", "Done" }, steps);
+        Assert.Equal(new[] { "Starting", "Proposing the map", "Fixing the map", "Extracting", "Synthesising", "Writing the paper", "Done" }, steps); // without a writer the run ends after the references
         string folder = store.FolderOf(runId);
         Assert.Contains("Source [1] in the TraceableAI review", File.ReadAllText(Path.Join(folder, GreyReferences.RisFile)));
         Assert.Contains("@misc{ana2025managing,", File.ReadAllText(Path.Join(folder, GreyReferences.BibFile)));
@@ -120,7 +136,33 @@ public class MultivocalRunnerTests : IDisposable
         Assert.Equal("Done", done.Step);
         Assert.Null(done.Error);
         Assert.True(done.StartedUtc <= done.EndedUtc); // the page shows the elapsed time
-        Assert.False(MultivocalRunner.HasStepsLeft(store.LoadHeader(runId)!.Stage));
+        Assert.True(MultivocalRunner.HasStepsLeft(store.LoadHeader(runId)!.Stage)); // writing and checking need the writer
+    }
+
+    [Fact]
+    public async Task WithTheWriterTheRunGoesOnToWriteAndCheckThePaper()
+    {
+        var (store, runId, key, runner) = await AssessedRun(Model(() => false), withWriter: true);
+        var steps = new List<string>();
+        runner.Changed += id => { if (id == runId && runner.StatusOf(id) is { } s && (steps.Count == 0 || steps[^1] != s.Step)) steps.Add(s.Step); };
+
+        await runner.RunAsync(runId, key);
+
+        Assert.Equal(new[] { "Starting", "Proposing the map", "Fixing the map", "Extracting", "Synthesising", "Writing the paper", "Checking the citations", "Done" }, steps);
+        Assert.Equal(MultivocalWriter.StageChecked, store.LoadHeader(runId)!.Stage);
+        Assert.False(MultivocalRunner.HasStepsLeft(MultivocalWriter.StageChecked));
+        string folder = store.FolderOf(runId);
+        var paper = JsonSerializer.Deserialize<MultivocalPaperFile>(File.ReadAllText(Path.Join(folder, MultivocalWriter.PaperFile)))!;
+        Assert.Equal("Context engineering: a grey literature review", paper.Title);
+        Assert.Equal("Sources keep a running summary of the conversation [1].", paper.Results.Single(r => r.Kind == "theme").Text);
+        Assert.True(paper.Checks!.Checked > 0);
+        Assert.True(File.Exists(Path.Join(folder, MultivocalWriter.AuditFile)));
+        Assert.True(File.Exists(Path.Join(folder, GreyReferences.BibFile))); // written before the paper, which cites by its numbers
+
+        var zip = RunArchive.Build(runId, folder, Array.Empty<(string, byte[])>(), ReviewModules.Find("multivocal")!.ArchiveFiles, null, null);
+        using var archive = new System.IO.Compression.ZipArchive(new MemoryStream(zip));
+        Assert.Contains(archive.Entries, e => e.FullName == MultivocalWriter.PaperFile);
+        Assert.Contains(archive.Entries, e => e.FullName == MultivocalWriter.AuditFile);
     }
 
     [Fact]
@@ -161,11 +203,13 @@ public class MultivocalRunnerTests : IDisposable
     {
         Assert.Equal(0, MultivocalProgress.Percent(MultivocalPlanner.StagePlanned, null));
         Assert.Equal(4, MultivocalProgress.Percent(MultivocalSearcher.StageSearching, "4 of 5 searches · Fake: \"context\"")); // four fifths of the 5 of the search
-        Assert.Equal(5 + 25 + 35, MultivocalProgress.Percent(MultivocalQualityAssessor.StageAssessed, null));
-        Assert.Equal(5 + 25 + 35 + 5 + 10, MultivocalProgress.Percent(MultivocalExtractor.StageExtracting, "15 of 30 sources extracted"));
-        Assert.Equal(100, MultivocalProgress.Percent(MultivocalSynthesiser.StageSynthesised, null));
+        Assert.Equal(5 + 20 + 25, MultivocalProgress.Percent(MultivocalQualityAssessor.StageAssessed, null));
+        Assert.Equal(5 + 20 + 25 + 5 + 9, MultivocalProgress.Percent(MultivocalExtractor.StageExtracting, "18 of 30 sources extracted"));
+        Assert.Equal(80, MultivocalProgress.Percent(MultivocalSynthesiser.StageSynthesised, null)); // writing and checking are left
+        Assert.Equal(90 + 5, MultivocalProgress.Percent(MultivocalWriter.StageChecking, "First check: 5 of 10 sources"));
+        Assert.Equal(100, MultivocalProgress.Percent(MultivocalWriter.StageChecked, null));
         Assert.Equal(0, MultivocalProgress.Fraction("RQ1: findings in 4 values; naming the themes"));
-        Assert.Equal(new[] { "done", "done", "current", "waiting", "waiting", "waiting" },
+        Assert.Equal(new[] { "done", "done", "current", "waiting", "waiting", "waiting", "waiting", "waiting" },
             Enumerable.Range(0, MultivocalProgress.Steps.Count).Select(i => MultivocalProgress.StateOf(i, MultivocalQualityAssessor.StageAssessing)));
     }
 }
