@@ -198,12 +198,7 @@ public sealed class MultivocalReporter
         if (input.Synthesis.Model.Length > 0) report.Meta.Add($"Language model: {input.Synthesis.Model}");
 
         var sources = SourceNumbers(input.Extraction);
-        report.Sections.Add(Planning(input));
-        report.Sections.Add(Search(input));
-        report.Sections.Add(Selection(input));
-        report.Sections.Add(QualitySection(input));
-        report.Sections.Add(MapAndExtraction(input));
-        report.Sections.Add(SynthesisMethod(input));
+        report.Sections.AddRange(MethodSections(input));
         report.Sections.AddRange(Results(input, sources));
         report.Sections.Add(Guidelines(input));
         report.Sections.Add(Limits(input));
@@ -219,6 +214,16 @@ public sealed class MultivocalReporter
         .Where(s => s.Error == null)
         .Select((s, i) => (s.Address, Number: i + 1))
         .ToDictionary(x => x.Address, x => x.Number);
+
+    /// <summary>
+    /// The method, one section per phase of the guidelines (planning G1–G5, search G6–G8, selection G9–G10, quality
+    /// G11, map and extraction G12, synthesis G13), written in code from the run's files. The report and the paper's
+    /// method section use the same text.
+    /// </summary>
+    public static IReadOnlyList<ReportSection> MethodSections(MultivocalReportInput input) => new[]
+    {
+        Planning(input), Search(input), Selection(input), QualitySection(input), MapAndExtraction(input), SynthesisMethod(input),
+    };
 
     private static ReportSection Planning(MultivocalReportInput input)
     {
