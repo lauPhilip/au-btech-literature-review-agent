@@ -6,7 +6,7 @@
    runner's status (MultivocalProgress); this component only shows them. *@
 
 @{
-    bool complete = Stage == AuBtechReviewAgent.MultivocalSynthesiser.StageSynthesised;
+    bool complete = Stage == AuBtechReviewAgent.MultivocalWriter.StageChecked;
     bool running = Status is { Running: true };
     bool failed = !running && !complete && Status?.Error != null;
     int percent = AuBtechReviewAgent.MultivocalProgress.Percent(Stage, running ? Status!.Progress : null);
@@ -129,6 +129,18 @@
         }
 
         @FunnelRow("Themes", Synthesis == null ? "–" : Synthesis.Themes.Count.ToString(), Synthesis == null ? null : $"from {Synthesis.Findings.Count} findings", false)
+        @FunnelRow("Paper", Paper == null ? "–" : Paper.Results.Count(r => r.Kind == "theme").ToString(), Paper == null ? null : PaperNote(Paper), false)
+        @if (Paper?.Checks is { } checks)
+        {
+            @FunnelRow("Citations checked", checks.Checked.ToString(), "against the kept page of the source each cites", false)
+            <div class="grid grid-cols-2 sm:grid-cols-5 gap-1.5 text-[11px]">
+                @Verdict("Supported", checks.Supported, "border-green-100 bg-green-50/60 text-green-800")
+                @Verdict("Partly", checks.PartiallySupported, "border-amber-100 bg-amber-50/60 text-amber-800")
+                @Verdict("Not supported", checks.NotSupported, "border-red-100 bg-red-50/60 text-red-700")
+                @Verdict("Insufficient evidence", checks.InsufficientEvidence, "border-gray-200 bg-gray-50 text-gray-700")
+                @Verdict("Unverifiable", checks.Unverifiable, "border-gray-200 bg-gray-50 text-gray-700")
+            </div>
+        }
     </div>
 </div>
 
@@ -141,6 +153,16 @@
     [Parameter] public AuBtechReviewAgent.MultivocalMapFile? Map { get; set; }
     [Parameter] public AuBtechReviewAgent.MultivocalExtractionFile? Extraction { get; set; }
     [Parameter] public AuBtechReviewAgent.MultivocalSynthesisFile? Synthesis { get; set; }
+    [Parameter] public AuBtechReviewAgent.MultivocalPaperFile? Paper { get; set; }
+
+    private static string PaperNote(AuBtechReviewAgent.MultivocalPaperFile p)
+    {
+        int answers = p.Results.Count(r => r.Kind == "code");
+        return $"theme sections written; {answers} question{(answers == 1 ? "" : "s")} answered in code" + (p.SummaryItems.Count > 0 ? "; a summary for practitioners" : "");
+    }
+
+    private static RenderFragment Verdict(string label, int count, string classes) =>
+        @<div class="border p-2 @classes"><span class="block text-[9px] font-bold uppercase tracking-wider">@label</span><span class="text-base font-bold font-mono">@count</span></div>;
 
     private System.Threading.Timer? _timer;
 
