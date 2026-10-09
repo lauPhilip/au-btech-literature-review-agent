@@ -1,10 +1,12 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Net.Http;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
+using Microsoft.SemanticKernel.ChatCompletion;
 
 namespace AuBtechReviewAgent;
 
@@ -20,7 +22,9 @@ public sealed record MultivocalRunStatus(bool Running, string Step, string? Prog
 /// is), extraction, synthesis, and then the writing and the citation check of the paper (MultivocalWriter). Each step is the module's own service, so every step keeps its checks and writes
 /// its files as before; the runner only decides which step comes next from the run's stage. It runs on the server,
 /// so closing the page does not stop it. A step that fails stops the run where it is; starting it again continues
-/// from that step, and decisions already made come from the cache.
+/// from that step, and decisions already made come from the cache. With a chat factory, every model call of a start
+/// goes through one recording service (<see cref="LlmRecording"/>), labelled with the step, and is added to the
+/// run's llm-calls.json after each step.
 /// </summary>
 public sealed class MultivocalRunner
 {
@@ -35,14 +39,19 @@ public sealed class MultivocalRunner
     private readonly MultivocalSynthesiser _synthesiser;
     private readonly MultivocalPages _pages;
     private readonly MultivocalWriter? _writer;
+    private readonly Func<IChatCompletionService>? _chat;
+    private readonly string _model;
     private readonly ConcurrentDictionary<Guid, MultivocalRunStatus> _status = new();
 
     /// <summary>Raised whenever a run's status changes, with the run's id; pages listen to show the progress.</summary>
     public event Action<Guid>? Changed;
 
     public MultivocalRunner(RunStore runs, MultivocalSearcher searcher, MultivocalScreener screener, MultivocalQualityAssessor quality,
-        MultivocalMapper mapper, MultivocalExtractor extractor, MultivocalSynthesiser synthesiser, MultivocalPages pages, MultivocalWriter? writer = null)
+        MultivocalMapper mapper, MultivocalExtractor extractor, MultivocalSynthesiser synthesiser, MultivocalPages pages, MultivocalWriter? writer = null,
+        Func<IChatCompletionService>? chat = null, string model = "")
     {
+        _chat = chat;
+        _model = model;
         _pages = pages;
         _writer = writer;
         _runs = runs;
@@ -114,7 +123,12 @@ public sealed class MultivocalRunner
         string step = "Starting";
         try
         {
-            // Each pass runs the step the stage asks for; a step moves the stage on, so the loop ends at the synthesis.
+            string folder = _runs.FolderOf(runId);
+            var recorder = _chat == null ? null : new RecordingChatCompletionService(_chat(), _model);
+            var earlier = recorder == null ? new List<LlmCallRecord>() : MultivocalRunLog.LoadCalls(folder)?.Calls ?? new List<LlmCallRecord>();
+            using var recording = recorder == null ? null : LlmRecording.Begin(recorder);
+            bool checkedNow = false;
+            // Each pass runs the step the stage asks for; a step moves the stage on, so the loop ends once the citations are checked.
             // The bound only guards against a stage that does not move.
             for (int guard = 0; guard < 12; guard++)
             {
@@ -123,55 +137,13 @@ public sealed class MultivocalRunner
                 step = StepFor(stage);
                 Set(runId, new MultivocalRunStatus(true, step, null, null));
                 var progress = new Progress<string>(line => Set(runId, new MultivocalRunStatus(true, step, line, null)));
-                switch (stage)
-                {
-                    case MultivocalPlanner.StagePlanned:
-                    case MultivocalSearcher.StageSearching:
-                        if (stage == MultivocalSearcher.StageSearching) await ResetAsync(runId, MultivocalPlanner.StagePlanned); // a search stopped by the server starts again
-                        await _searcher.SearchAsync(runId, editKey, progress);
-                        break;
-                    case MultivocalSearcher.StageSearched:
-                    case MultivocalScreener.StageScreening:
-                        await _screener.ScreenAsync(runId, editKey, progress);
-                        break;
-                    case MultivocalScreener.StageScreened:
-                    case MultivocalQualityAssessor.StageAssessing:
-                        await _quality.AssessAsync(runId, editKey, progress);
-                        break;
-                    case MultivocalQualityAssessor.StageAssessed:
-                        if (_quality.Load(runId)?.Count("Passed") is null or 0)
-                        {
-                            Set(runId, new MultivocalRunStatus(false, "Stopped", null, "No source passed the quality check, so there is nothing to map or synthesise."));
-                            return;
-                        }
-                        await _mapper.ProposeAsync(runId, editKey);
-                        break;
-                    case MultivocalMapper.StageMapping:
-                        await _mapper.FixAsync(runId, editKey); // the model's map is used as proposed
-                        break;
-                    case MultivocalMapper.StageMapped:
-                    case MultivocalExtractor.StageExtracting:
-                        await _extractor.ExtractAsync(runId, editKey, progress);
-                        break;
-                    case MultivocalExtractor.StageExtracted:
-                        await _synthesiser.SynthesiseAsync(runId, editKey, progress);
-                        break;
-                    case MultivocalSynthesiser.StageSynthesised:
-                    case MultivocalWriter.StageWriting:
-                        // The references are written in code first; the paper cites them by their numbers.
-                        await SaveReferencesAsync(runId);
-                        if (_writer == null) { Set(runId, new MultivocalRunStatus(false, "Done", null, null)); return; }
-                        await _writer.WriteAsync(runId, editKey, progress);
-                        break;
-                    case MultivocalWriter.StageWritten:
-                    case MultivocalWriter.StageChecking:
-                        if (_writer == null) { Set(runId, new MultivocalRunStatus(false, "Done", null, null)); return; }
-                        await _writer.CheckAsync(runId, editKey, progress);
-                        break;
-                    default:
-                        throw new InvalidOperationException($"The run is at a stage the runner does not know: {stage}.");
-                }
+                using var label = LlmStage.Begin(MultivocalProgress.KeyFor(stage));
+                try { if (await RunStepAsync(runId, editKey, stage, progress)) return; }
+                finally { await SaveCallsAsync(folder, earlier, recorder); }
+                checkedNow |= stage is MultivocalWriter.StageWritten or MultivocalWriter.StageChecking;
             }
+            // The metrics of a run checked in this start, from its files and the call log written after the last step.
+            if (checkedNow && _writer != null) await _writer.WriteMetricsAsync(runId);
             Set(runId, new MultivocalRunStatus(false, "Done", null, null));
         }
         catch (Exception ex) when (ex is InvalidOperationException or ArgumentException or LlmOutputException or HttpRequestException or TaskCanceledException)
@@ -184,6 +156,71 @@ public sealed class MultivocalRunner
         {
             _log.LogError(ex, "Multivocal run {RunId} failed at {Step}", runId, step);
             Set(runId, new MultivocalRunStatus(false, step, null, $"{step} stopped because of an error on the server. Start it again to continue from this step."));
+        }
+    }
+
+    /// <summary>Runs the step a stage asks for; true when the run ends here (nothing passed, or no writer).</summary>
+    private async Task<bool> RunStepAsync(Guid runId, string? editKey, string stage, IProgress<string> progress)
+    {
+        switch (stage)
+        {
+            case MultivocalPlanner.StagePlanned:
+            case MultivocalSearcher.StageSearching:
+                if (stage == MultivocalSearcher.StageSearching) await ResetAsync(runId, MultivocalPlanner.StagePlanned); // a search stopped by the server starts again
+                await _searcher.SearchAsync(runId, editKey, progress);
+                break;
+            case MultivocalSearcher.StageSearched:
+            case MultivocalScreener.StageScreening:
+                await _screener.ScreenAsync(runId, editKey, progress);
+                break;
+            case MultivocalScreener.StageScreened:
+            case MultivocalQualityAssessor.StageAssessing:
+                await _quality.AssessAsync(runId, editKey, progress);
+                break;
+            case MultivocalQualityAssessor.StageAssessed:
+                if (_quality.Load(runId)?.Count("Passed") is null or 0)
+                {
+                    Set(runId, new MultivocalRunStatus(false, "Stopped", null, "No source passed the quality check, so there is nothing to map or synthesise."));
+                    return true;
+                }
+                await _mapper.ProposeAsync(runId, editKey);
+                break;
+            case MultivocalMapper.StageMapping:
+                await _mapper.FixAsync(runId, editKey); // the model's map is used as proposed
+                break;
+            case MultivocalMapper.StageMapped:
+            case MultivocalExtractor.StageExtracting:
+                await _extractor.ExtractAsync(runId, editKey, progress);
+                break;
+            case MultivocalExtractor.StageExtracted:
+                await _synthesiser.SynthesiseAsync(runId, editKey, progress);
+                break;
+            case MultivocalSynthesiser.StageSynthesised:
+            case MultivocalWriter.StageWriting:
+                // The references are written in code first; the paper cites them by their numbers.
+                await SaveReferencesAsync(runId);
+                if (_writer == null) { Set(runId, new MultivocalRunStatus(false, "Done", null, null)); return true; }
+                await _writer.WriteAsync(runId, editKey, progress);
+                break;
+            case MultivocalWriter.StageWritten:
+            case MultivocalWriter.StageChecking:
+                if (_writer == null) { Set(runId, new MultivocalRunStatus(false, "Done", null, null)); return true; }
+                await _writer.CheckAsync(runId, editKey, progress);
+                break;
+            default:
+                throw new InvalidOperationException($"The run is at a stage the runner does not know: {stage}.");
+        }
+        return false;
+    }
+
+    /// <summary>Adds this start's calls to llm-calls.json. Never stops the run: the log is a by-product.</summary>
+    private async Task SaveCallsAsync(string folder, IReadOnlyList<LlmCallRecord> earlier, RecordingChatCompletionService? recorder)
+    {
+        if (recorder == null || recorder.Calls.Count == 0) return;
+        try { await MultivocalRunLog.WriteCallsAsync(folder, earlier, recorder.Calls, _model); }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            _log.LogWarning("The call log was not written: {Message}", ex.Message);
         }
     }
 
@@ -269,6 +306,9 @@ public static class MultivocalProgress
         double done = Steps.Take(current).Sum(s => s.Weight) + Steps[current].Weight * Fraction(progress);
         return (int)Math.Round(done * 100 / Steps.Sum(s => s.Weight));
     }
+
+    /// <summary>The key of the step a run at this stage is on ("screening"), which labels its model calls.</summary>
+    public static string KeyFor(string? stage) => Steps[Math.Min(CurrentIndex(stage), Steps.Count - 1)].Key;
 
     /// <summary>"done", "current" or "waiting" for one step.</summary>
     public static string StateOf(int index, string? stage)
