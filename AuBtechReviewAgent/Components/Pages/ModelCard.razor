@@ -7,7 +7,7 @@
    (pooled from the metrics store). The failure modes follow docs/wiki/08 "What the checks do and do not catch". *@
 
 <SeoHead Title="Model card" Path="/model-card"
-         Description="Which steps of a TraceableAI review a language model does, how each one is checked in code, the known failure modes, and the measured citation accuracy." />
+         Description="Which steps of a TraceableAI review a language model does, for systematic and grey literature reviews, how each one is checked in code, the known failure modes, and the measured citation accuracy." />
 
 <SiteHeader />
 
@@ -28,6 +28,7 @@
 
         <section class="mt-14" aria-labelledby="steps">
             <h2 id="steps" class="ui-h2">Who decides what</h2>
+            <p class="mt-4 text-gray-700 leading-relaxed">In a systematic review:</p>
             <div class="mt-6 ui-card overflow-x-auto" tabindex="0" role="region" aria-labelledby="steps">
                 <table class="w-full text-sm min-w-[640px]">
                     <caption class="sr-only">Each step of a review, who does it, and how it is checked</caption>
@@ -52,6 +53,47 @@
             </div>
         </section>
 
+        <section class="mt-14" aria-labelledby="grey">
+            <h2 id="grey" class="ui-h2">In a grey literature review</h2>
+            <p class="mt-4 text-gray-700 leading-relaxed">
+                A grey literature review follows the multivocal review guidelines of Garousi et al. (2019) with the grey pool
+                only: blog posts, documentation, forum answers, repositories and reports. The same rule holds: every value,
+                quality point and citation counts only with a quote found word for word in the text of the source's page, kept
+                as a snapshot when it was read.
+            </p>
+            <div class="mt-6 ui-card overflow-x-auto" tabindex="0" role="region" aria-labelledby="grey">
+                <table class="w-full text-sm min-w-[640px]">
+                    <caption class="sr-only">Each step of a grey literature review, who does it, and how it is checked</caption>
+                    <thead class="bg-gray-50 text-left text-gray-600">
+                        <tr>
+                            <th scope="col" class="px-4 py-3 font-medium">Step</th>
+                            <th scope="col" class="px-4 py-3 font-medium">Done by</th>
+                            <th scope="col" class="px-4 py-3 font-medium">How it is checked</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-100 text-gray-700 align-top">
+                        @foreach (var (step, by, check) in GreySteps)
+                        {
+                            <tr>
+                                <th scope="row" class="px-4 py-3 text-left font-medium text-gray-900">@step</th>
+                                <td class="px-4 py-3 whitespace-nowrap"><span class="@(by == "Code" ? "ui-chip border-gray-200 bg-gray-50 text-gray-700" : "ui-chip border-brand-100 bg-brand-50 text-brand")">@by</span></td>
+                                <td class="px-4 py-3">@check</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+            <ul class="mt-6 space-y-4">
+                @foreach (var (title, text) in GreyFailures)
+                {
+                    <li class="border-l-2 border-amber-300 pl-4">
+                        <p class="font-medium text-gray-900">@title</p>
+                        <p class="text-gray-700 leading-relaxed mt-1">@text</p>
+                    </li>
+                }
+            </ul>
+        </section>
+
         <section class="mt-14" aria-labelledby="measured">
             <h2 id="measured" class="ui-h2">How well it does</h2>
             @if (runs.Count == 0)
@@ -60,7 +102,7 @@
             }
             else
             {
-                <p class="mt-4 text-gray-700 leading-relaxed">Pooled over the last @runs.Count finished runs on this server, from the same data as the <a href="/metrics" class="text-brand underline underline-offset-2">Metrics page</a>.</p>
+                <p class="mt-4 text-gray-700 leading-relaxed">Pooled over the last @runs.Count finished systematic reviews on this server, from the same data as the <a href="/metrics" class="text-brand underline underline-offset-2">Metrics page</a>.</p>
                 <dl class="mt-6 grid grid-cols-2 sm:grid-cols-4 gap-3">
                     @foreach (var (value, label) in Measured)
                     {
@@ -94,7 +136,7 @@
         <section class="mt-14" aria-labelledby="use">
             <h2 id="use" class="ui-h2">Intended use</h2>
             <p class="mt-4 text-gray-700 leading-relaxed">
-                A co-pilot for a researcher doing a systematic or scoping review: a documented first pass that a person checks,
+                A co-pilot for a researcher doing a systematic, scoping or grey literature review: a documented first pass that a person checks,
                 corrects and takes responsibility for. It is not meant to publish a review without that check, to make clinical
                 or policy decisions, or to stand in for a second human screener. Every report includes a statement on AI use
                 (section 6.4) to adapt for your paper or thesis.
@@ -122,6 +164,29 @@
         ("Reference numbers and reference list", "Code", "Built from the database metadata; a citation number that does not exist is removed."),
         ("Citation check", "Model", "A verdict counts only when its supporting quote is found word for word in the paper; weak ones get a second check and a repair."),
         ("Fingerprints and archive", "Code", "Every file of the run is fingerprinted in manifest.json, which you can check on the Verify page."),
+    };
+
+    private static readonly (string Step, string By, string Check)[] GreySteps =
+    {
+        ("Plan and protocol", "You", "The need, research questions, kinds of grey literature, search strings, criteria and quality threshold are written before the search and fingerprinted (SHA-256)."),
+        ("Searching the practitioner sites and open indexes", "Code", "Every raw answer is saved with its SHA-256; sources are de-duplicated by address; the stopping rule as applied is written into the ledger."),
+        ("Screening", "Model", "Two independent screenings against the criteria; a source they disagree on is kept and marked; Cohen's kappa is reported."),
+        ("Page snapshots", "Code", "Only pages the searches found, only where robots.txt allows; the text's SHA-256, the access date and a Wayback Machine link are recorded."),
+        ("Quality checklist (Table 7 of the guidelines)", "Model", "Every point needs a quote found in the kept page text; points without one are not counted; the threshold is yours."),
+        ("Systematic map", "Model", "Proposed from the research questions and checked in code against them; it is fixed as proposed, so you should read it."),
+        ("Extraction and support check", "Model", "Every value needs a quote found in the page text, and a second prompt checks that the quote says what the value claims; values that fail are listed, not used."),
+        ("Themes and their placement", "Model", "A second, independent placement of the values gives Cohen's kappa per research question; what each theme rests on (sources, tiers, quality) is counted in code."),
+        ("Answers about frequency or existence", "Code", "Counted from the extraction and shown as tables; the model never writes them."),
+        ("Paper and citation check", "Model", "The same writing, peer review, style pass and citation check as the systematic review, against the kept page text; method, counts, flow and references are written in code."),
+    };
+
+    private static readonly (string Title, string Text)[] GreyFailures =
+    {
+        ("Pages change", "A page can change or disappear after it was read. The review checks against the text it kept, whose fingerprint is in the archive; the Wayback Machine link may show a different version or none."),
+        ("Dates are what the site reports", "A source's year is the date its site gives, which for a repository is often the last update rather than when it was written."),
+        ("Few outlet tiers", "Searching practitioner sites alone gives mostly third-tier grey literature (posts, forum answers, repositories); the results say so for each theme, but they rest on less controlled sources than a systematic review."),
+        ("No general web search", "No general web search engine is used, because none is both free and allows keeping the results; relevant pages that the chosen sites and indexes do not cover are missed."),
+        ("The map is the model's", "The systematic map is proposed by the model and fixed without a reviewer's edit, so a missing attribute or value shapes everything after it."),
     };
 
     private static readonly (string Title, string Text)[] Failures =
