@@ -128,13 +128,16 @@ var multivocalExtractor = new AuBtechReviewAgent.MultivocalExtractor(reviewEngin
     multivocalMapper, multivocalPages, multivocalChat, reviewEngine.Cache, llmOptions.Model, llmOptions.ScreeningParallelism);
 builder.Services.AddSingleton(multivocalExtractor); // extraction (preview)
 var multivocalSynthesiser = new AuBtechReviewAgent.MultivocalSynthesiser(reviewEngine.Store, multivocalPlanner, multivocalSearcher, multivocalQuality,
-    multivocalMapper, multivocalExtractor, multivocalPages, multivocalChat, llmOptions.Model);
+    multivocalMapper, multivocalExtractor, multivocalPages, multivocalChat, llmOptions.Model, reviewEngine.Cache);
 builder.Services.AddSingleton(multivocalSynthesiser); // synthesis (preview)
 var multivocalReporter = new AuBtechReviewAgent.MultivocalReporter(reviewEngine.Store, multivocalPlanner, multivocalSearcher, multivocalScreener, multivocalPages,
     multivocalQuality, multivocalMapper, multivocalExtractor, multivocalSynthesiser);
 builder.Services.AddSingleton(multivocalReporter); // report, written in code (preview)
+var multivocalWriter = new AuBtechReviewAgent.MultivocalWriter(reviewEngine.Store, multivocalReporter, multivocalPages, multivocalChat,
+    llmOptions.Model, llmOptions.ScreeningParallelism, reviewEngine.Cache);
+builder.Services.AddSingleton(multivocalWriter); // writing and checking the paper (preview)
 builder.Services.AddSingleton(new AuBtechReviewAgent.MultivocalRunner(reviewEngine.Store, multivocalSearcher, multivocalScreener, multivocalQuality,
-    multivocalMapper, multivocalExtractor, multivocalSynthesiser, multivocalPages)); // runs the steps one after another (preview)
+    multivocalMapper, multivocalExtractor, multivocalSynthesiser, multivocalPages, multivocalWriter)); // runs the steps one after another (preview)
 // Modules shown as a preview while they are being built (Development only; see ReviewModulesOptions).
 builder.Services.AddSingleton(AuBtechReviewAgent.ReviewModulesOptions.From(builder.Configuration, builder.Environment.IsDevelopment()));
 

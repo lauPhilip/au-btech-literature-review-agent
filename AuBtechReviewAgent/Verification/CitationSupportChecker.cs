@@ -115,6 +115,12 @@ public static class CitationSupportChecker
     public const string Partial = "partially_supported";
     public const string NotSupported = "not_supported";
     public const string Unverifiable = "unverifiable";
+
+    /// <summary>Part of the cache key of a check: raise it whenever the check prompt changes.</summary>
+    public const string CheckPromptVersion = "citation-check-v1";
+
+    /// <summary>A model answer kept in the cache, as received.</summary>
+    public sealed class CachedAnswer { public string Text { get; set; } = ""; }
     public const string InsufficientEvidence = "insufficient_evidence";
 
     /// <summary>Rank of a verdict for the second-check rule: only verified support counts.</summary>
@@ -260,11 +266,12 @@ public static class CitationSupportChecker
         int parallelism = 1,
         bool secondCheck = false,
         Action<bool, int, int>? progress = null,
-        string review = CitationRepairer.DefaultReview)
+        string review = CitationRepairer.DefaultReview,
+        CheckCache? cache = null)
     {
         var byReference = papers.ToDictionary(p => p.ReferenceNumber);
         var pairs = citedSentences.SelectMany(s => s.References.Select(r => (Ref: r, Sentence: s))).ToList();
-        var results = await RunPassAsync(chat, pairs, byReference, excerptsPerReference, verifiedFindings, parallelism, second: false, progress, review);
+        var results = await RunPassAsync(chat, pairs, byReference, excerptsPerReference, verifiedFindings, parallelism, second: false, progress, review, cache);
         foreach (var r in results) r.FirstVerdict = r.Verdict;
 
         // Second, independent check for what the first did not find fully supported. It does not see the first
@@ -278,7 +285,7 @@ public static class CitationSupportChecker
             {
                 var sentenceOf = citedSentences.ToDictionary(s => (s.Field, s.SentenceIndex));
                 var secondPairs = doubtful.Select(r => (Ref: r.Reference, Sentence: sentenceOf[(r.Field, r.SentenceIndex)])).ToList();
-                var second = await RunPassAsync(chat, secondPairs, byReference, excerptsPerReference * 2, verifiedFindings, parallelism, second: true, progress, review);
+                var second = await RunPassAsync(chat, secondPairs, byReference, excerptsPerReference * 2, verifiedFindings, parallelism, second: true, progress, review, cache);
                 var secondOf = second.ToDictionary(r => (r.Field, r.SentenceIndex, r.Reference));
                 foreach (var r in doubtful)
                 {
@@ -306,7 +313,7 @@ public static class CitationSupportChecker
         IChatCompletionService chat, List<(int Ref, CitedSentence Sentence)> pairs,
         IReadOnlyDictionary<int, ReferencedPaper> byReference, int excerptsPerReference,
         IReadOnlyDictionary<int, IReadOnlyList<string>>? verifiedFindings, int parallelism, bool second,
-        Action<bool, int, int>? progress = null, string review = CitationRepairer.DefaultReview)
+        Action<bool, int, int>? progress = null, string review = CitationRepairer.DefaultReview, CheckCache? cache = null)
     {
         // References are checked a few at a time; the results are sorted afterwards, so the order of the
         // answers does not matter.
@@ -318,7 +325,7 @@ public static class CitationSupportChecker
             await throttle.WaitAsync();
             try
             {
-                var checkedRef = await CheckReferenceAsync(chat, group.Key, group.Select(x => x.Sentence).ToList(), byReference, excerptsPerReference, verifiedFindings, second, review);
+                var checkedRef = await CheckReferenceAsync(chat, group.Key, group.Select(x => x.Sentence).ToList(), byReference, excerptsPerReference, verifiedFindings, second, review, cache);
                 progress?.Invoke(second, Interlocked.Increment(ref finished), groups.Count);
                 return checkedRef;
             }
@@ -332,7 +339,8 @@ public static class CitationSupportChecker
     private static async Task<List<CitationSupportResult>> CheckReferenceAsync(
         IChatCompletionService chat, int reference, List<CitedSentence> sentences,
         IReadOnlyDictionary<int, ReferencedPaper> byReference, int excerptsPerReference,
-        IReadOnlyDictionary<int, IReadOnlyList<string>>? verifiedFindings, bool second = false, string review = CitationRepairer.DefaultReview)
+        IReadOnlyDictionary<int, IReadOnlyList<string>>? verifiedFindings, bool second = false, string review = CitationRepairer.DefaultReview,
+        CheckCache? cache = null)
     {
         var results = new List<CitationSupportResult>();
         var group = (Key: reference, Count: sentences.Count);
@@ -399,8 +407,19 @@ public static class CitationSupportChecker
                 settings.ExtensionData ??= new Dictionary<string, object>();
                 settings.ExtensionData["response_format"] = new { type = "json_object" };
 
-                var response = await chat.GetChatMessageContentAsync(prompt.ToString(), settings);
-                var parsed = ParseVerdicts(response.ToString());
+                // The same prompt (the same sentences, excerpts and quotes) gets the answer it got before, when the
+                // caller passes a cache: the key is the whole prompt, so any change to the text or the evidence asks again.
+                string promptText = prompt.ToString();
+                string? key = cache == null ? null : ReviewCache.Key(CheckPromptVersion, cache.Model, promptText);
+                string raw;
+                if (key != null && cache!.Cache.TryGet<CachedAnswer>("citation-check", key, out var hit) && hit?.Text is { Length: > 0 } cachedText)
+                    raw = cachedText;
+                else
+                {
+                    raw = (await chat.GetChatMessageContentAsync(promptText, settings)).ToString();
+                    if (key != null && ParseVerdicts(raw).Count > 0) cache!.Cache.Set("citation-check", key, new CachedAnswer { Text = raw });
+                }
+                var parsed = ParseVerdicts(raw);
 
                 for (int i = 0; i < sentences.Count; i++)
                 {
@@ -472,3 +491,6 @@ public static class CitationSupportChecker
         AttributedText = AttributedClause(s.Sentence, reference),
     };
 }
+
+/// <summary>A cache for the citation check's answers, and the model they came from (part of the key).</summary>
+public sealed record CheckCache(ReviewCache Cache, string Model);

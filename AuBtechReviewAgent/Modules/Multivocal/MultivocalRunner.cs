@@ -17,7 +17,7 @@ public sealed record MultivocalRunStatus(bool Running, string Step, string? Prog
 /// <summary>
 /// Runs a planned multivocal review from where it stands to the synthesis, without a click between the steps, as the
 /// systematic review runs (MLR block H): search, screening, quality, the map (the model's proposal is fixed as it
-/// is), extraction and synthesis. Each step is the module's own service, so every step keeps its checks and writes
+/// is), extraction, synthesis, and then the writing and the citation check of the paper (MultivocalWriter). Each step is the module's own service, so every step keeps its checks and writes
 /// its files as before; the runner only decides which step comes next from the run's stage. It runs on the server,
 /// so closing the page does not stop it. A step that fails stops the run where it is; starting it again continues
 /// from that step, and decisions already made come from the cache.
@@ -34,15 +34,17 @@ public sealed class MultivocalRunner
     private readonly MultivocalExtractor _extractor;
     private readonly MultivocalSynthesiser _synthesiser;
     private readonly MultivocalPages _pages;
+    private readonly MultivocalWriter? _writer;
     private readonly ConcurrentDictionary<Guid, MultivocalRunStatus> _status = new();
 
     /// <summary>Raised whenever a run's status changes, with the run's id; pages listen to show the progress.</summary>
     public event Action<Guid>? Changed;
 
     public MultivocalRunner(RunStore runs, MultivocalSearcher searcher, MultivocalScreener screener, MultivocalQualityAssessor quality,
-        MultivocalMapper mapper, MultivocalExtractor extractor, MultivocalSynthesiser synthesiser, MultivocalPages pages)
+        MultivocalMapper mapper, MultivocalExtractor extractor, MultivocalSynthesiser synthesiser, MultivocalPages pages, MultivocalWriter? writer = null)
     {
         _pages = pages;
+        _writer = writer;
         _runs = runs;
         _searcher = searcher;
         _screener = screener;
@@ -58,7 +60,7 @@ public sealed class MultivocalRunner
     public bool IsRunning(Guid runId) => StatusOf(runId)?.Running == true;
 
     /// <summary>Whether a run at this stage has steps left for the runner.</summary>
-    public static bool HasStepsLeft(string? stage) => stage is not (null or "" or MultivocalSynthesiser.StageSynthesised);
+    public static bool HasStepsLeft(string? stage) => stage is not (null or "" or MultivocalWriter.StageChecked);
 
     /// <summary>
     /// Starts the run in the background and returns at once; false when it is running already or the key does not
@@ -154,15 +156,21 @@ public sealed class MultivocalRunner
                     case MultivocalExtractor.StageExtracted:
                         await _synthesiser.SynthesiseAsync(runId, editKey, progress);
                         break;
+                    case MultivocalSynthesiser.StageSynthesised:
+                    case MultivocalWriter.StageWriting:
+                        // The references are written in code first; the paper cites them by their numbers.
+                        await SaveReferencesAsync(runId);
+                        if (_writer == null) { Set(runId, new MultivocalRunStatus(false, "Done", null, null)); return; }
+                        await _writer.WriteAsync(runId, editKey, progress);
+                        break;
+                    case MultivocalWriter.StageWritten:
+                    case MultivocalWriter.StageChecking:
+                        if (_writer == null) { Set(runId, new MultivocalRunStatus(false, "Done", null, null)); return; }
+                        await _writer.CheckAsync(runId, editKey, progress);
+                        break;
                     default:
                         throw new InvalidOperationException($"The run is at a stage the runner does not know: {stage}.");
                 }
-            }
-            if (_runs.LoadHeader(runId)?.Stage == MultivocalSynthesiser.StageSynthesised)
-            {
-                step = "Writing the references";
-                Set(runId, new MultivocalRunStatus(true, step, null, null));
-                await SaveReferencesAsync(runId);
             }
             Set(runId, new MultivocalRunStatus(false, "Done", null, null));
         }
@@ -204,6 +212,8 @@ public sealed class MultivocalRunner
         MultivocalMapper.StageMapping => "Fixing the map",
         MultivocalMapper.StageMapped or MultivocalExtractor.StageExtracting => "Extracting",
         MultivocalExtractor.StageExtracted => "Synthesising",
+        MultivocalSynthesiser.StageSynthesised or MultivocalWriter.StageWriting => "Writing the paper",
+        MultivocalWriter.StageWritten or MultivocalWriter.StageChecking => "Checking the citations",
         _ => "Done",
     };
 }
@@ -220,11 +230,13 @@ public static class MultivocalProgress
     public static readonly IReadOnlyList<ProgressStep> Steps = new[]
     {
         new ProgressStep("search", "Search", 5),
-        new ProgressStep("screening", "Screening", 25),
-        new ProgressStep("quality", "Quality", 35),
+        new ProgressStep("screening", "Screening", 20),
+        new ProgressStep("quality", "Quality", 25),
         new ProgressStep("map", "Map", 5),
-        new ProgressStep("extraction", "Extraction", 20),
+        new ProgressStep("extraction", "Extraction", 15),
         new ProgressStep("synthesis", "Synthesis", 10),
+        new ProgressStep("writing", "Writing", 10),
+        new ProgressStep("checking", "Checking", 10),
     };
 
     /// <summary>The index of the step a run at this stage is on; <see cref="Steps"/>.Count when every step is done.</summary>
@@ -235,7 +247,9 @@ public static class MultivocalProgress
         MultivocalQualityAssessor.StageAssessed or MultivocalMapper.StageMapping => 3,
         MultivocalMapper.StageMapped or MultivocalExtractor.StageExtracting => 4,
         MultivocalExtractor.StageExtracted => 5,
-        MultivocalSynthesiser.StageSynthesised => Steps.Count,
+        MultivocalSynthesiser.StageSynthesised or MultivocalWriter.StageWriting => 6,
+        MultivocalWriter.StageWritten or MultivocalWriter.StageChecking => 7,
+        MultivocalWriter.StageChecked => Steps.Count,
         _ => 0,
     };
 

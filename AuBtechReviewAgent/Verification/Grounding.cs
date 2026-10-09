@@ -11,11 +11,13 @@ namespace AuBtechReviewAgent;
 /// <param name="SecondCheck">Whether citations that are not fully supported get a second, independent check.</param>
 /// <param name="Repair">Whether sentences with a rejected citation are repaired once and checked again.</param>
 /// <param name="Review">How the prompts name the review, e.g. "systematic literature review".</param>
+/// <param name="Cache">Where the check's answers are kept, so the same sentence with the same evidence is not asked again; none by default.</param>
 public sealed record GroundingOptions(
     int Parallelism = 1,
     bool SecondCheck = true,
     bool Repair = true,
-    string Review = CitationRepairer.DefaultReview);
+    string Review = CitationRepairer.DefaultReview,
+    CheckCache? Cache = null);
 
 /// <summary>The checked (and possibly repaired) text, every verdict, the counts before the repair, and the repair log.</summary>
 public sealed record GroundingResult(
@@ -56,7 +58,7 @@ public static class Grounding
         List<CitationSupportResult> checks;
         using (LlmStage.Begin("citation-check"))
             checks = await CitationSupportChecker.CheckAsync(chat, cited, sources, verifiedFindings: verifiedQuotes,
-                parallelism: options.Parallelism, secondCheck: options.SecondCheck, progress: checkProgress, review: options.Review);
+                parallelism: options.Parallelism, secondCheck: options.SecondCheck, progress: checkProgress, review: options.Review, cache: options.Cache);
         var beforeRepair = CitationSupportSummary.From(checks);
 
         var repairs = new List<CitationRepair>();

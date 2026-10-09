@@ -172,9 +172,10 @@ public sealed class MultivocalReporter
         return File.Exists(path) ? File.ReadAllText(path) : null;
     }
 
-    private MultivocalReportInput? LoadInput(Guid runId)
+    /// <summary>The run's files, loaded, once the run is synthesised; null before that or when a file is missing.</summary>
+    public MultivocalReportInput? LoadInput(Guid runId)
     {
-        if (_runs.LoadHeader(runId)?.Stage != MultivocalSynthesiser.StageSynthesised) return null;
+        if (!MultivocalWriter.IsSynthesised(_runs.LoadHeader(runId)?.Stage)) return null;
         var planned = _planner.Load(runId);
         var ledger = _searcher.LoadLedger(runId);
         var screening = _screener.Load(runId);
@@ -464,7 +465,7 @@ public sealed class MultivocalReporter
         return cited.Count == 0 ? "" : $"[{string.Join(", ", cited.Select(n => $"S{n}"))}]";
     }
 
-    private static string Audience(ReviewAudience? audience) => audience switch
+    public static string Audience(ReviewAudience? audience) => audience switch
     {
         ReviewAudience.Researchers => "researchers",
         ReviewAudience.Practitioners => "practitioners",
