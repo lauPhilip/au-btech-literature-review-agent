@@ -397,8 +397,11 @@
                     {
                         <div class="bg-white border border-green-200 p-4 shadow-sm space-y-2">
                             <p class="text-sm font-semibold text-gray-900">Your review is ready</p>
-                            <p class="text-xs text-gray-600">The paper is written and every citation is checked against the kept page of the source it cites. The report holds the paper's evidence, the references and the downloads.</p>
-                            <a href="@($"/mlr-report/{planned.RunId}")" class="ui-btn-primary ui-btn-sm inline-block">Read the report</a>
+                            <p class="text-xs text-gray-600">The paper is written and every citation is checked against the kept page of the source it cites. Open a citation to see what the check found; the paper page has main.tex, the references and the archive.</p>
+                            <div class="flex flex-wrap gap-2">
+                                <a href="@($"/mlr-paper/{planned.RunId}")" class="ui-btn-primary ui-btn-sm inline-block">Read the paper</a>
+                                <a href="@($"/mlr-report/{planned.RunId}")" class="ui-btn-secondary ui-btn-sm inline-block" title="The run's report written in code: guidelines table, quotations and source repository">Data appendix</a>
+                            </div>
                         </div>
                     }
                     else if (!runRunning && AuBtechReviewAgent.MultivocalRunner.HasStepsLeft(stage))

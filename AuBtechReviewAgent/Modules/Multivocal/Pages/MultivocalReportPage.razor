@@ -27,7 +27,7 @@
     else
     {
         <header class="space-y-2">
-            <p class="text-xs text-gray-500"><a href="@($"/mlr/{RunId}")" class="text-brand underline underline-offset-2">Back to the review</a></p>
+            <p class="text-xs text-gray-500"><a href="@($"/mlr/{RunId}")" class="text-brand underline underline-offset-2">Back to the review</a> · <a href="@($"/mlr-paper/{RunId}")" class="text-brand underline underline-offset-2">The paper</a></p>
             <h1 class="ui-h2">@report.Title</h1>
             <ul class="text-xs text-gray-600 space-y-0.5">
                 @foreach (var line in report.Meta)
