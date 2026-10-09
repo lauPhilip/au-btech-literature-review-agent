@@ -98,11 +98,18 @@ public static class MultivocalRunLog
         m.FullTextRetrieved = f.Extracted;
         m.FullTextShare = f.Passed == 0 ? 0 : Math.Round((double)f.Extracted / f.Passed, 4);
 
+        m.SourcesBySearch = input.Ledger.Searches.Where(x => x.Error == null).GroupBy(x => x.Source)
+            .OrderBy(g => g.Key, StringComparer.Ordinal).ToDictionary(g => g.Key, g => g.Sum(x => x.New));
+        var scored = input.Quality.Sources.Where(x => x.Outcome is "Passed" or "Below threshold").ToList();
+        m.MeanQualityPoints = scored.Count == 0 ? null : Math.Round(scored.Average(x => x.Points), 1);
+        m.MaxQualityPoints = input.Quality.MaxPoints;
+
         var synthesis = input.Synthesis;
         m.KeyFindings = synthesis.Findings.Count;
         int judged = synthesis.Findings.Count + synthesis.Unsupported.Count;
         m.VerifiedFindingShare = judged == 0 ? 0 : Math.Round((double)synthesis.Findings.Count / judged, 4);
         m.ExtractionErrors = f.NotExtracted;
+        m.ValuesRejected = synthesis.Unsupported.Count;
         m.ThematicSynthesisUsed = synthesis.Themes.Count > 0;
         m.Themes = synthesis.Themes.Count;
         m.StudiesCoded = synthesis.Findings.Select(x => x.Address).Distinct(StringComparer.Ordinal).Count();

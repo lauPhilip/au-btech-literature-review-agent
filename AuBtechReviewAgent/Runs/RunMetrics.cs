@@ -127,6 +127,19 @@ public class RunMetrics
     public double CitationsPer100Words { get; set; }
     public double MultiPaperSentenceShare { get; set; }
 
+    // Grey literature (multivocal runs only; empty or null for a systematic review)
+    /// <summary>New sources each grey search added, by search (after the ones before it in the run).</summary>
+    public Dictionary<string, int> SourcesBySearch { get; set; } = new();
+
+    /// <summary>The mean quality checklist points of the sources that were scored.</summary>
+    public double? MeanQualityPoints { get; set; }
+
+    /// <summary>The checklist's maximum points, for reading <see cref="MeanQualityPoints"/>.</summary>
+    public double? MaxQualityPoints { get; set; }
+
+    /// <summary>Extracted values the support check left out, because their quote did not say what the value claims.</summary>
+    public int ValuesRejected { get; set; }
+
     // Cost
     public int LlmCalls { get; set; }
     public int LlmRetries { get; set; }
