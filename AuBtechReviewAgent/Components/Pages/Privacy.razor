@@ -2,13 +2,14 @@
 @inject AuBtechReviewAgent.RunsOptions RunsOptions
 @inject AuBtechReviewAgent.CacheOptions CacheOptions
 @inject AuBtechReviewAgent.QuotaOptions QuotaOptions
+@inject AuBtechReviewAgent.ReviewModulesOptions ModuleOptions
 
 @* Everything on this page describes what the code does (RunQuotaService, ReviewCache, SessionCleanupWorker,
    RunMetricsStore, the key dialog, and for grey literature MultivocalPages, PageFetcher and RobotsRules); the numbers
    come from the running configuration. Update it with the code. *@
 
 <SeoHead Title="Privacy" Path="/privacy"
-         Description="What TraceableAI stores, for how long, what it sends to the language model, the scholarly databases and the grey literature sites, and how it keeps the web pages a review cites. No accounts, no tracking." />
+         Description="@(Grey ? "What TraceableAI stores, for how long, what it sends to the language model, the scholarly databases and the grey literature sites, and how it keeps the web pages a review cites. No accounts, no tracking." : "What TraceableAI stores, for how long, and what it sends to the language model and the scholarly databases. No accounts, no tracking.")" />
 
 <SiteHeader />
 
@@ -31,7 +32,7 @@
             }
         </div>
 
-        @foreach (var (id, heading, paragraphs) in Sections)
+        @foreach (var (id, heading, paragraphs) in Sections.Where(x => Grey || x.Id != "web-pages"))
         {
             <section class="mt-12" aria-labelledby="@id">
                 <h2 id="@id" class="ui-h2">@heading</h2>
@@ -51,7 +52,7 @@
                         <tr><th scope="col" class="px-4 py-3 font-medium">Service</th><th scope="col" class="px-4 py-3 font-medium">What it receives</th></tr>
                     </thead>
                     <tbody class="divide-y divide-gray-100 text-gray-700">
-                        @foreach (var (service, receives) in ThirdParties)
+                        @foreach (var (service, receives) in Grey ? ThirdParties.Concat(GreyThirdParties) : ThirdParties)
                         {
                             <tr><th scope="row" class="px-4 py-3 text-left font-medium text-gray-900 align-top">@service</th><td class="px-4 py-3">@receives</td></tr>
                         }
@@ -76,6 +77,9 @@
 </main>
 
 @code {
+    /// <summary>Whether the grey literature review is described: its card is on, or its module is in preview.</summary>
+    private bool Grey => ModuleOptions.Shows("grey");
+
     private (string Title, string Text)[] Summary => new[]
     {
         ("No account, no tracking", "No sign-up, no analytics, no advertising cookies."),
@@ -102,8 +106,8 @@
         {
             "What you type in the review form (search query, objective, criteria, artifact instruction) is saved with the run, together with " +
             "everything the run produces: the protocol, the search results, every screening decision, the downloaded open-access papers, the " +
-            "report and a record of every model call. This is what makes the review checkable. A multivocal or grey literature review saves its " +
-            "plan the same way: the need for the review, its research questions, search strings, criteria and quality threshold.",
+            "report and a record of every model call. This is what makes the review checkable." + (Grey ? " A grey literature review saves its " +
+            "plan the same way: the need for the review, its research questions, search strings, criteria and quality threshold." : ""),
             $"A run is kept for {RunsOptions.RetentionDays} days after it is created and then deleted automatically, files and all. Anyone who has " +
             "the link to a run can read it, but only the browser that started it can change or delete it; the links contain a random identifier that cannot be guessed, and they are not listed anywhere or shown to search engines.",
         }),
@@ -123,7 +127,7 @@
         }),
         ("web-pages", "Web pages a grey literature review reads", new[]
         {
-            "A multivocal or grey literature review cites web pages, such as blog posts, documentation, forum answers and reports, so it keeps a " +
+            "A grey literature review cites web pages, such as blog posts, documentation, forum answers and reports, so it keeps a " +
             "snapshot of each page it reads. The server fetches only pages that the review's own searches found. Before it fetches anything from a " +
             $"site it reads the site's robots.txt for its name, {AuBtechReviewAgent.RobotsRules.ProductToken}, and fetches nothing the site disallows " +
             "(nothing at all when the site has a robots.txt that cannot be read, as RFC 9309 asks). It sends at most one request a second to a site, or slower when the site asks for it, " +
@@ -139,9 +143,9 @@
         {
             $"To save time and cost, a database's answer to a search is reused for {CacheOptions.SearchResponseHours} hours, and a screening " +
             $"decision for the same paper, criteria and model is reused for {CacheOptions.ScreeningDecisionDays} days. They are filed under a " +
-            "fingerprint of the request and contain the papers' metadata and the decision, not who asked. A multivocal or grey literature review " +
+            "fingerprint of the request and contain the papers' metadata and the decision, not who asked." + (Grey ? " A grey literature review " +
             $"reuses its model decisions the same way, also for {CacheOptions.ScreeningDecisionDays} days: the screening, the quality points, the " +
-            "extracted values and the checks of values and citations, each with the short quotes it rests on but not the page's text.",
+            "extracted values and the checks of values and citations, each with the short quotes it rests on but not the page's text." : ""),
             "For the public Metrics page, every finished run leaves a line of quality figures: how many citations were supported, coverage, " +
             "time and cost. It contains no research question, criteria or paper text, and no network address.",
         }),
@@ -153,7 +157,12 @@
         ("arXiv, OpenAlex, Semantic Scholar, Crossref", "Your search query and its extra phrasings, and the identifiers of included papers for citation chaining."),
         ("Scopus, ScienceDirect, IEEE Xplore", "Your search query, only when a key for them is set."),
         ("Unpaywall, Zenodo and publishers' open-access servers", "The DOI or link of an included paper, to download a legal open-access copy."),
-        ("Stack Exchange, GitHub, Hacker News (Algolia), OpenAlex and Zenodo", "In a multivocal or grey literature review: the review's grey search strings, to find practitioner posts, repositories, discussions, reports and theses."),
-        ("The sites of the sources found", "In a multivocal or grey literature review: a request for robots.txt and for the page of a source the searches found, from the server, naming TraceableAI."),
+    };
+
+    /// <summary>The services a grey literature review adds; listed while it is described (<see cref="Grey"/>).</summary>
+    private static readonly (string Service, string Receives)[] GreyThirdParties =
+    {
+        ("Stack Exchange, GitHub, Hacker News (Algolia), OpenAlex and Zenodo", "In a grey literature review: the review's grey search strings, to find practitioner posts, repositories, discussions, reports and theses."),
+        ("The sites of the sources found", "In a grey literature review: a request for robots.txt and for the page of a source the searches found, from the server, naming TraceableAI."),
     };
 }

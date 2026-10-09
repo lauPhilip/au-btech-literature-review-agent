@@ -2,12 +2,13 @@
 @using System.Globalization
 @inject AuBtechReviewAgent.PrismaReviewEngine ReviewEngine
 @inject AuBtechReviewAgent.RunMetricsStore MetricsStore
+@inject AuBtechReviewAgent.ReviewModulesOptions ModuleOptions
 
 @* What the model decides, how each decision is checked, where it fails, and how well it does on this server
    (pooled from the metrics store). The failure modes follow docs/wiki/08 "What the checks do and do not catch". *@
 
 <SeoHead Title="Model card" Path="/model-card"
-         Description="Which steps of a TraceableAI review a language model does, for systematic and grey literature reviews, how each one is checked in code, the known failure modes, and the measured citation accuracy." />
+         Description="@(ModuleOptions.Shows("grey") ? "Which steps of a TraceableAI review a language model does, for systematic and grey literature reviews, how each one is checked in code, the known failure modes, and the measured citation accuracy." : "Which steps of a TraceableAI review a language model does, how each one is checked in code, the known failure modes, and the measured citation accuracy.")" />
 
 <SiteHeader />
 
@@ -28,7 +29,10 @@
 
         <section class="mt-14" aria-labelledby="steps">
             <h2 id="steps" class="ui-h2">Who decides what</h2>
-            <p class="mt-4 text-gray-700 leading-relaxed">In a systematic review:</p>
+            @if (ModuleOptions.Shows("grey"))
+            {
+                <p class="mt-4 text-gray-700 leading-relaxed">In a systematic review:</p>
+            }
             <div class="mt-6 ui-card overflow-x-auto" tabindex="0" role="region" aria-labelledby="steps">
                 <table class="w-full text-sm min-w-[640px]">
                     <caption class="sr-only">Each step of a review, who does it, and how it is checked</caption>
@@ -53,6 +57,8 @@
             </div>
         </section>
 
+        @if (ModuleOptions.Shows("grey"))
+        {
         <section class="mt-14" aria-labelledby="grey">
             <h2 id="grey" class="ui-h2">In a grey literature review</h2>
             <p class="mt-4 text-gray-700 leading-relaxed">
@@ -93,6 +99,7 @@
                 }
             </ul>
         </section>
+        }
 
         <section class="mt-14" aria-labelledby="measured">
             <h2 id="measured" class="ui-h2">How well it does</h2>
@@ -136,7 +143,7 @@
         <section class="mt-14" aria-labelledby="use">
             <h2 id="use" class="ui-h2">Intended use</h2>
             <p class="mt-4 text-gray-700 leading-relaxed">
-                A co-pilot for a researcher doing a systematic, scoping or grey literature review: a documented first pass that a person checks,
+                A co-pilot for a researcher doing a systematic, scoping@(ModuleOptions.Shows("grey") ? " or grey literature" : "") review: a documented first pass that a person checks,
                 corrects and takes responsibility for. It is not meant to publish a review without that check, to make clinical
                 or policy decisions, or to stand in for a second human screener. Every report includes a statement on AI use
                 (section 6.4) to adapt for your paper or thesis.
