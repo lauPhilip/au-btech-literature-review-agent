@@ -106,7 +106,7 @@ public class MultivocalReportTests
     {
         string md = Text(MultivocalReporter.Write(Input()));
 
-        Assert.StartsWith("# Context engineering for LLM agents: a multivocal literature review", md);
+        Assert.StartsWith("# Context engineering for LLM agents: a grey literature review", md); // grey only for now (decision 6)
         Assert.Contains("1 search ran across 1 source", md);
         Assert.Contains("questions and answers on Q&A sites; and code repositories", md); // the failed Zenodo search does not count as run
         Assert.Contains("| Reports and documents on Zenodo | context engineering | failed: HTTP 400 | 0 |", md);
@@ -118,7 +118,7 @@ public class MultivocalReportTests
         Assert.Contains("| G8 | When to stop | The top 100 hits of each search string. |", md);
         Assert.Contains("version 1 was fixed", md);
         Assert.Contains("3 sources were extracted against it and 1 could not be", md);
-        Assert.Contains("formal literature has not been searched yet", md);
+        Assert.DoesNotContain("formal literature has not been searched", md); // a grey literature review does not apologise for the formal pool
     }
 
     [Fact]

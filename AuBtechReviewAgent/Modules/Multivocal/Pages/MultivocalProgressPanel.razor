@@ -1,0 +1,188 @@
+@implements IDisposable
+
+@* The progress of a multivocal run, laid out like the systematic review's progress tab (RunProgressPanel and
+   PrismaFunnel): the overall bar with the elapsed time, the step running with its progress line, the list of steps,
+   and below it the funnel of the sources from search to synthesis. The numbers come from the run's files and the
+   runner's status (MultivocalProgress); this component only shows them. *@
+
+@{
+    bool complete = Stage == AuBtechReviewAgent.MultivocalSynthesiser.StageSynthesised;
+    bool running = Status is { Running: true };
+    bool failed = !running && !complete && Status?.Error != null;
+    int percent = AuBtechReviewAgent.MultivocalProgress.Percent(Stage, running ? Status!.Progress : null);
+    string barColor = failed ? "bg-red-600" : complete ? "bg-green-600" : "bg-brand";
+}
+
+<div class="bg-white border border-gray-200 p-3 shadow-sm text-left space-y-2">
+    <div class="flex items-center justify-between gap-2">
+        <span class="text-[10px] font-bold uppercase tracking-wider text-gray-500">Progress</span>
+        <span class="text-[11px] font-mono text-gray-600">@(failed ? "stopped" : $"{percent}%")@(Elapsed is { } e ? $" · {e}" : "")</span>
+    </div>
+
+    <div class="w-full h-2 bg-gray-100 rounded-full overflow-hidden" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="@percent" aria-label="Run progress">
+        <div class="h-full @barColor rounded-full transition-all duration-500 @(running && percent == 0 ? "animate-pulse w-1/12" : "")" style="@(percent > 0 ? $"width:{percent}%" : "")"></div>
+    </div>
+
+    <p class="text-[11px] text-gray-700 leading-snug" role="status" aria-live="polite">
+        <span class="font-semibold">@CurrentLabel(complete, running, failed)</span>
+        @if (running && !string.IsNullOrWhiteSpace(Status!.Progress))
+        {
+            <span class="text-gray-500"> · @Status.Progress</span>
+        }
+    </p>
+
+    <ol class="flex flex-wrap gap-x-3 gap-y-1">
+        @for (int i = 0; i < AuBtechReviewAgent.MultivocalProgress.Steps.Count; i++)
+        {
+            var progressStep = AuBtechReviewAgent.MultivocalProgress.Steps[i];
+            string state = AuBtechReviewAgent.MultivocalProgress.StateOf(i, Stage);
+            if (state == "current" && failed) state = "failed";
+            else if (state == "current" && !running) state = "stopped";
+            <li class="flex items-center gap-1 text-[10px] @(state == "current" ? "text-brand font-semibold" : state == "done" ? "text-gray-600" : "text-gray-500")">
+                @switch (state)
+                {
+                    case "done":
+                        <svg class="w-3 h-3 text-green-600" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M16.7 5.3a1 1 0 010 1.4l-8 8a1 1 0 01-1.4 0l-4-4a1 1 0 111.4-1.4L8 12.6l7.3-7.3a1 1 0 011.4 0z" clip-rule="evenodd" /></svg>
+                        break;
+                    case "current":
+                        <span class="inline-block w-2.5 h-2.5 border-2 border-brand border-t-transparent rounded-full animate-spin" aria-hidden="true"></span>
+                        break;
+                    case "failed":
+                        <span class="inline-block w-2.5 h-2.5 rounded-full bg-red-600" aria-hidden="true"></span>
+                        break;
+                    case "stopped":
+                        <span class="inline-block w-2.5 h-2.5 rounded-full border-2 border-amber-500" aria-hidden="true"></span>
+                        break;
+                    default:
+                        <span class="inline-block w-2.5 h-2.5 rounded-full border border-gray-300" aria-hidden="true"></span>
+                        break;
+                }
+                <span>@progressStep.Label</span>
+                <span class="sr-only">(@state)</span>
+            </li>
+        }
+    </ol>
+</div>
+
+@{
+    int found = Ledger?.Sources.Count ?? 0;
+    int duplicates = Screening?.Count("Duplicate") ?? 0;
+    int notScreened = Screening?.Count("Error") ?? 0;
+    int included = Screening?.Count("Included") ?? 0;
+    int excluded = Screening?.Count("Excluded") ?? 0;
+    int toLook = Screening?.Sources.Count(s => s.NeedsLook) ?? 0;
+    int extracted = Extraction?.Sources.Count(x => x.Error == null) ?? 0;
+    int notExtracted = Extraction?.Sources.Count(x => x.Error != null) ?? 0;
+}
+
+<div class="bg-white border border-gray-200 p-4 shadow-sm text-left">
+    <span class="text-[10px] font-bold uppercase tracking-wider text-gray-500 block mb-3">Source funnel</span>
+
+    <div class="space-y-1.5 text-xs">
+        @FunnelRow("Found", Ledger == null ? "–" : found.ToString(), Ledger == null ? null : $"from {Ledger.Searches.Count} search{(Ledger.Searches.Count == 1 ? "" : "es")}", true)
+        @if (Screening != null && (duplicates > 0 || notScreened > 0))
+        {
+            <div class="pl-4 space-y-0.5 text-[11px] text-gray-500">
+                <div class="flex justify-between" title="The same source found under another address; that source was screened"><span>− Duplicates</span><span class="font-mono">@duplicates</span></div>
+                @if (notScreened > 0)
+                {
+                    <div class="flex justify-between text-amber-700" title="The model call failed, so these sources were not screened"><span>− Could not be screened</span><span class="font-mono">@notScreened</span></div>
+                }
+            </div>
+        }
+
+        @FunnelRow("Screened", Screening == null ? "–" : (included + excluded).ToString(), Screening?.Kappa is double k ? $"twice; agreement κ = {k:0.00}" : null, false)
+        @if (Screening != null)
+        {
+            <div class="grid grid-cols-2 gap-1.5">
+                <div class="p-2 bg-red-50/60 border border-red-100">
+                    <span class="block text-[9px] font-bold text-red-500 uppercase tracking-wider">Excluded</span>
+                    <span class="text-lg font-bold text-red-600 font-mono">@excluded</span>
+                </div>
+                <div class="p-2 bg-green-50/60 border border-green-100">
+                    <span class="block text-[9px] font-bold text-green-600 uppercase tracking-wider">Included</span>
+                    <span class="text-lg font-bold text-green-700 font-mono">@included</span>
+                    @if (toLook > 0)
+                    {
+                        <span class="block text-[10px] text-amber-800">@toLook marked to look at</span>
+                    }
+                </div>
+            </div>
+        }
+
+        @FunnelRow("Quality", Quality == null ? "–" : Quality.Count("Passed").ToString(), Quality == null ? null : $"passed {Quality.Threshold} of {AuBtechReviewAgent.MultivocalGuidelines.QualityPointsMax} points", false)
+        @if (Quality != null && (Quality.Count("Below threshold") > 0 || Quality.Count("Not assessed") > 0))
+        {
+            <div class="pl-4 space-y-0.5 text-[11px] text-gray-500">
+                <div class="flex justify-between"><span>− Below the threshold</span><span class="font-mono">@Quality.Count("Below threshold")</span></div>
+                @if (Quality.Count("Not assessed") > 0)
+                {
+                    <div class="flex justify-between text-amber-700" title="The page could not be read"><span>− Not assessed</span><span class="font-mono">@Quality.Count("Not assessed")</span></div>
+                }
+            </div>
+        }
+
+        @FunnelRow("Extracted", Extraction == null ? "–" : extracted.ToString(), Map?.FixedVersion is int v ? $"against map version {v}, {Map.Versions.First(x => x.Number == v).Attributes.Count} attributes" : null, false)
+        @if (notExtracted > 0)
+        {
+            <div class="pl-4 text-[11px] text-amber-700 flex justify-between"><span>− Could not be extracted</span><span class="font-mono">@notExtracted</span></div>
+        }
+
+        @FunnelRow("Themes", Synthesis == null ? "–" : Synthesis.Themes.Count.ToString(), Synthesis == null ? null : $"from {Synthesis.Findings.Count} findings", false)
+    </div>
+</div>
+
+@code {
+    [Parameter] public string Stage { get; set; } = "";
+    [Parameter] public AuBtechReviewAgent.MultivocalRunStatus? Status { get; set; }
+    [Parameter] public AuBtechReviewAgent.MultivocalLedger? Ledger { get; set; }
+    [Parameter] public AuBtechReviewAgent.MultivocalScreeningFile? Screening { get; set; }
+    [Parameter] public AuBtechReviewAgent.MultivocalQualityFile? Quality { get; set; }
+    [Parameter] public AuBtechReviewAgent.MultivocalMapFile? Map { get; set; }
+    [Parameter] public AuBtechReviewAgent.MultivocalExtractionFile? Extraction { get; set; }
+    [Parameter] public AuBtechReviewAgent.MultivocalSynthesisFile? Synthesis { get; set; }
+
+    private System.Threading.Timer? _timer;
+
+    protected override void OnParametersSet()
+    {
+        // Tick once a second while the run is going, so the elapsed time moves between the runner's updates.
+        bool running = Status is { Running: true };
+        if (running && _timer == null)
+            _timer = new System.Threading.Timer(_ => InvokeAsync(StateHasChanged), null, 1000, 1000);
+        else if (!running && _timer != null)
+        {
+            _timer.Dispose();
+            _timer = null;
+        }
+    }
+
+    private string? Elapsed
+    {
+        get
+        {
+            if (Status?.StartedUtc is not DateTime started) return null;
+            var span = (Status.EndedUtc ?? DateTime.UtcNow) - started;
+            if (span < TimeSpan.Zero) return null;
+            return span.TotalHours >= 1 ? $"{(int)span.TotalHours} h {span.Minutes} min"
+                 : span.TotalMinutes >= 1 ? $"{(int)span.TotalMinutes} min {span.Seconds:00} s"
+                 : $"{span.Seconds} s";
+        }
+    }
+
+    private string CurrentLabel(bool complete, bool running, bool failed)
+    {
+        if (complete) return "Review complete";
+        if (running) return Status!.Step;
+        if (failed) return "The run stopped";
+        return "The run is not running";
+    }
+
+    private static RenderFragment FunnelRow(string label, string value, string? note, bool brand) =>
+        @<div class="flex items-baseline justify-between gap-2 p-2 bg-gray-50 border border-gray-100">
+            <span class="font-semibold text-gray-700">@label@if (note != null){<span class="font-normal text-[11px] text-gray-500"> · @note</span>}</span>
+            <span class="text-lg font-bold @(brand ? "text-brand" : "text-gray-700") font-mono">@value</span>
+        </div>;
+
+    public void Dispose() => _timer?.Dispose();
+}

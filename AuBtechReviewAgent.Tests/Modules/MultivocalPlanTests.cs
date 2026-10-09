@@ -44,7 +44,12 @@ public class MultivocalPlanTests : IDisposable
 
         string protocol = MultivocalProtocol.Write(plan, Guid.NewGuid(), new DateTime(2026, 10, 6, 12, 0, 0, DateTimeKind.Utc));
 
-        Assert.Contains("Review type: Multivocal Literature Review, following Garousi", protocol);
+        // Grey literature only while the formal pool is not built (decision 6), whichever card planned it.
+        Assert.False(plan.IsGreyOnly);
+        Assert.Contains("Review type: Grey Literature Review, following Garousi", protocol);
+        Assert.Contains("- Sources reviewed: grey literature only", protocol);
+        Assert.DoesNotContain("Formal literature:", protocol);
+        Assert.DoesNotContain("Formal and grey sources", protocol);
         Assert.Contains(plan.Topic, protocol);
         Assert.Contains(plan.Goal, protocol);
         Assert.Contains(plan.ExistingReviews, protocol);
@@ -62,7 +67,7 @@ public class MultivocalPlanTests : IDisposable
         Assert.Contains("No general web search engine is used", protocol);
         Assert.Contains("Practitioners and authors are not contacted", protocol);
         Assert.Contains("Talks and videos are not covered.", protocol);
-        Assert.Contains("Formal literature:", protocol);
+        Assert.DoesNotContain("Formal literature:", protocol); // the formal pool is not built yet (decision 6)
         Assert.Contains("Inclusion criteria (G9): Sources on context engineering practice for LLM agents.", protocol);
         Assert.Contains("Exclusion criteria (G9): Marketing pages.", protocol);
         Assert.Contains("screened twice", protocol);

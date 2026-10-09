@@ -215,7 +215,9 @@ public sealed class MultivocalScreener
             {
                 entry.Decision = "Duplicate";
                 entry.DuplicateOf = first;
-                entry.Reasoning = "The same title by the same producer was found under another address; that source was screened.";
+                entry.Reasoning = r.Title.Split(' ', StringSplitOptions.RemoveEmptyEntries).Length >= DistinctTitleWords
+                    ? "The same title was found under another address; that source was screened."
+                    : "The same title by the same producer was found under another address; that source was screened.";
             }
             else
             {
@@ -351,15 +353,21 @@ public sealed class MultivocalScreener
         entry.ExclusionReason = entry.Decision == "Excluded" ? first.ExclusionReason ?? second.ExclusionReason ?? ExclusionReasons.Unspecified : null;
     }
 
+    /// <summary>How many words a title needs to identify a source on its own, whoever is named as its producer.</summary>
+    public const int DistinctTitleWords = 6;
+
     /// <summary>
-    /// What spots the same source under two addresses: its title and producer, in lower case with letters and digits
-    /// only. Both are needed, since two different blogs can share a title such as "Context engineering". Empty when
-    /// the source has no title.
+    /// What spots the same source under two addresses, in lower case with letters and digits only. A short title needs
+    /// its producer too, since two different blogs can share a title such as "Context engineering"; a long title is
+    /// enough on its own, since the same report is often listed by two searches with its producer written differently
+    /// (seen in a live run: one white paper found at a DOI in OpenAlex and at its record on Zenodo). Empty when the
+    /// source has no title.
     /// </summary>
     public static string SameSourceKey(GreyRecord r)
     {
         string title = Plain(r.Title);
-        return title.Length == 0 ? "" : $"{title}|{Plain(r.Producer)}";
+        if (title.Length == 0) return "";
+        return title.Split(' ').Length >= DistinctTitleWords ? title : $"{title}|{Plain(r.Producer)}";
     }
 
     private static string Plain(string text) =>
