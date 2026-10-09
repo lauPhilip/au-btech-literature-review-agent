@@ -149,6 +149,22 @@ public sealed class MultivocalReporter
         return report;
     }
 
+    /// <summary>
+    /// The run's references in code (G-6): "bib" or "ris" for the sources the results rest on, once the run is
+    /// extracted, or "screened" for every screened source, once it is screened; null otherwise.
+    /// </summary>
+    public string? ExportReferences(Guid runId, string format)
+    {
+        var ledger = _searcher.LoadLedger(runId);
+        var screening = _screener.Load(runId);
+        if (ledger == null || screening == null) return null;
+        var extraction = _extractor.Load(runId);
+        if (format == "screened") return GreyReferences.ToScreenedRis(ledger, screening, extraction == null ? null : SourceNumbers(extraction));
+        if (extraction == null) return null;
+        var references = GreyReferences.Build(ledger, _pages.Load(runId), extraction);
+        return format == "ris" ? GreyReferences.ToRis(references) : format == "bib" ? GreyReferences.ToBibTeX(references) : null;
+    }
+
     /// <summary>The saved report, or null when it has not been written.</summary>
     public string? ReadSaved(Guid runId)
     {
@@ -402,11 +418,10 @@ public sealed class MultivocalReporter
 
     private static ReportSection Limits(MultivocalReportInput input)
     {
-        var plan = input.Planned.Plan;
         var section = new ReportSection { Heading = "9. Limits" };
         var limits = new List<string>
         {
-            "A language model screened the sources, scored their quality, proposed the map, extracted the values and named the themes. Its answers were checked in code: every value, point and quotation rests on a quote found in the source's kept page text, and every count in this report was made in code. Whether a quote supports its value as well as it appears was not checked by code.",
+            "A language model screened the sources, scored their quality, proposed the map, extracted the values and named the themes. Its answers were checked in code: every value, point and quotation rests on a quote found in the source's kept page text, and every count in this report was made in code. Whether a quote supports its value was checked by the model too, once per source, and the values it judged not supported were left out; that check is a model's judgement, not a check in code.",
             "Grey literature is not peer reviewed. Each theme says which outlet tiers it rests on, and a theme resting on 3rd-tier sources only (such as blog posts and code repositories) is labelled as such.",
             "Only robots.txt was checked before a page was fetched; other terms of a site cannot be read by code.",
         };

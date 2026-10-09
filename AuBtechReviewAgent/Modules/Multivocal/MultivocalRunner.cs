@@ -33,14 +33,16 @@ public sealed class MultivocalRunner
     private readonly MultivocalMapper _mapper;
     private readonly MultivocalExtractor _extractor;
     private readonly MultivocalSynthesiser _synthesiser;
+    private readonly MultivocalPages _pages;
     private readonly ConcurrentDictionary<Guid, MultivocalRunStatus> _status = new();
 
     /// <summary>Raised whenever a run's status changes, with the run's id; pages listen to show the progress.</summary>
     public event Action<Guid>? Changed;
 
     public MultivocalRunner(RunStore runs, MultivocalSearcher searcher, MultivocalScreener screener, MultivocalQualityAssessor quality,
-        MultivocalMapper mapper, MultivocalExtractor extractor, MultivocalSynthesiser synthesiser)
+        MultivocalMapper mapper, MultivocalExtractor extractor, MultivocalSynthesiser synthesiser, MultivocalPages pages)
     {
+        _pages = pages;
         _runs = runs;
         _searcher = searcher;
         _screener = screener;
@@ -156,6 +158,12 @@ public sealed class MultivocalRunner
                         throw new InvalidOperationException($"The run is at a stage the runner does not know: {stage}.");
                 }
             }
+            if (_runs.LoadHeader(runId)?.Stage == MultivocalSynthesiser.StageSynthesised)
+            {
+                step = "Writing the references";
+                Set(runId, new MultivocalRunStatus(true, step, null, null));
+                await SaveReferencesAsync(runId);
+            }
             Set(runId, new MultivocalRunStatus(false, "Done", null, null));
         }
         catch (Exception ex) when (ex is InvalidOperationException or ArgumentException or LlmOutputException or HttpRequestException or TaskCanceledException)
@@ -169,6 +177,15 @@ public sealed class MultivocalRunner
             _log.LogError(ex, "Multivocal run {RunId} failed at {Step}", runId, step);
             Set(runId, new MultivocalRunStatus(false, step, null, $"{step} stopped because of an error on the server. Start it again to continue from this step."));
         }
+    }
+
+    /// <summary>Writes references.bib, references.ris and screened.ris to the run folder, in code (G-6).</summary>
+    private async Task SaveReferencesAsync(Guid runId)
+    {
+        var ledger = _searcher.LoadLedger(runId);
+        var screening = _screener.Load(runId);
+        if (ledger == null || screening == null) return;
+        await GreyReferences.SaveAsync(_runs.FolderOf(runId), ledger, _pages.Load(runId), screening, _extractor.Load(runId));
     }
 
     private async Task ResetAsync(Guid runId, string stage)
