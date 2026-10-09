@@ -50,6 +50,12 @@ public sealed class ReviewPaper
     /// <summary>Subsections after the discussion, such as the automated citation check.</summary>
     public List<PaperSection> DiscussionNotes { get; init; } = new();
 
+    /// <summary>
+    /// A section of its own after the discussion, when the module has one: the multivocal review's summary for
+    /// practitioners (G14). The systematic review has none.
+    /// </summary>
+    public PaperSection? Summary { get; init; }
+
     /// <summary>Support, registration and protocol, availability.</summary>
     public List<PaperSection> Declarations { get; init; } = new();
 
@@ -89,6 +95,8 @@ public static class PaperLatex
                          .Replace("^", @"\textasciicircum ");
         // Straight double quotes print as two closing quotes in LaTeX; use proper ``opening'' and closing quotes.
         escaped = Regex.Replace(escaped, "\"([^\"\n]*)\"", "``$1''");
+        // Symbols the run's own text uses that pdflatex cannot set from UTF-8 (Cohen's κ in a multivocal method, say).
+        escaped = escaped.Replace("κ", @"$\kappa$").Replace("≥", @"$\geq$").Replace("≤", @"$\leq$").Replace("→", @"$\rightarrow$").Replace("×", @"$\times$");
         // Markdown-style *italics* (used for venues in the APA references) -> real LaTeX italics.
         return Regex.Replace(escaped, @"\*([^*\n]+)\*", @"\textit{$1}");
     }
@@ -189,6 +197,12 @@ public static class PaperLatex
         {
             sb.AppendLine($"\\subsection{{{Escape(note.Heading)}}}");
             sb.AppendLine(Body(note));
+        }
+
+        if (paper.Summary != null)
+        {
+            sb.AppendLine($"\\section{{{Escape(paper.Summary.Heading)}}}");
+            sb.AppendLine(Body(paper.Summary));
         }
 
         sb.AppendLine(@"\section{Administrative Declarations}");
