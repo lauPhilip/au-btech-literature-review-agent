@@ -73,6 +73,31 @@ public static class LlmStage
 }
 
 /// <summary>
+/// The recording chat service of the run that is running in this async flow, so services that ask a factory for a
+/// chat service (the multivocal module's steps) use the run's recorder and their calls land in its llm-calls.json.
+/// Outside a scope, <see cref="Current"/> is null and the factory makes a plain service.
+/// </summary>
+public static class LlmRecording
+{
+    private static readonly AsyncLocal<RecordingChatCompletionService?> Ambient = new();
+    public static RecordingChatCompletionService? Current => Ambient.Value;
+
+    public static IDisposable Begin(RecordingChatCompletionService recorder)
+    {
+        var previous = Ambient.Value;
+        Ambient.Value = recorder;
+        return new Restore(previous);
+    }
+
+    private sealed class Restore : IDisposable
+    {
+        private readonly RecordingChatCompletionService? _previous;
+        public Restore(RecordingChatCompletionService? previous) => _previous = previous;
+        public void Dispose() => Ambient.Value = _previous;
+    }
+}
+
+/// <summary>
 /// Wraps the Mistral chat service for one run. It (1) retries rate-limit (429) and temporary server errors
 /// with exponential backoff, so a busy moment does not break a run halfway, and (2) records every call:
 /// stage, model, temperature, duration, token usage and SHA-256 hashes of the prompt and the response.
@@ -149,12 +174,14 @@ public class RecordingChatCompletionService : IChatCompletionService
         ChatHistory chatHistory, PromptExecutionSettings? executionSettings = null, Kernel? kernel = null, CancellationToken cancellationToken = default) =>
         _inner.GetStreamingChatMessageContentsAsync(chatHistory, executionSettings, kernel, cancellationToken);
 
-    public RunSettingsRecord Summarize(string appVersion)
+    public RunSettingsRecord Summarize(string appVersion) => Summarize(Calls, _model, appVersion);
+
+    /// <summary>The settings record of a list of calls, for a run whose calls were recorded over more than one start.</summary>
+    public static RunSettingsRecord Summarize(IReadOnlyList<LlmCallRecord> calls, string model, string appVersion)
     {
-        var calls = Calls;
         var settings = new RunSettingsRecord
         {
-            Model = _model,
+            Model = model,
             AppVersion = appVersion,
             LlmCalls = calls.Count,
             LlmRetries = calls.Sum(c => Math.Max(0, c.Attempts - 1)),
