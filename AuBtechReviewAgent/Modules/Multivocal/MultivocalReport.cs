@@ -418,11 +418,10 @@ public sealed class MultivocalReporter
 
     private static ReportSection Limits(MultivocalReportInput input)
     {
-        var plan = input.Planned.Plan;
         var section = new ReportSection { Heading = "9. Limits" };
         var limits = new List<string>
         {
-            "A language model screened the sources, scored their quality, proposed the map, extracted the values and named the themes. Its answers were checked in code: every value, point and quotation rests on a quote found in the source's kept page text, and every count in this report was made in code. Whether a quote supports its value as well as it appears was not checked by code.",
+            "A language model screened the sources, scored their quality, proposed the map, extracted the values and named the themes. Its answers were checked in code: every value, point and quotation rests on a quote found in the source's kept page text, and every count in this report was made in code. Whether a quote supports its value was checked by the model too, once per source, and the values it judged not supported were left out; that check is a model's judgement, not a check in code.",
             "Grey literature is not peer reviewed. Each theme says which outlet tiers it rests on, and a theme resting on 3rd-tier sources only (such as blog posts and code repositories) is labelled as such.",
             "Only robots.txt was checked before a page was fetched; other terms of a site cannot be read by code.",
         };

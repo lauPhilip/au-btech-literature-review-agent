@@ -65,7 +65,8 @@ public class GreyReferencesTests
 
         Assert.Equal(new[] { 1, 2 }, references.Select(r => r.Number)); // the source that could not be extracted is not cited
         var guide = references[0];
-        Assert.Equal(("docs.acme.dev", (int?)null), (guide.Producer, guide.Year)); // no producer: credited to the site
+        Assert.Equal("docs.acme.dev", guide.Producer); // no producer: credited to the site
+        Assert.Null(guide.Year);
         Assert.Null(guide.AccessedUtc); // its page was not kept
         Assert.Null(guide.WaybackUrl); // and an address that is not http(s) is never linked
         Assert.Equal("docs.acme.dev (n.d.). Effective context & memory_management. https://docs.acme.dev/guide", GreyReferences.Line(guide));
