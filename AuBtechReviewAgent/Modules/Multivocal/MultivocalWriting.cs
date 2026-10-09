@@ -113,11 +113,13 @@ public sealed class MultivocalWriter
     private readonly int _parallelism;
 
     private readonly ReviewCache _cache;
+    private readonly RunMetricsStore _metrics;
 
     public MultivocalWriter(RunStore runs, MultivocalReporter reporter, MultivocalPages pages, Func<IChatCompletionService> chat, string model = "", int parallelism = 4,
-        ReviewCache? cache = null)
+        ReviewCache? cache = null, RunMetricsStore? metrics = null)
     {
         _cache = cache ?? ReviewCache.Disabled;
+        _metrics = metrics ?? RunMetricsStore.Disabled;
         _runs = runs;
         _reporter = reporter;
         _pages = pages;
@@ -135,6 +137,31 @@ public sealed class MultivocalWriter
     public MultivocalPaperFile? Load(Guid runId) => Read<MultivocalPaperFile>(Path.Join(_runs.FolderOf(runId), PaperFile));
 
     public MultivocalCitationAudit? LoadAudit(Guid runId) => Read<MultivocalCitationAudit>(Path.Join(_runs.FolderOf(runId), AuditFile));
+
+    /// <summary>
+    /// Writes run-metrics.json of a checked run from its files and its call log, and adds it to the metrics store;
+    /// null before the check. Never fails: the metrics are a by-product of the run.
+    /// </summary>
+    public async Task<RunMetrics?> WriteMetricsAsync(Guid runId)
+    {
+        try
+        {
+            var input = _reporter.LoadInput(runId);
+            var paper = Load(runId);
+            if (input == null || paper?.CheckedUtc == null) return null;
+            string folder = _runs.FolderOf(runId);
+            var calls = MultivocalRunLog.LoadCalls(folder)?.Calls ?? new List<LlmCallRecord>();
+            var metrics = MultivocalRunLog.BuildMetrics(input, paper, LoadAudit(runId), calls);
+            await SafeFile.WriteAllTextAsync(Path.Join(folder, MultivocalRunLog.MetricsFile), JsonSerializer.Serialize(metrics, Json));
+            _metrics.Append(metrics);
+            return metrics;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
+        {
+            _log.LogWarning("Run {RunId}: run metrics not written: {Message}", runId, ex.Message);
+            return null;
+        }
+    }
 
     private static T? Read<T>(string path) where T : class
     {
