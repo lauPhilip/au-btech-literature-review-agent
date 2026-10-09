@@ -262,7 +262,7 @@ public sealed class MultivocalExtractor
 
         var questions = plan.Numbered().Select(q => q.Number).ToList();
         result.Coverage = questions
-            .Where(q => map.Attributes.Any(a => a.Question == q && result.Attributes.Any(x => x.Attribute == a.Name && !x.NotStated)))
+            .Where(q => map.Attributes.Any(a => a.Serves(q) && result.Attributes.Any(x => x.Attribute == a.Name && !x.NotStated)))
             .ToList();
     }
 

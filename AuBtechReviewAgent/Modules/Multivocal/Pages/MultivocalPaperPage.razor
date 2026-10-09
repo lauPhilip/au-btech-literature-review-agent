@@ -1,0 +1,329 @@
+@page "/mlr-paper/{RunId:guid}"
+@rendermode InteractiveServer
+@inject AuBtechReviewAgent.ReviewModulesOptions ModuleOptions
+@inject AuBtechReviewAgent.RunStore Runs
+@inject AuBtechReviewAgent.MultivocalReporter Reporter
+@inject AuBtechReviewAgent.MultivocalWriter Writer
+@inject NavigationManager Nav
+@inject IJSRuntime JS
+@inject ILogger<MultivocalPaperPage> Logger
+
+@* The paper of a checked multivocal run (MLR G-8), laid out like the systematic review's Review output page and
+   built from the same shared parts (Components/Paper): every citation in the written text is a button that opens what
+   the check found, and the bar at the top steps through the citations that need attention. The written parts come
+   from mlr-paper.json; the method, the data, the answers in code, the notes, the declarations and the references are
+   written in code from the run's files each time the page opens, as main.tex is. *@
+
+<SeoHead Title="Grey literature review paper (preview)" Path="/mlr-paper" NoIndex="true"
+         Description="The paper of a grey literature review following the Garousi et al. (2019) guidelines, with every citation checked." />
+
+<SiteHeader Active="dashboard" DashboardHref="@($"/mlr/{RunId}")" />
+
+<main id="main" tabindex="-1" class="flex-1 min-h-0 overflow-y-auto">
+<div class="max-w-5xl w-full mx-auto p-4 lg:p-6 space-y-4">
+    @if (input == null || paper == null || paper.CheckedUtc == null)
+    {
+        <div class="ui-card p-4 text-sm text-gray-700">
+            This run has no checked paper yet: it is written and checked after the synthesis. <a href="@($"/mlr/{RunId}")" class="text-brand underline underline-offset-2">Back to the review</a>
+        </div>
+    }
+    else
+    {
+        <div class="flex flex-wrap items-center justify-between gap-2 print:hidden">
+            <a href="@($"/mlr/{RunId}")" class="text-xs text-brand underline underline-offset-2">Back to the review</a>
+            <div class="flex flex-wrap gap-2">
+                <a href="@($"/api/workspace/{RunId:N}/archive")" class="ui-btn-primary ui-btn-sm" title="Every file of the run, with a manifest of their fingerprints">Download the archive</a>
+                <a href="@($"/api/workspace/{RunId:N}/main.tex")" class="ui-btn-secondary ui-btn-sm">main.tex</a>
+                <a href="@($"/api/workspace/{RunId:N}/references.bib")" class="ui-btn-secondary ui-btn-sm" title="The references, for Zotero, EndNote or Mendeley">BibTeX</a>
+                <a href="@($"/api/workspace/{RunId:N}/references.ris")" class="ui-btn-secondary ui-btn-sm" title="The references, for Zotero, EndNote or Mendeley">RIS</a>
+                <a href="@($"/api/workspace/{RunId:N}/screened.ris")" class="ui-btn-secondary ui-btn-sm" title="Every screened source, tagged with its decision">Screened (RIS)</a>
+                <a href="@($"/mlr-report/{RunId}")" class="ui-btn-secondary ui-btn-sm" title="The run's report written in code: guidelines table, quotations and source repository">Data appendix</a>
+            </div>
+        </div>
+
+        <CitationAttentionBar Attention="Attention" Index="attentionIndex" OnStep="StepAttention" />
+
+        <article class="w-full max-w-[8.5in] bg-white shadow-lift p-6 md:p-[1in] text-gray-900 font-serif text-[11pt] leading-relaxed mx-auto border border-gray-200 print:shadow-none print:border-none print:p-0 overflow-visible">
+            <div class="text-center space-y-3 mb-8 font-sans">
+                <div class="text-[9px] tracking-widest text-gray-500 uppercase font-bold">@AuBtechReviewAgent.MultivocalPaper.KindLabel(input.Planned.Plan)</div>
+                <h1 class="text-2xl font-bold tracking-tight font-serif text-gray-900 leading-tight">@paper.Title</h1>
+                <div class="text-xs font-medium text-gray-600">Department of Business Development and Technology, Aarhus University</div>
+                <div class="text-[10px] text-gray-500 font-mono break-all">Protocol hash: @input.Planned.ProtocolSha256 | Written: @paper.WrittenUtc.ToString("yyyy-MM-dd HH:mm") UTC</div>
+                <hr class="border-gray-300 my-4" />
+            </div>
+
+            <div class="mb-6 font-sans text-xs bg-gray-50 border border-gray-200 p-4 text-justify">
+                <span class="font-bold text-brand block mb-1 uppercase tracking-wider text-[10px]">Abstract</span>
+                <p class="text-gray-700 leading-normal">@paper.Abstract</p>
+            </div>
+
+            <div class="space-y-6 text-justify text-xs leading-relaxed">
+                <section class="space-y-3">
+                    <h2 class="font-sans font-bold text-sm text-brand uppercase tracking-wide border-b border-gray-200 pb-1">1. Introduction</h2>
+                    <div class="space-y-1">
+                        <span class="font-sans font-bold text-[10px] text-gray-500 uppercase block">1.1 Rationale</span>
+                        @Cited(AuBtechReviewAgent.MultivocalWriter.RationaleField, paper.Rationale)
+                    </div>
+                    <div class="space-y-1">
+                        <span class="font-sans font-bold text-[10px] text-gray-500 uppercase block">1.2 Objectives and research questions</span>
+                        <p class="text-gray-800">@AuBtechReviewAgent.MultivocalPaper.Objectives(input.Planned.Plan, paper.Objectives)</p>
+                    </div>
+                </section>
+
+                <section class="space-y-3">
+                    <h2 class="font-sans font-bold text-sm text-brand uppercase tracking-wide border-b border-gray-200 pb-1">2. Method</h2>
+                    <p class="font-sans text-[11px] text-gray-500">Written in code from the run's files, one part per phase of the Garousi et al. (2019) guidelines.</p>
+                    @{ int methodNumber = 0; }
+                    @foreach (var section in AuBtechReviewAgent.MultivocalReporter.MethodSections(input))
+                    {
+                        methodNumber++;
+                        var current = section;
+                        <div class="space-y-1">
+                            <span class="font-sans font-bold text-[10px] text-gray-500 uppercase block">2.@methodNumber @AuBtechReviewAgent.MultivocalPaperParts.ToPaperSection(current).Heading</span>
+                            @Blocks(current.Blocks)
+                        </div>
+                    }
+                </section>
+
+                <section class="space-y-3">
+                    <h2 class="font-sans font-bold text-sm text-brand uppercase tracking-wide border-b border-gray-200 pb-1">3. Data and the flow of sources</h2>
+                    <p class="text-gray-800">@AuBtechReviewAgent.MultivocalPaperParts.DataText(input)</p>
+                    @{ var flow = AuBtechReviewAgent.MultivocalPaperParts.Flow(input); }
+                    <ol class="font-sans text-[11px] text-gray-700 grid grid-cols-2 sm:grid-cols-3 gap-1.5" aria-label="Flow of sources">
+                        @FlowStep("Found", flow.Found, $"from {flow.Searches} searches")
+                        @FlowStep("Screened twice", flow.Screened, $"{flow.Duplicates} duplicates set aside")
+                        @FlowStep("Included", flow.Included, $"{flow.Excluded} excluded")
+                        @FlowStep("Passed the quality threshold", flow.Passed, $"{flow.BelowThreshold} below it, {flow.NotAssessed} not assessed")
+                        @FlowStep("Extracted", flow.Extracted, flow.NotExtracted > 0 ? $"{flow.NotExtracted} could not be" : "against the fixed map")
+                        @FlowStep("Synthesised", flow.Themes, $"themes from {flow.Findings} findings")
+                    </ol>
+                    @Table(new AuBtechReviewAgent.PaperTable("Extracted sources by kind of grey literature", new[] { "Kind", "Outlet tier", "Sources" },
+                        AuBtechReviewAgent.MultivocalPaperParts.Kinds(input).Select(k => (IReadOnlyList<string>)new[] { k.Label, Ordinal(k.Tier), k.Sources.ToString() }).ToList()))
+                    @Table(AuBtechReviewAgent.MultivocalPaperParts.MapCounts(input))
+                </section>
+
+                <section class="space-y-4">
+                    <h2 class="font-sans font-bold text-sm text-brand uppercase tracking-wide border-b border-gray-200 pb-1">4. Results</h2>
+                    <p class="text-gray-800">@AuBtechReviewAgent.MultivocalPaper.ResultsText(paper)</p>
+                    @{ int resultNumber = 0; }
+                    @foreach (var result in paper.Results)
+                    {
+                        resultNumber++;
+                        var current = result;
+                        <div class="space-y-1">
+                            <h3 class="font-sans font-bold text-[11px] text-gray-700 block">4.@resultNumber @(current.Kind == "theme" ? $"{current.Question}: {current.Heading}" : current.Heading)</h3>
+                            @if (current.Kind == "theme")
+                            {
+                                @Cited(current.Field, current.Text)
+                                @if (!string.IsNullOrWhiteSpace(current.Note))
+                                {
+                                    <p class="font-sans text-[11px] italic text-gray-600">@current.Note</p>
+                                }
+                            }
+                            else
+                            {
+                                var question = input.Planned.Plan.Numbered().FirstOrDefault(q => q.Number == current.Question).Question;
+                                @if (question != null && AuBtechReviewAgent.MultivocalPaperParts.AnsweredInCode(question.Type))
+                                {
+                                    @* Written in code each time from the run's files, so the lead and the tables always match the map. *@
+                                    <p class="text-gray-800">@AuBtechReviewAgent.MultivocalPaperParts.CodeAnswerLead(input, current.Question, question)</p>
+                                    @foreach (var table in AuBtechReviewAgent.MultivocalPaperParts.CodeAnswerTables(input, current.Question))
+                                    {
+                                        @Table(table)
+                                    }
+                                }
+                                else
+                                {
+                                    <p class="text-gray-800">@current.Text</p>
+                                }
+                            }
+                        </div>
+                    }
+                </section>
+
+                <section class="space-y-3">
+                    <h2 class="font-sans font-bold text-sm text-brand uppercase tracking-wide border-b border-gray-200 pb-1">5. Discussion</h2>
+                    @Cited(AuBtechReviewAgent.MultivocalWriter.DiscussionField, paper.Discussion)
+                    @if (audit?.SupportSummary != null)
+                    {
+                        <div class="space-y-1">
+                            <span class="font-sans font-bold text-[10px] text-gray-500 uppercase block">5.1 Automated citation check</span>
+                            <p class="text-gray-800">@AuBtechReviewAgent.MultivocalPaper.CheckNote(audit)</p>
+                        </div>
+                    }
+                </section>
+
+                @if (paper.SummaryItems.Count > 0)
+                {
+                    <section class="space-y-3">
+                        <h2 class="font-sans font-bold text-sm text-brand uppercase tracking-wide border-b border-gray-200 pb-1">6. Summary for practitioners</h2>
+                        @if (!string.IsNullOrWhiteSpace(paper.SummaryLead))
+                        {
+                            <p class="text-gray-800">@paper.SummaryLead</p>
+                        }
+                        @Cited(AuBtechReviewAgent.MultivocalWriter.SummaryField, string.Join("\n\n", paper.SummaryItems))
+                    </section>
+                }
+
+                <section class="space-y-3">
+                    <h2 class="font-sans font-bold text-sm text-brand uppercase tracking-wide border-b border-gray-200 pb-1">@(paper.SummaryItems.Count > 0 ? "7" : "6"). Declarations</h2>
+                    @foreach (var declaration in AuBtechReviewAgent.MultivocalPaper.Declarations(input, paper))
+                    {
+                        var current = declaration;
+                        <div class="space-y-1">
+                            <span class="font-sans font-bold text-[10px] text-gray-500 uppercase block">@current.Heading</span>
+                            <p class="text-gray-800 break-words">@current.Text</p>
+                        </div>
+                    }
+                </section>
+
+                <section class="space-y-2">
+                    <h2 class="font-sans font-bold text-sm text-brand uppercase tracking-wide border-b border-gray-200 pb-1">References</h2>
+                    <ol class="space-y-1 text-[11px]">
+                        @foreach (var reference in references)
+                        {
+                            var current = reference;
+                            <li id="@($"ref-{current.Number}")" class="break-words">[@current.Number] @ReferenceLine(current)</li>
+                        }
+                    </ol>
+                </section>
+            </div>
+        </article>
+    }
+</div>
+</main>
+
+@code {
+    [Parameter] public Guid RunId { get; set; }
+
+    private AuBtechReviewAgent.MultivocalReportInput? input;
+    private AuBtechReviewAgent.MultivocalPaperFile? paper;
+    private AuBtechReviewAgent.MultivocalCitationAudit? audit;
+    private IReadOnlyList<AuBtechReviewAgent.GreyReference> references = Array.Empty<AuBtechReviewAgent.GreyReference>();
+    private IReadOnlyList<AuBtechReviewAgent.CitationSupportResult> checks = Array.Empty<AuBtechReviewAgent.CitationSupportResult>();
+    private (string Field, int Sentence, int Reference)? openCitation;
+    private int attentionIndex = -1;
+    private string? pendingFocus;
+
+    protected override void OnParametersSet()
+    {
+        var module = AuBtechReviewAgent.ReviewModules.Find("multivocal")!;
+        if (!ModuleOptions.CanOpen(module)) { Nav.NotFound(); return; }
+        if (AuBtechReviewAgent.ReviewModules.ElsewhereFor(Runs.LoadHeader(RunId), module.Key) is string elsewhere)
+        {
+            Nav.NavigateTo(elsewhere, replace: true);
+            return;
+        }
+        input = Reporter.LoadInput(RunId);
+        paper = Writer.Load(RunId);
+        audit = Writer.LoadAudit(RunId);
+        checks = audit?.SupportChecks ?? new List<AuBtechReviewAgent.CitationSupportResult>();
+        references = input == null ? Array.Empty<AuBtechReviewAgent.GreyReference>() : AuBtechReviewAgent.GreyReferences.Build(input.Ledger, input.Pages, input.Extraction);
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (pendingFocus is { } focusId)
+        {
+            pendingFocus = null;
+            try { await JS.InvokeAsync<bool>("traceableReview.focus", focusId); }
+            catch (JSException) { /* moving focus is a convenience; the page works without it */ }
+            catch (JSDisconnectedException) { /* the tab was closed */ }
+        }
+    }
+
+    private RenderFragment Cited(string field, string text) =>
+        @<CitedProse Field="@field" Text="@text" Checks="checks" Open="openCitation" SourceNoun="page"
+                     OnToggle="@(c => ToggleCitation(c.Field, c.Sentence, c.Reference))" OnClose="CloseCitation"
+                     SourceTitle="@(reference => references.FirstOrDefault(r => r.Number == reference)?.Title)" />;
+
+    // The reading order of the paper's fields, for stepping through the citations that need attention.
+    private int FieldRank(string field)
+    {
+        if (field == AuBtechReviewAgent.MultivocalWriter.RationaleField) return -1;
+        int result = paper?.Results.FindIndex(r => r.Field == field) ?? -1;
+        if (result >= 0) return 1 + result;
+        return field == AuBtechReviewAgent.MultivocalWriter.DiscussionField ? 2000 : 3000;
+    }
+
+    private List<AuBtechReviewAgent.CitationSupportResult> Attention => AuBtechReviewAgent.CitationView.Attention(checks, FieldRank);
+
+    private async Task StepAttention(int delta)
+    {
+        var list = Attention;
+        if (list.Count == 0) return;
+        attentionIndex = ((attentionIndex < 0 && delta < 0 ? 0 : attentionIndex) + delta + list.Count) % list.Count;
+        var c = list[attentionIndex];
+        openCitation = (c.Field, c.SentenceIndex, c.Reference);
+        StateHasChanged();
+        try { await JS.InvokeAsync<bool>("traceableReview.scrollTo", AuBtechReviewAgent.CitationView.CiteId(c.Field, c.SentenceIndex, c.Reference)); }
+        catch (Exception ex) when (ex is JSException or JSDisconnectedException or InvalidOperationException or TaskCanceledException)
+        {
+            // Scrolling is a convenience: the citation is open and the bar shows which one it is, so the page works without it.
+            Logger.LogDebug("Could not scroll to the citation: {Message}", ex.Message);
+        }
+    }
+
+    private void ToggleCitation(string field, int sentence, int reference)
+    {
+        bool closing = openCitation == (field, sentence, reference);
+        openCitation = closing ? null : (field, sentence, reference);
+        pendingFocus = closing ? null : $"verdict-{field}";
+    }
+
+    private void CloseCitation()
+    {
+        if (openCitation is { } open) pendingFocus = AuBtechReviewAgent.CitationView.CiteId(open.Field, open.Sentence, open.Reference);
+        openCitation = null;
+    }
+
+    private static string ReferenceLine(AuBtechReviewAgent.GreyReference r) => AuBtechReviewAgent.GreyReferences.Line(r).Replace("*", "");
+
+    private static string Ordinal(int n) => n switch { 1 => "1st", 2 => "2nd", 3 => "3rd", _ => $"{n}th" };
+
+    private static RenderFragment FlowStep(string label, int count, string note) =>
+        @<li class="border border-gray-200 bg-gray-50 p-2"><span class="block text-[10px] uppercase tracking-wider text-gray-500 font-bold">@label</span><span class="text-base font-bold font-mono text-gray-900">@count</span><span class="block text-[10px] text-gray-500">@note</span></li>;
+
+    private static RenderFragment Table(AuBtechReviewAgent.PaperTable table) =>
+        @<div class="font-sans overflow-x-auto">
+            <table class="w-full text-[11px] text-left">
+                <caption class="text-left font-semibold text-gray-800 pb-1">@table.Caption</caption>
+                <thead class="text-gray-500 border-b border-gray-200"><tr>@foreach (var h in table.Headers) { <th scope="col" class="py-1 pr-2 font-medium">@h</th> }</tr></thead>
+                <tbody>
+                    @foreach (var row in table.Rows)
+                    {
+                        <tr class="border-t border-gray-100 align-top">@foreach (var cell in row) { <td class="py-0.5 pr-2">@cell</td> }</tr>
+                    }
+                </tbody>
+            </table>
+            @if (!string.IsNullOrWhiteSpace(table.Note))
+            {
+                <p class="text-[10px] italic text-gray-500 mt-1">@table.Note</p>
+            }
+        </div>;
+
+    private static RenderFragment Blocks(IReadOnlyList<AuBtechReviewAgent.ReportBlock> blocks) => __builder =>
+    {
+        foreach (var block in blocks)
+        {
+            var current = block;
+            if (current.Kind == "table")
+            {
+                @Table(new AuBtechReviewAgent.PaperTable("", current.Headers, current.Rows))
+            }
+            else if (current.Kind == "list")
+            {
+                <ul class="list-disc pl-5 text-gray-800">
+                    @foreach (var item in current.Items)
+                    {
+                        <li>@item</li>
+                    }
+                </ul>
+            }
+            else
+            {
+                <p class="text-gray-800">@current.Text</p>
+            }
+        }
+    };
+}

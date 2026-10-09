@@ -212,6 +212,7 @@ public class MultivocalMapTests : IDisposable
 
         Assert.Single(model.Prompts); // accepted at once, not sent back
         Assert.Equal("Practice", Assert.Single(file.Latest.Attributes).Name);
-        Assert.Contains("\"Source type\" (RQ2) was left out", Assert.Single(file.Notes));
+        Assert.Contains(file.Notes, n => n.Contains("\"Source type\" (RQ2) was left out"));
+        Assert.Contains("RQ2 has no attribute in the model's map, so the extraction records nothing for it.", file.Notes); // said, not hidden
     }
 }

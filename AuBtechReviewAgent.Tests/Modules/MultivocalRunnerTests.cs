@@ -18,6 +18,9 @@ public class MultivocalRunnerTests : IDisposable
 
     public void Dispose() => TestFolders.TryDelete(_root);
 
+    /// <summary>The writer of the last run made with one, for the archive and main.tex.</summary>
+    private MultivocalWriter? _writer;
+
     private const string PageWords = "We keep a running summary of the conversation. Retrieval brings in only the documents the agent needs.";
 
     private const string Map = """
@@ -108,6 +111,7 @@ public class MultivocalRunnerTests : IDisposable
         {
             var reporter = new MultivocalReporter(store, planner, searcher, screener, pages, assessor, mapper, extractor, synthesiser);
             writer = new MultivocalWriter(store, reporter, pages, () => model, "fake-model", parallelism: 1);
+            _writer = writer;
         }
         return (store, runId, key, new MultivocalRunner(store, searcher, screener, assessor, mapper, extractor, synthesiser, pages, writer));
     }
@@ -159,10 +163,14 @@ public class MultivocalRunnerTests : IDisposable
         Assert.True(File.Exists(Path.Join(folder, MultivocalWriter.AuditFile)));
         Assert.True(File.Exists(Path.Join(folder, GreyReferences.BibFile))); // written before the paper, which cites by its numbers
 
-        var zip = RunArchive.Build(runId, folder, Array.Empty<(string, byte[])>(), ReviewModules.Find("multivocal")!.ArchiveFiles, null, null);
-        using var archive = new System.IO.Compression.ZipArchive(new MemoryStream(zip));
+        // The archive of a multivocal run: main.tex built from the checked paper, then the run's files and the manifest.
+        using var archive = new System.IO.Compression.ZipArchive(new MemoryStream(_writer!.Archive(runId)));
+        Assert.Equal(MultivocalPaper.MainTexFile, archive.Entries[0].FullName);
         Assert.Contains(archive.Entries, e => e.FullName == MultivocalWriter.PaperFile);
         Assert.Contains(archive.Entries, e => e.FullName == MultivocalWriter.AuditFile);
+        Assert.Contains(archive.Entries, e => e.FullName == "manifest.json");
+        Assert.Contains(@"\section{Summary for practitioners}", _writer.MainTex(runId));
+        Assert.Empty(_writer.Archive(Guid.NewGuid())); // not a run
     }
 
     [Fact]

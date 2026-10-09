@@ -198,12 +198,18 @@ app.UseRateLimiter();
 app.MapGet("/api/workspace/{sessionId:guid}/archive", (Guid sessionId) =>
 {
     byte[] zipBytes = reviewEngine.GenerateWorkspaceArchiveFromDisk(sessionId);
+    bool multivocal = false;
+    if (zipBytes.Length == 0)
+    {
+        zipBytes = multivocalWriter.Archive(sessionId); // a multivocal run has no systematic review state
+        multivocal = zipBytes.Length > 0;
+    }
     if (zipBytes.Length == 0)
     {
         return Results.NotFound();
     }
 
-    string fileName = $"PRISMA_Evaluation_Footprint_{DateTime.UtcNow:yyyyMMdd}.zip";
+    string fileName = multivocal ? $"MLR_Run_Archive_{DateTime.UtcNow:yyyyMMdd}.zip" : $"PRISMA_Evaluation_Footprint_{DateTime.UtcNow:yyyyMMdd}.zip";
     return Results.File(zipBytes, "application/zip", fileName);
 }).RequireRateLimiting("ArchiveDownloadPolicy");
 
@@ -230,6 +236,14 @@ app.MapGet("/api/workspace/{sessionId:guid}/protocol.md", (Guid sessionId) =>
 {
     string? text = reviewEngine.Store.ReadProtocol(sessionId);
     return text == null ? Results.NotFound() : Results.Text(text, "text/markdown; charset=utf-8");
+}).RequireRateLimiting("ArchiveDownloadPolicy");
+
+// The paper of a checked multivocal run as LaTeX, built in code from its files (MLR G-8).
+app.MapGet("/api/workspace/{sessionId:guid}/main.tex", (Guid sessionId) =>
+{
+    string? tex = multivocalWriter.MainTex(sessionId);
+    return tex == null ? Results.NotFound()
+        : Results.File(new System.Text.UTF8Encoding(false).GetBytes(tex), "application/x-tex; charset=utf-8", AuBtechReviewAgent.MultivocalPaper.MainTexFile);
 }).RequireRateLimiting("ArchiveDownloadPolicy");
 
 // The report of a synthesised multivocal run, written in code from its files (MLR block G).

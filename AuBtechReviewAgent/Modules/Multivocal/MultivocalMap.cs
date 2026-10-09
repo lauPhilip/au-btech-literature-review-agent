@@ -25,6 +25,15 @@ public sealed class MapAttribute
     public List<string> Values { get; set; } = new();
     public bool Multiple { get; set; }
     public bool Open { get; set; }
+
+    /// <summary>
+    /// Other research questions this attribute answers too, such as "how often is each practice mentioned?" for the
+    /// practice attribute: a question that only counts another attribute's values gets no attribute of its own.
+    /// </summary>
+    public List<string> AlsoFor { get; set; } = new();
+
+    /// <summary>Whether this attribute answers the question, as its own or as one it answers too.</summary>
+    public bool Serves(string question) => Question == question || AlsoFor.Contains(question);
 }
 
 /// <summary>One version of the map: who made it and when.</summary>
@@ -72,7 +81,7 @@ public sealed class MultivocalMapper
     public const string MapFile = "multivocal-map.json";
     public const string StageMapping = "Mapping";
     public const string StageMapped = "Mapped";
-    public const string PromptVersion = "grey-map-v2";
+    public const string PromptVersion = "grey-map-v3";
 
     public const int MaxAttributes = 20;
 
@@ -138,6 +147,9 @@ public sealed class MultivocalMapper
             var answer = await AskAsync(_chat(), planned.Plan, shown);
             var file = new MultivocalMapFile { RunId = runId, PromptVersion = PromptVersion, Model = _model, SourcesSeen = shown.Count };
             var proposed = Clean(answer.Attributes);
+            // A question the map does not serve is said so in the map's notes, and the paper says it is not answered.
+            foreach (var (number, _) in planned.Plan.Numbered().Where(q => !proposed.Any(a => !IsKnownFact(a) && a.Serves(q.Number))))
+                file.Notes.Add($"{number} has no attribute in the model's map, so the extraction records nothing for it.");
             foreach (var known in proposed.Where(IsKnownFact))
                 file.Notes.Add($"\"{known.Name}\" ({known.Question}) was left out of the model's map: it is known for every source and recorded by code.");
             file.Versions.Add(new MapVersion { Number = 1, CreatedUtc = DateTime.UtcNow, By = "model", Attributes = proposed.Where(a => !IsKnownFact(a)).ToList() });
@@ -251,6 +263,8 @@ public sealed class MultivocalMapper
         Description = ReviewInputGuard.Normalize(a.Description ?? "", singleLine: true),
         Open = a.Open,
         Multiple = a.Multiple,
+        AlsoFor = (a.AlsoFor ?? new()).Select(q => (q ?? "").Trim().ToUpperInvariant())
+            .Where(q => q.Length > 0 && q != (a.Question ?? "").Trim().ToUpperInvariant()).Distinct().ToList(),
         Values = a.Open ? new() : (a.Values ?? new())
             .Select(v => ReviewInputGuard.Normalize(v ?? "", singleLine: true))
             .Where(v => v.Length > 0 && !NotStatedValues.Contains(v.TrimEnd('.')))
@@ -268,6 +282,7 @@ public sealed class MultivocalMapper
         {
             if (a.Name.Length == 0) return "Give every attribute a name.";
             if (!questions.Contains(a.Question)) return $"\"{a.Name}\" must belong to one of the research questions ({string.Join(", ", questions)}).";
+            if (a.AlsoFor.FirstOrDefault(q => !questions.Contains(q)) is { } unknown) return $"\"{a.Name}\" names {unknown} in alsoFor, which is not one of the research questions ({string.Join(", ", questions)}).";
             if (new[] { a.Name, a.Description }.Concat(a.Values).Any(t => t.Length > MaxText)) return $"Keep every text in \"{a.Name}\" under {MaxText} characters.";
             if (!a.Open && a.Values.Count < 2) return $"\"{a.Name}\" needs at least two values, or mark it as open text.";
             if (a.Values.Count > MaxValues) return $"\"{a.Name}\" can have at most {MaxValues} values.";
@@ -330,6 +345,7 @@ public sealed class MultivocalMapper
             6. Do not add "Not specified", "Unknown" or similar values: "not stated" is recorded for every attribute automatically.
             7. Do not add attributes for what is already known about every source: {{string.Join(", ", KnownFacts.Select(f => f.Name.ToLowerInvariant()))}}, and the source's producer.
             8. Name each attribute in plain words with spaces ("Tool or framework", not "ToolOrFramework").
+            9. Every research question needs an attribute. A question that only asks how often, or whether, the values of another question's attribute occur (such as "how often is each practice mentioned?") gets no attribute of its own: add its number to that attribute's "alsoFor" list instead.
             Use two to {{MaxValues}} values per attribute.
 
             {{AnswerShape}}
@@ -339,7 +355,7 @@ public sealed class MultivocalMapper
 
     private const string AnswerShape = """
         Respond ONLY with a valid minified JSON object of this shape:
-        {"attributes":[{"name":"Practice","question":"RQ1","description":"One sentence.","values":["Retrieval","Summarisation","Other"],"multiple":true,"open":false}]}
+        {"attributes":[{"name":"Practice","question":"RQ1","alsoFor":[],"description":"One sentence.","values":["Retrieval","Summarisation","Other"],"multiple":true,"open":false}]}
         """;
 }
 
