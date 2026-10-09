@@ -31,6 +31,26 @@ The ledger is written with `SafeFile.WriteAllTextAsync`: a temporary copy is wri
 
 Outside the run folders, `App_Data/metrics/runs.jsonl` (`RunMetricsStore`) keeps one line of `RunMetrics` per completed run. It is not removed by the run clean-up, so quality can be compared across months of runs and app versions. It holds no research question (only a hash of it) and no paper text. `ConfigFingerprint` is a hash of the model, the app version and the settings that shape the output; runs with the same fingerprint were produced the same way. The prompt fingerprint in `llm-calls.json` cannot serve for this, because it hashes the prompts with their paper excerpts and so differs between any two reviews.
 
+## The run folder of a multivocal run
+
+A multivocal or grey literature review (`Modules/Multivocal/`) keeps its own files in the same kind of folder, one file per step, each written with `SafeFile` when its step ends. The step's service names the file in a constant, and `MultivocalModule.ArchiveFiles` lists the ones that go into the archive.
+
+| File | Written by | Contents |
+|---|---|---|
+| `run.json`, `protocol.md`, `multivocal-plan.json` | `MultivocalPlanner` | The header, the protocol with its SHA-256, and the plan it was written from |
+| `multivocal-ledger.json`, `SourceResponses/` | `MultivocalSearcher` | Every search with its raw answers, the sources found with the searches that found them, skipped searches and the stopping rule as applied |
+| `multivocal-screening.json` | `MultivocalScreener` | Both screenings of every source, their agreement (κ) and the reviewer's changes |
+| `multivocal-pages.json`, `PageText/` | `MultivocalPages` | The record of each page snapshot (address after redirects, access date, SHA-256 of the text, Wayback Machine link, or why it was not fetched); the text itself is in `PageText/` |
+| `multivocal-quality.json` | `MultivocalQualityAssessor` | The checklist points of every included source with their quotes, and the threshold |
+| `multivocal-map.json`, `multivocal-extraction.json`, `multivocal-synthesis.json` | mapper, extractor, synthesiser | The systematic map, every value with its quote, and the themes with their findings, second placements and the values the support check left out |
+| `references.bib`, `references.ris`, `screened.ris` | `GreyReferences` | Written in code after the synthesis; the paper cites by their numbers |
+| `mlr-paper.json`, `grounded-outline.txt`, `peer-review-feedback.json`, `citation-audit.json` | `MultivocalWriter` | The written paper, its outline and peer review, and the citation check |
+| `multivocal-report.md` | the report page | The report written in code, when opened in the browser that planned the run |
+| `llm-calls.json` | `MultivocalRunner` | Every model call, labelled with its step; each start of the run adds its calls after the earlier ones (`MultivocalRunLog`) |
+| `run-metrics.json` | `MultivocalWriter.WriteMetricsAsync` | The run's figures, with the setting `Module = multivocal`, also appended to the metrics store, which returns them apart from the systematic runs |
+
+**Page snapshots.** A grey source is cited for what its web page says, so the review keeps the text of each page it reads. `PageFetcher` fetches only pages the run's own searches found; it reads the site's `robots.txt` for the product token `TraceableAI` first (RFC 9309: a missing file allows everything, a server error or an unreadable file allows nothing), waits at least a second between requests to a site or longer for a `Crawl-delay` (a site asking for more than 30 seconds is skipped), refuses sign-in pages, stops at 10 MB and connects only to public addresses. The main text (HTML, plain text or PDF) is kept in `PageText/` for the run's lifetime, so the quality checklist, the extraction and the citation check can be repeated against exactly the text that was read, and it is deleted with the run folder by the clean-up after `Runs:RetentionDays`. The archive holds `multivocal-pages.json` but not `PageText/`: the address, the access date, the SHA-256 of the text, the quoted passages and a link to the Wayback Machine's capture nearest the access date (a link built in code; no capture is requested). Anyone with the archive can therefore check a quote against the page as archived, and anyone with the run can check it against the kept text, without the archive redistributing other people's pages. The privacy page says the same in plain words.
+
 ## The data model
 
 ```mermaid

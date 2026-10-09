@@ -34,6 +34,18 @@ public class ReviewModulesOptionsTests
     }
 
     [Fact]
+    public void AReviewIsDescribedOnTheSiteOnlyWhenItsCardIsOnOrItsModuleIsInPreview()
+    {
+        var development = ReviewModulesOptions.From(Settings("multivocal"), isDevelopment: true);
+        var production = ReviewModulesOptions.From(Settings("multivocal"), isDevelopment: false);
+
+        Assert.True(development.Shows("grey"));
+        Assert.False(production.Shows("grey"));      // the model card and privacy page leave it out until the card is on
+        Assert.True(production.Shows("systematic")); // an available card is always described
+        Assert.False(development.Shows("unknown"));
+    }
+
+    [Fact]
     public void ARunOpensOnTheModuleThatMadeIt()
     {
         var runId = Guid.NewGuid();

@@ -21,6 +21,19 @@ public sealed class ReviewModulesOptions
     /// <summary>Can people open this module's pages here? Yes when one of its cards is available, or it is in preview.</summary>
     public bool CanOpen(IReviewModule module) => module.Cards.Any(c => c.Available) || IsPreview(module.Key);
 
+    /// <summary>
+    /// Should the site describe this card's review (on the model card, the privacy page and the like)? Yes when the
+    /// card is available, or its module is in preview. So a review being built is described in Development and stays
+    /// out of sight in production until its card is switched on (<see cref="ReviewMethod.Available"/>), which is the
+    /// one switch that makes it public everywhere.
+    /// </summary>
+    public bool Shows(string cardKey)
+    {
+        var module = ReviewModules.ForCard(cardKey);
+        var card = module.Cards.FirstOrDefault(c => c.Key.Equals(cardKey, StringComparison.OrdinalIgnoreCase));
+        return card != null && (card.Available || IsPreview(module.Key));
+    }
+
     /// <summary>Reads the section; outside Development the preview list is always empty.</summary>
     public static ReviewModulesOptions From(IConfiguration configuration, bool isDevelopment)
     {
