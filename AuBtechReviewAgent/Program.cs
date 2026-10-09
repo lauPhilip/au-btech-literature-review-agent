@@ -112,7 +112,9 @@ var multivocalPlanner = new AuBtechReviewAgent.MultivocalPlanner(reviewEngine.St
 builder.Services.AddSingleton(multivocalPlanner); // multivocal planning (preview)
 var multivocalSearcher = new AuBtechReviewAgent.MultivocalSearcher(reviewEngine.Store, multivocalPlanner, key => AuBtechReviewAgent.GreySourceCatalog.Create(key, openSources.ContactEmail));
 builder.Services.AddSingleton(multivocalSearcher); // multivocal grey searches (preview)
-var multivocalChat = () => AuBtechReviewAgent.LlmFactory.Create(llmOptions, mistralApiKey);
+// Inside a run started by the runner, the steps use the run's recording service, so their calls land in llm-calls.json.
+var multivocalChat = () => (Microsoft.SemanticKernel.ChatCompletion.IChatCompletionService?)AuBtechReviewAgent.LlmRecording.Current
+    ?? AuBtechReviewAgent.LlmFactory.Create(llmOptions, mistralApiKey);
 var multivocalScreener = new AuBtechReviewAgent.MultivocalScreener(reviewEngine.Store, multivocalPlanner, multivocalSearcher,
     multivocalChat, reviewEngine.Cache, llmOptions.Model, llmOptions.ScreeningParallelism);
 builder.Services.AddSingleton(multivocalScreener); // grey screening (preview)
@@ -134,10 +136,11 @@ var multivocalReporter = new AuBtechReviewAgent.MultivocalReporter(reviewEngine.
     multivocalQuality, multivocalMapper, multivocalExtractor, multivocalSynthesiser);
 builder.Services.AddSingleton(multivocalReporter); // report, written in code (preview)
 var multivocalWriter = new AuBtechReviewAgent.MultivocalWriter(reviewEngine.Store, multivocalReporter, multivocalPages, multivocalChat,
-    llmOptions.Model, llmOptions.ScreeningParallelism, reviewEngine.Cache);
+    llmOptions.Model, llmOptions.ScreeningParallelism, reviewEngine.Cache, metricsStore);
 builder.Services.AddSingleton(multivocalWriter); // writing and checking the paper (preview)
 builder.Services.AddSingleton(new AuBtechReviewAgent.MultivocalRunner(reviewEngine.Store, multivocalSearcher, multivocalScreener, multivocalQuality,
-    multivocalMapper, multivocalExtractor, multivocalSynthesiser, multivocalPages, multivocalWriter)); // runs the steps one after another (preview)
+    multivocalMapper, multivocalExtractor, multivocalSynthesiser, multivocalPages, multivocalWriter,
+    () => AuBtechReviewAgent.LlmFactory.Create(llmOptions, mistralApiKey), llmOptions.Model)); // runs the steps one after another (preview)
 // Modules shown as a preview while they are being built (Development only; see ReviewModulesOptions).
 builder.Services.AddSingleton(AuBtechReviewAgent.ReviewModulesOptions.From(builder.Configuration, builder.Environment.IsDevelopment()));
 

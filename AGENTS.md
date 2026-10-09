@@ -47,4 +47,4 @@ The site uses a strict Content-Security-Policy (`script-src 'self'`): no inline 
 
 A kind of review is done only when its module passes the module test kit (`AuBtechReviewAgent.Tests/Modules/ModuleKitTests.cs`), which checks rules 1, 2, 3, 5, 6 and 7 on a complete fake run.
 
-Commits are small and focused (a few files each) and every commit builds and passes the tests on its own.
+Commits are small and focused, with at most three files each, and every commit builds and passes the tests on its own. Every commit message starts with one of four prefixes: `(feat): ` for a new feature, `(fix): ` for a bug fix, `(add): ` for added tests, data or assets, and `(docs): ` for documentation.

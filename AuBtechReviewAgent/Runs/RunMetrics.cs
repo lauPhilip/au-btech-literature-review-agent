@@ -135,6 +135,10 @@ public class RunMetrics
     public double DurationMinutes { get; set; }
     public Dictionary<string, StageCost> CostByStage { get; set; } = new();
 
+    /// <summary>Whether the run is a multivocal one (setting Module = "multivocal"); systematic runs have no Module setting.</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public bool IsMultivocal => Settings.TryGetValue("Module", out var module) && module == "multivocal";
+
     /// <summary>App version without the build metadata, for display ("1.4.0+abc1234" → "1.4.0 (abc1234)").</summary>
     public string ShortVersion
     {
@@ -326,8 +330,11 @@ public class RunMetricsStore
         }
     }
 
-    /// <summary>Every stored run, oldest first. A line that cannot be read is skipped.</summary>
-    public List<RunMetrics> ReadAll()
+    /// <summary>
+    /// Every stored run of one kind, oldest first: the systematic runs, or with <paramref name="multivocal"/> the
+    /// multivocal ones, so the figures of the two kinds of review are never mixed. A line that cannot be read is skipped.
+    /// </summary>
+    public List<RunMetrics> ReadAll(bool multivocal = false)
     {
         var list = new List<RunMetrics>();
         if (!_options.Enabled || !File.Exists(_file)) return list;
@@ -345,6 +352,6 @@ public class RunMetricsStore
             }
         }
         if (skipped > 0) _log.LogWarning("Skipped {Count} unreadable line(s) in {File}", skipped, _file);
-        return list.OrderBy(m => m.CompletedUtc, StringComparer.Ordinal).ToList();
+        return list.Where(m => m.IsMultivocal == multivocal).OrderBy(m => m.CompletedUtc, StringComparer.Ordinal).ToList();
     }
 }
