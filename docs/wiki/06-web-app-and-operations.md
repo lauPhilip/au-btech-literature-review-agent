@@ -18,8 +18,8 @@ The request pipeline then adds, in order: forwarded headers (for a reverse proxy
 | component | `Components/Layout/SiteHeader.razor` | The top bar every page shares, with the current page marked and a "Skip to content" link |
 | `/glossary` | `Components/Pages/GlossaryPage.razor` | Plain-language explanations of the terms the app uses (`Glossary.cs`) |
 | `/about` | `Components/Pages/About.razor` | Who made it, what the verdict colours mean, the limits, questions and answers, how to cite, contact |
-| `/privacy` | `Components/Pages/Privacy.razor` | What is stored, for how long and what is sent where; the periods come from the running configuration |
-| `/model-card` | `Components/Pages/ModelCard.razor` | Which steps the model does and how each is checked in code, the known failure modes, measured citation accuracy from the metrics store |
+| `/privacy` | `Components/Pages/Privacy.razor` | What is stored, for how long and what is sent where, including how a grey literature review fetches web pages and keeps their text for the run's lifetime; the periods come from the running configuration |
+| `/model-card` | `Components/Pages/ModelCard.razor` | Which steps the model does and how each is checked in code, for the systematic review and the grey literature review, the known failure modes of each, and measured citation accuracy of the systematic runs from the metrics store |
 | `/verify` | `Components/Pages/Verify.razor` | Upload a run archive and check every file against `manifest.json` (`RunManifest.CheckArchive`); nothing is stored |
 | `GET /health` | `Program.cs`, `SiteHealth.cs` | Whether the app can do its work, as JSON for uptime monitoring (see "Health, database status and logs" below) |
 | `GET /.well-known/security.txt` | `Program.cs`, `SiteSeo.SecurityTxt` | Where to report a vulnerability (RFC 9116), with an expiry date computed when served; see `SECURITY.md` |
