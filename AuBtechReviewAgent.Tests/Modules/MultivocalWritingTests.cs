@@ -69,7 +69,7 @@ public class MultivocalWritingTests
 
         // The prompts name the review and its sources, and the abstract's numbers come from code.
         Assert.Contains(model.Prompts, p => p.Contains("You are writing one subsection of the Results") && p.Contains("a grey literature review following the Garousi et al. (2019) guidelines") && p.Contains("SOURCE [1]"));
-        Assert.Contains(model.Prompts, p => p.Contains("You are writing the title") && p.Contains("Screened twice: 4; included: 3; excluded: 1."));
+        Assert.Contains(model.Prompts, p => p.Contains("You are writing the title") && p.Contains("Included at screening, before the quality check: 3; excluded at screening: 1.") && p.Contains("kept for the synthesis: 3"));
         Assert.Contains(model.Prompts, p => p.Contains("You are writing the summary for practitioners") && p.Contains("WRITTEN FOR: " + MultivocalReporter.Audience(input.Planned.Plan.Audience)));
         Assert.Contains("6 of 6 writing steps · the title, abstract and introduction", lines);
     }
@@ -136,6 +136,41 @@ public class MultivocalWritingTests
             TestFolders.TryDelete(folder);
         }
     }
+
+    [Fact]
+    public async Task TheCheckedPaperIsBuiltInTheSharedShapeAndWrittenAsLatex()
+    {
+        var input = MultivocalPaperTests.Input();
+        var model = new FakeChatService().RespondsWith(Respond);
+        var (paper, _) = await MultivocalWriter.WritePaperAsync(model, input, Kept, "fake-model", parallelism: 1);
+        var audit = await MultivocalWriter.CheckPaperAsync(model, input, paper, Kept, parallelism: 1);
+
+        var built = MultivocalPaper.Build(input, paper, audit);
+
+        Assert.Equal("AI-GENERATED GREY LITERATURE REVIEW", built.KindLabel);
+        Assert.Equal(paper.Title, built.Title);
+        Assert.EndsWith("The research questions were RQ1: Which context engineering practices do practitioners and researchers describe?; RQ1.1: Which tools and frameworks support these practices?; RQ1.2: How are the practices usually applied when an agent is built?; RQ2: How often is each practice mentioned in grey and in academic sources?; RQ3: Is the use of retrieval for context related to fewer reported agent failures?", built.Objectives);
+        Assert.Equal(new[] { "RQ1: Keeping the context short", "RQ1.1: Which tools and frameworks support these practices?" }, built.Themes.Take(2).Select(t => t.Heading));
+        Assert.Contains(@"\begin{tabular}", built.Themes[1].Latex); // RQ1.1 answered in code, as a table
+        Assert.Contains("What this theme rests on", built.Themes[0].Latex);
+        Assert.Equal("Automated citation check", Assert.Single(built.DiscussionNotes).Heading);
+        Assert.Contains("could not be verified", built.DiscussionNotes[0].Text);
+        Assert.Equal("Summary for practitioners", built.Summary!.Heading);
+        Assert.Equal(new[] { "Use of artificial intelligence", "Registration and protocol", "Availability" }, built.Declarations.Select(d => d.Heading));
+        Assert.Equal(3, built.References.Count);
+
+        string tex = PaperLatex.Build(built);
+        Assert.Contains(@"\section{Summary for practitioners}", tex);
+        Assert.Contains(@"\item Keep a running summary of the conversation [1, 2].", tex);
+        Assert.Contains(@"\bibitem{ref3}", tex);
+        Assert.Equal(CountOf(tex, @"\begin{"), CountOf(tex, @"\end{"));
+
+        // The summary is shown one item per paragraph; its sentences are the ones the check numbered.
+        Assert.Equal(CitationSupportChecker.SplitSentences(paper.SummaryItems.Aggregate((a, b) => a + "\n" + b)),
+            CitationSupportChecker.SplitSentences(string.Join("\n\n", paper.SummaryItems)));
+    }
+
+    private static int CountOf(string text, string part) => (text.Length - text.Replace(part, "").Length) / part.Length;
 
     private sealed class SyncProgress(Action<string> report) : IProgress<string>
     {

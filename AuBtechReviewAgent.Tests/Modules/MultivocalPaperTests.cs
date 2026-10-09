@@ -184,6 +184,42 @@ public class MultivocalPaperTests
     }
 
     [Fact]
+    public void AFrequencyQuestionCanBeAnsweredByCountingAnotherQuestionsAttribute()
+    {
+        var input = Input();
+        var map = input.Map.Versions[0];
+        map.Attributes.RemoveAll(a => a.Name == "Practice mentioned");
+        map.Attributes.Single(a => a.Name == "Practice").AlsoFor.Add("RQ2"); // "how often is each practice mentioned?" counts RQ1's practices
+        var rq2 = input.Planned.Plan.Numbered().Single(q => q.Number == "RQ2");
+
+        var table = Assert.Single(MultivocalPaperParts.CodeAnswerTables(input, "RQ2"));
+
+        Assert.Equal("Practice", table.Caption);
+        Assert.Equal(new[] { "Summarisation", "2", "67%", "[1, 2]" }, table.Rows[0]);
+        Assert.Contains("It counts the values of \"Practice\" (RQ1)", MultivocalPaperParts.CodeAnswerLead(input, "RQ2", rq2.Question));
+        Assert.True(map.Attributes.Single(a => a.Name == "Practice").Serves("RQ2"));
+        var cleaned = Assert.Single(MultivocalMapper.Clean(new[] { new MapAttribute { Name = "Practice", Question = "rq1", AlsoFor = { " rq2 ", "RQ1", "RQ2" }, Values = { "A", "B" } } }));
+        Assert.Equal(new[] { "RQ2" }, cleaned.AlsoFor); // its own question and repeats are dropped
+        Assert.NotNull(MultivocalMapper.Problem(new[] { new MapAttribute { Name = "Practice", Question = "RQ1", AlsoFor = { "RQ9" }, Values = { "A", "B" } } }, input.Planned.Plan));
+    }
+
+    [Fact]
+    public void ALongListOfNamesEachFromOneSourceIsShownAsOneRow()
+    {
+        var counts = new List<(string, int, IReadOnlyList<int>)> { ("LangGraph", 2, new[] { 1, 2 }) };
+        counts.AddRange(Enumerable.Range(1, MultivocalPaperParts.SingleSourceRows + 2).Select(i => ($"Tool {i}", 1, (IReadOnlyList<int>)new[] { i })));
+        counts.Add(("not stated", 1, Array.Empty<int>()));
+
+        var (shown, once) = MultivocalPaperParts.Compact(counts, open: true);
+
+        Assert.Equal(new[] { "LangGraph", "not stated" }, shown.Select(c => c.Value));
+        Assert.Equal(MultivocalPaperParts.SingleSourceRows + 2, once.Count);
+        Assert.Equal(counts.Count, MultivocalPaperParts.Compact(counts, open: false).Shown.Count); // a closed attribute keeps every value
+        var few = counts.Take(1 + MultivocalPaperParts.SingleSourceRows).ToList(); // as many names from one source as rows allow
+        Assert.Empty(MultivocalPaperParts.Compact(few, open: true).NamedOnce);
+    }
+
+    [Fact]
     public void TheNoteUnderAThemeSaysWhatItRestsOnAndWhereSourcesDisagree()
     {
         var input = Input();

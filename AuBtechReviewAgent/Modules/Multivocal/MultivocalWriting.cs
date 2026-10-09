@@ -164,9 +164,41 @@ public sealed class MultivocalWriter
         var f = MultivocalPaperParts.Flow(input);
         var plan = input.Planned.Plan;
         return $"Kind of review: {plan.ReviewKind} following the Garousi et al. (2019) guidelines. " +
-               $"Grey sources found: {f.Found} from {f.Searches} searches. Screened twice: {f.Screened}; included: {f.Included}; excluded: {f.Excluded}. " +
-               $"Passed the quality threshold of {input.Quality.Threshold} of {input.Quality.MaxPoints} points: {f.Passed}. Extracted against the systematic map: {f.Extracted}. " +
-               $"Findings: {f.Findings}. Themes: {f.Themes}. Research questions: {plan.Numbered().Count}.";
+               $"Grey sources found by the searches: {f.Found}, from {f.Searches} searches. Screened twice against the criteria: {f.Screened}. " +
+               $"Included at screening, before the quality check: {f.Included}; excluded at screening: {f.Excluded}. " +
+               $"Passed the quality check ({input.Quality.Threshold} of {input.Quality.MaxPoints} points or more) and kept for the synthesis: {f.Passed}; below the threshold: {f.Included - f.Passed}. " +
+               $"Extracted against the systematic map: {f.Extracted}. Findings: {f.Findings}. Themes: {f.Themes}. Research questions: {plan.Numbered().Count}. " +
+               "Use each number only with the meaning given here: the sources the results rest on are the ones kept for the synthesis, not the ones included at screening.";
+    }
+
+    // ---------- The paper as main.tex, and the archive ----------
+
+    /// <summary>The paper of a checked run as main.tex, built in code from its files each time; null before the check.</summary>
+    public string? MainTex(Guid runId)
+    {
+        var input = _reporter.LoadInput(runId);
+        var paper = Load(runId);
+        if (input == null || paper?.CheckedUtc == null) return null;
+        var previous = System.Globalization.CultureInfo.CurrentCulture;
+        System.Globalization.CultureInfo.CurrentCulture = System.Globalization.CultureInfo.InvariantCulture;
+        try { return PaperLatex.Build(MultivocalPaper.Build(input, paper, LoadAudit(runId))); }
+        finally { System.Globalization.CultureInfo.CurrentCulture = previous; }
+    }
+
+    /// <summary>
+    /// The archive of a multivocal run: main.tex when the paper is checked, then the module's files and the core
+    /// files of the run folder, the raw search answers, and manifest.json with the SHA-256 of everything
+    /// (<see cref="RunArchive.Build"/>). Empty when the run is not a multivocal run.
+    /// </summary>
+    public byte[] Archive(Guid runId)
+    {
+        var header = _runs.LoadHeader(runId);
+        var module = ReviewModules.Find("multivocal");
+        if (header == null || module == null || ReviewModules.ElsewhereFor(header, module.Key) != null) return Array.Empty<byte>();
+        var generated = new List<(string Path, byte[] Content)>();
+        if (MainTex(runId) is { } tex) generated.Add((MultivocalPaper.MainTexFile, new System.Text.UTF8Encoding(false).GetBytes(tex)));
+        var planned = _reporter.LoadInput(runId)?.Planned;
+        return RunArchive.Build(runId, _runs.FolderOf(runId), generated, module.ArchiveFiles, planned?.ProtocolSha256, Load(runId)?.Model);
     }
 
     // ---------- Writing ----------

@@ -172,7 +172,7 @@ public static class MultivocalPaperParts
         string ticks = string.Join(",", Enumerable.Range(1, kinds.Count));
         string labels = string.Join(",", kinds.Select(k => "{" + PaperLatex.Escape(Short(k.Label)) + "}"));
         sb.AppendLine(@"\begin{tikzpicture}[scale=0.8]");
-        sb.AppendLine($"\\begin{{axis}}[xbar stacked, ytick={{{ticks}}}, yticklabels={{{labels}}}, y dir=reverse, xmin=0, xmax={max}, ymin=0.5, ymax={kinds.Count + 0.5}, xlabel={{Sources}}, width=\\textwidth, height={Math.Max(4, 1 + kinds.Count * 0.8).ToString("0.#", CultureInfo.InvariantCulture)}cm, bar width=8pt, yticklabel style={{font=\\footnotesize}}, legend style={{font=\\footnotesize, at={{(0.5,-0.45)}}, anchor=north, legend columns=3, draw=none}}]");
+        sb.AppendLine($"\\begin{{axis}}[xbar stacked, ytick={{{ticks}}}, yticklabels={{{labels}}}, y dir=reverse, xmin=0, xmax={max}, ymin=0.5, ymax={kinds.Count + 0.5}, xlabel={{Sources}}, width=0.8\\textwidth, height={Math.Max(4, 1 + kinds.Count * 0.8).ToString("0.#", CultureInfo.InvariantCulture)}cm, bar width=8pt, yticklabel style={{font=\\footnotesize}}, legend style={{font=\\footnotesize, at={{(0.5,-0.45)}}, anchor=north, legend columns=3, draw=none}}]");
         foreach (var (tier, colour) in new[] { (1, "blue!60"), (2, "teal!50"), (3, "orange!50") })
         {
             string points = string.Join(" ", kinds.Select((k, i) => $"({(k.Tier == tier ? k.Sources : 0)},{i + 1})"));
@@ -220,8 +220,13 @@ public static class MultivocalPaperParts
         var map = FixedMap(input);
         var rows = new List<IReadOnlyList<string>>();
         foreach (var attribute in map.Attributes)
-            foreach (var (value, sources, _) in ValueCounts(input, attribute))
+        {
+            var (shown, namedOnce) = Compact(ValueCounts(input, attribute), attribute.Open);
+            foreach (var (value, sources, _) in shown)
                 rows.Add(new[] { attribute.Name, attribute.Question, value, sources.ToString(CultureInfo.InvariantCulture) });
+            if (namedOnce.Count > 0)
+                rows.Add(new[] { attribute.Name, attribute.Question, $"{namedOnce.Count} more, each named by one source", namedOnce.Count.ToString(CultureInfo.InvariantCulture) });
+        }
         int extracted = input.Extraction.Sources.Count(x => x.Error == null);
         return new PaperTable("The systematic map as counts", new[] { "Attribute", "Question", "Value", "Sources" }, rows,
             $"Counted in code from the {extracted} extracted sources; a source with several values counts once for each, and only values whose quote was found in the kept page and judged to support the value count.");
@@ -259,37 +264,70 @@ public static class MultivocalPaperParts
     public static PaperSection CodeAnswer(MultivocalReportInput input, string number, PlannedQuestion question)
     {
         var tables = CodeAnswerTables(input, number);
-        int extracted = input.Extraction.Sources.Count(x => x.Error == null);
-        string kind = question.Type == "existence" ? "whether something exists" : "how often something occurs";
-        string lead = tables.Count == 0
-            ? $"This question asks {kind}. The systematic map has no attribute for it, so it is not answered here."
-            : $"This question asks {kind}, so it is answered by counting, in code, rather than in written text: the {(tables.Count == 1 ? "table counts" : "tables count")} how many of the {extracted} extracted sources state each value of the systematic map, each value backed by a quote found in the source's kept page. A count says how many sources state a value, not how common it is in practice.";
+        string lead = CodeAnswerLead(input, number, question);
         var latex = new StringBuilder();
         latex.AppendLine(Prose(lead)).AppendLine();
         foreach (var table in tables) latex.Append(ColumnTable(table));
+        // Plain text with "\n" line ends on every system, so the lead can always be told from the tables.
         var text = new StringBuilder(lead);
         foreach (var table in tables)
         {
-            text.AppendLine().AppendLine().AppendLine(table.Caption);
-            foreach (var row in table.Rows) text.AppendLine(string.Join(" | ", row));
+            text.Append("\n\n").Append(table.Caption);
+            foreach (var row in table.Rows) text.Append('\n').Append(string.Join(" | ", row));
+            if (!string.IsNullOrWhiteSpace(table.Note)) text.Append('\n').Append(table.Note);
         }
-        return new PaperSection($"{number}: {question.Text}", text.ToString().Trim(), latex.ToString());
+        return new PaperSection($"{number}: {question.Text}", text.ToString(), latex.ToString());
+    }
+
+    /// <summary>The sentence before the tables of a question answered in code.</summary>
+    public static string CodeAnswerLead(MultivocalReportInput input, string number, PlannedQuestion question)
+    {
+        var attributes = FixedMap(input).Attributes.Where(a => a.Serves(number)).ToList();
+        int extracted = input.Extraction.Sources.Count(x => x.Error == null);
+        string kind = question.Type == "existence" ? "whether something exists" : "how often something occurs";
+        if (attributes.Count == 0) return $"This question asks {kind}. The systematic map has no attribute for it, so it is not answered here.";
+        string borrowed = attributes.All(a => a.Question != number)
+            ? $" It counts the values of {string.Join(" and ", attributes.Select(a => $"\"{a.Name}\" ({a.Question})"))}, which the map records for {(attributes.Count == 1 ? "that question" : "those questions")}."
+            : "";
+        return $"This question asks {kind}, so it is answered by counting, in code, rather than in written text: the {(attributes.Count == 1 ? "table counts" : "tables count")} how many of the {extracted} extracted sources state each value of the systematic map, each value backed by a quote found in the source's kept page.{borrowed} A count says how many sources state a value, not how common it is in practice.";
+    }
+
+    /// <summary>At most this many values named by one source each are listed as rows of an open attribute; the rest share one row.</summary>
+    public const int SingleSourceRows = 8;
+
+    /// <summary>
+    /// The counts as shown: for an open attribute (names of tools, say) with more than <see cref="SingleSourceRows"/>
+    /// values named by one source each, those values leave the rows and are returned apart, to be listed in one line.
+    /// </summary>
+    public static (IReadOnlyList<(string Value, int Sources, IReadOnlyList<int> References)> Shown, IReadOnlyList<(string Value, int Sources, IReadOnlyList<int> References)> NamedOnce) Compact(
+        IReadOnlyList<(string Value, int Sources, IReadOnlyList<int> References)> counts, bool open)
+    {
+        var once = counts.Where(c => c.Sources == 1 && c.Value != "not stated").ToList();
+        if (!open || once.Count <= SingleSourceRows) return (counts, Array.Empty<(string, int, IReadOnlyList<int>)>());
+        return (counts.Where(c => !once.Contains(c)).ToList(), once);
     }
 
     public static IReadOnlyList<PaperTable> CodeAnswerTables(MultivocalReportInput input, string number)
     {
         int extracted = input.Extraction.Sources.Count(x => x.Error == null);
-        return FixedMap(input).Attributes.Where(a => a.Question == number).Select(attribute => new PaperTable(
-            attribute.Name,
-            new[] { "Value", "Sources", "Share", "Cited" },
-            ValueCounts(input, attribute).Select(c => (IReadOnlyList<string>)new[]
+        string Share(int sources) => extracted == 0 ? "–" : $"{Math.Round(100.0 * sources / extracted).ToString(CultureInfo.InvariantCulture)}%";
+        string Cite(IEnumerable<int> refs) => refs.Any() ? $"[{string.Join(", ", refs.Distinct().OrderBy(n => n))}]" : "";
+        return FixedMap(input).Attributes.Where(a => a.Serves(number)).Select(attribute =>
+        {
+            var (shown, namedOnce) = Compact(ValueCounts(input, attribute), attribute.Open);
+            var rows = shown.Select(c => (IReadOnlyList<string>)new[] { c.Value, c.Sources.ToString(CultureInfo.InvariantCulture), Share(c.Sources), Cite(c.References) }).ToList();
+            var notes = new List<string>();
+            if (namedOnce.Count > 0)
             {
-                c.Value,
-                c.Sources.ToString(CultureInfo.InvariantCulture),
-                extracted == 0 ? "–" : $"{Math.Round(100.0 * c.Sources / extracted).ToString(CultureInfo.InvariantCulture)}%",
-                c.References.Count == 0 ? "" : $"[{string.Join(", ", c.References)}]",
-            }).ToList(),
-            attribute.Multiple ? "A source can state several values, so the shares can add up to more than 100%." : null)).ToList();
+                var refs = namedOnce.SelectMany(c => c.References).Distinct().ToList();
+                // Before "not stated", which stays the last row.
+                int at = rows.FindIndex(r => r[0] == "not stated");
+                rows.Insert(at < 0 ? rows.Count : at, new[] { $"{namedOnce.Count} more, each named by one source", refs.Count.ToString(CultureInfo.InvariantCulture), Share(refs.Count), Cite(refs) });
+                notes.Add($"Named by one source each: {string.Join("; ", namedOnce.Select(c => $"{c.Value} [{c.References[0]}]"))}.");
+            }
+            if (attribute.Multiple) notes.Add("A source can state several values, so the shares can add up to more than 100%.");
+            return new PaperTable(attribute.Name, new[] { "Value", "Sources", "Share", "Cited" }, rows, notes.Count == 0 ? null : string.Join(" ", notes));
+        }).ToList();
     }
 
     // ---------- Notes under the themes ----------
@@ -324,10 +362,11 @@ public static class MultivocalPaperParts
     {
         if (table.Headers.Count == 0) return "";
         var sb = new StringBuilder();
-        string width = (0.96 / table.Headers.Count).ToString("0.###", CultureInfo.InvariantCulture);
-        sb.AppendLine(@"\par\smallskip\noindent{\scriptsize");
+        // Each column gets an equal share of the line less its padding (3pt a side), so the table never runs into the next column.
+        string width = (1.0 / table.Headers.Count).ToString("0.###", CultureInfo.InvariantCulture);
+        sb.AppendLine(@"\par\smallskip\noindent{\scriptsize\setlength{\tabcolsep}{3pt}");
         if (table.Caption.Length > 0) sb.AppendLine(@"\textbf{" + PaperLatex.Escape(table.Caption) + @"}\\[2pt]");
-        sb.AppendLine(@"\begin{tabular}{@{}" + string.Concat(table.Headers.Select(_ => $@">{{\raggedright\arraybackslash}}p{{{width}\linewidth}}")) + "@{}}");
+        sb.AppendLine(@"\begin{tabular}{@{}" + string.Concat(table.Headers.Select(_ => $@">{{\raggedright\arraybackslash}}p{{\dimexpr{width}\linewidth-6pt\relax}}")) + "@{}}");
         sb.AppendLine(@"\toprule");
         sb.AppendLine(string.Join(" & ", table.Headers.Select(h => @"\textbf{" + PaperLatex.Escape(h) + "}")) + @" \\");
         sb.AppendLine(@"\midrule");

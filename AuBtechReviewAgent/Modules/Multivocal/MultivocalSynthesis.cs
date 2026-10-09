@@ -249,7 +249,9 @@ public sealed class MultivocalSynthesiser
                 var findings = file.Findings.Where(f => f.Question == question).ToList();
                 if (findings.Count == 0)
                 {
-                    file.Unanswered.Add(question);
+                    // A question answered by another question's attribute (alsoFor) is answered by counting its values.
+                    bool countedElsewhere = fixedMap.Attributes.Any(a => a.AlsoFor.Contains(question) && file.Findings.Any(f => f.Attribute == a.Name));
+                    if (!countedElsewhere) file.Unanswered.Add(question);
                     continue;
                 }
                 var groups = ValueGroups(findings);
