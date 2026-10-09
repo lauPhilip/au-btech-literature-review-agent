@@ -6,6 +6,7 @@
 @inject AuBtechReviewAgent.MultivocalWriter Writer
 @inject NavigationManager Nav
 @inject IJSRuntime JS
+@inject ILogger<MultivocalPaperPage> Logger
 
 @* The paper of a checked multivocal run (MLR G-8), laid out like the systematic review's Review output page and
    built from the same shared parts (Components/Paper): every citation in the written text is a button that opens what
@@ -256,8 +257,11 @@
         openCitation = (c.Field, c.SentenceIndex, c.Reference);
         StateHasChanged();
         try { await JS.InvokeAsync<bool>("traceableReview.scrollTo", AuBtechReviewAgent.CitationView.CiteId(c.Field, c.SentenceIndex, c.Reference)); }
-        catch (JSException) { }
-        catch (JSDisconnectedException) { }
+        catch (Exception ex) when (ex is JSException or JSDisconnectedException or InvalidOperationException or TaskCanceledException)
+        {
+            // Scrolling is a convenience: the citation is open and the bar shows which one it is, so the page works without it.
+            Logger.LogDebug("Could not scroll to the citation: {Message}", ex.Message);
+        }
     }
 
     private void ToggleCitation(string field, int sentence, int reference)
