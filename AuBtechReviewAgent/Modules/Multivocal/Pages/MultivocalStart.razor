@@ -763,7 +763,7 @@
                                         @if (score.NotAssessed != null)
                                         {
                                             <p class="mt-1">Not assessed: @score.NotAssessed.</p>
-                                            @if (canEdit && stage == AuBtechReviewAgent.MultivocalQualityAssessor.StageAssessed && !Runner.IsRunning(planned!.RunId))
+                                            @if (canEdit && stage == AuBtechReviewAgent.MultivocalQualityAssessor.StageAssessed && planned != null && !Runner.IsRunning(planned.RunId))
                                             {
                                                 string address = score.Address;
                                                 <button type="button" class="ui-btn-secondary ui-btn-sm mt-1" disabled="@(retrying == address)" @onclick="() => RetryAsync(address)">@(retrying == address ? "Assessing…" : "Try again")</button>
@@ -876,7 +876,7 @@
                                         }
                                     </details>
                                 }
-                                @if (canEdit && decision != null && decision.Decision != "Duplicate" && stage == AuBtechReviewAgent.MultivocalScreener.StageScreened && !Runner.IsRunning(planned.RunId))
+                                @if (canEdit && decision != null && decision.Decision != "Duplicate" && stage == AuBtechReviewAgent.MultivocalScreener.StageScreened && planned != null && !Runner.IsRunning(planned.RunId))
                                 {
                                     string address = decision.Address;
                                     <div class="mt-1.5 flex flex-wrap items-center gap-1.5">

@@ -32,10 +32,11 @@ public class MultivocalRunnerTests : IDisposable
     private sealed class Web : HttpMessageHandler
     {
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) =>
-            Task.FromResult(new HttpResponseMessage(request.RequestUri!.AbsolutePath == "/post" ? HttpStatusCode.OK : HttpStatusCode.NotFound)
-            {
-                Content = new StringContent($"<html><body><main><p>{PageWords}</p></main></body></html>", Encoding.UTF8, "text/html"),
-            });
+            Task.FromResult(Respond(request.RequestUri!.AbsolutePath == "/post" ? HttpStatusCode.OK : HttpStatusCode.NotFound));
+
+        // The HttpClient that called the handler owns and disposes the response.
+        private static HttpResponseMessage Respond(HttpStatusCode status) =>
+            new(status) { Content = new StringContent($"<html><body><main><p>{PageWords}</p></main></body></html>", Encoding.UTF8, "text/html") };
     }
 
     private sealed class Source : IGreySource
@@ -106,7 +107,9 @@ public class MultivocalRunnerTests : IDisposable
         var map = JsonSerializer.Deserialize<MultivocalMapFile>(File.ReadAllText(Path.Join(store.FolderOf(runId), MultivocalMapper.MapFile)))!;
         Assert.Equal(1, map.FixedVersion); // the model's proposal, fixed as it is
         var done = runner.StatusOf(runId)!;
-        Assert.Equal((false, "Done", (string?)null), (done.Running, done.Step, done.Error));
+        Assert.False(done.Running);
+        Assert.Equal("Done", done.Step);
+        Assert.Null(done.Error);
         Assert.True(done.StartedUtc <= done.EndedUtc); // the page shows the elapsed time
         Assert.False(MultivocalRunner.HasStepsLeft(store.LoadHeader(runId)!.Stage));
     }
