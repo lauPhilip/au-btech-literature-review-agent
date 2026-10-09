@@ -74,7 +74,7 @@ public class MultivocalRunnerTests : IDisposable
             : null;
 
     /// <summary>A run at "Assessed" with its page kept, and a runner over the module's own services.</summary>
-    private async Task<(RunStore Store, Guid RunId, string Key, MultivocalRunner Runner)> AssessedRun(FakeChatService model, bool anyPassed = true, bool withWriter = false)
+    private async Task<(RunStore Store, Guid RunId, string Key, MultivocalRunner Runner)> AssessedRun(FakeChatService model, bool anyPassed = true, bool withWriter = false, bool recorded = false, RunMetricsStore? metrics = null)
     {
         var store = new RunStore(_root);
         var planner = new MultivocalPlanner(store);
@@ -101,19 +101,22 @@ public class MultivocalRunnerTests : IDisposable
         }));
         await RunHeader.WriteAsync(folder, store.LoadHeader(runId)! with { Stage = MultivocalQualityAssessor.StageAssessed });
 
-        var screener = new MultivocalScreener(store, planner, searcher, () => model);
-        var assessor = new MultivocalQualityAssessor(store, planner, searcher, screener, pages, () => model);
-        var mapper = new MultivocalMapper(store, planner, searcher, assessor, () => model);
-        var extractor = new MultivocalExtractor(store, planner, searcher, assessor, mapper, pages, () => model, parallelism: 1);
-        var synthesiser = new MultivocalSynthesiser(store, planner, searcher, assessor, mapper, extractor, pages, () => model);
+        // With recording, the steps use the run's recording service, as the server's factory does.
+        Func<Microsoft.SemanticKernel.ChatCompletion.IChatCompletionService> chat = recorded ? () => LlmRecording.Current ?? (Microsoft.SemanticKernel.ChatCompletion.IChatCompletionService)model : () => model;
+        var screener = new MultivocalScreener(store, planner, searcher, chat);
+        var assessor = new MultivocalQualityAssessor(store, planner, searcher, screener, pages, chat);
+        var mapper = new MultivocalMapper(store, planner, searcher, assessor, chat);
+        var extractor = new MultivocalExtractor(store, planner, searcher, assessor, mapper, pages, chat, parallelism: 1);
+        var synthesiser = new MultivocalSynthesiser(store, planner, searcher, assessor, mapper, extractor, pages, chat);
         MultivocalWriter? writer = null;
         if (withWriter)
         {
             var reporter = new MultivocalReporter(store, planner, searcher, screener, pages, assessor, mapper, extractor, synthesiser);
-            writer = new MultivocalWriter(store, reporter, pages, () => model, "fake-model", parallelism: 1);
+            writer = new MultivocalWriter(store, reporter, pages, chat, "fake-model", parallelism: 1, metrics: metrics);
             _writer = writer;
         }
-        return (store, runId, key, new MultivocalRunner(store, searcher, screener, assessor, mapper, extractor, synthesiser, pages, writer));
+        return (store, runId, key, new MultivocalRunner(store, searcher, screener, assessor, mapper, extractor, synthesiser, pages, writer,
+            recorded ? () => model : null, "fake-model"));
     }
 
     [Fact]
@@ -191,6 +194,76 @@ public class MultivocalRunnerTests : IDisposable
         await runner.RunAsync(runId, key);
         Assert.Equal(MultivocalSynthesiser.StageSynthesised, store.LoadHeader(runId)!.Stage);
         Assert.Null(runner.StatusOf(runId)!.Error);
+    }
+
+    [Fact]
+    public async Task EveryModelCallOfEveryStartIsAddedToTheRunsCallLog()
+    {
+        bool broken = true;
+        var (store, runId, key, runner) = await AssessedRun(Model(() => broken), recorded: true);
+        string folder = store.FolderOf(runId);
+
+        await runner.RunAsync(runId, key); // stops at the map
+        var first = MultivocalRunLog.LoadCalls(folder)!;
+        Assert.NotEmpty(first.Calls);
+        Assert.All(first.Calls, c => Assert.Equal("map", c.Stage));
+
+        broken = false;
+        await runner.RunAsync(runId, key);
+        var log = MultivocalRunLog.LoadCalls(folder)!;
+        Assert.Equal(first.Calls.Select(c => c.PromptSha256), log.Calls.Take(first.Calls.Count).Select(c => c.PromptSha256)); // the first start's calls are kept
+        Assert.Equal(Enumerable.Range(1, log.Calls.Count), log.Calls.Select(c => c.Sequence)); // and the second start's are numbered on
+        Assert.Contains(log.Calls, c => c.Stage == "extraction");
+        Assert.Contains(log.Calls, c => c.Stage == "synthesis");
+        Assert.Equal(log.Calls.Count, log.RunSettings!.LlmCalls);
+        Assert.Equal("fake-model", log.RunSettings.Model);
+        Assert.Null(LlmRecording.Current); // the scope ends with the run
+    }
+
+    [Fact]
+    public async Task ACheckedRunWritesItsMetricsOnceAndKeepsThemApartFromTheSystematicRuns()
+    {
+        var metrics = new RunMetricsStore(new MetricsOptions { Folder = Path.Join(_root, "metrics") }, _root);
+        var (store, runId, key, runner) = await AssessedRun(Model(() => false), withWriter: true, recorded: true, metrics: metrics);
+        string folder = store.FolderOf(runId);
+
+        await runner.RunAsync(runId, key);
+        await runner.RunAsync(runId, key); // nothing is left to run, so nothing is added again
+
+        var m = JsonSerializer.Deserialize<RunMetrics>(File.ReadAllText(Path.Join(folder, MultivocalRunLog.MetricsFile)))!;
+        Assert.True(m.IsMultivocal);
+        Assert.Equal("grey literature review", m.Settings["ReviewKind"]);
+        Assert.Equal(1, m.Identified);
+        Assert.Equal(1, m.Included); // kept for the synthesis
+        Assert.Equal(1, m.Themes);
+        Assert.Equal(1, m.StudiesCited);
+        Assert.True(m.CitationsFinal.Total > 0);
+        Assert.True(m.SynthesisWords > 0);
+        var calls = MultivocalRunLog.LoadCalls(folder)!.Calls;
+        Assert.Equal(calls.Count, m.LlmCalls);
+        Assert.Contains("theme-sections", m.CostByStage.Keys); // the shared writing steps label their own calls
+        Assert.Contains("citation-check", m.CostByStage.Keys);
+        Assert.DoesNotContain("unlabelled", m.CostByStage.Keys);
+        Assert.Equal(m.RunId, Assert.Single(metrics.ReadAll(multivocal: true)).RunId);
+        Assert.Empty(metrics.ReadAll()); // the systematic review's figures stay its own
+
+        using var archive = new System.IO.Compression.ZipArchive(new MemoryStream(_writer!.Archive(runId)));
+        Assert.Contains(archive.Entries, e => e.FullName == MultivocalRunLog.CallsFile);
+        Assert.Contains(archive.Entries, e => e.FullName == MultivocalRunLog.MetricsFile);
+    }
+
+    [Fact]
+    public void TheCallsOfAStartAreNumberedOnFromTheCallsAlreadyInTheLog()
+    {
+        var earlier = new List<LlmCallRecord> { new() { Sequence = 1, Stage = "screening" }, new() { Sequence = 2, Stage = "screening" } };
+        var now = new List<LlmCallRecord> { new() { Sequence = 2, Stage = "map" }, new() { Sequence = 1, Stage = "map", PromptSha256 = "a" } };
+
+        var merged = MultivocalRunLog.Merge(earlier, now);
+
+        Assert.Equal(new[] { 1, 2, 3, 4 }, merged.Select(c => c.Sequence));
+        Assert.Equal("a", merged[2].PromptSha256); // in the order they were made
+        Assert.Equal(2, now[0].Sequence); // the recorder's own records are left as they are
+        Assert.Empty(MultivocalRunLog.Merge(new List<LlmCallRecord>(), new List<LlmCallRecord>()));
     }
 
     [Fact]
