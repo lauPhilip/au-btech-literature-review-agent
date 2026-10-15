@@ -129,8 +129,9 @@ jobs:
       #   SIMPLY_FTP_PASSWORD  - its password
       # 1) app_offline.htm stops the app so its files are not locked; 2) the new files are uploaded
       # (web.config, App_Data and WorkspaceStore on the server are left alone, and nothing is deleted there);
-      # 3) app_offline.htm is removed, which starts the new version. If the upload fails, the site stays
-      # on the "Updating" page rather than running a half-updated app; re-run the job or remove the file by FTP.
+      # 3) every file is checked on the server; 4) app_offline.htm is removed, which starts the new version.
+      # If any step fails, the site stays on the "Updating" page rather than running a half-updated app;
+      # re-run the job or remove the file by FTP.
       # lftp goes on after a failed command unless told otherwise, so cmd:fail-exit stops the script (and fails the
       # job) at the first error; without it a broken upload still removed app_offline.htm and started a half-updated
       # app (HTTP 502.5). The pause after app_offline.htm gives IIS time to stop the app and release its files.
@@ -153,6 +154,29 @@ jobs:
             sleep 15;
             mirror --reverse --parallel=2 --verbose=1 --no-perms \
               --exclude-glob web.config --exclude-glob App_Data/ --exclude-glob WorkspaceStore/ \
-              ./publish .;
+              ./publish .
+          "
+
+      # The mirror skips files it takes to be unchanged, and once left empty runtime files on the server that
+      # every later deploy kept (HTTP 502.5, 15 October 2026). This asks the server for the size of every file of
+      # the build, uploads again any that is missing or differs, and fails the job if one still differs.
+      - name: Check every file on the server
+        env:
+          LFTP_PASSWORD: ${{ secrets.SIMPLY_FTP_PASSWORD }}
+          FTP_USER: ${{ secrets.SIMPLY_FTP_USER }}
+        run: python3 deploy/verify-upload.py ./publish
+
+      - name: Start the new version
+        env:
+          LFTP_PASSWORD: ${{ secrets.SIMPLY_FTP_PASSWORD }}
+          FTP_USER: ${{ secrets.SIMPLY_FTP_USER }}
+        run: |
+          lftp -c "
+            set cmd:fail-exit yes;
+            set ftp:ssl-force true;
+            set ftp:ssl-protect-data true;
+            set ssl:verify-certificate yes;
+            open --env-password -u \"$FTP_USER\" \"$FTP_HOST\";
+            cd \"$REMOTE_DIR\";
             rm app_offline.htm
           "
