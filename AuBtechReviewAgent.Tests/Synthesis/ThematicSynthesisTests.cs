@@ -142,6 +142,27 @@ public class ThematicSynthesisTests : IDisposable
     public void RemoveReferenceDropsOnlyThatNumber(string sentence, int reference, string expected) =>
         Assert.Equal(expected, PrismaReviewEngine.RemoveReference(sentence, reference));
 
+    [Theory]
+    [InlineData("Loops recover [1].", new[] { 1 }, true)]
+    [InlineData("Loops recover [1], but fail [2].", new[] { 1 }, true)]
+    [InlineData("Sources [1, 2] show that loops recover.", new[] { 1 }, true)]           // [2] stays and carries the sentence
+    [InlineData("Sources [1, 2] show that loops recover.", new[] { 1, 2 }, true)]        // "Sources show that loops recover." still reads
+    [InlineData("Loops recover [1] and fail.", new[] { 1 }, true)]
+    [InlineData("Whereas [6] and [14] prioritise gating, [3] does not.", new[] { 14 }, false)] // "[6] and prioritise"
+    [InlineData("Neither [6] nor [14] examines it.", new[] { 6 }, false)]
+    [InlineData("[14]'s harness reduced the rate.", new[] { 14 }, false)]
+    public void ACitationTheSentenceReadsThroughIsNotDropped(string sentence, int[] references, bool canDrop) =>
+        Assert.Equal(canDrop, CitationRepairer.CanDrop(sentence, references));
+
+    [Fact]
+    public void ARevisionNamesOtherSectionsByTheirHeading()
+    {
+        var headings = new Dictionary<string, string> { ["synthesis-2"] = "Memory tiers", ["synthesis-12"] = "Costs" };
+        Assert.Equal("As discussed in the section \u201cMemory tiers\u201d, tiers help [1].", ReviewWriter.NameSections("As discussed in synthesis-2, tiers help [1].", headings));
+        Assert.Equal("See the section \u201cCosts\u201d.", ReviewWriter.NameSections("See [synthesis-12].", headings));
+        Assert.Equal("Nothing to name [1].", ReviewWriter.NameSections("Nothing to name [1].", headings));
+    }
+
     [Fact]
     public void MethodsTextDescribesWhatTheRunDid()
     {
