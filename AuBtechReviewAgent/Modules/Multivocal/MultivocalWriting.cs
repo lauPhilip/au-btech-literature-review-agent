@@ -190,11 +190,15 @@ public sealed class MultivocalWriter
     {
         var f = MultivocalPaperParts.Flow(input);
         var plan = input.Planned.Plan;
+        var inCode = plan.Numbered().Where(q => MultivocalPaperParts.AnsweredInCode(q.Question.Type)).Select(q => q.Number).ToHashSet();
+        int written = input.Synthesis.Themes.Count(t => !inCode.Contains(t.Question));
         return $"Kind of review: {plan.ReviewKind} following the Garousi et al. (2019) guidelines. " +
                $"Grey sources found by the searches: {f.Found}, from {f.Searches} searches. Screened twice against the criteria: {f.Screened}. " +
                $"Included at screening, before the quality check: {f.Included}; excluded at screening: {f.Excluded}. " +
-               $"Passed the quality check ({input.Quality.Threshold} of {input.Quality.MaxPoints} points or more) and kept for the synthesis: {f.Passed}; below the threshold: {f.Included - f.Passed}. " +
-               $"Extracted against the systematic map: {f.Extracted}. Findings: {f.Findings}. Themes: {f.Themes}. Research questions: {plan.Numbered().Count}. " +
+               $"Passed the quality check ({input.Quality.Threshold} of {input.Quality.MaxPoints} points or more) and kept for the synthesis: {f.Passed}; below the threshold: {f.BelowThreshold}; not assessed (page not readable): {f.NotAssessed}. " +
+               $"Extracted against the systematic map: {f.Extracted}. Findings: {f.Findings}. Themes written up as result sections: {written}" +
+               (written == f.Themes ? ". " : $" (of {f.Themes} themes formed in the synthesis; the others belong to questions answered by counting, shown as tables). ") +
+               $"Research questions: {plan.Numbered().Count}. " +
                "Use each number only with the meaning given here: the sources the results rest on are the ones kept for the synthesis, not the ones included at screening.";
     }
 

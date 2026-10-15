@@ -54,6 +54,8 @@ public class GreySourceTests
         Assert.Equal("https://news.ycombinator.com/item?id=402", records[1].Url);
         Assert.Equal("qa", records[1].Kind);
         Assert.Equal("We tried summaries.", records[1].Summary);
+        Assert.Equal("", records[0].Producer); // the poster did not write the linked page; the reference names its site
+        Assert.Equal("x", records[1].Producer); // an Ask HN discussion is the poster's own
     }
 
     [Fact]

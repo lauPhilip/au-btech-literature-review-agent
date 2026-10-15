@@ -42,6 +42,36 @@ public static class CitationRepairer
     }
 
     /// <summary>
+    /// Can these references be dropped without breaking the sentence? Not when it is a marker of its own that the
+    /// sentence reads through, such as "[6] and [14] show" or "Neither [6] nor [14] examines": removing it would leave
+    /// "and show". A marker that ends a clause (followed by punctuation, another marker or the end) is safe to drop, as
+    /// is one after a content word ("loops recover [1] and fail"), and a reference that shares its marker with one that
+    /// stays ("[3, 5] show" without 3 keeps "[5]").
+    /// </summary>
+    private static readonly HashSet<string> NounSlot = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "and", "or", "nor", "neither", "either", "both", "whereas", "while", "but", "than", "unlike", "like", "as", "by", "from",
+        "in", "of", "with", "to", "for", "between", "whether", "although", "though", "since", "because", "where", "when",
+    };
+
+    public static bool CanDrop(string sentence, IReadOnlyCollection<int> references)
+    {
+        foreach (Match m in Regex.Matches(sentence, @"\[(\d+(?:\s*[,–-]\s*\d+)*)\]"))
+        {
+            var refs = CitationSupportChecker.ReferencesIn(m.Value);
+            if (refs.Count == 0 || refs.Any(r => !references.Contains(r))) continue; // the marker keeps a reference
+            string after = sentence[(m.Index + m.Length)..].TrimStart();
+            if (after.Length == 0 || !(char.IsLetterOrDigit(after[0]) || after[0] is '\'' or '’')) continue; // ends a clause
+            if (after[0] is '\'' or '’') return false;                                                    // "[14]'s harness"
+            string before = sentence[..m.Index].TrimEnd();
+            string word = Regex.Match(before, @"(\p{L}+)$").Groups[1].Value;
+            // The marker stands where a name would: at the start, or after a word that needs a noun next.
+            if (before.Length == 0 || before.EndsWith(',') || NounSlot.Contains(word)) return false;
+        }
+        return true;
+    }
+
+    /// <summary>
     /// Should the repair pass look at this verdict? Not supported, partly supported (the sentence claims more
     /// than the paper says), or a positive verdict whose quote was not found. Not "insufficient evidence":
     /// with only an abstract there is nothing to rewrite the sentence from.
@@ -140,7 +170,16 @@ public static class CitationRepairer
                 string action = answer.Action.Trim().ToLowerInvariant();
                 string replacement;
                 if (action == "delete") replacement = "";
-                else if (action == "drop_citation") replacement = flaggedRefs.Aggregate(item.Sentence, RemoveReference);
+                else if (action == "drop_citation")
+                {
+                    if (!CanDrop(item.Sentence, flaggedRefs))
+                    {
+                        repairs.Add(new CitationRepair(field, item.Sentence, item.Sentence, "not applied", flaggedRefs, verdicts,
+                            "The citation is part of the sentence (the sentence names the source), so dropping it would break the sentence; the sentence is unchanged and keeps its verdict."));
+                        continue;
+                    }
+                    replacement = flaggedRefs.Aggregate(item.Sentence, RemoveReference);
+                }
                 else
                 {
                     replacement = MethodsSectionWriter.StripMarkdownEmphasis((answer.Sentence ?? "").Trim());
