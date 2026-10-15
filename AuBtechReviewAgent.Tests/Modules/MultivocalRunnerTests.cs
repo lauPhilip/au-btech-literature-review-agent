@@ -239,6 +239,10 @@ public class MultivocalRunnerTests : IDisposable
         Assert.Equal(1, m.StudiesCited);
         Assert.True(m.CitationsFinal.Total > 0);
         Assert.True(m.SynthesisWords > 0);
+        Assert.Equal(1, m.SourcesBySearch["stackexchange"]);
+        Assert.Equal(12, m.MeanQualityPoints);
+        Assert.Equal(GreyQualityChecklist.MaxPoints, m.MaxQualityPoints);
+        Assert.Equal(0, m.ValuesRejected);
         var calls = MultivocalRunLog.LoadCalls(folder)!.Calls;
         Assert.Equal(calls.Count, m.LlmCalls);
         Assert.Contains("theme-sections", m.CostByStage.Keys); // the shared writing steps label their own calls
