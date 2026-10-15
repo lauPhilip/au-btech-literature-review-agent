@@ -146,6 +146,7 @@ CURRENT SECTION (Recovery and oversight):
 Agent loops recover from faults through supervisor checks [1]. Governance layers audit agent actions [2].
 
 Write plain paragraphs separated by a blank line: no Markdown, no headings, no bullet or numbered lists, no tables and no bold or italics.
+Refer to another section only by its heading in words, never by an id.
 Respond ONLY with a valid minified JSON object:
 {"text":"the revised section with inline [n] citations"}
 === You are writing the title, abstract, rationale and objectives

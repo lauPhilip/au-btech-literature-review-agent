@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.SemanticKernel.ChatCompletion;
@@ -491,6 +492,9 @@ public static class ReviewWriter
             Verdict = "No changes applied",
         };
         var ids = sections.Select(x => x.Field).Append("discussion").ToList();
+        // The critique names sections by id; the reader never sees those ids, so a revision names a section by its heading.
+        var headings = sections.GroupBy(x => x.Field, StringComparer.OrdinalIgnoreCase).ToDictionary(g => g.Key, g => g.First().Heading, StringComparer.OrdinalIgnoreCase);
+        string Named(string text) => NameSections(text, headings);
         string sectionsText = string.Join("\n\n", sections.Select(x => $"[{x.Field}] {x.Heading}\n{x.Text}"))
                               + $"\n\n[discussion] Discussion\n{discussion}";
 
@@ -538,7 +542,7 @@ public static class ReviewWriter
             {
                 var section = sections.FirstOrDefault(x => x.Field == group.Key);
                 string before = section?.Text ?? discussion;
-                string feedback = string.Join("\n", group.Select(c => $"- [{c.Severity}] {c.Issue} -> {c.Suggestion}"));
+                string feedback = Named(string.Join("\n", group.Select(c => $"- [{c.Severity}] {c.Issue} -> {c.Suggestion}")));
                 string revisePrompt = $$"""
                     You are the author revising one section of {{profile.ReviewShort}} in response to peer-review feedback. Apply the feedback. Keep every existing inline [n] citation, cite ONLY numbers from the reference list, and do not invent claims, numbers or {{profile.Sources}}.
 
@@ -552,6 +556,7 @@ public static class ReviewWriter
                     {{before}}
 
                     {{ProseCleaner.PlainProseRule}}
+                    Refer to another section only by its heading in words, never by an id.
                     Respond ONLY with a valid minified JSON object:
                     {"text":"the revised section with inline [n] citations"}
                     """;
@@ -559,7 +564,7 @@ public static class ReviewWriter
                 {
                     var answer = await LlmJson.GetAsync<TextAnswer>(chat, revisePrompt, LlmJson.JsonMode(0.3), a =>
                         string.IsNullOrWhiteSpace(a.Text) ? "text must not be empty." : null);
-                    string after = MethodsSectionWriter.StripMarkdownEmphasis(answer.Text!.Trim());
+                    string after = Named(MethodsSectionWriter.StripMarkdownEmphasis(answer.Text!.Trim()));
                     string? problem = ThematicSynthesis.RevisionProblem(before, after, referenceCount);
                     return new SectionRevision(group.Key, before, problem == null ? after : before, problem == null,
                         problem == null ? $"Revised in response to {group.Count()} comment(s)." : $"Revision rejected: {problem}; original kept.");
@@ -587,5 +592,13 @@ public static class ReviewWriter
         int applied = log.SectionRevisions.Count(r => r.Applied);
         log.Verdict = $"Revisions applied to {applied} of {log.SectionRevisions.Count} section(s) with medium or high comments";
         return (log, discussion);
+    }
+
+    /// <summary>Replaces section ids such as "synthesis-2" (with or without brackets) by the section's heading in quotes.</summary>
+    public static string NameSections(string text, IReadOnlyDictionary<string, string> headings)
+    {
+        if (headings.Count == 0 || string.IsNullOrEmpty(text)) return text;
+        string ids = string.Join("|", headings.Keys.OrderByDescending(k => k.Length).Select(Regex.Escape));
+        return Regex.Replace(text, $@"\[?\b({ids})\b\]?", m => headings.TryGetValue(m.Groups[1].Value, out var heading) ? $"the section \u201c{heading}\u201d" : m.Value, RegexOptions.IgnoreCase);
     }
 }
