@@ -135,6 +135,9 @@ jobs:
       # lftp goes on after a failed command unless told otherwise, so cmd:fail-exit stops the script (and fails the
       # job) at the first error; without it a broken upload still removed app_offline.htm and started a half-updated
       # app (HTTP 502.5). The pause after app_offline.htm gives IIS time to stop the app and release its files.
+      # --transfer-all uploads every file of the build. Without it the mirror skips a file whose copy on the server
+      # has the same size and a newer date, and the .NET runtime files carry their package's old date: after a
+      # build with another .NET patch was uploaded by hand, the server kept a mix of two runtimes (HTTP 502.5).
       - name: Upload to Simply over FTPS
         env:
           LFTP_PASSWORD: ${{ secrets.SIMPLY_FTP_PASSWORD }}
@@ -152,7 +155,7 @@ jobs:
             cd \"$REMOTE_DIR\";
             put app_offline.htm;
             sleep 15;
-            mirror --reverse --parallel=2 --verbose=1 --no-perms \
+            mirror --reverse --transfer-all --parallel=2 --verbose=1 --no-perms \
               --exclude-glob web.config --exclude-glob App_Data/ --exclude-glob WorkspaceStore/ \
               ./publish .
           "
