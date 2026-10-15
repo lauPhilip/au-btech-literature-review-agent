@@ -48,7 +48,9 @@ public sealed class HackerNewsSource : IGreySource
                 title,
                 GreySourceHttp.PlainText(GreyJson.Str(hit, "story_text")),
                 url,
-                GreyJson.Str(hit, "author"),
+                // The author of a story is the person who posted it; for a link that is not the author of the page it
+                // links to, so the producer is left out and the reference names the page's site instead.
+                url == discussion ? GreyJson.Str(hit, "author") : "",
                 GreySourceHttp.HostOf(url),
                 url == discussion ? "qa" : "blogs",
                 DateTime.TryParse(GreyJson.Str(hit, "created_at"), null, System.Globalization.DateTimeStyles.AdjustToUniversal | System.Globalization.DateTimeStyles.AssumeUniversal, out var t) ? t : null,
