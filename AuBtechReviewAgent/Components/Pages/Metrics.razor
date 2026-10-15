@@ -7,6 +7,7 @@
 @inject AuBtechReviewAgent.RunQuotaService Quota
 @inject ProtectedSessionStorage SessionStorage
 @inject ILogger<Metrics> Logger
+@inject AuBtechReviewAgent.ReviewModulesOptions ModuleOptions
 
 <SeoHead Title="Run quality metrics" Path="/metrics" BreadcrumbName="Metrics" ExtraJsonLd="@(baseUrl => AuBtechReviewAgent.SiteSeo.DatasetJsonLd(baseUrl, Store.ReadAll().Count))" Description="How well TraceableAI's citations hold up, run by run: the share of supported, partly supported and unsupported citations, coverage and cost, grouped by app version and settings." />
 
@@ -20,9 +21,31 @@
             Every completed run stores its quality and cost figures here, computed in code from the run's own files. The store outlives the run folders, holds no
             research question or paper text, and groups runs by app version and settings, so you can see whether a change to the pipeline made the citations
             better. The page is public, like the code: it shows quality figures only. Links to the individual run reports are shown to the maintainers of
-            this deployment. Green is supported, amber partly supported, red not supported, blue not checkable from an abstract, grey could not be verified.
+            this deployment. Each kind of review has its own figures, because the same number means different things in each.
         </p>
     </div>
+
+    @if (ShowGrey)
+    {
+        <nav aria-label="Kind of review" class="flex gap-1 border-b border-gray-200">
+            @foreach (var (key, label) in Kinds)
+            {
+                bool active = key == Kind;
+                <a href="@(key == "systematic" ? "/metrics" : $"/metrics?kind={key}")" aria-current="@(active ? "page" : null)"
+                   class="px-3 py-2.5 text-xs border-b-2 -mb-px @(active ? "border-brand text-brand font-semibold" : "border-transparent text-gray-500 hover:text-gray-800")">@label</a>
+            }
+        </nav>
+    }
+    <p class="text-xs text-gray-600 max-w-3xl">
+        @if (Grey)
+        {
+            <span>Grey literature reviews: every citation is checked against the text of the cited web page as it was kept when it was read. Green is supported, amber partly supported, red not supported, blue could not be judged from the kept text, grey could not be verified (the page's kept text was missing or had changed, or the quote was not found in it).</span>
+        }
+        else
+        {
+            <span>Systematic reviews: every citation is checked against the cited paper. Green is supported, amber partly supported, red not supported, blue not checkable from an abstract, grey could not be verified.</span>
+        }
+    </p>
 
     @if (!loaded)
     {
@@ -30,7 +53,7 @@
     }
     else if (runs.Count == 0)
     {
-        <p class="text-xs text-gray-600">No completed runs have been recorded yet. Metrics are written at the end of every completed run (Metrics:Enabled).</p>
+        <p class="text-xs text-gray-600">No completed @(Grey ? "grey literature reviews" : "systematic reviews") have been recorded yet. Metrics are written at the end of every completed run (Metrics:Enabled).</p>
     }
     else
     {
@@ -38,7 +61,7 @@
             <h2 class="ui-h3">Citation verdicts per run</h2>
             <p class="text-[11px] text-gray-500">Share of final verdicts in each of the last @chartRuns.Count runs, oldest on the left. Hover a bar for the numbers; the runs table below has the same data.</p>
             <div class="flex flex-wrap gap-4 text-[11px] text-gray-700">
-                @foreach (var (label, color) in Legend)
+                @foreach (var (label, color) in Grey ? GreyLegend : Legend)
                 {
                     <span class="flex items-center gap-1"><span class="inline-block w-3 h-3 " style="background:@color"></span>@label</span>
                 }
@@ -58,8 +81,10 @@
                         double x = 34 + (double)i * (BarWidth + 2);
                         double top = 4;
                         <g>
-                            <title>@($"{r.CompletedUtc[..10]} · {r.ShortVersion} · {c.Total} citations: {c.Supported} supported, {c.PartiallySupported} partly, {c.NotSupported} not supported, {c.InsufficientEvidence} abstract only, {c.Unverifiable} unverifiable · {r.StudiesCited}/{r.Included} studies cited")</title>
-                            @foreach (var (count, color) in new[] { (c.Unverifiable, Grey), (c.InsufficientEvidence, Blue), (c.NotSupported, Red), (c.PartiallySupported, Amber), (c.Supported, Green) })
+                            <title>@(Grey
+                                ? $"{r.CompletedUtc[..10]} · {r.ShortVersion} · {c.Total} citations: {c.Supported} supported, {c.PartiallySupported} partly, {c.NotSupported} not supported, {c.InsufficientEvidence} not judged from the kept text, {c.Unverifiable} unverifiable · {r.StudiesCited}/{r.Included} sources cited"
+                                : $"{r.CompletedUtc[..10]} · {r.ShortVersion} · {c.Total} citations: {c.Supported} supported, {c.PartiallySupported} partly, {c.NotSupported} not supported, {c.InsufficientEvidence} abstract only, {c.Unverifiable} unverifiable · {r.StudiesCited}/{r.Included} studies cited")</title>
+                            @foreach (var (count, color) in new[] { (c.Unverifiable, Neutral), (c.InsufficientEvidence, Blue), (c.NotSupported, Red), (c.PartiallySupported, Amber), (c.Supported, Green) })
                             {
                                 if (c.Total == 0 || count == 0) continue;
                                 double h = (double)count / c.Total * ChartHeight;
@@ -80,9 +105,17 @@
                 <table class="w-full text-[11px] border border-gray-200">
                     <thead class="bg-gray-50 text-gray-600 text-left">
                         <tr>
-                            <th class="p-1.5">Version</th><th class="p-1.5">Settings</th><th class="p-1.5">Runs</th><th class="p-1.5">Studies cited</th>
-                            <th class="p-1.5">Supported (before)</th><th class="p-1.5">Partly</th><th class="p-1.5">Not supported</th><th class="p-1.5"><Term Key="abstract-only" Below="true">Abstract only</Term></th>
-                            <th class="p-1.5">Full text</th><th class="p-1.5"><Term Key="kappa" Below="true">Coding kappa</Term></th><th class="p-1.5">Calls / run</th><th class="p-1.5">Minutes / run</th>
+                            <th class="p-1.5">Version</th><th class="p-1.5">Settings</th><th class="p-1.5">Runs</th><th class="p-1.5">@(Grey ? "Sources cited" : "Studies cited")</th>
+                            <th class="p-1.5">Supported (before)</th><th class="p-1.5">Partly</th><th class="p-1.5">Not supported</th>
+                            @if (Grey)
+                            {
+                                <th class="p-1.5">Could not be verified</th><th class="p-1.5"><Term Key="kappa" Below="true">Screening kappa</Term></th><th class="p-1.5">Placement kappa</th><th class="p-1.5">Mean quality</th>
+                            }
+                            else
+                            {
+                                <th class="p-1.5"><Term Key="abstract-only" Below="true">Abstract only</Term></th><th class="p-1.5">Full text</th><th class="p-1.5"><Term Key="kappa" Below="true">Coding kappa</Term></th>
+                            }
+                            <th class="p-1.5">Calls / run</th><th class="p-1.5">Minutes / run</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -96,9 +129,19 @@
                                 <td class="p-1.5">@Pct(g.Final.SupportedShare) <span class="text-gray-500">(@Pct(g.Initial.SupportedShare))</span></td>
                                 <td class="p-1.5">@Pct(g.Final.PartialShare) <span class="text-gray-500">(@Pct(g.Initial.PartialShare))</span></td>
                                 <td class="p-1.5">@Pct(g.Final.NotSupportedShare) <span class="text-gray-500">(@Pct(g.Initial.NotSupportedShare))</span></td>
-                                <td class="p-1.5">@Pct(g.Final.InsufficientShare)</td>
-                                <td class="p-1.5">@Pct(g.FullText)</td>
-                                <td class="p-1.5">@(g.CodingKappa is double k ? k.ToString("0.00", CultureInfo.InvariantCulture) : "-")</td>
+                                @if (Grey)
+                                {
+                                    <td class="p-1.5">@Pct(g.Final.UnverifiableShare)</td>
+                                    <td class="p-1.5">@Kappa(g.ScreeningKappa)</td>
+                                    <td class="p-1.5">@Kappa(g.CodingKappa)</td>
+                                    <td class="p-1.5">@(g.MeanQuality is double q ? $"{q.ToString("0.0", CultureInfo.InvariantCulture)} of {g.MaxQuality.ToString("0", CultureInfo.InvariantCulture)}" : "-")</td>
+                                }
+                                else
+                                {
+                                    <td class="p-1.5">@Pct(g.Final.InsufficientShare)</td>
+                                    <td class="p-1.5">@Pct(g.FullText)</td>
+                                    <td class="p-1.5">@Kappa(g.CodingKappa)</td>
+                                }
                                 <td class="p-1.5">@g.Calls.ToString("0", CultureInfo.InvariantCulture)</td>
                                 <td class="p-1.5">@g.Minutes.ToString("0.0", CultureInfo.InvariantCulture)</td>
                             </tr>
@@ -115,9 +158,18 @@
                 <table class="w-full text-[11px] border border-gray-200">
                     <thead class="bg-gray-50 text-gray-600 text-left">
                         <tr>
-                            <th class="p-1.5">#</th><th class="p-1.5">Completed (UTC)</th><th class="p-1.5">Version</th><th class="p-1.5">Included</th><th class="p-1.5">Cited</th>
+                            <th class="p-1.5">#</th><th class="p-1.5">Completed (UTC)</th><th class="p-1.5">Version</th>
+                            @if (Grey)
+                            {
+                                <th class="p-1.5">Found</th><th class="p-1.5">Kept after quality</th>
+                            }
+                            else
+                            {
+                                <th class="p-1.5">Included</th>
+                            }
+                            <th class="p-1.5">Cited</th>
                             <th class="p-1.5">Themes</th><th class="p-1.5">Citations</th><th class="p-1.5">Supported</th><th class="p-1.5">Partly</th><th class="p-1.5">Not</th>
-                            <th class="p-1.5">Repaired</th><th class="p-1.5">Raised by 2nd check</th><th class="p-1.5">Words</th><th class="p-1.5">Report</th>
+                            <th class="p-1.5">Repaired</th><th class="p-1.5">Raised by 2nd check</th><th class="p-1.5">Words</th><th class="p-1.5">@(Grey ? "Paper" : "Report")</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -128,6 +180,10 @@
                                 <td class="p-1.5">@(i + 1)</td>
                                 <td class="p-1.5 font-mono">@r.CompletedUtc.Replace("T", " ").TrimEnd('Z')</td>
                                 <td class="p-1.5 font-mono">@r.ShortVersion</td>
+                                @if (Grey)
+                                {
+                                    <td class="p-1.5">@r.Identified</td>
+                                }
                                 <td class="p-1.5">@r.Included</td>
                                 <td class="p-1.5">@r.StudiesCited</td>
                                 <td class="p-1.5">@(r.ThematicSynthesisUsed ? r.Themes.ToString() : "fallback")</td>
@@ -141,7 +197,7 @@
                                 <td class="p-1.5">
                                     @if (allowed)
                                     {
-                                        <a class="text-brand underline" href="@($"/spec-matrix/{r.RunId}")" @onclick:stopPropagation="true">open</a>
+                                        <a class="text-brand underline" href="@(Grey ? $"/mlr-paper/{r.RunId}" : $"/spec-matrix/{r.RunId}")" @onclick:stopPropagation="true">open</a>
                                     }
                                     else
                                     {
@@ -159,6 +215,22 @@
         {
             <section class="ui-card p-5 space-y-3">
                 <h2 class="ui-h3">Where the citations of the run from @run.CompletedUtc.Replace("T", " ").TrimEnd('Z') fail</h2>
+                @if (Grey)
+                {
+                    <div class="grid md:grid-cols-3 gap-4">
+                        @Breakdown("By section", run.CitationsBySection)
+                        @SearchTable(run.SourcesBySearch)
+                    </div>
+                    <p class="text-[11px] text-gray-600">
+                        @run.Identified sources found, @run.DuplicatesRemoved duplicates, @run.Screened screened twice (kappa @Kappa(run.ScreeningKappa)), @run.Included kept after the quality check
+                        @(run.MeanQualityPoints is double q ? $"(mean {q.ToString("0.0", CultureInfo.InvariantCulture)} of {(run.MaxQualityPoints ?? 0).ToString("0", CultureInfo.InvariantCulture)} points among those scored)" : "")
+                        and @run.FullTextRetrieved extracted from their kept page. @run.KeyFindings findings in @run.Themes themes; the support check left out @run.ValuesRejected values
+                        (@Pct(run.VerifiedFindingShare) kept), and the second placement agreed with kappa @Kappa(run.CodingKappa). @Pct(run.CitedSentenceShare) of the sentences carry a citation,
+                        @Pct(run.MultiPaperSentenceShare) of those cite more than one source, @run.CitationsPer100Words.ToString("0.0", CultureInfo.InvariantCulture) citations per 100 words.
+                    </p>
+                }
+                else
+                {
                 <div class="grid md:grid-cols-3 gap-4">
                     @Breakdown("By section", run.CitationsBySection)
                     @Breakdown("By evidence available", run.CitationsByEvidence)
@@ -170,6 +242,7 @@
                     @Pct(run.MultiPaperSentenceShare) of those cite more than one paper, @run.CitationsPer100Words.ToString("0.0", CultureInfo.InvariantCulture) citations per 100 words.
                     @(run.FallbackReason is { Length: > 0 } fb ? $"Thematic synthesis fell back: {fb}." : "")
                 </p>
+                }
                 <details class="text-[11px]">
                     <summary class="cursor-pointer text-gray-600">Cost by stage (@run.LlmCalls calls, @run.Tokens.ToString("N0", CultureInfo.InvariantCulture) tokens, @run.DurationMinutes.ToString("0.0", CultureInfo.InvariantCulture) minutes)</summary>
                     <table class="mt-2 text-[11px] border border-gray-200">
@@ -192,11 +265,24 @@
 
 @code {
     // Status colours: reserved for verdicts, always shown with a label in the legend and the tooltip.
-    private const string Green = "#0ca30c", Amber = "#fab219", Red = "#d03b3b", Blue = "#5b8fd6", Grey = "#b5b5b0";
+    private const string Green = "#0ca30c", Amber = "#fab219", Red = "#d03b3b", Blue = "#5b8fd6", Neutral = "#b5b5b0";
     private static readonly (string, string)[] Legend =
     {
-        ("Supported", Green), ("Partly supported", Amber), ("Not supported", Red), ("Abstract only, not checkable", Blue), ("Could not be verified", Grey),
+        ("Supported", Green), ("Partly supported", Amber), ("Not supported", Red), ("Abstract only, not checkable", Blue), ("Could not be verified", Neutral),
     };
+    private static readonly (string, string)[] GreyLegend =
+    {
+        ("Supported", Green), ("Partly supported", Amber), ("Not supported", Red), ("Could not be judged from the kept text", Blue), ("Could not be verified", Neutral),
+    };
+    private static readonly (string Key, string Label)[] Kinds = { ("systematic", "Systematic reviews"), ("grey", "Grey literature reviews") };
+
+    /// <summary>"grey" shows the grey literature reviews; anything else the systematic reviews.</summary>
+    [SupplyParameterFromQuery(Name = "kind")] public string? KindParameter { get; set; }
+
+    /// <summary>The grey literature tab is there while that review is described on the site (its card is on, or it is in preview).</summary>
+    private bool ShowGrey => ModuleOptions.Shows("grey");
+    private string Kind => ShowGrey && KindParameter == "grey" ? "grey" : "systematic";
+    private bool Grey => Kind == "grey";
     private const int ChartHeight = 160;
     // Wider bars when there are few runs, never wider than 36 px.
     private int BarWidth => Math.Clamp(720 / Math.Max(1, chartRuns.Count), 10, 36);
@@ -210,7 +296,15 @@
     private int ChartWidth => 40 + Math.Max(1, chartRuns.Count) * (BarWidth + 2);
 
     private sealed record Group(string Version, string Fingerprint, string SettingsText, int Runs, double Coverage,
-        AuBtechReviewAgent.VerdictCounts Initial, AuBtechReviewAgent.VerdictCounts Final, double FullText, double? CodingKappa, double Calls, double Minutes);
+        AuBtechReviewAgent.VerdictCounts Initial, AuBtechReviewAgent.VerdictCounts Final, double FullText, double? CodingKappa, double Calls, double Minutes,
+        double? ScreeningKappa, double? MeanQuality, double MaxQuality);
+
+    // Following a tab link changes only the query, so the runs of the other kind are loaded here.
+    protected override void OnParametersSet()
+    {
+        if (!loaded) return;
+        Load();
+    }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -237,7 +331,7 @@
 
     private void Load()
     {
-        runs = Store.ReadAll();
+        runs = Store.ReadAll(multivocal: Grey);
         chartRuns = runs.TakeLast(40).ToList();
         selected = runs.LastOrDefault();
         groups = runs.GroupBy(r => (r.ShortVersion, r.ConfigFingerprint))
@@ -248,8 +342,9 @@
                 Ratio(g.Sum(r => r.StudiesCited), g.Sum(r => r.Included)),
                 Pool(g.Select(r => r.CitationsInitial)), Pool(g.Select(r => r.CitationsFinal)),
                 Ratio(g.Sum(r => r.FullTextRetrieved), g.Sum(r => r.Included)),
-                g.Where(r => r.CodingKappa.HasValue).Select(r => r.CodingKappa!.Value).DefaultIfEmpty(double.NaN).Average() is double k && !double.IsNaN(k) ? k : null,
-                g.Average(r => r.LlmCalls), g.Average(r => r.DurationMinutes)))
+                Mean(g.Select(r => r.CodingKappa)),
+                g.Average(r => r.LlmCalls), g.Average(r => r.DurationMinutes),
+                Mean(g.Select(r => r.ScreeningKappa)), Mean(g.Select(r => r.MeanQualityPoints)), g.First().MaxQualityPoints ?? 0))
             .OrderByDescending(g => runs.Last(r => r.ConfigFingerprint == g.Fingerprint).CompletedUtc, StringComparer.Ordinal)
             .ToList();
     }
@@ -264,6 +359,13 @@
         };
     }
 
+    private static double? Mean(IEnumerable<double?> values)
+    {
+        var list = values.Where(v => v.HasValue).Select(v => v!.Value).ToList();
+        return list.Count == 0 ? null : list.Average();
+    }
+
+    private static string Kappa(double? k) => k is double v ? v.ToString("0.00", CultureInfo.InvariantCulture) : "-";
     private static double Ratio(double a, double b) => b <= 0 ? 0 : a / b;
     private static string Pct(double share) => (share * 100).ToString("0", CultureInfo.InvariantCulture) + "%";
     private static string F(double v) => v.ToString("0.#", CultureInfo.InvariantCulture);
@@ -271,6 +373,22 @@
     // An SVG <text> element (Razor reserves the <text> tag inside code blocks, so it is written as markup).
     private static MarkupString SvgText(double x, double y, string anchor, string content) =>
         new($"<text x=\"{F(x)}\" y=\"{F(y)}\" text-anchor=\"{anchor}\" font-size=\"9\" fill=\"#6b7280\">{System.Net.WebUtility.HtmlEncode(content)}</text>");
+
+    private RenderFragment SearchTable(Dictionary<string, int> bySearch) => __builder =>
+    {
+        <div>
+            <span class="text-[10px] font-bold text-gray-500 uppercase block mb-1">New sources by search</span>
+            <table class="w-full text-[11px] border border-gray-200">
+                <thead class="bg-gray-50 text-gray-600 text-left"><tr><th class="p-1.5">Search</th><th class="p-1.5">New sources</th></tr></thead>
+                <tbody>
+                    @foreach (var (key, count) in bySearch)
+                    {
+                        <tr class="border-t border-gray-100"><td class="p-1.5">@AuBtechReviewAgent.MultivocalGuidelines.SearchLabel(key)</td><td class="p-1.5">@count</td></tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    };
 
     private RenderFragment Breakdown(string title, Dictionary<string, AuBtechReviewAgent.VerdictCounts> data) => __builder =>
     {
