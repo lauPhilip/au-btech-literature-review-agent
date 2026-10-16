@@ -651,7 +651,7 @@
     private List<string> includedCitations = new();
     private Dictionary<string, int> publicationsByYear = new();
     private List<IncludedPaperMetricRow> tableRecords = new();
-    private List<AuBtechReviewAgent.StudyExtraction> extractions = new();
+    private readonly List<AuBtechReviewAgent.StudyExtraction> extractions = new();
     private readonly List<AuBtechReviewAgent.CitationSupportResult> auditChecks = new();
     private AuBtechReviewAgent.ThematicCodebook? codebook;
     private int journalCount, conferenceCount, transactionsCount, proceedingsCount, preprintCount;
@@ -1058,7 +1058,7 @@
         report = new PrismaReport();
         includedCitations = new();
         tableRecords = new();
-        extractions = new();
+        extractions.Clear();
         auditChecks.Clear();
         codebook = null;
         publicationsByYear = new();
@@ -1096,7 +1096,7 @@
         aiShort = AuBtechReviewAgent.AiUseStatement.Short(state);
         passedPeerReviewCheck = state.Stats.PassedPeerReviewCheck;
         failedPeerReviewCheck = state.Stats.FailedPeerReviewCheck;
-        extractions = state.Extractions ?? new();
+        if (state.Extractions != null) extractions.AddRange(state.Extractions);
         codebook = state.ThematicSynthesis;
 
         // Older runs have ReferenceNumber = 0 everywhere; OrderBy is stable, so they keep their order.
