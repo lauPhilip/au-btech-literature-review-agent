@@ -245,8 +245,11 @@ public static class MultivocalPaperParts
             .ToList();
         var counts = findings
             .GroupBy(f => f.Value.Trim(), StringComparer.OrdinalIgnoreCase)
-            .Select(g => (Value: g.First().Value.Trim(), References: (IReadOnlyList<int>)g.Select(f => numbers[f.Address]).Distinct().OrderBy(n => n).ToList()))
-            .Select(x => (x.Value, Sources: x.References.Count, x.References))
+            .Select(g =>
+            {
+                IReadOnlyList<int> references = g.Select(f => numbers[f.Address]).Distinct().OrderBy(n => n).ToList();
+                return (Value: g.First().Value.Trim(), Sources: references.Count, References: references);
+            })
             .OrderByDescending(x => x.Sources).ThenBy(x => x.Value, StringComparer.OrdinalIgnoreCase)
             .ToList();
         int stating = findings.Select(f => f.Address).Distinct().Count();
