@@ -89,8 +89,10 @@ public static class MultivocalPaper
     public static string ResultsText(MultivocalPaperFile paper)
     {
         int themes = paper.Results.Count(r => r.Kind == "theme");
+        int unwritten = paper.Results.Count(r => r.Kind == MultivocalWriter.UnwrittenKind);
         return $"The results answer each research question in turn. The {themes} theme section{(themes == 1 ? " was" : "s were")} written by the language model from the findings of {(themes == 1 ? "its theme" : "each theme")} only, and every citation in {(themes == 1 ? "it" : "them")} was checked against the kept page of the source it cites; " +
-               "the note under each theme, on what it rests on, and the answers to questions about frequency or existence are counted in code.";
+               "the note under each theme, on what it rests on, and the answers to questions about frequency or existence are counted in code." +
+               (unwritten == 0 ? "" : $" The section{(unwritten == 1 ? "" : "s")} on {unwritten} more theme{(unwritten == 1 ? "" : "s")} could not be written; {(unwritten == 1 ? "it is" : "they are")} kept in {(unwritten == 1 ? "its" : "their")} place with what {(unwritten == 1 ? "it rests" : "they rest")} on.");
     }
 
     /// <summary>The citation check in words, in code, with the multivocal review's evidence named as it is.</summary>
