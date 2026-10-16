@@ -8,5 +8,8 @@
   },
   "devDependencies": {
     "tailwindcss": "3.4.19"
+  },
+  "overrides": {
+    "postcss-selector-parser": "^7.1.6"
   }
 }
