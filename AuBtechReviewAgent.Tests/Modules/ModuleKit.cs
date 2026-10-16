@@ -108,8 +108,12 @@ public static class ModuleKit
     {
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) =>
             Task.FromResult(request.RequestUri!.AbsolutePath == "/post"
-                ? new HttpResponseMessage(System.Net.HttpStatusCode.OK) { Content = new StringContent($"<html><body><main><p>{PageWords}</p><p>{Injection}.</p></main></body></html>", Encoding.UTF8, "text/html") }
-                : new HttpResponseMessage(System.Net.HttpStatusCode.NotFound) { Content = new StringContent("") });
+                ? Respond(System.Net.HttpStatusCode.OK, $"<html><body><main><p>{PageWords}</p><p>{Injection}.</p></main></body></html>")
+                : Respond(System.Net.HttpStatusCode.NotFound, ""));
+
+        // The HttpClient that called the handler owns and disposes the response.
+        private static HttpResponseMessage Respond(System.Net.HttpStatusCode status, string body) =>
+            new(status) { Content = new StringContent(body, Encoding.UTF8, "text/html") };
     }
 
     /// <summary>One grey search: a post whose summary and page carry the injection, and a source whose address is the bad link.</summary>
