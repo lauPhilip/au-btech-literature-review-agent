@@ -52,7 +52,8 @@
                     <div class="mt-auto pt-6">
                         @if (m.Available)
                         {
-                            <a href="@($"/review?method={m.Key}")" class="ui-btn-primary w-full" aria-describedby="@titleId">
+                            @* Each card starts on its own module's pages; only the systematic module's cards use its form. *@
+                            <a href="@(AuBtechReviewAgent.ReviewMethods.RunsHere(m) ? $"/review?method={m.Key}" : $"{owner.RoutePrefix}?card={m.Key}")" class="ui-btn-primary w-full" aria-describedby="@titleId">
                                 Start this review
                                 <svg class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M10.3 4.3a1 1 0 011.4 0l5 5a1 1 0 010 1.4l-5 5a1 1 0 01-1.4-1.4l3.3-3.3H4a1 1 0 110-2h9.6l-3.3-3.3a1 1 0 010-1.4z" clip-rule="evenodd" /></svg>
                             </a>

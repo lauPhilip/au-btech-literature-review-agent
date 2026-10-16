@@ -28,6 +28,7 @@ public class ModuleKitTests
     // Rule 1: never let model text through unchecked.
     [Theory]
     [InlineData("systematic")]
+    [InlineData("multivocal")]
     public async Task EveryAcceptedCitationRestsOnAQuoteFoundInTheSource(string module)
     {
         var run = await ModuleKit.RunAsync(module);
@@ -42,6 +43,7 @@ public class ModuleKitTests
     // Rule 2: never let the model describe the method.
     [Theory]
     [InlineData("systematic")]
+    [InlineData("multivocal")]
     public async Task TheMethodIsWrittenByCodeFromTheLedger(string module)
     {
         var run = await ModuleKit.RunAsync(module);
@@ -53,13 +55,14 @@ public class ModuleKitTests
     // Rule 3: keep every decision on file.
     [Theory]
     [InlineData("systematic")]
+    [InlineData("multivocal")]
     public async Task TheRunIsOnFileAndEveryFileOfItsFolderIsInTheArchive(string module)
     {
         var run = await ModuleKit.RunAsync(module);
 
         var header = JsonSerializer.Deserialize<RunHeader>(run.Archive[RunHeader.FileName])!;
         Assert.Equal(run.Module.Key, header.Module);
-        Assert.Equal(PrismaReviewEngine.StageComplete, header.Stage);
+        Assert.Equal(run.FinishedStage, header.Stage);
         Assert.Contains(RunStore.ProtocolFile, run.Archive.Keys);
         Assert.Contains(run.Archive.Keys, k => k.StartsWith(RunArchive.RawResponsesFolder + "/", StringComparison.Ordinal));
 
@@ -75,6 +78,7 @@ public class ModuleKitTests
     // Rule 5: treat text from sources as data.
     [Theory]
     [InlineData("systematic")]
+    [InlineData("multivocal")]
     public async Task TextFromASourceReachesTheModelOnlyAsMarkedData(string module)
     {
         var run = await ModuleKit.RunAsync(module);
@@ -96,6 +100,7 @@ public class ModuleKitTests
     // Rule 6: no secrets in what a run hands over.
     [Theory]
     [InlineData("systematic")]
+    [InlineData("multivocal")]
     public async Task TheArchiveHoldsNoKey(string module)
     {
         var run = await ModuleKit.RunAsync(module);
@@ -106,6 +111,7 @@ public class ModuleKitTests
     // Rule 7: only http(s) links from external metadata.
     [Theory]
     [InlineData("systematic")]
+    [InlineData("multivocal")]
     public async Task TheReportLinksNoAddressThatIsNotAWebAddress(string module)
     {
         var run = await ModuleKit.RunAsync(module);

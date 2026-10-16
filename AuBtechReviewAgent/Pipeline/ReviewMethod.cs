@@ -44,6 +44,14 @@ public static class ReviewMethods
     public static ReviewMethod? Find(string? key) =>
         All.FirstOrDefault(m => m.Key.Equals(key?.Trim() ?? "", StringComparison.OrdinalIgnoreCase));
 
-    /// <summary>The method with this key when it can be run; otherwise the default (an older link or an unknown key).</summary>
-    public static ReviewMethod AvailableOrDefault(string? key) => Find(key) is { Available: true } m ? m : Default;
+    /// <summary>
+    /// The method with this key when the systematic review's form can run it; otherwise the default (an older link, an
+    /// unknown key, or a card of another module, such as "grey", whose review has its own pages and must never be run
+    /// by the PRISMA engine).
+    /// </summary>
+    public static ReviewMethod AvailableOrDefault(string? key) => Find(key) is { } m && RunsHere(m) ? m : Default;
+
+    /// <summary>Whether the systematic review's form and engine can run this method: it is switched on and its card is theirs.</summary>
+    public static bool RunsHere(ReviewMethod method) =>
+        method.Available && ReviewModules.ForCard(method.Key).Key == ReviewMethod.SystematicKey;
 }

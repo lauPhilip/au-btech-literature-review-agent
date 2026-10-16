@@ -4,7 +4,9 @@ namespace AuBtechReviewAgent;
 
 /// <summary>
 /// The multivocal review (Garousi et al., 2019), and the grey literature review as its variant with only the grey
-/// pool. Not built yet: its cards say "coming soon". The plan is docs/roadmap/mlr-todo.md.
+/// pool. The Grey Literature Review card is on (G-9, after a run was checked by hand); the Multivocal Literature
+/// Review card stays "coming soon" until the formal pool is built (block I), because a card that promises academic and
+/// grey sources must deliver both. The plan is docs/roadmap/mlr-todo.md.
 /// </summary>
 public sealed class MultivocalModule : IReviewModule
 {
@@ -34,6 +36,6 @@ public sealed class MultivocalModule : IReviewModule
             "https://doi.org/10.1016/j.infsof.2018.09.006",
             "Reviews only grey literature, such as reports, documentation and practitioner articles, where research is scarce.",
             new[] { "Grey sources only", "Quality check for sources that are not peer reviewed", "Every citation checked against the source" },
-            Available: false),
+            Available: true),
     };
 }

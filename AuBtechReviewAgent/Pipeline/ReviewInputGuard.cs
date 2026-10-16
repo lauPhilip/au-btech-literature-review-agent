@@ -95,9 +95,12 @@ public static class ReviewInputGuard
             Exclusion = Field("Exclusion criteria", request.Exclusion, MaxCriteria, singleLine: false, required: false),
             SynthesisDirective = Field("Artifact target", request.SynthesisDirective, MaxDirective, singleLine: false, required: false),
         };
-        // Only review methods the engine supports can be run; "coming soon" methods are shown but refused here too.
-        if (ReviewMethods.Find(request.Method) is not { Available: true })
+        // Only review methods this engine supports can be run; "coming soon" methods are shown but refused here too,
+        // and so is a card of another module (a grey literature review runs on its own pages, not here).
+        if (ReviewMethods.Find(request.Method) is not { } method || !method.Available)
             errors.Add($"The review type \"{request.Method}\" is not available yet.");
+        else if (!ReviewMethods.RunsHere(method))
+            errors.Add($"The review type \"{method.Name}\" is started from its own page, not from this form.");
 
         if (request.SearchStrings != null)
         {

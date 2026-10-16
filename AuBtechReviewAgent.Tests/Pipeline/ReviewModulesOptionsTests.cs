@@ -12,17 +12,13 @@ public class ReviewModulesOptionsTests
         .Build();
 
     [Fact]
-    public void APreviewOpensAModuleOnlyInDevelopment()
+    public void APreviewIsReadOnlyInDevelopment()
     {
-        var multivocal = ReviewModules.Find("multivocal")!;
-
         var development = ReviewModulesOptions.From(Settings("multivocal"), isDevelopment: true);
         Assert.True(development.IsPreview("multivocal"));
-        Assert.True(development.CanOpen(multivocal));
 
         var production = ReviewModulesOptions.From(Settings("multivocal"), isDevelopment: false);
         Assert.False(production.IsPreview("multivocal"));
-        Assert.False(production.CanOpen(multivocal));
     }
 
     [Fact]
@@ -30,7 +26,7 @@ public class ReviewModulesOptionsTests
     {
         var none = ReviewModulesOptions.From(Settings(), isDevelopment: false);
         Assert.True(none.CanOpen(ReviewModules.Find("systematic")!));
-        Assert.False(none.CanOpen(ReviewModules.Find("multivocal")!));
+        Assert.True(none.CanOpen(ReviewModules.Find("multivocal")!)); // the Grey Literature Review card is on
     }
 
     [Fact]
@@ -39,9 +35,10 @@ public class ReviewModulesOptionsTests
         var development = ReviewModulesOptions.From(Settings("multivocal"), isDevelopment: true);
         var production = ReviewModulesOptions.From(Settings("multivocal"), isDevelopment: false);
 
-        Assert.True(development.Shows("grey"));
-        Assert.False(production.Shows("grey"));      // the model card and privacy page leave it out until the card is on
-        Assert.True(production.Shows("systematic")); // an available card is always described
+        Assert.True(development.Shows("multivocal"));
+        Assert.False(production.Shows("multivocal")); // the model card and privacy page leave it out until the card is on
+        Assert.True(production.Shows("grey"));        // an available card is always described
+        Assert.True(production.Shows("systematic"));
         Assert.False(development.Shows("unknown"));
     }
 
