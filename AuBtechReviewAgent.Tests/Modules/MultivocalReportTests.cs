@@ -109,6 +109,8 @@ public class MultivocalReportTests
         Assert.StartsWith("# Context engineering for LLM agents: a grey literature review", md); // grey only for now (decision 6)
         Assert.Contains("1 search ran across 1 source", md);
         Assert.Contains("questions and answers on Q&A sites; and code repositories", md); // the failed Zenodo search does not count as run
+        // The kinds the searches found are named apart from the ones the protocol named, so no kind is claimed that no search reached.
+        Assert.Contains("the sources the searches found were white papers and technical reports; blog posts and practitioner articles; and code repositories and their README files.", md);
         Assert.Contains("| Reports and documents on Zenodo | context engineering | failed: HTTP 400 | 0 |", md);
         Assert.Contains("not run (not built yet).", md);
         Assert.Contains("κ = 0.85", md);
@@ -128,11 +130,12 @@ public class MultivocalReportTests
         string md = Text(MultivocalReporter.Write(input));
 
         Assert.Contains("**Keeping the context short.** Sources keep the context small. This theme rests on 2 sources [S1, S2]: 1 from 1st-tier, 0 from 2nd-tier and 1 from 3rd-tier outlets", md);
-        // One quote per source, the 1st-tier white paper first; F1.2 is the second finding of S1, so it is not shown.
+        // One quote per source, the 1st-tier white paper first, and each value of the theme once before a value is
+        // repeated: S2 already shows Summarisation, so S1 shows its Retrieval finding, not a second summary.
         int paper = md.IndexOf("> \"Summaries cut tokens by half.\" (Practice: Summarisation) [S2]", StringComparison.Ordinal);
-        int blog = md.IndexOf("> \"We keep a running summary.\" (Practice: Summarisation) [S1]", StringComparison.Ordinal);
+        int blog = md.IndexOf("> \"We fetch only what is needed.\" (Practice: Retrieval) [S1]", StringComparison.Ordinal);
         Assert.True(paper > 0 && blog > paper);
-        Assert.DoesNotContain("We fetch only what is needed.", md);
+        Assert.DoesNotContain("We keep a running summary.", md);
         Assert.Contains("- Summarisation against Retrieval. They disagree. [S1, S2]", md);
         Assert.Contains("Not coded by the map: 1 finding on Practice from 1 source [S3]", md);
         Assert.Contains("No extracted source answers this question", md);
@@ -145,12 +148,26 @@ public class MultivocalReportTests
         var report = MultivocalReporter.Write(input);
         var guidelines = report.Sections.Single(s => s.Heading.StartsWith("8.")).Blocks.Single(b => b.Kind == "table");
         Assert.Equal(Enumerable.Range(1, 14).Select(i => $"G{i}"), guidelines.Rows.Select(r => r[0]));
+        Assert.EndsWith("0 decisions flagged as uncertain; 1 looked at by the reviewer.", guidelines.Rows[9][2]); // what the reviewer did, not what was planned
+        Assert.DoesNotContain("still to come", guidelines.Rows[13][2]);
 
         var repository = report.Sections.Single(s => s.Heading == "Source repository").Blocks.Single(b => b.Kind == "table");
         Assert.Equal(new[] { "S1", "S2", "S3" }, repository.Rows.Select(r => r[0])); // the failed extraction has no number
         Assert.Equal(new[] { "S1", "Post A", "Blog posts and practitioner articles", "3rd", "11 of 20", "https://blog.example.org/a", "2026-10-03", "https://web.archive.org/web/20261003000000/https://blog.example.org/a" }, repository.Rows[0]);
         Assert.Equal("", repository.Rows[2][5]); // only http(s) addresses are given
         Assert.Contains("| S2 | Report B \\| 2026 |", report.ToMarkdown()); // a "|" in a title does not break the table
+    }
+
+    [Theory]
+    [InlineData("too-little-information", "Too little information to include")]
+    [InlineData("off-topic", "Off topic")]
+    [InlineData("Marketing page", "Marketing page")]
+    public void AnExclusionReasonIsShownInWords(string reason, string shown)
+    {
+        var input = Input();
+        input.Screening.Sources.Single(x => x.Decision == "Excluded").ExclusionReason = reason;
+
+        Assert.Contains($"| {shown} | 1 |", Text(MultivocalReporter.Write(input)));
     }
 
     [Fact]
