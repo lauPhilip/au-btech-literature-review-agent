@@ -11,10 +11,11 @@ public class ReviewMethodTests : IDisposable
     public void Dispose() => TestFolders.TryDelete(_root);
 
     [Fact]
-    public void OnlyTheSystematicReviewIsAvailableForNow()
+    public void TheSystematicAndTheGreyLiteratureReviewAreAvailable()
     {
         Assert.Equal(new[] { "systematic", "multivocal", "rapid", "living", "grey" }, ReviewMethods.All.Select(m => m.Key));
-        Assert.Equal(new[] { "systematic" }, ReviewMethods.All.Where(m => m.Available).Select(m => m.Key));
+        Assert.Equal(new[] { "systematic", "grey" }, ReviewMethods.All.Where(m => m.Available).Select(m => m.Key));
+        Assert.False(ReviewMethods.Find("multivocal")!.Available); // stays off until the formal pool is built (block I)
         Assert.All(ReviewMethods.All, m =>
         {
             Assert.False(string.IsNullOrWhiteSpace(m.Standard));
@@ -28,6 +29,7 @@ public class ReviewMethodTests : IDisposable
     [InlineData("SYSTEMATIC", "systematic")]
     [InlineData("living", "systematic")]   // coming soon: the form falls back to what can run
     [InlineData("narrative", "systematic")] // unknown
+    [InlineData("grey", "systematic")]      // on, but run on its own pages, never by the systematic form
     public void TheFormAlwaysGetsAMethodThatCanRun(string? key, string expected) =>
         Assert.Equal(expected, ReviewMethods.AvailableOrDefault(key).Key);
 
@@ -38,6 +40,16 @@ public class ReviewMethodTests : IDisposable
         var check = ReviewInputGuard.Check(request);
         Assert.Contains(check.Errors, e => e.Contains("not available yet"));
         Assert.True(ReviewInputGuard.Check(request with { Method = "systematic" }).IsValid);
+    }
+
+    [Fact]
+    public void ACardOfAnotherModuleIsNeverRunByTheSystematicEngine()
+    {
+        var request = new ReviewRequest("agent loops", "", "Agent architecture", "", 3, Method: "grey");
+        var check = ReviewInputGuard.Check(request);
+        Assert.Contains(check.Errors, e => e.Contains("started from its own page"));
+        Assert.False(ReviewMethods.RunsHere(ReviewMethods.Find("grey")!));
+        Assert.True(ReviewMethods.RunsHere(ReviewMethods.Default));
     }
 
     [Fact]
