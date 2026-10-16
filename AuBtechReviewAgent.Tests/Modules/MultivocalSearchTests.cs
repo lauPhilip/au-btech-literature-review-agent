@@ -176,4 +176,22 @@ public class MultivocalSearchTests : IDisposable
         plan.GreySearchStrings = Enumerable.Range(1, 6).Select(i => $"s{i}").ToList();
         Assert.Contains("Use at most 5 search strings.", plan.Problems());
     }
+
+    [Fact]
+    public async Task APlanWithAcademicDatabasesIsNotSearchedForGreyLiteratureOnly()
+    {
+        var (store, planner) = Services();
+        var plan = Plan("stackexchange");
+        plan.FormalDatabases = new List<string> { "openalex" };
+        var (runId, key) = await planner.CreateAsync(plan);
+        var se = new FakeGreySource("stackexchange", (_, _) => new() { Record("https://stackoverflow.com/q/1") });
+        var searcher = new MultivocalSearcher(store, planner, _ => se);
+
+        var refused = await Assert.ThrowsAsync<InvalidOperationException>(() => searcher.SearchAsync(runId, key));
+
+        Assert.Equal(MultivocalSearcher.FormalNotBuiltMessage, refused.Message);
+        Assert.Empty(se.Calls);
+        Assert.Null(searcher.LoadLedger(runId));
+        Assert.Equal(MultivocalPlanner.StagePlanned, store.LoadHeader(runId)!.Stage);
+    }
 }

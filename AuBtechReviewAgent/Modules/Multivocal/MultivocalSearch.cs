@@ -70,6 +70,16 @@ public sealed class MultivocalSearcher
     /// <summary>The most one search can ask for: the APIs return one page of at most 100 hits.</summary>
     public const int MaxPerSearch = 100;
 
+    /// <summary>
+    /// Whether the academic databases of a multivocal plan can be searched (block I-2 of docs/roadmap/mlr-todo.md).
+    /// Until they can, a plan that names them is refused here rather than searched for grey literature only, since its
+    /// protocol promises both pools and its paper would call it a multivocal review.
+    /// </summary>
+    public const bool FormalSearchBuilt = false;
+
+    public const string FormalNotBuiltMessage =
+        "The academic databases cannot be searched yet; that comes in step I-2 of the roadmap. Plan a new review with no academic database ticked, or from the Grey Literature Review card.";
+
     private static readonly JsonSerializerOptions Json = new() { WriteIndented = true };
     private static readonly SemaphoreSlim Gate = new(1, 1);
     private static ILogger _log => AppLog.For("AuBtechReviewAgent.MultivocalSearcher");
@@ -102,6 +112,7 @@ public sealed class MultivocalSearcher
     {
         if (!_runs.CanEdit(runId, editKey)) throw new InvalidOperationException("Only the browser that planned this run can start its search.");
         var planned = _planner.Load(runId) ?? throw new InvalidOperationException("This run has no plan.");
+        if (planned.Plan.UsesFormalPool && !FormalSearchBuilt) throw new InvalidOperationException(FormalNotBuiltMessage);
 
         await Gate.WaitAsync();
         try
