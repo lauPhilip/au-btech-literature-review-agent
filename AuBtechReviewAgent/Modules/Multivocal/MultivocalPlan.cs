@@ -146,6 +146,40 @@ public sealed class MultivocalPlan
     public string StoppingRule { get; set; } = "effort";
 
     /// <summary>
+    /// The bibliographic databases the formal pool is searched in (keys of <see cref="SourceCatalog"/>), in the
+    /// catalogue's order. Scopus and IEEE Xplore need a key, which is never written to the plan (decision 7). Empty
+    /// means no formal pool: every plan made before block I has none, and stays a grey literature review.
+    /// </summary>
+    public List<string> FormalDatabases { get; set; } = new();
+
+    /// <summary>
+    /// The search strings sent to the formal databases, in this order. Formal literature has its own words, so these
+    /// are separate from the grey strings (p. 111). Empty means the topic is used.
+    /// </summary>
+    public List<string> FormalSearchStrings { get; set; } = new();
+
+    /// <summary>
+    /// The strings the language model proposed for the formal databases when the reviewer last asked, kept so the
+    /// protocol can say which strings the model proposed and the reviewer accepted, and which were not used.
+    /// </summary>
+    public List<string> FormalStringsProposed { get; set; } = new();
+
+    /// <summary>The databases a multivocal plan starts with: the ones that need no key.</summary>
+    public static IReadOnlyList<string> DefaultFormalDatabases =>
+        SourceCatalog.All.Where(s => s.KeyKind == SourceKeyKind.None).Select(s => s.Key).ToList();
+
+    /// <summary>The strings the formal databases are searched with: the ones given, or the topic when none are given.</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public IReadOnlyList<string> EffectiveFormalSearchStrings =>
+        FormalSearchStrings.Any(s => !string.IsNullOrWhiteSpace(s))
+            ? FormalSearchStrings.Where(s => !string.IsNullOrWhiteSpace(s)).Select(s => s.Trim()).ToList()
+            : new[] { Topic.Trim() };
+
+    /// <summary>Whether a formal search string was proposed by the language model (and so accepted by the reviewer).</summary>
+    public bool WasProposed(string searchString) =>
+        FormalStringsProposed.Any(p => p.Trim().Equals(searchString.Trim(), StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>
     /// The selection criteria (G9): what a source must be about to be included, and what excludes it. Formal and grey
     /// sources are screened with the same criteria (G10). Older plans have none, and cannot be screened.
     /// </summary>
@@ -164,14 +198,13 @@ public sealed class MultivocalPlan
     public bool IsGreyOnly => Card == "grey";
 
     /// <summary>
-    /// Whether the formal (academic) pool is built (decision 6 in docs/roadmap/mlr-todo.md). Until it is, every review
-    /// searches and uses grey literature only, whichever card planned it, and says so; block I builds the formal pool.
+    /// Whether this review searches and uses formal (academic) literature too: a plan from the Multivocal card that
+    /// names formal databases (block I). The planning page plans from that card only where it is on or in preview
+    /// (Development), so production makes grey literature reviews until the card is switched on. A plan without formal
+    /// databases, which every plan made before block I is, stays a grey literature review.
     /// </summary>
-    public static readonly bool FormalPoolBuilt = false;
-
-    /// <summary>Whether this review searches and uses formal (academic) literature too.</summary>
     [System.Text.Json.Serialization.JsonIgnore]
-    public bool UsesFormalPool => !IsGreyOnly && FormalPoolBuilt;
+    public bool UsesFormalPool => !IsGreyOnly && FormalDatabases.Count > 0;
 
     /// <summary>What the review is, in lower case: "multivocal literature review" with both pools, otherwise "grey literature review".</summary>
     [System.Text.Json.Serialization.JsonIgnore]
@@ -277,7 +310,20 @@ public sealed class MultivocalPlan
         ExclusionCriteria = Clean(ExclusionCriteria);
         foreach (var q in Questions) q.Text = Clean(q.Text);
         GreySearchStrings = GreySearchStrings.Select(t => ReviewInputGuard.Normalize(t ?? "", singleLine: true)).Where(t => t.Length > 0).ToList();
+        FormalSearchStrings = Distinct(FormalSearchStrings.Select(t => ReviewInputGuard.Normalize(t ?? "", singleLine: true)));
+        FormalStringsProposed = Distinct(FormalStringsProposed.Select(t => ReviewInputGuard.Normalize(t ?? "", singleLine: true)));
+        // The catalogue's order, so the protocol lists the databases the same way every time.
+        FormalDatabases = SourceCatalog.AllKeys.Where(k => FormalDatabases.Contains(k, StringComparer.OrdinalIgnoreCase))
+            .Concat(FormalDatabases.Where(k => SourceCatalog.Find(k) == null)).ToList();
         return this;
+    }
+
+    private static List<string> Distinct(IEnumerable<string> strings)
+    {
+        var result = new List<string>();
+        foreach (var t in strings)
+            if (t.Length > 0 && !result.Contains(t, StringComparer.OrdinalIgnoreCase)) result.Add(t);
+        return result;
     }
 
     /// <summary>What must be fixed before the protocol can be written; empty when the plan is complete.</summary>
@@ -310,6 +356,9 @@ public sealed class MultivocalPlan
         if (!HasCriteria) problems.Add("Say what a source must be about to be included (the inclusion criteria).");
         if (GreySearchStrings.Count > MaxSearchStrings) problems.Add($"Use at most {MaxSearchStrings} search strings.");
         if (GreySearchStrings.Any(t => t.Length > MaxSearchStringLength)) problems.Add($"Keep every search string under {MaxSearchStringLength} characters.");
+        if (FormalDatabases.Any(k => SourceCatalog.Find(k) == null)) problems.Add("Choose the academic databases from the list.");
+        if (FormalSearchStrings.Count > MaxSearchStrings) problems.Add($"Use at most {MaxSearchStrings} search strings for academic databases.");
+        if (FormalSearchStrings.Any(t => t.Length > MaxSearchStringLength)) problems.Add($"Keep every search string for academic databases under {MaxSearchStringLength} characters.");
         if (StoppingRule == "effort" && TopHits is < 10 or > 500) problems.Add("Look at between 10 and 500 top hits per search string.");
         if (QualityThreshold is < 1 or > MultivocalGuidelines.QualityPointsMax)
             problems.Add($"Set the quality threshold between 1 and {MultivocalGuidelines.QualityPointsMax} points.");

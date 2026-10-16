@@ -13,6 +13,7 @@
 @inject AuBtechReviewAgent.MultivocalSynthesiser Synthesiser
 @inject AuBtechReviewAgent.MultivocalRunner Runner
 @inject AuBtechReviewAgent.MultivocalWriter Writer
+@inject AuBtechReviewAgent.PrismaReviewEngine ReviewEngine
 @inject NavigationManager Nav
 @inject IJSRuntime JS
 @inject ILogger<MultivocalStart> Logger
@@ -67,6 +68,11 @@
                         @SettingRow("Questions", string.Join(" ", planned.Plan.Numbered().Select(q => q.Number)))
                         @SettingRow("Searches", string.Join(", ", planned.Plan.GreySearches.Select(AuBtechReviewAgent.MultivocalGuidelines.SearchLabel)))
                         @SettingRow("Strings", string.Join("; ", planned.Plan.EffectiveGreySearchStrings))
+                        @if (planned.Plan.UsesFormalPool)
+                        {
+                            @SettingRow("Databases", string.Join(", ", planned.Plan.FormalDatabases.Select(AuBtechReviewAgent.SourceCatalog.DisplayNameFor)))
+                            @SettingRow("Academic", string.Join("; ", planned.Plan.EffectiveFormalSearchStrings))
+                        }
                         @SettingRow("Threshold", $"{planned.Plan.QualityThreshold} of {AuBtechReviewAgent.MultivocalGuidelines.QualityPointsMax} points")
                     </dl>
                     <p class="text-[11px] text-gray-500 leading-snug border-t border-gray-100 pt-2">
@@ -263,6 +269,73 @@
                                     <button type="button" class="text-xs text-brand font-medium hover:underline mt-1.5" @onclick="AddSearchString">Add a search string</button>
                                 }
                             </fieldset>
+                            @if (!plan.IsGreyOnly)
+                            {
+                                <fieldset>
+                                    <legend class="ui-label">Academic databases</legend>
+                                    <p class="text-xs text-gray-600 mb-1.5">The formal literature is searched here, in its own pool. With none ticked, the review uses grey literature only.</p>
+                                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-3 gap-y-1.5">
+                                        @foreach (var database in AuBtechReviewAgent.SourceCatalog.All)
+                                        {
+                                            var d = database;
+                                            bool usable = FormalAvailable(d.Key);
+                                            <label class="flex items-start gap-2 text-sm select-none @(usable ? "text-gray-800 cursor-pointer" : "text-gray-400 cursor-not-allowed")">
+                                                <input type="checkbox" class="w-4 h-4 mt-0.5 accent-brand" disabled="@(!usable)" checked="@plan.FormalDatabases.Contains(d.Key)"
+                                                       @onchange="e => plan.FormalDatabases = Toggle(plan.FormalDatabases, d.Key, e, AuBtechReviewAgent.SourceCatalog.AllKeys)" />
+                                                <span>@(d.DisplayName + (usable ? "" : " (needs a key on the server)"))</span>
+                                            </label>
+                                        }
+                                    </div>
+                                </fieldset>
+                                @if (plan.FormalDatabases.Count > 0)
+                                {
+                                    <fieldset>
+                                        <legend class="ui-label">Search strings for academic databases</legend>
+                                        <p class="text-xs text-gray-600 mb-1.5">Researchers use other words than practitioners, so these are separate. Each string is sent to every database. Empty means the topic is used. Only the strings in the list are searched.</p>
+                                        <ol class="space-y-1.5">
+                                            @for (int i = 0; i < plan.FormalSearchStrings.Count; i++)
+                                            {
+                                                int index = i;
+                                                <li class="flex items-center gap-2">
+                                                    <span class="w-4 text-right text-xs text-gray-500">@(index + 1)</span>
+                                                    <input type="text" aria-label="@($"Search string for academic databases {index + 1}")" maxlength="@AuBtechReviewAgent.MultivocalPlan.MaxSearchStringLength"
+                                                           value="@plan.FormalSearchStrings[index]" @onchange="e => plan.FormalSearchStrings[index] = e.Value?.ToString() ?? string.Empty" class="ui-input py-1" />
+                                                    <button type="button" @onclick="() => plan.FormalSearchStrings.RemoveAt(index)" class="ui-btn ui-btn-sm px-2 text-gray-600 hover:text-red-700" aria-label="@($"Remove search string for academic databases {index + 1}")">✕</button>
+                                                </li>
+                                            }
+                                        </ol>
+                                        <div class="flex flex-wrap items-center gap-3 mt-1.5">
+                                            @if (plan.FormalSearchStrings.Count < AuBtechReviewAgent.MultivocalPlan.MaxSearchStrings)
+                                            {
+                                                <button type="button" class="text-xs text-brand font-medium hover:underline" @onclick="AddFormalSearchString">Add a search string</button>
+                                            }
+                                            <button type="button" class="ui-btn-ghost ui-btn-sm" @onclick="ProposeFormalStrings" disabled="@(proposingStrings || proposalsLeft <= 0 || string.IsNullOrWhiteSpace(plan.Topic))">
+                                                @(proposingStrings ? "Asking the model…" : "Propose search strings")
+                                            </button>
+                                        </div>
+                                        @if (UnusedProposals.Count > 0)
+                                        {
+                                            <div class="mt-2 border border-dashed border-gray-300 p-2">
+                                                <p class="text-xs text-gray-600 mb-1.5">The model proposes these. Add the ones you want; the protocol records which you used.</p>
+                                                <ul class="space-y-1">
+                                                    @foreach (var proposal in UnusedProposals)
+                                                    {
+                                                        var text = proposal;
+                                                        <li class="flex items-center justify-between gap-2 text-sm text-gray-800">
+                                                            <span class="min-w-0 break-words">@text</span>
+                                                            <button type="button" class="ui-btn-ghost ui-btn-sm" @onclick="() => UseProposal(text)" disabled="@(plan.FormalSearchStrings.Count >= AuBtechReviewAgent.MultivocalPlan.MaxSearchStrings)" aria-label="@($"Use the search string {text}")">Use</button>
+                                                        </li>
+                                                    }
+                                                </ul>
+                                            </div>
+                                        }
+                                        @if (proposalError != null)
+                                        {
+                                            <p class="text-xs text-amber-800 mt-1.5" role="status">@proposalError</p>
+                                        }
+                                    </fieldset>
+                                }
+                            }
                             <fieldset class="space-y-2">
                                 <legend class="ui-label">What to include (G9)</legend>
                                 <p class="text-xs text-gray-600">Every source found is screened against these, twice, with the same care for every source (G10), so write them about the subject, not about where a source was published.</p>
@@ -1018,6 +1091,76 @@
         // planned here is a grey literature review, which is what its card promises.
         bool multivocalOpen = Method.Available || ModuleOptions.IsPreview(module.Key);
         plan.Card = CardKey == "grey" || !multivocalOpen ? "grey" : "multivocal";
+        StartFormalPool();
+    }
+
+    // Which academic databases can be searched: the keyless ones always, Scopus and IEEE when the server has a key
+    // (decision 7). Read once; the key itself never reaches the page or the plan.
+    private IReadOnlyDictionary<string, bool>? formalAvailability;
+    private bool formalStarted;
+    private bool proposingStrings;
+    private int proposalsLeft = 5; // each proposal is one model call; a page gets a few, as on the systematic form
+    private string? proposalError;
+
+    private bool FormalAvailable(string key)
+    {
+        formalAvailability ??= ReviewEngine.GetSourceAvailability(null);
+        return formalAvailability.TryGetValue(key, out bool usable) && usable;
+    }
+
+    /// <summary>A new multivocal plan starts with every database that can be searched ticked, once.</summary>
+    private void StartFormalPool()
+    {
+        if (formalStarted || plan.IsGreyOnly) return;
+        formalStarted = true;
+        if (plan.FormalDatabases.Count == 0)
+            plan.FormalDatabases = AuBtechReviewAgent.SourceCatalog.AllKeys.Where(FormalAvailable).ToList();
+    }
+
+    private List<string> UnusedProposals => plan.FormalStringsProposed
+        .Where(p => !plan.FormalSearchStrings.Any(t => t.Trim().Equals(p, StringComparison.OrdinalIgnoreCase))).ToList();
+
+    private void AddFormalSearchString()
+    {
+        // The first string starts as the topic, as for grey literature.
+        plan.FormalSearchStrings.Add(plan.FormalSearchStrings.Count == 0 ? plan.Topic.Trim() : "");
+    }
+
+    private void UseProposal(string text)
+    {
+        if (plan.FormalSearchStrings.Count >= AuBtechReviewAgent.MultivocalPlan.MaxSearchStrings) return;
+        if (plan.FormalSearchStrings.Count == 0) plan.FormalSearchStrings.Add(plan.Topic.Trim());
+        if (plan.FormalSearchStrings.Count < AuBtechReviewAgent.MultivocalPlan.MaxSearchStrings) plan.FormalSearchStrings.Add(text);
+    }
+
+    /// <summary>
+    /// Asks the model for search strings for the academic databases, with the systematic review's preview. Every
+    /// proposal is kept on the plan, so the protocol can say which the reviewer used and which not.
+    /// </summary>
+    private async Task ProposeFormalStrings()
+    {
+        if (proposingStrings || proposalsLeft <= 0 || string.IsNullOrWhiteSpace(plan.Topic)) return;
+        proposingStrings = true;
+        proposalError = null;
+        proposalsLeft--;
+        try
+        {
+            var strings = await ReviewEngine.PreviewSearchStringsAsync(plan.Topic, plan.Goal, plan.InclusionCriteria, null);
+            int before = plan.FormalStringsProposed.Count;
+            foreach (var text in strings.Select(t => t.Trim()).Where(t => t.Length is > 0 and <= AuBtechReviewAgent.MultivocalPlan.MaxSearchStringLength))
+                if (!plan.FormalStringsProposed.Contains(text, StringComparer.OrdinalIgnoreCase)) plan.FormalStringsProposed.Add(text);
+            if (plan.FormalStringsProposed.Count == before)
+                proposalError = "The model proposed nothing new. Write your own strings, or ask again.";
+        }
+        catch (Exception ex)
+        {
+            Logger.LogInformation("Formal search-string proposal failed: {Error}", ex.GetType().Name);
+            proposalError = "The proposal did not work just now. Write your own strings, or try again.";
+        }
+        finally
+        {
+            proposingStrings = false;
+        }
     }
 
     protected override void OnInitialized() => Runner.Changed += OnRunChanged;
@@ -1118,9 +1261,9 @@
             {
                 ("Protocol", "Your plan is written down before anything is searched, with a fingerprint.", true),
                 ("Search", p.UsesFormalPool
-                    ? $"{searches} grey literature search{(searches == 1 ? "" : "es")} and the academic databases, {stop}."
-                    : $"{searches} grey literature search{(searches == 1 ? "" : "es")}, {stop}.", true),
-                ("Selection", p.UsesFormalPool ? "Grey and academic sources are screened twice, with the same criteria and the same care." : "Every source is screened twice against your criteria; a source the two screenings disagree on is kept and marked for you to look at.", true),
+                    ? $"{searches} grey literature search{(searches == 1 ? "" : "es")} and {p.FormalDatabases.Count} academic database{(p.FormalDatabases.Count == 1 ? "" : "s")}, each with its own search strings, {stop}."
+                    : $"{searches} grey literature search{(searches == 1 ? "" : "es")}, {stop}.", !p.UsesFormalPool), // the academic search comes in block I-2
+                ("Selection", p.UsesFormalPool ? "Grey and academic sources are screened twice, with the same criteria and the same care." : "Every source is screened twice against your criteria; a source the two screenings disagree on is kept and marked for you to look at.", !p.UsesFormalPool), // academic screening comes in block I-3
                 ("Quality", $"Each source is scored on Table 7; below {p.QualityThreshold} of {AuBtechReviewAgent.MultivocalGuidelines.QualityPointsMax} points it is left out. Every score rests on a quote.", true),
                 ("Map and extraction", "The sources are classified in a systematic map proposed from your research questions; every extracted value rests on a quote from the source's page.", true),
                 ("Synthesis", $"The findings are grouped into themes to answer {questions} research question{(questions == 1 ? "" : "s")}, each theme labelled with the kind and quality of the sources it rests on.", true),
@@ -1205,6 +1348,11 @@
     private void FillExample()
     {
         plan = AuBtechReviewAgent.MultivocalPlan.Example(plan.Card);
+        if (!plan.IsGreyOnly)
+        {
+            plan.FormalDatabases = AuBtechReviewAgent.SourceCatalog.AllKeys.Where(FormalAvailable).ToList();
+            plan.FormalSearchStrings = new List<string> { "context engineering large language model agents", "LLM agent memory management" };
+        }
         error = null;
     }
 
