@@ -220,6 +220,27 @@ public class MultivocalPaperTests
     }
 
     [Fact]
+    public void TheMapCountsGiveTheSourcesThatNameTheSingleNamesNotHowManyNamesThereAre()
+    {
+        // Seen in a live run: "94 more, each named by one source" had 94 in the Sources column, where 9 sources named them.
+        var input = Input();
+        for (int i = 1; i <= MultivocalPaperParts.SingleSourceRows + 2; i++)
+            input.Synthesis.Findings.Add(new SynthesisFinding
+            {
+                Id = $"F9.{i}", Question = "RQ1.1", Attribute = "Tool", Value = $"Tool {i}", Quote = $"Tool {i}",
+                Address = i % 2 == 0 ? "blog.example.org/a" : "docs.acme.dev/b", Kind = "blogs", Tier = 3, QualityPoints = 11,
+            });
+
+        var rows = MultivocalPaperParts.MapCounts(input).Rows.Where(r => r[0] == "Tool").ToList();
+
+        var more = Assert.Single(rows, r => r[2].EndsWith("more, each named by one source"));
+        int names = MultivocalPaperParts.SingleSourceRows + 4; // the added tools, LangGraph and LangChain
+        Assert.Equal(new[] { "Tool", "RQ1.1", $"{names} more, each named by one source", "3" }, more);
+        int notStated = rows.FindIndex(r => r[2] == "not stated");
+        Assert.True(notStated < 0 || notStated > rows.IndexOf(more)); // "not stated" stays the last row
+    }
+
+    [Fact]
     public void TheNoteUnderAThemeSaysWhatItRestsOnAndWhereSourcesDisagree()
     {
         var input = Input();

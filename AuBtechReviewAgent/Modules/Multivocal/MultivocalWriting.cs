@@ -16,7 +16,10 @@ public sealed class PaperResult
     public string Question { get; set; } = "";
     public string QuestionText { get; set; } = "";
 
-    /// <summary>"theme" (written by the model from the theme's evidence, then checked) or "code" (counted in code).</summary>
+    /// <summary>
+    /// "theme" (written by the model from the theme's evidence, then checked), "code" (counted in code) or "unwritten"
+    /// (a theme whose section the model could not write; said in code, with what the theme rests on).
+    /// </summary>
     public string Kind { get; set; } = "theme";
 
     /// <summary>The field the citation check names it by ("synthesis-2"), or "answer-RQ2" for an answer in code.</summary>
@@ -185,19 +188,29 @@ public sealed class MultivocalWriter
             "(a) what the themes together say about the goal, (b) the state of the practice: where the 1st-tier sources (such as white papers and documentation) and the 3rd-tier sources (such as blog posts) agree or differ, (c) gaps the sources leave open and directions for research and practice, (d) implications for practitioners, (e) the limitations of the evidence (grey literature, not peer reviewed, pages read as kept on the access date) and of this review (automated screening, extraction and synthesis by a language model).",
     };
 
+    /// <summary>The kind of a result whose theme section the model could not write.</summary>
+    public const string UnwrittenKind = "unwritten";
+
+    /// <summary>What the paper says, in code, in place of a theme section that could not be written.</summary>
+    public const string UnwrittenText =
+        "The section on this theme could not be written: the language model's answer failed the checks in code twice. " +
+        "The theme's quotations are listed in the data appendix.";
+
     /// <summary>The facts about the review the abstract may use, counted in code.</summary>
-    public static string FrontMatterFacts(MultivocalReportInput input)
+    public static string FrontMatterFacts(MultivocalReportInput input, int? sectionsWritten = null)
     {
         var f = MultivocalPaperParts.Flow(input);
         var plan = input.Planned.Plan;
         var inCode = plan.Numbered().Where(q => MultivocalPaperParts.AnsweredInCode(q.Question.Type)).Select(q => q.Number).ToHashSet();
-        int written = input.Synthesis.Themes.Count(t => !inCode.Contains(t.Question));
+        int themed = input.Synthesis.Themes.Count(t => !inCode.Contains(t.Question));
+        int written = Math.Min(sectionsWritten ?? themed, themed);
         return $"Kind of review: {plan.ReviewKind} following the Garousi et al. (2019) guidelines. " +
                $"Grey sources found by the searches: {f.Found}, from {f.Searches} searches. Screened twice against the criteria: {f.Screened}. " +
                $"Included at screening, before the quality check: {f.Included}; excluded at screening: {f.Excluded}. " +
                $"Passed the quality check ({input.Quality.Threshold} of {input.Quality.MaxPoints} points or more) and kept for the synthesis: {f.Passed}; below the threshold: {f.BelowThreshold}; not assessed (page not readable): {f.NotAssessed}. " +
                $"Extracted against the systematic map: {f.Extracted}. Findings: {f.Findings}. Themes written up as result sections: {written}" +
-               (written == f.Themes ? ". " : $" (of {f.Themes} themes formed in the synthesis; the others belong to questions answered by counting, shown as tables). ") +
+               (written < themed ? $"; {themed - written} more {(themed - written == 1 ? "theme" : "themes")} could not be written up and {(themed - written == 1 ? "is" : "are")} listed with {(themed - written == 1 ? "its" : "their")} sources only" : "") +
+               (themed == f.Themes ? ". " : $" (of {f.Themes} themes formed in the synthesis; the others belong to questions answered by counting, shown as tables). ") +
                $"Research questions: {plan.Numbered().Count}. " +
                "Use each number only with the meaning given here: the sources the results rest on are the ones kept for the synthesis, not the ones included at screening.";
     }
@@ -299,8 +312,8 @@ public sealed class MultivocalWriter
         file.Coverage = coverage;
 
         // The results in question order: each question's theme sections, or its answer in code.
-        var sectionsOf = sections.GroupBy(s => questionOfTheme.GetValueOrDefault(s.ThemeId, "")).ToDictionary(g => g.Key, g => g.ToList());
-        var themeByName = evidence.Themes.ToDictionary(t => t.Id);
+        // A theme whose section could not be written stays in its place, said in code, so no theme drops out unseen.
+        var themesOf = evidence.Themes.GroupBy(t => questionOfTheme.GetValueOrDefault(t.Id, "")).ToDictionary(g => g.Key, g => g.ToList());
         foreach (var (number, question) in plan.Numbered())
         {
             if (MultivocalPaperParts.AnsweredInCode(question.Type))
@@ -309,8 +322,8 @@ public sealed class MultivocalWriter
                 file.Results.Add(new PaperResult { Question = number, QuestionText = question.Text, Kind = "code", Field = $"answer-{number}", Heading = answer.Heading, Text = answer.Text });
                 continue;
             }
-            var written = sectionsOf.GetValueOrDefault(number) ?? new List<SynthesisSection>();
-            if (written.Count == 0)
+            var themesHere = themesOf.GetValueOrDefault(number) ?? new List<EvidenceTheme>();
+            if (themesHere.Count == 0)
             {
                 // Said in code, so the paper never leaves a question out without saying why.
                 file.Results.Add(new PaperResult
@@ -322,14 +335,26 @@ public sealed class MultivocalWriter
                 });
                 continue;
             }
-            foreach (var section in written)
+            foreach (var evidenceTheme in themesHere)
             {
-                var evidenceTheme = themeByName.GetValueOrDefault(section.ThemeId);
-                var theme = input.Synthesis.Themes.FirstOrDefault(t => t.Question == number && t.Name == evidenceTheme?.Name);
+                var theme = input.Synthesis.Themes.FirstOrDefault(t => t.Question == number && t.Name == evidenceTheme.Name);
+                string? note = theme == null ? null : MultivocalPaperParts.ThemeNote(input, theme);
+                var section = sections.FirstOrDefault(s => s.ThemeId == evidenceTheme.Id);
+                if (section == null)
+                {
+                    file.Results.Add(new PaperResult
+                    {
+                        Question = number, QuestionText = question.Text, Kind = UnwrittenKind,
+                        Field = coverage.FirstOrDefault(c => c.ThemeId == evidenceTheme.Id)?.Field ?? $"unwritten-{evidenceTheme.Id}",
+                        Heading = $"{number}: {evidenceTheme.Name}",
+                        Text = UnwrittenText + (note == null ? "" : " " + note),
+                    });
+                    continue;
+                }
                 file.Results.Add(new PaperResult
                 {
                     Question = number, QuestionText = question.Text, Kind = "theme", Field = section.Field, Heading = section.Heading, Text = section.Text,
-                    Note = theme == null ? null : MultivocalPaperParts.ThemeNote(input, theme),
+                    Note = note,
                 });
             }
         }
@@ -362,7 +387,7 @@ public sealed class MultivocalWriter
 
         // 6. Last, the title, abstract, rationale and objectives, with the numbers counted in code; then the style pass.
         Step(6, "the title, abstract and introduction");
-        var front = await ReviewWriter.WriteFrontMatterAsync(chat, profile, plan.Topic, goal, FrontMatterFacts(input), forDiscussion, discussion,
+        var front = await ReviewWriter.WriteFrontMatterAsync(chat, profile, plan.Topic, goal, FrontMatterFacts(input, sections.Count), forDiscussion, discussion,
             referenceLines, referenceCount, Warn);
         file.Title = front?.Title ?? $"{plan.Topic}: a {plan.ReviewKind}";
         file.Style.Add(new StyleDeltaLog("Title", file.Title, file.Title, Applied: false, Note: "The title is not sent through the style pass." + (front == null ? " The front-matter step failed; the title is the topic and the kind of review." : "")));

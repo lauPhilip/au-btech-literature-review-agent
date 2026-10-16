@@ -75,6 +75,30 @@ public class MultivocalWritingTests
     }
 
     [Fact]
+    public async Task AThemeWhoseSectionCannotBeWrittenStaysInItsPlaceSaidInCode()
+    {
+        // Seen in a live run: one theme's answer failed twice and the theme vanished from the paper unseen.
+        var input = MultivocalPaperTests.Input();
+        var model = new FakeChatService().RespondsWith(p => p.Contains("You are writing one subsection of the Results") ? "not an answer" : Respond(p));
+
+        var (paper, _) = await MultivocalWriter.WritePaperAsync(model, input, Kept, "fake-model", parallelism: 1);
+
+        var unwritten = paper.Results[0];
+        Assert.Equal(("RQ1", MultivocalWriter.UnwrittenKind), (unwritten.Question, unwritten.Kind));
+        Assert.StartsWith("RQ1: ", unwritten.Heading);
+        Assert.StartsWith(MultivocalWriter.UnwrittenText, unwritten.Text);
+        Assert.Contains("What this theme rests on: 2 sources [1, 2]", unwritten.Text);
+        Assert.DoesNotContain(paper.Results, r => r.Kind == "theme");
+        Assert.Contains(paper.Notes, n => n.Contains("could not be written"));
+        Assert.Contains("could not be written", MultivocalPaper.ResultsText(paper));
+        Assert.Contains(model.Prompts, p => p.Contains("You are writing the title") && p.Contains("Themes written up as result sections: 0; 1 more theme could not be written up"));
+
+        // Nothing in it is sent to the citation check: it was written in code.
+        var audit = await MultivocalWriter.CheckPaperAsync(model, input, paper, Kept, parallelism: 1);
+        Assert.DoesNotContain(audit.SupportChecks, c => c.Field == unwritten.Field);
+    }
+
+    [Fact]
     public async Task EveryCitationIsCheckedAgainstTheKeptPageAndASourceWithoutOneIsUnverifiable()
     {
         var input = MultivocalPaperTests.Input();

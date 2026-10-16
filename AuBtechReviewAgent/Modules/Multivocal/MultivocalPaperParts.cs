@@ -222,10 +222,16 @@ public static class MultivocalPaperParts
         foreach (var attribute in map.Attributes)
         {
             var (shown, namedOnce) = Compact(ValueCounts(input, attribute), attribute.Open);
+            int first = rows.Count;
             foreach (var (value, sources, _) in shown)
                 rows.Add(new[] { attribute.Name, attribute.Question, value, sources.ToString(CultureInfo.InvariantCulture) });
             if (namedOnce.Count > 0)
-                rows.Add(new[] { attribute.Name, attribute.Question, $"{namedOnce.Count} more, each named by one source", namedOnce.Count.ToString(CultureInfo.InvariantCulture) });
+            {
+                // The sources that name them, not the number of names, and before "not stated", as in the answer's own table.
+                int namingSources = namedOnce.SelectMany(c => c.References).Distinct().Count();
+                int at = rows.FindIndex(first, r => r[2] == "not stated");
+                rows.Insert(at < 0 ? rows.Count : at, new[] { attribute.Name, attribute.Question, $"{namedOnce.Count} more, each named by one source", namingSources.ToString(CultureInfo.InvariantCulture) });
+            }
         }
         int extracted = input.Extraction.Sources.Count(x => x.Error == null);
         return new PaperTable("The systematic map as counts", new[] { "Attribute", "Question", "Value", "Sources" }, rows,

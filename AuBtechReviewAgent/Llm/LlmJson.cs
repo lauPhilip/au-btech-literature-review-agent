@@ -65,6 +65,8 @@ public static class LlmJson
     /// which is exactly what the model meant, so nothing is guessed.</item>
     /// <item>A backslash that does not start a JSON escape (a path or regex the model copied from a page, seen
     /// in a live run: "'a' is an invalid escapable character") is kept as a literal backslash.</item>
+    /// <item>A quotation mark inside a string that cannot end it (it is followed by a word, not by a comma, colon or
+    /// bracket) is kept as an escaped quotation mark, which is what the model meant.</item>
     /// <item>The object ends at its matching closing brace (braces inside strings do not count), so a second
     /// object or text after the first is ignored ("'{' is invalid after a single JSON value").</item>
     /// </list>
@@ -92,7 +94,10 @@ public static class LlmJson
                         if (IsEscape(text, i + 1)) { escaped = true; result.Append(c); }
                         else result.Append("\\\\"); // a lone backslash copied from a page: keep it as a backslash
                         break;
-                    case '"': inString = false; result.Append(c); break;
+                    case '"':
+                        if (ClosesString(text, i + 1)) { inString = false; result.Append(c); }
+                        else result.Append("\\\""); // a quotation mark inside the text: keep it as one
+                        break;
                     case '\n': result.Append("\\n"); break;
                     case '\r': result.Append("\\r"); break;
                     case '\t': result.Append("\\t"); break;
@@ -114,6 +119,37 @@ public static class LlmJson
         int end = escapedText.LastIndexOf('}');
         return end > 0 ? escapedText.Substring(0, end + 1) : escapedText;
     }
+
+    /// <summary>
+    /// Whether a quotation mark that ends just before text[at] can close a JSON string. In valid JSON a closing mark is
+    /// followed by a comma, a colon, a closing bracket or the end; after a comma or colon comes a value or a name. Any
+    /// other mark is a quotation inside the text that the model did not escape (seen in a live run: the "lost in the
+    /// middle" effect broke a whole section with "'a' is invalid after a value"), so it is kept as part of the text.
+    /// Valid JSON is never changed by this.
+    /// </summary>
+    private static bool ClosesString(string text, int at)
+    {
+        int i = SkipSpace(text, at);
+        if (i >= text.Length) return true;
+        char c = text[i];
+        if (c is '}' or ']') return true;
+        if (c is not (',' or ':')) return false;
+        i = SkipSpace(text, i + 1);
+        if (i >= text.Length) return true;
+        char next = text[i];
+        if (next is '"' or '{' or '[' or '-' || char.IsAsciiDigit(next)) return true;
+        return StartsWord(text, i, "true") || StartsWord(text, i, "false") || StartsWord(text, i, "null");
+    }
+
+    private static int SkipSpace(string text, int at)
+    {
+        while (at < text.Length && char.IsWhiteSpace(text[at])) at++;
+        return at;
+    }
+
+    private static bool StartsWord(string text, int at, string word) =>
+        string.CompareOrdinal(text, at, word, 0, word.Length) == 0 &&
+        (at + word.Length >= text.Length || !char.IsLetterOrDigit(text[at + word.Length]));
 
     /// <summary>Whether text[at] starts a valid JSON escape after a backslash: one of "\/bfnrt, or u and four hex digits.</summary>
     private static bool IsEscape(string text, int at)

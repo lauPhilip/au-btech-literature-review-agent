@@ -246,9 +246,15 @@ public sealed class MultivocalReporter
         var ledger = input.Ledger;
         var section = new ReportSection { Heading = "2. Search (G6–G8)" };
         var ran = ledger.Searches.Where(s => s.Error == null).ToList();
-        string kinds = Join(plan.GreyTypes.Select(k => MultivocalGuidelines.GreyTypes.FirstOrDefault(t => t.Key == k).Label ?? k).Select(Lower), "; ");
+        string kinds = Join(plan.GreyTypes.Select(KindLabel).Select(Lower), "; ");
+        // The kinds the searches actually found, in the guidelines' order, so the method never claims a kind no search reached.
+        var foundKinds = ledger.Sources.Select(x => x.Record.Kind).Distinct()
+            .OrderBy(k => MultivocalGuidelines.GreyTypes.ToList().FindIndex(t => t.Key == k) is var i && i < 0 ? int.MaxValue : i).ToList();
+        string covered = foundKinds.Count == 0 || foundKinds.ToHashSet().SetEquals(plan.GreyTypes)
+            ? $"The review covered {kinds} (G6)."
+            : $"The protocol named {kinds} as the kinds of grey literature to cover (G6); the sources the searches found were {Join(foundKinds.Select(KindLabel).Select(Lower), "; ")}.";
         section.Blocks.Add(ReportBlock.Paragraph(
-            $"The review covered {kinds} (G6). On {ledger.SearchedUtc:yyyy-MM-dd} (UTC), {Count(ran.Count, "search", "searches")} ran across {Count(ran.Select(s => s.Source).Distinct().Count(), "source")} " +
+            $"{covered} On {ledger.SearchedUtc:yyyy-MM-dd} (UTC), {Count(ran.Count, "search", "searches")} ran across {Count(ran.Select(s => s.Source).Distinct().Count(), "source")} " +
             $"with {Count(plan.EffectiveGreySearchStrings.Count, "search string")} ({Join(plan.EffectiveGreySearchStrings.Select(t => $"\"{t}\""))}) and found {Count(ledger.Sources.Count, "source")} (G7). " +
             $"Each raw answer was saved as received, with its SHA-256 fingerprint. Stopping rule (G8): {Sentence(ledger.StoppingApplied)}"));
         section.Blocks.Add(ReportBlock.Table(new[] { "Source", "Search string", "Returned", "New" },
@@ -276,7 +282,7 @@ public sealed class MultivocalReporter
             $"The reviewer looked at {Count(reviewed, "decision")} and changed {Num(changed)}; the model's decision stays on file next to the reviewer's."));
         section.Blocks.Add(ReportBlock.Paragraph($"Inclusion criteria: {Sentence(s.InclusionCriteria)} Exclusion criteria: {(s.ExclusionCriteria.Trim().Length > 0 ? Sentence(s.ExclusionCriteria) : "none.")}"));
         var reasons = s.Sources.Where(x => x.Decision == "Excluded")
-            .GroupBy(x => string.IsNullOrWhiteSpace(x.ExclusionReason) ? "No reason given" : x.ExclusionReason!.Trim())
+            .GroupBy(x => ReasonLabel(x.ExclusionReason))
             .OrderByDescending(g => g.Count()).ThenBy(g => g.Key, StringComparer.Ordinal)
             .Select(g => new[] { g.Key, Num(g.Count()) }).ToList();
         if (reasons.Count > 0) section.Blocks.Add(ReportBlock.Table(new[] { "Reason for exclusion", "Sources" }, reasons));
@@ -388,13 +394,31 @@ public sealed class MultivocalReporter
                 .With(ReportBlock.List(s.Unassigned.Select(u => $"{u.Finding}: {Sentence(u.Reason)}")));
     }
 
-    /// <summary>The findings a theme shows: one per source, from the highest outlet tier and quality first.</summary>
-    public static IReadOnlyList<SynthesisFinding> Representative(IEnumerable<SynthesisFinding> findings) => findings
-        .GroupBy(f => f.Address)
-        .Select(g => g.First())
-        .OrderBy(f => f.Tier).ThenByDescending(f => f.QualityPoints).ThenBy(f => f.Id, StringComparer.Ordinal)
-        .Take(QuotesPerTheme)
-        .ToList();
+    /// <summary>
+    /// The findings a theme shows: one per source, from the highest outlet tier and quality first, each value of the theme
+    /// shown once before a value is shown again. A value can sit in two themes; without this, a theme that also holds
+    /// another theme's value showed that theme's quotes and none of its own (seen in a live run).
+    /// </summary>
+    public static IReadOnlyList<SynthesisFinding> Representative(IEnumerable<SynthesisFinding> findings)
+    {
+        var ordered = findings.OrderBy(f => f.Tier).ThenByDescending(f => f.QualityPoints).ThenBy(f => f.Id, StringComparer.Ordinal).ToList();
+        var chosen = new List<SynthesisFinding>();
+        var sources = new HashSet<string>(StringComparer.Ordinal);
+        var values = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var f in ordered)
+        {
+            if (chosen.Count == QuotesPerTheme) break;
+            if (sources.Contains(f.Address) || !values.Add(f.Value.Trim())) continue;
+            chosen.Add(f);
+            sources.Add(f.Address);
+        }
+        foreach (var f in ordered)
+        {
+            if (chosen.Count == QuotesPerTheme) break;
+            if (sources.Add(f.Address)) chosen.Add(f);
+        }
+        return chosen.OrderBy(f => f.Tier).ThenByDescending(f => f.QualityPoints).ThenBy(f => f.Id, StringComparer.Ordinal).ToList();
+    }
 
     private static ReportSection Guidelines(MultivocalReportInput input)
     {
@@ -412,11 +436,11 @@ public sealed class MultivocalReporter
             new[] { "G7", "Where to search", $"{Count(input.Ledger.Searches.Select(x => x.Source).Distinct().Count(), "free search source")}; no general web search engine; no one contacted." },
             new[] { "G8", "When to stop", Upper(Sentence(input.Ledger.StoppingApplied)) },
             new[] { "G9", "Inclusion and exclusion criteria", "Set in the protocol and applied to every source." },
-            new[] { "G10", "Selection with the same care for every source", $"Every source screened twice; κ = {(input.Screening.Kappa is double k ? k.ToString("0.00", CultureInfo.InvariantCulture) : "not computed")}; flagged decisions looked at by the reviewer." },
+            new[] { "G10", "Selection with the same care for every source", $"Every source screened twice; κ = {(input.Screening.Kappa is double k ? k.ToString("0.00", CultureInfo.InvariantCulture) : "not computed")}; {Count(input.Screening.Sources.Count(x => x.Uncertain), "decision")} flagged as uncertain; {Num(input.Screening.Sources.Count(x => x.Reviewed))} looked at by the reviewer." },
             new[] { "G11", "Quality of the sources", $"Table 7 checklist, threshold {input.Quality.Threshold} of {input.Quality.MaxPoints} points; every point backed by a quote." },
             new[] { "G12", "Data extraction and systematic map", $"Map version {fixedMap.Number} with {Count(fixedMap.Attributes.Count, "attribute")}, fixed before extraction; every value backed by a quote." },
             new[] { "G13", "Synthesis", $"Qualitative coding into {Count(input.Synthesis.Themes.Count, "theme")}; evidence counted in code; opinion pieces with the critical questions." },
-            new[] { "G14", "Reporting for the audience", "This report, written in code from the run's files, with its source repository. A summary for practitioners is still to come." },
+            new[] { "G14", "Reporting for the audience", "This report, written in code from the run's files, with its source repository; the paper and its summary for practitioners are written from the same files." },
         };
         section.Blocks.Add(ReportBlock.Table(new[] { "Guideline", "What it asks", "In this review" }, rows));
         return section;
@@ -474,6 +498,17 @@ public sealed class MultivocalReporter
     };
 
     private static string Ordinal(int tier) => tier switch { 1 => "1st", 2 => "2nd", _ => "3rd" };
+    private static string KindLabel(string key) => MultivocalGuidelines.GreyTypes.FirstOrDefault(t => t.Key == key).Label ?? key;
+
+    /// <summary>An exclusion reason in words: the screening's fixed groups by their label, anything else as written.</summary>
+    private static string ReasonLabel(string? reason)
+    {
+        if (string.IsNullOrWhiteSpace(reason)) return "No reason given";
+        string key = reason.Trim();
+        bool fixedGroup = ExclusionReasons.ModelKeys.Contains(key) || key is ExclusionReasons.ByReviewer or ExclusionReasons.NotPeerReviewed;
+        return fixedGroup ? ExclusionReasons.Label(key) : key == ExclusionReasons.Unspecified ? "No reason given" : key;
+    }
+
     private static string Num(int n) => n.ToString(CultureInfo.InvariantCulture);
     private static string Count(int n, string noun, string? plural = null) => $"{Num(n)} {(n == 1 ? noun : plural ?? noun + "s")}";
     private static string Upper(string text) => text.Length > 0 ? char.ToUpperInvariant(text[0]) + text[1..] : text;
