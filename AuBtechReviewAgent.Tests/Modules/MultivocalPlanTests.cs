@@ -62,7 +62,8 @@ public class MultivocalPlanTests : IDisposable
         Assert.Contains("- RQ2: Do these practices reduce agent failures? (type: Causality; sources may not allow this type to be answered)", protocol);
         foreach (var key in plan.GreyTypes) Assert.Contains(MultivocalGuidelines.GreyTypes.First(t => t.Key == key).Label, protocol);
         foreach (var key in plan.GreySearches) Assert.Contains(MultivocalGuidelines.GreySearches.First(s => s.Key == key).Label, protocol);
-        Assert.Contains("the top 50 hits of each search string", protocol);
+        Assert.Contains("Stopping rule (G8): Effort bounded: the top 50 hits of each search string.", protocol);
+        Assert.DoesNotContain("the top hits of each search string, the top", protocol);
         Assert.Contains("sources scoring below 12 points are excluded", protocol);
         Assert.Contains("No general web search engine is used", protocol);
         Assert.Contains("Practitioners and authors are not contacted", protocol);

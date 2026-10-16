@@ -88,7 +88,10 @@ public static class MultivocalProtocol
         if (plan.UsesFormalPool)
             WriteFormalStrings(sb, plan);
         var rule = MultivocalGuidelines.StoppingRules.First(r => r.Key == plan.StoppingRule);
-        sb.AppendLine($"Stopping rule (G8): {rule.Label}{(plan.StoppingRule == "effort" ? $", the top {plan.TopHits} hits of each search string" : "")}.");
+        // The effort-bounded label already says "the top hits of each search string"; with the number it is said once.
+        sb.AppendLine(plan.StoppingRule == "effort"
+            ? $"Stopping rule (G8): Effort bounded: the top {plan.TopHits} hits of each search string."
+            : $"Stopping rule (G8): {rule.Label}.");
         sb.AppendLine();
 
         sb.AppendLine("## 5. Selection and quality (G9–G11)");
