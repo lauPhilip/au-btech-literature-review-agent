@@ -20,12 +20,13 @@
 
 @* The multivocal review's planning form (MLR block C), laid out like the systematic review's dashboard: the steps
    on the left with one primary action at the bottom, and on the right what the review will do and its protocol.
-   The steps themselves follow the Garousi et al. (2019) guidelines, not PRISMA. While the module is being built it
-   is a preview: visible only where ReviewModules:Preview lists "multivocal" (Development), "not found" elsewhere.
+   The steps themselves follow the Garousi et al. (2019) guidelines, not PRISMA. The Grey Literature Review card is
+   on; the multivocal card is shown only where ReviewModules:Preview lists "multivocal" (Development), and until its
+   card is on every review planned here is a grey literature review.
    /mlr/{id} shows a planned run and its protocol. *@
 
-<SeoHead Title="@(GreyOnly ? "Grey literature review (preview)" : "Multivocal literature review (preview)")" Path="/mlr" NoIndex="true"
-         Description="Preview of the multivocal literature review, following the Garousi et al. (2019) guidelines." />
+<SeoHead Title="@((GreyOnly ? "Grey literature review" : "Multivocal literature review") + (CardOn ? "" : " (preview)"))" Path="/mlr" NoIndex="true"
+         Description="Plan a grey literature review following the Garousi et al. (2019) guidelines, with every citation checked against its source." />
 
 <SiteHeader Active="dashboard" DashboardHref="@(planned != null ? $"/mlr/{planned.RunId}" : "/mlr")" />
 
@@ -41,9 +42,12 @@
                 in which every citation will be checked against its source. <a href="/glossary" class="text-brand underline underline-offset-2">Glossary</a>
             </p>
         </div>
-        <span class="bg-amber-50 border-amber-200 text-amber-800 border px-2.5 py-1 text-[11px] flex items-center gap-1.5" title="Visible only in Development while it is being built">
-            <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>Preview · not available yet
-        </span>
+        @if (!CardOn)
+        {
+            <span class="bg-amber-50 border-amber-200 text-amber-800 border px-2.5 py-1 text-[11px] flex items-center gap-1.5" title="Visible only in Development while it is being built">
+                <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>Preview · not available yet
+            </span>
+        }
     </div>
 
     <div class="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
@@ -899,7 +903,7 @@
                 <div class="flex-1 min-h-0 overflow-y-auto p-5 space-y-5 text-left font-sans">
                     <div>
                         <h3 class="text-base font-semibold text-gray-900">What this review will do</h3>
-                        <p class="text-xs text-gray-600 mt-0.5">With your current answers. The steps marked as built work in this preview; the others follow one block at a time.</p>
+                        <p class="text-xs text-gray-600 mt-0.5">With your current answers.@(CardOn ? "" : " The steps marked as built work in this preview; the others follow one block at a time.")</p>
                     </div>
                     <ol class="space-y-3">
                         @for (int i = 0; i < PlanSteps.Count; i++)
@@ -987,6 +991,9 @@
     // Grey literature only while the formal pool is not built (decision 6), whichever card planned the review.
     private bool GreyOnly => !(planned?.Plan.UsesFormalPool ?? plan.UsesFormalPool);
     private AuBtechReviewAgent.MultivocalPlan Shown => planned?.Plan ?? plan;
+
+    /// <summary>Whether the card this review is planned from is switched on; when it is not, the page is a preview.</summary>
+    private bool CardOn => AuBtechReviewAgent.ReviewMethods.Find(Shown.Card)?.Available == true;
     private IReadOnlyList<string> Problems => plan.Problems();
     private string ProtocolPreview =>
         AuBtechReviewAgent.MultivocalProtocol.Write(plan, Guid.Empty, DateTime.UtcNow).Replace(Guid.Empty.ToString(), "assigned when the protocol is written");
@@ -1007,7 +1014,10 @@
             Reload(id);
             return;
         }
-        plan.Card = CardKey == "grey" ? "grey" : "multivocal";
+        // The multivocal card is planned only while it is on or its module is in preview; otherwise every review
+        // planned here is a grey literature review, which is what its card promises.
+        bool multivocalOpen = Method.Available || ModuleOptions.IsPreview(module.Key);
+        plan.Card = CardKey == "grey" || !multivocalOpen ? "grey" : "multivocal";
     }
 
     protected override void OnInitialized() => Runner.Changed += OnRunChanged;
