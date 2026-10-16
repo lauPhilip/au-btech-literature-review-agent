@@ -44,7 +44,7 @@ public class MultivocalPlanTests : IDisposable
 
         string protocol = MultivocalProtocol.Write(plan, Guid.NewGuid(), new DateTime(2026, 10, 6, 12, 0, 0, DateTimeKind.Utc));
 
-        // Grey literature only while the formal pool is not built (decision 6), whichever card planned it.
+        // A plan from the Multivocal card without formal databases (every plan made before block I) stays grey.
         Assert.False(plan.IsGreyOnly);
         Assert.Contains("Review type: Grey Literature Review, following Garousi", protocol);
         Assert.Contains("- Sources reviewed: grey literature only", protocol);
@@ -67,7 +67,7 @@ public class MultivocalPlanTests : IDisposable
         Assert.Contains("No general web search engine is used", protocol);
         Assert.Contains("Practitioners and authors are not contacted", protocol);
         Assert.Contains("Talks and videos are not covered.", protocol);
-        Assert.DoesNotContain("Formal literature:", protocol); // the formal pool is not built yet (decision 6)
+        Assert.DoesNotContain("Where formal (academic) literature is searched", protocol);
         Assert.Contains("Inclusion criteria (G9): Sources on context engineering practice for LLM agents.", protocol);
         Assert.Contains("Exclusion criteria (G9): Marketing pages.", protocol);
         Assert.Contains("screened twice", protocol);
@@ -213,5 +213,76 @@ public class MultivocalPlanTests : IDisposable
         Assert.Contains(MultivocalPlanner.PlanFile, names);
         Assert.Contains(RunStore.ProtocolFile, names);
         Assert.DoesNotContain(RunStore.OwnerFile, names);
+    }
+
+    [Fact]
+    public void AMultivocalPlanWithFormalDatabasesSearchesBothPoolsAndSaysWhichStringsTheModelProposed()
+    {
+        var plan = Complete();
+        plan.FormalDatabases = new List<string> { "scopus", "openalex", "openalex" };
+        plan.FormalSearchStrings = new List<string> { "Context engineering for LLM agents", " LLM agent memory ", "llm agent memory" };
+        plan.FormalStringsProposed = new List<string> { "LLM agent memory", "context window management" };
+        plan.Normalized();
+
+        Assert.Empty(plan.Problems());
+        Assert.True(plan.UsesFormalPool);
+        Assert.Equal("multivocal literature review", plan.ReviewKind);
+        Assert.Equal(new[] { "scopus", "openalex" }, plan.FormalDatabases); // the catalogue's order, once each
+        Assert.Equal(new[] { "Context engineering for LLM agents", "LLM agent memory" }, plan.EffectiveFormalSearchStrings);
+
+        string protocol = MultivocalProtocol.Write(plan, Guid.NewGuid(), DateTime.UtcNow);
+        Assert.Contains("Review type: Multivocal Literature Review", protocol);
+        Assert.Contains("- Sources reviewed: formal (academic) and grey literature, kept apart in two pools", protocol);
+        Assert.Contains("Where formal (academic) literature is searched (G7):\n- Scopus / ScienceDirect\n- OpenAlex", protocol.Replace("\r\n", "\n"));
+        Assert.Contains("- Context engineering for LLM agents\n", protocol.Replace("\r\n", "\n"));
+        Assert.Contains("- LLM agent memory (proposed by the language model, accepted by the reviewer)", protocol);
+        Assert.Contains("did not use: context window management.", protocol);
+        Assert.Contains("Formal and grey sources are screened with the same criteria", protocol);
+    }
+
+    [Fact]
+    public void AGreyCardOrAPlanWithoutFormalDatabasesStaysAGreyLiteratureReview()
+    {
+        var grey = Complete("grey");
+        grey.FormalDatabases = new List<string> { "openalex" };
+        Assert.False(grey.UsesFormalPool);
+
+        // A plan written before block I has no formal databases in its JSON.
+        var old = System.Text.Json.JsonSerializer.Deserialize<MultivocalPlan>("""{"Card":"multivocal","Topic":"Agents"}""")!;
+        Assert.Empty(old.FormalDatabases);
+        Assert.False(old.UsesFormalPool);
+        Assert.Equal("grey literature review", old.ReviewKind);
+
+        foreach (var plan in new[] { grey, Complete() })
+            Assert.DoesNotContain("Where formal (academic) literature is searched", MultivocalProtocol.Write(plan, Guid.NewGuid(), DateTime.UtcNow));
+    }
+
+    [Fact]
+    public void TheFormalPoolStartsWithTheDatabasesThatNeedNoKeyAndRefusesAnUnknownOne()
+    {
+        Assert.Equal(new[] { "arxiv", "openalex", "semanticscholar", "crossref" }, MultivocalPlan.DefaultFormalDatabases);
+        Assert.All(MultivocalPlan.DefaultFormalDatabases, k => Assert.Equal(SourceKeyKind.None, SourceCatalog.Find(k)!.KeyKind));
+
+        var plan = Complete();
+        plan.FormalDatabases = new List<string> { "openalex", "googlescholar" };
+        plan.Normalized();
+        Assert.Contains("Choose the academic databases from the list.", plan.Problems());
+
+        plan.FormalDatabases = new List<string> { "openalex" };
+        plan.FormalSearchStrings = Enumerable.Range(1, MultivocalPlan.MaxSearchStrings + 1).Select(i => $"string {i}").ToList();
+        Assert.Contains($"Use at most {MultivocalPlan.MaxSearchStrings} search strings for academic databases.", plan.Problems());
+    }
+
+    [Fact]
+    public void FormalStringsTheReviewerWroteAloneAreSaidToBeTheirs()
+    {
+        var plan = Complete();
+        plan.FormalDatabases = new List<string> { "crossref" };
+        plan.FormalSearchStrings = new List<string> { "context engineering" };
+
+        string protocol = MultivocalProtocol.Write(plan, Guid.NewGuid(), DateTime.UtcNow);
+        Assert.Contains("- context engineering\n", protocol.Replace("\r\n", "\n"));
+        Assert.Contains("without asking the language model for proposals", protocol);
+        Assert.DoesNotContain("proposed by the language model", protocol);
     }
 }

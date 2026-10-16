@@ -65,9 +65,14 @@ public static class MultivocalProtocol
         sb.AppendLine("Where grey literature is searched (G7):");
         foreach (var key in plan.GreySearches)
             sb.AppendLine($"- {MultivocalGuidelines.SearchLabel(key)}");
-        if (plan.UsesFormalPool)
-            sb.AppendLine("- Formal literature: the bibliographic databases of the systematic review, searched with their own search strings");
         sb.AppendLine();
+        if (plan.UsesFormalPool)
+        {
+            sb.AppendLine("Where formal (academic) literature is searched (G7):");
+            foreach (var key in plan.FormalDatabases)
+                sb.AppendLine($"- {SourceCatalog.DisplayNameFor(key)}");
+            sb.AppendLine();
+        }
         sb.AppendLine("Not done, by design:");
         sb.AppendLine("- No general web search engine is used: none offers a search API that is free and allows its results to be kept, which a traceable review needs, so the searches above take its place.");
         if (!plan.GreyTypes.Contains("talks"))
@@ -80,6 +85,8 @@ public static class MultivocalProtocol
         foreach (var text in plan.EffectiveGreySearchStrings)
             sb.AppendLine($"- {text}");
         sb.AppendLine();
+        if (plan.UsesFormalPool)
+            WriteFormalStrings(sb, plan);
         var rule = MultivocalGuidelines.StoppingRules.First(r => r.Key == plan.StoppingRule);
         sb.AppendLine($"Stopping rule (G8): {rule.Label}{(plan.StoppingRule == "effort" ? $", the top {plan.TopHits} hits of each search string" : "")}.");
         sb.AppendLine();
@@ -109,6 +116,25 @@ public static class MultivocalProtocol
         sb.AppendLine();
         sb.AppendLine("The text of each web source is kept on the server for the run's lifetime, so every citation check can be repeated. The run archive holds each source's address, access date, SHA-256 fingerprint, the quoted passages and a Wayback Machine link, not the pages themselves.");
         return sb.ToString();
+    }
+
+    /// <summary>
+    /// The formal search strings, each marked when the language model proposed it and the reviewer accepted it, and the
+    /// model's proposals the reviewer did not use, so a reader can see what the reviewer approved.
+    /// </summary>
+    private static void WriteFormalStrings(StringBuilder sb, MultivocalPlan plan)
+    {
+        sb.AppendLine(plan.FormalSearchStrings.Count > 0 ? "Search strings for formal literature, separate from those for grey literature:" : "Search string for formal literature, the topic:");
+        foreach (var text in plan.EffectiveFormalSearchStrings)
+            sb.AppendLine($"- {text}{(plan.FormalSearchStrings.Count > 0 && plan.WasProposed(text) ? " (proposed by the language model, accepted by the reviewer)" : "")}");
+        var unused = plan.FormalStringsProposed.Where(p => !plan.EffectiveFormalSearchStrings.Any(t => t.Equals(p, StringComparison.OrdinalIgnoreCase))).ToList();
+        if (plan.FormalStringsProposed.Count > 0)
+            sb.AppendLine(unused.Count == 0
+                ? "The reviewer saw the language model's proposals before the protocol was written and used all of them."
+                : $"The reviewer saw the language model's proposals before the protocol was written and did not use: {string.Join("; ", unused)}.");
+        else if (plan.FormalSearchStrings.Count > 0)
+            sb.AppendLine("The reviewer wrote these strings without asking the language model for proposals.");
+        sb.AppendLine();
     }
 
     private static string Audience(ReviewAudience? audience) => audience switch
