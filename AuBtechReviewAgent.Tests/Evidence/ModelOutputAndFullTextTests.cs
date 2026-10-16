@@ -62,6 +62,28 @@ public class ModelOutputAndFullTextTests
     }
 
     [Fact]
+    public void AQuotationMarkInsideTheTextIsKeptAsPartOfIt()
+    {
+        // Seen in a live run: a theme section quoting a phrase was rejected twice ("'a' is invalid after a value").
+        const string raw = """{"heading":"Long contexts","text":"Sources name the "lost in the middle" effect [2] and say "keep it short", often [3].","refs":[2, 3],"ok":true}""";
+
+        var node = System.Text.Json.Nodes.JsonNode.Parse(LlmJson.ExtractObject(raw))!;
+
+        Assert.Equal("Long contexts", node["heading"]!.GetValue<string>());
+        Assert.Equal("Sources name the \"lost in the middle\" effect [2] and say \"keep it short\", often [3].", node["text"]!.GetValue<string>());
+        Assert.Equal(3, node["refs"]![1]!.GetValue<int>());
+        Assert.True(node["ok"]!.GetValue<bool>());
+    }
+
+    [Theory]
+    [InlineData("""{"a": "x", "b": ["y", "z"], "c": {"d": null}, "e": -1, "f": "say \"hi\""}""")]
+    [InlineData("""{"list":["one","two"],"n":3,"t":true,"f":false}""")]
+    public void ValidJsonIsLeftAsItIs(string raw)
+    {
+        Assert.Equal(raw, LlmJson.ExtractObject(raw));
+    }
+
+    [Fact]
     public void ACutOffAnswerIsStillReportedAsInvalid()
     {
         string extracted = LlmJson.ExtractObject("{\"text\": \"the answer stops here");
