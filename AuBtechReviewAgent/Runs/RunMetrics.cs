@@ -65,7 +65,9 @@ public class StageCost
 /// </summary>
 public class RunMetrics
 {
-    public int SchemaVersion { get; set; } = 1;
+    /// <summary>2 since versions come from git tags (#105). Runs written with 1 were made before versioning: every
+    /// build then called itself 1.0.0, so their version says nothing. Their files are kept as they are.</summary>
+    public int SchemaVersion { get; set; } = 2;
     public string RunId { get; set; } = "";
     public string CompletedUtc { get; set; } = "";
     public string AppVersion { get; set; } = "";
@@ -152,17 +154,14 @@ public class RunMetrics
     [System.Text.Json.Serialization.JsonIgnore]
     public bool IsMultivocal => Settings.TryGetValue("Module", out var module) && module == "multivocal";
 
-    /// <summary>App version without the build metadata, for display ("1.4.0+abc1234" → "1.4.0 (abc1234)").</summary>
-    public string ShortVersion
-    {
-        get
-        {
-            int plus = AppVersion.IndexOf('+');
-            if (plus < 0) return AppVersion;
-            string meta = AppVersion[(plus + 1)..];
-            return $"{AppVersion[..plus]} ({(meta.Length > 7 ? meta[..7] : meta)})";
-        }
-    }
+    /// <summary>Whether the run was made before versions came from git tags, when every build said 1.0.0.</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public bool BeforeVersioning => SchemaVersion < 2;
+
+    /// <summary>The version for display: "v0.2.0 (40b00a0)", or "before versioning (40b00a0)" for an older run.</summary>
+    public string ShortVersion => BeforeVersioning
+        ? (ToolVersion.ShortCommit(AppVersion) is { } commit ? $"before versioning ({commit})" : "before versioning")
+        : ToolVersion.Display(AppVersion);
 
     public static string Sha(string text) => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(text))).ToLowerInvariant()[..12];
 

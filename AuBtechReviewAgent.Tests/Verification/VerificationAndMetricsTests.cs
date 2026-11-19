@@ -143,7 +143,23 @@ public class VerificationAndMetricsTests : IDisposable
 
         RunMetricsStore.Disabled.Append(new RunMetrics());
         Assert.Empty(RunMetricsStore.Disabled.ReadAll());
-        Assert.Equal("1.0.0 (abcdef1)", new RunMetrics { AppVersion = "1.0.0+abcdef1234" }.ShortVersion);
+        Assert.Equal("v0.2.0 (abcdef1)", new RunMetrics { AppVersion = "0.2.0+abcdef1234" }.ShortVersion);
+    }
+
+    [Fact]
+    public void ARunFromBeforeVersioningKeepsItsFileAndIsMarkedOnTheMetricsPage()
+    {
+        // A line as the store held it before versions came from git tags: every build said 1.0.0.
+        const string old = "{\"SchemaVersion\":1,\"RunId\":\"c5ff\",\"AppVersion\":\"1.0.0\\u002B40b00a0c59f6b49e121c30d1d6d98ac8f3d3c961\"}";
+        var before = System.Text.Json.JsonSerializer.Deserialize<RunMetrics>(old)!;
+        Assert.True(before.BeforeVersioning);
+        Assert.Equal("1.0.0+40b00a0c59f6b49e121c30d1d6d98ac8f3d3c961", before.AppVersion);
+        Assert.Equal("before versioning (40b00a0)", before.ShortVersion);
+
+        var now = new RunMetrics { AppVersion = "0.2.1-alpha.0.3+40b00a0c59f6b49e121c30d1d6d98ac8f3d3c961" };
+        Assert.False(now.BeforeVersioning);
+        Assert.Equal("v0.2.1-alpha.0.3 (40b00a0)", now.ShortVersion);
+        Assert.Contains("\"SchemaVersion\":2", System.Text.Json.JsonSerializer.Serialize(now));
     }
 
     [Fact]
