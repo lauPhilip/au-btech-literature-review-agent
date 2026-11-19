@@ -87,11 +87,14 @@ public partial class PrismaReviewEngine
             return result;
         }
 
-        // 3. Second, independent coding (reported, does not change the themes)
+        // 3. Second, independent coding (reported, does not change the themes). The subsections do not use it, so it
+        //    runs while they are written and is awaited after them.
+        //    SecondCodingAsync records its own failure instead of throwing.
+        Task<SecondCoding>? secondCoding = null;
         if (Synthesis.DualCoding)
         {
             using (LlmStage.Begin("thematic-coding-second"))
-                book.SecondCoding = await ThematicSynthesis.SecondCodingAsync(chat, book.Themes, codes);
+                secondCoding = ThematicSynthesis.SecondCodingAsync(chat, book.Themes, codes);
         }
 
         // 4. One subsection per theme, each with its own coverage fill pass (shared by every kind of review:
@@ -103,6 +106,7 @@ public partial class PrismaReviewEngine
         var (sections, coverage) = await ReviewWriter.WriteThemesAsync(chat, profile, goal, evidence, referenceCount, Llm.ScreeningParallelism,
             (n, total) => ReportProgress(runId, state, RunProgress.Synthesis, RunProgress.Phase(RunProgress.SynthesisPhases, 3, (double)n / total), $"Theme subsections: {Of(n, total, "written")}"),
             Warn);
+        if (secondCoding != null) book.SecondCoding = await secondCoding;
         book.Coverage.AddRange(coverage);
         result.Sections.AddRange(sections);
         if (result.Sections.Count == 0)
