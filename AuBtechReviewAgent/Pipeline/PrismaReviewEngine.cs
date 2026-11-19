@@ -242,7 +242,7 @@ public partial class PrismaReviewEngine
                 "arxiv" => new ArxivSource(),
                 "scopus" => new ElsevierSource(activeElsevier),
                 "ieee" => new IeeeXploreSource(activeIeee!),
-                "openalex" => new OpenAlexSource(OpenSources.ContactEmail),
+                "openalex" => new OpenAlexSource(OpenSources.ContactEmail, OpenSources.OpenAlexApiKey),
                 "semanticscholar" => new SemanticScholarSource(activeScholar ?? OpenSources.SemanticScholarApiKey),
                 "crossref" => new CrossrefSource(OpenSources.ContactEmail),
                 _ => throw new InvalidOperationException($"Unknown source key '{key}'.")

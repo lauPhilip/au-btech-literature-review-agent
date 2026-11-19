@@ -12,7 +12,7 @@ dotnet user-secrets set "MISTRAL_API_KEY" "your-key-here"
 dotnet user-secrets set "OpenSources:ContactEmail" "you@example.org"
 ```
 
-OpenAlex, Crossref and Unpaywall ask callers to identify themselves with an e-mail address, and Unpaywall does not answer without one. Scopus/ScienceDirect and IEEE Xplore are optional and use the same pattern with `ELSEVIER_API_KEY` and `IEEE_API_KEY`. arXiv, OpenAlex, Semantic Scholar and Crossref need no key; a free Semantic Scholar key (`OpenSources:SemanticScholarApiKey`) only raises its rate limit. Start the app with `dotnet watch`; NuGet packages are restored on the first build, and the terminal shows the address.
+OpenAlex, Crossref and Unpaywall ask callers to identify themselves with an e-mail address, and Unpaywall does not answer without one. Scopus/ScienceDirect and IEEE Xplore are optional and use the same pattern with `ELSEVIER_API_KEY` and `IEEE_API_KEY`. arXiv, Semantic Scholar and Crossref need no key; a free Semantic Scholar key (`OpenSources:SemanticScholarApiKey`) only raises its rate limit. OpenAlex has expected a key since February 2026: without one its daily budget is tiny and shared by everyone on the same address, so most OpenAlex queries and citation-chaining lookups are refused with 429. Get a free key at openalex.org/settings/api and set it with `dotnet user-secrets set "OpenSources:OpenAlexApiKey" "<key>"` (on the server: `OpenSources__OpenAlexApiKey`). It is sent as an `Authorization` header, never in an address, so it stays out of the logs and the archive. Start the app with `dotnet watch`; NuGet packages are restored on the first build, and the terminal shows the address.
 
 On the server, the same settings are environment variables in `web.config`, with a double underscore between section and name (`OpenSources__ContactEmail`, `Quota__AdminToken`).
 
@@ -71,6 +71,7 @@ All of these can be set in `appsettings.json` (non-secret values only), user sec
 | `Llm:ScreeningParallelism` | 4 | How many model calls one run makes at the same time (screening, extraction, coding, checks) |
 | `OpenSources:ContactEmail` | empty | Contact address for OpenAlex, Crossref and Unpaywall |
 | `OpenSources:SemanticScholarApiKey` | empty | Optional Semantic Scholar key (secret) |
+| `OpenSources:OpenAlexApiKey` | empty | OpenAlex key (secret); without it most OpenAlex queries are refused once the small keyless budget is used up |
 | `OpenSources:ChainingPerPaper` | 5 | References and citing papers taken per included paper in citation chaining |
 | `Cache:Enabled` | true | Reuse search responses and screening decisions; every reuse is marked in the ledger |
 | `Cache:SearchResponseHours` | 24 | How long a search response is reused |

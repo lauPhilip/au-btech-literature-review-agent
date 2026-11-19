@@ -453,6 +453,59 @@ public class OpenSourceAndSafetyTests : IDisposable
         Assert.EndsWith("...", OpenAICompatibleChatService.ErrorDetail(new string('x', 500)));
     }
 
+    private class RateLimitedHandler : HttpMessageHandler
+    {
+        private readonly TimeSpan _retryAfter;
+        public int Calls;
+        public RateLimitedHandler(TimeSpan retryAfter) => _retryAfter = retryAfter;
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            Interlocked.Increment(ref Calls);
+            return Task.FromResult(Refuse(_retryAfter));
+        }
+
+        // The HttpClient that called the handler owns and disposes the response.
+        private static HttpResponseMessage Refuse(TimeSpan retryAfter) => new(HttpStatusCode.TooManyRequests)
+        {
+            Content = new StringContent("{}"),
+            Headers = { RetryAfter = new System.Net.Http.Headers.RetryConditionHeaderValue(retryAfter) },
+        };
+    }
+
+    [Fact]
+    public async Task ARateLimitThatAsksForALongWaitIsNotRetried()
+    {
+        // OpenAlex once the day's budget is used up: four capped waits of 30 s were refused again, 2 minutes a query.
+        var handler = new RateLimitedHandler(TimeSpan.FromHours(1));
+        using var http = new HttpClient(handler);
+        var clock = System.Diagnostics.Stopwatch.StartNew();
+        var ex = await Assert.ThrowsAsync<HttpRequestException>(() =>
+            OpenSourceHttp.GetStringAsync("https://limited.example.org/works", client: http));
+
+        Assert.Equal(1, handler.Calls);
+        Assert.Contains("asked to wait 60 min", ex.Message);
+        Assert.True(clock.Elapsed < TimeSpan.FromSeconds(5));
+    }
+
+    [Fact]
+    public async Task ARateLimitWithAShortWaitIsStillRetried()
+    {
+        var handler = new RateLimitedHandler(TimeSpan.Zero);
+        using var http = new HttpClient(handler);
+        await Assert.ThrowsAsync<HttpRequestException>(() =>
+            OpenSourceHttp.GetStringAsync("https://limited.example.org/works", maxAttempts: 3, client: http));
+        Assert.Equal(3, handler.Calls);
+    }
+
+    [Fact]
+    public void TheOpenAlexKeyTravelsInAHeaderNotInTheAddress()
+    {
+        Assert.Null(OpenAlexSource.AuthHeaders(""));
+        Assert.Null(OpenAlexSource.AuthHeaders(null));
+        Assert.Equal("Bearer abc123", OpenAlexSource.AuthHeaders(" abc123 ")!["Authorization"]);
+        Assert.Equal("", new OpenSourcesOptions().OpenAlexApiKey); // optional, and never in appsettings.json
+    }
+
     [Fact]
     public void MethodsTextReportsDualScreeningAgreement()
     {
