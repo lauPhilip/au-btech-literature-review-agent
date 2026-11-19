@@ -428,6 +428,18 @@ public class OpenSourceAndSafetyTests : IDisposable
     }
 
     [Fact]
+    public void ErrorsCarryTheServersOwnReason()
+    {
+        // Seen in a live run: without the reason, the ledger said only "The model server answered 400."
+        Assert.Equal(": top_p must be 1 when using greedy sampling",
+            OpenAICompatibleChatService.ErrorDetail("""{"object":"error","message":"top_p must be 1 when using greedy sampling.","type":"invalid_request_error"}"""));
+        Assert.Equal(": Invalid model", OpenAICompatibleChatService.ErrorDetail("""{"error":{"message":"Invalid model"}}"""));
+        Assert.Equal(": Bad Gateway", OpenAICompatibleChatService.ErrorDetail("Bad Gateway"));
+        Assert.Equal(" with an empty answer", OpenAICompatibleChatService.ErrorDetail(""));
+        Assert.EndsWith("...", OpenAICompatibleChatService.ErrorDetail(new string('x', 500)));
+    }
+
+    [Fact]
     public void MethodsTextReportsDualScreeningAgreement()
     {
         var stats = new ReviewStats { Screened = 10, Included = 4, Excluded = 6, DualScreened = 10, ScreeningDisagreements = 2, ScreeningKappa = 0.58, InjectionSuspected = 1, UncertainDecisions = 3 };

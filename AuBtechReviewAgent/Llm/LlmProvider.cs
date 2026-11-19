@@ -104,7 +104,7 @@ public class OpenAICompatibleChatService : IChatCompletionService
                 _reasoningEffort = "";
                 continue;
             }
-            throw new HttpOperationException(response.StatusCode, json, $"The model server answered {(int)response.StatusCode}.", null);
+            throw new HttpOperationException(response.StatusCode, json, $"The model server answered {(int)response.StatusCode}{ErrorDetail(json)}.", null);
         }
 
         var (text, model, usage) = ParseResponse(json);
@@ -136,6 +136,36 @@ public class OpenAICompatibleChatService : IChatCompletionService
             body["response_format"] = new JsonObject { ["type"] = "json_object" };
         if (!string.IsNullOrWhiteSpace(reasoningEffort)) body["reasoning_effort"] = reasoningEffort.Trim();
         return body.ToJsonString();
+    }
+
+    /// <summary>
+    /// The server's own reason for an error, for the log and the ledger (": temperature must be ..."), or empty. Only the
+    /// "message" or "detail" text of a JSON error body is used, cut to 200 characters, so a page of HTML never lands there.
+    /// Public for unit tests.
+    /// </summary>
+    public static string ErrorDetail(string body)
+    {
+        try
+        {
+            using var doc = JsonDocument.Parse(body);
+            var root = doc.RootElement;
+            string? text = null;
+            if (root.ValueKind == JsonValueKind.Object)
+            {
+                if (root.TryGetProperty("message", out var m)) text = m.ValueKind == JsonValueKind.String ? m.GetString() : m.GetRawText();
+                else if (root.TryGetProperty("error", out var e) && e.ValueKind == JsonValueKind.Object && e.TryGetProperty("message", out var em) && em.ValueKind == JsonValueKind.String) text = em.GetString();
+                else if (root.TryGetProperty("detail", out var d)) text = d.ValueKind == JsonValueKind.String ? d.GetString() : d.GetRawText();
+            }
+            if (!string.IsNullOrWhiteSpace(text))
+            {
+                text = text.Replace('\r', ' ').Replace('\n', ' ').Trim().TrimEnd('.');
+                return ": " + (text.Length > 200 ? text[..200] + "..." : text);
+            }
+        }
+        catch (JsonException) { }
+        // Not a JSON error body (a proxy's page, an empty answer): its start, on one line.
+        string raw = (body ?? "").Replace('\r', ' ').Replace('\n', ' ').Trim();
+        return raw.Length == 0 ? " with an empty answer" : ": " + (raw.Length > 200 ? raw[..200] + "..." : raw);
     }
 
     /// <summary>Whether an error answer says the model does not accept reasoning_effort. Public for unit tests.</summary>
