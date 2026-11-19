@@ -125,6 +125,12 @@
                                               placeholder="e.g. Which safety mechanisms do agent frameworks use, and how are they evaluated?" class="@InputClass resize-y"></textarea>
                                     @Help("h-objective", "The question the review answers. It guides the themes and the discussion.", reviewObjective, AuBtechReviewAgent.ReviewInputGuard.MaxObjective)
                                 </div>
+                                <div>
+                                    <label for="f-questions" class="@LabelClass">Research questions <span class="font-normal text-gray-500">(optional)</span></label>
+                                    <textarea id="f-questions" rows="3" aria-describedby="h-questions" aria-invalid="@Invalid("Research question")" maxlength="@ResearchQuestionsMaxLength" @bind="researchQuestionsText" @bind:event="oninput"
+                                              placeholder="One per line, e.g. RQ1: Which safety mechanisms do the frameworks use?" class="@InputClass resize-y"></textarea>
+                                    @Help("h-questions", ResearchQuestionsHelp, researchQuestionsText, ResearchQuestionsMaxLength)
+                                </div>
                                 break;
 
                             case 2:
@@ -346,6 +352,10 @@
                     <dl class="text-xs space-y-2">
                         @SettingRow("Query", runInfo?.SearchQuery ?? searchQuery)
                         @SettingRow("Objective", !string.IsNullOrWhiteSpace(runInfo?.ReviewObjective) ? runInfo!.ReviewObjective : runInfo == null ? reviewObjective : "(not stored for this run)")
+                        @if ((runInfo?.ResearchQuestions ?? AuBtechReviewAgent.ReviewInputGuard.ResearchQuestionLines(researchQuestionsText)) is { Count: > 0 } shownQuestions)
+                        {
+                            @SettingRow("Questions", string.Join(" ", shownQuestions.Select((q, i) => $"RQ{i + 1}. {q}")))
+                        }
                         @SettingRow("Include", !string.IsNullOrWhiteSpace(runInfo?.InclusionCriteria) ? runInfo!.InclusionCriteria : runInfo == null ? inclusionCriteria : "(see the protocol)")
                         @SettingRow("Years", runInfo is { YearFrom: > 0 } ? $"{runInfo.YearFrom}–{runInfo.YearTo}" : $"{yearFrom}–{yearTo}")
                         @SettingRow("Sources", string.Join(", ", (runInfo?.SelectedSources ?? State.SelectedSources.ToList()).Select(AuBtechReviewAgent.SourceCatalog.DisplayNameFor)))
@@ -519,6 +529,12 @@
 
     private string searchQuery { get => State.SearchQuery; set => State.SearchQuery = value; }
     private string reviewObjective { get => State.ReviewObjective; set => State.ReviewObjective = value; }
+    // The research questions as typed, one per line; ReviewInputGuard.ResearchQuestionLines splits them.
+    private string researchQuestionsText { get => State.ResearchQuestions; set => State.ResearchQuestions = value; }
+    // Room for every question plus its numbering ("RQ1: "); the guard checks each question's own length.
+    private static readonly string ResearchQuestionsHelp =
+        $"Up to {AuBtechReviewAgent.ReviewInputGuard.MaxResearchQuestions}, one per line. The protocol lists them, and the conclusion answers each one.";
+    private const int ResearchQuestionsMaxLength = AuBtechReviewAgent.ReviewInputGuard.MaxResearchQuestions * (AuBtechReviewAgent.ReviewInputGuard.MaxResearchQuestion + 10);
     private string inclusionCriteria { get => State.InclusionCriteria; set => State.InclusionCriteria = value; }
     private string exclusionCriteria { get => State.ExclusionCriteria; set => State.ExclusionCriteria = value; }
     private bool requirePeerReview { get => State.RequirePeerReview; set => State.RequirePeerReview = value; }
@@ -725,7 +741,7 @@
     // The input guard names fields by these labels; this is where each one lives in the form.
     private static readonly (string Name, int Step, string FieldId)[] FieldsByName =
     {
-        ("Search query", 1, "f-query"), ("Review objective", 1, "f-objective"),
+        ("Search query", 1, "f-query"), ("Review objective", 1, "f-objective"), ("Research question", 1, "f-questions"),
         ("Inclusion criteria", 2, "f-inclusion"), ("Exclusion criteria", 2, "f-exclusion"),
         ("Artifact target", 3, "f-directive"),
     };
@@ -812,19 +828,20 @@
     private sealed record Draft(
         string Query, string Objective, string Inclusion, string Exclusion, int YearFrom, int YearTo,
         string ArtifactKind, string Directive, List<string> Sources, bool Dual, bool Chaining, bool Check, bool PeerReviewed,
-        int MaxResults, DateTime SavedUtc, List<string>? SearchStrings = null);
+        int MaxResults, DateTime SavedUtc, List<string>? SearchStrings = null, string? ResearchQuestions = null);
 
     private string lastSavedDraft = "";
     private bool draftRestored;
 
     private bool FormIsEmpty() =>
         string.IsNullOrWhiteSpace(searchQuery) && string.IsNullOrWhiteSpace(reviewObjective)
-        && string.IsNullOrWhiteSpace(inclusionCriteria) && string.IsNullOrWhiteSpace(exclusionCriteria);
+        && string.IsNullOrWhiteSpace(inclusionCriteria) && string.IsNullOrWhiteSpace(exclusionCriteria)
+        && string.IsNullOrWhiteSpace(researchQuestionsText);
 
     private Draft CurrentDraft() => new(searchQuery, reviewObjective, inclusionCriteria, exclusionCriteria,
         yearFrom, yearTo, State.ArtifactKind, synthesisTargetDirective, State.SelectedSources.OrderBy(x => x, StringComparer.Ordinal).ToList(),
         State.DualScreening, State.CitationChaining, State.ReviewScreeningFirst, requirePeerReview, maxResults, DateTime.MinValue,
-        reviewedSearchStrings?.ToList());
+        reviewedSearchStrings?.ToList(), researchQuestionsText);
 
     // The draft without its timestamp, to tell whether anything changed since the last save.
     private string DraftFingerprint() => JsonSerializer.Serialize(CurrentDraft());
@@ -859,6 +876,7 @@
             if (draft == null || draft.SavedUtc < DateTime.UtcNow.AddDays(-30)) return;
             searchQuery = draft.Query; reviewObjective = draft.Objective;
             inclusionCriteria = draft.Inclusion; exclusionCriteria = draft.Exclusion;
+            researchQuestionsText = draft.ResearchQuestions ?? "";
             if (draft.YearFrom > 0) yearFrom = draft.YearFrom;
             if (draft.YearTo > 0) yearTo = draft.YearTo;
             State.ArtifactKind = AuBtechReviewAgent.ArtifactKinds.Normalize(draft.ArtifactKind);
@@ -887,7 +905,7 @@
 
     private async Task StartEmpty()
     {
-        searchQuery = reviewObjective = inclusionCriteria = exclusionCriteria = "";
+        searchQuery = reviewObjective = inclusionCriteria = exclusionCriteria = researchQuestionsText = "";
         reviewedSearchStrings = null;
         synthesisTargetDirective = AuBtechReviewAgent.ArtifactKinds.DefaultInstruction(State.ArtifactKind);
         prefillNotice = null;
@@ -930,6 +948,7 @@
     {
         searchQuery = "agentic AI software frameworks";
         reviewObjective = "Which safety and fault-tolerance mechanisms do agentic AI frameworks use, and how are they evaluated?";
+        researchQuestionsText = "Which safety and fault-tolerance mechanisms do agentic AI frameworks use?\nHow are these mechanisms evaluated, and with what evidence?";
         inclusionCriteria = "Studies that describe or evaluate an agent framework or orchestration loop, with some form of evaluation.";
         exclusionCriteria = "Studies about agriculture or marketing; opinion pieces without evidence.";
         SetYears(2020);
@@ -1012,6 +1031,7 @@
         formStep = 1;
         searchQuery = old.SearchQuery;
         if (!string.IsNullOrWhiteSpace(old.ReviewObjective)) reviewObjective = old.ReviewObjective;
+        researchQuestionsText = string.Join("\n", old.ResearchQuestions ?? new List<string>());
         if (!string.IsNullOrWhiteSpace(old.InclusionCriteria)) inclusionCriteria = old.InclusionCriteria;
         if (!string.IsNullOrWhiteSpace(old.ExclusionCriteria)) exclusionCriteria = old.ExclusionCriteria;
         if (!string.IsNullOrWhiteSpace(old.ArtifactKind)) State.ArtifactKind = AuBtechReviewAgent.ArtifactKinds.Normalize(old.ArtifactKind);
@@ -1395,7 +1415,7 @@
         // instruction-like phrases must be confirmed once (they are then recorded in the protocol).
         var draft = new AuBtechReviewAgent.ReviewRequest(searchQuery, reviewObjective, inclusionCriteria, exclusionCriteria, maxResults,
             SynthesisDirective: synthesisTargetDirective, ArtifactKind: State.ArtifactKind, SearchStrings: reviewedSearchStrings,
-            Method: ReviewMethod.Key);
+            Method: ReviewMethod.Key, ResearchQuestions: AuBtechReviewAgent.ReviewInputGuard.ResearchQuestionLines(researchQuestionsText));
         inputCheck = AuBtechReviewAgent.ReviewInputGuard.Check(draft);
         if (!inputCheck.IsValid)
         {
@@ -1479,7 +1499,8 @@
             cleanQuery, cleanObjective, cleanInclusion, cleanExclusion, runMaxResults,
             requirePeerReview, cleanDirective, sessionKeys, runSources, yearFrom, yearTo, State.ReviewScreeningFirst,
             DualScreening: State.DualScreening, CitationChaining: State.CitationChaining, ArtifactKind: State.ArtifactKind,
-            SearchStrings: inputCheck.Request.SearchStrings, Method: ReviewMethod.Key);
+            SearchStrings: inputCheck.Request.SearchStrings, Method: ReviewMethod.Key,
+            ResearchQuestions: inputCheck.Request.ResearchQuestions);
 
         Subscribe();
 
