@@ -213,6 +213,53 @@ public class PipelineFeatureTests : IDisposable
     }
 
     [Fact]
+    public async Task ScreeningDecisionsAreReusedOnlyUnderTheModelThatMadeThem()
+    {
+        var cache = new ReviewCache(new CacheOptions { Folder = Path.Join(_root, "cache") }, _root);
+        async Task<ReviewState> RunWith(string fastModel)
+        {
+            var engine = new PrismaReviewEngine("test-key", "", null, null, null, new RunsOptions())
+            {
+                WorkspaceRoot = _root,
+                ChatFactory = _ => new FakeChatService().RespondsWith(PipelineTests.Respond),
+                SourceFactory = _ => new PipelineTests.FakeSource(),
+                Cache = cache,
+                Llm = new LlmOptions { FastModel = fastModel },
+                FullTextFetcher = (_, _) => Task.FromResult(new FullTextResult(Array.Empty<DocumentChunk>(), "none (test)", null)),
+            };
+            var runId = Guid.NewGuid();
+            await engine.RunReviewAsync(runId, Request());
+            return engine.LoadState(runId)!;
+        }
+
+        await RunWith("mistral-small-latest");
+        Assert.DoesNotContain((await RunWith("another-small-model")).Phases.Screening, l => l.FromCache);
+        Assert.True((await RunWith("mistral-small-latest")).Phases.Screening.All(l => l.FromCache));
+    }
+
+    [Fact]
+    public void TheMethodsTextNamesTheModelThatScreenedAndCheckedCitations()
+    {
+        var options = new LlmOptions { FastModel = "mistral-small-latest" };
+        var stats = new ReviewStats { Screened = 10, Included = 4, Excluded = 6, DualScreened = 10, ScreeningKappa = 0.8 };
+
+        string selection = MethodsSectionWriter.SelectionProcess(false, stats, modelName: options.DisplayNameFor("screening"));
+        Assert.Contains("language model (mistral-small-latest (Mistral API), temperature 0)", selection);
+
+        string synthesis = ThematicSynthesis.MethodsText(null, options.DisplayName, true, options.DisplayNameFor("citation-check"));
+        Assert.Contains("synthesised narratively by the language model (mistral-large-latest (Mistral API))", synthesis);
+        Assert.Contains("checked against the cited paper by a second language model (mistral-small-latest (Mistral API))", synthesis);
+
+        // One model: the text is as before, with no second model named.
+        string single = ThematicSynthesis.MethodsText(null, new LlmOptions().DisplayName, true, new LlmOptions().DisplayNameFor("citation-check"));
+        Assert.DoesNotContain("second language model", single);
+
+        var state = new ReviewState { RunSettings = new RunSettingsRecord { Model = "mistral-large-latest", FastModel = "mistral-small-latest" } };
+        Assert.Contains("mistral-large-latest (and mistral-small-latest for screening and citation checks)", AiUseStatement.Methods(state, Guid.Empty));
+        Assert.Contains("using mistral-large-latest and mistral-small-latest", AiUseStatement.Short(state));
+    }
+
+    [Fact]
     public async Task ARecordWithoutAnAbstractIsMarkedLowConfidence()
     {
         var noAbstract = new AcademicPaper("SCHOLAR_n", "Agent supervision without an abstract", "", "Published: 2025", new() { "Ann" }, "Journal of Agents");
