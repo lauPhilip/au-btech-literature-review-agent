@@ -110,18 +110,25 @@ public partial class PrismaReviewEngine
                 if (!peerReviewed) return new ScreeningOutcome(paper, sourceName, true, null, null, 0, flags, null);
             }
 
-            int hits = 0;
-            ScreeningAnswer first, second;
-            bool hit;
+            // The two screenings are independent (different prompts, separate cache keys), so they run at the same
+            // time; each call keeps its own stage label, which is taken when the call starts.
+            Task<(ScreeningAnswer Answer, bool FromCache)> firstTask;
+            Task<(ScreeningAnswer Answer, bool FromCache)>? secondTask = null;
             using (LlmStage.Begin("screening"))
-                (first, hit) = await ScreenWithCacheAsync(ctx, paper, secondScreener: false);
-            if (hit) hits++;
-            if (!ctx.Request.DualScreening) return new ScreeningOutcome(paper, sourceName, false, first, null, hits, flags, null);
+                firstTask = ScreenWithCacheAsync(ctx, paper, secondScreener: false);
+            if (ctx.Request.DualScreening)
+                using (LlmStage.Begin("screening-second"))
+                    secondTask = ScreenWithCacheAsync(ctx, paper, secondScreener: true);
 
-            using (LlmStage.Begin("screening-second"))
-                (second, hit) = await ScreenWithCacheAsync(ctx, paper, secondScreener: true);
-            if (hit) hits++;
-            return new ScreeningOutcome(paper, sourceName, false, first, second, hits, flags, null);
+            if (secondTask == null)
+            {
+                var (only, onlyHit) = await firstTask;
+                return new ScreeningOutcome(paper, sourceName, false, only, null, onlyHit ? 1 : 0, flags, null);
+            }
+            await Task.WhenAll(firstTask, secondTask); // a failure of either is thrown here, and both are observed
+            var (first, firstHit) = await firstTask;
+            var (second, secondHit) = await secondTask;
+            return new ScreeningOutcome(paper, sourceName, false, first, second, (firstHit ? 1 : 0) + (secondHit ? 1 : 0), flags, null);
         }
         catch (Exception ex)
         {

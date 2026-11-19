@@ -68,7 +68,7 @@ All of these can be set in `appsettings.json` (non-secret values only), user sec
 | `Llm:Model` | mistral-large-latest | The model name sent to the provider |
 | `Llm:BaseUrl` / `Llm:ApiKey` | empty | Address and optional key of an OpenAI-compatible server |
 | `Llm:ReasoningEffort` | low | Mistral only: the `reasoning_effort` sent with every call (`low`, `medium` or `high`). Mistral Large 4, which `mistral-large-latest` can point to, always reasons and uses `high` when the setting is left out, which makes a review several times slower. Empty leaves the setting out. A model that rejects it is asked again without it, and the run stops sending it |
-| `Llm:ScreeningParallelism` | 4 | How many model calls one run makes at the same time (screening, extraction, coding, checks) |
+| `Llm:ScreeningParallelism` | 8 | How many model calls one run makes at the same time (screening, extraction, coding, checks). With a reasoning model each call takes 30 to 110 seconds, so more calls at once shortens a review; with `Runs:MaxConcurrentRuns` at 3 the server can have up to 24 calls in flight, and a 429 from the model is retried with backoff. The two screenings of a record run at the same time |
 | `OpenSources:ContactEmail` | empty | Contact address for OpenAlex, Crossref and Unpaywall |
 | `OpenSources:SemanticScholarApiKey` | empty | Optional Semantic Scholar key (secret) |
 | `OpenSources:OpenAlexApiKey` | empty | OpenAlex key (secret); without it most OpenAlex queries are refused once the small keyless budget is used up |

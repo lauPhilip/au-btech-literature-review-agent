@@ -61,6 +61,60 @@ public class PipelineFeatureTests : IDisposable
         Assert.True(PrismaFlowCounts.From(state).IsConsistent);
     }
 
+    /// <summary>Answers like PipelineTests.Respond, but holds each screening until the other screening of the same record has started.</summary>
+    private sealed class OverlapChat : Microsoft.SemanticKernel.ChatCompletion.IChatCompletionService
+    {
+        private readonly System.Collections.Concurrent.ConcurrentDictionary<string, TaskCompletionSource> _started = new();
+        public int Overlapped;
+        public IReadOnlyDictionary<string, object?> Attributes { get; } = new Dictionary<string, object?>();
+
+        public async Task<IReadOnlyList<Microsoft.SemanticKernel.ChatMessageContent>> GetChatMessageContentsAsync(Microsoft.SemanticKernel.ChatCompletion.ChatHistory chatHistory,
+            Microsoft.SemanticKernel.PromptExecutionSettings? executionSettings = null, Microsoft.SemanticKernel.Kernel? kernel = null, CancellationToken cancellationToken = default)
+        {
+            string prompt = string.Join("\n", chatHistory.Select(m => m.Content));
+            var title = Regex.Match(prompt, @"- Title: ([^\n]*)");
+            if (prompt.Contains("Evaluate the following academic paper") && title.Success)
+            {
+                bool second = prompt.Contains("SECOND, INDEPENDENT screener");
+                string key = title.Groups[1].Value;
+                _started.GetOrAdd(key + (second ? "|2" : "|1"), _ => new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously)).TrySetResult();
+                var other = _started.GetOrAdd(key + (second ? "|1" : "|2"), _ => new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously));
+                if (await Task.WhenAny(other.Task, Task.Delay(TimeSpan.FromSeconds(5), cancellationToken)) == other.Task)
+                    Interlocked.Increment(ref Overlapped);
+            }
+            return new[] { new Microsoft.SemanticKernel.ChatMessageContent(Microsoft.SemanticKernel.ChatCompletion.AuthorRole.Assistant, PipelineTests.Respond(prompt)) { ModelId = "fake-model" } };
+        }
+
+        public IAsyncEnumerable<Microsoft.SemanticKernel.StreamingChatMessageContent> GetStreamingChatMessageContentsAsync(Microsoft.SemanticKernel.ChatCompletion.ChatHistory chatHistory,
+            Microsoft.SemanticKernel.PromptExecutionSettings? executionSettings = null, Microsoft.SemanticKernel.Kernel? kernel = null, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+    }
+
+    [Fact]
+    public async Task TheTwoScreeningsOfARecordRunAtTheSameTime()
+    {
+        var chat = new OverlapChat();
+        var engine = new PrismaReviewEngine("test-key", "", null, null, null, new RunsOptions())
+        {
+            WorkspaceRoot = _root,
+            ChatFactory = _ => chat,
+            SourceFactory = _ => new PipelineTests.FakeSource(),
+            Cache = ReviewCache.Disabled,
+            FullTextFetcher = (_, _) => Task.FromResult(new FullTextResult(Array.Empty<DocumentChunk>(), "none (test)", null)),
+        };
+        var runId = Guid.NewGuid();
+        await engine.RunReviewAsync(runId, Request());
+
+        var state = engine.LoadState(runId)!;
+        // Every screening found the other screening of its record already running: 3 records, 2 screenings each.
+        Assert.Equal(6, chat.Overlapped);
+        Assert.Equal(3, state.Stats.DualScreened);
+        Assert.Equal(0, state.Stats.ScreeningErrors);
+        // Each call kept its own stage label.
+        Assert.Contains("screening", state.RunSettings!.StageTemperatures.Keys);
+        Assert.Contains("screening-second", state.RunSettings.StageTemperatures.Keys);
+    }
+
     [Fact]
     public async Task SingleScreeningSendsOnePromptPerRecord()
     {

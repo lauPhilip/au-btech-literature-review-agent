@@ -434,6 +434,21 @@ public class OpenSourceAndSafetyTests : IDisposable
     }
 
     [Fact]
+    public async Task TheCallLogShowsTheReasoningEffortThatWasSent()
+    {
+        var sent = new RecordingChatCompletionService(
+            new OpenAICompatibleChatService(LlmFactory.MistralBaseUrl, "mistral-large-latest", "key", new HttpClient(new StubHandler()), "low"), "mistral-large-latest");
+        await sent.GetChatMessageContentAsync("hello");
+        Assert.Equal("low", sent.Calls.Single().ReasoningEffort);
+
+        // A model that rejects the setting is asked again without it, and the log says so.
+        var dropped = new RecordingChatCompletionService(
+            new OpenAICompatibleChatService(LlmFactory.MistralBaseUrl, "mistral-large-2411", "key", new HttpClient(new RejectsEffortHandler()), "low"), "mistral-large-2411");
+        await dropped.GetChatMessageContentAsync("hello");
+        Assert.Null(dropped.Calls.Single().ReasoningEffort);
+    }
+
+    [Fact]
     public void OtherErrorsAreNotRetriedWithoutReasoningEffort()
     {
         Assert.False(OpenAICompatibleChatService.RejectsReasoningEffort(HttpStatusCode.Unauthorized, "reasoning_effort"));

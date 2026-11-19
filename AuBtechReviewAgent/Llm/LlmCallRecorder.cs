@@ -25,6 +25,8 @@ public class LlmCallRecord
     public string ModelRequested { get; set; } = "";
     public string? ModelReported { get; set; }
     public double? Temperature { get; set; }
+    /// <summary>The reasoning_effort the call was sent with ("low"), or null when none was sent.</summary>
+    public string? ReasoningEffort { get; set; }
     public int Attempts { get; set; }
     public string Outcome { get; set; } = "";
     public string PromptSha256 { get; set; } = "";
@@ -154,6 +156,7 @@ public class RecordingChatCompletionService : IChatCompletionService
                 record.ResponseChars = response.Length;
                 record.ModelReported = result.FirstOrDefault()?.ModelId;
                 record.Usage = ReadUsage(result.FirstOrDefault());
+                record.ReasoningEffort = ReadReasoningEffort(result.FirstOrDefault());
                 Finish(record, stopwatch);
                 return result;
             }
@@ -237,6 +240,9 @@ public class RecordingChatCompletionService : IChatCompletionService
             _ => null
         };
     }
+
+    private static string? ReadReasoningEffort(ChatMessageContent? content) =>
+        content?.Metadata != null && content.Metadata.TryGetValue("ReasoningEffort", out var effort) ? effort as string : null;
 
     private static string? ReadUsage(ChatMessageContent? content)
     {

@@ -35,8 +35,11 @@ public class LlmOptions
     /// <summary>OpenAICompatible only: API key if the server needs one (Ollama does not). Keep it in user-secrets.</summary>
     public string ApiKey { get; set; } = "";
 
-    /// <summary>How many records are screened at the same time within one run.</summary>
-    public int ScreeningParallelism { get; set; } = 4;
+    /// <summary>
+    /// How many model calls one run makes at the same time (screening, extraction, coding, checks). Reasoning models
+    /// take 30 to 110 seconds a call, so the calls are bound by waiting, not by the server's throughput.
+    /// </summary>
+    public int ScreeningParallelism { get; set; } = 8;
 
     /// <summary>
     /// Mistral only: the reasoning_effort sent with every call ("low", "medium" or "high"). Reasoning models such as
@@ -88,9 +91,11 @@ public class OpenAICompatibleChatService : IChatCompletionService
         ChatHistory chatHistory, PromptExecutionSettings? executionSettings = null, Kernel? kernel = null, CancellationToken cancellationToken = default)
     {
         string json;
+        string sentEffort;
         while (true)
         {
             string effort = _reasoningEffort;
+            sentEffort = effort;
             string body = BuildRequestBody(_model, chatHistory, executionSettings, effort);
             using var request = new HttpRequestMessage(HttpMethod.Post, _endpoint) { Content = new StringContent(body, Encoding.UTF8, "application/json") };
             if (!string.IsNullOrWhiteSpace(_apiKey)) request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _apiKey);
@@ -109,7 +114,10 @@ public class OpenAICompatibleChatService : IChatCompletionService
 
         var (text, model, usage) = ParseResponse(json);
         var content = new ChatMessageContent(AuthorRole.Assistant, text) { ModelId = model ?? _model };
-        if (usage != null) content.Metadata = new Dictionary<string, object?> { ["Usage"] = usage };
+        // What was sent, so the call log can show it: the effort can be dropped for a model that rejects it.
+        var metadata = new Dictionary<string, object?> { ["ReasoningEffort"] = sentEffort.Length > 0 ? sentEffort : null };
+        if (usage != null) metadata["Usage"] = usage;
+        content.Metadata = metadata;
         return new[] { content };
     }
 

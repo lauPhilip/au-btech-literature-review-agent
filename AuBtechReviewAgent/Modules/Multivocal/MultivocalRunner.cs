@@ -110,6 +110,28 @@ public sealed class MultivocalRunner
     {
         var started = _status.TryGetValue(runId, out var current) ? current.StartedUtc : null;
         _status[runId] = status with { StartedUtc = started, EndedUtc = status.Running ? null : DateTime.UtcNow };
+        Notify(runId);
+    }
+
+    /// <summary>
+    /// A progress line from a step. Progress&lt;T&gt; posts its lines to the thread pool, so a line can arrive after the step,
+    /// or the whole run, has ended; it then changes nothing. Before, a late line overwrote "Done" with "running" (seen in CI).
+    /// Public for unit tests.
+    /// </summary>
+    public void SetProgress(Guid runId, string step, string line)
+    {
+        while (_status.TryGetValue(runId, out var current) && current.Running && current.Step == step)
+        {
+            if (_status.TryUpdate(runId, current with { Progress = line }, current))
+            {
+                Notify(runId);
+                return;
+            }
+        }
+    }
+
+    private void Notify(Guid runId)
+    {
         try { Changed?.Invoke(runId); }
         catch (Exception ex) when (ex is not OutOfMemoryException)
         {
@@ -136,7 +158,8 @@ public sealed class MultivocalRunner
                 if (!HasStepsLeft(stage)) break;
                 step = StepFor(stage);
                 Set(runId, new MultivocalRunStatus(true, step, null, null));
-                var progress = new Progress<string>(line => Set(runId, new MultivocalRunStatus(true, step, line, null)));
+                string thisStep = step; // the loop changes step; a late line must keep the name of the step that sent it
+                var progress = new Progress<string>(line => SetProgress(runId, thisStep, line));
                 using var label = LlmStage.Begin(MultivocalProgress.KeyFor(stage));
                 try { if (await RunStepAsync(runId, editKey, stage, progress)) return; }
                 finally { await SaveCallsAsync(folder, earlier, recorder); }
