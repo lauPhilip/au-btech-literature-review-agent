@@ -125,4 +125,16 @@ public class MethodsSectionWriterTests
         Assert.Equal("3 citations in a theme subsection refer to a study not coded under that theme and are flagged in the audit.",
             PrismaReviewEngine.OutsideThemeSentence(3));
     }
+
+    [Fact]
+    public void TheProtocolItemNamesTheResearchQuestionsOnlyWhenTheRunHasThem()
+    {
+        // Issue #121: section 7.1 left out the research questions.
+        var created = new DateTime(2026, 11, 19, 0, 0, 0, DateTimeKind.Utc);
+        string with = MethodsSectionWriter.Protocol("0123456789abcdef0123", created, hasResearchQuestions: true);
+        Assert.Contains("Its protocol (search query, objective, research questions, eligibility criteria, sources, limits and screening set-up)", with);
+
+        string without = MethodsSectionWriter.Protocol("0123456789abcdef0123", created);
+        Assert.Contains("Its protocol (search query, objective, eligibility criteria, sources, limits and screening set-up)", without);
+    }
 }
