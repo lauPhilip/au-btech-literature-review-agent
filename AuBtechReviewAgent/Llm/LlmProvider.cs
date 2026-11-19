@@ -134,7 +134,7 @@ public class OpenAICompatibleChatService : IChatCompletionService
         // top_p as in the settings (1 by default), which is what the Semantic Kernel connector always sent. Mistral answers
         // 400 "top_p must be 1 when using greedy sampling" to temperature 0 without it, and every decision runs at 0.
         if (settings is MistralAIPromptExecutionSettings withTopP)
-            body["top_p"] = Convert.ToDouble((object?)withTopP.TopP ?? 1.0, System.Globalization.CultureInfo.InvariantCulture);
+            body["top_p"] = withTopP.TopP;
 
         if (settings?.ExtensionData?.ContainsKey("response_format") == true)
             body["response_format"] = new JsonObject { ["type"] = "json_object" };
@@ -149,24 +149,27 @@ public class OpenAICompatibleChatService : IChatCompletionService
     /// </summary>
     public static string ErrorDetail(string body)
     {
+        string? text = null;
         try
         {
             using var doc = JsonDocument.Parse(body);
             var root = doc.RootElement;
-            string? text = null;
             if (root.ValueKind == JsonValueKind.Object)
             {
                 if (root.TryGetProperty("message", out var m)) text = m.ValueKind == JsonValueKind.String ? m.GetString() : m.GetRawText();
                 else if (root.TryGetProperty("error", out var e) && e.ValueKind == JsonValueKind.Object && e.TryGetProperty("message", out var em) && em.ValueKind == JsonValueKind.String) text = em.GetString();
                 else if (root.TryGetProperty("detail", out var d)) text = d.ValueKind == JsonValueKind.String ? d.GetString() : d.GetRawText();
             }
-            if (!string.IsNullOrWhiteSpace(text))
-            {
-                text = text.Replace('\r', ' ').Replace('\n', ' ').Trim().TrimEnd('.');
-                return ": " + (text.Length > 200 ? text[..200] + "..." : text);
-            }
         }
-        catch (JsonException) { }
+        catch (JsonException)
+        {
+            text = null; // not JSON: the raw body is used below
+        }
+        if (!string.IsNullOrWhiteSpace(text))
+        {
+            text = text.Replace('\r', ' ').Replace('\n', ' ').Trim().TrimEnd('.');
+            return ": " + (text.Length > 200 ? text[..200] + "..." : text);
+        }
         // Not a JSON error body (a proxy's page, an empty answer): its start, on one line.
         string raw = (body ?? "").Replace('\r', ' ').Replace('\n', ' ').Trim();
         return raw.Length == 0 ? " with an empty answer" : ": " + (raw.Length > 200 ? raw[..200] + "..." : raw);
