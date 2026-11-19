@@ -465,13 +465,16 @@ public static class ThematicSynthesis
     }
 
     /// <summary>PRISMA item 13d, written from the codebook.</summary>
-    public static string MethodsText(ThematicCodebook? book, string? modelName, bool repairEnabled)
+    /// <param name="checkModelName">The model of the citation checks, when it is not <paramref name="modelName"/>.</param>
+    public static string MethodsText(ThematicCodebook? book, string? modelName, bool repairEnabled, string? checkModelName = null)
     {
         string model = string.IsNullOrWhiteSpace(modelName) ? "the language model" : $"the language model ({modelName})";
+        // The checks are named only when another model made them, so the text says which model did what.
+        string checkedBy = string.IsNullOrWhiteSpace(checkModelName) || checkModelName == modelName ? "" : $" by a second language model ({checkModelName})";
         if (book == null || book.Themes.Count == 0)
         {
             string why = book?.FallbackReason is { Length: > 0 } r ? $" Thematic coding was not used in this run: {r.TrimEnd('.')}." : "";
-            return $"The findings were synthesised narratively by {model} from the abstracts and selected full-text passages of the included studies, organised by themes proposed in a preceding outline step.{why} Every cited sentence was then checked against the cited paper (see the automated citation check).";
+            return $"The findings were synthesised narratively by {model} from the abstracts and selected full-text passages of the included studies, organised by themes proposed in a preceding outline step.{why} Every cited sentence was then checked against the cited paper{checkedBy} (see the automated citation check).";
         }
         var sb = new StringBuilder();
         sb.Append($"The findings were synthesised thematically, following the thematic synthesis method of Thomas and Harden (2008), with {model} performing each step. ");
@@ -485,8 +488,8 @@ public static class ThematicSynthesis
         }
         sb.Append("Third, each theme was written up as a subsection from its own studies only, with every study of the theme to be cited; studies still uncited were given to one further revision pass. ");
         sb.Append(repairEnabled
-            ? "Finally, the part of every cited sentence attributed to a paper was checked against that paper; sentences judged not supported or only partly supported were rewritten once from the paper's evidence and checked again."
-            : "Finally, the part of every cited sentence attributed to a paper was checked against that paper.");
+            ? $"Finally, the part of every cited sentence attributed to a paper was checked against that paper{checkedBy}; sentences judged not supported or only partly supported were rewritten once from the paper's evidence and checked again."
+            : $"Finally, the part of every cited sentence attributed to a paper was checked against that paper{checkedBy}.");
         return sb.ToString();
     }
 }
