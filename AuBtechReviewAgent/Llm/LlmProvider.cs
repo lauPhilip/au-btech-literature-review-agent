@@ -80,14 +80,6 @@ public class LlmOptions
     /// <summary>A readable name for the methods section, e.g. "mistral-large-latest (Mistral API)".</summary>
     public string DisplayName => NameOf(Model);
 
-    /// <summary>
-    /// Both models when the checks use <see cref="FastModel"/>, for the protocol: "mistral-large-latest (Mistral API);
-    /// screening and citation checks: mistral-small-latest (Mistral API)". Otherwise the same as <see cref="DisplayName"/>.
-    /// </summary>
-    public string DisplayNameWithChecks => HasFastModel
-        ? $"{DisplayName}; screening and citation checks: {NameOf(FastModel.Trim())}"
-        : DisplayName;
-
     /// <summary>The same settings with another model and effort, for the client of <see cref="FastModel"/>.</summary>
     public LlmOptions ForFastModel() => new()
     {

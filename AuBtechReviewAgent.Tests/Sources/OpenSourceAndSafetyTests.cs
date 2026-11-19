@@ -547,13 +547,12 @@ public class OpenSourceAndSafetyTests : IDisposable
         var options = new LlmOptions();
         Assert.False(options.HasFastModel);
         Assert.Equal("mistral-large-latest", options.ModelFor("screening"));
-        Assert.Equal(options.DisplayName, options.DisplayNameWithChecks);
         Assert.IsType<OpenAICompatibleChatService>(LlmFactory.CreateForReview(options, "key"));
         Assert.False(new LlmOptions { FastModel = "mistral-large-latest" }.HasFastModel); // the same model is not a second one
 
         var split = new LlmOptions { FastModel = "mistral-small-latest" };
         Assert.IsType<StageRoutedChatService>(LlmFactory.CreateForReview(split, "key"));
-        Assert.Equal("mistral-large-latest (Mistral API); screening and citation checks: mistral-small-latest (Mistral API)", split.DisplayNameWithChecks);
+        Assert.Equal("mistral-large-latest (Mistral API)", split.DisplayName);
         Assert.Equal("mistral-small-latest (Mistral API)", split.DisplayNameFor("screening"));
         Assert.Equal("none", split.ForFastModel().ReasoningEffort);
         Assert.Equal("mistral-small-latest", split.ForFastModel().Model);

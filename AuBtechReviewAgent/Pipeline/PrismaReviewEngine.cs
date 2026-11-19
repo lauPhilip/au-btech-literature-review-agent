@@ -539,7 +539,7 @@ public partial class PrismaReviewEngine
     private async Task WriteProtocolAsync(RunContext ctx)
     {
         var names = ctx.State.SelectedSources.Except(ctx.State.UnavailableSources).Select(SourceCatalog.DisplayNameFor).ToList();
-        string text = ProtocolWriter.Write(ctx.RunId, ctx.Request with { UserKeys = null }, names, Llm.DisplayNameWithChecks, _runsOptions, DateTime.UtcNow, ctx.State.InputFlags);
+        string text = ProtocolWriter.Write(ctx.RunId, ctx.Request with { UserKeys = null }, names, Llm.DisplayNameFor("screening"), _runsOptions, DateTime.UtcNow, ctx.State.InputFlags);
         string path = Path.Join(ctx.Workspace, "protocol.md");
         await File.WriteAllTextAsync(path, text, new UTF8Encoding(false));
         ctx.State.ProtocolSha256 = RunManifest.Sha256(File.ReadAllBytes(path));
