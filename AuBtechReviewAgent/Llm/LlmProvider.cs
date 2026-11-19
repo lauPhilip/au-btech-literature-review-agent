@@ -38,6 +38,14 @@ public class LlmOptions
     /// <summary>How many records are screened at the same time within one run.</summary>
     public int ScreeningParallelism { get; set; } = 4;
 
+    /// <summary>
+    /// Mistral only: the reasoning_effort sent with every call ("low", "medium" or "high"). Reasoning models such as
+    /// Mistral Large 4 always reason and use "high" when the parameter is left out, which made a review several
+    /// times slower than with the earlier non-reasoning model. Empty: the parameter is not sent. A model that does
+    /// not accept it is asked again without it.
+    /// </summary>
+    public string ReasoningEffort { get; set; } = "low";
+
     public bool IsOpenAICompatible => Provider.Equals("OpenAICompatible", StringComparison.OrdinalIgnoreCase);
 
     /// <summary>A readable name for the methods section, e.g. "mistral-large-latest (Mistral API)".</summary>
@@ -61,14 +69,16 @@ public class OpenAICompatibleChatService : IChatCompletionService
     private readonly string _model;
     private readonly Uri _endpoint;
     private readonly string _apiKey;
+    private volatile string _reasoningEffort;
 
-    public OpenAICompatibleChatService(string baseUrl, string model, string apiKey = "", HttpClient? http = null)
+    public OpenAICompatibleChatService(string baseUrl, string model, string apiKey = "", HttpClient? http = null, string reasoningEffort = "")
     {
         if (!Uri.TryCreate(baseUrl.TrimEnd('/') + "/chat/completions", UriKind.Absolute, out var endpoint))
             throw new ArgumentException($"Llm:BaseUrl '{baseUrl}' is not a valid URL.");
         _endpoint = endpoint;
         _model = model;
         _apiKey = apiKey;
+        _reasoningEffort = reasoningEffort?.Trim() ?? "";
         _http = http ?? new HttpClient { Timeout = TimeSpan.FromMinutes(10) }; // local models can be slow
     }
 
@@ -77,14 +87,25 @@ public class OpenAICompatibleChatService : IChatCompletionService
     public async Task<IReadOnlyList<ChatMessageContent>> GetChatMessageContentsAsync(
         ChatHistory chatHistory, PromptExecutionSettings? executionSettings = null, Kernel? kernel = null, CancellationToken cancellationToken = default)
     {
-        string body = BuildRequestBody(_model, chatHistory, executionSettings);
-        using var request = new HttpRequestMessage(HttpMethod.Post, _endpoint) { Content = new StringContent(body, Encoding.UTF8, "application/json") };
-        if (!string.IsNullOrWhiteSpace(_apiKey)) request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _apiKey);
+        string json;
+        while (true)
+        {
+            string effort = _reasoningEffort;
+            string body = BuildRequestBody(_model, chatHistory, executionSettings, effort);
+            using var request = new HttpRequestMessage(HttpMethod.Post, _endpoint) { Content = new StringContent(body, Encoding.UTF8, "application/json") };
+            if (!string.IsNullOrWhiteSpace(_apiKey)) request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _apiKey);
 
-        using var response = await _http.SendAsync(request, cancellationToken);
-        string json = await response.Content.ReadAsStringAsync(cancellationToken);
-        if (!response.IsSuccessStatusCode)
+            using var response = await _http.SendAsync(request, cancellationToken);
+            json = await response.Content.ReadAsStringAsync(cancellationToken);
+            if (response.IsSuccessStatusCode) break;
+            if (effort.Length > 0 && RejectsReasoningEffort(response.StatusCode, json))
+            {
+                // A model without adjustable reasoning: ask again without the parameter, and leave it out from now on.
+                _reasoningEffort = "";
+                continue;
+            }
             throw new HttpOperationException(response.StatusCode, json, $"The model server answered {(int)response.StatusCode}.", null);
+        }
 
         var (text, model, usage) = ParseResponse(json);
         var content = new ChatMessageContent(AuthorRole.Assistant, text) { ModelId = model ?? _model };
@@ -101,7 +122,7 @@ public class OpenAICompatibleChatService : IChatCompletionService
     }
 
     /// <summary>The JSON request body. Public for unit tests.</summary>
-    public static string BuildRequestBody(string model, ChatHistory history, PromptExecutionSettings? settings)
+    public static string BuildRequestBody(string model, ChatHistory history, PromptExecutionSettings? settings, string reasoningEffort = "")
     {
         var messages = new JsonArray();
         foreach (var m in history)
@@ -113,8 +134,14 @@ public class OpenAICompatibleChatService : IChatCompletionService
 
         if (settings?.ExtensionData?.ContainsKey("response_format") == true)
             body["response_format"] = new JsonObject { ["type"] = "json_object" };
+        if (!string.IsNullOrWhiteSpace(reasoningEffort)) body["reasoning_effort"] = reasoningEffort.Trim();
         return body.ToJsonString();
     }
+
+    /// <summary>Whether an error answer says the model does not accept reasoning_effort. Public for unit tests.</summary>
+    public static bool RejectsReasoningEffort(System.Net.HttpStatusCode status, string body) =>
+        (status is System.Net.HttpStatusCode.BadRequest or System.Net.HttpStatusCode.UnprocessableEntity) &&
+        (body ?? "").Contains("reasoning_effort", StringComparison.OrdinalIgnoreCase);
 
     /// <summary>Text, model name and usage from a chat completions response. Public for unit tests.</summary>
     public static (string Text, string? Model, string? Usage) ParseResponse(string json)
@@ -171,6 +198,6 @@ public static class LlmFactory
         if (options.IsOpenAICompatible)
             return new OpenAICompatibleChatService(options.BaseUrl, options.Model, options.ApiKey);
 
-        return new OpenAICompatibleChatService(MistralBaseUrl, options.Model, mistralApiKey, MistralHttp);
+        return new OpenAICompatibleChatService(MistralBaseUrl, options.Model, mistralApiKey, MistralHttp, options.ReasoningEffort);
     }
 }

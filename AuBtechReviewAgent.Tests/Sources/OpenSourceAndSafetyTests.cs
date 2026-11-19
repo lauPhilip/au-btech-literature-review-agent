@@ -367,9 +367,64 @@ public class OpenSourceAndSafetyTests : IDisposable
     }
 
     [Fact]
-    public void MistralIsCalledOnItsChatCompletionsApi()
+    public void ReasoningEffortIsSentOnlyWhenSet()
     {
+        var history = new ChatHistory();
+        history.AddUserMessage("Hello");
+
+        Assert.Contains("\"reasoning_effort\":\"low\"", OpenAICompatibleChatService.BuildRequestBody("mistral-large-latest", history, null, "low"));
+        Assert.DoesNotContain("reasoning_effort", OpenAICompatibleChatService.BuildRequestBody("mistral-large-latest", history, null, ""));
+        Assert.DoesNotContain("reasoning_effort", OpenAICompatibleChatService.BuildRequestBody("llama3.1", history, null));
+    }
+
+    [Fact]
+    public void MistralIsCalledWithLowReasoningEffortByDefault()
+    {
+        Assert.Equal("low", new LlmOptions().ReasoningEffort);
         Assert.IsType<OpenAICompatibleChatService>(LlmFactory.Create(new LlmOptions(), "test-key"));
+    }
+
+    private class RejectsEffortHandler : HttpMessageHandler
+    {
+        public List<string> Bodies { get; } = new();
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            string body = await request.Content!.ReadAsStringAsync(cancellationToken);
+            Bodies.Add(body);
+            if (body.Contains("reasoning_effort"))
+                return new HttpResponseMessage(HttpStatusCode.BadRequest)
+                {
+                    Content = new StringContent("""{"message":"Extra inputs are not permitted: reasoning_effort"}""", Encoding.UTF8, "application/json"),
+                };
+            return new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent("""{"model":"mistral-large-2411","choices":[{"message":{"content":"ok"}}]}""", Encoding.UTF8, "application/json"),
+            };
+        }
+    }
+
+    [Fact]
+    public async Task AModelThatRejectsReasoningEffortIsAskedAgainWithoutIt()
+    {
+        var handler = new RejectsEffortHandler();
+        var chat = new OpenAICompatibleChatService(LlmFactory.MistralBaseUrl, "mistral-large-2411", "key", new HttpClient(handler), "low");
+
+        Assert.Equal("ok", (await chat.GetChatMessageContentAsync("first")).Content);
+        Assert.Equal("ok", (await chat.GetChatMessageContentAsync("second")).Content);
+
+        // One rejected call, then the parameter is left out for the rest of the run.
+        Assert.Equal(3, handler.Bodies.Count);
+        Assert.Contains("reasoning_effort", handler.Bodies[0]);
+        Assert.DoesNotContain("reasoning_effort", handler.Bodies[1]);
+        Assert.DoesNotContain("reasoning_effort", handler.Bodies[2]);
+    }
+
+    [Fact]
+    public void OtherErrorsAreNotRetriedWithoutReasoningEffort()
+    {
+        Assert.False(OpenAICompatibleChatService.RejectsReasoningEffort(HttpStatusCode.Unauthorized, "reasoning_effort"));
+        Assert.False(OpenAICompatibleChatService.RejectsReasoningEffort(HttpStatusCode.BadRequest, "invalid model"));
+        Assert.True(OpenAICompatibleChatService.RejectsReasoningEffort(HttpStatusCode.UnprocessableEntity, "reasoning_effort: unexpected value"));
     }
 
     [Fact]
