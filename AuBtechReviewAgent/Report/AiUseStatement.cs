@@ -19,6 +19,8 @@ public static class AiUseStatement
         var s = state.Stats;
         var inv = CultureInfo.InvariantCulture;
         string model = string.IsNullOrWhiteSpace(state.RunSettings?.Model) ? "a large language model" : $"the large language model {state.RunSettings!.Model}";
+        string? fast = state.RunSettings?.FastModel;
+        if (!string.IsNullOrWhiteSpace(fast)) model += $" (and {fast} for screening and citation checks)";
         string version = string.IsNullOrWhiteSpace(state.RunSettings?.AppVersion) ? "" : $" (version {state.RunSettings!.AppVersion.Split('+')[0]})";
         string date = (state.CompletedUtc ?? state.Timestamp).ToString("d MMMM yyyy", inv);
 
@@ -60,6 +62,7 @@ public static class AiUseStatement
     public static string Short(ReviewState state)
     {
         string model = string.IsNullOrWhiteSpace(state.RunSettings?.Model) ? "a large language model" : state.RunSettings!.Model;
+        if (!string.IsNullOrWhiteSpace(state.RunSettings?.FastModel)) model += $" and {state.RunSettings!.FastModel}";
         return $"The literature search, screening, data extraction and a first draft of the synthesis were carried out with TraceableAI using {model}; " +
                "every citation was automatically checked against the cited paper, and the authors reviewed and edited all output and take full responsibility for it.";
     }

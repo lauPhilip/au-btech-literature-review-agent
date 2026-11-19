@@ -187,7 +187,8 @@ public partial class PrismaReviewEngine
         Coordinator.Register(sessionId);
         var (activeMistral, activeElsevier, activeIeee, activeScholar) = ResolveKeys(request.UserKeys);
 
-        IChatCompletionService innerChat = ChatFactory != null ? ChatFactory(activeMistral) : LlmFactory.Create(Llm, activeMistral);
+        // With Llm:FastModel set, the screenings and citation checks go to it (StageRoutedChatService).
+        IChatCompletionService innerChat = ChatFactory != null ? ChatFactory(activeMistral) : LlmFactory.CreateForReview(Llm, activeMistral);
         var chat = new RecordingChatCompletionService(innerChat, Llm.Model);
 
         int yearFrom = request.YearFrom, yearTo = request.YearTo;
@@ -538,7 +539,7 @@ public partial class PrismaReviewEngine
     private async Task WriteProtocolAsync(RunContext ctx)
     {
         var names = ctx.State.SelectedSources.Except(ctx.State.UnavailableSources).Select(SourceCatalog.DisplayNameFor).ToList();
-        string text = ProtocolWriter.Write(ctx.RunId, ctx.Request with { UserKeys = null }, names, Llm.DisplayName, _runsOptions, DateTime.UtcNow, ctx.State.InputFlags);
+        string text = ProtocolWriter.Write(ctx.RunId, ctx.Request with { UserKeys = null }, names, Llm.DisplayNameFor("screening"), _runsOptions, DateTime.UtcNow, ctx.State.InputFlags);
         string path = Path.Join(ctx.Workspace, "protocol.md");
         await File.WriteAllTextAsync(path, text, new UTF8Encoding(false));
         ctx.State.ProtocolSha256 = RunManifest.Sha256(File.ReadAllBytes(path));
