@@ -522,6 +522,44 @@ public class OpenSourceAndSafetyTests : IDisposable
     }
 
     [Fact]
+    public async Task ChecksGoToTheFastModelAndEverythingElseToTheMainModel()
+    {
+        var options = new LlmOptions { Model = "mistral-large-latest", FastModel = "mistral-small-latest" };
+        var router = new StageRoutedChatService(new FakeChatService().RespondsWith(_ => "main"), new FakeChatService().RespondsWith(_ => "fast"), options);
+
+        foreach (var stage in new[] { "peer-review-filter", "screening", "screening-second", "citation-check", "citation-recheck" })
+            using (LlmStage.Begin(stage))
+            {
+                Assert.Equal("fast", (await router.GetChatMessageContentAsync("x")).Content);
+                Assert.Equal("mistral-small-latest", router.ModelFor(stage));
+            }
+        foreach (var stage in new[] { "search-perspectives", "extraction", "thematic-coding", "theme-sections", "citation-repair", "automated-peer-review" })
+            using (LlmStage.Begin(stage))
+            {
+                Assert.Equal("main", (await router.GetChatMessageContentAsync("x")).Content);
+                Assert.Equal("mistral-large-latest", router.ModelFor(stage));
+            }
+    }
+
+    [Fact]
+    public void WithoutAFastModelOneModelDoesEverything()
+    {
+        var options = new LlmOptions();
+        Assert.False(options.HasFastModel);
+        Assert.Equal("mistral-large-latest", options.ModelFor("screening"));
+        Assert.Equal(options.DisplayName, options.DisplayNameWithChecks);
+        Assert.IsType<OpenAICompatibleChatService>(LlmFactory.CreateForReview(options, "key"));
+        Assert.False(new LlmOptions { FastModel = "mistral-large-latest" }.HasFastModel); // the same model is not a second one
+
+        var split = new LlmOptions { FastModel = "mistral-small-latest" };
+        Assert.IsType<StageRoutedChatService>(LlmFactory.CreateForReview(split, "key"));
+        Assert.Equal("mistral-large-latest (Mistral API); screening and citation checks: mistral-small-latest (Mistral API)", split.DisplayNameWithChecks);
+        Assert.Equal("mistral-small-latest (Mistral API)", split.DisplayNameFor("screening"));
+        Assert.Equal("none", split.ForFastModel().ReasoningEffort);
+        Assert.Equal("mistral-small-latest", split.ForFastModel().Model);
+    }
+
+    [Fact]
     public void MethodsTextReportsDualScreeningAgreement()
     {
         var stats = new ReviewStats { Screened = 10, Included = 4, Excluded = 6, DualScreened = 10, ScreeningDisagreements = 2, ScreeningKappa = 0.58, InjectionSuspected = 1, UncertainDecisions = 3 };

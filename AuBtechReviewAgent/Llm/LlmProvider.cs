@@ -49,12 +49,55 @@ public class LlmOptions
     /// </summary>
     public string ReasoningEffort { get; set; } = "low";
 
+    /// <summary>
+    /// Optional second model for the narrow, high-volume checks of a systematic review (<see cref="FastStages"/>):
+    /// the peer-review filter, both screenings and the citation checks. Those calls answer a short structured
+    /// question, so a smaller model without reasoning is several times faster there; everything that writes or
+    /// reasons (search strings, extraction, coding, writing, repair, peer review) stays on <see cref="Model"/>.
+    /// Empty: <see cref="Model"/> does everything.
+    /// </summary>
+    public string FastModel { get; set; } = "";
+
+    /// <summary>The reasoning_effort sent to <see cref="FastModel"/> ("none" switches reasoning off on Mistral Small 4).</summary>
+    public string FastReasoningEffort { get; set; } = "none";
+
+    /// <summary>The stages (LlmStage names) that go to <see cref="FastModel"/> when one is set.</summary>
+    public static readonly IReadOnlySet<string> FastStages = new HashSet<string>(StringComparer.Ordinal)
+    {
+        "peer-review-filter", "screening", "screening-second", "citation-check", "citation-recheck",
+    };
+
+    public bool HasFastModel => !string.IsNullOrWhiteSpace(FastModel) && !FastModel.Trim().Equals(Model.Trim(), StringComparison.Ordinal);
+
+    /// <summary>The model a call of this stage is sent to.</summary>
+    public string ModelFor(string stage) => HasFastModel && FastStages.Contains(stage) ? FastModel.Trim() : Model;
+
+    /// <summary>A readable name of the model a stage uses, for the methods text.</summary>
+    public string DisplayNameFor(string stage) => NameOf(ModelFor(stage));
+
     public bool IsOpenAICompatible => Provider.Equals("OpenAICompatible", StringComparison.OrdinalIgnoreCase);
 
     /// <summary>A readable name for the methods section, e.g. "mistral-large-latest (Mistral API)".</summary>
-    public string DisplayName => IsOpenAICompatible
-        ? $"{Model} (OpenAI-compatible endpoint{(string.IsNullOrWhiteSpace(BaseUrl) ? "" : " " + SafeHost(BaseUrl))})"
-        : $"{Model} (Mistral API)";
+    public string DisplayName => NameOf(Model);
+
+    /// <summary>
+    /// Both models when the checks use <see cref="FastModel"/>, for the protocol: "mistral-large-latest (Mistral API);
+    /// screening and citation checks: mistral-small-latest (Mistral API)". Otherwise the same as <see cref="DisplayName"/>.
+    /// </summary>
+    public string DisplayNameWithChecks => HasFastModel
+        ? $"{DisplayName}; screening and citation checks: {NameOf(FastModel.Trim())}"
+        : DisplayName;
+
+    /// <summary>The same settings with another model and effort, for the client of <see cref="FastModel"/>.</summary>
+    public LlmOptions ForFastModel() => new()
+    {
+        Provider = Provider, Model = FastModel.Trim(), BaseUrl = BaseUrl, ApiKey = ApiKey,
+        ScreeningParallelism = ScreeningParallelism, ReasoningEffort = FastReasoningEffort,
+    };
+
+    private string NameOf(string model) => IsOpenAICompatible
+        ? $"{model} (OpenAI-compatible endpoint{(string.IsNullOrWhiteSpace(BaseUrl) ? "" : " " + SafeHost(BaseUrl))})"
+        : $"{model} (Mistral API)";
 
     private static string SafeHost(string url) => Uri.TryCreate(url, UriKind.Absolute, out var u) ? u.Host : "";
 }
@@ -224,9 +267,55 @@ public class OpenAICompatibleChatService : IChatCompletionService
     }
 }
 
+/// <summary>A chat service that can say which model a stage's calls go to, so the call log records it.</summary>
+public interface IStageModels
+{
+    string ModelFor(string stage);
+}
+
+/// <summary>
+/// Sends each call to the fast model when its stage (<see cref="LlmStage.Name"/>, set around every call) is one of
+/// <see cref="LlmOptions.FastStages"/>, and to the main model otherwise. No prompt code has to know about it.
+/// </summary>
+public sealed class StageRoutedChatService : IChatCompletionService, IStageModels
+{
+    private readonly IChatCompletionService _main;
+    private readonly IChatCompletionService _fast;
+    private readonly LlmOptions _options;
+
+    public StageRoutedChatService(IChatCompletionService main, IChatCompletionService fast, LlmOptions options)
+    {
+        _main = main;
+        _fast = fast;
+        _options = options;
+    }
+
+    public IReadOnlyDictionary<string, object?> Attributes => _main.Attributes;
+
+    public string ModelFor(string stage) => _options.ModelFor(stage);
+
+    private IChatCompletionService For(string stage) => _options.HasFastModel && LlmOptions.FastStages.Contains(stage) ? _fast : _main;
+
+    public Task<IReadOnlyList<ChatMessageContent>> GetChatMessageContentsAsync(
+        ChatHistory chatHistory, PromptExecutionSettings? executionSettings = null, Kernel? kernel = null, CancellationToken cancellationToken = default) =>
+        For(LlmStage.Name).GetChatMessageContentsAsync(chatHistory, executionSettings, kernel, cancellationToken);
+
+    public IAsyncEnumerable<StreamingChatMessageContent> GetStreamingChatMessageContentsAsync(
+        ChatHistory chatHistory, PromptExecutionSettings? executionSettings = null, Kernel? kernel = null, CancellationToken cancellationToken = default) =>
+        For(LlmStage.Name).GetStreamingChatMessageContentsAsync(chatHistory, executionSettings, kernel, cancellationToken);
+}
+
 /// <summary>Builds the chat service for a run from the configured provider.</summary>
 public static class LlmFactory
 {
+    /// <summary>
+    /// The chat service of a systematic review: <see cref="Create"/> for the main model, routed to a second client for
+    /// the checks when <see cref="LlmOptions.FastModel"/> is set.
+    /// </summary>
+    public static IChatCompletionService CreateForReview(LlmOptions options, string mistralApiKey) => options.HasFastModel
+        ? new StageRoutedChatService(Create(options, mistralApiKey), Create(options.ForFastModel(), mistralApiKey), options)
+        : Create(options, mistralApiKey);
+
     /// <summary>The Mistral chat completions API, which follows the OpenAI format.</summary>
     public const string MistralBaseUrl = "https://api.mistral.ai/v1";
 
