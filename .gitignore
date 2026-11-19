@@ -41,3 +41,6 @@ Claude outputs/
 
 # Local publish output (contains web.config with API keys)
 **/publish/
+
+# Python bytecode from tools/ReleaseCheck and deploy scripts
+__pycache__/
