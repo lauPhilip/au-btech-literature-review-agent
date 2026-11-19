@@ -453,6 +453,43 @@ public class OpenSourceAndSafetyTests : IDisposable
         Assert.EndsWith("...", OpenAICompatibleChatService.ErrorDetail(new string('x', 500)));
     }
 
+    private class RateLimitedHandler : HttpMessageHandler
+    {
+        private readonly TimeSpan _retryAfter;
+        public int Calls;
+        public RateLimitedHandler(TimeSpan retryAfter) => _retryAfter = retryAfter;
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            Interlocked.Increment(ref Calls);
+            var response = new HttpResponseMessage(HttpStatusCode.TooManyRequests) { Content = new StringContent("{}") };
+            response.Headers.RetryAfter = new System.Net.Http.Headers.RetryConditionHeaderValue(_retryAfter);
+            return Task.FromResult(response);
+        }
+    }
+
+    [Fact]
+    public async Task ARateLimitThatAsksForALongWaitIsNotRetried()
+    {
+        // OpenAlex once the day's budget is used up: four capped waits of 30 s were refused again, 2 minutes a query.
+        var handler = new RateLimitedHandler(TimeSpan.FromHours(1));
+        var clock = System.Diagnostics.Stopwatch.StartNew();
+        var ex = await Assert.ThrowsAsync<HttpRequestException>(() =>
+            OpenSourceHttp.GetStringAsync("https://limited.example.org/works", client: new HttpClient(handler)));
+
+        Assert.Equal(1, handler.Calls);
+        Assert.Contains("asked to wait 60 min", ex.Message);
+        Assert.True(clock.Elapsed < TimeSpan.FromSeconds(5));
+    }
+
+    [Fact]
+    public async Task ARateLimitWithAShortWaitIsStillRetried()
+    {
+        var handler = new RateLimitedHandler(TimeSpan.Zero);
+        await Assert.ThrowsAsync<HttpRequestException>(() =>
+            OpenSourceHttp.GetStringAsync("https://limited.example.org/works", maxAttempts: 3, client: new HttpClient(handler)));
+        Assert.Equal(3, handler.Calls);
+    }
+
     [Fact]
     public void MethodsTextReportsDualScreeningAgreement()
     {
