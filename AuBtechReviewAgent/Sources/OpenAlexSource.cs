@@ -9,15 +9,27 @@ namespace AuBtechReviewAgent;
 /// <summary>
 /// OpenAlex (openalex.org): a free, open catalogue of about 250 million scholarly works with DOIs, abstracts,
 /// venues, open-access links and citation links. Replaces the Google Scholar / ResearchGate route, which went
-/// through SerpApi (paid scraping of sites whose terms do not allow it). No API key is needed.
+/// through SerpApi (paid scraping of sites whose terms do not allow it). An API key (OpenSources:OpenAlexApiKey) is
+/// sent as an Authorization header, so it never appears in a URL, a log line or the archived raw responses.
 /// </summary>
 public class OpenAlexSource : IAcademicSource, ICitationGraph
 {
     private const string Api = "https://api.openalex.org";
     private readonly string _contactEmail;
+    private readonly IDictionary<string, string>? _headers;
     private readonly List<string> _raw = new();
 
-    public OpenAlexSource(string contactEmail = "") => _contactEmail = contactEmail;
+    public OpenAlexSource(string contactEmail = "", string apiKey = "")
+    {
+        _contactEmail = contactEmail;
+        _headers = AuthHeaders(apiKey);
+    }
+
+    /// <summary>The request headers that carry the API key, or null without one. Public for unit tests.</summary>
+    public static IDictionary<string, string>? AuthHeaders(string? apiKey) =>
+        string.IsNullOrWhiteSpace(apiKey) ? null : new Dictionary<string, string> { ["Authorization"] = "Bearer " + apiKey.Trim() };
+
+    private Task<string> GetAsync(string url) => OpenSourceHttp.GetStringAsync(OpenSourceHttp.WithMailto(url, _contactEmail), _headers);
 
     public string SourceName => "OpenAlex";
     public IReadOnlyList<string> LastRawResponses => _raw;
@@ -25,9 +37,7 @@ public class OpenAlexSource : IAcademicSource, ICitationGraph
     public async Task<List<AcademicPaper>> FetchPapersAsync(string query, int maxResults = 5)
     {
         _raw.Clear();
-        string url = OpenSourceHttp.WithMailto(
-            $"{Api}/works?search={Uri.EscapeDataString(query)}&per-page={Math.Clamp(maxResults, 1, 200)}", _contactEmail);
-        string json = await OpenSourceHttp.GetStringAsync(url);
+        string json = await GetAsync($"{Api}/works?search={Uri.EscapeDataString(query)}&per-page={Math.Clamp(maxResults, 1, 200)}");
         _raw.Add(json);
         return ParseWorks(json);
     }
@@ -40,7 +50,7 @@ public class OpenAlexSource : IAcademicSource, ICitationGraph
     {
         // Local list (not _raw): chaining calls for several papers can run at the same time.
         var raw = new List<string>();
-        string workJson = await OpenSourceHttp.GetStringAsync(OpenSourceHttp.WithMailto($"{Api}/works/doi:{Uri.EscapeDataString(doi)}", _contactEmail));
+        string workJson = await GetAsync($"{Api}/works/doi:{Uri.EscapeDataString(doi)}");
         raw.Add(workJson);
 
         using var doc = JsonDocument.Parse(workJson);
@@ -53,8 +63,7 @@ public class OpenAlexSource : IAcademicSource, ICitationGraph
         var backward = new List<AcademicPaper>();
         if (referenced.Count > 0)
         {
-            string backJson = await OpenSourceHttp.GetStringAsync(OpenSourceHttp.WithMailto(
-                $"{Api}/works?filter=openalex:{string.Join("|", referenced)}&per-page={referenced.Count}", _contactEmail));
+            string backJson = await GetAsync($"{Api}/works?filter=openalex:{string.Join("|", referenced)}&per-page={referenced.Count}");
             raw.Add(backJson);
             backward = ParseWorks(backJson);
         }
@@ -62,8 +71,7 @@ public class OpenAlexSource : IAcademicSource, ICitationGraph
         var forward = new List<AcademicPaper>();
         if (id.Length > 0 && perDirection > 0)
         {
-            string fwdJson = await OpenSourceHttp.GetStringAsync(OpenSourceHttp.WithMailto(
-                $"{Api}/works?filter=cites:{id}&sort=cited_by_count:desc&per-page={perDirection}", _contactEmail));
+            string fwdJson = await GetAsync($"{Api}/works?filter=cites:{id}&sort=cited_by_count:desc&per-page={perDirection}");
             raw.Add(fwdJson);
             forward = ParseWorks(fwdJson);
         }

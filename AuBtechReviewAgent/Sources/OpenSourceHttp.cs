@@ -18,6 +18,13 @@ public class OpenSourcesOptions
     /// <summary>Optional Semantic Scholar API key (the API works without one, with a lower shared rate limit).</summary>
     public string SemanticScholarApiKey { get; set; } = "";
 
+    /// <summary>
+    /// OpenAlex API key (free at openalex.org/settings/api). Since February 2026 OpenAlex expects one: without it the
+    /// daily budget is tiny and shared by everyone on the same address, so most queries are refused with 429. A secret:
+    /// keep it in user-secrets or the server's configuration.
+    /// </summary>
+    public string OpenAlexApiKey { get; set; } = "";
+
     /// <summary>How many referenced and citing papers to fetch per included paper when citation chaining is on.</summary>
     public int ChainingPerPaper { get; set; } = 5;
 }

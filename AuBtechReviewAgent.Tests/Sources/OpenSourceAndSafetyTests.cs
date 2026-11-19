@@ -491,6 +491,15 @@ public class OpenSourceAndSafetyTests : IDisposable
     }
 
     [Fact]
+    public void TheOpenAlexKeyTravelsInAHeaderNotInTheAddress()
+    {
+        Assert.Null(OpenAlexSource.AuthHeaders(""));
+        Assert.Null(OpenAlexSource.AuthHeaders(null));
+        Assert.Equal("Bearer abc123", OpenAlexSource.AuthHeaders(" abc123 ")!["Authorization"]);
+        Assert.Equal("", new OpenSourcesOptions().OpenAlexApiKey); // optional, and never in appsettings.json
+    }
+
+    [Fact]
     public void MethodsTextReportsDualScreeningAgreement()
     {
         var stats = new ReviewStats { Screened = 10, Included = 4, Excluded = 6, DualScreened = 10, ScreeningDisagreements = 2, ScreeningKappa = 0.58, InjectionSuspected = 1, UncertainDecisions = 3 };
