@@ -397,5 +397,13 @@ class RepositoryFilesTests(unittest.TestCase):
         self.assertRegex(fields.get("date-released", ""), r"^\d{4}-\d{2}-\d{2}$")
 
 
+    def test_citation_doi_is_the_concept_doi_in_the_readme_badge(self):
+        """The concept DOI always resolves to the newest version, so the badge and the citation name the same one."""
+        doi = rc.citation_fields((self.ROOT / "CITATION.cff").read_text(encoding="utf-8")).get("doi", "")
+        self.assertRegex(doi, r"^10\.5281/zenodo\.\d+$", "CITATION.cff gives Zenodo's concept DOI as doi")
+        readme = (self.ROOT / "README.md").read_text(encoding="utf-8")
+        self.assertIn(f"](https://doi.org/{doi})", readme, "the README's DOI badge links to the same DOI")
+
+
 if __name__ == "__main__":
     unittest.main()
