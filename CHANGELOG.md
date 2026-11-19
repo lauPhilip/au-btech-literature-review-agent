@@ -6,6 +6,8 @@ Each version's section becomes the notes of its GitHub release, so write it for 
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-11-19
+
 This is the first version of TraceableAI. It runs a full systematic review, from your question to a paper you can check line by line. 🎉
 
 ### Added
@@ -28,4 +30,5 @@ The version now comes from the release tag. You can see it on the Metrics page, 
 
 Screening and citation checks now use a smaller, faster model. The writing still uses the large one, where it counts.
 
-[Unreleased]: https://github.com/lauPhilip/au-btech-literature-review-agent/commits/master
+[Unreleased]: https://github.com/lauPhilip/au-btech-literature-review-agent/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/lauPhilip/au-btech-literature-review-agent/releases/tag/v0.1.0
