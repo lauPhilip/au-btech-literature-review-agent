@@ -41,6 +41,7 @@ public class ReviewPaperTests : IDisposable
         tex = Regex.Replace(tex, @"Protocol Hash: \S+", "Protocol Hash: HASH");
         tex = Regex.Replace(tex, @"fingerprint [0-9a-f]{16}", "fingerprint FINGERPRINT");
         tex = Regex.Replace(tex, @"version [^ ]+\)", "version VERSION)");
+        tex = Regex.Replace(tex, @"This run used version .*?(?= The run archive)", "This run used VERSION.");
         return tex;
     }
 
