@@ -1069,6 +1069,10 @@
     {
         // The saved ledger can be a little behind the live events; never let the progress bar move back.
         var s = AuBtechReviewAgent.RunProgress.KeepFurthest(State.Stats, state.Stats);
+        // While the review is written and checked the ledger is not saved, so a page opened then would show the last
+        // saved step (extraction) until the next event, which can be minutes away. Take the run's live step instead.
+        if (ReviewEngine.LiveStats(currentSessionId) is { } live)
+            lock (live) s = AuBtechReviewAgent.RunProgress.KeepFurthest(live, s);
         State.Stats = s;
         State.RemovedBeforeScreening = state.RemovedBeforeScreening;
         State.SearchStringYields = state.SearchStringYields;
@@ -1584,4 +1588,4 @@
             StateHasChanged();
         });
     }
-}
+}
