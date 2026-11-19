@@ -461,10 +461,15 @@ public class OpenSourceAndSafetyTests : IDisposable
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
             Interlocked.Increment(ref Calls);
-            var response = new HttpResponseMessage(HttpStatusCode.TooManyRequests) { Content = new StringContent("{}") };
-            response.Headers.RetryAfter = new System.Net.Http.Headers.RetryConditionHeaderValue(_retryAfter);
-            return Task.FromResult(response);
+            return Task.FromResult(Refuse(_retryAfter));
         }
+
+        // The HttpClient that called the handler owns and disposes the response.
+        private static HttpResponseMessage Refuse(TimeSpan retryAfter) => new(HttpStatusCode.TooManyRequests)
+        {
+            Content = new StringContent("{}"),
+            Headers = { RetryAfter = new System.Net.Http.Headers.RetryConditionHeaderValue(retryAfter) },
+        };
     }
 
     [Fact]
@@ -472,9 +477,10 @@ public class OpenSourceAndSafetyTests : IDisposable
     {
         // OpenAlex once the day's budget is used up: four capped waits of 30 s were refused again, 2 minutes a query.
         var handler = new RateLimitedHandler(TimeSpan.FromHours(1));
+        using var http = new HttpClient(handler);
         var clock = System.Diagnostics.Stopwatch.StartNew();
         var ex = await Assert.ThrowsAsync<HttpRequestException>(() =>
-            OpenSourceHttp.GetStringAsync("https://limited.example.org/works", client: new HttpClient(handler)));
+            OpenSourceHttp.GetStringAsync("https://limited.example.org/works", client: http));
 
         Assert.Equal(1, handler.Calls);
         Assert.Contains("asked to wait 60 min", ex.Message);
@@ -485,8 +491,9 @@ public class OpenSourceAndSafetyTests : IDisposable
     public async Task ARateLimitWithAShortWaitIsStillRetried()
     {
         var handler = new RateLimitedHandler(TimeSpan.Zero);
+        using var http = new HttpClient(handler);
         await Assert.ThrowsAsync<HttpRequestException>(() =>
-            OpenSourceHttp.GetStringAsync("https://limited.example.org/works", maxAttempts: 3, client: new HttpClient(handler)));
+            OpenSourceHttp.GetStringAsync("https://limited.example.org/works", maxAttempts: 3, client: http));
         Assert.Equal(3, handler.Calls);
     }
 
