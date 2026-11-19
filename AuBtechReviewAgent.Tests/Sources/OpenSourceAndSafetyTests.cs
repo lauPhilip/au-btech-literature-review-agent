@@ -560,6 +560,27 @@ public class OpenSourceAndSafetyTests : IDisposable
     }
 
     [Fact]
+    public async Task TheCallLogNamesTheModelEachStageWentTo()
+    {
+        var options = new LlmOptions { Model = "mistral-large-latest", FastModel = "mistral-small-latest" };
+        var router = new StageRoutedChatService(new FakeChatService().RespondsWith(_ => "main"), new FakeChatService().RespondsWith(_ => "fast"), options);
+        var recorder = new RecordingChatCompletionService(router, "mistral-large-latest");
+
+        using (LlmStage.Begin("screening")) await recorder.GetChatMessageContentAsync("x");
+        using (LlmStage.Begin("extraction")) await recorder.GetChatMessageContentAsync("y");
+
+        Assert.Equal(new[] { "mistral-small-latest", "mistral-large-latest" }, recorder.Calls.OrderBy(c => c.Sequence).Select(c => c.ModelRequested));
+        var settings = recorder.Summarize("test");
+        Assert.Equal("mistral-large-latest", settings.Model);
+        Assert.Equal("mistral-small-latest", settings.FastModel);
+
+        // One model: no fast model on file.
+        var single = new RecordingChatCompletionService(new FakeChatService().RespondsWith(_ => "ok"), "mistral-large-latest");
+        using (LlmStage.Begin("screening")) await single.GetChatMessageContentAsync("x");
+        Assert.Null(single.Summarize("test").FastModel);
+    }
+
+    [Fact]
     public void MethodsTextReportsDualScreeningAgreement()
     {
         var stats = new ReviewStats { Screened = 10, Included = 4, Excluded = 6, DualScreened = 10, ScreeningDisagreements = 2, ScreeningKappa = 0.58, InjectionSuspected = 1, UncertainDecisions = 3 };

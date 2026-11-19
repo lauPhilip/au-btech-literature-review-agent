@@ -40,6 +40,9 @@ public class LlmCallRecord
 public class RunSettingsRecord
 {
     public string Model { get; set; } = "";
+
+    /// <summary>The second model that took some stages (Llm:FastModel), or null when one model made every call.</summary>
+    public string? FastModel { get; set; }
     public string AppVersion { get; set; } = "";
     public Dictionary<string, double> StageTemperatures { get; set; } = new();
     public int LlmCalls { get; set; }
@@ -137,7 +140,8 @@ public class RecordingChatCompletionService : IChatCompletionService
         {
             Stage = LlmStage.Name,
             StartedUtc = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss.fff UTC"),
-            ModelRequested = _model,
+            // With two models (StageRoutedChatService), the one this stage goes to; known before the call, so a failed call has it too.
+            ModelRequested = (_inner as IStageModels)?.ModelFor(LlmStage.Name) ?? _model,
             Temperature = ReadTemperature(executionSettings),
             PromptSha256 = Sha256(prompt),
             PromptChars = prompt.Length,
@@ -185,6 +189,7 @@ public class RecordingChatCompletionService : IChatCompletionService
         var settings = new RunSettingsRecord
         {
             Model = model,
+            FastModel = calls.Select(c => c.ModelRequested).FirstOrDefault(m => !string.IsNullOrEmpty(m) && m != model),
             AppVersion = appVersion,
             LlmCalls = calls.Count,
             LlmRetries = calls.Sum(c => Math.Max(0, c.Attempts - 1)),
