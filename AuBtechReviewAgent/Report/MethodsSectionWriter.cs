@@ -220,7 +220,7 @@ public static class MethodsSectionWriter
     {
         var s = state.Stats;
         var sb = new StringBuilder("This review has limits of its own. ");
-        sb.Append($"The records were screened by a language model ({screeningModel})");
+        sb.Append($"The records were screened by the language model {screeningModel}");
         if (state.DualScreeningRequested && s.DualScreened > 0) sb.Append(", twice with independent prompts");
         sb.Append(state.HumanScreeningReviewRequested && s.HumanReviewed > 0
             ? $", and a human reviewer checked {s.HumanReviewed} of the decisions. "
@@ -233,7 +233,7 @@ public static class MethodsSectionWriter
                 : abstractOnly == s.Included
                     ? (s.Included == 1 ? "No open-access full text was found for the included study, so it was read from its abstract only. "
                                        : $"No open-access full text was found for any of the {s.Included} included studies, so all were read from their abstracts only. ")
-                    : $"{abstractOnly} of the {s.Included} included studies {(abstractOnly == 1 ? "was" : "were")} read from {(abstractOnly == 1 ? "its abstract" : "their abstracts")} only, because no open-access full text was found. ");
+                    : $"Of the {s.Included} included studies, {abstractOnly} {(abstractOnly == 1 ? "was" : "were")} read from {(abstractOnly == 1 ? "its abstract" : "their abstracts")} only, because no open-access full text was found. ");
         }
         if (state.MaxResultsPerSource > 0)
             sb.Append($"The search took at most {state.MaxResultsPerSource} records per source");
@@ -244,7 +244,7 @@ public static class MethodsSectionWriter
         var unavailable = state.UnavailableSources.Select(SourceCatalog.DisplayNameFor).ToList();
         if (unavailable.Count > 0)
             sb.Append($"{string.Join(" and ", unavailable)} could not be searched. ");
-        sb.Append($"The extraction, the synthesis and the text were written by a language model ({writingModel}); every cited sentence was checked against its source, but the review should be read by a person before it is relied on.");
+        sb.Append($"The extraction, the synthesis and the text were written by the language model {writingModel}; every cited sentence was checked against its source, but the review should be read by a person before it is relied on.");
         return sb.ToString();
     }
 

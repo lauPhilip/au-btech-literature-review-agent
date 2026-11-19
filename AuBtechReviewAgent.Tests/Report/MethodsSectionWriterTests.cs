@@ -80,11 +80,11 @@ public class MethodsSectionWriterTests
         };
         string text = MethodsSectionWriter.ReviewProcessLimitations(state, "mistral-small-latest (Mistral API)", "mistral-large-latest (Mistral API)");
 
-        Assert.Contains("screened by a language model (mistral-small-latest (Mistral API)), twice with independent prompts, and a human reviewer checked 4 of the decisions.", text);
-        Assert.Contains("3 of the 8 included studies were read from their abstracts only", text);
+        Assert.Contains("screened by the language model mistral-small-latest (Mistral API), twice with independent prompts, and a human reviewer checked 4 of the decisions.", text);
+        Assert.Contains("Of the 8 included studies, 3 were read from their abstracts only", text);
         Assert.Contains("at most 5 records per source, published from 2020 to 2026.", text);
         Assert.Contains("IEEE Xplore could not be searched.", text);
-        Assert.Contains("written by a language model (mistral-large-latest (Mistral API))", text);
+        Assert.Contains("written by the language model mistral-large-latest (Mistral API);", text);
     }
 
     [Fact]
@@ -92,7 +92,7 @@ public class MethodsSectionWriterTests
     {
         var single = new ReviewState { MaxResultsPerSource = 3, Stats = new ReviewStats { Included = 1 } };
         string text = MethodsSectionWriter.ReviewProcessLimitations(single, "m", "m");
-        Assert.Contains("screened by a language model (m), and no human reviewer checked the decisions within the tool.", text);
+        Assert.Contains("screened by the language model m, and no human reviewer checked the decisions within the tool.", text);
         Assert.Contains("No open-access full text was found for the included study, so it was read from its abstract only.", text);
         Assert.DoesNotContain("published from", text);
         Assert.DoesNotContain("could not be searched", text);
