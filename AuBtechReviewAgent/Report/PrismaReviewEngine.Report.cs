@@ -521,7 +521,7 @@ public partial class PrismaReviewEngine
             string methodsSearch = MethodsSectionWriter.SearchStrategy(query, effectivePerspectives, finalState.MaxResultsPerSource,
                 finalState.Stats.DuplicatesRemoved, finalState.Stats.CappedBeyondMaxResults, finalState.YearFrom, finalState.YearTo, finalState.Stats.OutsideDateRange,
                 finalState.SearchStringsReviewed, finalState.SearchStringYields);
-            string methodsSelection = MethodsSectionWriter.SelectionProcess(finalState.PeerReviewOnlyToggle, finalState.Stats, finalState.HumanScreeningReviewRequested, finalState.HumanScreeningReviewOutcome, Llm.DisplayName);
+            string methodsSelection = MethodsSectionWriter.SelectionProcess(finalState.PeerReviewOnlyToggle, finalState.Stats, finalState.HumanScreeningReviewRequested, finalState.HumanScreeningReviewOutcome, Llm.DisplayNameFor("screening"));
             if (ExclusionReasons.Sentence(finalState.Phases.Screening) is { } exclusionSentence)
                 methodsSelection += " " + exclusionSentence;
             string rawDiscussion = ResolveField("discussionItem");
@@ -811,7 +811,7 @@ public partial class PrismaReviewEngine
                 SelectionProcessItem = methodsSelection,
                 SynthesisResultsItem = fullSynthesisField,
                 SynthesisSections = sections,
-                SynthesisMethodsItem = ThematicSynthesis.MethodsText(useThematic ? thematic!.Codebook : thematic?.Codebook is { } fb ? new ThematicCodebook { FallbackReason = fb.FallbackReason } : null, Llm.DisplayName, Synthesis.RepairCitations)
+                SynthesisMethodsItem = ThematicSynthesis.MethodsText(useThematic ? thematic!.Codebook : thematic?.Codebook is { } fb ? new ThematicCodebook { FallbackReason = fb.FallbackReason } : null, Llm.DisplayName, Synthesis.RepairCitations, Llm.DisplayNameFor("citation-check"))
                     + (artifact == null ? "" : artifact.Error == null
                         ? $" The {ArtifactKinds.All.First(k => k.Key == artifact.Requested).Label.ToLowerInvariant()} requested by the reviewer was built by the model from the finished results only, and the elements in it that cite a study were checked like the sentences of the report."
                         : $" The requested artifact could not be built: {artifact.Error}"),
