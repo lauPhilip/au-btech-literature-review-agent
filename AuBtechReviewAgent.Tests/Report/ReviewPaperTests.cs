@@ -127,6 +127,24 @@ public class ReviewPaperTests : IDisposable
     }
 
     [Fact]
+    public void AConclusionThatRestatesAnAnswerIsRejected()
+    {
+        // Issue #117: with research questions, the conclusion repeated the answers printed just before it.
+        const string known = "Supervisor checks let agent loops recover from faults [1]. Governance layers audit what agents do [2].";
+        string[] answers = { "Supervisor checks let agent loops recover from faults [1].", "Governance layers audit what agents do [2]." };
+
+        const string repeats = "Agent loops recover from faults through supervisor checks, and governance layers audit their actions [1, 2].";
+        Assert.Equal(((int, int)?)(1, 1), ReviewWriter.RepeatedAnswer(repeats, answers));
+        Assert.Equal(((int, int)?)(2, 2), ReviewWriter.RepeatedAnswer("Safety needs more than one safeguard [1]. Governance layers audit what agents do [2].", answers));
+        Assert.Contains("conclusion sentence 1 restates the answer to RQ1", ReviewWriter.ClosingProblem("a [1].", "b", "c", repeats, known, 2, answers, 2));
+
+        const string drawsTogether = "Together, the themes suggest that safe agent loops need both recovery and oversight, and that support for either is still thin [1, 2].";
+        Assert.Null(ReviewWriter.RepeatedAnswer(drawsTogether, answers));
+        Assert.Null(ReviewWriter.ClosingProblem("a [1].", "b", "c", drawsTogether, known, 2, answers, 2));
+        Assert.Null(ReviewWriter.ClosingProblem("a [1].", "b", "c", repeats, known, 2)); // without questions there is nothing to repeat
+    }
+
+    [Fact]
     public void TheAnswersComeBetweenTheClosingSectionsAndTheConclusionInReadingOrder()
     {
         var themes = new[] { "theme1" };
@@ -178,7 +196,7 @@ public class ReviewPaperTests : IDisposable
     }
 
     private static string RespondWithAnswers(string prompt) => prompt.Contains("You are writing the sections that follow the discussion")
-        ? """{"limitations":"The evidence rests on two studies read from their abstracts [1, 2].","implications":"Teams should add supervisor checks to agent loops [1].","futureResearch":"Governance layers need evaluation in production [2].","conclusion":"Agent loops recover from faults through supervisor checks, and governance layers audit their actions [1, 2].","answers":["Supervisor checks let agent loops recover from faults [1].","Governance layers audit what agents do [2]."]}"""
+        ? """{"limitations":"The evidence rests on two studies read from their abstracts [1, 2].","implications":"Teams should add supervisor checks to agent loops [1].","futureResearch":"Governance layers need evaluation in production [2].","conclusion":"Together, the themes suggest that safe agent loops need both recovery and oversight, and that support for either is still thin [1, 2].","answers":["Supervisor checks let agent loops recover from faults [1].","Governance layers audit what agents do [2]."]}"""
         : ReviewWriterTests.Respond(prompt);
 
     [Fact]
@@ -204,6 +222,7 @@ public class ReviewPaperTests : IDisposable
         Assert.Contains("- Research question 1 (RQ1): How do agent loops recover from faults?", protocol);
         Assert.Contains("- Research question 2 (RQ2): How are agent actions audited?", protocol);
         Assert.Contains(model.Prompts, p => p.Contains("RQ2: How are agent actions audited?") && p.Contains("exactly 2 answer(s)"));
+        Assert.Contains(model.Prompts, p => p.Contains("exactly 2 answer(s)") && p.Contains("the conclusion must not restate them"));
 
         // One checked answer per question, in order.
         var report = System.Text.Json.JsonSerializer.Deserialize<PrismaReport>(File.ReadAllText(Path.Join(folder, "prisma-report.json")))!;
@@ -223,7 +242,7 @@ public class ReviewPaperTests : IDisposable
         Assert.Contains(@"\textbf{RQ2.} How are agent actions audited?", tex);
         int conclusion = tex.IndexOf(@"\section{Conclusion}", StringComparison.Ordinal);
         int firstAnswer = tex.IndexOf(@"\textbf{RQ1. How do agent loops recover from faults?}", StringComparison.Ordinal);
-        int conclusionText = tex.IndexOf("Agent loops recover from faults through supervisor checks, and", StringComparison.Ordinal);
+        int conclusionText = tex.IndexOf("Together, the themes suggest that safe agent loops need both recovery and oversight", StringComparison.Ordinal);
         Assert.True(conclusion >= 0 && conclusion < firstAnswer && firstAnswer < conclusionText);
     }
 
