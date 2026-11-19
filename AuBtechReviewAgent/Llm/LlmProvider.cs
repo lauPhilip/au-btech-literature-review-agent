@@ -88,9 +88,11 @@ public class OpenAICompatibleChatService : IChatCompletionService
         ChatHistory chatHistory, PromptExecutionSettings? executionSettings = null, Kernel? kernel = null, CancellationToken cancellationToken = default)
     {
         string json;
+        string sentEffort;
         while (true)
         {
             string effort = _reasoningEffort;
+            sentEffort = effort;
             string body = BuildRequestBody(_model, chatHistory, executionSettings, effort);
             using var request = new HttpRequestMessage(HttpMethod.Post, _endpoint) { Content = new StringContent(body, Encoding.UTF8, "application/json") };
             if (!string.IsNullOrWhiteSpace(_apiKey)) request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _apiKey);
@@ -109,7 +111,10 @@ public class OpenAICompatibleChatService : IChatCompletionService
 
         var (text, model, usage) = ParseResponse(json);
         var content = new ChatMessageContent(AuthorRole.Assistant, text) { ModelId = model ?? _model };
-        if (usage != null) content.Metadata = new Dictionary<string, object?> { ["Usage"] = usage };
+        // What was sent, so the call log can show it: the effort can be dropped for a model that rejects it.
+        var metadata = new Dictionary<string, object?> { ["ReasoningEffort"] = sentEffort.Length > 0 ? sentEffort : null };
+        if (usage != null) metadata["Usage"] = usage;
+        content.Metadata = metadata;
         return new[] { content };
     }
 
