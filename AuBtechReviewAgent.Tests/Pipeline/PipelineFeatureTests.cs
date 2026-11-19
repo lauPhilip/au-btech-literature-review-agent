@@ -236,6 +236,9 @@ public class PipelineFeatureTests : IDisposable
         Assert.Equal(RunProgress.Synthesis, liveStep);
         Assert.NotEqual(RunProgress.Synthesis, savedStep); // what a page opened then used to show
         Assert.Null(engine.LiveStats(runId)); // forgotten once the run has ended
+    }
+
+    [Fact]
     public async Task ScreeningDecisionsAreReusedOnlyUnderTheModelThatMadeThem()
     {
         var cache = new ReviewCache(new CacheOptions { Folder = Path.Join(_root, "cache") }, _root);
