@@ -37,13 +37,13 @@ Every source implements `IAcademicSource` (`IAcademicSource.cs`): a `SourceName`
 | Class | Key needed | Notes |
 |---|---|---|
 | `ArxivSource` | no | Atom XML API. All requests in the app go one at a time through a static gate, 3 s apart, through `OpenSourceHttp`'s retries, because arXiv answers bursts with 503 |
-| `OpenAlexSource` | no | Also implements `ICitationGraph`, used for citation chaining; abstracts are rebuilt from OpenAlex's inverted index |
+| `OpenAlexSource` | expected | Also implements `ICitationGraph`, used for citation chaining; abstracts are rebuilt from OpenAlex's inverted index. Sends `OpenSources:OpenAlexApiKey` as an `Authorization` header; without a key most requests are refused once the small keyless budget is used up |
 | `SemanticScholarSource` | optional | All requests in the app go one at a time through a static gate, 1 s apart with a key and 3 s without, because the API rate-limits hard |
 | `CrossrefSource` | no | Abstracts arrive as JATS XML and are stripped to text |
 | `ElsevierSource` | yes | Scopus / ScienceDirect |
 | `IeeeXploreSource` | yes | IEEE Xplore API |
 
-The open sources share `OpenSourceHttp` (`OpenSourceHttp.cs`): one `HttpClient` with a `User-Agent` that names the project, and up to five attempts on rate limits and server errors, waiting 3, 6, 12 and 24 seconds (or what the server's `Retry-After` asks for). OpenAlex and Crossref also get the contact e-mail from `OpenSources:ContactEmail`, which puts the app in their faster "polite" pool. `SourceCatalog.cs` holds the list of sources the dashboard offers and which kind of key each needs.
+The open sources share `OpenSourceHttp` (`OpenSourceHttp.cs`): one `HttpClient` with a `User-Agent` that names the project, and up to five attempts on rate limits and server errors, waiting 3, 6, 12 and 24 seconds (or what the server's `Retry-After` asks for, up to 30 seconds). A server that asks for a longer wait, as OpenAlex does once its daily budget is used up, is not asked again: the call fails at once with the wait in its message, instead of spending two minutes on attempts that are refused again. OpenAlex and Crossref also get the contact e-mail from `OpenSources:ContactEmail`, which puts the app in their faster "polite" pool. `SourceCatalog.cs` holds the list of sources the dashboard offers and which kind of key each needs.
 
 ## Screening one record
 
