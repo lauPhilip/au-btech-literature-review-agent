@@ -344,6 +344,35 @@ public class OpenSourceAndSafetyTests : IDisposable
     }
 
     [Fact]
+    public void ReasoningModelAnswersAreReadFromTheTextChunksOnly()
+    {
+        // Mistral Large 4 answers with a list of chunks; the thinking chunk holds a JSON object of its own,
+        // which must never be read as the answer.
+        string json = """
+            {"model":"mistral-large-4-0","choices":[{"message":{"role":"assistant","content":[
+              {"type":"thinking","thinking":[{"type":"text","text":"Draft: {\"decision\":\"Excluded\"}"}]},
+              {"type":"text","text":"{\"decision\":\"Included\","},
+              {"type":"text","text":"\"reasoning\":\"On topic.\"}"}
+            ]}}]}
+            """;
+        var (text, model, _) = OpenAICompatibleChatService.ParseResponse(json);
+
+        Assert.Equal("{\"decision\":\"Included\",\"reasoning\":\"On topic.\"}", text);
+        Assert.DoesNotContain("Draft", text);
+        Assert.Equal("mistral-large-4-0", model);
+        var answer = System.Text.Json.JsonSerializer.Deserialize<ScreeningAnswer>(LlmJson.ExtractObject(text),
+            new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true })!;
+        Assert.Null(ScreeningAnswer.Validate(answer));
+        Assert.True(answer.IsIncluded);
+    }
+
+    [Fact]
+    public void MistralIsCalledOnItsChatCompletionsApi()
+    {
+        Assert.IsType<OpenAICompatibleChatService>(LlmFactory.Create(new LlmOptions(), "test-key"));
+    }
+
+    [Fact]
     public void MethodsTextReportsDualScreeningAgreement()
     {
         var stats = new ReviewStats { Screened = 10, Included = 4, Excluded = 6, DualScreened = 10, ScreeningDisagreements = 2, ScreeningKappa = 0.58, InjectionSuspected = 1, UncertainDecisions = 3 };

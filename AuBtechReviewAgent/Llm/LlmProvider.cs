@@ -49,10 +49,11 @@ public class LlmOptions
 }
 
 /// <summary>
-/// A minimal chat client for OpenAI-compatible servers. It only needs what the review uses: one user
-/// prompt in, one text answer out, with temperature and JSON mode. The engine writes its settings as
-/// MistralAIPromptExecutionSettings; temperature and response_format are read from those, so no prompt code
-/// has to know which provider is behind it.
+/// A minimal chat client for OpenAI-compatible servers, including the Mistral API itself. It only needs what the
+/// review uses: one user prompt in, one text answer out, with temperature and JSON mode. The engine writes its
+/// settings as MistralAIPromptExecutionSettings; temperature and response_format are read from those, so no prompt
+/// code has to know which provider is behind it. A reasoning model's answer is a list of chunks; only the text
+/// chunks are the answer, and the thinking is never passed on.
 /// </summary>
 public class OpenAICompatibleChatService : IChatCompletionService
 {
@@ -122,24 +123,54 @@ public class OpenAICompatibleChatService : IChatCompletionService
         var root = doc.RootElement;
         string text = "";
         if (root.TryGetProperty("choices", out var choices) && choices.ValueKind == JsonValueKind.Array && choices.GetArrayLength() > 0
-            && choices[0].TryGetProperty("message", out var msg) && msg.TryGetProperty("content", out var c) && c.ValueKind == JsonValueKind.String)
-            text = c.GetString() ?? "";
+            && choices[0].TryGetProperty("message", out var msg) && msg.TryGetProperty("content", out var c))
+            text = ContentText(c);
         string? model = root.TryGetProperty("model", out var mEl) && mEl.ValueKind == JsonValueKind.String ? mEl.GetString() : null;
         string? usage = root.TryGetProperty("usage", out var u) ? u.GetRawText() : null;
         return (text, model, usage);
+    }
+
+    /// <summary>
+    /// The answer text of a message's content: a plain string, or, from a reasoning model, a list of chunks of which
+    /// only the "text" chunks are the answer. Thinking chunks are left out, so a JSON object in the model's reasoning
+    /// can never be read as its answer. Public for unit tests.
+    /// </summary>
+    public static string ContentText(JsonElement content)
+    {
+        if (content.ValueKind == JsonValueKind.String) return content.GetString() ?? "";
+        if (content.ValueKind != JsonValueKind.Array) return "";
+        var text = new StringBuilder();
+        foreach (var chunk in content.EnumerateArray())
+        {
+            if (chunk.ValueKind == JsonValueKind.String) { text.Append(chunk.GetString()); continue; }
+            if (chunk.ValueKind != JsonValueKind.Object) continue;
+            string type = chunk.TryGetProperty("type", out var t) && t.ValueKind == JsonValueKind.String ? t.GetString() ?? "" : "text";
+            if (!type.Equals("text", StringComparison.OrdinalIgnoreCase)) continue; // thinking, images, references
+            if (chunk.TryGetProperty("text", out var value) && value.ValueKind == JsonValueKind.String) text.Append(value.GetString());
+        }
+        return text.ToString();
     }
 }
 
 /// <summary>Builds the chat service for a run from the configured provider.</summary>
 public static class LlmFactory
 {
+    /// <summary>The Mistral chat completions API, which follows the OpenAI format.</summary>
+    public const string MistralBaseUrl = "https://api.mistral.ai/v1";
+
+    // One client for every run, so connections are reused instead of opened per run.
+    private static readonly HttpClient MistralHttp = new() { Timeout = TimeSpan.FromMinutes(10) };
+
+    /// <summary>
+    /// Mistral is called on its chat completions API directly rather than through the Semantic Kernel connector.
+    /// The connector has no thinking chunk, so a reasoning model's whole chunk list reached the JSON reader, which
+    /// took the thinking chunk for the answer: every structured answer failed validation and was asked for twice.
+    /// </summary>
     public static IChatCompletionService Create(LlmOptions options, string mistralApiKey)
     {
         if (options.IsOpenAICompatible)
             return new OpenAICompatibleChatService(options.BaseUrl, options.Model, options.ApiKey);
 
-        var builder = Kernel.CreateBuilder();
-        builder.AddMistralChatCompletion(options.Model, mistralApiKey);
-        return builder.Build().GetRequiredService<IChatCompletionService>();
+        return new OpenAICompatibleChatService(MistralBaseUrl, options.Model, mistralApiKey, MistralHttp);
     }
 }
