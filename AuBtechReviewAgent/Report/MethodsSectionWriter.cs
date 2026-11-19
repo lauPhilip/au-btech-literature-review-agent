@@ -236,7 +236,7 @@ public static class MethodsSectionWriter
                     : $"Of the {s.Included} included studies, {abstractOnly} {(abstractOnly == 1 ? "was" : "were")} read from {(abstractOnly == 1 ? "its abstract" : "their abstracts")} only, because no open-access full text was found. ");
         }
         if (state.MaxResultsPerSource > 0)
-            sb.Append($"The search took at most {state.MaxResultsPerSource} records per source");
+            sb.Append($"The search took at most {state.MaxResultsPerSource} record{(state.MaxResultsPerSource == 1 ? "" : "s")} per source");
         else
             sb.Append("The search covered the selected sources");
         if (state.YearFrom > 0 && state.YearTo > 0) sb.Append($", published from {state.YearFrom} to {state.YearTo}");
