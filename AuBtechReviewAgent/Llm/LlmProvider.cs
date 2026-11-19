@@ -35,8 +35,11 @@ public class LlmOptions
     /// <summary>OpenAICompatible only: API key if the server needs one (Ollama does not). Keep it in user-secrets.</summary>
     public string ApiKey { get; set; } = "";
 
-    /// <summary>How many records are screened at the same time within one run.</summary>
-    public int ScreeningParallelism { get; set; } = 4;
+    /// <summary>
+    /// How many model calls one run makes at the same time (screening, extraction, coding, checks). Reasoning models
+    /// take 30 to 110 seconds a call, so the calls are bound by waiting, not by the server's throughput.
+    /// </summary>
+    public int ScreeningParallelism { get; set; } = 8;
 
     /// <summary>
     /// Mistral only: the reasoning_effort sent with every call ("low", "medium" or "high"). Reasoning models such as
