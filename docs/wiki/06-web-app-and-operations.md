@@ -152,6 +152,8 @@ Separately, the download endpoints are rate-limited per client address (20 per m
 
 Secrets are never committed. `appsettings.json` holds only placeholders, and the server's `web.config` is excluded from every deploy so the keys on the server are never overwritten.
 
+`Report:SupportStatement` is the text under Support and Funding in every paper. It names the Department of Business Development and Technology (BTECH), Aarhus University, and `SupportStatementTests` fails if `appsettings.json` names another department. An environment variable `Report__SupportStatement` in the server's `web.config` overrides the file, and no test sees it, so check it there after changing the text.
+
 ## Security measures
 
 `SecurityHeaders.Apply` adds a strict Content Security Policy (scripts and styles only from the site itself, images from the site and `data:`), `X-Frame-Options: DENY`, `nosniff`, a referrer policy and a permissions policy to every response. All scripts are served locally: Tailwind is compiled ahead of time into `wwwroot/css/tailwind.css`, and Mermaid is vendored under `wwwroot/lib/mermaid`. User-provided API keys are cleaned with `SecurityUtility.SanitizeApiKey` (only letters, digits and `. _ - :` survive; anything else empties the field) and kept in the browser's protected session storage, not on the server.

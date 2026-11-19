@@ -100,4 +100,41 @@ public class MethodsSectionWriterTests
         var all = new ReviewState { Stats = new ReviewStats { Included = 4, FullTextRetrieved = 4 } };
         Assert.Contains("All 4 included studies were read in full text.", MethodsSectionWriter.ReviewProcessLimitations(all, "m", "m"));
     }
+
+    [Fact]
+    public void OneRecordPerSourceIsSingularInTheLimitationsAndTheProtocol()
+    {
+        // Issue #119: "at most 1 records per source".
+        var state = new ReviewState { MaxResultsPerSource = 1, Stats = new ReviewStats { Included = 1 } };
+        string limits = MethodsSectionWriter.ReviewProcessLimitations(state, "m", "m");
+        Assert.Contains("The search took at most 1 record per source.", limits);
+
+        var request = new ReviewRequest("agent loops", "Map agent loop safety", "Agent architecture", "Agronomy", 1,
+            SelectedSources: new[] { "arxiv" });
+        string protocol = ProtocolWriter.Write(Guid.NewGuid(), request, new[] { "arXiv" }, "m", new RunsOptions(), DateTime.UtcNow);
+        Assert.Contains("- At most 1 record per source;", protocol);
+        Assert.DoesNotContain("records per source", protocol);
+    }
+
+    [Fact]
+    public void TheCitationsOutsideAThemeAgreeWithTheirCount()
+    {
+        // Issue #119: "1 citation ... refer ... are flagged".
+        Assert.Equal("1 citation in a theme subsection refers to a study not coded under that theme and is flagged in the audit.",
+            PrismaReviewEngine.OutsideThemeSentence(1));
+        Assert.Equal("3 citations in a theme subsection refer to a study not coded under that theme and are flagged in the audit.",
+            PrismaReviewEngine.OutsideThemeSentence(3));
+    }
+
+    [Fact]
+    public void TheProtocolItemNamesTheResearchQuestionsOnlyWhenTheRunHasThem()
+    {
+        // Issue #121: section 7.1 left out the research questions.
+        var created = new DateTime(2026, 11, 19, 0, 0, 0, DateTimeKind.Utc);
+        string with = MethodsSectionWriter.Protocol("0123456789abcdef0123", created, hasResearchQuestions: true);
+        Assert.Contains("Its protocol (search query, objective, research questions, eligibility criteria, sources, limits and screening set-up)", with);
+
+        string without = MethodsSectionWriter.Protocol("0123456789abcdef0123", created);
+        Assert.Contains("Its protocol (search query, objective, eligibility criteria, sources, limits and screening set-up)", without);
+    }
 }

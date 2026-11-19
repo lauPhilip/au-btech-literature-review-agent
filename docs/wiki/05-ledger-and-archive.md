@@ -160,7 +160,7 @@ To check an unpacked archive by hand, recompute a file's fingerprint and compare
 
 ## How main.tex is built
 
-`main.tex` is assembled line by line in `BuildWorkspaceArchive`. All text coming from the model or from sources passes through `EscapeLatexText`, which escapes LaTeX special characters. The pieces come from different places:
+`main.tex` is assembled line by line in `BuildWorkspaceArchive`. All text coming from the model or from sources passes through `EscapeLatexText` (`PaperLatex.Escape`), which escapes LaTeX special characters and removes trailing spaces only, so every paragraph keeps its closing full stop. Lines of the reference list go through `PaperLatex.EscapeReference` instead, which also drops a trailing full stop, comma or slash, as a bibitem ends without one. The pieces come from different places:
 
 | Part of `main.tex` | Source |
 |---|---|
@@ -168,7 +168,7 @@ To check an unpacked archive by hand, recompute a file's fingerprint and compare
 | Synthesis methods (item 13d), coverage sentence | `prisma-report.json`, written by `ThematicSynthesis.MethodsText` and `CoverageSentence` |
 | The artifact: TikZ figure, Table 4.2 or a list | `PrismaReport.Artifact`, `ArtifactLatex`, `ArtifactBuilder.ToTikz` |
 | Table 4.1, evidence map of the thematic synthesis | `ReviewState.ThematicSynthesis`, `EvidenceMapTable` |
-| Methods sections, protocol and availability statements | `prisma-report.json`, written by `MethodsSectionWriter` |
+| Methods sections, protocol and availability statements | `prisma-report.json`, written by `MethodsSectionWriter`; the protocol statement (section 7.1) lists the research questions among what the protocol holds when the run has them |
 | "Characteristics of the Included Studies" paragraph | `MethodsSectionWriter.IncludedSet` |
 | Discussion subsections for PRISMA items 23b to 23d, and the Conclusion section | `prisma-report.json`: `EvidenceLimitationsItem`, `ImplicationsItem`, `FutureResearchItem` and `ConclusionItem` from `ReviewWriter.WriteClosingAsync`, checked like the discussion; `ReviewLimitationsItem` (23c) from `MethodsSectionWriter.ReviewProcessLimitations`. Runs made before these existed leave them empty, and the sections are left out |
 | "Research Questions", the first subsection of the method, and the answers at the start of the Conclusion ("RQ1. question" in bold, then the answer) | `ReviewState.ResearchQuestions` and `PrismaReport.ResearchAnswers`, built by `ConclusionSection`; a run without research questions has neither |

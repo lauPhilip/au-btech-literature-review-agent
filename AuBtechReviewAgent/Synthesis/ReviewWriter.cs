@@ -188,7 +188,7 @@ public static class ReviewWriter
             """;
         string answerRule = questions.Count == 0 ? "" : $$"""
 
-            6. "answers": exactly {{questions.Count}} answer(s), one per research question in the order given, each one to three sentences that answer the question from the results, with inline [n] markers. Do not repeat the question. Where the results do not answer a question, say so plainly.
+            6. "answers": exactly {{questions.Count}} answer(s), one per research question in the order given, each one to three sentences that answer the question from the results, with inline [n] markers. Do not repeat the question. Where the results do not answer a question, say so plainly. The answers are printed just before the conclusion, so the conclusion must not restate them: it says what the answers mean together for the review objective.
             """;
         string answerField = questions.Count == 0 ? "" : ",\"answers\":[\"answer to RQ1\"]";
         string prompt = $$"""
@@ -255,11 +255,49 @@ public static class ReviewWriter
         if (missing.Count > 0) return $"{string.Join(", ", missing)} must not be empty.";
         if (conclusion!.Split(' ', StringSplitOptions.RemoveEmptyEntries).Length > MaxConclusionWords)
             return $"the conclusion is too long; keep it to three to five sentences of at most {MaxConclusionWords} words.";
+        if (questions > 0 && RepeatedAnswer(conclusion, answers!) is { } repeat)
+            return $"conclusion sentence {repeat.Sentence} restates the answer to RQ{repeat.Answer}; the answers are printed just before the conclusion, so say what they mean together for the review objective instead.";
         var outside = parts.SelectMany(p => ThematicSynthesis.CitedIn(p.Item2!)).Where(r => r < 1 || r > referenceCount).Distinct().ToList();
         if (outside.Count > 0) return $"citation numbers {string.Join(", ", outside)} are not in the reference list.";
         var knownNumbers = NumbersIn(known);
         var unknown = parts.SelectMany(p => NumbersIn(p.Item2!)).Where(n => !knownNumbers.Contains(n)).Distinct().ToList();
         return unknown.Count > 0 ? $"the text uses {string.Join(", ", unknown)}, which is in neither the results nor the facts; use only their numbers." : null;
+    }
+
+    /// <summary>Words too common to tell two sentences apart.</summary>
+    private static readonly HashSet<string> CommonWords = new(StringComparer.Ordinal)
+    {
+        "that", "this", "with", "from", "their", "they", "them", "have", "were", "which", "also", "than", "these", "those",
+        "into", "more", "most", "what", "when", "where", "does", "only", "some", "such", "both", "each", "other", "there",
+        "while", "about", "through", "studies", "study", "review", "results", "evidence",
+    };
+
+    private static HashSet<string> ContentWords(string sentence) =>
+        Regex.Matches(sentence.ToLowerInvariant(), @"\p{L}{4,}").Select(m => m.Value).Where(w => !CommonWords.Contains(w)).ToHashSet();
+
+    /// <summary>
+    /// The first conclusion sentence that restates an answer to a research question, by number, or null (issue #117).
+    /// A sentence restates an answer when nearly all the content words of the shorter of the two are in the other.
+    /// Public for unit tests.
+    /// </summary>
+    public static (int Sentence, int Answer)? RepeatedAnswer(string conclusion, IReadOnlyList<string> answers)
+    {
+        var answerSentences = answers
+            .SelectMany((a, i) => CitationSupportChecker.SplitSentences(a ?? "").Select(s => (Answer: i + 1, Words: ContentWords(s))))
+            .Where(a => a.Words.Count >= 4)
+            .ToList();
+        var sentences = CitationSupportChecker.SplitSentences(conclusion);
+        for (int i = 0; i < sentences.Count; i++)
+        {
+            var words = ContentWords(sentences[i]);
+            if (words.Count < 4) continue;
+            foreach (var a in answerSentences)
+            {
+                int shared = words.Count(a.Words.Contains);
+                if (shared >= 0.8 * Math.Min(words.Count, a.Words.Count)) return (i + 1, a.Answer);
+            }
+        }
+        return null;
     }
 
     private sealed class FrontMatterAnswer { public string? Title { get; set; } public string? Abstract { get; set; } public string? Rationale { get; set; } public string? Objectives { get; set; } }

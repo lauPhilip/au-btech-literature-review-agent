@@ -168,7 +168,7 @@ public static class ProtocolWriter
         sb.AppendLine("## Information sources and search");
         sb.AppendLine();
         sb.AppendLine($"- Sources: {string.Join(", ", sourceNames)}");
-        sb.AppendLine($"- At most {request.MaxResultsPerSource} records per source; the language model adds up to three extra search strings (recorded below as an amendment).");
+        sb.AppendLine($"- At most {request.MaxResultsPerSource} record{(request.MaxResultsPerSource == 1 ? "" : "s")} per source; the language model adds up to three extra search strings (recorded below as an amendment).");
         sb.AppendLine($"- Citation chaining (references and citing papers of included studies via OpenAlex): {(request.CitationChaining ? "yes" : "no")}");
         sb.AppendLine();
         sb.AppendLine("## Selection, extraction and appraisal");

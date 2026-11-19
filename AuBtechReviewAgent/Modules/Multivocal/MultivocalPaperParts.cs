@@ -407,11 +407,8 @@ public static class MultivocalPaperParts
         return sb.ToString();
     }
 
-    /// <summary>
-    /// Prose for LaTeX: <see cref="PaperLatex.Escape"/>, which also trims a trailing full stop (it cleans the ends of
-    /// reference lines), with the full stop put back.
-    /// </summary>
-    public static string Prose(string text) => PaperLatex.Escape(text) + (text.TrimEnd().EndsWith('.') ? "." : "");
+    /// <summary>Prose for LaTeX: <see cref="PaperLatex.Escape"/>, which keeps the closing full stop.</summary>
+    public static string Prose(string text) => PaperLatex.Escape(text);
 
     private static MapVersion FixedMap(MultivocalReportInput input) =>
         input.Map.Versions.FirstOrDefault(v => v.Number == input.Map.FixedVersion) ?? input.Map.Latest;

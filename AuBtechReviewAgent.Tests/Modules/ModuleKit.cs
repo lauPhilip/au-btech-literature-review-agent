@@ -96,7 +96,7 @@ public static class ModuleKit
                 ("selection process", Item("SelectionProcessItem"), MethodsSectionWriter.SelectionProcess(state.PeerReviewOnlyToggle, state.Stats,
                     state.HumanScreeningReviewRequested, state.HumanScreeningReviewOutcome, model)),
                 ("data and appraisal", Item("BiasAssessmentItem"), MethodsSectionWriter.DataAndAppraisal(state.Extractions ?? new(), model)),
-                ("protocol", Item("ProtocolItem"), MethodsSectionWriter.Protocol(state.ProtocolSha256, state.Timestamp)),
+                ("protocol", Item("ProtocolItem"), MethodsSectionWriter.Protocol(state.ProtocolSha256, state.Timestamp, state.ResearchQuestions is { Count: > 0 })),
             },
             PrismaReviewEngine.StageComplete);
     }

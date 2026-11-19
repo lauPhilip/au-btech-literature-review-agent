@@ -236,7 +236,7 @@ public static class MethodsSectionWriter
                     : $"Of the {s.Included} included studies, {abstractOnly} {(abstractOnly == 1 ? "was" : "were")} read from {(abstractOnly == 1 ? "its abstract" : "their abstracts")} only, because no open-access full text was found. ");
         }
         if (state.MaxResultsPerSource > 0)
-            sb.Append($"The search took at most {state.MaxResultsPerSource} records per source");
+            sb.Append($"The search took at most {state.MaxResultsPerSource} record{(state.MaxResultsPerSource == 1 ? "" : "s")} per source");
         else
             sb.Append("The search covered the selected sources");
         if (state.YearFrom > 0 && state.YearTo > 0) sb.Append($", published from {state.YearFrom} to {state.YearTo}");
@@ -282,12 +282,16 @@ public static class MethodsSectionWriter
         return t;
     }
 
-    /// <summary>PRISMA item 24 (registration and protocol).</summary>
-    public static string Protocol(string? protocolSha256, DateTime createdUtc)
+    /// <summary>
+    /// PRISMA item 24 (registration and protocol). The list of what the protocol holds names the research questions
+    /// when the run has them (issue #121).
+    /// </summary>
+    public static string Protocol(string? protocolSha256, DateTime createdUtc, bool hasResearchQuestions = false)
     {
         if (string.IsNullOrWhiteSpace(protocolSha256))
             return "No protocol was recorded for this run, and the review was not registered.";
-        return $"The review was not registered. Its protocol (search query, objective, eligibility criteria, sources, limits and screening set-up) was written to protocol.md on {createdUtc:yyyy-MM-dd} (UTC) before any search was run, with SHA-256 fingerprint {protocolSha256[..16]}...; the extra search strings are appended to it as a dated amendment. The file is part of the run archive.";
+        string questions = hasResearchQuestions ? "research questions, " : "";
+        return $"The review was not registered. Its protocol (search query, objective, {questions}eligibility criteria, sources, limits and screening set-up) was written to protocol.md on {createdUtc:yyyy-MM-dd} (UTC) before any search was run, with SHA-256 fingerprint {protocolSha256[..16]}...; the extra search strings are appended to it as a dated amendment. The file is part of the run archive.";
     }
 
     /// <summary>
