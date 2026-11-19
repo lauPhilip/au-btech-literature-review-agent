@@ -95,7 +95,7 @@ sequenceDiagram
     H->>F: SpecMatrix.razor reads the files
 ```
 
-`Home.razor` starts the run with `Task.Run` and does not wait for it: a review takes minutes, and the page must stay responsive. Progress reaches the page through the engine's `OnProgressUpdated` event, which fires every time the ledger is saved. Because every step is also written to disk, a user who closes the tab can come back to `/review/{runId}` and the page rebuilds itself from the files. If the quota reservation succeeded but the run could not start, the page gives the reservation back with `Quota.Refund(lease)`.
+`Home.razor` starts the run with `Task.Run` and does not wait for it: a review takes minutes, and the page must stay responsive. Progress reaches the page through the engine's `OnProgressUpdated` event, which fires every time the ledger is saved. Because every step is also written to disk, a user who closes the tab can come back to `/review/{runId}` and the page rebuilds itself from the files. The ledger is not saved while the review is written and checked, so a page opened then would show the last saved step until the next event, which can be minutes away during one long model call. The engine therefore keeps the live counters of every running run (`LiveStats`, set by `ReportProgress` and forgotten when the run ends), and the page takes whichever of the two is further along. If the quota reservation succeeded but the run could not start, the page gives the reservation back with `Quota.Refund(lease)`.
 
 ## Where state lives
 
