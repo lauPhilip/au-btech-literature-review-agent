@@ -14,7 +14,17 @@
     <PackageReference Include="Microsoft.SemanticKernel" Version="1.81.0" />
     <PackageReference Include="Microsoft.SemanticKernel.Connectors.MistralAI" Version="1.77.0-alpha" />
     <PackageReference Include="PdfPig" Version="0.1.16" />
+    <PackageReference Include="MinVer" Version="8.0.0" PrivateAssets="all" />
   </ItemGroup>
+
+<!-- The version comes from the git tag, and only from there (Semantic Versioning, tags vMAJOR.MINOR.PATCH).
+     A build on a tag is that version; a build after it is a pre-release of the next patch (0.2.1-alpha.0.3, the
+     last number counting commits since the tag). The SDK adds the commit after a plus sign. Before the first tag,
+     builds are pre-releases of 0.1.0. The build needs the git history: CI checks out with fetch-depth: 0. -->
+<PropertyGroup>
+  <MinVerTagPrefix>v</MinVerTagPrefix>
+  <MinVerMinimumMajorMinor>0.1</MinVerMinimumMajorMinor>
+</PropertyGroup>
 
 <!-- Run folders, the cache and quota counters are data, not source: keep them out of the project entirely, so
      dotnet watch does not reload the project every time a run writes a file (and publish does not copy them). -->
