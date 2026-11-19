@@ -75,7 +75,7 @@ Don't worry about getting everything perfect. If something needs adjusting, we'l
 
 This part is for maintainers. A version is set in one place only, a git tag such as `v0.1.0`, and the app, the paper and the Metrics page read it from there. Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html): while they start with 0, a new minor version may change the method or the output.
 
-Pushing the tag starts `.github/workflows/release.yml`. It checks the tag, `CHANGELOG.md` and `CITATION.cff`, runs the tests and publishes a GitHub release titled "v0.1.0 - Research questions". The notes are the version's section of `CHANGELOG.md`, followed by GitHub's list of merged pull requests and a link comparing it with the previous release. Zenodo archives each release with its own DOI once the integration is switched on.
+Pushing the tag starts `.github/workflows/release.yml`. It checks the tag, `CHANGELOG.md` and `CITATION.cff`, runs the tests and publishes a GitHub release titled "v0.1.0 - Research questions". The notes are the version's section of `CHANGELOG.md`, followed by GitHub's list of merged pull requests and a link comparing it with the previous release. Zenodo then archives the release and gives it its own version DOI, with nothing to do by hand. v0.1.0 is [10.5281/zenodo.24379095](https://doi.org/10.5281/zenodo.24379095). The concept DOI, [10.5281/zenodo.24379094](https://doi.org/10.5281/zenodo.24379094), stands for all versions and always opens the newest, so it is the one in the README badge and in `CITATION.cff` and does not change. Cite a version DOI when you need the exact version a run used.
 
 | Step | What to do |
 |---|---|

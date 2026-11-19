@@ -196,7 +196,10 @@ A release is published by pushing an annotated tag whose message is its title: `
 | Title | The first line of the annotated tag's message |
 | Notes | The version's section of `CHANGELOG.md`, then GitHub's generated notes |
 | Citation | `version` and `date-released` in `CITATION.cff`, checked against the tag |
-| Archive and DOI | Zenodo, from `.zenodo.json`, once the integration is on |
+| Archive and DOI | Zenodo archives every release, from `.zenodo.json`, and gives it its own version DOI |
+| Concept DOI | `10.5281/zenodo.24379094` in the README badge and as `doi` in `CITATION.cff` |
+
+Zenodo gives the software two kinds of DOI, and they do different jobs. The concept DOI, [10.5281/zenodo.24379094](https://doi.org/10.5281/zenodo.24379094), stands for every version and always opens the newest one. It is the DOI in the README badge and in `CITATION.cff`, and the one to give when you mean the software in general. Each release also gets a version DOI of its own, made by Zenodo when the release is published, so nothing has to be changed in the repository for it. v0.1.0 is [10.5281/zenodo.24379095](https://doi.org/10.5281/zenodo.24379095). A paper that needs the exact version a run used should cite that version's DOI, which is on its Zenodo record.
 
 Release notes are written for someone running a review, not for developers. They say what changed and why it helps, in short plain paragraphs, and may be a bit playful. Two of the rules are checked in code, and the rest by the person who reviews the pull request. Because `[Unreleased]` becomes the next version's notes, CI checks it on every pull request too.
 
