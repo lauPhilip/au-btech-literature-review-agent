@@ -213,6 +213,32 @@ public class PipelineFeatureTests : IDisposable
     }
 
     [Fact]
+    public async Task APageOpenedWhileTheReviewIsWrittenSeesTheLiveStepNotTheLastSavedOne()
+    {
+        // Seen live: a page opened during the writing showed "Extraction and appraisal" for minutes, because the ledger is
+        // not saved while the review is written and checked.
+        var runId = Guid.NewGuid();
+        PrismaReviewEngine? engine = null;
+        string? liveStep = null, savedStep = null;
+        string Respond(string prompt)
+        {
+            if (prompt.Contains("You are turning the results of a systematic literature review") && liveStep == null)
+            {
+                var live = engine!.LiveStats(runId)!;
+                lock (live) liveStep = live.ProgressStep;
+                savedStep = engine.LoadState(runId)!.Stats.ProgressStep;
+            }
+            return PipelineTests.Respond(prompt);
+        }
+        engine = Engine(Respond);
+        await engine.RunReviewAsync(runId, Request());
+
+        Assert.Equal(RunProgress.Synthesis, liveStep);
+        Assert.NotEqual(RunProgress.Synthesis, savedStep); // what a page opened then used to show
+        Assert.Null(engine.LiveStats(runId)); // forgotten once the run has ended
+    }
+
+    [Fact]
     public async Task ScreeningDecisionsAreReusedOnlyUnderTheModelThatMadeThem()
     {
         var cache = new ReviewCache(new CacheOptions { Folder = Path.Join(_root, "cache") }, _root);

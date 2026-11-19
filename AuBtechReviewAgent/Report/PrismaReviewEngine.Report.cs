@@ -373,6 +373,13 @@ public partial class PrismaReviewEngine
         // and discussionItem are written against a pre-checked claim map instead of free-associating.
         string groundedOutline;
         ReportProgress(sessionId, finalState, RunProgress.Synthesis, 0, "Outline and report draft");
+        // The thematic synthesis reads neither the outline nor the first draft below (the draft is only its fallback), so
+        // it starts now and runs while they are written; it is awaited where its result is used, and on every way out.
+        var papersForCheck = referencedPapers ?? Array.Empty<ReferencedPaper>();
+        Task<ThematicResult>? thematicTask = Synthesis.ThematicSynthesis && papersForCheck.Count > 0
+            ? ThematicOrFallbackAsync(sessionId, chat, query, explicitObjective, finalState, papersForCheck, referenceCount)
+            : null;
+
         using (LlmStage.Begin("outline"))
             groundedOutline = await ReviewWriter.WriteOutlineAsync(chat, WritingProfile.Systematic, query, explicitObjective, groundedChunksText, referenceListMapping,
                 message => _log.LogWarning("{Message}", SanitizeLogMessage(message)));
@@ -530,19 +537,10 @@ public partial class PrismaReviewEngine
             // stylistic refiner - that rewrite step tends to drop the inline [n] citation markers. They are
             // written by the thematic synthesis (one cited subsection per theme, then the discussion), or, when
             // that is switched off or fails, by a single citation-mandatory pass; both are then peer reviewed.
-            var papersForCheck = referencedPapers ?? Array.Empty<ReferencedPaper>();
             ThematicResult? thematic = null;
-            if (Synthesis.ThematicSynthesis && papersForCheck.Count > 0)
+            if (thematicTask != null)
             {
-                try
-                {
-                    thematic = await RunThematicSynthesisAsync(sessionId, chat, query, explicitObjective, finalState, papersForCheck, referenceCount);
-                }
-                catch (Exception ex)
-                {
-                    _log.LogWarning("Thematic synthesis failed, falling back to the single-pass synthesis: {Message}", SanitizeLogMessage(ex.Message));
-                    thematic = new ThematicResult { Codebook = new ThematicCodebook { FallbackReason = $"the thematic synthesis failed ({SanitizeLogMessage(ex.Message)})" } };
-                }
+                thematic = await thematicTask;
                 finalState.ThematicSynthesis = thematic.Codebook;
             }
             bool useThematic = thematic != null && thematic.Sections.Count > 0 && !string.IsNullOrWhiteSpace(thematic.Discussion);
@@ -596,20 +594,52 @@ public partial class PrismaReviewEngine
             ReportProgress(sessionId, finalState, RunProgress.Synthesis, RunProgress.Phase(RunProgress.SynthesisPhases, 5, 1), "Title, abstract and introduction");
             var resultSections = sections.Count > 0 ? (IReadOnlyList<SynthesisSection>)sections
                 : new[] { new SynthesisSection { Field = "synthesisResultsItem", Heading = "Results", Text = synthesisProse } };
-            var front = await ReviewWriter.WriteFrontMatterAsync(chat, WritingProfile.Systematic, query, explicitObjective,
-                FrontMatterFacts(finalState, useThematic ? thematic!.Codebook : null, includedFacts, screeningFacts), resultSections, discussionText,
-                referenceListMapping, referenceCount, message => _log.LogWarning("{Message}", SanitizeLogMessage(message)));
+            // The front matter (then its copy-edit) and the artifact both read the finished sections and neither reads the
+            // other, so they run at the same time; results are used in the same order as before.
+            async Task<(FrontMatter? Front, (string Text, StyleDeltaLog Delta) Abstract, (string Text, StyleDeltaLog Delta) Rationale, (string Text, StyleDeltaLog Delta) Objectives)> FrontAndStyleAsync()
+            {
+                var written = await ReviewWriter.WriteFrontMatterAsync(chat, WritingProfile.Systematic, query, explicitObjective,
+                    FrontMatterFacts(finalState, useThematic ? thematic!.Codebook : null, includedFacts, screeningFacts), resultSections, discussionText,
+                    referenceListMapping, referenceCount, message => _log.LogWarning("{Message}", SanitizeLogMessage(message)));
+                using (LlmStage.Begin("style"))
+                {
+                    // Three separate copy-edits, sent together.
+                    var abstractTask = StylisticRefinerUtility.RefineAcademicProseAsync(chat, "Abstract", written?.Abstract ?? rawAbstract);
+                    var rationaleTask = StylisticRefinerUtility.RefineAcademicProseAsync(chat, "Rationale", written?.Rationale ?? rawRationale);
+                    var objectivesTask = StylisticRefinerUtility.RefineAcademicProseAsync(chat, "Objectives", written?.Objectives ?? rawObjectives);
+                    await Task.WhenAll(abstractTask, rationaleTask, objectivesTask);
+                    return (written, await abstractTask, await rationaleTask, await objectivesTask);
+                }
+            }
+
+            ReviewArtifact? artifact = null;
+            string artifactKind = ArtifactKinds.Normalize(finalState.ArtifactKind);
+            async Task<ReviewArtifact?> ArtifactAsync()
+            {
+                if (artifactKind == ArtifactKinds.None) return null;
+                ReportProgress(sessionId, finalState, RunProgress.Synthesis, RunProgress.Phase(RunProgress.SynthesisPhases, 6, 0), "Building the artifact");
+                string results = sections.Count > 0
+                    ? string.Join("\n\n", sections.Select(x => $"THEME: {x.Heading}\n{x.Text}")) + $"\n\nDISCUSSION:\n{discussionText}"
+                    : $"{synthesisProse}\n\nDISCUSSION:\n{discussionText}";
+                using (LlmStage.Begin("artifact"))
+                    return await ArtifactBuilder.BuildAsync(chat, artifactKind, finalState.SynthesisTargetDirective ?? "",
+                        explicitObjective, results, referenceListMapping, referenceCount);
+            }
+
+            var frontTask = FrontAndStyleAsync();
+            var artifactTask = ArtifactAsync();
+            await Task.WhenAll(frontTask, artifactTask); // a failure of either is thrown here, after both have finished
+            var (front, styledAbstract, styledRationale, styledObjectives) = await frontTask;
+            artifact = await artifactTask;
+
             string frontNote = front == null ? "The front-matter step failed; the first draft's text was used." : "";
             string titleText = front?.Title ?? rawTitle;
             string cleanTitle = CleanTitle(titleText, query);
             deltas.Add(new StyleDeltaLog("Title", titleText, cleanTitle, Applied: false, Note: "Title is not sent through the stylistic pass." + (frontNote.Length > 0 ? " " + frontNote : "")));
-            string cleanAbstract, cleanRationale, cleanObjectives;
-            using (LlmStage.Begin("style"))
-            {
-                var (a, dAbstract) = await StylisticRefinerUtility.RefineAcademicProseAsync(chat, "Abstract", front?.Abstract ?? rawAbstract); deltas.Add(dAbstract); cleanAbstract = a;
-                var (r, dRationale) = await StylisticRefinerUtility.RefineAcademicProseAsync(chat, "Rationale", front?.Rationale ?? rawRationale); deltas.Add(dRationale); cleanRationale = r;
-                var (o, dObjectives) = await StylisticRefinerUtility.RefineAcademicProseAsync(chat, "Objectives", front?.Objectives ?? rawObjectives); deltas.Add(dObjectives); cleanObjectives = o;
-            }
+            deltas.Add(styledAbstract.Delta);
+            deltas.Add(styledRationale.Delta);
+            deltas.Add(styledObjectives.Delta);
+            string cleanAbstract = styledAbstract.Text, cleanRationale = styledRationale.Text, cleanObjectives = styledObjectives.Text;
             if (string.IsNullOrWhiteSpace(cleanAbstract)) cleanAbstract = front?.Abstract ?? rawAbstract;
             if (string.IsNullOrWhiteSpace(cleanRationale)) cleanRationale = front?.Rationale ?? rawRationale;
             if (string.IsNullOrWhiteSpace(cleanObjectives)) cleanObjectives = front?.Objectives ?? rawObjectives;
@@ -618,20 +648,8 @@ public partial class PrismaReviewEngine
             // prose before the citation check, so the checked sentences are exactly the ones shown on the page
             // and in main.tex. Every change is listed under FormattingChanges in citation-audit.json.
             // Fields are kept in report order: the synthesis overview, the theme subsections, the discussion.
-            // The artifact the reviewer asked for, built from the finished results; its cited elements go through
-            // the same range check, support check and repair as the prose.
-            ReviewArtifact? artifact = null;
-            string artifactKind = ArtifactKinds.Normalize(finalState.ArtifactKind);
-            if (artifactKind != ArtifactKinds.None)
-            {
-                ReportProgress(sessionId, finalState, RunProgress.Synthesis, RunProgress.Phase(RunProgress.SynthesisPhases, 6, 0), "Building the artifact");
-                string results = sections.Count > 0
-                    ? string.Join("\n\n", sections.Select(x => $"THEME: {x.Heading}\n{x.Text}")) + $"\n\nDISCUSSION:\n{discussionText}"
-                    : $"{synthesisProse}\n\nDISCUSSION:\n{discussionText}";
-                using (LlmStage.Begin("artifact"))
-                    artifact = await ArtifactBuilder.BuildAsync(chat, artifactKind, finalState.SynthesisTargetDirective ?? "",
-                        explicitObjective, results, referenceListMapping, referenceCount);
-            }
+            // The artifact the reviewer asked for was built from the finished results above; its cited elements go
+            // through the same range check, support check and repair as the prose.
 
             var formattingChanges = new List<FormattingChange>();
             string Plain(string text, string field)
@@ -818,6 +836,8 @@ public partial class PrismaReviewEngine
         }
         catch (Exception fatalEx)
         {
+            // The thematic synthesis may still be running beside a step that failed; it must not outlive the report.
+            if (thematicTask != null) await thematicTask;
             _log.LogError(fatalEx, "Run {RunId}: report generation failed", sessionId);
             var failureReport = new PrismaReport
             {
@@ -826,6 +846,21 @@ public partial class PrismaReviewEngine
             };
             await File.WriteAllTextAsync(GetReportFilePath(sessionId), JsonSerializer.Serialize(failureReport, new JsonSerializerOptions { WriteIndented = true }));
             finalState.FailureMessage = $"The report could not be generated: {SanitizeLogMessage(fatalEx.Message)}";
+        }
+    }
+
+    /// <summary>The thematic synthesis, or a result that names why it failed; never throws, so it can run beside other steps.</summary>
+    private async Task<ThematicResult> ThematicOrFallbackAsync(Guid sessionId, IChatCompletionService chat, string query, string explicitObjective,
+        ReviewState finalState, IReadOnlyList<ReferencedPaper> papers, int referenceCount)
+    {
+        try
+        {
+            return await RunThematicSynthesisAsync(sessionId, chat, query, explicitObjective, finalState, papers, referenceCount);
+        }
+        catch (Exception ex)
+        {
+            _log.LogWarning("Thematic synthesis failed, falling back to the single-pass synthesis: {Message}", SanitizeLogMessage(ex.Message));
+            return new ThematicResult { Codebook = new ThematicCodebook { FallbackReason = $"the thematic synthesis failed ({SanitizeLogMessage(ex.Message)})" } };
         }
     }
 

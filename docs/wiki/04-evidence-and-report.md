@@ -76,6 +76,15 @@ A single call that writes the whole synthesis cannot use seventy papers: the out
 
 **Discussion** (`WriteDiscussionAsync`, stage `discussion`). Written from the finished subsections, with facts about the evidence base taken from the extraction (how many studies were read in full text, how many are not empirical, the most common study types) so the limitations paragraph does not have to guess. Its length grows with the number of themes (3 to 6 paragraphs).
 
+Steps that do not read each other's output run at the same time, which shortens the writing by a few minutes with a reasoning model; the results are used in the same order as before, so nothing in the report changes.
+
+| Runs at the same time as | Because |
+|---|---|
+| The thematic synthesis, and the outline and first draft (`report-draft`) | The synthesis reads neither; the draft is only its fallback. The synthesis is awaited where its result is used and also when the report fails, so it never outlives the run (`ThematicOrFallbackAsync`) |
+| The second coding, and the theme subsections | The subsections use the first coding; the second is only reported |
+| The front matter with its copy-edit, and the artifact | Both read the finished sections and discussion, and neither reads the other |
+| The copy-edits of the abstract, rationale and objectives | Three separate calls |
+
 The codebook, coverage, second coding and the list of studies not cited (with the reason) are saved as `thematic-codebook.json` and as `ReviewState.ThematicSynthesis`. The Review Output page and `main.tex` show them as an evidence map (themes × studies).
 
 ## The artifact

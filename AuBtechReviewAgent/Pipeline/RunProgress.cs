@@ -100,6 +100,13 @@ public partial class PrismaReviewEngine
 {
     // When each run last sent a progress event, so a fast loop sends a few updates per second, not hundreds.
     private readonly ConcurrentDictionary<Guid, long> _lastProgressTicks = new();
+
+    // The live counters of each running run. The ledger is saved only at certain points (not while the review is
+    // written and checked), so a page opened mid-run reads these to show the step the run is really in.
+    private readonly ConcurrentDictionary<Guid, ReviewStats> _liveStats = new();
+
+    /// <summary>The live counters of a running run, or null when it is not running here. Lock the object while reading it.</summary>
+    public ReviewStats? LiveStats(Guid runId) => _liveStats.TryGetValue(runId, out var stats) ? stats : null;
     private static readonly long ProgressInterval = TimeSpan.FromMilliseconds(400).Ticks;
 
     /// <summary>
@@ -110,6 +117,7 @@ public partial class PrismaReviewEngine
     private void ReportProgress(Guid runId, ReviewState state, string step, double fraction, string detail = "")
     {
         var stats = state.Stats;
+        _liveStats[runId] = stats;
         bool stepChanged;
         lock (stats)
         {

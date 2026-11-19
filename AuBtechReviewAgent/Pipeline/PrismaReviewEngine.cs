@@ -325,6 +325,7 @@ public partial class PrismaReviewEngine
                 await WriteRunMetricsAsync(ctx);
             Coordinator.Unregister(sessionId);
             _lastProgressTicks.TryRemove(sessionId, out _);
+            _liveStats.TryRemove(sessionId, out _);
         }
     }
 
