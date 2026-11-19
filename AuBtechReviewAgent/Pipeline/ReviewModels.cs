@@ -26,6 +26,8 @@ public class ReviewState
 
     // The rest of what the reviewer entered, so a later run can start from the same settings.
     public string ReviewObjective { get; set; } = "";
+    /// <summary>The reviewer's research questions, as checked by ReviewInputGuard (empty when the run had none).</summary>
+    public List<string> ResearchQuestions { get; set; } = new();
     public string InclusionCriteria { get; set; } = "";
     public string ExclusionCriteria { get; set; } = "";
     public string ArtifactKind { get; set; } = "";
@@ -288,6 +290,10 @@ public class PrismaReport
     public string ImplicationsItem { get; set; } = "";               // Item 23d
     public string FutureResearchItem { get; set; } = "";             // Item 23d
     public string ConclusionItem { get; set; } = "";
+
+    // The reviewer's research questions with the answer to each, in order (empty when the run had none); every answer
+    // is checked against its sources like the conclusion.
+    public List<ResearchAnswer> ResearchAnswers { get; set; } = new();
     
     // SECTION 5: OTHER INFORMATION
     public string SupportItem { get; set; } = "Pending...";          // Item 25
@@ -349,7 +355,9 @@ public record ReviewRequest(
     // here). null: the model proposes them during the run; an empty list: only the primary query is searched.
     IReadOnlyList<string>? SearchStrings = null,
     // The kind of review (ReviewMethods); only available methods can be run.
-    string Method = "systematic"
+    string Method = "systematic",
+    // Optional research questions (at most ReviewInputGuard.MaxResearchQuestions), answered one by one in the conclusion.
+    IReadOnlyList<string>? ResearchQuestions = null
 );
 
 /// <summary>A record that was found but removed before screening, and why (written to the run ledger).</summary>
@@ -366,4 +374,12 @@ public record RemovedRecord(
     public const string Duplicate = "Duplicate";
     public const string OutsideYearRange = "Outside year range";
     public const string OverCap = "Over per-source cap";
+}
+
+/// <summary>One research question of a review and the answer the closing step wrote to it, after the citation check.</summary>
+public class ResearchAnswer
+{
+    public int Number { get; set; }
+    public string Question { get; set; } = "";
+    public string Answer { get; set; } = "";
 }

@@ -216,6 +216,7 @@ public partial class PrismaReviewEngine
                 PeerReviewOnlyToggle = request.PeerReviewOnly,
                 SynthesisTargetDirective = request.SynthesisDirective,
                 ReviewObjective = request.Objective,
+                ResearchQuestions = request.ResearchQuestions?.ToList() ?? new List<string>(),
                 InclusionCriteria = request.Inclusion,
                 ExclusionCriteria = request.Exclusion,
                 ArtifactKind = ArtifactKinds.Normalize(request.ArtifactKind),
