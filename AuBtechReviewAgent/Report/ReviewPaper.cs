@@ -71,8 +71,18 @@ public sealed class ReviewPaper
 /// </summary>
 public static class PaperLatex
 {
-    /// <summary>Escapes plain text for LaTeX, turns straight quotes into LaTeX quotes and *italics* into \textit.</summary>
-    public static string Escape(string input)
+    /// <summary>
+    /// Escapes plain text for LaTeX, turns straight quotes into LaTeX quotes and *italics* into \textit. The text keeps
+    /// its closing full stop; only trailing spaces are removed.
+    /// </summary>
+    public static string Escape(string input) => Escape(input, ' ');
+
+    /// <summary>
+    /// Escapes one line of the reference list, which ends without a full stop, comma or slash, as a bibitem does.
+    /// </summary>
+    public static string EscapeReference(string input) => Escape(input, ' ', ',', '.', '/');
+
+    private static string Escape(string input, params char[] trimEnd)
     {
         if (string.IsNullOrEmpty(input)) return string.Empty;
         string cleanInput = input.Replace("https://doi.org/XXXX-XXXXXX", "")
@@ -81,7 +91,7 @@ public static class PaperLatex
                                  .Replace("https://doi.org/XXXX", "")
                                  .Replace("https://doi.org/XXX", "")
                                  .Replace("XXXXXX.XXXXX", "")
-                                 .TrimEnd(' ', ',', '.', '/');
+                                 .TrimEnd(trimEnd);
 
         string escaped = cleanInput.Replace(@"\", @"\textbackslash ")
                          .Replace("&", @"\&")
@@ -216,7 +226,7 @@ public static class PaperLatex
         sb.AppendLine(@"\clearpage");
         sb.AppendLine(@"\begin{thebibliography}{99}");
         for (int i = 0; i < paper.References.Count; i++)
-            sb.AppendLine($"\\bibitem{{ref{i + 1}}} {Escape(paper.References[i])}");
+            sb.AppendLine($"\\bibitem{{ref{i + 1}}} {EscapeReference(paper.References[i])}");
         sb.AppendLine(@"\end{thebibliography}");
         sb.AppendLine(@"\end{document}");
         return sb.ToString();
