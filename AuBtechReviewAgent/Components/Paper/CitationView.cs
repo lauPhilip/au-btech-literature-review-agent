@@ -51,6 +51,9 @@ public static class CitationView
         int section = themeFields.ToList().IndexOf(field);
         if (section >= 0) return 1 + section;
         if (field.StartsWith("artifact-", StringComparison.Ordinal)) return 1000;
+        // The answers to the research questions come just before the conclusion text.
+        if (field.StartsWith("researchAnswer", StringComparison.Ordinal)
+            && int.TryParse(field.AsSpan("researchAnswer".Length), out int rq)) return 2003 + rq;
         // After the discussion come the closing sections, in the order the paper shows them.
         return field switch
         {
@@ -58,7 +61,7 @@ public static class CitationView
             "evidenceLimitationsItem" => 2001,
             "implicationsItem" => 2002,
             "futureResearchItem" => 2003,
-            "conclusionItem" => 2004,
+            "conclusionItem" => 2100,
             _ => 3000,
         };
     }

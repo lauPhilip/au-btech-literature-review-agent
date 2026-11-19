@@ -149,6 +149,11 @@ public partial class PrismaReviewEngine
             new("Data Collection and Quality Appraisal", report.BiasAssessmentItem ?? ""),
         };
         if (!string.IsNullOrWhiteSpace(report.SynthesisMethodsItem)) methods.Add(new("Synthesis Methods", report.SynthesisMethodsItem));
+        // The reviewer's research questions come first in the method, as published reviews list them.
+        var questions = state?.ResearchQuestions ?? new List<string>();
+        if (questions.Count > 0)
+            methods.Insert(0, new PaperSection("Research Questions", "", string.Join("", questions.Select((q, i) =>
+                $"\\noindent\\textbf{{RQ{i + 1}.}} {EscapeLatexText(q)}\\par{Environment.NewLine}"))));
 
         var sb = new StringBuilder();
         if (state != null)
@@ -269,7 +274,7 @@ public partial class PrismaReviewEngine
             ResultsLatex = resultsLatex,
             Discussion = report.DiscussionItem ?? "",
             DiscussionNotes = discussionNotes,
-            Summary = string.IsNullOrWhiteSpace(report.ConclusionItem) ? null : new PaperSection("Conclusion", report.ConclusionItem),
+            Summary = ConclusionSection(report),
             Declarations = declarations,
             References = records.Select(r => r.ApaCitation).ToList(),
         };
@@ -289,6 +294,21 @@ public partial class PrismaReviewEngine
         var module = ReviewModules.Find(ReviewMethod.SystematicKey)!;
         return RunArchive.Build(sessionId, GetWorkspaceFolderPath(sessionId), generated, module.ArchiveFiles,
             state?.ProtocolHash, state?.RunSettings?.Model);
+    }
+
+    /// <summary>
+    /// The Conclusion: the answer to each research question ("RQ1. question" then its answer), then the conclusion text.
+    /// Null when the run wrote no conclusion.
+    /// </summary>
+    private PaperSection? ConclusionSection(PrismaReport report)
+    {
+        if (string.IsNullOrWhiteSpace(report.ConclusionItem)) return null;
+        if (report.ResearchAnswers is not { Count: > 0 } answers) return new PaperSection("Conclusion", report.ConclusionItem);
+        var latex = new StringBuilder();
+        foreach (var a in answers)
+            latex.AppendLine($"\\noindent\\textbf{{RQ{a.Number}. {EscapeLatexText(a.Question)}}} {EscapeLatexText(a.Answer)}\\par\\smallskip");
+        latex.AppendLine(EscapeLatexText(report.ConclusionItem));
+        return new PaperSection("Conclusion", report.ConclusionItem, latex.ToString());
     }
 
     /// <summary>The artifact as a TikZ figure, a table or a list, outside the two-column layout.</summary>
