@@ -71,6 +71,21 @@ If you change the Tailwind classes in a component, rebuild the CSS in the `AuBte
 
 Don't worry about getting everything perfect. If something needs adjusting, we'll talk it through in the review.
 
+## Publishing a version
+
+This part is for maintainers. A version is set in one place only, a git tag such as `v0.1.0`, and the app, the paper and the Metrics page read it from there. Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html): while they start with 0, a new minor version may change the method or the output.
+
+Pushing the tag starts `.github/workflows/release.yml`. It checks the tag, `CHANGELOG.md` and `CITATION.cff`, runs the tests and publishes a GitHub release titled "v0.1.0 - Research questions". The notes are the version's section of `CHANGELOG.md`, followed by GitHub's list of merged pull requests and a link comparing it with the previous release. Zenodo archives each release with its own DOI once the integration is switched on.
+
+| Step | What to do |
+|---|---|
+| 1. Prepare | On a branch, rename `## [Unreleased]` in `CHANGELOG.md` to `## [0.1.0] - 2026-11-20` and start a new, empty `## [Unreleased]` above it. In `CITATION.cff`, set `version: "0.1.0"` and `date-released: 2026-11-20`. Commit both in one `(docs): ` commit. |
+| 2. Merge | Open a pull request and merge it once the checks pass. The "Release check and changelog" job tests both files. |
+| 3. Tag | On the merged master, make an annotated tag whose message is the title, a few plain words: `git tag -a v0.1.0 -m "Research questions"`. Tag on the day you wrote in `date-released`. |
+| 4. Push the tag | `git push origin v0.1.0`. Follow the Release workflow under Actions. |
+
+The workflow publishes nothing, and says why, if the tag is not a version, if it is a lightweight tag without a message, if `CHANGELOG.md` has no section for the version, or if `CITATION.cff` names another version or day. To try again, fix the files on master, delete the tag (`git tag -d v0.1.0` and `git push origin :refs/tags/v0.1.0`) and tag again. You can run the same check yourself before pushing: `python3 tools/ReleaseCheck/release_check.py v0.1.0`.
+
 ## Reporting a bug
 
 Open an issue using the bug report template and include:
