@@ -158,7 +158,7 @@
                 }
 
                 <div class="space-y-3 md:col-span-2 border-b border-gray-200 pt-2 pb-1">
-                    <h2 class="font-sans font-bold text-sm text-brand uppercase tracking-wide">3. Data & Collection Metrics</h2>
+                    <h2 class="font-sans font-bold text-sm text-brand uppercase tracking-wide">3. Characteristics of the Included Studies</h2>
                 </div>
 
                 <div class="md:col-span-2 space-y-2">
@@ -431,7 +431,7 @@
                 </div>
 
                 <div class="space-y-1 md:col-span-2">
-                    <span class="font-sans font-bold text-[10px] text-gray-500 uppercase block">4.1 Dataset Characteristics & Synthesis Outcomes (Item 20a)</span>
+                    <span class="font-sans font-bold text-[10px] text-gray-500 uppercase block">4.1 Overview of the Synthesis (Item 20a)</span>
                     @if (auditChecks.Count > 0)
                     {
                         <p class="font-sans text-[10px] text-gray-500 print:hidden">Click a citation number to see what the automated check found in the cited paper.</p>
@@ -559,7 +559,7 @@
                 </div>
 
                 <div class="space-y-1 md:col-span-2">
-                    <span class="font-sans font-bold text-[10px] text-gray-500 uppercase block">5.1 General Interpretation & Architectural Analysis (Item 23a)</span>
+                    <span class="font-sans font-bold text-[10px] text-gray-500 uppercase block">5.1 General Interpretation (Item 23a)</span>
                     @CitedText("discussionItem", report.DiscussionItem)
                     @if (!string.IsNullOrWhiteSpace(report.CitationCheckSummary))
                     {
@@ -567,12 +567,54 @@
                     }
                 </div>
 
+                @* PRISMA 2020 items 23b to 23d, which published reviews give their own headings. Runs made before they were
+                   written have none of them; 23c is written in code from the run's facts. *@
+                @if (!string.IsNullOrWhiteSpace(report.EvidenceLimitationsItem))
+                {
+                    <div class="space-y-1 md:col-span-2">
+                        <span class="font-sans font-bold text-[10px] text-gray-500 uppercase block">5.2 Limitations of the Evidence (Item 23b)</span>
+                        @CitedText("evidenceLimitationsItem", report.EvidenceLimitationsItem)
+                    </div>
+                }
+                @if (!string.IsNullOrWhiteSpace(report.ReviewLimitationsItem))
+                {
+                    <div class="space-y-1 md:col-span-2">
+                        <span class="font-sans font-bold text-[10px] text-gray-500 uppercase block">5.3 Limitations of the Review Process (Item 23c)</span>
+                        <p class="text-gray-800">@report.ReviewLimitationsItem</p>
+                    </div>
+                }
+                @if (!string.IsNullOrWhiteSpace(report.ImplicationsItem))
+                {
+                    <div class="space-y-1 md:col-span-2">
+                        <span class="font-sans font-bold text-[10px] text-gray-500 uppercase block">5.4 Implications for Practice and Policy (Item 23d)</span>
+                        @CitedText("implicationsItem", report.ImplicationsItem)
+                    </div>
+                }
+                @if (!string.IsNullOrWhiteSpace(report.FutureResearchItem))
+                {
+                    <div class="space-y-1 md:col-span-2">
+                        <span class="font-sans font-bold text-[10px] text-gray-500 uppercase block">5.5 Directions for Future Research (Item 23d)</span>
+                        @CitedText("futureResearchItem", report.FutureResearchItem)
+                    </div>
+                }
+
+                @{ int declarationsNumber = string.IsNullOrWhiteSpace(report.ConclusionItem) ? 6 : 7; }
+                @if (!string.IsNullOrWhiteSpace(report.ConclusionItem))
+                {
+                    <div class="space-y-3 md:col-span-2 border-b border-gray-200 pt-2 pb-1">
+                        <h2 class="font-sans font-bold text-sm text-brand uppercase tracking-wide">6. Conclusion</h2>
+                    </div>
+                    <div class="space-y-1 md:col-span-2">
+                        @CitedText("conclusionItem", report.ConclusionItem)
+                    </div>
+                }
+
                 <div class="space-y-3 md:col-span-2 border-b border-gray-200 pt-2 pb-1">
-                    <h2 class="font-sans font-bold text-sm text-brand uppercase tracking-wide">6. Administrative Declarations</h2>
+                    <h2 class="font-sans font-bold text-sm text-brand uppercase tracking-wide">@(declarationsNumber). Declarations</h2>
                 </div>
 
                 <div class="space-y-1">
-                    <span class="font-sans font-bold text-[10px] text-gray-500 uppercase block">6.1 Registration and Protocol (Item 24)</span>
+                    <span class="font-sans font-bold text-[10px] text-gray-500 uppercase block">@(declarationsNumber).1 Registration and Protocol (Item 24)</span>
                     <p class="text-gray-800">
                         @(string.IsNullOrWhiteSpace(report.ProtocolItem) ? "No protocol was recorded for this run (it was made before protocols were written)." : report.ProtocolItem)
                         @if (hasProtocol)
@@ -583,12 +625,12 @@
                 </div>
 
                 <div class="space-y-1">
-                    <span class="font-sans font-bold text-[10px] text-gray-500 uppercase block">6.2 Support & Funding (Item 25)</span>
+                    <span class="font-sans font-bold text-[10px] text-gray-500 uppercase block">@(declarationsNumber).2 Support & Funding (Item 25)</span>
                     <p class="text-gray-800">@ScrubAnchors(report.SupportItem)</p>
                 </div>
 
                 <div class="space-y-1 md:col-span-2">
-                    <span class="font-sans font-bold text-[10px] text-gray-500 uppercase block">6.3 Availability of Data and Code (Item 27)</span>
+                    <span class="font-sans font-bold text-[10px] text-gray-500 uppercase block">@(declarationsNumber).3 Availability of Data and Code (Item 27)</span>
                     <p class="text-gray-800">@ScrubAnchors(report.AvailabilityItem)</p>
                 </div>
 
@@ -597,7 +639,7 @@
                     @* Ready to copy into a paper or thesis; built only from what the run recorded (AiUseStatement). *@
                     <div class="space-y-1 md:col-span-2" id="ai-use">
                         <div class="flex items-center justify-between gap-2">
-                            <span class="font-sans font-bold text-[10px] text-gray-500 uppercase block">6.4 Use of Artificial Intelligence</span>
+                            <span class="font-sans font-bold text-[10px] text-gray-500 uppercase block">@(declarationsNumber).4 Use of Artificial Intelligence</span>
                             <span class="flex gap-2 print:hidden font-sans">
                                 <button type="button" class="ui-btn-secondary ui-btn-sm" @onclick='() => CopyStatement(aiStatement, "Methods statement")'>Copy for the methods</button>
                                 <button type="button" class="ui-btn-secondary ui-btn-sm" @onclick='() => CopyStatement(aiShort, "Short declaration")'>Copy a short declaration</button>
