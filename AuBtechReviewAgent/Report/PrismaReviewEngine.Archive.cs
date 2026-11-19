@@ -200,7 +200,7 @@ public partial class PrismaReviewEngine
 
         sb.AppendLine(@"\small");
         sb.AppendLine(@"\begin{tabularx}{\textwidth}{>{\hsize=0.6\hsize}X >{\hsize=1.2\hsize}X >{\hsize=1.0\hsize}X >{\hsize=0.5\hsize}X >{\hsize=1.7\hsize}X}");
-        sb.AppendLine(@"\multicolumn{5}{l}{\textbf{Table 3.1: Systematic Synthesis Extraction Registry}} \\\\");
+        sb.AppendLine(@"\multicolumn{5}{l}{\textbf{Table 3.1: Included studies}} \\\\");
         sb.AppendLine(@"\toprule");
         sb.AppendLine(@"\textbf{Paper Name} & \textbf{Executive Summary} & \textbf{Inclusion Rationale} & \textbf{Category} & \textbf{Citation (APA 7th)} \\");
         sb.AppendLine(@"\midrule");
@@ -215,7 +215,7 @@ public partial class PrismaReviewEngine
         }
         sb.AppendLine(@"\end{tabularx}");
         sb.AppendLine(@"\vspace{4pt}\noindent\small ");
-        sb.AppendLine(@"\textbf{Table Overview:} The extraction logs archived inside Table 3.1 summarize the qualitative characteristics of each selected paper.");
+        sb.AppendLine(@"Table 3.1 lists each included study with a short summary, the reason it was included, its category and its reference.");
         if (state?.Extractions is { Count: > 0 } extractions)
         {
             sb.AppendLine(@"\vspace{10pt}");
@@ -236,7 +236,13 @@ public partial class PrismaReviewEngine
                 @"\caption{Grounded Architectural Synthesis System Model Diagram}", @"\end{figure}",
             }.Select(line => line + Environment.NewLine)));
 
+        // PRISMA 2020 items 23b to 23d after the general interpretation (23a), as published reviews give them their own headings.
         var discussionNotes = new List<PaperSection>();
+        void Note(string heading, string? text) { if (!string.IsNullOrWhiteSpace(text)) discussionNotes.Add(new(heading, text)); }
+        Note("Limitations of the Evidence", report.EvidenceLimitationsItem);
+        Note("Limitations of the Review Process", report.ReviewLimitationsItem);
+        Note("Implications for Practice and Policy", report.ImplicationsItem);
+        Note("Directions for Future Research", report.FutureResearchItem);
         if (!string.IsNullOrWhiteSpace(report.CitationCheckSummary)) discussionNotes.Add(new("Automated Citation Check", report.CitationCheckSummary));
         if (!string.IsNullOrWhiteSpace(state?.HumanScreeningReviewOutcome)) discussionNotes.Add(new("Human Screening Review", state!.HumanScreeningReviewOutcome!));
 
@@ -254,6 +260,7 @@ public partial class PrismaReviewEngine
             Rationale = report.RationaleItem ?? "",
             Objectives = report.ObjectivesItem ?? "",
             Methods = methods,
+            DataHeading = "Characteristics of the Included Studies",
             DataText = MethodsSectionWriter.IncludedSet(records),
             DataLatex = dataLatex,
             ResultsText = textSynthesisOnly,
@@ -262,6 +269,7 @@ public partial class PrismaReviewEngine
             ResultsLatex = resultsLatex,
             Discussion = report.DiscussionItem ?? "",
             DiscussionNotes = discussionNotes,
+            Summary = string.IsNullOrWhiteSpace(report.ConclusionItem) ? null : new PaperSection("Conclusion", report.ConclusionItem),
             Declarations = declarations,
             References = records.Select(r => r.ApaCitation).ToList(),
         };
