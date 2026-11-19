@@ -131,6 +131,10 @@ public class OpenAICompatibleChatService : IChatCompletionService
         var body = new JsonObject { ["model"] = model, ["messages"] = messages, ["stream"] = false };
         if (settings is MistralAIPromptExecutionSettings mistral && mistral.Temperature is double t) body["temperature"] = t;
         else if (settings?.ExtensionData?.TryGetValue("temperature", out var temp) == true && temp is double t2) body["temperature"] = t2;
+        // top_p as in the settings (1 by default), which is what the Semantic Kernel connector always sent. Mistral answers
+        // 400 "top_p must be 1 when using greedy sampling" to temperature 0 without it, and every decision runs at 0.
+        if (settings is MistralAIPromptExecutionSettings withTopP)
+            body["top_p"] = Convert.ToDouble((object?)withTopP.TopP ?? 1.0, System.Globalization.CultureInfo.InvariantCulture);
 
         if (settings?.ExtensionData?.ContainsKey("response_format") == true)
             body["response_format"] = new JsonObject { ["type"] = "json_object" };

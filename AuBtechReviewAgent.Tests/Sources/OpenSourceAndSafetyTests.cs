@@ -378,6 +378,20 @@ public class OpenSourceAndSafetyTests : IDisposable
     }
 
     [Fact]
+    public void GreedyDecisionsSendTopPOne()
+    {
+        // Mistral answers 400 "top_p must be 1 when using greedy sampling" to temperature 0 without top_p,
+        // and every decision runs at temperature 0. The Semantic Kernel connector always sent it.
+        var history = new ChatHistory();
+        history.AddUserMessage("Screen this record");
+        string body = OpenAICompatibleChatService.BuildRequestBody("mistral-large-latest", history, LlmJson.JsonMode(0.0), "low");
+
+        Assert.Contains("\"temperature\":0", body);
+        Assert.Contains("\"top_p\":1", body);
+        Assert.DoesNotContain("top_p", OpenAICompatibleChatService.BuildRequestBody("llama3.1", history, null));
+    }
+
+    [Fact]
     public void MistralIsCalledWithLowReasoningEffortByDefault()
     {
         Assert.Equal("low", new LlmOptions().ReasoningEffort);
