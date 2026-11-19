@@ -122,7 +122,7 @@ public static class MultivocalPaper
         new PaperSection("Registration and protocol",
             $"The review was not registered. Its protocol (need and audience, the decision to include grey literature, research questions, kinds of grey literature, searches and search strings, stopping rule, criteria and quality threshold) was written on {input.Planned.CreatedUtc:yyyy-MM-dd} (UTC), before any search; its SHA-256 fingerprint begins {Short(input.Planned.ProtocolSha256)}. The file is part of the run archive."),
         new PaperSection("Availability",
-            ($"The code of the tool (version {RecordingChatCompletionService.AppVersion}) is openly available at https://github.com/lauPhilip/au-btech-literature-review-agent. The run archive contains the protocol, the raw search answers, every screening decision and quality score with its quotes, the systematic map, the extraction, the synthesis, the written paper, the citation audit and a manifest.json with the SHA-256 fingerprint of every file. The kept page texts are fingerprinted but not redistributed.")),
+            ($"The code of the tool is openly available at {ToolVersion.RepositoryUrl}. {ToolVersion.PaperSentence(ToolVersion.Current)} The run archive contains the protocol, the raw search answers, every screening decision and quality score with its quotes, the systematic map, the extraction, the synthesis, the written paper, the citation audit and a manifest.json with the SHA-256 fingerprint of every file. The kept page texts are fingerprinted but not redistributed.")),
     };
 
     /// <summary>The statement on the use of AI, written in code from what the run did.</summary>
