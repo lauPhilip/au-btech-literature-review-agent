@@ -15,8 +15,6 @@
 
 using System.Text.Json;
 using AuBtechReviewAgent;
-using Microsoft.SemanticKernel;
-using Microsoft.SemanticKernel.ChatCompletion;
 
 var options = ParseArgs(args);
 if (!options.TryGetValue("data", out var dataPath) || !options.TryGetValue("inclusion", out var inclusion))
@@ -40,10 +38,8 @@ var records = ScreeningEvaluation.LoadCsv(File.ReadAllText(dataPath));
 var (sample, excludedWeight) = ScreeningEvaluation.Sample(records, maxExcluded, seed);
 Console.WriteLine($"Loaded {records.Count} labelled records ({records.Count(r => r.Included)} relevant). Screening {sample.Count} (seed {seed}).");
 
-#pragma warning disable SKEXP0070
-var kernel = Kernel.CreateBuilder().AddMistralChatCompletion(PrismaReviewEngine.ModelId, apiKey).Build();
-#pragma warning restore SKEXP0070
-var chat = new RecordingChatCompletionService(kernel.GetRequiredService<IChatCompletionService>(), PrismaReviewEngine.ModelId);
+// The same client the review uses, so the evaluation measures exactly what a run does.
+var chat = new RecordingChatCompletionService(LlmFactory.Create(new LlmOptions { Model = PrismaReviewEngine.ModelId }, apiKey), PrismaReviewEngine.ModelId);
 
 var results = new List<object>();
 var pairs = new List<(bool Gold, bool Predicted)>();
