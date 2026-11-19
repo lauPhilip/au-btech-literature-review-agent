@@ -378,6 +378,15 @@ class RepositoryFilesTests(unittest.TestCase):
                 rc.parse_version("v" + version)
                 self.assertEqual(rc.check_notes(rc.changelog_section(text, version), version), [])
 
+    def test_unreleased_notes_would_pass_the_release_check(self):
+        """[Unreleased] becomes the next version's notes, so it is held to the same rules on every pull request."""
+        text = (self.ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+        try:
+            notes = rc.changelog_section(text, "Unreleased")
+        except rc.ReleaseError:
+            self.skipTest("[Unreleased] is empty, as it is just after a release")
+        self.assertEqual(rc.check_notes(notes, "Unreleased"), [])
+
     def test_citation_version_has_a_changelog_section(self):
         fields = rc.citation_fields((self.ROOT / "CITATION.cff").read_text(encoding="utf-8"))
         if "version" not in fields:
