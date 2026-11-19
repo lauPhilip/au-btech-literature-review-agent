@@ -252,7 +252,7 @@ public partial class PrismaReviewEngine
             .ToList();
         if (seeds.Count == 0) return;
 
-        var graph = CitationGraphFactory?.Invoke() ?? new OpenAlexSource(OpenSources.ContactEmail);
+        var graph = CitationGraphFactory?.Invoke() ?? new OpenAlexSource(OpenSources.ContactEmail, OpenSources.OpenAlexApiKey);
         int perDirection = Math.Clamp(OpenSources.ChainingPerPaper, 1, 25);
         string sourceName = $"{graph.SourceName} (citation chaining)";
 
