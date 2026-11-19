@@ -2,22 +2,30 @@
 
 All notable changes to TraceableAI are listed here, newest first. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html). While the version starts with 0, the method and the output may still change between minor versions.
 
-Each version's section becomes the notes of its GitHub release, so write it for someone deciding which version to use or cite. Under each version, list what was **Added**, **Changed** and **Fixed**, in plain words. Changes that are merged but not yet released go under [Unreleased]. How to publish a version is in [CONTRIBUTING.md](CONTRIBUTING.md#publishing-a-version).
+Each version's section becomes the notes of its GitHub release, so write it for someone deciding which version to use or cite. Under each version, say what was **Added**, **Changed** and **Fixed** in short, plain paragraphs, and what it means for someone running a review. The notes must score at least 60 for Flesch Reading Ease, have exactly one emoji and may be a bit playful; the release check stops the release otherwise. Changes that are merged but not yet released go under [Unreleased]. How to publish a version is in [CONTRIBUTING.md](CONTRIBUTING.md#publishing-a-version).
 
 ## [Unreleased]
 
+This is the first version of TraceableAI. It runs a full systematic review, from your question to a paper you can check line by line. 🎉
+
 ### Added
 
-- The systematic review (PRISMA 2020): a protocol written before the search, searches of open scholarly databases, screening of every record twice, full-text extraction and quality appraisal, a thematic synthesis, and a citation check that keeps a verdict only when its quote is found word for word in the paper.
-- Optional research questions on the start form, listed in the protocol and answered at the start of the conclusion.
-- The closing sections of the paper: limitations of the evidence, implications, future research and a conclusion.
-- An archive of every run with a SHA-256 manifest, a LaTeX manuscript, BibTeX and RIS files.
-- A Metrics page that compares citation quality, coverage and cost across runs.
-- Releases titled from the version tag, with notes from this changelog, and a check that `CITATION.cff` names the version being released.
+You write down your plan before the search starts, so nobody can quietly move the goalposts later. The tool then searches open databases and screens each record twice. It reads the full texts, rates their quality and groups what it finds into themes.
+
+Every claim in the paper points to a source. Each citation is checked against the paper it cites, and it only passes when its quote is found there word for word. If the quote is not there, the claim does not get through.
+
+You can add your own research questions on the start form. The plan lists them, and the conclusion answers them first. The paper also ends with the limits of the evidence, what it means in practice, ideas for future work and a short conclusion.
+
+Each run is saved as an archive with a fingerprint for every file, so you can show that nothing was changed later. You also get the paper in LaTeX, and the references as BibTeX and RIS files for your reference manager.
+
+A new Metrics page puts your runs side by side. It shows how well they cite, how much they cover and what they cost.
+
+Each release now has a clear title and notes like these. A check stops the release if the notes are hard to read, or if the citation file names the wrong version.
 
 ### Changed
 
-- The version comes from the git tag and is shown on the Metrics page and cited in the paper. Runs made before this show "before versioning".
-- Screenings and citation checks use a smaller, faster model; the writing uses the large model.
+The version now comes from the release tag. You can see it on the Metrics page, and the paper cites it, so a reader knows which version made the review. Runs from before this show "before versioning".
+
+Screening and citation checks now use a smaller, faster model. The writing still uses the large one, where it counts.
 
 [Unreleased]: https://github.com/lauPhilip/au-btech-literature-review-agent/commits/master

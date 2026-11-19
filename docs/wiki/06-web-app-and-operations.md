@@ -189,7 +189,7 @@ A version is set in one place only: a git tag `vMAJOR.MINOR.PATCH`, following Se
 
 ### Publishing a version
 
-A release is published by pushing an annotated tag whose message is its title: `git tag -a v0.1.0 -m "Research questions"` gives the release "v0.1.0 - Research questions". Before that, a `(docs): ` commit on master turns `## [Unreleased]` in `CHANGELOG.md` into the version's section and sets `version` and `date-released` in `CITATION.cff`, so GitHub's "Cite this repository" names the version a run used. `release.yml` first runs `tools/ReleaseCheck/release_check.py`, which stops the release with every reason it found when the tag is not `v` and a Semantic Version, is a lightweight tag or has an empty message, when `CHANGELOG.md` has no section for the version, or when `CITATION.cff`'s version or date does not match the tag and the day it was made. The checkout is told to fetch the tag again by name, because otherwise it can lose the tag's message. Then the tests run, and the release is created with the changelog section as its notes, followed by GitHub's list of merged pull requests and the comparison link. A version with a pre-release part, such as `v0.2.0-rc.1`, is marked as a pre-release. The steps for maintainers are in `CONTRIBUTING.md` under "Publishing a version".
+A release is published by pushing an annotated tag whose message is its title: `git tag -a v0.1.0 -m "Research questions"` gives the release "v0.1.0 - Research questions". Before that, a `(docs): ` commit on master turns `## [Unreleased]` in `CHANGELOG.md` into the version's section and sets `version` and `date-released` in `CITATION.cff`, so GitHub's "Cite this repository" names the version a run used. `release.yml` first runs `tools/ReleaseCheck/release_check.py`, which stops the release with every reason it found when the tag is not `v` and a Semantic Version, is a lightweight tag or has an empty message, when `CHANGELOG.md` has no section for the version, when `CITATION.cff`'s version or date does not match the tag and the day it was made, or when the notes break the house style for release notes. The checkout is told to fetch the tag again by name, because otherwise it can lose the tag's message. Then the tests run, and the release is created with the changelog section as its notes, followed by GitHub's list of merged pull requests and the comparison link. A version with a pre-release part, such as `v0.2.0-rc.1`, is marked as a pre-release. The steps for maintainers are in `CONTRIBUTING.md` under "Publishing a version".
 
 | What | Where |
 |---|---|
@@ -197,3 +197,12 @@ A release is published by pushing an annotated tag whose message is its title: `
 | Notes | The version's section of `CHANGELOG.md`, then GitHub's generated notes |
 | Citation | `version` and `date-released` in `CITATION.cff`, checked against the tag |
 | Archive and DOI | Zenodo, from `.zenodo.json`, once the integration is on |
+
+Release notes are written for someone running a review, not for developers. They say what changed and why it helps, in short plain paragraphs, and may be a bit playful. Two of the rules are checked in code, and the rest by the person who reviews the pull request. Because `[Unreleased]` becomes the next version's notes, CI checks it on every pull request too.
+
+| Rule for the notes | Target | Checked by |
+|---|---|---|
+| Readability | Flesch Reading Ease of 60 or more (plain English) | `release_check.py` |
+| Emoji | Exactly one | `release_check.py` |
+| Content | What changed, and why it matters for a review | Review by eye |
+| Tone | Everyday English, a bit playful | Review by eye |

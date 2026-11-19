@@ -4,7 +4,8 @@
 
 The unit tests check each rule on its own. The feature tests build a small git repository with an annotated or a
 lightweight tag, run the script as release.yml does, and check the title, the notes and the reasons it stops.
-The last test checks the repository's own CHANGELOG.md and CITATION.cff, so a broken file is caught on the pull
+The notes tests check the readability score and the emoji count against texts whose answer is known.
+The last tests check the repository's own CHANGELOG.md and CITATION.cff, so a broken file is caught on the pull
 request, not on the day of a release.
 """
 
@@ -36,13 +37,13 @@ All notable changes to TraceableAI are listed here.
 
 ### Fixed
 
-- A later fix.
+- A later fix that stops a crash. 🐛
 
 ## [0.1.0] - 2026-11-20
 
 ### Added
 
-- Research questions on the start form.
+- Research questions on the start form. 🎉
 
 ### Changed
 
@@ -91,7 +92,7 @@ class TitleTests(unittest.TestCase):
 class ChangelogTests(unittest.TestCase):
     def test_section_is_text_up_to_next_heading(self):
         section = rc.changelog_section(CHANGELOG, "0.2.0")
-        self.assertEqual(section, "### Fixed\n\n- A later fix.")
+        self.assertEqual(section, "### Fixed\n\n- A later fix that stops a crash. 🐛")
 
     def test_last_section_leaves_out_link_definitions(self):
         section = rc.changelog_section(CHANGELOG, "0.1.0")
@@ -110,6 +111,92 @@ class ChangelogTests(unittest.TestCase):
     def test_empty_section_stops(self):
         with self.assertRaisesRegex(rc.ReleaseError, "empty"):
             rc.changelog_section("## [0.1.0] - 2026-11-20\n\n## [0.0.9]\n- old\n", "0.1.0")
+
+
+HARD_NOTES = """### Added
+
+- Comprehensive methodological documentation describing the computational infrastructure, the configuration
+  parameters, and the operational responsibilities associated with institutional deployment considerations. 🎉
+"""
+
+
+class SyllableTests(unittest.TestCase):
+    def test_known_words(self):
+        expected = {"the": 1, "cat": 1, "plain": 1, "makes": 1, "changed": 1, "review": 2, "table": 2,
+                    "screening": 2, "English": 2, "citation": 3, "readability": 5}
+        for word, count in expected.items():
+            with self.subTest(word=word):
+                self.assertEqual(rc.count_syllables(word), count)
+
+    def test_parts_joined_by_a_hyphen_are_added(self):
+        self.assertEqual(rc.count_syllables("full-text"), 2)
+
+    def test_numbers_count_as_one(self):
+        self.assertEqual(rc.count_syllables("2026"), 1)
+
+
+class EmojiTests(unittest.TestCase):
+    def test_plain_text_has_none(self):
+        self.assertEqual(rc.find_emoji("Plain words, a tick \u2713, a star \u2605 and a (c) sign."), [])
+
+    def test_each_emoji_is_found(self):
+        self.assertEqual(rc.find_emoji("Ready \U0001F389 set \u2728 go \u2705"), ["\U0001F389", "\u2728", "\u2705"])
+
+    def test_a_sequence_that_shows_as_one_picture_counts_once(self):
+        family = "\U0001F468\u200d\U0001F469\u200d\U0001F467"
+        thumbs = "\U0001F44D\U0001F3FD"
+        flag = "\U0001F1E9\U0001F1F0"
+        keycap = "1\ufe0f\u20e3"
+        heart = "\u2764\ufe0f"
+        for emoji in [family, thumbs, flag, keycap, heart]:
+            with self.subTest(emoji=emoji):
+                self.assertEqual(rc.find_emoji(f"a {emoji} b"), [emoji])
+
+
+class ReadingEaseTests(unittest.TestCase):
+    def test_short_plain_sentences_score_high(self):
+        score = rc.reading_ease("The cat sat on the mat. It was a good day.")
+        self.assertGreater(score, 100)
+
+    def test_long_formal_sentences_score_low(self):
+        self.assertLess(rc.reading_ease(HARD_NOTES), 0)
+
+    def test_score_follows_the_formula(self):
+        # 2 sentences, 6 words, 7 syllables: 206.835 - 1.015 x 3 - 84.6 x 7/6.
+        self.assertAlmostEqual(rc.reading_ease("Screening is fast. The cat sat."), 206.835 - 3.045 - 84.6 * 7 / 6)
+
+    def test_headings_links_and_code_marks_are_not_read(self):
+        with_markup = "### Added\n\n- The [Metrics](https://example.org/metrics/page) page is `new`."
+        self.assertAlmostEqual(rc.reading_ease(with_markup), rc.reading_ease("The Metrics page is new."))
+
+    def test_a_list_item_without_a_full_stop_ends_a_sentence(self):
+        self.assertAlmostEqual(rc.reading_ease("- The cat sat\n- The dog ran"),
+                               rc.reading_ease("The cat sat. The dog ran."))
+
+    def test_version_numbers_do_not_end_a_sentence(self):
+        self.assertAlmostEqual(rc.reading_ease("It is v0.1.0 now."), rc.reading_ease("It is v010 now."))
+
+    def test_no_words_gives_none(self):
+        self.assertIsNone(rc.reading_ease("### Added\n\n\U0001F389"))
+
+
+class NotesTests(unittest.TestCase):
+    def test_plain_notes_with_one_emoji_pass(self):
+        self.assertEqual(rc.check_notes("You can now ask your own questions. The paper answers them. \U0001F389", "0.1.0"), [])
+
+    def test_hard_notes_are_stopped_with_the_score(self):
+        problems = rc.check_notes(HARD_NOTES, "0.1.0")
+        self.assertEqual(len(problems), 1)
+        self.assertIn("Flesch Reading Ease", problems[0])
+        self.assertIn("at least 60", problems[0])
+
+    def test_no_emoji_is_stopped(self):
+        problems = rc.check_notes("You can now ask your own questions.", "0.1.0")
+        self.assertEqual(problems, ["The notes for 0.1.0 need exactly one emoji; they have none."])
+
+    def test_two_emoji_are_stopped_and_shown(self):
+        problems = rc.check_notes("New questions \U0001F389 and a faster check \u26a1.", "0.1.0")
+        self.assertEqual(problems, ["The notes for 0.1.0 need exactly one emoji; they have 2 (\U0001F389 \u26a1)."])
 
 
 class CitationTests(unittest.TestCase):
@@ -209,12 +296,12 @@ class ReleaseFeatureTests(unittest.TestCase):
         self.assertIn("title=v0.1.0 - Research questions\n", output)
         self.assertIn("prerelease=false\n", output)
         text = notes.read_text(encoding="utf-8")
-        self.assertIn("- Research questions on the start form.", text)
+        self.assertIn("- Research questions on the start form. 🎉", text)
         self.assertNotIn("A later fix", text)
         self.assertNotIn("Something not yet released", text)
 
     def test_pre_release_is_marked(self):
-        changelog = "# Changelog\n\n## [0.2.0-rc.1] - 2026-11-20\n\n### Added\n\n- A trial.\n"
+        changelog = "# Changelog\n\n## [0.2.0-rc.1] - 2026-11-20\n\n### Added\n\n- A trial run to try things out. 🧪\n"
         self.commit(changelog, citation("0.2.0-rc.1", "2026-11-20"))
         self.git("tag", "-a", "v0.2.0-rc.1", "-m", "Trial")
 
@@ -254,6 +341,20 @@ class ReleaseFeatureTests(unittest.TestCase):
         self.assertEqual(code, 1)
         self.assertIn('no section "## [0.3.0]"', errors)
 
+    def test_hard_notes_with_two_emoji_stop_with_both_reasons(self):
+        hard = CHANGELOG.replace("- Research questions on the start form. 🎉\n", HARD_NOTES.split("\n\n", 1)[1] + "- More. 🚀\n")
+        self.commit(hard, citation("0.1.0", "2026-11-20"))
+        self.git("tag", "-a", "v0.1.0", "-m", "Research questions")
+
+        code, notes, output, errors = self.run_check("v0.1.0")
+
+        self.assertEqual(code, 1)
+        self.assertIn("are hard to read: Flesch Reading Ease", errors)
+        self.assertIn("need exactly one emoji; they have 2", errors)
+        self.assertIn("::error title=Release check::", errors)
+        self.assertFalse(notes.exists())
+        self.assertNotIn("title=", output)
+
     def test_unknown_tag_stops(self):
         self.commit(CHANGELOG, citation("0.1.0", "2026-11-20"))
 
@@ -275,7 +376,16 @@ class RepositoryFilesTests(unittest.TestCase):
         for version in versions[1:]:
             with self.subTest(version=version):
                 rc.parse_version("v" + version)
-                self.assertTrue(rc.changelog_section(text, version))
+                self.assertEqual(rc.check_notes(rc.changelog_section(text, version), version), [])
+
+    def test_unreleased_notes_would_pass_the_release_check(self):
+        """[Unreleased] becomes the next version's notes, so it is held to the same rules on every pull request."""
+        text = (self.ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+        try:
+            notes = rc.changelog_section(text, "Unreleased")
+        except rc.ReleaseError:
+            self.skipTest("[Unreleased] is empty, as it is just after a release")
+        self.assertEqual(rc.check_notes(notes, "Unreleased"), [])
 
     def test_citation_version_has_a_changelog_section(self):
         fields = rc.citation_fields((self.ROOT / "CITATION.cff").read_text(encoding="utf-8"))
