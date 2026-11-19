@@ -99,4 +99,56 @@ public class ReviewPaperTests : IDisposable
         Assert.Contains(@"\bibitem{ref2} Bo (2026). Retrieval first\_v2", tex);
         Assert.DoesNotContain("PRISMA", tex);
     }
+
+    [Fact]
+    public void AClosingAnswerIsRejectedWhenAPartIsMissingTooLongOrUnfounded()
+    {
+        const string known = "Agent loops recover through supervisor checks [1]. 2 studies were included.";
+        Assert.Null(ReviewWriter.ClosingProblem("Two studies only [1].", "Use supervisors [1].", "Test at scale [2].", "Loops recover [1, 2].", known, 2));
+        Assert.Contains("futureResearch, conclusion must not be empty", ReviewWriter.ClosingProblem("a", "b", " ", "", known, 2));
+        Assert.Contains("conclusion is too long", ReviewWriter.ClosingProblem("a", "b", "c", string.Join(" ", Enumerable.Repeat("word", ReviewWriter.MaxConclusionWords + 1)), known, 2));
+        Assert.Contains("citation numbers 7 are not in the reference list", ReviewWriter.ClosingProblem("a [7].", "b", "c", "d", known, 2));
+        Assert.Contains("the text uses 85", ReviewWriter.ClosingProblem("a", "85 percent adopt it.", "c", "d", known, 2));
+        Assert.Null(ReviewWriter.ClosingProblem("2 studies were included.", "b", "c", "d", known, 2)); // a number from the facts is fine
+    }
+
+    private static string RespondWithClosing(string prompt) => prompt.Contains("You are writing the sections that follow the discussion")
+        ? """{"limitations":"The evidence rests on two studies read from their abstracts [1, 2].","implications":"Teams should add supervisor checks to agent loops [1].","futureResearch":"Governance layers need evaluation in production [2].","conclusion":"Agent loops recover from faults through supervisor checks, and governance layers audit their actions [1, 2]."}"""
+        : ReviewWriterTests.Respond(prompt);
+
+    [Fact]
+    public async Task TheClosingSectionsReachTheReportTheCitationCheckAndMainTex()
+    {
+        var engine = new PrismaReviewEngine("test-key", "", null, null, null, new RunsOptions { MaxConcurrentRuns = 1 })
+        {
+            WorkspaceRoot = _root,
+            ChatFactory = _ => new FakeChatService().RespondsWith(RespondWithClosing),
+            SourceFactory = _ => new PipelineTests.FakeSource(),
+            FullTextFetcher = (_, _) => Task.FromResult(new FullTextResult(Array.Empty<DocumentChunk>(), "none (test)", null)),
+        };
+        var runId = Guid.NewGuid();
+        await engine.RunReviewAsync(runId, new ReviewRequest("agent loops", "Map agent loop safety", "Agent architecture", "Agronomy", 3, SelectedSources: new[] { "arxiv" }));
+
+        string folder = Path.Join(_root, runId.ToString("N"));
+        var report = System.Text.Json.JsonSerializer.Deserialize<PrismaReport>(File.ReadAllText(Path.Join(folder, "prisma-report.json")))!;
+        Assert.Equal("The evidence rests on two studies read from their abstracts [1, 2].", report.EvidenceLimitationsItem);
+        Assert.Equal("Teams should add supervisor checks to agent loops [1].", report.ImplicationsItem);
+        Assert.Equal("Governance layers need evaluation in production [2].", report.FutureResearchItem);
+        Assert.StartsWith("Agent loops recover from faults through supervisor checks", report.ConclusionItem);
+        Assert.StartsWith("This review has limits of its own.", report.ReviewLimitationsItem);
+
+        // Every closing part went through the citation check like the discussion.
+        string audit = File.ReadAllText(Path.Join(folder, "citation-audit.json"));
+        foreach (var field in new[] { "evidenceLimitationsItem", "implicationsItem", "futureResearchItem", "conclusionItem" })
+            Assert.Contains($"\"{field}\"", audit);
+
+        using var archive = new ZipArchive(new MemoryStream(engine.GenerateWorkspaceArchiveFromDisk(runId)));
+        using var reader = new StreamReader(archive.GetEntry("main.tex")!.Open());
+        string tex = reader.ReadToEnd();
+        foreach (var heading in new[] { @"\subsection{Limitations of the Evidence}", @"\subsection{Limitations of the Review Process}",
+                     @"\subsection{Implications for Practice and Policy}", @"\subsection{Directions for Future Research}", @"\section{Conclusion}" })
+            Assert.Contains(heading, tex);
+        Assert.True(tex.IndexOf(@"\section{Discussion}", StringComparison.Ordinal) < tex.IndexOf(@"\section{Conclusion}", StringComparison.Ordinal));
+        Assert.True(tex.IndexOf(@"\section{Conclusion}", StringComparison.Ordinal) < tex.IndexOf(@"\section{Declarations}", StringComparison.Ordinal));
+    }
 }
