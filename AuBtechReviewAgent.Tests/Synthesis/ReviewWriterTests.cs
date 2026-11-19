@@ -120,6 +120,72 @@ public class ReviewWriterTests : IDisposable
         Assert.Equal(File.ReadAllText(path).Replace("\r\n", "\n"), prompts);
     }
 
+    /// <summary>
+    /// Answers like <see cref="Respond"/>, but holds a prompt of one kind of a pair until a prompt of the other kind has
+    /// started (at most 5 s), and counts which kinds saw the other one while they were waiting.
+    /// </summary>
+    private sealed class PairedChat : Microsoft.SemanticKernel.ChatCompletion.IChatCompletionService
+    {
+        private readonly (string A, string B)[] _pairs;
+        private readonly System.Collections.Concurrent.ConcurrentDictionary<string, TaskCompletionSource> _started = new();
+        public System.Collections.Concurrent.ConcurrentDictionary<string, bool> SawOther { get; } = new();
+        public PairedChat(params (string A, string B)[] pairs) => _pairs = pairs;
+        public IReadOnlyDictionary<string, object?> Attributes { get; } = new Dictionary<string, object?>();
+
+        private TaskCompletionSource Started(string marker) => _started.GetOrAdd(marker, _ => new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously));
+
+        public async Task<IReadOnlyList<Microsoft.SemanticKernel.ChatMessageContent>> GetChatMessageContentsAsync(Microsoft.SemanticKernel.ChatCompletion.ChatHistory chatHistory,
+            Microsoft.SemanticKernel.PromptExecutionSettings? executionSettings = null, Microsoft.SemanticKernel.Kernel? kernel = null, CancellationToken cancellationToken = default)
+        {
+            string prompt = string.Join("\n", chatHistory.Select(m => m.Content));
+            foreach (var (a, b) in _pairs)
+            {
+                string? mine = prompt.Contains(a) ? a : prompt.Contains(b) ? b : null;
+                if (mine == null) continue;
+                Started(mine).TrySetResult();
+                var other = Started(mine == a ? b : a).Task;
+                if (await Task.WhenAny(other, Task.Delay(TimeSpan.FromSeconds(5), cancellationToken)) == other) SawOther[mine] = true;
+            }
+            return new[] { new Microsoft.SemanticKernel.ChatMessageContent(Microsoft.SemanticKernel.ChatCompletion.AuthorRole.Assistant, Respond(prompt)) { ModelId = "fake-model" } };
+        }
+
+        public IAsyncEnumerable<Microsoft.SemanticKernel.StreamingChatMessageContent> GetStreamingChatMessageContentsAsync(Microsoft.SemanticKernel.ChatCompletion.ChatHistory chatHistory,
+            Microsoft.SemanticKernel.PromptExecutionSettings? executionSettings = null, Microsoft.SemanticKernel.Kernel? kernel = null, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+    }
+
+    [Fact]
+    public async Task IndependentWritingStepsRunAtTheSameTime()
+    {
+        // Each pair: neither step reads the other's output. Run one after the other, only the second of a pair would
+        // find the first already started; run together, each finds the other.
+        var pairs = new[]
+        {
+            ("grounded synthesis outline", "You are coding studies"),
+            ("second, independent coder", "You are writing one subsection of the Results"),
+            ("You are writing the title, abstract, rationale and objectives", "You are turning the results of a systematic literature review"),
+        };
+        var chat = new PairedChat(pairs);
+        var engine = new PrismaReviewEngine("test-key", "", null, null, null, new RunsOptions { MaxConcurrentRuns = 1 })
+        {
+            WorkspaceRoot = _root,
+            ChatFactory = _ => chat,
+            SourceFactory = _ => new PipelineTests.FakeSource(),
+            FullTextFetcher = (_, _) => Task.FromResult(new FullTextResult(Array.Empty<DocumentChunk>(), "none (test)", null)),
+        };
+        var runId = Guid.NewGuid();
+        await engine.RunReviewAsync(runId, new ReviewRequest("agent loops", "Map agent loop safety", "Agent architecture", "Agronomy", 3, SelectedSources: new[] { "arxiv" }));
+
+        foreach (var (a, b) in pairs)
+        {
+            Assert.True(chat.SawOther.ContainsKey(a), $"'{a}' did not run beside '{b}'");
+            Assert.True(chat.SawOther.ContainsKey(b), $"'{b}' did not run beside '{a}'");
+        }
+        var state = engine.LoadState(runId)!;
+        Assert.Null(state.ThematicSynthesis!.FallbackReason);
+        Assert.NotNull(state.ThematicSynthesis.SecondCoding);
+    }
+
     [Fact]
     public async Task AnotherKindOfReviewGetsItsOwnWordsAndTheSameChecks()
     {
