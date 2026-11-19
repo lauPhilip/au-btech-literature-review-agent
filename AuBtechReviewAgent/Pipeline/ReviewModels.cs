@@ -280,6 +280,14 @@ public class PrismaReport
     // SECTION 4: RESULTS & DISCUSSION
     public string SynthesisResultsItem { get; set; } = string.Empty; // Item 20a
     public string DiscussionItem { get; set; } = "Pending...";       // Item 23a
+    // The parts after the discussion (empty in runs made before they were written): the limitations of the evidence (23b,
+    // written by the model and citation-checked), the limitations of the review processes (23c, written in code), the
+    // implications for practice and policy and the directions for future research (23d), and the conclusion.
+    public string EvidenceLimitationsItem { get; set; } = "";        // Item 23b
+    public string ReviewLimitationsItem { get; set; } = "";          // Item 23c
+    public string ImplicationsItem { get; set; } = "";               // Item 23d
+    public string FutureResearchItem { get; set; } = "";             // Item 23d
+    public string ConclusionItem { get; set; } = "";
     
     // SECTION 5: OTHER INFORMATION
     public string SupportItem { get; set; } = "Pending...";          // Item 25

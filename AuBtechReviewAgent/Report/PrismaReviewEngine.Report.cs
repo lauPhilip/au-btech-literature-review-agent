@@ -626,9 +626,19 @@ public partial class PrismaReviewEngine
                         explicitObjective, results, referenceListMapping, referenceCount);
             }
 
+            // The limitations of the evidence, the implications, the future research and the conclusion (PRISMA 23b, 23d)
+            // read the same finished sections, so they are written beside the front matter and the artifact.
+            async Task<ClosingSections?> ClosingAsync() => useThematic && thematic!.Evidence != null
+                ? await ReviewWriter.WriteClosingAsync(chat, WritingProfile.Systematic, query, explicitObjective,
+                    FrontMatterFacts(finalState, thematic.Codebook, includedFacts, screeningFacts), resultSections, discussionText,
+                    thematic.Evidence, referenceCount, message => _log.LogWarning("{Message}", SanitizeLogMessage(message)))
+                : null;
+
             var frontTask = FrontAndStyleAsync();
             var artifactTask = ArtifactAsync();
-            await Task.WhenAll(frontTask, artifactTask); // a failure of either is thrown here, after both have finished
+            var closingTask = ClosingAsync();
+            await Task.WhenAll(frontTask, artifactTask, closingTask); // a failure of any is thrown here, after all have finished
+            var closing = await closingTask;
             var (front, styledAbstract, styledRationale, styledObjectives) = await frontTask;
             artifact = await artifactTask;
 
@@ -661,6 +671,15 @@ public partial class PrismaReviewEngine
             var fields = new List<(string Field, string Text)> { ("rationaleItem", Plain(cleanRationale, "rationaleItem")), ("synthesisResultsItem", Plain(synthesisProse, "synthesisResultsItem")) };
             fields.AddRange(sections.Select(s => (s.Field, Plain(s.Text, s.Field))));
             fields.Add(("discussionItem", Plain(discussionText, "discussionItem")));
+            // The closing sections are checked like the discussion; the limitations of the review processes are written in
+            // code and cite nothing, so they are not checked.
+            if (closing != null)
+            {
+                fields.Add(("evidenceLimitationsItem", Plain(closing.EvidenceLimitations, "evidenceLimitationsItem")));
+                fields.Add(("implicationsItem", Plain(closing.Implications, "implicationsItem")));
+                fields.Add(("futureResearchItem", Plain(closing.FutureResearch, "futureResearchItem")));
+                fields.Add(("conclusionItem", Plain(closing.Conclusion, "conclusionItem")));
+            }
             if (artifact is { Error: null }) fields.AddRange(artifact.CitableTexts().ToList());
 
             // STORM-style traceability guardrail: every [n] citation marker the model writes must resolve to
@@ -818,6 +837,11 @@ public partial class PrismaReviewEngine
                 Artifact = artifact,
                 CoverageSummary = coverageSentence,
                 DiscussionItem = cleanDiscussionValidated,
+                EvidenceLimitationsItem = closing == null ? "" : textOf["evidenceLimitationsItem"],
+                ReviewLimitationsItem = MethodsSectionWriter.ReviewProcessLimitations(finalState, Llm.DisplayNameFor("screening"), Llm.DisplayName),
+                ImplicationsItem = closing == null ? "" : textOf["implicationsItem"],
+                FutureResearchItem = closing == null ? "" : textOf["futureResearchItem"],
+                ConclusionItem = closing == null ? "" : textOf["conclusionItem"],
                 // Items 9-11 from the extraction and MMAT appraisal the run actually produced.
                 BiasAssessmentItem = MethodsSectionWriter.DataAndAppraisal(finalState.Extractions ?? new List<StudyExtraction>(), Llm.DisplayName),
                 ProtocolItem = MethodsSectionWriter.Protocol(finalState.ProtocolSha256, finalState.Timestamp),

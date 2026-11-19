@@ -68,4 +68,36 @@ public class MethodsSectionWriterTests
         Assert.NotEqual(a, c);
         Assert.Equal(8, a.Length);
     }
+
+    [Fact]
+    public void TheLimitationsOfTheReviewProcessAreWrittenFromWhatTheRunDid()
+    {
+        var state = new ReviewState
+        {
+            DualScreeningRequested = true, HumanScreeningReviewRequested = true, MaxResultsPerSource = 5, YearFrom = 2020, YearTo = 2026,
+            UnavailableSources = new List<string> { "ieee" },
+            Stats = new ReviewStats { DualScreened = 20, HumanReviewed = 4, Included = 8, FullTextRetrieved = 5 },
+        };
+        string text = MethodsSectionWriter.ReviewProcessLimitations(state, "mistral-small-latest (Mistral API)", "mistral-large-latest (Mistral API)");
+
+        Assert.Contains("screened by the language model mistral-small-latest (Mistral API), twice with independent prompts, and a human reviewer checked 4 of the decisions.", text);
+        Assert.Contains("Of the 8 included studies, 3 were read from their abstracts only", text);
+        Assert.Contains("at most 5 records per source, published from 2020 to 2026.", text);
+        Assert.Contains("IEEE Xplore could not be searched.", text);
+        Assert.Contains("written by the language model mistral-large-latest (Mistral API);", text);
+    }
+
+    [Fact]
+    public void TheLimitationsOfTheReviewProcessSayWhenNoPersonCheckedAndNothingWasReadInFull()
+    {
+        var single = new ReviewState { MaxResultsPerSource = 3, Stats = new ReviewStats { Included = 1 } };
+        string text = MethodsSectionWriter.ReviewProcessLimitations(single, "m", "m");
+        Assert.Contains("screened by the language model m, and no human reviewer checked the decisions within the tool.", text);
+        Assert.Contains("No open-access full text was found for the included study, so it was read from its abstract only.", text);
+        Assert.DoesNotContain("published from", text);
+        Assert.DoesNotContain("could not be searched", text);
+
+        var all = new ReviewState { Stats = new ReviewStats { Included = 4, FullTextRetrieved = 4 } };
+        Assert.Contains("All 4 included studies were read in full text.", MethodsSectionWriter.ReviewProcessLimitations(all, "m", "m"));
+    }
 }

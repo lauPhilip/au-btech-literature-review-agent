@@ -57,7 +57,7 @@ For each included study, a language model (mistral-large-latest (Mistral API), t
 \subsection{Synthesis Methods}
 The findings were synthesised thematically, following the thematic synthesis method of Thomas and Harden (2008), with the language model (mistral-large-latest (Mistral API)) performing each step. First, the key findings extracted from each study (whose supporting quotes had been found in the paper's text) were coded; each code names the findings it comes from, and for studies without verified findings the code had to quote the abstract verbatim, which was checked in code (2 of 2 codes were anchored this way). Second, the codes were grouped into 1 descriptive themes; a study belongs to a theme when one of its codes does, and the model's answer was rejected until every coded study was either placed in a theme or explicitly left out with a reason. A second, independent coding assigned the studies to the same themes; agreement over 2 study-theme decisions was Cohen's kappa = 1.00 (0 disagreements, listed in thematic-codebook.json). Third, each theme was written up as a subsection from its own studies only, with every study of the theme to be cited; studies still uncited were given to one further revision pass. Finally, the part of every cited sentence attributed to a paper was checked against that paper; sentences judged not supported or only partly supported were rewritten once from the paper's evidence and checked again. The requested artifact could not be built: The artifact could not be built from the results (LlmOutputException)
 \end{multicols}
-\section{Data \& Collection Metrics}
+\section{Characteristics of the Included Studies}
 The 2 included papers were published between 2025 and 2026, most of them in 2026. By the source that first returned them: 2 from Google Scholar. By venue type: 1 journal, 0 transactions, 1 conference and 0 preprint or unknown
 \vspace{10pt}
 \begin{figure}[H]
@@ -118,7 +118,7 @@ The 2 included papers were published between 2025 and 2026, most of them in 2026
 \vspace{10pt}
 \small
 \begin{tabularx}{\textwidth}{>{\hsize=0.6\hsize}X >{\hsize=1.2\hsize}X >{\hsize=1.0\hsize}X >{\hsize=0.5\hsize}X >{\hsize=1.7\hsize}X}
-\multicolumn{5}{l}{\textbf{Table 3.1: Systematic Synthesis Extraction Registry}} \\\\
+\multicolumn{5}{l}{\textbf{Table 3.1: Included studies}} \\\\
 \toprule
 \textbf{Paper Name} & \textbf{Executive Summary} & \textbf{Inclusion Rationale} & \textbf{Category} & \textbf{Citation (APA 7th)} \\
 \midrule
@@ -126,7 +126,7 @@ Agent loops for safe orchestration & An agent paper & About agent architecture &
 Agent governance layers & An agent paper & About agent architecture & Scholar & Lee, K. (2026). Agent governance layers. In \textit{Proceedings of the Conference on Agents} \\ \hline
 \end{tabularx}
 \vspace{4pt}\noindent\small 
-\textbf{Table Overview:} The extraction logs archived inside Table 3.1 summarize the qualitative characteristics of each selected paper.
+Table 3.1 lists each included study with a short summary, the reason it was included, its category and its reference.
 \vspace{10pt}
 \begin{tabularx}{\textwidth}{>{\hsize=0.25\hsize}X >{\hsize=0.8\hsize}X >{\hsize=1.1\hsize}X >{\hsize=0.9\hsize}X >{\hsize=1.95\hsize}X}
 \multicolumn{5}{l}{\textbf{Table 3.2: Extracted Study Data}} \\
@@ -169,9 +169,11 @@ Recovery and oversight & How agent loops recover and are overseen & {[}1{]}, {[}
 \begin{multicols}{2}
 \section{Discussion}
 Recovery and audits complement each other [1, 2]
+\subsection{Limitations of the Review Process}
+This review has limits of its own. The records were screened by the language model mistral-large-latest (Mistral API), twice with independent prompts, and no human reviewer checked the decisions within the tool. No open-access full text was found for any of the 2 included studies, so all were read from their abstracts only. The search took at most 3 records per source. The extraction, the synthesis and the text were written by the language model mistral-large-latest (Mistral API); every cited sentence was checked against its source, but the review should be read by a person before it is relied on
 \subsection{Automated Citation Check}
 An automated check compared the part of each cited sentence attributed to a paper with the text of that paper. Of 5 citations checked, 5 were judged supported, 0 partially supported, 0 not supported, and 0 could not be verified. Every verdict, with the quoted evidence, is listed in citation-audit.json; these are model judgements and should be spot-checked by a human reviewer
-\section{Administrative Declarations}
+\section{Declarations}
 \subsection{Support \& Funding}
 No funding statement has been declared for this review. The funding and support text can be set in the Report:SupportStatement configuration value
 \subsection{Registration and Protocol}

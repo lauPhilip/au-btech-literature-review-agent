@@ -29,6 +29,9 @@ public partial class PrismaReviewEngine
         public List<SynthesisSection> Sections { get; } = new();
         public string Discussion { get; set; } = "";
         public PeerReviewLog? PeerReview { get; set; }
+
+        /// <summary>The evidence the sections were written from, for the closing sections written after them.</summary>
+        public ReviewEvidence? Evidence { get; set; }
     }
 
     /// <summary>
@@ -100,6 +103,7 @@ public partial class PrismaReviewEngine
         // 4. One subsection per theme, each with its own coverage fill pass (shared by every kind of review:
         //    Synthesis/ReviewWriter.cs). Written in parallel, assembled in theme order.
         var evidence = SystematicEvidence.Build(book, state.SynthesizedRecords, papers, extractions);
+        result.Evidence = evidence;
         var profile = WritingProfile.Systematic;
         void Warn(string message) => _log.LogWarning("{Message}", SanitizeLogMessage(message));
         ReportProgress(runId, state, RunProgress.Synthesis, RunProgress.Phase(RunProgress.SynthesisPhases, 3, 0), $"Writing {book.Themes.Count} theme subsections");

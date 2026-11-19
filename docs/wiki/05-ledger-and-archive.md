@@ -117,6 +117,8 @@ classDiagram
         TitleItem, AbstractItem, RationaleItem
         EligibilityItem, SourcesItem, SelectionProcessItem
         SynthesisResultsItem, DiscussionItem
+        EvidenceLimitationsItem, ReviewLimitationsItem
+        ImplicationsItem, FutureResearchItem, ConclusionItem
         CitationCheckSummary, ProtocolItem ...
     }
     ReviewRequest ..> ReviewState : RunReviewAsync creates
@@ -166,7 +168,8 @@ To check an unpacked archive by hand, recompute a file's fingerprint and compare
 | The artifact: TikZ figure, Table 4.2 or a list | `PrismaReport.Artifact`, `ArtifactLatex`, `ArtifactBuilder.ToTikz` |
 | Table 4.1, evidence map of the thematic synthesis | `ReviewState.ThematicSynthesis`, `EvidenceMapTable` |
 | Methods sections, protocol and availability statements | `prisma-report.json`, written by `MethodsSectionWriter` |
-| "Data & Collection Metrics" paragraph | `MethodsSectionWriter.IncludedSet` |
+| "Characteristics of the Included Studies" paragraph | `MethodsSectionWriter.IncludedSet` |
+| Discussion subsections for PRISMA items 23b to 23d, and the Conclusion section | `prisma-report.json`: `EvidenceLimitationsItem`, `ImplicationsItem`, `FutureResearchItem` and `ConclusionItem` from `ReviewWriter.WriteClosingAsync`, checked like the discussion; `ReviewLimitationsItem` (23c) from `MethodsSectionWriter.ReviewProcessLimitations`. Runs made before these existed leave them empty, and the sections are left out |
 | PRISMA flow diagram (TikZ) | `PrismaFlowDiagram.ToTikz(PrismaFlowCounts.From(state))` |
 | Year bar chart and pie charts | computed from the included records; `LatexPie` |
 | Tables 3.1–3.3 (studies, extraction, MMAT) | `SynthesizedRecords`, `ExtractionTables` |

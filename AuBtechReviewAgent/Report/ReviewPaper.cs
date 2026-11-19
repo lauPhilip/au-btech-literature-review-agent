@@ -205,7 +205,7 @@ public static class PaperLatex
             sb.AppendLine(Body(paper.Summary));
         }
 
-        sb.AppendLine(@"\section{Administrative Declarations}");
+        sb.AppendLine(@"\section{Declarations}");
         foreach (var declaration in paper.Declarations)
         {
             sb.AppendLine($"\\subsection{{{Escape(declaration.Heading)}}}");
