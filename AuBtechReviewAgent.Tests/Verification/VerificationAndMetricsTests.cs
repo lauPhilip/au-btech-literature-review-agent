@@ -143,7 +143,23 @@ public class VerificationAndMetricsTests : IDisposable
 
         RunMetricsStore.Disabled.Append(new RunMetrics());
         Assert.Empty(RunMetricsStore.Disabled.ReadAll());
-        Assert.Equal("1.0.0 (abcdef1)", new RunMetrics { AppVersion = "1.0.0+abcdef1234" }.ShortVersion);
+        Assert.Equal("v0.2.0 (abcdef1)", new RunMetrics { AppVersion = "0.2.0+abcdef1234" }.ShortVersion);
+    }
+
+    [Fact]
+    public void ARunFromBeforeVersioningKeepsItsFileAndIsMarkedOnTheMetricsPage()
+    {
+        // A line as the store held it before versions came from git tags: every build said 1.0.0.
+        const string old = "{\"SchemaVersion\":1,\"RunId\":\"c5ff\",\"AppVersion\":\"1.0.0\\u002B40b00a0c59f6b49e121c30d1d6d98ac8f3d3c961\"}";
+        var before = System.Text.Json.JsonSerializer.Deserialize<RunMetrics>(old)!;
+        Assert.True(before.BeforeVersioning);
+        Assert.Equal("1.0.0+40b00a0c59f6b49e121c30d1d6d98ac8f3d3c961", before.AppVersion);
+        Assert.Equal("before versioning (40b00a0)", before.ShortVersion);
+
+        var now = new RunMetrics { AppVersion = "0.2.1-alpha.0.3+40b00a0c59f6b49e121c30d1d6d98ac8f3d3c961" };
+        Assert.False(now.BeforeVersioning);
+        Assert.Equal("v0.2.1-alpha.0.3 (40b00a0)", now.ShortVersion);
+        Assert.Contains("\"SchemaVersion\":2", System.Text.Json.JsonSerializer.Serialize(now));
     }
 
     [Fact]
@@ -158,11 +174,25 @@ public class VerificationAndMetricsTests : IDisposable
             FullTextFetcher = (_, _) => Task.FromResult(new FullTextResult(Array.Empty<DocumentChunk>(), "none (test)", null)),
             MetricsStore = store,
         };
+        // A run from before versioning is already in the store, as the server holds it today.
+        const string oldLine = "{\"SchemaVersion\":1,\"RunId\":\"c5ff8a414f7243c5a5bd631fef922e62\",\"CompletedUtc\":\"2026-01-01T10:00:00Z\",\"AppVersion\":\"1.0.0\\u002B40b00a0c59f6b49e121c30d1d6d98ac8f3d3c961\"}";
+        Directory.CreateDirectory(Path.GetDirectoryName(store.FilePath)!);
+        File.WriteAllText(store.FilePath, oldLine + "\n");
+
         var runId = Guid.NewGuid();
         await engine.RunReviewAsync(runId, new ReviewRequest("agent loops", "Map agent loop safety", "Agent architecture", "Agronomy", 3, SelectedSources: new[] { "arxiv" }));
 
-        var m = Assert.Single(store.ReadAll());
+        var all = store.ReadAll();
+        Assert.Equal(2, all.Count);
+        Assert.Equal(oldLine, File.ReadLines(store.FilePath).First()); // the older run's line is not rewritten
+        Assert.Equal("before versioning (40b00a0)", all[0].ShortVersion);
+        var m = all[1];
         Assert.Equal(runId.ToString("N"), m.RunId);
+        // The new run records the build's version, read from the git tag, and is shown as "v<version> (<commit>)".
+        Assert.Equal(ToolVersion.Current, m.AppVersion);
+        Assert.False(m.BeforeVersioning);
+        Assert.Equal(ToolVersion.Display(ToolVersion.Current), m.ShortVersion);
+        Assert.StartsWith("v", m.ShortVersion);
         Assert.Equal(2, m.Included);
         Assert.Equal(4, m.CitationsFinal.Total);
         Assert.Equal(4, m.CitationsFinal.Supported);
@@ -178,5 +208,11 @@ public class VerificationAndMetricsTests : IDisposable
         byte[] zip = engine.GenerateWorkspaceArchiveFromDisk(runId);
         using var archive = new ZipArchive(new MemoryStream(zip));
         Assert.NotNull(archive.GetEntry("run-metrics.json"));
+        // The paper names the same version and says where its code is.
+        using var tex = new StreamReader(archive.GetEntry("main.tex")!.Open());
+        string mainTex = tex.ReadToEnd();
+        Assert.Contains(ToolVersion.PaperSentence(ToolVersion.Current), mainTex);
+        Assert.Contains(ToolVersion.CodeUrl(ToolVersion.Current), mainTex);
+        Assert.DoesNotContain("version " + ToolVersion.Current, mainTex); // no raw build string with the full commit
     }
 }
