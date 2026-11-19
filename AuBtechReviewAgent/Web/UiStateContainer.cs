@@ -13,6 +13,8 @@ public class UiStateContainer
     public string InclusionCriteria { get; set; } = "";
     public string ExclusionCriteria { get; set; } = "";
     public string ReviewObjective { get; set; } = "";
+    // The research questions as typed, one per line.
+    public string ResearchQuestions { get; set; } = "";
     public DateTime DateFrom { get; set; } = new DateTime(2020, 01, 01);
     public DateTime DateTo { get; set; } = DateTime.Today;
     public bool RequirePeerReview { get; set; } = false;

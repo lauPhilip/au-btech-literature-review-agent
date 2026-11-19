@@ -35,7 +35,7 @@ A run moves through a fixed set of stages, stored in `ReviewStats.ProcessingStag
 
 **Setting up.** `ResolveKeys` decides which API keys to use: the visitor's own keys from `request.UserKeys` when given, otherwise the server's. The chat client is created by `LlmFactory.Create` (or the `ChatFactory` test hook) and wrapped in a `RecordingChatCompletionService`, so every model call of this run is recorded. The selected source keys are checked with `GetSourceAvailability`; a source that was ticked but has no usable key is not queried and is recorded in `UnavailableSources`, so the report says it was not searched instead of implying it was. All of this goes into a `RunContext`, the in-memory object that the rest of the run passes around.
 
-**Protocol.** `WriteProtocolAsync` writes `protocol.md` with the question, criteria, sources, limits and screening set-up, and records its SHA-256 in the ledger. This happens before anything is searched, so the protocol's timestamp predates every result (PRISMA 2020 item 24).
+**Protocol.** `WriteProtocolAsync` writes `protocol.md` with the question, the research questions (one line each, "Research question 1 (RQ1)", when the reviewer gave any), criteria, sources, limits and screening set-up, and records its SHA-256 in the ledger. This happens before anything is searched, so the protocol's timestamp predates every result (PRISMA 2020 item 24).
 
 **Queue.** `AcquireSlotAsync` asks the `RunCoordinator` for one of the `Runs:MaxConcurrentRuns` slots. While it waits, the run shows its place in line. The slot is held for the model-heavy parts only, which is why the run takes it twice: once for search and screening, once for synthesis, and not while it waits for a human.
 

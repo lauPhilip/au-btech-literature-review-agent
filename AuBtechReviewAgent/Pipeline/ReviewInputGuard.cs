@@ -43,6 +43,16 @@ public static class ReviewInputGuard
     public const int MaxSearchString = 200;
     /// <summary>Extra search strings besides the primary query.</summary>
     public const int MaxSearchStrings = 4;
+    public const int MaxResearchQuestion = 300;
+    /// <summary>Research questions a review may state (published reviews state a median of three).</summary>
+    public const int MaxResearchQuestions = 4;
+
+    /// <summary>The research questions in a text box: one per line, numbering such as "RQ1:" or "1." left out, blank lines dropped.</summary>
+    public static List<string> ResearchQuestionLines(string? text) => (text ?? "")
+        .Split('\n')
+        .Select(line => Regex.Replace(line.Trim(), @"^(RQ\s*\d+|\d+)\s*[.:)\-–]\s*", "", RegexOptions.IgnoreCase).Trim())
+        .Where(line => line.Length > 0)
+        .ToList();
 
     // Patterns that are ordinary in eligibility criteria and would flag almost every honest input.
     private static readonly HashSet<string> NotFlaggedForReviewers = new() { "demands-inclusion", "claims-criteria-met" };
@@ -111,6 +121,17 @@ public static class ReviewInputGuard
                 .ToList();
             if (strings.Count > MaxSearchStrings) errors.Add($"There are {strings.Count} extra search strings; the limit is {MaxSearchStrings}.");
             cleaned = cleaned with { SearchStrings = strings };
+        }
+
+        if (request.ResearchQuestions != null)
+        {
+            var questions = request.ResearchQuestions
+                .Select((q, i) => Field($"Research question {i + 1}", q, MaxResearchQuestion, singleLine: true, required: false))
+                .Where(q => q.Length > 0)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            if (questions.Count > MaxResearchQuestions) errors.Add($"Research questions: there are {questions.Count}; the limit is {MaxResearchQuestions}.");
+            cleaned = cleaned with { ResearchQuestions = questions };
         }
         return new InputCheck(cleaned, errors, flags);
     }

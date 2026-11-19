@@ -631,7 +631,8 @@ public partial class PrismaReviewEngine
             async Task<ClosingSections?> ClosingAsync() => useThematic && thematic!.Evidence != null
                 ? await ReviewWriter.WriteClosingAsync(chat, WritingProfile.Systematic, query, explicitObjective,
                     FrontMatterFacts(finalState, thematic.Codebook, includedFacts, screeningFacts), resultSections, discussionText,
-                    thematic.Evidence, referenceCount, message => _log.LogWarning("{Message}", SanitizeLogMessage(message)))
+                    thematic.Evidence, referenceCount, message => _log.LogWarning("{Message}", SanitizeLogMessage(message)),
+                    finalState.ResearchQuestions)
                 : null;
 
             var frontTask = FrontAndStyleAsync();
@@ -679,6 +680,9 @@ public partial class PrismaReviewEngine
                 fields.Add(("implicationsItem", Plain(closing.Implications, "implicationsItem")));
                 fields.Add(("futureResearchItem", Plain(closing.FutureResearch, "futureResearchItem")));
                 fields.Add(("conclusionItem", Plain(closing.Conclusion, "conclusionItem")));
+                // One field per answer to a research question, so each is checked and repaired on its own.
+                for (int i = 0; i < (closing.Answers?.Count ?? 0); i++)
+                    fields.Add(($"researchAnswer{i + 1}", Plain(closing.Answers![i], $"researchAnswer{i + 1}")));
             }
             if (artifact is { Error: null }) fields.AddRange(artifact.CitableTexts().ToList());
 
@@ -842,6 +846,9 @@ public partial class PrismaReviewEngine
                 ImplicationsItem = closing == null ? "" : textOf["implicationsItem"],
                 FutureResearchItem = closing == null ? "" : textOf["futureResearchItem"],
                 ConclusionItem = closing == null ? "" : textOf["conclusionItem"],
+                ResearchAnswers = closing?.Answers == null ? new List<ResearchAnswer>() : finalState.ResearchQuestions
+                    .Select((question, i) => new ResearchAnswer { Number = i + 1, Question = question, Answer = textOf[$"researchAnswer{i + 1}"] })
+                    .ToList(),
                 // Items 9-11 from the extraction and MMAT appraisal the run actually produced.
                 BiasAssessmentItem = MethodsSectionWriter.DataAndAppraisal(finalState.Extractions ?? new List<StudyExtraction>(), Llm.DisplayName),
                 ProtocolItem = MethodsSectionWriter.Protocol(finalState.ProtocolSha256, finalState.Timestamp),

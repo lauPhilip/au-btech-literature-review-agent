@@ -118,6 +118,15 @@
                 <div class="space-y-1">
                     <span class="font-sans font-bold text-[10px] text-gray-500 uppercase block">1.2 Objectives (Item 4)</span>
                     <p class="text-gray-800">@ScrubAnchors(report.ObjectivesItem)</p>
+                    @if (researchQuestions.Count > 0)
+                    {
+                        <ol class="space-y-1 pt-1">
+                            @for (int i = 0; i < researchQuestions.Count; i++)
+                            {
+                                <li class="text-gray-800"><span class="font-bold">RQ@(i + 1).</span> @researchQuestions[i]</li>
+                            }
+                        </ol>
+                    }
                 </div>
 
                 <div class="space-y-3 md:col-span-2 border-b border-gray-200 pt-2 pb-1">
@@ -604,6 +613,13 @@
                     <div class="space-y-3 md:col-span-2 border-b border-gray-200 pt-2 pb-1">
                         <h2 class="font-sans font-bold text-sm text-brand uppercase tracking-wide">6. Conclusion</h2>
                     </div>
+                    @foreach (var answer in report.ResearchAnswers ?? new List<ResearchAnswer>())
+                    {
+                        <div class="space-y-1 md:col-span-2">
+                            <span class="font-sans font-bold text-[10px] text-gray-500 uppercase block">RQ@(answer.Number). @answer.Question</span>
+                            @CitedText($"researchAnswer{answer.Number}", answer.Answer)
+                        </div>
+                    }
                     <div class="space-y-1 md:col-span-2">
                         @CitedText("conclusionItem", report.ConclusionItem)
                     </div>
@@ -1017,6 +1033,7 @@
     // The statement on AI use for this run (section 6.4), and the confirmation after copying it.
     private string aiStatement = "";
     private string aiShort = "";
+    private List<string> researchQuestions = new();
     private string? copyNotice;
 
     private async Task CopyStatement(string text, string what)
@@ -1108,6 +1125,7 @@
         journalCount = conferenceCount = transactionsCount = proceedingsCount = preprintCount = 0;
         peerReviewOnlyToggle = false;
         aiStatement = aiShort = "";
+        researchQuestions = new();
         copyNotice = null;
         passedPeerReviewCheck = failedPeerReviewCheck = 0;
         mermaidDiagramCode = "";
@@ -1136,6 +1154,7 @@
         peerReviewOnlyToggle = state.PeerReviewOnlyToggle;
         aiStatement = AuBtechReviewAgent.AiUseStatement.Methods(state, State.CurrentSessionId);
         aiShort = AuBtechReviewAgent.AiUseStatement.Short(state);
+        researchQuestions = state.ResearchQuestions?.ToList() ?? new List<string>();
         passedPeerReviewCheck = state.Stats.PassedPeerReviewCheck;
         failedPeerReviewCheck = state.Stats.FailedPeerReviewCheck;
         if (state.Extractions != null) extractions.AddRange(state.Extractions);

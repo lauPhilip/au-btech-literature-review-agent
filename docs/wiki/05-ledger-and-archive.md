@@ -9,7 +9,7 @@ Every run has a folder `WorkspaceStore/{runId}/`, where the run id is a GUID wri
 | File | Written by | When | Contents |
 |---|---|---|---|
 | `run.json` | `RunHeader.WriteAsync` | first, when the run starts; again when it ends or is marked interrupted | The **header**: run id, module, card, start time, final stage, end time. A folder without it is an older systematic run |
-| `protocol.md` | `WriteProtocolAsync`, `ProtocolWriter` | before the search; amendment after the search strings are known | Question, criteria, sources, limits, screening set-up; dated amendments |
+| `protocol.md` | `WriteProtocolAsync`, `ProtocolWriter` | before the search; amendment after the search strings are known | Question, research questions, criteria, sources, limits, screening set-up; dated amendments |
 | `transparent-process.json` | `SaveStateAsync` (via `PublishAsync`) | after every step | The **ledger**: the whole `ReviewState` |
 | `SourceResponses/*.json`, `*.xml` | `SaveRawResponses` | during search and chaining | Each source response exactly as received |
 | `*.pdf` | `DocumentRAGUtility` | during synthesis | Open-access full texts used in the run |
@@ -58,7 +58,7 @@ A multivocal or grey literature review (`Modules/Multivocal/`) keeps its own fil
 ```mermaid
 classDiagram
     class ReviewRequest {
-        Query, Objective
+        Query, Objective, ResearchQuestions
         Inclusion, Exclusion
         MaxResultsPerSource, YearFrom, YearTo
         SelectedSources, UserKeys
@@ -119,6 +119,7 @@ classDiagram
         SynthesisResultsItem, DiscussionItem
         EvidenceLimitationsItem, ReviewLimitationsItem
         ImplicationsItem, FutureResearchItem, ConclusionItem
+        ResearchAnswers
         CitationCheckSummary, ProtocolItem ...
     }
     ReviewRequest ..> ReviewState : RunReviewAsync creates
@@ -170,6 +171,7 @@ To check an unpacked archive by hand, recompute a file's fingerprint and compare
 | Methods sections, protocol and availability statements | `prisma-report.json`, written by `MethodsSectionWriter` |
 | "Characteristics of the Included Studies" paragraph | `MethodsSectionWriter.IncludedSet` |
 | Discussion subsections for PRISMA items 23b to 23d, and the Conclusion section | `prisma-report.json`: `EvidenceLimitationsItem`, `ImplicationsItem`, `FutureResearchItem` and `ConclusionItem` from `ReviewWriter.WriteClosingAsync`, checked like the discussion; `ReviewLimitationsItem` (23c) from `MethodsSectionWriter.ReviewProcessLimitations`. Runs made before these existed leave them empty, and the sections are left out |
+| "Research Questions", the first subsection of the method, and the answers at the start of the Conclusion ("RQ1. question" in bold, then the answer) | `ReviewState.ResearchQuestions` and `PrismaReport.ResearchAnswers`, built by `ConclusionSection`; a run without research questions has neither |
 | PRISMA flow diagram (TikZ) | `PrismaFlowDiagram.ToTikz(PrismaFlowCounts.From(state))` |
 | Year bar chart and pie charts | computed from the included records; `LatexPie` |
 | Tables 3.1–3.3 (studies, extraction, MMAT) | `SynthesizedRecords`, `ExtractionTables` |

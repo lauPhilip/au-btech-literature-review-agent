@@ -112,6 +112,30 @@ public class ReviewPaperTests : IDisposable
         Assert.Null(ReviewWriter.ClosingProblem("2 studies were included.", "b", "c", "d", known, 2)); // a number from the facts is fine
     }
 
+    [Fact]
+    public void AnswersToTheResearchQuestionsAreCheckedLikeTheOtherClosingParts()
+    {
+        const string known = "Agent loops recover through supervisor checks [1]. 2 studies were included.";
+        string? Problem(params string[] answers) => ReviewWriter.ClosingProblem("a [1].", "b", "c", "d", known, 2, answers, 2);
+        Assert.Null(Problem("Through supervisor checks [1].", "The results do not say [2]."));
+        Assert.Contains("exactly 2 answer(s)", Problem("Only one [1]."));
+        Assert.Contains("exactly 2 answer(s)", Problem("One [1].", " "));
+        Assert.Contains("citation numbers 9 are not in the reference list", Problem("One [9].", "Two [1]."));
+        Assert.Contains("the text uses 85", Problem("85 percent adopt it.", "Two [1]."));
+        Assert.Null(ReviewWriter.ClosingProblem("a", "b", "c", "d", known, 2)); // without questions nothing changes
+    }
+
+    [Fact]
+    public void TheAnswersComeBetweenTheClosingSectionsAndTheConclusionInReadingOrder()
+    {
+        var themes = new[] { "theme1" };
+        int Rank(string field) => CitationView.FieldRank(field, themes);
+        Assert.True(Rank("futureResearchItem") < Rank("researchAnswer1"));
+        Assert.True(Rank("researchAnswer1") < Rank("researchAnswer4"));
+        Assert.True(Rank("researchAnswer4") < Rank("conclusionItem"));
+        Assert.True(Rank("conclusionItem") < Rank("somethingElse"));
+    }
+
     private static string RespondWithClosing(string prompt) => prompt.Contains("You are writing the sections that follow the discussion")
         ? """{"limitations":"The evidence rests on two studies read from their abstracts [1, 2].","implications":"Teams should add supervisor checks to agent loops [1].","futureResearch":"Governance layers need evaluation in production [2].","conclusion":"Agent loops recover from faults through supervisor checks, and governance layers audit their actions [1, 2]."}"""
         : ReviewWriterTests.Respond(prompt);
@@ -150,5 +174,77 @@ public class ReviewPaperTests : IDisposable
             Assert.Contains(heading, tex);
         Assert.True(tex.IndexOf(@"\section{Discussion}", StringComparison.Ordinal) < tex.IndexOf(@"\section{Conclusion}", StringComparison.Ordinal));
         Assert.True(tex.IndexOf(@"\section{Conclusion}", StringComparison.Ordinal) < tex.IndexOf(@"\section{Declarations}", StringComparison.Ordinal));
+    }
+
+    private static string RespondWithAnswers(string prompt) => prompt.Contains("You are writing the sections that follow the discussion")
+        ? """{"limitations":"The evidence rests on two studies read from their abstracts [1, 2].","implications":"Teams should add supervisor checks to agent loops [1].","futureResearch":"Governance layers need evaluation in production [2].","conclusion":"Agent loops recover from faults through supervisor checks, and governance layers audit their actions [1, 2].","answers":["Supervisor checks let agent loops recover from faults [1].","Governance layers audit what agents do [2]."]}"""
+        : ReviewWriterTests.Respond(prompt);
+
+    [Fact]
+    public async Task EachResearchQuestionIsInTheProtocolAndAnsweredInTheConclusion()
+    {
+        var model = new FakeChatService().RespondsWith(RespondWithAnswers);
+        var engine = new PrismaReviewEngine("test-key", "", null, null, null, new RunsOptions { MaxConcurrentRuns = 1 })
+        {
+            WorkspaceRoot = _root,
+            ChatFactory = _ => model,
+            SourceFactory = _ => new PipelineTests.FakeSource(),
+            FullTextFetcher = (_, _) => Task.FromResult(new FullTextResult(Array.Empty<DocumentChunk>(), "none (test)", null)),
+        };
+        var runId = Guid.NewGuid();
+        var questions = new[] { "How do agent loops recover from faults?", "How are agent actions audited?" };
+        await engine.RunReviewAsync(runId, new ReviewRequest("agent loops", "Map agent loop safety", "Agent architecture", "Agronomy", 3,
+            SelectedSources: new[] { "arxiv" }, ResearchQuestions: questions));
+
+        // The questions are on file before the search, and kept with the run.
+        string folder = Path.Join(_root, runId.ToString("N"));
+        Assert.Equal(questions, engine.LoadState(runId)!.ResearchQuestions);
+        string protocol = File.ReadAllText(Path.Join(folder, "protocol.md"));
+        Assert.Contains("- Research question 1 (RQ1): How do agent loops recover from faults?", protocol);
+        Assert.Contains("- Research question 2 (RQ2): How are agent actions audited?", protocol);
+        Assert.Contains(model.Prompts, p => p.Contains("RQ2: How are agent actions audited?") && p.Contains("exactly 2 answer(s)"));
+
+        // One checked answer per question, in order.
+        var report = System.Text.Json.JsonSerializer.Deserialize<PrismaReport>(File.ReadAllText(Path.Join(folder, "prisma-report.json")))!;
+        Assert.Equal(new[] { 1, 2 }, report.ResearchAnswers.Select(a => a.Number));
+        Assert.Equal(questions, report.ResearchAnswers.Select(a => a.Question));
+        Assert.StartsWith("Supervisor checks let agent loops recover from faults", report.ResearchAnswers[0].Answer);
+        Assert.StartsWith("Governance layers audit what agents do", report.ResearchAnswers[1].Answer);
+        string audit = File.ReadAllText(Path.Join(folder, "citation-audit.json"));
+        Assert.Contains("\"researchAnswer1\"", audit);
+        Assert.Contains("\"researchAnswer2\"", audit);
+
+        // main.tex lists the questions in the method and answers them at the start of the Conclusion.
+        using var archive = new ZipArchive(new MemoryStream(engine.GenerateWorkspaceArchiveFromDisk(runId)));
+        using var reader = new StreamReader(archive.GetEntry("main.tex")!.Open());
+        string tex = reader.ReadToEnd();
+        Assert.Contains(@"\subsection{Research Questions}", tex);
+        Assert.Contains(@"\textbf{RQ2.} How are agent actions audited?", tex);
+        int conclusion = tex.IndexOf(@"\section{Conclusion}", StringComparison.Ordinal);
+        int firstAnswer = tex.IndexOf(@"\textbf{RQ1. How do agent loops recover from faults?}", StringComparison.Ordinal);
+        int conclusionText = tex.IndexOf("Agent loops recover from faults through supervisor checks, and", StringComparison.Ordinal);
+        Assert.True(conclusion >= 0 && conclusion < firstAnswer && firstAnswer < conclusionText);
+    }
+
+    [Fact]
+    public async Task WithoutResearchQuestionsTheClosingPromptAsksForNoAnswers()
+    {
+        var model = new FakeChatService().RespondsWith(RespondWithClosing);
+        var engine = new PrismaReviewEngine("test-key", "", null, null, null, new RunsOptions { MaxConcurrentRuns = 1 })
+        {
+            WorkspaceRoot = _root,
+            ChatFactory = _ => model,
+            SourceFactory = _ => new PipelineTests.FakeSource(),
+            FullTextFetcher = (_, _) => Task.FromResult(new FullTextResult(Array.Empty<DocumentChunk>(), "none (test)", null)),
+        };
+        var runId = Guid.NewGuid();
+        await engine.RunReviewAsync(runId, new ReviewRequest("agent loops", "Map agent loop safety", "Agent architecture", "Agronomy", 3, SelectedSources: new[] { "arxiv" }));
+
+        string closingPrompt = model.Prompts.First(p => p.Contains("You are writing the sections that follow the discussion"));
+        Assert.DoesNotContain("RESEARCH QUESTIONS", closingPrompt);
+        Assert.DoesNotContain("\"answers\"", closingPrompt);
+        var report = System.Text.Json.JsonSerializer.Deserialize<PrismaReport>(File.ReadAllText(Path.Join(_root, runId.ToString("N"), "prisma-report.json")))!;
+        Assert.Empty(report.ResearchAnswers);
+        Assert.DoesNotContain("Research question", File.ReadAllText(Path.Join(_root, runId.ToString("N"), "protocol.md")));
     }
 }
