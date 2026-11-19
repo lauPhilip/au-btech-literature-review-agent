@@ -344,6 +344,116 @@ public class OpenSourceAndSafetyTests : IDisposable
     }
 
     [Fact]
+    public void ReasoningModelAnswersAreReadFromTheTextChunksOnly()
+    {
+        // Mistral Large 4 answers with a list of chunks; the thinking chunk holds a JSON object of its own,
+        // which must never be read as the answer.
+        string json = """
+            {"model":"mistral-large-4-0","choices":[{"message":{"role":"assistant","content":[
+              {"type":"thinking","thinking":[{"type":"text","text":"Draft: {\"decision\":\"Excluded\"}"}]},
+              {"type":"text","text":"{\"decision\":\"Included\","},
+              {"type":"text","text":"\"reasoning\":\"On topic.\"}"}
+            ]}}]}
+            """;
+        var (text, model, _) = OpenAICompatibleChatService.ParseResponse(json);
+
+        Assert.Equal("{\"decision\":\"Included\",\"reasoning\":\"On topic.\"}", text);
+        Assert.DoesNotContain("Draft", text);
+        Assert.Equal("mistral-large-4-0", model);
+        var answer = System.Text.Json.JsonSerializer.Deserialize<ScreeningAnswer>(LlmJson.ExtractObject(text),
+            new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true })!;
+        Assert.Null(ScreeningAnswer.Validate(answer));
+        Assert.True(answer.IsIncluded);
+    }
+
+    [Fact]
+    public void ReasoningEffortIsSentOnlyWhenSet()
+    {
+        var history = new ChatHistory();
+        history.AddUserMessage("Hello");
+
+        Assert.Contains("\"reasoning_effort\":\"low\"", OpenAICompatibleChatService.BuildRequestBody("mistral-large-latest", history, null, "low"));
+        Assert.DoesNotContain("reasoning_effort", OpenAICompatibleChatService.BuildRequestBody("mistral-large-latest", history, null, ""));
+        Assert.DoesNotContain("reasoning_effort", OpenAICompatibleChatService.BuildRequestBody("llama3.1", history, null));
+    }
+
+    [Fact]
+    public void GreedyDecisionsSendTopPOne()
+    {
+        // Mistral answers 400 "top_p must be 1 when using greedy sampling" to temperature 0 without top_p,
+        // and every decision runs at temperature 0. The Semantic Kernel connector always sent it.
+        var history = new ChatHistory();
+        history.AddUserMessage("Screen this record");
+        string body = OpenAICompatibleChatService.BuildRequestBody("mistral-large-latest", history, LlmJson.JsonMode(0.0), "low");
+
+        Assert.Contains("\"temperature\":0", body);
+        Assert.Contains("\"top_p\":1", body);
+        Assert.DoesNotContain("top_p", OpenAICompatibleChatService.BuildRequestBody("llama3.1", history, null));
+    }
+
+    [Fact]
+    public void MistralIsCalledWithLowReasoningEffortByDefault()
+    {
+        Assert.Equal("low", new LlmOptions().ReasoningEffort);
+        Assert.IsType<OpenAICompatibleChatService>(LlmFactory.Create(new LlmOptions(), "test-key"));
+    }
+
+    private class RejectsEffortHandler : HttpMessageHandler
+    {
+        public List<string> Bodies { get; } = new();
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            string body = await request.Content!.ReadAsStringAsync(cancellationToken);
+            Bodies.Add(body);
+            if (body.Contains("reasoning_effort"))
+                return new HttpResponseMessage(HttpStatusCode.BadRequest)
+                {
+                    Content = new StringContent("""{"message":"Extra inputs are not permitted: reasoning_effort"}""", Encoding.UTF8, "application/json"),
+                };
+            return new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent("""{"model":"mistral-large-2411","choices":[{"message":{"content":"ok"}}]}""", Encoding.UTF8, "application/json"),
+            };
+        }
+    }
+
+    [Fact]
+    public async Task AModelThatRejectsReasoningEffortIsAskedAgainWithoutIt()
+    {
+        var handler = new RejectsEffortHandler();
+        var chat = new OpenAICompatibleChatService(LlmFactory.MistralBaseUrl, "mistral-large-2411", "key", new HttpClient(handler), "low");
+
+        Assert.Equal("ok", (await chat.GetChatMessageContentAsync("first")).Content);
+        Assert.Equal("ok", (await chat.GetChatMessageContentAsync("second")).Content);
+
+        // One rejected call, then the parameter is left out for the rest of the run.
+        Assert.Equal(3, handler.Bodies.Count);
+        Assert.Contains("reasoning_effort", handler.Bodies[0]);
+        Assert.DoesNotContain("reasoning_effort", handler.Bodies[1]);
+        Assert.DoesNotContain("reasoning_effort", handler.Bodies[2]);
+    }
+
+    [Fact]
+    public void OtherErrorsAreNotRetriedWithoutReasoningEffort()
+    {
+        Assert.False(OpenAICompatibleChatService.RejectsReasoningEffort(HttpStatusCode.Unauthorized, "reasoning_effort"));
+        Assert.False(OpenAICompatibleChatService.RejectsReasoningEffort(HttpStatusCode.BadRequest, "invalid model"));
+        Assert.True(OpenAICompatibleChatService.RejectsReasoningEffort(HttpStatusCode.UnprocessableEntity, "reasoning_effort: unexpected value"));
+    }
+
+    [Fact]
+    public void ErrorsCarryTheServersOwnReason()
+    {
+        // Seen in a live run: without the reason, the ledger said only "The model server answered 400."
+        Assert.Equal(": top_p must be 1 when using greedy sampling",
+            OpenAICompatibleChatService.ErrorDetail("""{"object":"error","message":"top_p must be 1 when using greedy sampling.","type":"invalid_request_error"}"""));
+        Assert.Equal(": Invalid model", OpenAICompatibleChatService.ErrorDetail("""{"error":{"message":"Invalid model"}}"""));
+        Assert.Equal(": Bad Gateway", OpenAICompatibleChatService.ErrorDetail("Bad Gateway"));
+        Assert.Equal(" with an empty answer", OpenAICompatibleChatService.ErrorDetail(""));
+        Assert.EndsWith("...", OpenAICompatibleChatService.ErrorDetail(new string('x', 500)));
+    }
+
+    [Fact]
     public void MethodsTextReportsDualScreeningAgreement()
     {
         var stats = new ReviewStats { Screened = 10, Included = 4, Excluded = 6, DualScreened = 10, ScreeningDisagreements = 2, ScreeningKappa = 0.58, InjectionSuspected = 1, UncertainDecisions = 3 };

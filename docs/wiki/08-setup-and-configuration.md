@@ -67,6 +67,7 @@ All of these can be set in `appsettings.json` (non-secret values only), user sec
 | `Llm:Provider` | Mistral | `Mistral` or `OpenAICompatible` |
 | `Llm:Model` | mistral-large-latest | The model name sent to the provider |
 | `Llm:BaseUrl` / `Llm:ApiKey` | empty | Address and optional key of an OpenAI-compatible server |
+| `Llm:ReasoningEffort` | low | Mistral only: the `reasoning_effort` sent with every call (`low`, `medium` or `high`). Mistral Large 4, which `mistral-large-latest` can point to, always reasons and uses `high` when the setting is left out, which makes a review several times slower. Empty leaves the setting out. A model that rejects it is asked again without it, and the run stops sending it |
 | `Llm:ScreeningParallelism` | 4 | How many model calls one run makes at the same time (screening, extraction, coding, checks) |
 | `OpenSources:ContactEmail` | empty | Contact address for OpenAlex, Crossref and Unpaywall |
 | `OpenSources:SemanticScholarApiKey` | empty | Optional Semantic Scholar key (secret) |
