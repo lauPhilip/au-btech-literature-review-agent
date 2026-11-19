@@ -211,6 +211,43 @@ public static class MethodsSectionWriter
     /// One paragraph describing the included set (years, sources, venue types), built only from the run's
     /// records. Used by the Review Output page and main.tex, replacing a fixed sentence that claimed trends.
     /// </summary>
+    /// <summary>
+    /// The limitations of the review processes (PRISMA 2020 item 23c), written from what the run did: who screened, whether
+    /// a person checked the decisions, how many included studies were read from their abstracts only, the search limits and
+    /// the sources that could not be searched. The model never writes this: it describes the method (AGENTS.md rule 2).
+    /// </summary>
+    public static string ReviewProcessLimitations(ReviewState state, string screeningModel, string writingModel)
+    {
+        var s = state.Stats;
+        var sb = new StringBuilder("This review has limits of its own. ");
+        sb.Append($"The records were screened by a language model ({screeningModel})");
+        if (state.DualScreeningRequested && s.DualScreened > 0) sb.Append(", twice with independent prompts");
+        sb.Append(state.HumanScreeningReviewRequested && s.HumanReviewed > 0
+            ? $", and a human reviewer checked {s.HumanReviewed} of the decisions. "
+            : ", and no human reviewer checked the decisions within the tool. ");
+        if (s.Included > 0)
+        {
+            int abstractOnly = Math.Clamp(s.Included - s.FullTextRetrieved, 0, s.Included);
+            sb.Append(abstractOnly == 0
+                ? (s.Included == 1 ? "The included study was read in full text. " : $"All {s.Included} included studies were read in full text. ")
+                : abstractOnly == s.Included
+                    ? (s.Included == 1 ? "No open-access full text was found for the included study, so it was read from its abstract only. "
+                                       : $"No open-access full text was found for any of the {s.Included} included studies, so all were read from their abstracts only. ")
+                    : $"{abstractOnly} of the {s.Included} included studies {(abstractOnly == 1 ? "was" : "were")} read from {(abstractOnly == 1 ? "its abstract" : "their abstracts")} only, because no open-access full text was found. ");
+        }
+        if (state.MaxResultsPerSource > 0)
+            sb.Append($"The search took at most {state.MaxResultsPerSource} records per source");
+        else
+            sb.Append("The search covered the selected sources");
+        if (state.YearFrom > 0 && state.YearTo > 0) sb.Append($", published from {state.YearFrom} to {state.YearTo}");
+        sb.Append(". ");
+        var unavailable = state.UnavailableSources.Select(SourceCatalog.DisplayNameFor).ToList();
+        if (unavailable.Count > 0)
+            sb.Append($"{string.Join(" and ", unavailable)} could not be searched. ");
+        sb.Append($"The extraction, the synthesis and the text were written by a language model ({writingModel}); every cited sentence was checked against its source, but the review should be read by a person before it is relied on.");
+        return sb.ToString();
+    }
+
     public static string IncludedSet(IReadOnlyList<IncludedPaperMetricRow> records)
     {
         if (records.Count == 0) return "No papers were included, so there is no data to describe.";

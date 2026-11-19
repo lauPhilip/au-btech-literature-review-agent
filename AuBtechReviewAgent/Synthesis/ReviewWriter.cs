@@ -40,10 +40,20 @@ public sealed record WritingProfile
     /// <summary>What the excerpts of the sources' texts are, e.g. "excerpts from the included papers".</summary>
     public string SourceTexts { get; init; } = "excerpts from the included papers";
 
-    /// <summary>What the discussion's paragraphs cover, in order.</summary>
+    /// <summary>
+    /// What the discussion's paragraphs cover, in order. The systematic review's discussion is PRISMA item 23a only: the
+    /// limitations, implications, future research and conclusion are written after it by <see cref="ReviewWriter.WriteClosingAsync"/>.
+    /// </summary>
     public string DiscussionParts { get; init; } =
-        "(a) what the themes together say about the objective, (b) where the themes connect, reinforce or contradict each other, (c) gaps the literature leaves open and directions for research, (d) implications for practice, (e) the limitations of the evidence base and of this review (automated screening and synthesis by a language model).";
+        "(a) what the themes together say about the objective, (b) where the themes connect, reinforce or contradict each other, (c) how strong the evidence behind the main findings is. Do not write the limitations, the implications, the directions for future research or a conclusion: they are separate sections written after this one.";
 }
+
+/// <summary>
+/// The parts of a review after its discussion (PRISMA 2020 items 23b and 23d, and a conclusion), written last from the
+/// checked results and discussion. The limitations of the review processes (item 23c) are not here: they describe the
+/// method, so they are written in code (<see cref="MethodsSectionWriter.ReviewProcessLimitations"/>).
+/// </summary>
+public sealed record ClosingSections(string EvidenceLimitations, string Implications, string FutureResearch, string Conclusion);
 
 /// <summary>The title, abstract, rationale and objectives of a review, written last from its checked sections.</summary>
 public sealed record FrontMatter(string Title, string Abstract, string Rationale, string Objectives);
@@ -141,6 +151,88 @@ public static class ReviewWriter
         var known = NumbersIn(results);
         var unknown = items.SelectMany(NumbersIn).Where(n => !known.Contains(n)).Distinct().ToList();
         return unknown.Count > 0 ? $"the items use {string.Join(", ", unknown)}, which is not in the results; use only their numbers." : null;
+    }
+
+    private sealed class ClosingAnswer
+    {
+        public string? Limitations { get; set; }
+        public string? Implications { get; set; }
+        public string? FutureResearch { get; set; }
+        public string? Conclusion { get; set; }
+    }
+
+    /// <summary>At most this many words in the conclusion, so it stays a conclusion.</summary>
+    public const int MaxConclusionWords = 180;
+
+    /// <summary>
+    /// The limitations of the evidence (PRISMA item 23b), the implications for practice and policy and the directions for
+    /// future research (23d), and a short conclusion, written from the finished, checked results and discussion only. Every
+    /// part is required; citations must be in the reference list, and a number that is in neither the results nor
+    /// <paramref name="facts"/> is rejected. The parts are checked against their sources like every other cited sentence.
+    /// Returns null when no acceptable answer comes back; the paper then goes without these sections rather than with
+    /// unchecked ones.
+    /// </summary>
+    public static async Task<ClosingSections?> WriteClosingAsync(IChatCompletionService chat, WritingProfile profile, string topic, string goal,
+        string facts, IReadOnlyList<SynthesisSection> sections, string discussion, ReviewEvidence evidence, int referenceCount, Action<string>? warn = null)
+    {
+        string results = string.Join("\n\n", sections.Select(x => $"### {x.Heading}\n{x.Text}")) + $"\n\n### Discussion\n{discussion}";
+        string prompt = $$"""
+            You are writing the sections that follow the discussion of {{profile.Review}}. Its results and discussion are finished and checked; write only what they and the facts below say.
+
+            REVIEW OBJECTIVE: "{{goal}}"
+            PRIMARY TOPIC: "{{topic}}"
+            {{PromptSafety.ReviewerInputNotice}}
+
+            REFERENCE LIST (cite ONLY these numbers):
+            {{evidence.ReferenceLines()}}
+
+            FACTS ABOUT THE EVIDENCE BASE ({{profile.BaseFactsFrom}}; do not change them):
+            {{evidence.BaseFacts}}
+
+            FACTS ABOUT THE REVIEW (counted in code):
+            {{facts}}
+
+            RESULTS AND DISCUSSION:
+            {{results}}
+
+            REQUIREMENTS:
+            1. "limitations": one paragraph on the limitations of the evidence base (PRISMA 2020 item 23b): what kinds of {{profile.Sources}} it rests on, what they leave unmeasured, and how far the findings generalise. Use the facts above. Do not describe how this review was done; that is written separately.
+            2. "implications": one paragraph on the implications for practice and policy (item 23d): what someone acting on these findings should do or watch for, and how firm each point is.
+            3. "futureResearch": one paragraph on the directions for future research (item 23d): the open questions and missing kinds of study the results show, each tied to the theme or {{profile.Sources}} it comes from.
+            4. "conclusion": three to five sentences that answer the review objective in plain words, at most {{MaxConclusionWords}} words, with no new claims.
+            5. Every sentence that attributes something to the literature ends with an inline marker such as [3] or [2, 5], using the same {{profile.Sources}} the results cite for it. Do not invent numbers, statistics or {{profile.Sources}}.
+            {{ProseCleaner.PlainProseRule}}
+            Respond ONLY with a valid minified JSON object:
+            {"limitations":"...","implications":"...","futureResearch":"...","conclusion":"..."}
+            """;
+        try
+        {
+            ClosingAnswer answer;
+            using (LlmStage.Begin("closing"))
+                answer = await LlmJson.GetAsync<ClosingAnswer>(chat, prompt, LlmJson.JsonMode(0.3), a => ClosingProblem(a.Limitations, a.Implications, a.FutureResearch, a.Conclusion, results + "\n" + facts + "\n" + evidence.BaseFacts, referenceCount));
+            string Clean(string? text) => MethodsSectionWriter.StripMarkdownEmphasis(text!.Trim());
+            return new ClosingSections(Clean(answer.Limitations), Clean(answer.Implications), Clean(answer.FutureResearch), Clean(answer.Conclusion));
+        }
+        catch (Exception ex)
+        {
+            warn?.Invoke($"The limitations, implications, future research and conclusion could not be written: {ex.Message}");
+            return null;
+        }
+    }
+
+    /// <summary>Why a closing answer cannot be used, or null. Public for unit tests.</summary>
+    public static string? ClosingProblem(string? limitations, string? implications, string? futureResearch, string? conclusion, string known, int referenceCount)
+    {
+        var parts = new[] { ("limitations", limitations), ("implications", implications), ("futureResearch", futureResearch), ("conclusion", conclusion) };
+        var missing = parts.Where(p => string.IsNullOrWhiteSpace(p.Item2)).Select(p => p.Item1).ToList();
+        if (missing.Count > 0) return $"{string.Join(", ", missing)} must not be empty.";
+        if (conclusion!.Split(' ', StringSplitOptions.RemoveEmptyEntries).Length > MaxConclusionWords)
+            return $"the conclusion is too long; keep it to three to five sentences of at most {MaxConclusionWords} words.";
+        var outside = parts.SelectMany(p => ThematicSynthesis.CitedIn(p.Item2!)).Where(r => r < 1 || r > referenceCount).Distinct().ToList();
+        if (outside.Count > 0) return $"citation numbers {string.Join(", ", outside)} are not in the reference list.";
+        var knownNumbers = NumbersIn(known);
+        var unknown = parts.SelectMany(p => NumbersIn(p.Item2!)).Where(n => !knownNumbers.Contains(n)).Distinct().ToList();
+        return unknown.Count > 0 ? $"the text uses {string.Join(", ", unknown)}, which is in neither the results nor the facts; use only their numbers." : null;
     }
 
     private sealed class FrontMatterAnswer { public string? Title { get; set; } public string? Abstract { get; set; } public string? Rationale { get; set; } public string? Objectives { get; set; } }
