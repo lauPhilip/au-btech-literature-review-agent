@@ -246,8 +246,11 @@ public static class ReviewWriter
             var given = (answers ?? new List<string>()).Where(a => !string.IsNullOrWhiteSpace(a)).ToList();
             if (given.Count != questions) return $"answers must hold exactly {questions} answer(s), one per research question; you gave {given.Count}.";
         }
-        var parts = new[] { ("limitations", limitations), ("implications", implications), ("futureResearch", futureResearch), ("conclusion", conclusion) }
-            .Concat((questions > 0 ? answers! : new List<string>()).Select((a, i) => ($"answer {i + 1}", (string?)a))).ToArray();
+        var parts = new List<(string Name, string? Text)>
+        {
+            ("limitations", limitations), ("implications", implications), ("futureResearch", futureResearch), ("conclusion", conclusion),
+        };
+        if (questions > 0) parts.AddRange(answers!.Select((a, i) => ($"answer {i + 1}", a)));
         var missing = parts.Where(p => string.IsNullOrWhiteSpace(p.Item2)).Select(p => p.Item1).ToList();
         if (missing.Count > 0) return $"{string.Join(", ", missing)} must not be empty.";
         if (conclusion!.Split(' ', StringSplitOptions.RemoveEmptyEntries).Length > MaxConclusionWords)
