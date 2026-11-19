@@ -155,6 +155,8 @@ public static class ProtocolWriter
         sb.AppendLine();
         sb.AppendLine($"- Search query: \"{request.Query}\"");
         sb.AppendLine($"- Review objective: {request.Objective}");
+        if (request.ResearchQuestions is { Count: > 0 } questions)
+            for (int i = 0; i < questions.Count; i++) sb.AppendLine($"- Research question {i + 1} (RQ{i + 1}): {questions[i]}");
         sb.AppendLine();
         sb.AppendLine("## Eligibility");
         sb.AppendLine();
