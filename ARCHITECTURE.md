@@ -70,6 +70,7 @@ A run lives in its own folder under `WorkspaceStore/{runId}/`. The ledger is `tr
 | `AuBtechReviewAgent.Tests/` | xUnit tests, all offline, with a scripted fake model |
 | `tools/ScreeningEval/` | Command-line tool that measures screening accuracy against human decisions |
 | `tools/a11y/` | The accessibility check that runs in CI |
+| `tools/ReleaseCheck/` | The check that runs before a version is released: tag, `CHANGELOG.md` and `CITATION.cff` |
 | `docs/wiki/` | The developer wiki, copied to the Wiki tab on every merge |
 | `deploy/` | The page shown while a new version is uploaded |
 | `.github/workflows/` | CI, CodeQL, release and wiki sync |

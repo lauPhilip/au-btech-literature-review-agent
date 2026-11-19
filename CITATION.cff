@@ -1,4 +1,8 @@
 # How to cite this software. GitHub shows a "Cite this repository" button based on this file.
+# When a version is released, add or update two top-level lines in the "(docs): " commit that prepares it:
+#   version: "0.1.0"
+#   date-released: 2026-11-20
+# The release workflow stops if they do not match the tag and the day it was made (see CONTRIBUTING.md).
 cff-version: 1.2.0
 message: "If you use TraceableAI in your research, please cite the paper below and the software version you used."
 title: "TraceableAI: an open-source agentic framework for PRISMA-compliant literature synthesis"
