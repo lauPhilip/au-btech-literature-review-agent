@@ -20,6 +20,14 @@ namespace AuBtechReviewAgent;
 /// <summary>Synthesis stage: full texts, extraction and appraisal, outline, cited sections, peer review and the report.</summary>
 public partial class PrismaReviewEngine
 {
+    /// <summary>
+    /// The sentence of the citation check about citations in a theme subsection to a study not coded under that
+    /// theme, singular or plural by the count (issue #119).
+    /// </summary>
+    public static string OutsideThemeSentence(int count) => count == 1
+        ? "1 citation in a theme subsection refers to a study not coded under that theme and is flagged in the audit."
+        : $"{count} citations in a theme subsection refer to a study not coded under that theme and are flagged in the audit.";
+
     /// <summary>Test hook: replaces the full-text download (default: arXiv, the source's open-access link, then Unpaywall).</summary>
     public Func<AcademicPaper, string, Task<FullTextResult>>? FullTextFetcher { get; init; }
 
@@ -819,7 +827,7 @@ public partial class PrismaReviewEngine
             if (repairs.Count > 0)
                 checkSentence += $" Before this final count, {initialSummary.NotSupported} citation{(initialSummary.NotSupported == 1 ? " was" : "s were")} judged not supported and {initialSummary.PartiallySupported} partially supported; {finalState.Stats.CitationsRepaired} cited sentence{(finalState.Stats.CitationsRepaired == 1 ? " was" : "s were")} rewritten or had the citation removed once and checked again (listed under Repairs in citation-audit.json).";
             if (finalState.Stats.CitationsOutsideTheme > 0)
-                checkSentence += $" {finalState.Stats.CitationsOutsideTheme} citation{(finalState.Stats.CitationsOutsideTheme == 1 ? "" : "s")} in a theme subsection refer to a study not coded under that theme and are flagged in the audit.";
+                checkSentence += " " + OutsideThemeSentence(finalState.Stats.CitationsOutsideTheme);
 
             var reportObj = new PrismaReport
             {

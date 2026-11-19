@@ -115,4 +115,14 @@ public class MethodsSectionWriterTests
         Assert.Contains("- At most 1 record per source;", protocol);
         Assert.DoesNotContain("records per source", protocol);
     }
+
+    [Fact]
+    public void TheCitationsOutsideAThemeAgreeWithTheirCount()
+    {
+        // Issue #119: "1 citation ... refer ... are flagged".
+        Assert.Equal("1 citation in a theme subsection refers to a study not coded under that theme and is flagged in the audit.",
+            PrismaReviewEngine.OutsideThemeSentence(1));
+        Assert.Equal("3 citations in a theme subsection refer to a study not coded under that theme and are flagged in the audit.",
+            PrismaReviewEngine.OutsideThemeSentence(3));
+    }
 }
