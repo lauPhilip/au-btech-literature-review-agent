@@ -140,7 +140,8 @@ public partial class PrismaReviewEngine
     private async Task<(ScreeningAnswer Answer, bool FromCache)> ScreenWithCacheAsync(RunContext ctx, AcademicPaper paper, bool secondScreener)
     {
         var r = ctx.Request;
-        string key = ReviewCache.Key(ScreeningPromptVersion, secondScreener ? "second" : "first", Llm.Model,
+        // The model that makes this screening, so a decision is never reused under another model.
+        string key = ReviewCache.Key(ScreeningPromptVersion, secondScreener ? "second" : "first", Llm.ModelFor(secondScreener ? "screening-second" : "screening"),
             r.Inclusion, r.Exclusion, paper.Title, paper.Abstract, paper.JournalSource, paper.PublishedDate, string.Join(";", paper.Authors ?? new()));
         if (Cache.TryGet<ScreeningAnswer>("screening", key, out var cached) && cached != null && ScreeningAnswer.Validate(cached) == null)
             return (cached.Normalized(), true);

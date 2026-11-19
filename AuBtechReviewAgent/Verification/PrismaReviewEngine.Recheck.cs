@@ -106,7 +106,7 @@ public partial class PrismaReviewEngine
             if (extraction != null) findings[reference] = ThematicSynthesis.VerifiedFindings(extraction).Select(f => f.Finding.Quote).ToList();
 
             var (activeMistral, _, _, _) = ResolveKeys(userKeys);
-            IChatCompletionService chat = ChatFactory != null ? ChatFactory(activeMistral) : LlmFactory.Create(Llm, activeMistral);
+            IChatCompletionService chat = ChatFactory != null ? ChatFactory(activeMistral) : LlmFactory.CreateForReview(Llm, activeMistral);
             var cited = new CitedSentence(field, sentenceIndex, before.Sentence, new[] { reference });
             var after = await Grounding.RecheckAsync(chat, cited, referenced, findings)
                 ?? throw new RecheckException("The check gave no answer. Try again later.");
@@ -114,7 +114,7 @@ public partial class PrismaReviewEngine
             checks[index] = after;
 
             var entry = new CitationRecheck(field, sentenceIndex, reference, DateTime.UtcNow, before.Verdict, after.Verdict,
-                before.EvidenceBasis, after.EvidenceBasis, after.Quote, after.QuoteVerified, after.Reason, Llm.DisplayName,
+                before.EvidenceBasis, after.EvidenceBasis, after.Quote, after.QuoteVerified, after.Reason, Llm.DisplayNameFor("citation-recheck"),
                 RecordingChatCompletionService.AppVersion.Split('+')[0]);
             rechecks.Add(JsonSerializer.SerializeToNode(entry));
             var oldSummary = CitationSupportSummary.From(checks.Select((c, i) => i == index ? before : c));
