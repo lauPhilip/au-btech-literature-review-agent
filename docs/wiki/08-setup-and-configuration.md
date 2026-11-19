@@ -33,12 +33,14 @@ dotnet user-secrets set "Llm:BaseUrl" "http://localhost:11434/v1"
 The main deployment is the .NET app on Simply, which does not use Docker. For running elsewhere, the `Dockerfile` builds an image (not part of any release so far):
 
 ```
-docker build -t traceableai .
+docker build --build-arg APP_VERSION=$(git describe --tags) -t traceableai .
 docker run -p 8080:8080 -e MISTRAL_API_KEY=... -e OpenSources__ContactEmail=you@example.org \
   -v traceable-runs:/app/WorkspaceStore -v traceable-data:/app/App_Data traceableai
 ```
 
 The two volumes keep runs, run quotas, the cache and the metrics store when the container is replaced.
+
+The image is built without the git history, so it cannot read its version from the tag the way other builds do (page 6, Versions). `APP_VERSION` passes it in; without it the app calls itself `0.0.0-local`. A build on your own machine needs no argument, as long as the clone has its tags: a clone made with `--depth 1` gets a wrong version, so run `git fetch --tags --unshallow` first.
 
 ## Styling
 
