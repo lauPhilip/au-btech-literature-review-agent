@@ -4,7 +4,8 @@
 # The release is titled "v0.1.0 - Research questions". Its notes are the version's section of CHANGELOG.md,
 # followed by GitHub's list of merged pull requests and the link comparing it with the previous release.
 # tools/ReleaseCheck/release_check.py stops the release, with the reason, if the tag is not a version or has no
-# message, if CHANGELOG.md has no section for it, or if CITATION.cff's version or date-released does not match.
+# message, if CHANGELOG.md has no section for it, if CITATION.cff's version or date-released does not match, or if
+# the notes score below 60 for Flesch Reading Ease or do not have exactly one emoji.
 # (The Dockerfile is not built here: the app is deployed to Simply as a .NET app.) When the repository is linked
 # to Zenodo (zenodo.org -> GitHub -> switch the repository on), every GitHub release is archived there with its
 # own DOI, using the metadata in .zenodo.json.
