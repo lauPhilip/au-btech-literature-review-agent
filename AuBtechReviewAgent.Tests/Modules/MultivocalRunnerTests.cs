@@ -147,6 +147,21 @@ public class MultivocalRunnerTests : IDisposable
     }
 
     [Fact]
+    public async Task ALateProgressLineDoesNotReopenAFinishedRun()
+    {
+        var (_, runId, key, runner) = await AssessedRun(Model(() => false));
+        await runner.RunAsync(runId, key);
+        var done = runner.StatusOf(runId)!;
+
+        // Progress<T> posts its lines to the thread pool, so one can arrive after the run has ended.
+        runner.SetProgress(runId, "Extracting", "Extracting source 3 of 3");
+
+        Assert.Equal(done, runner.StatusOf(runId));
+        Assert.False(runner.StatusOf(runId)!.Running);
+        Assert.Equal("Done", runner.StatusOf(runId)!.Step);
+    }
+
+    [Fact]
     public async Task WithTheWriterTheRunGoesOnToWriteAndCheckThePaper()
     {
         var (store, runId, key, runner) = await AssessedRun(Model(() => false), withWriter: true);
