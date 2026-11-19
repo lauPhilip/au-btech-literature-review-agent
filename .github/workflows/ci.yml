@@ -57,6 +57,18 @@ jobs:
           npm run build:css
           git diff --exit-code -- wwwroot/css/tailwind.css
 
+  release-check:
+    name: Release check and changelog
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # The tests of tools/ReleaseCheck/release_check.py, which release.yml runs before it publishes a version. They
+      # also check that CHANGELOG.md and CITATION.cff are well formed, so a mistake shows here and not on the
+      # day of a release. Standard library only; the runner's Python is enough.
+      - name: Test the release check
+        run: python3 -m unittest discover -s tools/ReleaseCheck -v
+
   accessibility:
     name: Accessibility (axe-core, WCAG 2.2 AA)
     runs-on: ubuntu-latest
