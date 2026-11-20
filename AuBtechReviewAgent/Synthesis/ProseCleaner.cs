@@ -102,7 +102,48 @@ public static class ProseCleaner
         result = Regex.Replace(result, @"(?<=\s|^)#{1,6}\s+", "");                     // a heading marker left inside a line
         result = MethodsSectionWriter.StripMarkdownEmphasis(result);
         result = Regex.Replace(result, @"[ \t]{2,}", " ");
+        foreach (var sentence in CitationSupportChecker.SplitSentences(result))
+        {
+            string once = DropRepeatedCitations(sentence);
+            if (once == sentence) continue;
+            int at = result.IndexOf(sentence, StringComparison.Ordinal);
+            if (at < 0) continue;
+            result = result[..at] + once + result[(at + sentence.Length)..];
+            changes.Add(new FormattingChange(field, "repeated citation removed", sentence));
+        }
         return (result.Trim(), changes);
+    }
+
+    private static readonly Regex Marker = new(@"\s*\[(\d+(?:\s*[,–-]\s*\d+)*)\]", RegexOptions.Compiled);
+
+    /// <summary>
+    /// Removes the citation at the end of a sentence for a study the sentence already names, so "[5] warns that X [5]."
+    /// becomes "[5] warns that X." (issue #125). A study is named when its marker is read as a word of the sentence:
+    /// followed by a word, as in "[5] warns" or "Study [6] reports". Only the sentence's last marker loses references,
+    /// and only when nothing but punctuation follows it; a marker that ends one clause and is repeated at the end of
+    /// the next ("A [3]; B [3].") stays, because there each marker carries a claim of its own. Public for unit tests.
+    /// </summary>
+    public static string DropRepeatedCitations(string sentence)
+    {
+        var markers = Marker.Matches(sentence).Cast<Match>().ToList();
+        if (markers.Count < 2) return sentence;
+        var last = markers[^1];
+        if (sentence[(last.Index + last.Length)..].Any(char.IsLetterOrDigit)) return sentence;
+
+        var named = new HashSet<int>();
+        foreach (var m in markers.Take(markers.Count - 1))
+        {
+            string after = sentence[(m.Index + m.Length)..].TrimStart();
+            // "[3] and [7] show" names [7] (the subject's verb follows it) but not [3], which a later claim may still need.
+            if (after.Length > 0 && char.IsLetter(after[0]) && !Regex.IsMatch(after, @"^(and|or|nor)\b", RegexOptions.IgnoreCase))
+                named.UnionWith(CitationSupportChecker.ReferencesIn(m.Value));
+        }
+        var lastRefs = CitationSupportChecker.ReferencesIn(last.Value);
+        if (!lastRefs.Any(named.Contains)) return sentence;
+
+        var keep = lastRefs.Where(r => !named.Contains(r)).ToList();
+        string replacement = keep.Count == 0 ? "" : $" [{string.Join(", ", keep)}]";
+        return sentence[..last.Index] + replacement + sentence[(last.Index + last.Length)..];
     }
 
     private static string EndAsSentence(string s)

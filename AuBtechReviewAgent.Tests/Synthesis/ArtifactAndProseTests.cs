@@ -57,6 +57,29 @@ public class ArtifactAndProseTests : IDisposable
         Assert.Empty(changes);
     }
 
+    [Fact]
+    public void ASentenceThatNamesAStudyDoesNotCiteItAgainAtTheEnd()
+    {
+        // Issue #125, from run 959b875d: "[5] warns ... [5]" and "Study [6] reports ... [6]".
+        Assert.Equal("[1] and [11] stress provenance, whereas [5] warns that governance can fail.",
+            ProseCleaner.DropRepeatedCitations("[1] and [11] stress provenance, whereas [5] warns that governance can fail [5]."));
+        Assert.Equal("Study [6] reports gains of 40% over manual testing.",
+            ProseCleaner.DropRepeatedCitations("Study [6] reports gains of 40% over manual testing [6]."));
+        Assert.Equal("[8] calls for shared benchmarks [2].", ProseCleaner.DropRepeatedCitations("[8] calls for shared benchmarks [2, 8]."));
+
+        // A marker that ends a clause carries a claim of its own, and "[3] and" does not name [3] as the subject.
+        Assert.Equal("Loops recover [3]; audits help [3].", ProseCleaner.DropRepeatedCitations("Loops recover [3]; audits help [3]."));
+        Assert.Equal("Studies [3] and [7] show recovery, and logging helps [3].",
+            ProseCleaner.DropRepeatedCitations("Studies [3] and [7] show recovery, and logging helps [3]."));
+        Assert.Equal("[5] warns [5] that governance fails.", ProseCleaner.DropRepeatedCitations("[5] warns [5] that governance fails."));
+
+        var (clean, changes) = ProseCleaner.Clean("Audits help [2].\n\n[5] warns that governance can fail [5]. Loops recover [1].", "synthesis-2");
+        Assert.Equal("Audits help [2].\n\n[5] warns that governance can fail. Loops recover [1].", clean);
+        var change = Assert.Single(changes);
+        Assert.Equal("repeated citation removed", change.Kind);
+        Assert.Equal("[5] warns that governance can fail [5].", change.Text);
+    }
+
     private static string DiagramJson(string extraNodeRef = "1") => $$"""
         {"format":"concept-map","title":"How safety mechanisms relate","caption":"Concepts from the themes.",
          "nodes":[{"id":"A","label":"Supervisor checks recover from faults [{{extraNodeRef}}]"},{"id":"B","label":"Governance layers audit actions [2]"},{"id":"C","label":"Safe orchestration"}],
