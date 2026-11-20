@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 using Microsoft.SemanticKernel.ChatCompletion;
@@ -48,6 +49,11 @@ public class StudyExtraction
     public string AppraisalCategory { get; set; } = "";
     public List<AppraisalAnswer> Appraisal { get; set; } = new();
     public string? Error { get; set; }
+    /// <summary>
+    /// What the code did beyond the model's answer, e.g. that the answer was kept after a problem the model did not
+    /// fix when it was sent back. Null when there is nothing to say.
+    /// </summary>
+    public string? Note { get; set; }
 
     [JsonIgnore] public int AppraisalYes => Appraisal.Count(a => a.Answer == "yes");
 }
@@ -106,7 +112,7 @@ public static class StudyExtractor
         },
     };
 
-    private class ExtractionAnswer
+    internal class ExtractionAnswer
     {
         public string StudyType { get; set; } = "";
         public EvidencedValue? Method { get; set; }
@@ -117,17 +123,25 @@ public static class StudyExtractor
         public List<AppraisalAnswer>? Appraisal { get; set; }
     }
 
+    /// <summary>Passages added for the appraisal on top of the extraction passages, when the full text was read.</summary>
+    public const int AppraisalExcerpts = 6;
+
     public static async Task<StudyExtraction> ExtractAsync(IChatCompletionService chat, ReferencedPaper paper, int excerpts = 8)
     {
         var result = new StudyExtraction { ReferenceNumber = paper.ReferenceNumber, PaperId = paper.PaperId, Title = paper.Title,
             EvidenceBasis = paper.HasFullText ? "full text" : "abstract only" };
 
         var terms = TextRelevance.Terms("method methodology approach design sample participants dataset case study experiment evaluation results findings show limitations threats validity");
+        // The MMAT questions ask about data collection, analysis and how the results follow from the data, which the
+        // extraction passages often miss; a full-text study then got "can't tell" on every question (issue #149).
+        var appraisalTerms = TextRelevance.Terms("data collection collected interviews questionnaire survey observation analysis analysed analyzed coding themes randomised randomized control group baseline outcome measured measures response rate integration qualitative quantitative mixed rationale interpretation");
         var chunks = GroundingContextBuilder.SelectChunks(paper.Chunks, terms, excerpts);
+        var appraisalChunks = GroundingContextBuilder.SelectChunks(paper.Chunks, appraisalTerms, excerpts + AppraisalExcerpts)
+            .Where(c => !chunks.Contains(c)).Take(AppraisalExcerpts).ToList();
         var evidence = new StringBuilder();
         evidence.AppendLine($"Title: {paper.Title}");
         evidence.AppendLine($"Abstract: {(string.IsNullOrWhiteSpace(paper.Abstract) ? "(no abstract available)" : paper.Abstract)}");
-        foreach (var c in chunks) evidence.AppendLine($"[page {c.PageNumber}] {c.Text}");
+        foreach (var c in chunks.Concat(appraisalChunks)) evidence.AppendLine($"[page {c.PageNumber}] {c.Text}");
         string evidenceText = evidence.ToString();
 
         string criteriaList = string.Join("\n", MmatCriteria.Select(kv => $"- {kv.Key}: " + string.Join(" | ", kv.Value)));
@@ -141,10 +155,12 @@ public static class StudyExtractor
 
             TASK 1 - EXTRACTION. Fill each field from the text above. Every value must have a verbatim quote (one sentence, max 40 words) copied exactly from the text as one unbroken passage (no "...", no rephrasing). If the text does not say, use value "not reported" and an empty quote.
             - studyType: one short phrase (e.g. "design science artefact with case study", "controlled experiment", "survey", "literature review", "position paper").
-            - method, sample, limitations: one sentence each.
-            - keyFindings: 1 to 3 findings.
+            - method, sample: a short value of at most {{ShortValueWords}} words in your own words, e.g. "semi-structured interviews" or "24 engineering students". Never copy the quote into the value; the quote is the proof, the value is the answer.
+            - limitations: one short sentence of at most {{SentenceWords}} words.
+            - keyFindings: 1 to 3 findings, each one short sentence of at most {{SentenceWords}} words.
+            - Keep every number with its unit and sign as the text gives it (write "40-90%", not "40-90").
 
-            TASK 2 - APPRAISAL. First decide if the study is empirical (it has a research question and collects or analyses data to answer it). If not (e.g. a position paper, a system description without evaluation, or a literature review), set appraisalCategory to "not_empirical" and appraisal to []. Otherwise choose ONE category and answer its five criteria with "yes", "no" or "cant_tell", each with a verbatim quote (empty quote only for "cant_tell").
+            TASK 2 - APPRAISAL. First decide if the study is empirical (it has a research question and collects or analyses data to answer it). If not (e.g. a position paper, a system description without evaluation, or a literature review), set appraisalCategory to "not_empirical" and appraisal to []. Otherwise choose ONE category and answer all five of its criteria, each with its id (e.g. "1.1") and "yes", "no" or "cant_tell". A "yes" or "no" needs a verbatim quote that shows it; use "cant_tell" with an empty quote only when the text above does not show it. When passages from the full text are given, most criteria can be answered from them.
             {{criteriaList}}
 
             Respond ONLY with a minified JSON object:
@@ -157,15 +173,20 @@ public static class StudyExtractor
 
         try
         {
-            var answer = await LlmJson.GetAsync<ExtractionAnswer>(chat, prompt, settings, a =>
+            // First with the full checks; if the model does not fix a problem when it is sent back, the answer is
+            // asked for once more and kept with the basic checks, and the note says which problem was left.
+            ExtractionAnswer answer;
+            try
             {
-                if (string.IsNullOrWhiteSpace(a.StudyType)) return "studyType is missing.";
-                if (a.AppraisalCategory != "not_empirical" && !MmatCriteria.ContainsKey(a.AppraisalCategory))
-                    return $"appraisalCategory must be one of: {string.Join(", ", MmatCriteria.Keys)}, not_empirical.";
-                if (a.Appraisal != null && a.Appraisal.Any(x => !LlmJson.OneOf(x.Answer, "yes", "no", "cant_tell")))
-                    return "each appraisal answer must be yes, no or cant_tell.";
-                return null;
-            });
+                answer = await LlmJson.GetAsync<ExtractionAnswer>(chat, prompt, settings,
+                    a => BasicProblem(a) ?? StrictProblem(a, evidenceText, paper.HasFullText));
+            }
+            catch (LlmOutputException)
+            {
+                answer = await LlmJson.GetAsync<ExtractionAnswer>(chat, prompt, settings, BasicProblem);
+                string? left = StrictProblem(answer, evidenceText, paper.HasFullText);
+                if (left != null) result.Note = $"Kept after a second try with a problem the model did not fix: {left}";
+            }
 
             result.StudyType = answer.StudyType.Trim();
             result.Method = Verify(answer.Method, evidenceText);
@@ -179,8 +200,8 @@ public static class StudyExtractor
                 for (int i = 0; i < criteria.Length; i++)
                 {
                     string id = criteria[i].Split(' ')[0];
-                    var given = answer.Appraisal?.FirstOrDefault(x => x.Id.Trim() == id) ?? answer.Appraisal?.ElementAtOrDefault(i);
-                    var a = new AppraisalAnswer { Id = id, Criterion = criteria[i][(id.Length + 1)..], Answer = given?.Answer.ToLowerInvariant() ?? "cant_tell", Quote = given?.Quote ?? "" };
+                    var given = answer.Appraisal?.FirstOrDefault(x => CriterionId(x.Id) == id) ?? answer.Appraisal?.ElementAtOrDefault(i);
+                    var a = new AppraisalAnswer { Id = id, Criterion = criteria[i][(id.Length + 1)..], Answer = given == null ? "cant_tell" : NormalAnswer(given.Answer), Quote = given?.Quote ?? "" };
                     a.QuoteVerified = CitationSupportChecker.QuoteOccursIn(a.Quote, evidenceText);
                     // A "yes" or "no" must be backed by text that is really in the paper; otherwise it cannot be told.
                     if (a.Answer != "cant_tell" && !a.QuoteVerified) a.Answer = "cant_tell";
@@ -194,6 +215,74 @@ public static class StudyExtractor
         }
         return result;
     }
+
+    /// <summary>The most words in a method or sample value, which is an answer, not a sentence (issue #130).</summary>
+    public const int ShortValueWords = 12;
+    /// <summary>The most words in a limitation or a finding.</summary>
+    public const int SentenceWords = 30;
+
+    /// <summary>"1.1" from "1.1", " 1.1 " or "1.1 The qualitative approach ...".</summary>
+    private static string CriterionId(string? id) => Regex.Match(id ?? "", @"\d\.\d").Value;
+
+    /// <summary>yes, no or cant_tell; "can't tell", "cannot tell" and "cant tell" mean cant_tell.</summary>
+    private static string NormalAnswer(string? answer)
+    {
+        string a = (answer ?? "").Trim().ToLowerInvariant().Replace('\u2019', '\'');
+        return a is "can't tell" or "cannot tell" or "cant tell" or "can't_tell" ? "cant_tell" : a;
+    }
+
+    private static string? BasicProblem(ExtractionAnswer a)
+    {
+        if (string.IsNullOrWhiteSpace(a.StudyType)) return "studyType is missing.";
+        if (a.AppraisalCategory != "not_empirical" && !MmatCriteria.ContainsKey(a.AppraisalCategory))
+            return $"appraisalCategory must be one of: {string.Join(", ", MmatCriteria.Keys)}, not_empirical.";
+        if (a.Appraisal != null && a.Appraisal.Any(x => !LlmJson.OneOf(NormalAnswer(x.Answer), "yes", "no", "cant_tell")))
+            return "each appraisal answer must be yes, no or cant_tell.";
+        return null;
+    }
+
+    /// <summary>
+    /// The checks an answer should pass but that are not worth losing the whole extraction for: short values that
+    /// are not the quote and keep their % signs (issue #130), and all five MMAT answers, each yes or no backed by a
+    /// quote that is in the text, not all "can't tell" when the full text was read (issue #149).
+    /// </summary>
+    internal static string? StrictProblem(ExtractionAnswer a, string evidenceText, bool fullText)
+    {
+        var fields = new List<(string Name, EvidencedValue? Value, int MaxWords)>
+        {
+            ("method", a.Method, ShortValueWords), ("sample", a.Sample, ShortValueWords), ("limitations", a.Limitations, SentenceWords),
+        };
+        fields.AddRange((a.KeyFindings ?? new()).Select((f, i) => ($"keyFindings[{i}]", (EvidencedValue?)f, SentenceWords)));
+        foreach (var (name, v, maxWords) in fields)
+        {
+            string value = (v?.Value ?? "").Trim(), quote = (v?.Quote ?? "").Trim();
+            if (value.Length == 0 || value.Equals("not reported", StringComparison.OrdinalIgnoreCase)) continue;
+            if (Words(value) > maxWords)
+                return $"{name}.value has {Words(value)} words; give a short value of at most {maxWords} words in your own words and keep the sentence in the quote.";
+            if (maxWords == ShortValueWords && Words(quote) > 5 && Canonical(value) == Canonical(quote))
+                return $"{name}.value repeats the quote; give a short value in your own words.";
+            foreach (Match m in Percent.Matches(quote))
+                if (Regex.IsMatch(value, $@"(?<![\d.,]){Regex.Escape(m.Groups[1].Value)}(?![\d.,]*\s?%)(?![\d.,])"))
+                    return $"{name}.value gives {m.Groups[1].Value} without the % sign that the quote has.";
+        }
+
+        if (!MmatCriteria.TryGetValue(a.AppraisalCategory, out var criteria)) return null;
+        var given = a.Appraisal ?? new();
+        var ids = criteria.Select(c => c.Split(' ')[0]).ToList();
+        var missing = ids.Where(id => !given.Any(x => CriterionId(x.Id) == id)).ToList();
+        if (missing.Count > 0)
+            return $"appraisal must answer all five criteria of {a.AppraisalCategory} by id; missing: {string.Join(", ", missing)}.";
+        foreach (var x in given.Where(x => NormalAnswer(x.Answer) != "cant_tell"))
+            if (!CitationSupportChecker.QuoteOccursIn(x.Quote, evidenceText))
+                return $"the quote for {CriterionId(x.Id)} is not in the text word for word; copy one exact sentence that shows the answer, or answer cant_tell.";
+        if (fullText && given.All(x => NormalAnswer(x.Answer) == "cant_tell"))
+            return "every criterion is cant_tell, but passages from the full text are given; answer each criterion they show with yes or no and a quote, and keep cant_tell for the rest.";
+        return null;
+    }
+
+    private static readonly Regex Percent = new(@"(\d+(?:[.,]\d+)?)\s?%", RegexOptions.CultureInvariant);
+    private static int Words(string text) => text.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries).Length;
+    private static string Canonical(string text) => Regex.Replace(text.ToLowerInvariant(), @"[^\p{L}\p{N}]+", " ").Trim();
 
     private static EvidencedValue Verify(EvidencedValue? v, string evidenceText)
     {
