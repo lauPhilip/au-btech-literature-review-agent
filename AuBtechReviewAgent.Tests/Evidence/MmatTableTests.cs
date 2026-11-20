@@ -58,4 +58,42 @@ public class MmatTableTests
         string all = MethodsSectionWriter.AppendixPointer(2, new[] { Study(1, "qualitative"), Study(2, "not_empirical") });
         Assert.Contains("Table A.2 gives the data extracted from each study, and Table A.3 the quality appraisal", all);
     }
+
+    // Issue #148: a study with neither an abstract nor a full text is not called non-empirical.
+
+    [Fact]
+    public async Task AStudyWithNoTextIsNotSentToTheModel()
+    {
+        var chat = new FakeChatService().RespondsWith(_ => throw new InvalidOperationException("the model should not be asked"));
+        var paper = new ReferencedPaper(9, "p9", "Agents in the loop", " ", Array.Empty<DocumentChunk>());
+        var e = await StudyExtractor.ExtractAsync(chat, paper);
+
+        Assert.Empty(chat.Prompts);
+        Assert.Null(e.Error);
+        Assert.Equal(StudyExtractor.NotAppraised, e.AppraisalCategory);
+        Assert.Equal(StudyExtractor.NoText, e.EvidenceBasis);
+        Assert.Equal("not reported", e.Method.Value);
+        Assert.Empty(e.Appraisal);
+        Assert.StartsWith("Not extracted or appraised", e.Note);
+    }
+
+    [Fact]
+    public void AStudyWithNoTextIsNamedApartFromTheNonEmpiricalOnes()
+    {
+        Assert.False(MethodsSectionWriter.ShowInAppraisalTable(Study(2, StudyExtractor.NotAppraised)));
+        Assert.Equal("Not shown: 1 study ([2]) was not appraised, because neither an abstract nor a full text was available.",
+            MethodsSectionWriter.NotAppraisedNote(new[] { Study(1, "qualitative"), Study(2, StudyExtractor.NotAppraised) }));
+        Assert.Equal("Not shown: 2 studies ([1] and [4]) were classified as non-empirical (for example reviews or position papers), to which MMAT does not apply. " +
+                     "2 studies ([2] and [3]) were not appraised, because neither an abstract nor a full text was available.",
+            MethodsSectionWriter.NotAppraisedNote(new[] { Study(1, "not_empirical"), Study(2, StudyExtractor.NotAppraised), Study(3, StudyExtractor.NotAppraised), Study(4, "not_empirical") }));
+    }
+
+    [Fact]
+    public void TheMethodsTextCountsStudiesWithNoTextApart()
+    {
+        string text = MethodsSectionWriter.DataAndAppraisal(new[] { Study(1, "not_empirical"), Study(2, StudyExtractor.NotAppraised) }, "test-model");
+        Assert.Contains("1 was classified as non-empirical", text);
+        Assert.Contains("1 study had neither an abstract nor a full text, so nothing was extracted from it and it was not appraised.", text);
+        Assert.DoesNotContain("neither an abstract", MethodsSectionWriter.DataAndAppraisal(new[] { Study(1, "not_empirical") }, "test-model"));
+    }
 }

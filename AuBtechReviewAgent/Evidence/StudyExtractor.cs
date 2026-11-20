@@ -126,10 +126,28 @@ public static class StudyExtractor
     /// <summary>Passages added for the appraisal on top of the extraction passages, when the full text was read.</summary>
     public const int AppraisalExcerpts = 6;
 
+    /// <summary>The category of a study with neither an abstract nor a full text: there was nothing to appraise.</summary>
+    public const string NotAppraised = "not_appraised";
+    /// <summary>The evidence basis of such a study.</summary>
+    public const string NoText = "no text";
+
     public static async Task<StudyExtraction> ExtractAsync(IChatCompletionService chat, ReferencedPaper paper, int excerpts = 8)
     {
         var result = new StudyExtraction { ReferenceNumber = paper.ReferenceNumber, PaperId = paper.PaperId, Title = paper.Title,
             EvidenceBasis = paper.HasFullText ? "full text" : "abstract only" };
+
+        // With only a title, the model called such studies non-empirical, which says more than anyone knows (issue
+        // #148). There is no text to quote, so the model is not asked and the study is marked as not appraised.
+        if (!paper.HasFullText && string.IsNullOrWhiteSpace(paper.Abstract))
+        {
+            result.EvidenceBasis = NoText;
+            result.Method = new EvidencedValue { Value = "not reported" };
+            result.Sample = new EvidencedValue { Value = "not reported" };
+            result.Limitations = new EvidencedValue { Value = "not reported" };
+            result.AppraisalCategory = NotAppraised;
+            result.Note = "Not extracted or appraised: neither an abstract nor a full text was available, so there was no text to quote.";
+            return result;
+        }
 
         var terms = TextRelevance.Terms("method methodology approach design sample participants dataset case study experiment evaluation results findings show limitations threats validity");
         // The MMAT questions ask about data collection, analysis and how the results follow from the data, which the
