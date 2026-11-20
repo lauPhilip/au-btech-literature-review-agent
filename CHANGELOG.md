@@ -6,6 +6,26 @@ Each version's section becomes the notes of its GitHub release, so write it for 
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-11-20
+
+This version makes the paper easier to read and harder to get wrong. We fixed the faults we found in two real runs. 🧹
+
+### Changed
+
+The big tables of the included studies now sit in an appendix after the references. They are Tables A.1, A.2 and A.3, and each keeps its note. Section 3 keeps its text, the flow diagram and the charts, and it tells the reader where to find the tables. This holds for the paper page and for main.tex.
+
+The model now gets the full list of study designs before it writes the discussion. So the discussion uses the same designs as the data table. It also gets every record that was removed before screening, so the counts in the abstract add up to the flow diagram.
+
+The review's own statements no longer carry citations. Counts, the conclusion and the limits are the review's own words, so they do not point to a paper. If a repair makes a citation worse, it is now undone.
+
+### Fixed
+
+Sentences in main.tex end with a full stop again. The funding statement names the right department. The conclusion no longer repeats the answers to the research questions.
+
+A few small slips are gone. The text now says "1 disagreement", not "1 disagreements". A number such as 10^6 is printed as a real power. The list of studies that were not rated ends with "and" in the right place. The source column in the first table uses the same names as the paper page.
+
+The repository now shows its Zenodo DOI, so the software is easy to cite.
+
 ## [0.1.0] - 2026-11-19
 
 This is the first version of TraceableAI. It runs a full systematic review, from your question to a paper you can check line by line. 🎉
@@ -30,5 +50,6 @@ The version now comes from the release tag. You can see it on the Metrics page, 
 
 Screening and citation checks now use a smaller, faster model. The writing still uses the large one, where it counts.
 
-[Unreleased]: https://github.com/lauPhilip/au-btech-literature-review-agent/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/lauPhilip/au-btech-literature-review-agent/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/lauPhilip/au-btech-literature-review-agent/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/lauPhilip/au-btech-literature-review-agent/releases/tag/v0.1.0
