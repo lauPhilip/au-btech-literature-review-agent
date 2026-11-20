@@ -102,16 +102,20 @@ public static class ProseCleaner
         result = Regex.Replace(result, @"(?<=\s|^)#{1,6}\s+", "");                     // a heading marker left inside a line
         result = MethodsSectionWriter.StripMarkdownEmphasis(result);
         result = Regex.Replace(result, @"[ \t]{2,}", " ");
+        // Walk the sentences in order and copy the text between them unchanged, so paragraph breaks stay.
+        var once = new StringBuilder(result.Length);
+        int copied = 0;
         foreach (var sentence in CitationSupportChecker.SplitSentences(result))
         {
-            string once = DropRepeatedCitations(sentence);
-            if (once == sentence) continue;
-            int at = result.IndexOf(sentence, StringComparison.Ordinal);
+            int at = result.IndexOf(sentence, copied, StringComparison.Ordinal);
             if (at < 0) continue;
-            result = result[..at] + once + result[(at + sentence.Length)..];
-            changes.Add(new FormattingChange(field, "repeated citation removed", sentence));
+            string kept = DropRepeatedCitations(sentence);
+            once.Append(result, copied, at - copied).Append(kept);
+            copied = at + sentence.Length;
+            if (kept != sentence) changes.Add(new FormattingChange(field, "repeated citation removed", sentence));
         }
-        return (result.Trim(), changes);
+        once.Append(result, copied, result.Length - copied);
+        return (once.ToString().Trim(), changes);
     }
 
     private static readonly Regex Marker = new(@"\s*\[(\d+(?:\s*[,–-]\s*\d+)*)\]", RegexOptions.Compiled);
