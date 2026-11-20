@@ -708,7 +708,7 @@
     private PrismaReport report = new PrismaReport();
     private List<string> includedCitations = new();
     private Dictionary<string, int> publicationsByYear = new();
-    private List<IncludedPaperMetricRow> tableRecords = new();
+    private readonly List<IncludedPaperMetricRow> tableRecords = new();
     private readonly List<AuBtechReviewAgent.StudyExtraction> extractions = new();
     private readonly List<AuBtechReviewAgent.CitationSupportResult> auditChecks = new();
     private AuBtechReviewAgent.ThematicCodebook? codebook;
@@ -1116,7 +1116,7 @@
 
         report = new PrismaReport();
         includedCitations = new();
-        tableRecords = new();
+        tableRecords.Clear();
         extractions.Clear();
         auditChecks.Clear();
         codebook = null;
@@ -1161,7 +1161,7 @@
         codebook = state.ThematicSynthesis;
 
         // Older runs have ReferenceNumber = 0 everywhere; OrderBy is stable, so they keep their order.
-        tableRecords = state.SynthesizedRecords.OrderBy(r => r.ReferenceNumber).ToList();
+        tableRecords.AddRange(state.SynthesizedRecords.OrderBy(r => r.ReferenceNumber));
         fullTextUrls = state.FullTextUrls ?? new();
         notes = Runs.LoadNotes(State.CurrentSessionId).ToList();
         includedCitations = tableRecords.Select(r => r.ApaCitation.Trim().TrimEnd('.')).ToList();

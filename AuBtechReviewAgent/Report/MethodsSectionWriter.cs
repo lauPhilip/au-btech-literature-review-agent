@@ -344,7 +344,9 @@ public static class MethodsSectionWriter
             int start = refs[i];
             while (i + 1 < refs.Count && refs[i + 1] == refs[i] + 1) i++;
             int end = refs[i];
-            parts.Add(end == start ? $"[{start}]" : end == start + 1 ? $"[{start}], [{end}]" : $"[{start}]{rangeDash}[{end}]");
+            // Two neighbours are two items, so the list ends "[12] and [13]", never "and [12], [13]" (issue #131).
+            if (end == start + 1) parts.AddRange(new[] { $"[{start}]", $"[{end}]" });
+            else parts.Add(end == start ? $"[{start}]" : $"[{start}]{rangeDash}[{end}]");
         }
         string list = parts.Count == 1 ? parts[0] : string.Join(", ", parts.Take(parts.Count - 1)) + " and " + parts[^1];
         string verb = refs.Count == 1 ? "was" : "were";

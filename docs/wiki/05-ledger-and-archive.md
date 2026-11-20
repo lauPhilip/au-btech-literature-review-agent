@@ -160,7 +160,7 @@ To check an unpacked archive by hand, recompute a file's fingerprint and compare
 
 ## How main.tex is built
 
-`main.tex` is assembled line by line in `BuildWorkspaceArchive`. All text coming from the model or from sources passes through `EscapeLatexText` (`PaperLatex.Escape`), which escapes LaTeX special characters and removes trailing spaces only, so every paragraph keeps its closing full stop. Lines of the reference list go through `PaperLatex.EscapeReference` instead, which also drops a trailing full stop, comma or slash, as a bibitem ends without one. The pieces come from different places:
+`main.tex` is assembled line by line in `BuildWorkspaceArchive`. All text coming from the model or from sources passes through `EscapeLatexText` (`PaperLatex.Escape`), which escapes LaTeX special characters and removes trailing spaces only, so every paragraph keeps its closing full stop. Lines of the reference list go through `PaperLatex.EscapeReference` instead, which also drops a trailing full stop, comma or slash, as a bibitem ends without one. A number raised to a number, such as "10^6" or "10^-3" in a quoted finding, is set as a power (`$10^{6}$`); any other caret stays as text. Table 3.1 names the database in a "Source" column with the same display names as the paper page (`CategoryLabel`: arXiv, Semantic Scholar, Google Scholar). The pieces come from different places:
 
 | Part of `main.tex` | Source |
 |---|---|

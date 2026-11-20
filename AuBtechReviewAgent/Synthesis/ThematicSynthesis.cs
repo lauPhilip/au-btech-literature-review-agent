@@ -483,7 +483,7 @@ public static class ThematicSynthesis
         if (book.SecondCoding is { } second)
         {
             sb.Append(second.Kappa is double k
-                ? $"A second, independent coding assigned the studies to the same themes; agreement over {second.CellsCompared} study-theme decisions was Cohen's kappa = {k.ToString("0.00", CultureInfo.InvariantCulture)} ({second.Disagreements.Count} disagreements, listed in thematic-codebook.json). "
+                ? $"A second, independent coding assigned the studies to the same themes; agreement over {second.CellsCompared} study-theme decisions was Cohen's kappa = {k.ToString("0.00", CultureInfo.InvariantCulture)} ({second.Disagreements.Count} disagreement{(second.Disagreements.Count == 1 ? "" : "s")}, listed in thematic-codebook.json). "
                 : $"A second, independent coding was attempted but could not be completed ({second.Error}). ");
         }
         sb.Append("Third, each theme was written up as a subsection from its own studies only, with every study of the theme to be cited; studies still uncited were given to one further revision pass. ");

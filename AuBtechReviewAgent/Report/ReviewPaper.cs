@@ -103,10 +103,14 @@ public static class PaperLatex
                          .Replace("}", @"\}")
                          .Replace("~", @"\textasciitilde ")
                          .Replace("^", @"\textasciicircum ");
+        // A number raised to a number ("10^6", "10^-3") is set as a power, not as a caret (issue #129).
+        escaped = Regex.Replace(escaped, @"(?<![\w.])(\d+(?:\.\d+)?)\\textasciicircum (-?\d+)(?!\w)", m => $"${m.Groups[1].Value}^{{{m.Groups[2].Value}}}$");
         // Straight double quotes print as two closing quotes in LaTeX; use proper ``opening'' and closing quotes.
         escaped = Regex.Replace(escaped, "\"([^\"\n]*)\"", "``$1''");
         // Symbols the run's own text uses that pdflatex cannot set from UTF-8 (Cohen's κ in a multivocal method, say).
         escaped = escaped.Replace("κ", @"$\kappa$").Replace("≥", @"$\geq$").Replace("≤", @"$\leq$").Replace("→", @"$\rightarrow$").Replace("×", @"$\times$");
+        // Two maths spans side by side ("2×10^6") become one, since "$$" would start display maths.
+        escaped = Regex.Replace(escaped, @"(?<!\\)\$\$", "");
         // Markdown-style *italics* (used for venues in the APA references) -> real LaTeX italics.
         return Regex.Replace(escaped, @"\*([^*\n]+)\*", @"\textit{$1}");
     }
