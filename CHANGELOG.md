@@ -6,6 +6,18 @@ Each version's section becomes the notes of its GitHub release, so write it for 
 
 ## [Unreleased]
 
+The data taken from each study is shorter and better backed. This changes what the model is asked, so runs can differ from 0.2.3.
+
+### Fixed
+
+The method and sample of a study are now short, like "24 students", not a whole sentence copied from the paper. A finding keeps its % sign.
+
+A study read in full gets a fair quality check. The model now sees the parts of the paper on how data were collected and studied, and it must answer all five questions. Before, such studies got "can't tell" on every one. 🔍
+
+A study with no abstract and no full text is no longer called "non-empirical". It is marked as not checked, since there was nothing to read.
+
+When a record has no abstract, the screening reason may no longer talk about its abstract.
+
 ## [0.2.3] - 2026-11-20
 
 The paper page looks tidier. The method and main.tex are the same as in 0.2.2.
