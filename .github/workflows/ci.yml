@@ -35,7 +35,7 @@ jobs:
         run: dotnet test AuBtechReviewAgent.sln --configuration Release --no-build --verbosity normal
 
   css-up-to-date:
-    name: Compiled CSS matches the components
+    name: Compiled CSS matches components
     runs-on: ubuntu-latest
     defaults:
       run:
