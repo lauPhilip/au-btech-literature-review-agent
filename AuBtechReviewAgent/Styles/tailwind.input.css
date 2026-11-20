@@ -3,10 +3,112 @@
 @tailwind components;
 @tailwind utilities;
 
+/* The two typefaces, self-hosted because the Content-Security-Policy allows fonts only from this site
+   (licences in wwwroot/fonts). Inter is one variable file for body text; Poppins 600 and 700 are for
+   headings, the wordmark and buttons. swap shows the system font until the file has loaded. */
+@font-face {
+    font-family: 'Inter';
+    font-style: normal;
+    font-weight: 100 900;
+    font-display: swap;
+    src: url('../fonts/inter-latin-wght-normal.woff2') format('woff2-variations'), url('../fonts/inter-latin-wght-normal.woff2') format('woff2');
+}
+@font-face {
+    font-family: 'Poppins';
+    font-style: normal;
+    font-weight: 600;
+    font-display: swap;
+    src: url('../fonts/poppins-latin-600-normal.woff2') format('woff2');
+}
+@font-face {
+    font-family: 'Poppins';
+    font-style: normal;
+    font-weight: 700;
+    font-display: swap;
+    src: url('../fonts/poppins-latin-700-normal.woff2') format('woff2');
+}
+
+/* Theme tokens. tailwind.config.js maps its theme-aware colours (page, soft, ink, muted, line, primary, the
+   five verdicts, ...) to these variables, written as "R G B" so opacity modifiers work. The light values are
+   on :root; data-theme="dark" on <html> switches them. Every text colour reaches 4.5:1 on its fill and page. */
+@layer base {
+    :root {
+        --navy: 19 41 75;              /* #13294B */
+        --page: 255 255 255;           /* #FFFFFF */
+        --soft: 246 248 251;           /* #F6F8FB */
+        --panel: 233 239 247;          /* #E9EFF7 */
+        --panel-dot: 199 210 227;      /* #C7D2E3 */
+        --text: 14 22 38;              /* #0E1626 */
+        --muted: 74 85 104;            /* #4A5568 */
+        --border: 227 232 240;         /* #E3E8F0 */
+        --field-border: 197 207 221;   /* #C5CFDD */
+        --active: 234 240 248;         /* #EAF0F8 */
+        --primary: 19 41 75;           /* #13294B */
+        --on-primary: 255 255 255;     /* #FFFFFF */
+        --accent: 245 184 46;          /* #F5B82E */
+        --supported: 20 122 75;        /* #147A4B */
+        --supported-fill: 233 246 239; /* #E9F6EF */
+        --supported-border: 167 220 192; /* #A7DCC0 */
+        --supported-chart: 30 158 100; /* #1E9E64 */
+        --partly: 180 83 9;            /* #B45309 */
+        --partly-fill: 255 247 230;    /* #FFF7E6 */
+        --partly-border: 242 200 121;  /* #F2C879 */
+        --partly-chart: 227 155 46;    /* #E39B2E */
+        --not-supported: 180 35 24;    /* #B42318 */
+        --not-supported-fill: 254 241 240; /* #FEF1F0 */
+        --not-supported-border: 244 180 174; /* #F4B4AE */
+        --not-supported-chart: 217 71 59; /* #D9473B */
+        --abstract-only: 29 111 168;   /* #1D6FA8 */
+        --abstract-only-fill: 234 244 251; /* #EAF4FB */
+        --abstract-only-border: 181 214 238; /* #B5D6EE */
+        --abstract-only-chart: 59 143 203; /* #3B8FCB */
+        --unverifiable: 91 100 114;    /* #5B6472 */
+        --unverifiable-fill: 241 243 246; /* #F1F3F6 */
+        --unverifiable-border: 213 218 225; /* #D5DAE1 */
+        --unverifiable-chart: 160 168 181; /* #A0A8B5 */
+        color-scheme: light;
+    }
+    [data-theme="dark"] {
+        --navy: 242 245 250;           /* #F2F5FA, headings are light on dark */
+        --page: 11 18 32;              /* #0B1220 */
+        --soft: 14 22 38;              /* #0E1626 */
+        --panel: 17 26 44;             /* #111A2C */
+        --panel-dot: 36 48 74;         /* #24304A */
+        --text: 242 245 250;           /* #F2F5FA */
+        --muted: 169 180 199;          /* #A9B4C7 */
+        --border: 38 50 74;            /* #26324A */
+        --field-border: 51 65 92;      /* #33415C */
+        --active: 26 37 64;            /* #1A2540 */
+        --primary: 169 197 247;        /* #A9C5F7 */
+        --on-primary: 11 18 32;        /* #0B1220 */
+        --supported: 95 211 154;       /* #5FD39A */
+        --supported-fill: 19 41 31;    /* #13291F */
+        --supported-border: 36 83 60;  /* #24533C */
+        --supported-chart: 39 176 114; /* #27B072 */
+        --partly: 245 181 98;          /* #F5B562 */
+        --partly-fill: 42 34 19;       /* #2A2213 */
+        --partly-border: 107 78 30;    /* #6B4E1E */
+        --partly-chart: 227 155 46;    /* #E39B2E */
+        --not-supported: 255 138 128;  /* #FF8A80 */
+        --not-supported-fill: 45 21 23; /* #2D1517 */
+        --not-supported-border: 122 51 48; /* #7A3330 */
+        --not-supported-chart: 229 83 75; /* #E5534B */
+        --abstract-only: 124 190 235;  /* #7CBEEB */
+        --abstract-only-fill: 15 34 51; /* #0F2233 */
+        --abstract-only-border: 31 71 102; /* #1F4766 */
+        --abstract-only-chart: 79 163 221; /* #4FA3DD */
+        --unverifiable: 174 182 196;   /* #AEB6C4 */
+        --unverifiable-fill: 26 32 48; /* #1A2030 */
+        --unverifiable-border: 52 60 76; /* #343C4C */
+        --unverifiable-chart: 107 116 134; /* #6B7486 */
+        color-scheme: dark;
+    }
+}
+
 /* Accessibility basics for every page: a visible focus ring for keyboard users (WCAG 2.4.7 / 2.4.11), and
    anchors that scroll into view below nothing (the top bar is not fixed, so no offset is needed). */
 @layer base {
-    :focus-visible { outline: 2px solid #003B5C; outline-offset: 2px; }
+    :focus-visible { outline: 2px solid #13294B; outline-offset: 2px; }
     header :focus-visible, .bg-brand :focus-visible { outline-color: #ffffff; }
     [tabindex="-1"]:focus { outline: none; }
 }
@@ -14,25 +116,25 @@
 /*
  * The shared building blocks of every page. Use these instead of repeating long class lists, so the pages
  * look like one product and a change of style is made in one place. Colours come from tailwind.config.js.
- * Only buttons are rounded (rounded-btn); cards, panels, fields and labels have square corners.
+ * Buttons and fields have a 10 px radius (rounded-btn, rounded-field) and cards 16 px (rounded-card).
  */
 @layer components {
     .ui-container { @apply max-w-6xl mx-auto px-4 sm:px-6; }
     .ui-eyebrow { @apply text-xs font-semibold uppercase tracking-[0.14em] text-brand; }
-    .ui-h1 { @apply text-4xl sm:text-5xl font-semibold tracking-tight text-gray-950 leading-[1.08]; }
-    .ui-h2 { @apply text-2xl sm:text-3xl font-semibold tracking-tight text-gray-950; }
-    .ui-h3 { @apply text-base font-semibold text-gray-900; }
+    .ui-h1 { @apply font-display text-4xl sm:text-5xl font-semibold tracking-tight text-gray-950 leading-[1.08]; }
+    .ui-h2 { @apply font-display text-2xl sm:text-3xl font-semibold tracking-tight text-gray-950; }
+    .ui-h3 { @apply font-display text-base font-semibold text-gray-900; }
     .ui-lead { @apply text-base sm:text-lg text-gray-600 leading-relaxed; }
     .ui-muted { @apply text-sm text-gray-500 leading-relaxed; }
 
-    .ui-btn { @apply inline-flex items-center justify-center gap-2 rounded-btn px-5 py-2.5 text-sm font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:opacity-50; }
+    .ui-btn { @apply font-display inline-flex items-center justify-center gap-2 rounded-btn px-5 py-2.5 text-sm font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:opacity-50; }
     .ui-btn-primary { @apply ui-btn bg-brand text-white shadow-sm hover:bg-brand-700; }
     .ui-btn-secondary { @apply ui-btn bg-white text-gray-800 border border-gray-300 hover:border-brand hover:text-brand; }
     .ui-btn-ghost { @apply ui-btn text-brand hover:bg-brand-50; }
     .ui-btn-sm { @apply px-3 py-1.5 text-xs; }
     .ui-btn-danger { @apply ui-btn bg-red-600 text-white hover:bg-red-700; }
 
-    .ui-card { @apply bg-white border border-gray-200 shadow-card; }
+    .ui-card { @apply bg-white border border-gray-200 rounded-card shadow-card; }
     .ui-chip { @apply inline-flex items-center gap-1.5 border px-2 py-0.5 text-xs font-medium; }
     .ui-label { @apply block text-sm font-medium text-gray-800 mb-1; }
     /* A term with a plain-language explanation on hover and keyboard focus (Components/Layout/Term.razor). */
@@ -44,7 +146,7 @@
     .ui-term:hover .ui-term-tip, .ui-term:focus .ui-term-tip, .ui-term:focus-within .ui-term-tip { @apply visible opacity-100; }
     .ui-term.ui-term-dismissed .ui-term-tip { @apply invisible opacity-0; }
     .ui-skip { @apply sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-[200] focus:bg-white focus:text-brand focus:px-4 focus:py-2 focus:font-semibold focus:shadow-lift; }
-    .ui-input { @apply w-full px-3 py-2 bg-white border border-gray-300 text-sm placeholder:text-gray-500 focus:outline-none focus:border-brand focus:ring-2 focus:ring-brand/15 transition-colors; }
+    .ui-input { @apply w-full rounded-field px-3 py-2 bg-white border border-gray-300 text-sm placeholder:text-gray-500 focus:outline-none focus:border-brand focus:ring-2 focus:ring-brand/15 transition-colors; }
     .ui-chip-ok { @apply ui-chip border-green-200 bg-verdict-okBg text-verdict-ok; }
     .ui-chip-partial { @apply ui-chip border-amber-200 bg-verdict-partialBg text-verdict-partial; }
     .ui-chip-bad { @apply ui-chip border-red-200 bg-verdict-badBg text-verdict-bad; }
@@ -64,7 +166,7 @@
     @media (prefers-reduced-motion: reduce) {
         .tai-cycle-a, .tai-cite-a, .tai-cite-b, .tai-scan, .tai-flow-x, .tai-flow-y { animation: none; }
         .tai-cycle-b { animation: none; opacity: 0; }
-        .tai-cite-a { background-color: rgba(0, 59, 92, 0.12); }
+        .tai-cite-a { background-color: rgba(19, 41, 75, 0.12); }
         .tai-scan { transform: scaleX(1); }
     }
 }
@@ -80,9 +182,9 @@
     100% { opacity: 0; transform: translateY(6px); }
 }
 @keyframes tai-cite-a {
-    0%, 44% { background-color: rgba(0, 59, 92, 0.12); }
+    0%, 44% { background-color: rgba(19, 41, 75, 0.12); }
     50%, 94% { background-color: transparent; }
-    100% { background-color: rgba(0, 59, 92, 0.12); }
+    100% { background-color: rgba(19, 41, 75, 0.12); }
 }
 @keyframes tai-cite-b {
     0%, 44% { background-color: transparent; }
@@ -107,8 +209,8 @@
 #components-reconnect-modal {
     position: fixed; inset: auto 1rem 1rem auto; margin: 0; z-index: 300;
     width: min(32rem, calc(100vw - 2rem)); padding: 1rem 1.25rem;
-    background: #ffffff; color: #111827; border: 1px solid #e5e7eb; border-left: 4px solid #003B5C;
-    box-shadow: 0 12px 32px -12px rgba(0, 41, 63, 0.35), 0 2px 6px rgba(16, 24, 40, 0.08);
+    background: #ffffff; color: #111827; border: 1px solid #e5e7eb; border-left: 4px solid #13294B;
+    box-shadow: 0 12px 32px -12px rgba(12, 27, 51, 0.35), 0 2px 6px rgba(16, 24, 40, 0.08);
     font-family: inherit;
 }
 #components-reconnect-modal[open] { animation: reconnect-in 0.25s ease-out; }
@@ -130,7 +232,7 @@
 #components-reconnect-modal.components-reconnect-resume-failed button.components-resume-failed-visible { display: inline-flex; }
 .reconnect-spinner {
     flex: none; width: 0.875rem; height: 0.875rem; border-radius: 9999px;
-    border: 2px solid #D7E5EE; border-top-color: #003B5C; animation: reconnect-spin 0.9s linear infinite;
+    border: 2px solid #D6DEEB; border-top-color: #13294B; animation: reconnect-spin 0.9s linear infinite;
 }
 #components-reconnect-modal.components-reconnect-failed .reconnect-spinner,
 #components-reconnect-modal.components-reconnect-paused .reconnect-spinner,

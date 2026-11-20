@@ -6,6 +6,12 @@ Each version's section becomes the notes of its GitHub release, so write it for 
 
 ## [Unreleased]
 
+### Changed
+
+The site starts its new look. It now uses a deeper navy, the same one as Coursebot, and two new typefaces: Inter for text and Poppins for headings and buttons. Cards and fields have round corners. The browser tab shows the new mark, a small robot reading a book. 🤖
+
+Nothing about how a review runs has changed. This is the first step of the redesign; the pages follow one by one.
+
 ## [0.4.0] - 2026-11-20
 
 The model writes about the studies from facts, not from its own guesses. This changes what the model is asked, so runs can differ from 0.3.0.
