@@ -349,10 +349,13 @@ public static class ReviewWriter
     /// only say what the review found. Numbers come from <paramref name="facts"/>, which the module writes in code
     /// (sources found, included, themes): a number in the abstract that is in neither the facts nor the sections is
     /// rejected, as is a citation outside the reference list. The rationale's citations are checked against their
-    /// sources like any other sentence. Returns null when no acceptable answer comes back.
+    /// sources like any other sentence. A module can add its own check on the abstract (<paramref name="abstractRule"/>,
+    /// null when the abstract is fine), such as the systematic review's rule that its record counts add up. Returns
+    /// null when no acceptable answer comes back.
     /// </summary>
     public static async Task<FrontMatter?> WriteFrontMatterAsync(IChatCompletionService chat, WritingProfile profile, string topic, string goal,
-        string facts, IReadOnlyList<SynthesisSection> sections, string discussion, string referenceLines, int referenceCount, Action<string>? warn = null)
+        string facts, IReadOnlyList<SynthesisSection> sections, string discussion, string referenceLines, int referenceCount, Action<string>? warn = null,
+        Func<string, string?>? abstractRule = null)
     {
         string results = string.Join("\n\n", sections.Select(x => $"### {x.Heading}\n{x.Text}")) + $"\n\n### Discussion\n{discussion}";
         string prompt = $$"""
@@ -385,7 +388,7 @@ public static class ReviewWriter
         {
             using (LlmStage.Begin("front-matter"))
             {
-                var answer = await LlmJson.GetAsync<FrontMatterAnswer>(chat, prompt, LlmJson.JsonMode(0.3), a => FrontMatterProblem(a, allowedNumbers, referenceCount), repairAttempts: 2);
+                var answer = await LlmJson.GetAsync<FrontMatterAnswer>(chat, prompt, LlmJson.JsonMode(0.3), a => FrontMatterProblem(a, allowedNumbers, referenceCount) ?? abstractRule?.Invoke(a.Abstract!), repairAttempts: 2);
                 return new FrontMatter(
                     answer.Title!.Trim().TrimEnd('.'),
                     MethodsSectionWriter.StripMarkdownEmphasis(answer.Abstract!.Trim()),
