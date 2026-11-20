@@ -270,7 +270,8 @@ public static class StudyExtractor
         {
             ("method", a.Method, ShortValueWords), ("sample", a.Sample, ShortValueWords), ("limitations", a.Limitations, SentenceWords),
         };
-        fields.AddRange((a.KeyFindings ?? new()).Select((f, i) => ($"keyFindings[{i}]", (EvidencedValue?)f, SentenceWords)));
+        var findings = a.KeyFindings ?? new();
+        for (int i = 0; i < findings.Count; i++) fields.Add(($"keyFindings[{i}]", findings[i], SentenceWords));
         foreach (var (name, v, maxWords) in fields)
         {
             string value = (v?.Value ?? "").Trim(), quote = (v?.Quote ?? "").Trim();
