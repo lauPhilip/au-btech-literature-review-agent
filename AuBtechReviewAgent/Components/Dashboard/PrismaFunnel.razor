@@ -105,7 +105,7 @@
         @if (s.DualScreened > 0)
         {
             <p class="text-[10px] text-gray-500" title="Every record was screened by two independent prompts; disagreements are included and flagged">
-                Dual screening: @(s.DualScreened - s.ScreeningDisagreements) of @s.DualScreened agreed@(s.ScreeningKappa is double k ? $" (kappa {k:0.00})" : "").
+                Dual screening: @(s.DualScreened - s.ScreeningDisagreements) of @s.DualScreened agreed@(s.ScreeningKappa is double k ? $" (kappa {k.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture)})" : "").
             </p>
         }
         @if (s.UncertainDecisions > 0)

@@ -312,7 +312,7 @@ Agent frameworks rely on approval gates
             {
                 (total == 0 ? "–" : $"{supported * 100.0 / total:0}%", "of citations supported by the cited paper"),
                 (included == 0 ? "–" : $"{cited * 100.0 / included:0}%", "of included studies cited in the report"),
-                (total.ToString("N0"), "citations checked against the papers"),
+                (total.ToString("N0", System.Globalization.CultureInfo.InvariantCulture), "citations checked against the papers"),
             };
         }
         else
