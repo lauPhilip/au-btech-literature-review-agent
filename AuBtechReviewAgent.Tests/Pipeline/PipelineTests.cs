@@ -179,6 +179,13 @@ public class PipelineTests : IDisposable
         Assert.True(appendix < a1 && a1 < a1Note && a1Note < a2 && a2 < a2Note && a2Note < a3, "the tables keep their order, each with its note");
         Assert.True(a3 < At(@"\end{document}"));
         Assert.DoesNotMatch(@"Table 3\.[123]", tex);
+
+        // Issue #145: A.3's title fits on the page and its key is in the note under the table; A.1's title row
+        // ends with one line break, as A.2's does, so there is no empty row under it.
+        Assert.Contains(@"\textbf{Table A.3: Quality Appraisal (MMAT 2018)}} \\" + "\n", tex);
+        Assert.True(At(PrismaReviewEngine.AppraisalTableKey) > a3, "the key to Table A.3 is in the note under it");
+        Assert.Contains(@"\textbf{Table A.1: Included studies}} \\" + "\n", tex);
+        Assert.DoesNotContain(@"\textbf{Table A.1: Included studies}} \\\\", tex);
     }
 
     [Fact]
