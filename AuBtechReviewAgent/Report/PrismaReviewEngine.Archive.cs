@@ -93,7 +93,7 @@ public partial class PrismaReviewEngine
         // manuscript_*.tex file in the project folder, and every download first deleted all such files - so
         // two people downloading at the same moment could delete each other's main.tex.
 
-        // Table 3.1 and the bibliography must follow the reference numbers the synthesis cites.
+        // Table A.1 and the bibliography must follow the reference numbers the synthesis cites.
         // (Older runs have ReferenceNumber = 0 everywhere; OrderBy is stable, so they keep their order.)
         records = records.OrderBy(r => r.ReferenceNumber).ToList();
 
@@ -202,13 +202,20 @@ public partial class PrismaReviewEngine
         sb.AppendLine(@"\end{minipage}");
         sb.AppendLine(@"\end{figure}");
         sb.AppendLine(@"\vspace{10pt}");
-
+        // \small used to come with Table 3.1 and stays here, so the rest of the paper keeps its text size.
         sb.AppendLine(@"\small");
-        sb.AppendLine(@"\begin{tabularx}{\textwidth}{>{\hsize=0.6\hsize}X >{\hsize=1.2\hsize}X >{\hsize=1.0\hsize}X >{\hsize=0.5\hsize}X >{\hsize=1.7\hsize}X}");
-        sb.AppendLine(@"\multicolumn{5}{l}{\textbf{Table 3.1: Included studies}} \\\\");
-        sb.AppendLine(@"\toprule");
-        sb.AppendLine(@"\textbf{Paper Name} & \textbf{Executive Summary} & \textbf{Inclusion Rationale} & \textbf{Source} & \textbf{Citation (APA 7th)} \\");
-        sb.AppendLine(@"\midrule");
+        sb.AppendLine(@"\vspace{10pt}");
+        string dataLatex = sb.ToString();
+
+        // The tables of the included studies go to the appendix after the references, as Tables A.1 to A.3
+        // (issue #139). Section 3 keeps its text, flow diagram and charts and points to them (AppendixPointer).
+        var ab = new StringBuilder();
+        ab.AppendLine(@"\small");
+        ab.AppendLine(@"\begin{tabularx}{\textwidth}{>{\hsize=0.6\hsize}X >{\hsize=1.2\hsize}X >{\hsize=1.0\hsize}X >{\hsize=0.5\hsize}X >{\hsize=1.7\hsize}X}");
+        ab.AppendLine(@"\multicolumn{5}{l}{\textbf{Table A.1: Included studies}} \\\\");
+        ab.AppendLine(@"\toprule");
+        ab.AppendLine(@"\textbf{Paper Name} & \textbf{Executive Summary} & \textbf{Inclusion Rationale} & \textbf{Source} & \textbf{Citation (APA 7th)} \\");
+        ab.AppendLine(@"\midrule");
         foreach (var row in records)
         {
             string title = EscapeLatexText(row.Title);
@@ -217,18 +224,17 @@ public partial class PrismaReviewEngine
             // The database by its display name, as on the paper page (issue #133).
             string source = EscapeLatexText(CategoryLabel(row.Category));
             string citation = EscapeLatexText(row.ApaCitation);
-            sb.AppendLine($"{title} & {summary} & {rationale} & {source} & {citation} \\\\ \\hline");
+            ab.AppendLine($"{title} & {summary} & {rationale} & {source} & {citation} \\\\ \\hline");
         }
-        sb.AppendLine(@"\end{tabularx}");
-        sb.AppendLine(@"\vspace{4pt}\noindent\small ");
-        sb.AppendLine(@"Table 3.1 lists each included study with a short summary, the reason it was included, the database it came from and its reference.");
+        ab.AppendLine(@"\end{tabularx}");
+        ab.AppendLine(@"\vspace{4pt}\noindent\small ");
+        ab.AppendLine(@"Table A.1 lists each included study with a short summary, the reason it was included, the database it came from and its reference.");
         if (state?.Extractions is { Count: > 0 } extractions)
         {
-            sb.AppendLine(@"\vspace{10pt}");
-            sb.Append(ExtractionTables(extractions));
+            ab.AppendLine(@"\vspace{10pt}");
+            ab.Append(ExtractionTables(extractions));
         }
-        sb.AppendLine(@"\vspace{10pt}");
-        string dataLatex = sb.ToString();
+        string appendixLatex = ab.ToString();
 
         var resultsLatex = new List<string>();
         if (state?.ThematicSynthesis is { Themes.Count: > 0 } book && (report.SynthesisSections?.Count ?? 0) > 0)
@@ -267,7 +273,7 @@ public partial class PrismaReviewEngine
             Objectives = report.ObjectivesItem ?? "",
             Methods = methods,
             DataHeading = "Characteristics of the Included Studies",
-            DataText = MethodsSectionWriter.IncludedSet(records),
+            DataText = (MethodsSectionWriter.IncludedSet(records) + " " + MethodsSectionWriter.AppendixPointer(records.Count, state?.Extractions)).Trim(),
             DataLatex = dataLatex,
             ResultsText = textSynthesisOnly,
             Themes = (report.SynthesisSections ?? new List<SynthesisSection>()).Select(x => new PaperSection(x.Heading, x.Text)).ToList(),
@@ -278,6 +284,7 @@ public partial class PrismaReviewEngine
             Summary = ConclusionSection(report),
             Declarations = declarations,
             References = records.Select(r => r.ApaCitation).ToList(),
+            AppendixLatex = appendixLatex,
         };
 
         // The files only a systematic review generates; the core (Report/RunArchive.cs) adds the run folder's
@@ -378,13 +385,13 @@ public partial class PrismaReviewEngine
         return sb.ToString();
     }
 
-    /// <summary>Table 3.2 (extracted data, with a mark where the supporting quote was found) and Table 3.3 (MMAT).</summary>
+    /// <summary>Table A.2 (extracted data, with a mark where the supporting quote was found) and Table A.3 (MMAT), in the appendix.</summary>
     private string ExtractionTables(IReadOnlyList<StudyExtraction> extractions)
     {
         string V(EvidencedValue v) => EscapeLatexText(v.Value) + (v.QuoteVerified ? "" : (v.Value.Equals("not reported", StringComparison.OrdinalIgnoreCase) ? "" : "$^{\\dagger}$"));
         var sb = new StringBuilder();
         sb.AppendLine(@"\begin{tabularx}{\textwidth}{>{\hsize=0.25\hsize}X >{\hsize=0.8\hsize}X >{\hsize=1.1\hsize}X >{\hsize=0.9\hsize}X >{\hsize=1.95\hsize}X}");
-        sb.AppendLine(@"\multicolumn{5}{l}{\textbf{Table 3.2: Extracted Study Data}} \\");
+        sb.AppendLine(@"\multicolumn{5}{l}{\textbf{Table A.2: Extracted Study Data}} \\");
         sb.AppendLine(@"\toprule");
         sb.AppendLine(@"\textbf{Ref.} & \textbf{Study type} & \textbf{Method} & \textbf{Sample} & \textbf{Key findings} \\");
         sb.AppendLine(@"\midrule");
@@ -407,7 +414,7 @@ public partial class PrismaReviewEngine
         if (appraised.Count > 0)
         {
             sb.AppendLine(@"\begin{tabularx}{\textwidth}{>{\hsize=0.4\hsize}X >{\hsize=1.6\hsize}X c c c c c c}");
-            sb.AppendLine(@"\multicolumn{8}{l}{\textbf{Table 3.3: Quality Appraisal (MMAT 2018; Yes / No / ? = can't tell; Met = questions answered yes, not an overall score)}} \\");
+            sb.AppendLine(@"\multicolumn{8}{l}{\textbf{Table A.3: Quality Appraisal (MMAT 2018; Yes / No / ? = can't tell; Met = questions answered yes, not an overall score)}} \\");
             sb.AppendLine(@"\toprule");
             sb.AppendLine(@"\textbf{Ref.} & \textbf{Category} & \textbf{1} & \textbf{2} & \textbf{3} & \textbf{4} & \textbf{5} & \textbf{Met} \\");
             sb.AppendLine(@"\midrule");
