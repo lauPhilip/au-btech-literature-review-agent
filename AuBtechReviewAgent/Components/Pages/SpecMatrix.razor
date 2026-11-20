@@ -525,8 +525,10 @@
                     <ol class="space-y-2 text-xs font-sans text-gray-800">
                         @for (int i = 0; i < includedCitations.Count; i++)
                         {
+                            int number = i + 1;
+                            string citation = includedCitations[i];
                             <li class="pl-2 leading-relaxed">
-                                <span class="font-mono font-bold text-brand mr-1">[@(i + 1)]</span> - @includedCitations[i]
+                                <span class="font-mono font-bold text-brand mr-1">[@number]</span> - <ApaReference Text="@citation" />
                             </li>
                         }
                     </ol>
@@ -567,7 +569,7 @@
                                         <td class="p-2 border-r border-gray-150 align-top text-center font-mono font-medium text-[9.5px]">
                                             <span class="px-1.5 py-0.5 @badgeClass">@AuBtechReviewAgent.PrismaReviewEngine.CategoryLabel(paperRow.Category)</span>
                                         </td>
-                                        <td class="p-2 font-mono text-[9px] text-gray-500 bg-gray-50/20 align-top leading-normal break-all">@paperRow.ApaCitation</td>
+                                        <td class="p-2 font-mono text-[9px] text-gray-500 bg-gray-50/20 align-top leading-normal break-all"><ApaReference Text="@paperRow.ApaCitation" /></td>
                                     </tr>
                                 }
                             </tbody>
