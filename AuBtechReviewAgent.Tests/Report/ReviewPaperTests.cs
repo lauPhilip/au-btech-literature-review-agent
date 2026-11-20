@@ -138,10 +138,42 @@ public class ReviewPaperTests : IDisposable
         Assert.Equal(((int, int)?)(2, 2), ReviewWriter.RepeatedAnswer("Safety needs more than one safeguard [1]. Governance layers audit what agents do [2].", answers));
         Assert.Contains("conclusion sentence 1 restates the answer to RQ1", ReviewWriter.ClosingProblem("a [1].", "b", "c", repeats, known, 2, answers, 2));
 
-        const string drawsTogether = "Together, the themes suggest that safe agent loops need both recovery and oversight, and that support for either is still thin [1, 2].";
+        const string drawsTogether = "Together, the themes suggest that safe agent loops need both recovery and oversight, and that support for either is still thin.";
         Assert.Null(ReviewWriter.RepeatedAnswer(drawsTogether, answers));
         Assert.Null(ReviewWriter.ClosingProblem("a [1].", "b", "c", drawsTogether, known, 2, answers, 2));
         Assert.Null(ReviewWriter.ClosingProblem("a [1].", "b", "c", repeats, known, 2)); // without questions there is nothing to repeat
+    }
+
+    [Fact]
+    public void WithResearchQuestionsTheConclusionTakesNoCitations()
+    {
+        // Issue #124, from run 959b875d: the conclusion after the answers cited six or seven studies for the review's own reading.
+        const string known = "Supervisor checks let agent loops recover from faults [1]. Governance layers audit what agents do [2].";
+        string[] answers = { "Supervisor checks let agent loops recover from faults [1].", "Governance layers audit what agents do [2]." };
+        const string cited = "Together, these findings indicate that the identified mechanisms are internally consistent [1, 2].";
+
+        Assert.Contains("the conclusion takes no citations", ReviewWriter.ClosingProblem("a [1].", "b", "c", cited, known, 2, answers, 2));
+        Assert.Null(ReviewWriter.ClosingProblem("a [1].", "b", "c", "Together, these findings indicate that the mechanisms fit together.", known, 2, answers, 2));
+        Assert.Null(ReviewWriter.ClosingProblem("a [1].", "b", "c", cited, known, 2)); // without questions the conclusion is cited as before
+    }
+
+    [Fact]
+    public void TheReviewsOwnCountsTakeNoCitation()
+    {
+        // Issue #116, from run 959b875d: "The evidence base rests on 13 studies, ... 8 are not empirical ... [8]."
+        const string facts = "13 studies; full text was read for 9 and only the abstract for 4; 8 are not empirical (position papers, system descriptions or reviews).";
+        const string results = "PANDA keeps 100% task completion under faults [9]. Supervisors restart 4 failed workers [7].";
+
+        Assert.Equal("The evidence base rests on 13 studies, and 8 are not empirical [8].",
+            ReviewWriter.OwnCountCited("Evidence is thin. The evidence base rests on 13 studies, and 8 are not empirical [8].", facts, results));
+        Assert.NotNull(ReviewWriter.OwnCountCited("Only 9 were read in full text [2, 7].", facts, results));
+        Assert.Null(ReviewWriter.OwnCountCited("The evidence base rests on 13 studies, and 8 are not empirical.", facts, results)); // not cited
+        Assert.Null(ReviewWriter.OwnCountCited("Supervisors restart 4 failed workers [7].", facts, results)); // a number from the literature
+        Assert.Null(ReviewWriter.OwnCountCited("One trial ran 13 agents [3].", facts, results)); // not a count of sources
+        Assert.Null(ReviewWriter.OwnCountCited("Only 9 were read in full text [2].", "", results)); // no facts, nothing to compare
+
+        string? problem = ReviewWriter.ClosingProblem("The evidence rests on 13 studies [8].", "b", "c", "d", facts + " " + results, 13, ownFacts: facts, results: results);
+        Assert.Contains("limitations: \"The evidence rests on 13 studies [8].\" states this review's own count", problem);
     }
 
     [Fact]
@@ -196,7 +228,7 @@ public class ReviewPaperTests : IDisposable
     }
 
     private static string RespondWithAnswers(string prompt) => prompt.Contains("You are writing the sections that follow the discussion")
-        ? """{"limitations":"The evidence rests on two studies read from their abstracts [1, 2].","implications":"Teams should add supervisor checks to agent loops [1].","futureResearch":"Governance layers need evaluation in production [2].","conclusion":"Together, the themes suggest that safe agent loops need both recovery and oversight, and that support for either is still thin [1, 2].","answers":["Supervisor checks let agent loops recover from faults [1].","Governance layers audit what agents do [2]."]}"""
+        ? """{"limitations":"The evidence rests on two studies read from their abstracts [1, 2].","implications":"Teams should add supervisor checks to agent loops [1].","futureResearch":"Governance layers need evaluation in production [2].","conclusion":"Together, the themes suggest that safe agent loops need both recovery and oversight, and that support for either is still thin.","answers":["Supervisor checks let agent loops recover from faults [1].","Governance layers audit what agents do [2]."]}"""
         : ReviewWriterTests.Respond(prompt);
 
     [Fact]
