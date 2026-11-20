@@ -13,9 +13,12 @@
        CDN version did, so its reset (e.g. links inherit their colour) still wins over app.css. *@
     <link rel="stylesheet" href="@Assets["css/tailwind.css"]" />
     <link rel="icon" href="favicon.ico" sizes="any" />
+    <link rel="icon" href="favicon.svg" type="image/svg+xml" />
     <link rel="icon" type="image/png" sizes="192x192" href="favicon.png" />
     <link rel="apple-touch-icon" href="apple-touch-icon.png" />
-    <meta name="theme-color" content="#003B5C" />
+    @* The body font is preloaded so text does not change font after it appears. *@
+    <link rel="preload" href="fonts/inter-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin />
+    <meta name="theme-color" content="#13294B" />
     <link rel="manifest" href="site.webmanifest" />
     <HeadOutlet />
 </head>
