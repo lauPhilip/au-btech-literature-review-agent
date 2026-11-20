@@ -31,6 +31,16 @@ public class MmatTableTests
     }
 
     [Fact]
+    public void TheNoteEndsWithAndBeforeTheLastStudyWhenTheLastTwoAreNeighbours()
+    {
+        // Issue #131: a real run printed "[2], [4]--[6], [8], [10] and [12], [13]".
+        var studies = new[] { 2, 4, 5, 6, 8, 10, 12, 13 }.Select(n => Study(n, "not_empirical"));
+        Assert.Equal("Not shown: 8 studies ([2], [4]\u2013[6], [8], [10], [12] and [13]) were classified as non-empirical (for example reviews or position papers), to which MMAT does not apply.",
+            MethodsSectionWriter.NotAppraisedNote(studies));
+        Assert.Contains("([3] and [4])", MethodsSectionWriter.NotAppraisedNote(new[] { Study(3, "not_empirical"), Study(4, "not_empirical") }));
+    }
+
+    [Fact]
     public void NoNoteWhenEveryStudyIsAppraised()
     {
         Assert.Equal("", MethodsSectionWriter.NotAppraisedNote(new[] { Study(1, "qualitative") }));
