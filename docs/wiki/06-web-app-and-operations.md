@@ -165,7 +165,7 @@ The text a reviewer types into the configuration panel goes into prompts, so it 
 ```mermaid
 flowchart LR
     PUSH["push / merged PR<br/>to master"] --> BT["Build & Test<br/>dotnet test"]
-    PUSH --> CSS["Compiled CSS matches<br/>the components"]
+    PUSH --> CSS["Compiled CSS matches<br/>components"]
     PUSH --> CQ["CodeQL<br/>(separate workflow)"]
     BT & CSS --> DEP{"DEPLOY_ENABLED?"}
     DEP -- yes --> PUB["dotnet publish<br/>win-x86, self-contained"]
