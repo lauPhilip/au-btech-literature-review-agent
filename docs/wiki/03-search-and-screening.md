@@ -28,7 +28,7 @@ The reviewer can also see and edit the strings before the run. "Preview search s
 
 **Querying sources.** `FetchSourceAsync` runs the search strings against one source, one after another, and stops as soon as the source has returned enough distinct records to fill its cap (`MaxResultsPerSource`, split across the strings). All sources run at the same time. Every response is looked up in the `ReviewCache` first (key: source, string and cap; kept 24 hours); a response that is actually used is saved as it was received in `SourceResponses/`, and its SHA-256 goes into the `PlatformSearchLog`. A source that fails is logged as "Faulted" with a sanitised message and the run goes on without it.
 
-**Admitting records.** The results are then processed in a fixed order, source by source and string by string. `Admit` puts every identified record into exactly one bucket: duplicate (same source id, DOI or normalised title as a record seen earlier), outside the year range (records with no year are kept), over the per-source cap, or candidate. Each removal is written to `RemovedBeforeScreening` with its reason, which is what makes the PRISMA flow diagram add up and lets the Review Output page show "Duplicates: show".
+**Admitting records.** The results are then processed in a fixed order, source by source and string by string. `Admit` puts every identified record into exactly one bucket: duplicate (same source id, DOI or normalised title as a record seen earlier), outside the year range (records with no year are kept), over the per-source cap, or candidate. Each removal is written to `RemovedBeforeScreening` with its reason, which is what makes the PRISMA flow diagram add up and lets the Review Output page show "Duplicates: show". Because the cap is checked last, it counts only the records that go on to screening: a source can show more records identified in the flow diagram than its cap. The methods text says so, so the two do not seem to disagree (issue #150).
 
 ## The sources
 
@@ -36,7 +36,7 @@ Every source implements `IAcademicSource` (`IAcademicSource.cs`): a `SourceName`
 
 | Class | Key needed | Notes |
 |---|---|---|
-| `ArxivSource` | no | Atom XML API. All requests in the app go one at a time through a static gate, 3 s apart, through `OpenSourceHttp`'s retries, because arXiv answers bursts with 503 |
+| `ArxivSource` | no | Atom XML API. All requests in the app go one at a time through a static gate, 3 s apart, through `OpenSourceHttp`'s retries, because arXiv answers bursts with 503. The DOI is the published version's (`<arxiv:doi>`) when the authors gave one, and otherwise the arXiv DOI (`10.48550/arXiv.<id>`) |
 | `OpenAlexSource` | expected | Also implements `ICitationGraph`, used for citation chaining; abstracts are rebuilt from OpenAlex's inverted index. Sends `OpenSources:OpenAlexApiKey` as an `Authorization` header; without a key most requests are refused once the small keyless budget is used up |
 | `SemanticScholarSource` | optional | All requests in the app go one at a time through a static gate, 1 s apart with a key and 3 s without, because the API rate-limits hard |
 | `CrossrefSource` | no | Abstracts arrive as JATS XML and are stripped to text |

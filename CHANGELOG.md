@@ -6,6 +6,16 @@ Each version's section becomes the notes of its GitHub release, so write it for 
 
 ## [Unreleased]
 
+The paper reads better in a few small places. The method is the same as in 0.2.1.
+
+### Fixed
+
+The tables in the appendix of main.tex fit the page again. Table A.3 has a short title, and its key moved to the note below it. Table A.1 lost the empty row under its title.
+
+The methods now say that the limit per source counts the records sent to screening. Before, it read as if it did not match the flow diagram.
+
+A reference that names a journal now gives its volume and issue the APA way. If arXiv knows the journal's DOI, the reference uses it. If the only link is the arXiv one, the reference says it is the preprint. 📐
+
 ## [0.2.1] - 2026-11-20
 
 This is a small fix. The paper and the method are the same as in 0.2.0.
