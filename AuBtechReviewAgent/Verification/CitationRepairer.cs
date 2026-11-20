@@ -154,6 +154,7 @@ public static class CitationRepairer
         })).ToList();
 
         var texts = fields.ToDictionary(f => f.Field, f => f.Text);
+        var rewrites = new List<(string Field, string Original, string Replacement, int Log)>();
         foreach (var task in work)
         {
             var (field, items, answers, error) = await task;
@@ -182,7 +183,7 @@ public static class CitationRepairer
                 }
                 else
                 {
-                    replacement = MethodsSectionWriter.StripMarkdownEmphasis((answer.Sentence ?? "").Trim());
+                    replacement = ProseCleaner.DropRepeatedCitations(MethodsSectionWriter.StripMarkdownEmphasis((answer.Sentence ?? "").Trim()));
                     var original = CitationSupportChecker.ReferencesIn(item.Sentence).ToHashSet();
                     var added = CitationSupportChecker.ReferencesIn(replacement).Where(r => !original.Contains(r) || r > referenceCount).ToList();
                     if (replacement.Length == 0 || added.Count > 0)
@@ -203,6 +204,7 @@ public static class CitationRepairer
                 string updated = current[..at] + replacement + current[(at + item.Sentence.Length)..];
                 if (replacement.Length == 0) updated = Regex.Replace(updated, @"[ \t]{2,}", " ");
                 texts[field] = updated.Trim();
+                if (action == "rewrite" && replacement.Length > 0) rewrites.Add((field, item.Sentence, replacement, repairs.Count));
                 repairs.Add(new CitationRepair(field, item.Sentence, replacement, action, flaggedRefs, verdicts, (answer.Reason ?? "").Trim()));
             }
         }
@@ -228,10 +230,50 @@ public static class CitationRepairer
             }
             if (unchecked_.Count > 0) toCheck.Add(new CitedSentence(s.Field, s.SentenceIndex, s.Sentence, unchecked_));
         }
+        var fresh = new List<CitationSupportResult>();
         if (toCheck.Count > 0)
         {
             using (LlmStage.Begin("citation-check"))
-                merged.AddRange(await CitationSupportChecker.CheckAsync(chat, toCheck, papers, verifiedFindings: findings, parallelism: parallelism, secondCheck: secondCheck));
+                fresh = await CitationSupportChecker.CheckAsync(chat, toCheck, papers, verifiedFindings: findings, parallelism: parallelism, secondCheck: secondCheck);
+            merged.AddRange(fresh);
+        }
+
+        // A rewrite narrows the claim of the flagged citations, but keeps the sentence's other citations. When one of
+        // those is now judged worse than before (the narrowed claim is no longer what that paper says), the rewrite
+        // made the sentence worse: it is undone, and the sentence keeps its first verdicts (issue #124).
+        bool reverted = false;
+        foreach (var w in rewrites)
+        {
+            var worse = fresh.Where(r => r.Field == w.Field && r.Sentence == w.Replacement)
+                .Where(r => previous.TryGetValue((w.Field, w.Original, r.Reference), out var old) &&
+                            CitationSupportChecker.Rank(r.Verdict) < CitationSupportChecker.Rank(old.Verdict))
+                .Select(r => $"[{r.Reference}] {previous[(w.Field, w.Original, r.Reference)].Verdict} → {r.Verdict}").ToList();
+            if (worse.Count == 0) continue;
+            string current = texts[w.Field];
+            int at = current.IndexOf(w.Replacement, StringComparison.Ordinal);
+            if (at < 0) continue;
+            texts[w.Field] = current[..at] + w.Original + current[(at + w.Replacement.Length)..];
+            repairs[w.Log] = repairs[w.Log] with
+            {
+                After = w.Original,
+                Action = "reverted",
+                Note = $"The rewrite \"{w.Replacement}\" made citations it kept worse ({string.Join(", ", worse)}), so the sentence was put back as it was and keeps its first verdicts.",
+            };
+            reverted = true;
+        }
+        if (reverted)
+        {
+            newFields = fields.Select(f => (f.Field, texts[f.Field])).ToList();
+            var known = new Dictionary<(string, string, int), CitationSupportResult>(previous);
+            foreach (var r in fresh) known[(r.Field, r.Sentence, r.Reference)] = r;
+            merged = new List<CitationSupportResult>();
+            foreach (var s in newFields.SelectMany(f => CitationSupportChecker.ExtractCitedSentences(f.Item2, f.Field)))
+                foreach (var r in s.References)
+                    if (known.TryGetValue((s.Field, s.Sentence, r), out var result))
+                    {
+                        result.SentenceIndex = s.SentenceIndex;
+                        merged.Add(result);
+                    }
         }
         var ordered = merged.OrderBy(r => r.Field).ThenBy(r => r.SentenceIndex).ThenBy(r => r.Reference).ToList();
         return (newFields, ordered, repairs);

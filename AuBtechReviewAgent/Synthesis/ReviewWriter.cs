@@ -191,6 +191,8 @@ public static class ReviewWriter
             6. "answers": exactly {{questions.Count}} answer(s), one per research question in the order given, each one to three sentences that answer the question from the results, with inline [n] markers. Do not repeat the question. Where the results do not answer a question, say so plainly. The answers are printed just before the conclusion, so the conclusion must not restate them: it says what the answers mean together for the review objective.
             """;
         string answerField = questions.Count == 0 ? "" : ",\"answers\":[\"answer to RQ1\"]";
+        // With answers, the cited evidence is in the answers; the conclusion is the review's own reading of them (issue #124).
+        string conclusionRule = questions.Count == 0 ? "" : " It takes no citations: the answers carry them, and the conclusion is the review's own reading of the answers together.";
         string prompt = $$"""
             You are writing the sections that follow the discussion of {{profile.Review}}. Its results and discussion are finished and checked; write only what they and the facts below say.
 
@@ -214,8 +216,8 @@ public static class ReviewWriter
             1. "limitations": one paragraph on the limitations of the evidence base (PRISMA 2020 item 23b): what kinds of {{profile.Sources}} it rests on, what they leave unmeasured, and how far the findings generalise. Use the facts above. Do not describe how this review was done; that is written separately.
             2. "implications": one paragraph on the implications for practice and policy (item 23d): what someone acting on these findings should do or watch for, and how firm each point is.
             3. "futureResearch": one paragraph on the directions for future research (item 23d): the open questions and missing kinds of study the results show, each tied to the theme or {{profile.Sources}} it comes from.
-            4. "conclusion": three to five sentences that answer the review objective in plain words, at most {{MaxConclusionWords}} words, with no new claims.
-            5. Every sentence that attributes something to the literature ends with an inline marker such as [3] or [2, 5], using the same {{profile.Sources}} the results cite for it. Do not invent numbers, statistics or {{profile.Sources}}.{{answerRule}}
+            4. "conclusion": three to five sentences that answer the review objective in plain words, at most {{MaxConclusionWords}} words, with no new claims.{{conclusionRule}}
+            5. Every sentence that attributes something to the literature ends with an inline marker such as [3] or [2, 5], using the same {{profile.Sources}} the results cite for it. {{OwnCountRule}} Do not invent numbers, statistics or {{profile.Sources}}.{{answerRule}}
             {{ProseCleaner.PlainProseRule}}
             Respond ONLY with a valid minified JSON object:
             {"limitations":"...","implications":"...","futureResearch":"...","conclusion":"..."{{answerField}}}
@@ -225,7 +227,7 @@ public static class ReviewWriter
             ClosingAnswer answer;
             using (LlmStage.Begin("closing"))
                 answer = await LlmJson.GetAsync<ClosingAnswer>(chat, prompt, LlmJson.JsonMode(0.3), a => ClosingProblem(a.Limitations, a.Implications, a.FutureResearch, a.Conclusion, results + "\n" + facts + "\n" + evidence.BaseFacts, referenceCount,
-                    a.Answers, questions.Count));
+                    a.Answers, questions.Count, ownFacts: facts + "\n" + evidence.BaseFacts, results: results));
             string Clean(string? text) => MethodsSectionWriter.StripMarkdownEmphasis(text!.Trim());
             return new ClosingSections(Clean(answer.Limitations), Clean(answer.Implications), Clean(answer.FutureResearch), Clean(answer.Conclusion),
                 questions.Count == 0 ? null : answer.Answers!.Select(Clean).ToList());
@@ -239,7 +241,7 @@ public static class ReviewWriter
 
     /// <summary>Why a closing answer cannot be used, or null. Public for unit tests.</summary>
     public static string? ClosingProblem(string? limitations, string? implications, string? futureResearch, string? conclusion, string known, int referenceCount,
-        IReadOnlyList<string>? answers = null, int questions = 0)
+        IReadOnlyList<string>? answers = null, int questions = 0, string ownFacts = "", string results = "")
     {
         if (questions > 0)
         {
@@ -257,11 +259,51 @@ public static class ReviewWriter
             return $"the conclusion is too long; keep it to three to five sentences of at most {MaxConclusionWords} words.";
         if (questions > 0 && RepeatedAnswer(conclusion, answers!) is { } repeat)
             return $"conclusion sentence {repeat.Sentence} restates the answer to RQ{repeat.Answer}; the answers are printed just before the conclusion, so say what they mean together for the review objective instead.";
+        if (questions > 0 && ThematicSynthesis.CitedIn(conclusion).Count > 0)
+            return "the conclusion takes no citations when there are research questions: the answers carry them, and the conclusion is the review's own reading of the answers together.";
+        foreach (var (name, text) in parts)
+            if (OwnCountCited(text!, ownFacts, results) is { } own)
+                return $"{name}: \"{own}\" states this review's own count and carries a citation; the review's own counts take no citation.";
         var outside = parts.SelectMany(p => ThematicSynthesis.CitedIn(p.Item2!)).Where(r => r < 1 || r > referenceCount).Distinct().ToList();
         if (outside.Count > 0) return $"citation numbers {string.Join(", ", outside)} are not in the reference list.";
         var knownNumbers = NumbersIn(known);
         var unknown = parts.SelectMany(p => NumbersIn(p.Item2!)).Where(n => !knownNumbers.Contains(n)).Distinct().ToList();
         return unknown.Count > 0 ? $"the text uses {string.Join(", ", unknown)}, which is in neither the results nor the facts; use only their numbers." : null;
+    }
+
+    /// <summary>
+    /// The prompt rule for the review's own counts (issue #116): a sentence that states how many sources the review
+    /// rests on, read in full or found not empirical is the review's statement, not a source's.
+    /// </summary>
+    public const string OwnCountRule =
+        "A sentence that states this review's own counts (how many sources it rests on, how many were read in full text, how many are not empirical) is the review's statement, not a source's: it takes no citation.";
+
+    private static readonly Regex OwnCount = new(
+        @"\b(\d+)\s+(?:(?:included|empirical|non-empirical|primary)\s+)?(?:studies|study|records|papers|sources)\b|\b(\d+)\s+(?:of\s+(?:them|which)\s+)?(?:were|was|are|is)\s+(?:read|assessed|appraised|included|not\s+empirical|non-empirical)\b",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+    /// <summary>
+    /// The first cited sentence of <paramref name="text"/> that states one of the review's own counts, or null (issue
+    /// #116). A count is a number from <paramref name="ownFacts"/> (counted in code) that the sentence uses as a count of
+    /// sources ("13 studies", "9 were read in full text"), unless a cited sentence of <paramref name="results"/> already
+    /// uses that number, which makes it a number from the literature. Public for unit tests.
+    /// </summary>
+    public static string? OwnCountCited(string text, string ownFacts, string results = "")
+    {
+        if (string.IsNullOrWhiteSpace(text) || string.IsNullOrWhiteSpace(ownFacts)) return null;
+        var own = NumbersIn(ownFacts);
+        var fromLiterature = CitationSupportChecker.SplitSentences(results)
+            .Where(s => ThematicSynthesis.CitedIn(s).Count > 0).SelectMany(NumbersIn).ToHashSet();
+        foreach (var sentence in CitationSupportChecker.SplitSentences(text))
+        {
+            if (ThematicSynthesis.CitedIn(sentence).Count == 0) continue;
+            foreach (Match m in OwnCount.Matches(Regex.Replace(sentence, @"\[[^\]]*\]", "")))
+            {
+                string number = m.Groups[1].Success ? m.Groups[1].Value : m.Groups[2].Value;
+                if (own.Contains(number) && !fromLiterature.Contains(number)) return sentence;
+            }
+        }
+        return null;
     }
 
     /// <summary>Words too common to tell two sentences apart.</summary>
@@ -608,7 +650,7 @@ public static class ReviewWriter
 
             REQUIREMENTS:
             1. Write about {{paragraphs}} paragraphs, separated by a blank line: {{profile.DiscussionParts}}
-            2. Interpret, do not repeat the results. Ground every claim in the results above; every sentence that attributes something to the literature ends with an inline marker such as [3] or [2, 5], using the same {{profile.Sources}} the results cite for it.
+            2. Interpret, do not repeat the results. Ground every claim in the results above; every sentence that attributes something to the literature ends with an inline marker such as [3] or [2, 5], using the same {{profile.Sources}} the results cite for it. {{OwnCountRule}}
             3. Do not invent numbers, statistics or {{profile.Sources}}.
             {{ProseCleaner.PlainProseRule}}
             Respond ONLY with a valid minified JSON object:
@@ -620,7 +662,10 @@ public static class ReviewWriter
             {
                 if (string.IsNullOrWhiteSpace(a.Text)) return "text must not be empty.";
                 var outside = ThematicSynthesis.CitedIn(a.Text).Where(r => r < 1 || r > referenceCount).ToList();
-                return outside.Count > 0 ? $"citation numbers {string.Join(", ", outside)} are not in the reference list." : null;
+                if (outside.Count > 0) return $"citation numbers {string.Join(", ", outside)} are not in the reference list.";
+                return OwnCountCited(a.Text, evidence.BaseFacts, synthesis) is { } own
+                    ? $"\"{own}\" states this review's own count and carries a citation; the review's own counts take no citation."
+                    : null;
             });
             return MethodsSectionWriter.StripMarkdownEmphasis(answer.Text!.Trim());
         }

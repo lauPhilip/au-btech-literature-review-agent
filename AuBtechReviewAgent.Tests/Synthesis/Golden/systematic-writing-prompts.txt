@@ -110,7 +110,7 @@ Agent loops recover from faults through supervisor checks [1]. Governance layers
 
 REQUIREMENTS:
 1. Write about 3 paragraphs, separated by a blank line: (a) what the themes together say about the objective, (b) where the themes connect, reinforce or contradict each other, (c) how strong the evidence behind the main findings is. Do not write the limitations, the implications, the directions for future research or a conclusion: they are separate sections written after this one.
-2. Interpret, do not repeat the results. Ground every claim in the results above; every sentence that attributes something to the literature ends with an inline marker such as [3] or [2, 5], using the same studies the results cite for it.
+2. Interpret, do not repeat the results. Ground every claim in the results above; every sentence that attributes something to the literature ends with an inline marker such as [3] or [2, 5], using the same studies the results cite for it. A sentence that states this review's own counts (how many sources it rests on, how many were read in full text, how many are not empirical) is the review's statement, not a source's: it takes no citation.
 3. Do not invent numbers, statistics or studies.
 Write plain paragraphs separated by a blank line: no Markdown, no headings, no bullet or numbered lists, no tables and no bold or italics.
 Respond ONLY with a valid minified JSON object:
