@@ -7,7 +7,7 @@ cff-version: 1.2.0
 message: "If you use TraceableAI in your research, please cite the paper below and the software version you used."
 title: "TraceableAI: an open-source agentic framework for PRISMA-compliant literature synthesis"
 type: software
-version: "0.3.0"
+version: "0.4.0"
 date-released: 2026-11-20
 # The concept DOI always resolves to the newest version on Zenodo. Each release also gets its own version DOI there.
 doi: 10.5281/zenodo.24379094
