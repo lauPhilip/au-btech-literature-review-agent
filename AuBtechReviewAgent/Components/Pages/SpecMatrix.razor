@@ -281,160 +281,6 @@
                     </div>
                 </div>
 
-                <div class="md:col-span-2 space-y-2 pt-4 font-sans max-w-full overflow-hidden">
-                    <span class="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">Table 3.1: Included Studies</span>
-                    <div class="border border-gray-200 bg-white overflow-x-auto print:overflow-visible" tabindex="0" role="region" aria-label="Scrolls sideways">
-                        <table class="w-full text-left border-collapse text-[10px] leading-relaxed table-fixed min-w-[700px] print:min-w-0">
-                            <thead>
-                                <tr class="bg-gray-100 border-b border-gray-200 text-gray-700 font-bold font-mono text-[9px] uppercase sticky top-0 z-10">
-                                    <th class="p-2 border-r border-gray-200 w-[5%]">Ref.</th>
-                                    <th class="p-2 border-r border-gray-200 w-[17%]">Paper Name</th>
-                                    <th class="p-2 border-r border-gray-200 w-[22%]">Executive Summary</th>
-                                    <th class="p-2 border-r border-gray-200 w-[20%]">Inclusion Rationale</th>
-                                    <th class="p-2 border-r border-gray-200 w-[12%] text-center">Source</th>
-                                    <th class="p-2 w-[24%]">Citation (APA 7th)</th>
-                                </tr>
-                            </thead>
-                            <tbody class="divide-y divide-gray-100 text-gray-700 font-sans">
-                                @foreach (var paperRow in tableRecords)
-                                {
-                                    string badgeClass = platformShares.FirstOrDefault(p => p.Category == paperRow.Category)?.Badge ?? "text-gray-800 bg-gray-50";
-                                    <tr class="hover:bg-gray-50/40" id="@($"ref-{paperRow.ReferenceNumber}")">
-                                        <td class="p-2 font-mono text-brand font-bold border-r border-gray-150 align-top">[@paperRow.ReferenceNumber]</td>
-                                        <td class="p-2 border-r border-gray-150 align-top break-words">
-                                            <span class="font-semibold text-gray-900">@paperRow.Title</span>
-                                            @StudyLinks(paperRow)
-                                            @StudyNote(paperRow.ReferenceNumber)
-                                        </td>
-                                        <td class="p-2 text-gray-600 border-r border-gray-150 align-top font-light break-words">@paperRow.Summary</td>
-                                        <td class="p-2 text-gray-600 border-r border-gray-150 align-top font-light text-[9.5px] break-words">@paperRow.InclusionRationale</td>
-                                        <td class="p-2 border-r border-gray-150 align-top text-center font-mono font-medium text-[9.5px]">
-                                            <span class="px-1.5 py-0.5 @badgeClass">@AuBtechReviewAgent.PrismaReviewEngine.CategoryLabel(paperRow.Category)</span>
-                                        </td>
-                                        <td class="p-2 font-mono text-[9px] text-gray-500 bg-gray-50/20 align-top leading-normal break-all">@paperRow.ApaCitation</td>
-                                    </tr>
-                                }
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-
-                @if (extractions.Count > 0)
-                {
-                    <div class="md:col-span-2 space-y-2 pt-2 font-sans max-w-full overflow-hidden">
-                        <span class="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">Table 3.2: Extracted Study Data</span>
-                        <div class="border border-gray-200 bg-white overflow-x-auto print:overflow-visible" tabindex="0" role="region" aria-label="Scrolls sideways">
-                            <table class="w-full text-left border-collapse text-[10px] leading-relaxed table-fixed min-w-[700px] print:min-w-0">
-                                <thead>
-                                    <tr class="bg-gray-100 border-b border-gray-200 text-gray-700 font-bold font-mono text-[9px] uppercase">
-                                        <th class="p-2 border-r border-gray-200 w-[5%]">Ref.</th>
-                                        <th class="p-2 border-r border-gray-200 w-[15%]">Study type</th>
-                                        <th class="p-2 border-r border-gray-200 w-[20%]">Method</th>
-                                        <th class="p-2 border-r border-gray-200 w-[15%]">Sample</th>
-                                        <th class="p-2 w-[45%]">Key findings</th>
-                                    </tr>
-                                </thead>
-                                <tbody class="divide-y divide-gray-100 text-gray-700">
-                                    @foreach (var e in extractions)
-                                    {
-                                        <tr>
-                                            <td class="p-2 font-mono text-brand font-bold border-r border-gray-150 align-top">[@e.ReferenceNumber]</td>
-                                            @if (e.Error != null)
-                                            {
-                                                <td colspan="4" class="p-2 text-red-700">Extraction failed for this study.</td>
-                                            }
-                                            else
-                                            {
-                                                <td class="p-2 border-r border-gray-150 align-top">@e.StudyType<span class="block text-[9px] text-gray-500">@e.EvidenceBasis</span></td>
-                                                <td class="p-2 border-r border-gray-150 align-top">@Evidence(e.Method)</td>
-                                                <td class="p-2 border-r border-gray-150 align-top">@Evidence(e.Sample)</td>
-                                                <td class="p-2 align-top space-y-1">
-                                                    @foreach (var f in e.KeyFindings)
-                                                    {
-                                                        <div>@Evidence(f)</div>
-                                                    }
-                                                </td>
-                                            }
-                                        </tr>
-                                    }
-                                </tbody>
-                            </table>
-                        </div>
-                        <p class="text-[10px] text-gray-500">Hover over a value to see the quote it was taken from. <span class="text-amber-700">†</span> The quote could not be found in the paper's text, so treat the value with caution.</p>
-                    </div>
-
-                    <div class="md:col-span-2 space-y-2 pt-2 font-sans max-w-full overflow-hidden">
-                        <span class="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">Table 3.3: Quality Appraisal and <Term Key="risk-of-bias">Risk of Bias</Term> (MMAT 2018)</span>
-                        @if (extractions.Any(AuBtechReviewAgent.MethodsSectionWriter.ShowInAppraisalTable))
-                        {
-                            <div class="border border-gray-200 bg-white overflow-x-auto print:overflow-visible" tabindex="0" role="region" aria-label="Scrolls sideways">
-                                <table class="w-full text-left border-collapse text-[10px] min-w-[560px] print:min-w-0">
-                                    <thead>
-                                        <tr class="bg-gray-100 border-b border-gray-200 text-gray-700 font-bold font-mono text-[9px] uppercase">
-                                            <th class="p-2 border-r border-gray-200">Ref.</th>
-                                            <th class="p-2 border-r border-gray-200">Category</th>
-                                            @for (int i = 1; i <= 5; i++)
-                                            {
-                                                <th class="p-2 border-r border-gray-200 text-center">@i</th>
-                                            }
-                                            <th class="p-2 text-center" title="How many of the five questions were answered yes. MMAT does not combine them into one score.">Met</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody class="divide-y divide-gray-100 text-gray-700">
-                                        @foreach (var e in extractions.Where(AuBtechReviewAgent.MethodsSectionWriter.ShowInAppraisalTable))
-                                        {
-                                            <tr>
-                                                <td class="p-2 font-mono text-brand font-bold border-r border-gray-150">[@e.ReferenceNumber]</td>
-                                                <td class="p-2 border-r border-gray-150">@AppraisalCategory(e)</td>
-                                                @for (int i = 0; i < 5; i++)
-                                                {
-                                                    var a = i < e.Appraisal.Count ? e.Appraisal[i] : null;
-                                                    var light = AuBtechReviewAgent.RiskOfBias.For(a?.Answer);
-                                                    <td class="p-2 border-r border-gray-150 text-center whitespace-nowrap @light.Text"
-                                                        title="@(a == null ? "" : $"{a.Id} {a.Criterion}{(string.IsNullOrEmpty(a.Quote) ? "" : $" — \"{a.Quote}\"")}")">
-                                                        <span class="inline-block w-2 h-2 rounded-full align-middle mr-1 @light.Dot" aria-hidden="true"></span><span class="align-middle">@light.Word</span>
-                                                    </td>
-                                                }
-                                                <td class="p-2 text-center font-mono whitespace-nowrap">@(e.Appraisal.Count == 0 ? "–" : $"{e.AppraisalYes} of {e.Appraisal.Count}")</td>
-                                            </tr>
-                                        }
-                                    </tbody>
-                                </table>
-                            </div>
-                            <p class="text-[10px] text-gray-500">Hover over an answer to see the question and the supporting quote. "Met" counts the questions answered yes; following MMAT's guidance it is not an overall quality score. Appraised by the language model; check before use.</p>
-                            @foreach (var category in AuBtechReviewAgent.RiskOfBias.Summarise(extractions))
-                            {
-                                <figure class="mt-3 border border-gray-200 bg-white p-3">
-                                    <figcaption class="text-[10px] font-semibold text-gray-700">@category.Category.Replace('_', ' ') studies (@category.Studies): answers per question</figcaption>
-                                    <div class="mt-2 space-y-1.5">
-                                        @foreach (var q in category.Questions)
-                                        {
-                                            <div class="grid grid-cols-[minmax(0,1fr)_8rem] sm:grid-cols-[minmax(0,1fr)_12rem] gap-2 items-center text-[10px]">
-                                                <span class="text-gray-700 leading-snug"><span class="font-mono text-gray-500">@q.Id</span> @q.Criterion</span>
-                                                <span class="flex h-3 w-full overflow-hidden bg-gray-100" role="img" aria-label="@($"{q.Yes} yes, {q.No} no, {q.CantTell} can't tell")"
-                                                      title="@($"{q.Yes} yes · {q.No} no · {q.CantTell} can't tell")">
-                                                    @foreach (var (count, dot) in new[] { (q.Yes, "bg-verdict-ok"), (q.CantTell, "bg-verdict-partial"), (q.No, "bg-verdict-bad") })
-                                                    {
-                                                        @if (count > 0)
-                                                        {
-                                                            <span class="h-full @dot" style="width:@((100.0 * count / q.Total).ToString("0.#", System.Globalization.CultureInfo.InvariantCulture))%"></span>
-                                                        }
-                                                    }
-                                                </span>
-                                            </div>
-                                        }
-                                    </div>
-                                    <p class="mt-2 text-[10px] text-gray-500"><span class="inline-block w-2 h-2 rounded-full bg-verdict-ok align-middle"></span> yes · <span class="inline-block w-2 h-2 rounded-full bg-verdict-partial align-middle"></span> can't tell · <span class="inline-block w-2 h-2 rounded-full bg-verdict-bad align-middle"></span> no</p>
-                                </figure>
-                            }
-                        }
-                        @if (AuBtechReviewAgent.MethodsSectionWriter.NotAppraisedNote(extractions) is { Length: > 0 } notAppraised)
-                        {
-                            <p class="text-[10px] text-gray-500">@notAppraised</p>
-                        }
-                    </div>
-                }
-
                 <div class="space-y-3 md:col-span-2 border-b border-gray-200 pt-2 pb-1">
                     <h2 class="font-sans font-bold text-sm text-brand uppercase tracking-wide">4. Results & Synthesis</h2>
                 </div>
@@ -687,6 +533,165 @@
                 }
             </div>
 
+            @* The tables of the included studies come after the references, as Tables A.1 to A.3 (issue #139). *@
+            <div id="appendix" class="mt-8 pt-4 border-t border-gray-200 text-left overflow-visible space-y-4">
+                <h2 class="font-sans font-bold text-sm text-brand uppercase tracking-wide mb-3">Appendix</h2>
+
+                <div class="md:col-span-2 space-y-2 pt-4 font-sans max-w-full overflow-hidden">
+                    <span class="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">Table A.1: Included Studies</span>
+                    <div class="border border-gray-200 bg-white overflow-x-auto print:overflow-visible" tabindex="0" role="region" aria-label="Scrolls sideways">
+                        <table class="w-full text-left border-collapse text-[10px] leading-relaxed table-fixed min-w-[700px] print:min-w-0">
+                            <thead>
+                                <tr class="bg-gray-100 border-b border-gray-200 text-gray-700 font-bold font-mono text-[9px] uppercase sticky top-0 z-10">
+                                    <th class="p-2 border-r border-gray-200 w-[5%]">Ref.</th>
+                                    <th class="p-2 border-r border-gray-200 w-[17%]">Paper Name</th>
+                                    <th class="p-2 border-r border-gray-200 w-[22%]">Executive Summary</th>
+                                    <th class="p-2 border-r border-gray-200 w-[20%]">Inclusion Rationale</th>
+                                    <th class="p-2 border-r border-gray-200 w-[12%] text-center">Source</th>
+                                    <th class="p-2 w-[24%]">Citation (APA 7th)</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-gray-100 text-gray-700 font-sans">
+                                @foreach (var paperRow in tableRecords)
+                                {
+                                    string badgeClass = platformShares.FirstOrDefault(p => p.Category == paperRow.Category)?.Badge ?? "text-gray-800 bg-gray-50";
+                                    <tr class="hover:bg-gray-50/40" id="@($"ref-{paperRow.ReferenceNumber}")">
+                                        <td class="p-2 font-mono text-brand font-bold border-r border-gray-150 align-top">[@paperRow.ReferenceNumber]</td>
+                                        <td class="p-2 border-r border-gray-150 align-top break-words">
+                                            <span class="font-semibold text-gray-900">@paperRow.Title</span>
+                                            @StudyLinks(paperRow)
+                                            @StudyNote(paperRow.ReferenceNumber)
+                                        </td>
+                                        <td class="p-2 text-gray-600 border-r border-gray-150 align-top font-light break-words">@paperRow.Summary</td>
+                                        <td class="p-2 text-gray-600 border-r border-gray-150 align-top font-light text-[9.5px] break-words">@paperRow.InclusionRationale</td>
+                                        <td class="p-2 border-r border-gray-150 align-top text-center font-mono font-medium text-[9.5px]">
+                                            <span class="px-1.5 py-0.5 @badgeClass">@AuBtechReviewAgent.PrismaReviewEngine.CategoryLabel(paperRow.Category)</span>
+                                        </td>
+                                        <td class="p-2 font-mono text-[9px] text-gray-500 bg-gray-50/20 align-top leading-normal break-all">@paperRow.ApaCitation</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                @if (extractions.Count > 0)
+                {
+                    <div class="md:col-span-2 space-y-2 pt-2 font-sans max-w-full overflow-hidden">
+                        <span class="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">Table A.2: Extracted Study Data</span>
+                        <div class="border border-gray-200 bg-white overflow-x-auto print:overflow-visible" tabindex="0" role="region" aria-label="Scrolls sideways">
+                            <table class="w-full text-left border-collapse text-[10px] leading-relaxed table-fixed min-w-[700px] print:min-w-0">
+                                <thead>
+                                    <tr class="bg-gray-100 border-b border-gray-200 text-gray-700 font-bold font-mono text-[9px] uppercase">
+                                        <th class="p-2 border-r border-gray-200 w-[5%]">Ref.</th>
+                                        <th class="p-2 border-r border-gray-200 w-[15%]">Study type</th>
+                                        <th class="p-2 border-r border-gray-200 w-[20%]">Method</th>
+                                        <th class="p-2 border-r border-gray-200 w-[15%]">Sample</th>
+                                        <th class="p-2 w-[45%]">Key findings</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-gray-100 text-gray-700">
+                                    @foreach (var e in extractions)
+                                    {
+                                        <tr>
+                                            <td class="p-2 font-mono text-brand font-bold border-r border-gray-150 align-top">[@e.ReferenceNumber]</td>
+                                            @if (e.Error != null)
+                                            {
+                                                <td colspan="4" class="p-2 text-red-700">Extraction failed for this study.</td>
+                                            }
+                                            else
+                                            {
+                                                <td class="p-2 border-r border-gray-150 align-top">@e.StudyType<span class="block text-[9px] text-gray-500">@e.EvidenceBasis</span></td>
+                                                <td class="p-2 border-r border-gray-150 align-top">@Evidence(e.Method)</td>
+                                                <td class="p-2 border-r border-gray-150 align-top">@Evidence(e.Sample)</td>
+                                                <td class="p-2 align-top space-y-1">
+                                                    @foreach (var f in e.KeyFindings)
+                                                    {
+                                                        <div>@Evidence(f)</div>
+                                                    }
+                                                </td>
+                                            }
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                        <p class="text-[10px] text-gray-500">Hover over a value to see the quote it was taken from. <span class="text-amber-700">†</span> The quote could not be found in the paper's text, so treat the value with caution.</p>
+                    </div>
+
+                    <div class="md:col-span-2 space-y-2 pt-2 font-sans max-w-full overflow-hidden">
+                        <span class="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">Table A.3: Quality Appraisal and <Term Key="risk-of-bias">Risk of Bias</Term> (MMAT 2018)</span>
+                        @if (extractions.Any(AuBtechReviewAgent.MethodsSectionWriter.ShowInAppraisalTable))
+                        {
+                            <div class="border border-gray-200 bg-white overflow-x-auto print:overflow-visible" tabindex="0" role="region" aria-label="Scrolls sideways">
+                                <table class="w-full text-left border-collapse text-[10px] min-w-[560px] print:min-w-0">
+                                    <thead>
+                                        <tr class="bg-gray-100 border-b border-gray-200 text-gray-700 font-bold font-mono text-[9px] uppercase">
+                                            <th class="p-2 border-r border-gray-200">Ref.</th>
+                                            <th class="p-2 border-r border-gray-200">Category</th>
+                                            @for (int i = 1; i <= 5; i++)
+                                            {
+                                                <th class="p-2 border-r border-gray-200 text-center">@i</th>
+                                            }
+                                            <th class="p-2 text-center" title="How many of the five questions were answered yes. MMAT does not combine them into one score.">Met</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="divide-y divide-gray-100 text-gray-700">
+                                        @foreach (var e in extractions.Where(AuBtechReviewAgent.MethodsSectionWriter.ShowInAppraisalTable))
+                                        {
+                                            <tr>
+                                                <td class="p-2 font-mono text-brand font-bold border-r border-gray-150">[@e.ReferenceNumber]</td>
+                                                <td class="p-2 border-r border-gray-150">@AppraisalCategory(e)</td>
+                                                @for (int i = 0; i < 5; i++)
+                                                {
+                                                    var a = i < e.Appraisal.Count ? e.Appraisal[i] : null;
+                                                    var light = AuBtechReviewAgent.RiskOfBias.For(a?.Answer);
+                                                    <td class="p-2 border-r border-gray-150 text-center whitespace-nowrap @light.Text"
+                                                        title="@(a == null ? "" : $"{a.Id} {a.Criterion}{(string.IsNullOrEmpty(a.Quote) ? "" : $" — \"{a.Quote}\"")}")">
+                                                        <span class="inline-block w-2 h-2 rounded-full align-middle mr-1 @light.Dot" aria-hidden="true"></span><span class="align-middle">@light.Word</span>
+                                                    </td>
+                                                }
+                                                <td class="p-2 text-center font-mono whitespace-nowrap">@(e.Appraisal.Count == 0 ? "–" : $"{e.AppraisalYes} of {e.Appraisal.Count}")</td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
+                            <p class="text-[10px] text-gray-500">Hover over an answer to see the question and the supporting quote. "Met" counts the questions answered yes; following MMAT's guidance it is not an overall quality score. Appraised by the language model; check before use.</p>
+                            @foreach (var category in AuBtechReviewAgent.RiskOfBias.Summarise(extractions))
+                            {
+                                <figure class="mt-3 border border-gray-200 bg-white p-3">
+                                    <figcaption class="text-[10px] font-semibold text-gray-700">@category.Category.Replace('_', ' ') studies (@category.Studies): answers per question</figcaption>
+                                    <div class="mt-2 space-y-1.5">
+                                        @foreach (var q in category.Questions)
+                                        {
+                                            <div class="grid grid-cols-[minmax(0,1fr)_8rem] sm:grid-cols-[minmax(0,1fr)_12rem] gap-2 items-center text-[10px]">
+                                                <span class="text-gray-700 leading-snug"><span class="font-mono text-gray-500">@q.Id</span> @q.Criterion</span>
+                                                <span class="flex h-3 w-full overflow-hidden bg-gray-100" role="img" aria-label="@($"{q.Yes} yes, {q.No} no, {q.CantTell} can't tell")"
+                                                      title="@($"{q.Yes} yes · {q.No} no · {q.CantTell} can't tell")">
+                                                    @foreach (var (count, dot) in new[] { (q.Yes, "bg-verdict-ok"), (q.CantTell, "bg-verdict-partial"), (q.No, "bg-verdict-bad") })
+                                                    {
+                                                        @if (count > 0)
+                                                        {
+                                                            <span class="h-full @dot" style="width:@((100.0 * count / q.Total).ToString("0.#", System.Globalization.CultureInfo.InvariantCulture))%"></span>
+                                                        }
+                                                    }
+                                                </span>
+                                            </div>
+                                        }
+                                    </div>
+                                    <p class="mt-2 text-[10px] text-gray-500"><span class="inline-block w-2 h-2 rounded-full bg-verdict-ok align-middle"></span> yes · <span class="inline-block w-2 h-2 rounded-full bg-verdict-partial align-middle"></span> can't tell · <span class="inline-block w-2 h-2 rounded-full bg-verdict-bad align-middle"></span> no</p>
+                                </figure>
+                            }
+                        }
+                        @if (AuBtechReviewAgent.MethodsSectionWriter.NotAppraisedNote(extractions) is { Length: > 0 } notAppraised)
+                        {
+                            <p class="text-[10px] text-gray-500">@notAppraised</p>
+                        }
+                    </div>
+                }
+            </div>
+
             <div class="mt-12 pt-4 border-t border-gray-200 text-center font-sans text-[9px] text-gray-500 uppercase tracking-widest">
                 OSSYM 2026 - 8th International Open Search Symposium
             </div>
@@ -778,7 +783,9 @@
         e.AppraisalCategory.Replace('_', ' ');
 
     /// <summary>A one-paragraph description of the included set, built only from the run's own data.</summary>
-    private string DataParagraph() => AuBtechReviewAgent.MethodsSectionWriter.IncludedSet(tableRecords);
+    // Section 3 points to the tables in the appendix (issue #139), with the same sentence as main.tex.
+    private string DataParagraph() => (AuBtechReviewAgent.MethodsSectionWriter.IncludedSet(tableRecords) + " " +
+        AuBtechReviewAgent.MethodsSectionWriter.AppendixPointer(tableRecords.Count, extractions)).Trim();
 
     /// <summary>The value with its quote as a tooltip; a dagger when the quote was not found in the paper.</summary>
     private RenderFragment Evidence(AuBtechReviewAgent.EvidencedValue v) => __builder =>
