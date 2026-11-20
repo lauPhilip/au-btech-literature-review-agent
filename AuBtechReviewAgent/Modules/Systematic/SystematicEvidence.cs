@@ -55,9 +55,12 @@ public static class SystematicEvidence
     }
 
     /// <summary>
-    /// Facts about the evidence base for the discussion and the limitations, from the extraction (not the model). The
-    /// study designs are listed in full, each with its count, so a summary of the designs can only repeat the
-    /// extraction (issue #115); a study whose extraction failed or gave no design is counted as such.
+    /// Facts about the evidence base for the discussion, the limitations and the front matter, from the extraction (not
+    /// the model). The designs are grouped by their MMAT category, one of a few fixed values, so a summary of the designs
+    /// cannot list one design under several free-text names (issue #147); every category is listed with its count, so
+    /// a summary can only repeat the extraction (issue #115). Then each study is listed with its design as its authors
+    /// name it, its category and what it was read from, so a sentence that names the design of a cited study or counts
+    /// the abstract-only studies can be written from facts (issue #146). A study whose extraction failed is named as such.
     /// </summary>
     public static string BaseFacts(IReadOnlyList<StudyExtraction> extractions)
     {
@@ -66,16 +69,31 @@ public static class SystematicEvidence
         int notEmpirical = extractions.Count(e => e.AppraisalCategory == "not_empirical");
         // Studies with neither an abstract nor a full text (issue #148) are counted on their own, not as abstract-only.
         int noText = extractions.Count(e => e.AppraisalCategory == StudyExtractor.NotAppraised);
-        var withDesign = extractions.Where(e => e.Error == null && !string.IsNullOrWhiteSpace(e.StudyType)).ToList();
-        var designs = withDesign
-            .GroupBy(e => e.StudyType.Trim().ToLowerInvariant()).OrderByDescending(g => g.Count()).ThenBy(g => g.Key, System.StringComparer.Ordinal)
+        var withCategory = extractions.Where(e => e.Error == null && !string.IsNullOrWhiteSpace(e.AppraisalCategory)).ToList();
+        var categories = withCategory
+            .GroupBy(e => CategoryLabel(e.AppraisalCategory)).OrderByDescending(g => g.Count()).ThenBy(g => g.Key, System.StringComparer.Ordinal)
             .Select(g => $"{g.Key} ({g.Count()})");
-        int noDesign = extractions.Count - withDesign.Count;
-        string designList = withDesign.Count == 0 ? "none was extracted" : string.Join(", ", designs);
+        int noCategory = extractions.Count - withCategory.Count;
+        string categoryList = withCategory.Count == 0 ? "none was extracted" : string.Join(", ", categories);
+        string perStudy = string.Join("; ", extractions.OrderBy(e => e.ReferenceNumber).Select(StudyFact));
         return $"{extractions.Count} studies; full text was read for {fullText} and only the abstract for {extractions.Count - fullText - noText}" +
                (noText > 0 ? $"; {noText} had neither an abstract nor a full text, so nothing was extracted from {(noText == 1 ? "it" : "them")}; " : "; ") +
                $"{notEmpirical} are not empirical (position papers, system descriptions or reviews). " +
-               $"Study designs, the complete list from the data extraction (describe the designs only as listed here): {designList}" +
-               (noDesign > 0 && withDesign.Count > 0 ? $"; no design was extracted for {noDesign}." : ".");
+               $"Study designs by MMAT category, the complete list from the data extraction (describe the designs only by these categories and counts): {categoryList}" +
+               (noCategory > 0 && withCategory.Count > 0 ? $"; no category was extracted for {noCategory}." : ".") +
+               $" Each study's design as its authors name it, its MMAT category and what it was read from (name the design of a cited study, or count the studies read from the abstract only, only as given here): {perStudy}.";
+    }
+
+    /// <summary>An MMAT category as the tables print it, e.g. "quantitative descriptive".</summary>
+    public static string CategoryLabel(string category) => category.Trim().Replace('_', ' ');
+
+    /// <summary>One study for the facts: "[3] survey, quantitative descriptive, abstract only".</summary>
+    private static string StudyFact(StudyExtraction e)
+    {
+        if (e.Error != null) return $"[{e.ReferenceNumber}] nothing extracted";
+        var parts = new List<string> { string.IsNullOrWhiteSpace(e.StudyType) ? "design not reported" : e.StudyType.Trim() };
+        if (!string.IsNullOrWhiteSpace(e.AppraisalCategory)) parts.Add(CategoryLabel(e.AppraisalCategory));
+        if (!string.IsNullOrWhiteSpace(e.EvidenceBasis)) parts.Add(e.EvidenceBasis);
+        return $"[{e.ReferenceNumber}] {string.Join(", ", parts)}";
     }
 }

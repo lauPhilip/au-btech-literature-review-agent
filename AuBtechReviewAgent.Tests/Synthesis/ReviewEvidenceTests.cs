@@ -90,25 +90,48 @@ public class ReviewEvidenceTests
 
         Assert.Equal("[1] - Ana, A. (2025). Short contexts.\n[2] - Bo, B. (2024). Long contexts.", evidence.ReferenceLines());
         Assert.Equal("[2] - Bo, B. (2024). Long contexts.\n[9] - (citation unavailable)", evidence.ReferenceLines(new[] { 9, 2 }));
-        Assert.Equal("2 studies; full text was read for 1 and only the abstract for 1; 1 are not empirical (position papers, system descriptions or reviews). Study designs, the complete list from the data extraction (describe the designs only as listed here): experiment (1); no design was extracted for 1.", evidence.BaseFacts);
+        Assert.Equal("2 studies; full text was read for 1 and only the abstract for 1; 1 are not empirical (position papers, system descriptions or reviews). " +
+                     "Study designs by MMAT category, the complete list from the data extraction (describe the designs only by these categories and counts): none was extracted. " +
+                     "Each study's design as its authors name it, its MMAT category and what it was read from (name the design of a cited study, or count the studies read from the abstract only, only as given here): [1] experiment, full text; [2] nothing extracted.", evidence.BaseFacts);
     }
 
     [Fact]
-    public void TheFactsListEveryStudyDesignNotOnlyTheMostCommon()
+    public void TheFactsGroupTheDesignsByMmatCategory()
     {
-        // Eight designs, more than the six the facts used to show (issue #115); "Case study" and "case study " are one design.
-        string[] types = { "Case study", "case study ", "survey", "survey", "survey", "experiment", "interview study", "action research", "design science", "ethnography", "delphi study" };
-        var extractions = types.Select((t, i) => new StudyExtraction { ReferenceNumber = i + 1, StudyType = t, EvidenceBasis = "full text" })
+        // Issue #147: four names for mixed methods are one category, and every category is listed (issue #115).
+        (string Type, string Category)[] studies =
+        {
+            ("case study with mixed methods", "mixed_methods"), ("mixed methods case study", "mixed_methods"), ("mixed methods intervention study", "mixed_methods"),
+            ("mixed methods with experimental and control groups", "mixed_methods"), ("case study", "qualitative"), ("interview study", "qualitative"),
+            ("cluster-randomized controlled trial", "quantitative_randomized"), ("survey", "quantitative_descriptive"), ("position paper", "not_empirical"),
+        };
+        var extractions = studies.Select((s, i) => new StudyExtraction { ReferenceNumber = i + 1, StudyType = s.Type, AppraisalCategory = s.Category, EvidenceBasis = "full text" })
             .Append(new StudyExtraction { ReferenceNumber = 99, Error = "failed" }).ToList();
 
         string facts = SystematicEvidence.BaseFacts(extractions);
 
-        Assert.EndsWith("Study designs, the complete list from the data extraction (describe the designs only as listed here): survey (3), case study (2), action research (1), " +
-                        "delphi study (1), design science (1), ethnography (1), experiment (1), interview study (1); no design was extracted for 1.", facts);
-        Assert.StartsWith("12 studies; full text was read for 11 and only the abstract for 1;", facts);
-        Assert.DoesNotContain("Most common", facts);
-        Assert.EndsWith("Study designs, the complete list from the data extraction (describe the designs only as listed here): none was extracted.",
+        Assert.Contains("Study designs by MMAT category, the complete list from the data extraction (describe the designs only by these categories and counts): mixed methods (4), qualitative (2), not empirical (1), " +
+                        "quantitative descriptive (1), quantitative randomized (1); no category was extracted for 1.", facts);
+        Assert.StartsWith("10 studies; full text was read for 9 and only the abstract for 1; 1 are not empirical", facts);
+        Assert.DoesNotContain("mixed methods case study (1)", facts);
+        Assert.EndsWith("none was extracted. Each study's design as its authors name it, its MMAT category and what it was read from (name the design of a cited study, or count the studies read from the abstract only, only as given here): [1] nothing extracted.",
             SystematicEvidence.BaseFacts(new[] { new StudyExtraction { ReferenceNumber = 1, Error = "failed" } }));
+    }
+
+    [Fact]
+    public void TheFactsNameEachStudysDesignAndWhatItWasReadFrom()
+    {
+        // Issue #146: the writer called [7, 8] one trial and miscounted the abstract-only studies; both are known in code.
+        var extractions = new[]
+        {
+            new StudyExtraction { ReferenceNumber = 8, StudyType = "mixed methods case study ", AppraisalCategory = "mixed_methods", EvidenceBasis = "abstract only" },
+            new StudyExtraction { ReferenceNumber = 7, StudyType = "cluster-randomized controlled trial", AppraisalCategory = "quantitative_randomized", EvidenceBasis = "abstract only" },
+            new StudyExtraction { ReferenceNumber = 6, StudyType = "", AppraisalCategory = "qualitative", EvidenceBasis = "full text" },
+        };
+
+        Assert.EndsWith("(name the design of a cited study, or count the studies read from the abstract only, only as given here): [6] design not reported, qualitative, full text; " +
+                        "[7] cluster-randomized controlled trial, quantitative randomized, abstract only; [8] mixed methods case study, mixed methods, abstract only.",
+            SystematicEvidence.BaseFacts(extractions));
     }
 
     [Fact]
@@ -123,8 +146,10 @@ public class ReviewEvidenceTests
         };
 
         Assert.Equal("3 studies; full text was read for 1 and only the abstract for 1; 1 had neither an abstract nor a full text, so nothing was extracted from it; " +
-                     "0 are not empirical (position papers, system descriptions or reviews). Study designs, the complete list from the data extraction " +
-                     "(describe the designs only as listed here): survey (2); no design was extracted for 1.", SystematicEvidence.BaseFacts(extractions));
+                     "0 are not empirical (position papers, system descriptions or reviews). Study designs by MMAT category, the complete list from the data extraction (describe the designs only by these categories and counts): quantitative descriptive (2), not appraised (1). " +
+                     "Each study's design as its authors name it, its MMAT category and what it was read from (name the design of a cited study, or count the studies read from the abstract only, only as given here): " +
+                     "[1] survey, quantitative descriptive, full text; [2] survey, quantitative descriptive, abstract only; [3] design not reported, not appraised, no text.",
+            SystematicEvidence.BaseFacts(extractions));
     }
 
     [Fact]

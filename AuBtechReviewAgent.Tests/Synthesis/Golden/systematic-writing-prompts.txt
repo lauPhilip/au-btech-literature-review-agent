@@ -102,7 +102,7 @@ REFERENCE LIST (cite ONLY these numbers):
 [2] - Lee, K. (2026). Agent governance layers. In *Proceedings of the Conference on Agents*.
 
 FACTS ABOUT THE EVIDENCE BASE (from the data extraction; use them wherever you describe the studies or how they were studied, and do not change them):
-2 studies; full text was read for 0 and only the abstract for 2; 0 are not empirical (position papers, system descriptions or reviews). Study designs, the complete list from the data extraction (describe the designs only as listed here): design science artefact with evaluation (2).
+2 studies; full text was read for 0 and only the abstract for 2; 0 are not empirical (position papers, system descriptions or reviews). Study designs by MMAT category, the complete list from the data extraction (describe the designs only by these categories and counts): quantitative descriptive (2). Each study's design as its authors name it, its MMAT category and what it was read from (name the design of a cited study, or count the studies read from the abstract only, only as given here): [1] design science artefact with evaluation, quantitative descriptive, abstract only; [2] design science artefact with evaluation, quantitative descriptive, abstract only.
 
 RESULTS BY THEME:
 ### Recovery and oversight
@@ -140,7 +140,7 @@ REFERENCE LIST (valid citation numbers):
 [2] - Lee, K. (2026). Agent governance layers. In *Proceedings of the Conference on Agents*.
 
 FACTS ABOUT THE EVIDENCE BASE (from the data extraction; do not change them, and describe the studies only as they say):
-2 studies; full text was read for 0 and only the abstract for 2; 0 are not empirical (position papers, system descriptions or reviews). Study designs, the complete list from the data extraction (describe the designs only as listed here): design science artefact with evaluation (2).
+2 studies; full text was read for 0 and only the abstract for 2; 0 are not empirical (position papers, system descriptions or reviews). Study designs by MMAT category, the complete list from the data extraction (describe the designs only by these categories and counts): quantitative descriptive (2). Each study's design as its authors name it, its MMAT category and what it was read from (name the design of a cited study, or count the studies read from the abstract only, only as given here): [1] design science artefact with evaluation, quantitative descriptive, abstract only; [2] design science artefact with evaluation, quantitative descriptive, abstract only.
 
 PEER-REVIEW FEEDBACK:
 - [medium] Thin comparison. -> Compare the two mechanisms.
