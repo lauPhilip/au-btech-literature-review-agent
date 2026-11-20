@@ -134,8 +134,8 @@ public class ReviewPaperTests : IDisposable
         string[] answers = { "Supervisor checks let agent loops recover from faults [1].", "Governance layers audit what agents do [2]." };
 
         const string repeats = "Agent loops recover from faults through supervisor checks, and governance layers audit their actions [1, 2].";
-        Assert.Equal(((int, int)?)(1, 1), ReviewWriter.RepeatedAnswer(repeats, answers));
-        Assert.Equal(((int, int)?)(2, 2), ReviewWriter.RepeatedAnswer("Safety needs more than one safeguard [1]. Governance layers audit what agents do [2].", answers));
+        Assert.Equal<(int, int)?>((1, 1), ReviewWriter.RepeatedAnswer(repeats, answers));
+        Assert.Equal<(int, int)?>((2, 2), ReviewWriter.RepeatedAnswer("Safety needs more than one safeguard [1]. Governance layers audit what agents do [2].", answers));
         Assert.Contains("conclusion sentence 1 restates the answer to RQ1", ReviewWriter.ClosingProblem("a [1].", "b", "c", repeats, known, 2, answers, 2));
 
         const string drawsTogether = "Together, the themes suggest that safe agent loops need both recovery and oversight, and that support for either is still thin.";
