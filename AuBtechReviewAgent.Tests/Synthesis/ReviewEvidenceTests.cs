@@ -135,6 +135,32 @@ public class ReviewEvidenceTests
     }
 
     [Fact]
+    public void EachThemeGetsTheFactsOfItsOwnStudies()
+    {
+        // Issue #146: section 4.3 said two of its four studies were abstract-only, but three were.
+        var byExtraction = new[]
+        {
+            new StudyExtraction { ReferenceNumber = 6, StudyType = "interview study", AppraisalCategory = "qualitative", EvidenceBasis = "full text" },
+            new StudyExtraction { ReferenceNumber = 7, StudyType = "cluster-randomized controlled trial", AppraisalCategory = "quantitative_randomized", EvidenceBasis = "abstract only" },
+            new StudyExtraction { ReferenceNumber = 8, StudyType = "mixed methods case study", AppraisalCategory = "mixed_methods", EvidenceBasis = "abstract only" },
+            new StudyExtraction { ReferenceNumber = 11, StudyType = "case study with mixed methods", AppraisalCategory = "mixed_methods", EvidenceBasis = "abstract only" },
+            new StudyExtraction { ReferenceNumber = 12, Error = "failed" },
+        }.ToDictionary(e => e.ReferenceNumber);
+
+        Assert.Equal("Of the 4 studies in this theme, full text was read for 1 ([6]) and only the abstract for 3 ([7], [8], [11]). " +
+                     "By MMAT category: mixed methods (2: [8], [11]), qualitative (1: [6]), quantitative randomized (1: [7]).",
+            SystematicEvidence.ThemeFacts(new[] { 11, 8, 7, 6 }, byExtraction));
+        Assert.Equal("Of the 1 study in this theme, full text was read for 0 and only the abstract for 0; what 1 ([12]) was read from is not on file. " +
+                     "No MMAT category was extracted for them.", SystematicEvidence.ThemeFacts(new[] { 12 }, byExtraction));
+        Assert.Equal("", SystematicEvidence.ThemeFacts(Array.Empty<int>(), byExtraction));
+
+        // The systematic review's themes carry their facts; the shared shape leaves them empty for other reviews.
+        var evidence = SystematicEvidence.Build(Book(), Records, Papers, Extractions);
+        Assert.Equal("Of the 1 study in this theme, full text was read for 1 ([1]) and only the abstract for 0. No MMAT category was extracted for them.", evidence.Themes[1].Facts);
+        Assert.Equal("", new EvidenceTheme().Facts);
+    }
+
+    [Fact]
     public void StudiesWithNoTextAreCountedApartInTheFacts()
     {
         // Issue #148: a study with only a title is neither abstract-only nor non-empirical.

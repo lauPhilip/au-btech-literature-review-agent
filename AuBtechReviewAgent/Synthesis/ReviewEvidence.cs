@@ -41,6 +41,12 @@ public sealed class EvidenceTheme
 
     /// <summary>The labels of the codes that put each source in this theme.</summary>
     public IReadOnlyDictionary<int, IReadOnlyList<string>> Codes { get; init; } = new Dictionary<int, IReadOnlyList<string>>();
+
+    /// <summary>
+    /// Facts about the theme's sources, counted in code, for the writer of its subsection (issue #146): what they were
+    /// read from and how they were designed. Empty when the module gives none; then the prompt has no such line.
+    /// </summary>
+    public string Facts { get; init; } = "";
 }
 
 /// <summary>

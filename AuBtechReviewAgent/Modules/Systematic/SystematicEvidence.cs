@@ -50,6 +50,7 @@ public static class SystematicEvidence
             Description = t.Description,
             Sources = t.Studies.ToList(),
             Codes = t.Studies.ToDictionary(r => r, r => (IReadOnlyList<string>)book.Codes.Where(c => c.Reference == r && t.CodeIds.Contains(c.Id)).Select(c => c.Label).ToList()),
+            Facts = ThemeFacts(t.Studies, byExtraction),
         }).ToList();
         return new ReviewEvidence { Sources = sources, Themes = themes, BaseFacts = BaseFacts(extractions) };
     }
@@ -82,6 +83,35 @@ public static class SystematicEvidence
                $"Study designs by MMAT category, the complete list from the data extraction (describe the designs only by these categories and counts): {categoryList}" +
                (noCategory > 0 && withCategory.Count > 0 ? $"; no category was extracted for {noCategory}." : ".") +
                $" Each study's design as its authors name it, its MMAT category and what it was read from (name the design of a cited study, or count the studies read from the abstract only, only as given here): {perStudy}.";
+    }
+
+    /// <summary>
+    /// Facts about one theme's studies (issue #146): how many were read in full text and how many from the abstract
+    /// only, and their MMAT categories, each with the studies it counts, so a theme's subsection can say "three of the
+    /// four studies were read from the abstract" only when it is so.
+    /// </summary>
+    public static string ThemeFacts(IReadOnlyCollection<int> studies, IReadOnlyDictionary<int, StudyExtraction> byExtraction)
+    {
+        if (studies.Count == 0) return "";
+        var ordered = studies.Distinct().OrderBy(r => r).ToList();
+        StudyExtraction? Of(int r) => byExtraction.GetValueOrDefault(r);
+        static string Refs(IEnumerable<int> refs) => string.Join(", ", refs.Select(r => $"[{r}]"));
+        static string Counted(List<int> refs) => refs.Count == 0 ? "0" : $"{refs.Count} ({Refs(refs)})";
+        var fullText = ordered.Where(r => Of(r)?.EvidenceBasis == "full text").ToList();
+        var abstractOnly = ordered.Where(r => Of(r)?.EvidenceBasis == "abstract only").ToList();
+        var noText = ordered.Where(r => Of(r)?.EvidenceBasis == StudyExtractor.NoText).ToList();
+        var unknown = ordered.Except(fullText).Except(abstractOnly).Except(noText).ToList();
+        string read = $"Of the {ordered.Count} {(ordered.Count == 1 ? "study" : "studies")} in this theme, full text was read for {Counted(fullText)} and only the abstract for {Counted(abstractOnly)}" +
+                      (noText.Count > 0 ? $"; {Counted(noText)} had neither an abstract nor a full text" : "") +
+                      (unknown.Count > 0 ? $"; what {Counted(unknown)} was read from is not on file" : "") + ".";
+        var categorised = ordered.Where(r => Of(r) is { Error: null } e && !string.IsNullOrWhiteSpace(e.AppraisalCategory)).ToList();
+        var groups = categorised.GroupBy(r => CategoryLabel(Of(r)!.AppraisalCategory))
+            .OrderByDescending(g => g.Count()).ThenBy(g => g.Key, System.StringComparer.Ordinal)
+            .Select(g => $"{g.Key} ({g.Count()}: {Refs(g)})");
+        var uncategorised = ordered.Except(categorised).ToList();
+        string designs = categorised.Count == 0 ? " No MMAT category was extracted for them."
+            : $" By MMAT category: {string.Join(", ", groups)}" + (uncategorised.Count > 0 ? $"; no category for {Counted(uncategorised)}." : ".");
+        return read + designs;
     }
 
     /// <summary>An MMAT category as the tables print it, e.g. "quantitative descriptive".</summary>
