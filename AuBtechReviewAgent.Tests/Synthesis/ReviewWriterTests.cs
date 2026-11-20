@@ -247,4 +247,32 @@ public class ReviewWriterTests : IDisposable
         Assert.Equal("Agents lose detail in long contexts [1, 2].", front.Rationale);
         Assert.Equal(new HashSet<string> { "3", "25", "1.5" }, ReviewWriter.NumbersIn("Of 3 runs [12], 25 sources, and 1.5 times."));
     }
+    [Fact]
+    public async Task ThePeerReviewRevisionSeesTheFactsAboutTheEvidenceBase()
+    {
+        // Issue #115: a revision of the discussion must describe the study designs as the extraction has them.
+        const string facts = "2 studies; full text was read for 2 and only the abstract for 0; 0 are not empirical (position papers, system descriptions or reviews). " +
+                             "Study designs, the complete list from the data extraction (describe the designs only as listed here): survey (2).";
+        var evidence = new ReviewEvidence
+        {
+            Sources = new[]
+            {
+                new EvidenceSource { Reference = 1, ReferenceLine = "Ana (2025). Keeping context short." },
+                new EvidenceSource { Reference = 2, ReferenceLine = "Bo (2026). Retrieval first." },
+            },
+            BaseFacts = facts,
+        };
+        var sections = new List<SynthesisSection> { new() { Field = "synthesis-1", Heading = "Short contexts", Text = "Summaries help [1]. Retrieval helps [2]." } };
+        var model = new FakeChatService()
+            .Returns("""{"comments":[{"section":"discussion","severity":"high","issue":"The designs are not named.","suggestion":"Say how the studies were done."}]}""")
+            .Returns("""{"text":"Two surveys agree that short contexts help [1, 2]."}""");
+
+        var (log, discussion) = await ReviewWriter.PeerReviewAsync(model, WritingProfile.Systematic, sections, "Short contexts help [1, 2].", evidence, referenceCount: 2, parallelism: 1);
+
+        string revise = model.Prompts[1].Replace("\r\n", "\n");
+        Assert.Contains("You are the author revising one section", revise);
+        Assert.Contains("FACTS ABOUT THE EVIDENCE BASE (from the data extraction; do not change them, and describe the studies only as they say):\n" + facts, revise);
+        Assert.Equal("Two surveys agree that short contexts help [1, 2].", discussion);
+        Assert.True(Assert.Single(log.SectionRevisions).Applied);
+    }
 }

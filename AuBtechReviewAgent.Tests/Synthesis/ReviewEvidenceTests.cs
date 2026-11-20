@@ -94,6 +94,24 @@ public class ReviewEvidenceTests
     }
 
     [Fact]
+    public void TheFactsListEveryStudyDesignNotOnlyTheMostCommon()
+    {
+        // Eight designs, more than the six the facts used to show (issue #115); "Case study" and "case study " are one design.
+        string[] types = { "Case study", "case study ", "survey", "survey", "survey", "experiment", "interview study", "action research", "design science", "ethnography", "delphi study" };
+        var extractions = types.Select((t, i) => new StudyExtraction { ReferenceNumber = i + 1, StudyType = t, EvidenceBasis = "full text" })
+            .Append(new StudyExtraction { ReferenceNumber = 99, Error = "failed" }).ToList();
+
+        string facts = SystematicEvidence.BaseFacts(extractions);
+
+        Assert.EndsWith("Study designs, the complete list from the data extraction (describe the designs only as listed here): survey (3), case study (2), action research (1), " +
+                        "delphi study (1), design science (1), ethnography (1), experiment (1), interview study (1); no design was extracted for 1.", facts);
+        Assert.StartsWith("12 studies; full text was read for 11 and only the abstract for 1;", facts);
+        Assert.DoesNotContain("Most common", facts);
+        Assert.EndsWith("Study designs, the complete list from the data extraction (describe the designs only as listed here): none was extracted.",
+            SystematicEvidence.BaseFacts(new[] { new StudyExtraction { ReferenceNumber = 1, Error = "failed" } }));
+    }
+
+    [Fact]
     public void TheShapeHoldsOnlyWhatWasCheckedInCode()
     {
         var evidence = SystematicEvidence.Build(Book(), Records, Papers, Extractions);
