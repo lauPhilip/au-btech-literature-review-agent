@@ -212,7 +212,8 @@ public partial class PrismaReviewEngine
         var ab = new StringBuilder();
         ab.AppendLine(@"\small");
         ab.AppendLine(@"\begin{tabularx}{\textwidth}{>{\hsize=0.6\hsize}X >{\hsize=1.2\hsize}X >{\hsize=1.0\hsize}X >{\hsize=0.5\hsize}X >{\hsize=1.7\hsize}X}");
-        ab.AppendLine(@"\multicolumn{5}{l}{\textbf{Table A.1: Included studies}} \\\\");
+        // One line break, as in A.2 and A.3: a second one added an empty row under the title (issue #145).
+        ab.AppendLine(@"\multicolumn{5}{l}{\textbf{Table A.1: Included studies}} \\");
         ab.AppendLine(@"\toprule");
         ab.AppendLine(@"\textbf{Paper Name} & \textbf{Executive Summary} & \textbf{Inclusion Rationale} & \textbf{Source} & \textbf{Citation (APA 7th)} \\");
         ab.AppendLine(@"\midrule");
@@ -386,6 +387,7 @@ public partial class PrismaReviewEngine
     }
 
     /// <summary>Table A.2 (extracted data, with a mark where the supporting quote was found) and Table A.3 (MMAT), in the appendix.</summary>
+    /// <remarks>The appendix is set in \small; each note returns to \small, not \normalsize, so A.3 matches A.1 and A.2.</remarks>
     private string ExtractionTables(IReadOnlyList<StudyExtraction> extractions)
     {
         string V(EvidencedValue v) => EscapeLatexText(v.Value) + (v.QuoteVerified ? "" : (v.Value.Equals("not reported", StringComparison.OrdinalIgnoreCase) ? "" : "$^{\\dagger}$"));
@@ -406,7 +408,7 @@ public partial class PrismaReviewEngine
             sb.AppendLine($"{{[}}{e.ReferenceNumber}{{]}} & {EscapeLatexText(e.StudyType)} & {V(e.Method)} & {V(e.Sample)} & {findings} \\\\ \\hline");
         }
         sb.AppendLine(@"\end{tabularx}");
-        sb.AppendLine(@"\vspace{2pt}\noindent\scriptsize $^{\dagger}$ The supporting quote given by the model was not found in the paper's text; treat the value with caution. Evidence: full text or abstract, see extraction.json.\normalsize");
+        sb.AppendLine(@"\vspace{2pt}\noindent\scriptsize $^{\dagger}$ The supporting quote given by the model was not found in the paper's text; treat the value with caution. Evidence: full text or abstract, see extraction.json.\small");
         sb.AppendLine(@"\vspace{10pt}");
 
         string A(string answer) => answer switch { "yes" => "Yes", "no" => "No", _ => "?" };
@@ -414,7 +416,9 @@ public partial class PrismaReviewEngine
         if (appraised.Count > 0)
         {
             sb.AppendLine(@"\begin{tabularx}{\textwidth}{>{\hsize=0.4\hsize}X >{\hsize=1.6\hsize}X c c c c c c}");
-            sb.AppendLine(@"\multicolumn{8}{l}{\textbf{Table A.3: Quality Appraisal (MMAT 2018; Yes / No / ? = can't tell; Met = questions answered yes, not an overall score)}} \\");
+            // A short title: the long one with the key ran 154 pt past the text block and squeezed the Ref and
+            // Category columns. The key is in the note under the table (issue #145).
+            sb.AppendLine(@"\multicolumn{8}{l}{\textbf{Table A.3: Quality Appraisal (MMAT 2018)}} \\");
             sb.AppendLine(@"\toprule");
             sb.AppendLine(@"\textbf{Ref.} & \textbf{Category} & \textbf{1} & \textbf{2} & \textbf{3} & \textbf{4} & \textbf{5} & \textbf{Met} \\");
             sb.AppendLine(@"\midrule");
@@ -429,11 +433,16 @@ public partial class PrismaReviewEngine
             sb.AppendLine(@"\end{tabularx}");
         }
         string notAppraised = MethodsSectionWriter.NotAppraisedNote(extractions, "--");
-        if (notAppraised.Length > 0)
-            sb.AppendLine(@"\vspace{2pt}\noindent\scriptsize " + EscapeLatexText(notAppraised.TrimEnd('.')) + @".\normalsize");
+        string note = string.Join(" ", new[] { appraised.Count > 0 ? AppraisalTableKey : "", notAppraised }.Where(n => n.Length > 0));
+        if (note.Length > 0)
+            sb.AppendLine(@"\vspace{2pt}\noindent\scriptsize " + EscapeLatexText(note.TrimEnd('.')) + @".\small");
         sb.AppendLine(@"\vspace{10pt}");
         return sb.ToString();
     }
+
+    /// <summary>The key to Table A.3, printed in the note under the table.</summary>
+    public const string AppraisalTableKey =
+        "Columns 1 to 5 are the five MMAT 2018 criteria for the study's category, answered Yes, No or ? (can't tell). Met is the number answered Yes; it is not an overall score.";
 
     private static readonly string[] PieColors = { "teal!40", "orange!40", "blue!30", "yellow!40", "purple!30", "red!30", "green!30", "gray!30" };
 

@@ -65,6 +65,37 @@ public class ApaCitationBuilderTests
     }
 
     [Fact]
+    public void AJournalReferenceWithOnlyTheArxivDoiSaysTheLinkIsThePreprint()
+    {
+        // Issue #151: "Applied Sciences, Volume 14, Issue 2. https://doi.org/10.48550/arXiv.2407.00334" put the
+        // volume inside the italic venue and gave the preprint's DOI as if it were the journal's.
+        var paper = Paper(id: "http://arxiv.org/abs/2407.00334v1", authors: new List<string> { "Ana Lopes" },
+            title: "Serious play in engineering education", date: "Published: 2024",
+            venue: "Applied Sciences, Volume 14, Issue 2", doi: "10.48550/arXiv.2407.00334");
+
+        var result = ApaCitationBuilder.Build(paper);
+
+        Assert.Equal("Lopes, A. (2024). Serious play in engineering education. *Applied Sciences*, *14*(2). Preprint: https://doi.org/10.48550/arXiv.2407.00334", result.Citation);
+        Assert.Equal("Journals", result.VenueType);
+        Assert.Equal("Applied Sciences", result.VenueName);
+    }
+
+    [Theory]
+    [InlineData("Applied Sciences, Volume 14, Issue 2", "*Applied Sciences*, *14*(2).", "Applied Sciences")]
+    [InlineData("IEEE Access, vol. 12, no. 3, pp. 10-20", "*IEEE Access*, *12*(3), 10\u201320.", "IEEE Access")]
+    [InlineData("Computers & Education, Vol. 7", "*Computers & Education*, *7*.", "Computers & Education")]
+    [InlineData("IEEE Transactions on Education, Volume 66, Issue 1", "*IEEE Transactions on Education*, *66*(1).", "IEEE Transactions on Education")]
+    [InlineData("Journal of Volume Studies", "*Journal of Volume Studies*.", "Journal of Volume Studies")]
+    public void VolumeIssueAndPagesFollowTheItalicVenueAsInApa(string venue, string expectedPart, string expectedName)
+    {
+        var result = ApaCitationBuilder.Build(Paper(venue: venue, doi: "10.1016/j.epsr.2025.109876"));
+
+        Assert.Contains(" " + expectedPart + " https://doi.org/10.1016/j.epsr.2025.109876", result.Citation);
+        Assert.Equal(expectedName, result.VenueName);
+        Assert.DoesNotContain("Preprint", result.Citation);
+    }
+
+    [Fact]
     public void ConferenceVenueUsesInPrefix()
     {
         var result = ApaCitationBuilder.Build(Paper(venue: "2025 40th IEEE/ACM International Conference on Automated Software Engineering Workshops (ASEW)"));

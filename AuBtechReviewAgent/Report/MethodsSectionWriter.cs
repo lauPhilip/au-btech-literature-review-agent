@@ -108,11 +108,17 @@ public static class MethodsSectionWriter
             sb.Append("No additional search strings were used. ");
         }
 
-        sb.Append($"Each source contributed at most {maxResultsPerSource} record{(maxResultsPerSource == 1 ? "" : "s")} in total across all search strings. ");
+        // The cap counts records that go on to screening, after duplicates and the year filter, so a source can
+        // show more records identified in the flow diagram than the cap (issue #150).
+        bool yearFilter = yearFrom > 0 && yearTo > 0;
+        sb.Append($"At most {maxResultsPerSource} record{(maxResultsPerSource == 1 ? "" : "s")} from each source went on to screening, across all search strings. ");
+        sb.Append(yearFilter
+            ? "Duplicates and records outside the year range did not count towards this limit, so a source can show more records identified in the flow diagram. "
+            : "Duplicates did not count towards this limit, so a source can show more records identified in the flow diagram. ");
         sb.Append($"Duplicates were removed across all sources by identifier, DOI and normalised title ({duplicatesRemoved} removed)");
         sb.Append(cappedBeyondMax > 0 ? $", and {cappedBeyondMax} further record{(cappedBeyondMax == 1 ? " was" : "s were")} dropped by the per-source cap. " : ". ");
         sb.Append("Every record removed at this stage is listed with its reason in the run ledger. ");
-        if (yearFrom > 0 && yearTo > 0)
+        if (yearFilter)
         {
             sb.Append($"Records with a publication year outside {yearFrom}-{yearTo} were removed after retrieval ({outsideDateRange} removed); records with no year in the source metadata were kept. ");
             sb.Append("No language or document-type limits were applied.");

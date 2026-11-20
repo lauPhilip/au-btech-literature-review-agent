@@ -18,8 +18,24 @@ public class MethodsSectionWriterTests
         string text = MethodsSectionWriter.SearchStrategy(perspectives[0], perspectives, 3, 2, 0);
 
         foreach (var p in perspectives) Assert.Contains($"\"{p}\"", text);
-        Assert.Contains("at most 3 records", text);
+        Assert.Contains("At most 3 records from each source went on to screening", text);
         Assert.Contains("2 removed", text);
+    }
+
+    [Fact]
+    public void ThePerSourceLimitSaysItCountsRecordsSentToScreening()
+    {
+        // Issue #150: "contributed at most 5 records in total" read as if it contradicted the flow diagram,
+        // which counts every record identified, duplicates and records outside the years included.
+        string withYears = MethodsSectionWriter.SearchStrategy("lego serious play", new[] { "lego serious play" }, 5, 4, 0,
+            yearFrom: 2020, yearTo: 2026, outsideDateRange: 2);
+        Assert.Contains("At most 5 records from each source went on to screening, across all search strings.", withYears);
+        Assert.Contains("Duplicates and records outside the year range did not count towards this limit", withYears);
+        Assert.DoesNotContain("in total across", withYears);
+
+        string noYears = MethodsSectionWriter.SearchStrategy("lego serious play", new[] { "lego serious play" }, 1, 0, 0);
+        Assert.Contains("At most 1 record from each source went on to screening", noYears);
+        Assert.Contains("Duplicates did not count towards this limit", noYears);
     }
 
     [Fact]
