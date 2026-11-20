@@ -642,7 +642,7 @@ public static class ReviewWriter
             REFERENCE LIST (cite ONLY these numbers):
             {{evidence.ReferenceLines()}}
 
-            FACTS ABOUT THE EVIDENCE BASE ({{profile.BaseFactsFrom}}; use them for the limitations, do not change them):
+            FACTS ABOUT THE EVIDENCE BASE ({{profile.BaseFactsFrom}}; use them wherever you describe the {{profile.Sources}} or how they were studied, and do not change them):
             {{evidence.BaseFacts}}
 
             RESULTS BY THEME:
@@ -750,6 +750,9 @@ public static class ReviewWriter
 
                     REFERENCE LIST (valid citation numbers):
                     {{evidence.ReferenceLines()}}
+
+                    FACTS ABOUT THE EVIDENCE BASE ({{profile.BaseFactsFrom}}; do not change them, and describe the {{profile.Sources}} only as they say):
+                    {{evidence.BaseFacts}}
 
                     PEER-REVIEW FEEDBACK:
                     {{feedback}}
