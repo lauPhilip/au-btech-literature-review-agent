@@ -106,6 +106,29 @@ public static class ApaCitationBuilder
         return new ApaResult(string.Join(" ", parts), venueType, venue, year);
     }
 
+    /// <summary>A run of a reference's text, set in italics or not.</summary>
+    public record TextSpan(string Text, bool Italic);
+
+    /// <summary>
+    /// Splits a reference built by <see cref="Build"/> into plain and italic runs, so a web page can set
+    /// "*Journal*, *14*(2)" in italics instead of printing the asterisks (issue #128). The fields of a reference
+    /// never hold an asterisk (<c>CleanText</c> removes them), so each pair marks one italic run. A reference
+    /// with an unpaired asterisk, from an older run, is shown plain with its asterisks removed.
+    /// </summary>
+    public static IReadOnlyList<TextSpan> ItalicSpans(string? citation)
+    {
+        string text = citation ?? "";
+        if (text.Length == 0) return Array.Empty<TextSpan>();
+        string[] parts = text.Split('*');
+        if (parts.Length % 2 == 0) return new[] { new TextSpan(text.Replace("*", ""), false) };
+        var spans = new List<TextSpan>();
+        for (int i = 0; i < parts.Length; i++)
+        {
+            if (parts[i].Length > 0) spans.Add(new TextSpan(parts[i], i % 2 == 1));
+        }
+        return spans;
+    }
+
     public static int ExtractYear(string? publishedDate)
     {
         if (string.IsNullOrWhiteSpace(publishedDate)) return 0;
