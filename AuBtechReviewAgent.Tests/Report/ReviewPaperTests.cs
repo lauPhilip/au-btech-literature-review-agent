@@ -105,6 +105,23 @@ public class ReviewPaperTests : IDisposable
     }
 
     [Fact]
+    public void AnAppendixComesAfterTheReferencesOnlyWhenThereIsOne()
+    {
+        // Issue #139: the tables of the included studies go to an appendix after the references.
+        var paper = new ReviewPaper { Title = "T", References = { "Ana (2025). Keeping context short." }, AppendixLatex = "APPENDIX TABLES\n" };
+        string tex = PaperLatex.Build(paper).Replace("\r\n", "\n");
+
+        int references = tex.IndexOf(@"\end{thebibliography}", StringComparison.Ordinal);
+        int appendix = tex.IndexOf(@"\section*{Appendix}", StringComparison.Ordinal);
+        Assert.True(references > 0 && appendix > references, "the appendix comes after the references");
+        Assert.True(tex.IndexOf("APPENDIX TABLES", StringComparison.Ordinal) > appendix);
+        Assert.EndsWith("APPENDIX TABLES\n\\end{document}\n", tex); // the appendix's LaTeX is kept as it is
+
+        string without = PaperLatex.Build(new ReviewPaper { Title = "T" });
+        Assert.DoesNotContain("Appendix", without);
+    }
+
+    [Fact]
     public void AClosingAnswerIsRejectedWhenAPartIsMissingTooLongOrUnfounded()
     {
         const string known = "Agent loops recover through supervisor checks [1]. 2 studies were included.";
