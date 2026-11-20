@@ -64,13 +64,16 @@ public static class SystematicEvidence
         if (extractions.Count == 0) return "(no extraction data)";
         int fullText = extractions.Count(e => e.EvidenceBasis == "full text");
         int notEmpirical = extractions.Count(e => e.AppraisalCategory == "not_empirical");
+        // Studies with neither an abstract nor a full text (issue #148) are counted on their own, not as abstract-only.
+        int noText = extractions.Count(e => e.AppraisalCategory == StudyExtractor.NotAppraised);
         var withDesign = extractions.Where(e => e.Error == null && !string.IsNullOrWhiteSpace(e.StudyType)).ToList();
         var designs = withDesign
             .GroupBy(e => e.StudyType.Trim().ToLowerInvariant()).OrderByDescending(g => g.Count()).ThenBy(g => g.Key, System.StringComparer.Ordinal)
             .Select(g => $"{g.Key} ({g.Count()})");
         int noDesign = extractions.Count - withDesign.Count;
         string designList = withDesign.Count == 0 ? "none was extracted" : string.Join(", ", designs);
-        return $"{extractions.Count} studies; full text was read for {fullText} and only the abstract for {extractions.Count - fullText}; " +
+        return $"{extractions.Count} studies; full text was read for {fullText} and only the abstract for {extractions.Count - fullText - noText}" +
+               (noText > 0 ? $"; {noText} had neither an abstract nor a full text, so nothing was extracted from {(noText == 1 ? "it" : "them")}; " : "; ") +
                $"{notEmpirical} are not empirical (position papers, system descriptions or reviews). " +
                $"Study designs, the complete list from the data extraction (describe the designs only as listed here): {designList}" +
                (noDesign > 0 && withDesign.Count > 0 ? $"; no design was extracted for {noDesign}." : ".");

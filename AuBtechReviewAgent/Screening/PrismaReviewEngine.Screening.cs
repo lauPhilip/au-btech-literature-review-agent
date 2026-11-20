@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
@@ -37,6 +38,26 @@ public class ScreeningAnswer
         return null;
     }
 
+    /// <summary>
+    /// The problem with an answer for a record that has no abstract: its reasoning or summary describes an abstract
+    /// anyway (issue #132: "The abstract suggests a simulation-based evaluation" for a record with none).
+    /// </summary>
+    public static string? ValidateWithoutAbstract(ScreeningAnswer a) =>
+        Validate(a) ?? (ClaimsAnAbstract(a.Reasoning) || ClaimsAnAbstract(a.BriefSummary)
+            ? "This record has no abstract, but your reasoning or summary refers to one. Base both on the title and venue only, and do not describe an abstract."
+            : null);
+
+    // "no abstract", "without an abstract", "the abstract is missing": saying that there is none is fine.
+    private static readonly Regex NoAbstractPhrase = new(
+        @"\b(?:no|without|missing|lacks?|lacking|absent|unavailable|empty)\W+(?:\w+\W+){0,2}?abstracts?\b" +
+        @"|\babstracts?\W+(?:\w+\W+){0,2}?(?:missing|absent|unavailable|empty|not\s+(?:available|provided|given|present))\b",
+        RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+    private static readonly Regex AbstractWord = new(@"\babstracts?\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+
+    /// <summary>True when the text speaks of an abstract other than to say there is none.</summary>
+    public static bool ClaimsAnAbstract(string? text) =>
+        !string.IsNullOrWhiteSpace(text) && AbstractWord.IsMatch(NoAbstractPhrase.Replace(text, " "));
+
     public ScreeningAnswer Normalized() => new()
     {
         Decision = IsIncluded ? "Included" : "Excluded",
@@ -54,7 +75,7 @@ public partial class PrismaReviewEngine
     /// Part of the screening cache key: change it whenever a screening prompt changes, so decisions made
     /// with an older prompt are never reused.
     /// </summary>
-    public const string ScreeningPromptVersion = "screening-v5";
+    public const string ScreeningPromptVersion = "screening-v6";
 
     private sealed record ScreeningOutcome(
         AcademicPaper Paper,
@@ -249,13 +270,17 @@ public partial class PrismaReviewEngine
     public static async Task<ScreeningAnswer> ScreenPaperAsync(IChatCompletionService chatService, AcademicPaper paper, string inclusionCriteria, string exclusionCriteria, bool secondScreener = false)
     {
         string authorList = string.Join(", ", paper.Authors ?? new List<string>());
+        bool noAbstract = string.IsNullOrWhiteSpace(paper.Abstract);
         string record = $"""
             - Title: {paper.Title}
             - Authors: {authorList}
             - Date Context: {paper.PublishedDate}
             - Publication/Journal Venue: {paper.JournalSource}
-            - Abstract: {paper.Abstract}
+            - Abstract: {(noAbstract ? "(none: this record has no abstract)" : paper.Abstract)}
             """;
+        string noAbstractNotice = noAbstract
+            ? "\nTHIS RECORD HAS NO ABSTRACT. Judge it on the title and venue only, and do not describe or quote an abstract in the reasoning or the summary.\n"
+            : "";
 
         string procedure = ScreeningProcedure(secondScreener);
 
@@ -272,16 +297,33 @@ public partial class PrismaReviewEngine
 
             PAPER TARGET DATA:
             {{PromptSafety.Wrap(record, "paper metadata and abstract")}}
-
+            {{noAbstractNotice}}
             {{procedure}}
             (The reference string is built separately from the source metadata - do not write one.)
 
             {{ScreeningAnswerFormat}}
             """;
 
-        var answer = await LlmJson.GetAsync<ScreeningAnswer>(chatService, prompt, JsonMode(0.0), ScreeningAnswer.Validate);
-        return answer.Normalized();
+        if (!noAbstract)
+            return (await LlmJson.GetAsync<ScreeningAnswer>(chatService, prompt, JsonMode(0.0), ScreeningAnswer.Validate)).Normalized();
+
+        // A record without an abstract: an answer that still describes one is sent back. If the model keeps doing
+        // it, the decision is kept but its reason is flagged, so a reader knows not to trust that part (issue #132).
+        try
+        {
+            return (await LlmJson.GetAsync<ScreeningAnswer>(chatService, prompt, JsonMode(0.0), ScreeningAnswer.ValidateWithoutAbstract)).Normalized();
+        }
+        catch (LlmOutputException)
+        {
+            var answer = (await LlmJson.GetAsync<ScreeningAnswer>(chatService, prompt, JsonMode(0.0), ScreeningAnswer.Validate)).Normalized();
+            if (ScreeningAnswer.ClaimsAnAbstract(answer.Reasoning) || ScreeningAnswer.ClaimsAnAbstract(answer.BriefSummary))
+                answer.Reasoning = AbstractClaimWarning + " " + answer.Reasoning;
+            return answer;
+        }
     }
+
+    /// <summary>Put before a reason that speaks of an abstract the record does not have.</summary>
+    public const string AbstractClaimWarning = "(Warning: this reason mentions an abstract, but the record has none, so that part was not read from the record.)";
 
     /// <summary>
     /// The screening steps, shared by the systematic and the multivocal review so both screen with the same care

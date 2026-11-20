@@ -208,6 +208,9 @@ public static class MethodsSectionWriter
         sb.Append("Study quality was appraised with the Mixed Methods Appraisal Tool (MMAT, 2018): the model chose the study category and answered its five criteria with yes, no or can't tell, each backed by a quote; an answer whose quote could not be found in the text was changed to can't tell. ");
         sb.Append($"{appraised.Count} stud{(appraised.Count == 1 ? "y was" : "ies were")} appraised ({cantTell} of {answers} answers were can't tell)");
         sb.Append(notEmpirical > 0 ? $", and {notEmpirical} {(notEmpirical == 1 ? "was" : "were")} classified as non-empirical (for example position papers), to which MMAT does not apply. " : ". ");
+        int noText = extractions.Count(e => e.AppraisalCategory == StudyExtractor.NotAppraised);
+        if (noText > 0)
+            sb.Append($"{noText} stud{(noText == 1 ? "y had" : "ies had")} neither an abstract nor a full text, so nothing was extracted from {(noText == 1 ? "it and it was" : "them and they were")} not appraised. ");
         if (failed > 0) sb.Append($"Extraction failed for {failed} stud{(failed == 1 ? "y" : "ies")}. ");
         sb.Append("MMAT is not used to compute an overall score. The appraisal was done by a language model without a second human appraiser, so it should be checked before use (see extraction.json).");
         return sb.ToString();
@@ -350,16 +353,31 @@ public static class MethodsSectionWriter
     /// so they are left out of the table and named in <see cref="NotAppraisedNote"/> instead; studies whose
     /// extraction failed stay in the table, because that failure is something a reader should see.
     /// </summary>
-    public static bool ShowInAppraisalTable(StudyExtraction e) => e.Error != null || e.AppraisalCategory != "not_empirical";
+    public static bool ShowInAppraisalTable(StudyExtraction e) =>
+        e.Error != null || (e.AppraisalCategory != "not_empirical" && e.AppraisalCategory != StudyExtractor.NotAppraised);
 
     /// <summary>
-    /// One sentence naming the studies left out of the MMAT table, e.g. "[1], [4]-[5] and [10] were classified
-    /// as non-empirical ...". Empty when every study is in the table.
+    /// The note naming the studies left out of the MMAT table, e.g. "[1], [4]-[5] and [10] were classified
+    /// as non-empirical ...", with a second sentence for studies that had no text to appraise. Empty when every
+    /// study is in the table.
     /// </summary>
     public static string NotAppraisedNote(IEnumerable<StudyExtraction> extractions, string rangeDash = "\u2013")
     {
-        var refs = extractions.Where(e => !ShowInAppraisalTable(e)).Select(e => e.ReferenceNumber).Distinct().OrderBy(n => n).ToList();
-        if (refs.Count == 0) return "";
+        var left = extractions.Where(e => !ShowInAppraisalTable(e)).ToList();
+        var nonEmpirical = left.Where(e => e.AppraisalCategory == "not_empirical").Select(e => e.ReferenceNumber).Distinct().OrderBy(n => n).ToList();
+        var noText = left.Where(e => e.AppraisalCategory == StudyExtractor.NotAppraised).Select(e => e.ReferenceNumber).Distinct().OrderBy(n => n).ToList();
+        var sentences = new List<string>();
+        if (nonEmpirical.Count > 0)
+            sentences.Add($"{Studies(nonEmpirical, rangeDash)} {(nonEmpirical.Count == 1 ? "was" : "were")} classified as non-empirical (for example reviews or position papers), to which MMAT does not apply.");
+        // Issue #148: a study with only a title is not called non-empirical; it was not appraised at all.
+        if (noText.Count > 0)
+            sentences.Add($"{Studies(noText, rangeDash)} {(noText.Count == 1 ? "was" : "were")} not appraised, because neither an abstract nor a full text was available.");
+        return sentences.Count == 0 ? "" : "Not shown: " + string.Join(" ", sentences);
+    }
+
+    /// <summary>"9 studies ([1], [4], [5] and [13]-[16])".</summary>
+    private static string Studies(List<int> refs, string rangeDash)
+    {
         var parts = new List<string>();
         for (int i = 0; i < refs.Count; i++)
         {
@@ -371,8 +389,6 @@ public static class MethodsSectionWriter
             else parts.Add(end == start ? $"[{start}]" : $"[{start}]{rangeDash}[{end}]");
         }
         string list = parts.Count == 1 ? parts[0] : string.Join(", ", parts.Take(parts.Count - 1)) + " and " + parts[^1];
-        string verb = refs.Count == 1 ? "was" : "were";
-        string study = refs.Count == 1 ? "study" : "studies";
-        return $"Not shown: {refs.Count} {study} ({list}) {verb} classified as non-empirical (for example reviews or position papers), to which MMAT does not apply.";
+        return $"{refs.Count} {(refs.Count == 1 ? "study" : "studies")} ({list})";
     }
 }
