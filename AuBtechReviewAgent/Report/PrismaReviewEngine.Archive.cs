@@ -207,20 +207,21 @@ public partial class PrismaReviewEngine
         sb.AppendLine(@"\begin{tabularx}{\textwidth}{>{\hsize=0.6\hsize}X >{\hsize=1.2\hsize}X >{\hsize=1.0\hsize}X >{\hsize=0.5\hsize}X >{\hsize=1.7\hsize}X}");
         sb.AppendLine(@"\multicolumn{5}{l}{\textbf{Table 3.1: Included studies}} \\\\");
         sb.AppendLine(@"\toprule");
-        sb.AppendLine(@"\textbf{Paper Name} & \textbf{Executive Summary} & \textbf{Inclusion Rationale} & \textbf{Category} & \textbf{Citation (APA 7th)} \\");
+        sb.AppendLine(@"\textbf{Paper Name} & \textbf{Executive Summary} & \textbf{Inclusion Rationale} & \textbf{Source} & \textbf{Citation (APA 7th)} \\");
         sb.AppendLine(@"\midrule");
         foreach (var row in records)
         {
             string title = EscapeLatexText(row.Title);
             string summary = EscapeLatexText(row.Summary);
             string rationale = EscapeLatexText(row.InclusionRationale);
-            string category = EscapeLatexText(row.Category);
+            // The database by its display name, as on the paper page (issue #133).
+            string source = EscapeLatexText(CategoryLabel(row.Category));
             string citation = EscapeLatexText(row.ApaCitation);
-            sb.AppendLine($"{title} & {summary} & {rationale} & {category} & {citation} \\\\ \\hline");
+            sb.AppendLine($"{title} & {summary} & {rationale} & {source} & {citation} \\\\ \\hline");
         }
         sb.AppendLine(@"\end{tabularx}");
         sb.AppendLine(@"\vspace{4pt}\noindent\small ");
-        sb.AppendLine(@"Table 3.1 lists each included study with a short summary, the reason it was included, its category and its reference.");
+        sb.AppendLine(@"Table 3.1 lists each included study with a short summary, the reason it was included, the database it came from and its reference.");
         if (state?.Extractions is { Count: > 0 } extractions)
         {
             sb.AppendLine(@"\vspace{10pt}");
