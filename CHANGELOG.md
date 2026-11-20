@@ -6,6 +6,8 @@ Each version's section becomes the notes of its GitHub release, so write it for 
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-11-20
+
 The data taken from each study is shorter and better backed. This changes what the model is asked, so runs can differ from 0.2.3.
 
 ### Fixed
@@ -94,7 +96,8 @@ The version now comes from the release tag. You can see it on the Metrics page, 
 
 Screening and citation checks now use a smaller, faster model. The writing still uses the large one, where it counts.
 
-[Unreleased]: https://github.com/lauPhilip/au-btech-literature-review-agent/compare/v0.2.3...HEAD
+[Unreleased]: https://github.com/lauPhilip/au-btech-literature-review-agent/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/lauPhilip/au-btech-literature-review-agent/compare/v0.2.3...v0.3.0
 [0.2.3]: https://github.com/lauPhilip/au-btech-literature-review-agent/compare/v0.2.2...v0.2.3
 [0.2.2]: https://github.com/lauPhilip/au-btech-literature-review-agent/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/lauPhilip/au-btech-literature-review-agent/compare/v0.2.0...v0.2.1
