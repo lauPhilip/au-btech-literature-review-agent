@@ -54,13 +54,16 @@ public class AbstractCountsTests : IDisposable
         Assert.Null(PrismaReviewEngine.AbstractCountsProblem("Of the records found [40], 31 were screened.", s)); // a citation marker is not a count
     }
 
-    /// <summary>The front-matter answers: the first abstract leaves out the record removed for its year, the repair gives it.</summary>
+    /// <summary>
+    /// The front-matter answers: the first abstract leaves out the record removed for its year, the repair gives it. The
+    /// first one must not use the number 1 anywhere, or the check would count it as the removal.
+    /// </summary>
     private static string Respond(string prompt)
     {
         if (prompt.Contains("You are writing the title, abstract, rationale and objectives"))
             return prompt.Contains("leaves out the records outside the year range (1)")
                 ? """{"title":"Recovery and oversight in agent loops: a systematic review","abstract":"We identified 3 records, removed 1 published outside the year range and screened 2, then included 2 studies in 1 theme.","rationale":"Agent loops recover from faults through supervisor checks [1].","objectives":"To map how agent loops are kept safe."}"""
-                : """{"title":"Recovery and oversight in agent loops: a systematic review","abstract":"We identified 3 records and screened 2, then included 2 studies in 1 theme.","rationale":"Agent loops recover from faults through supervisor checks [1].","objectives":"To map how agent loops are kept safe."}""";
+                : """{"title":"Recovery and oversight in agent loops: a systematic review","abstract":"We identified 3 records and screened 2, then included 2 studies in a single theme.","rationale":"Agent loops recover from faults through supervisor checks [1].","objectives":"To map how agent loops are kept safe."}""";
         return ReviewWriterTests.Respond(prompt);
     }
 
