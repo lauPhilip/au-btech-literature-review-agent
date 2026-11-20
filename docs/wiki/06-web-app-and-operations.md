@@ -60,9 +60,9 @@ There is deliberately no way to see, copy or restore the key. A key that can be 
 
 ### Reviewer notes, links and Zotero
 
-On the Review Output page, the reviewer can add a note to any citation (in its popup) and to any included study (in Table 3.1). Notes are kept in `reviewer-notes.json` (`RunStore.SaveNoteAsync`), at most 1,000 characters each, cleaned like the form fields, shown to every reader, and included in the archive. They are never sent to the model.
+On the Review Output page, the reviewer can add a note to any citation (in its popup) and to any included study (in Table A.1, in the appendix after the references). Notes are kept in `reviewer-notes.json` (`RunStore.SaveNoteAsync`), at most 1,000 characters each, cleaned like the form fields, shown to every reader, and included in the archive. They are never sent to the model.
 
-Table 3.1 links each study's DOI (or its source page when it has no DOI) and, when an open-access copy was downloaded, the PDF; the address is kept as `ReviewState.FullTextUrls`. Only `http` and `https` addresses are linked (`IsWebAddress`), so metadata from a source cannot inject a script link.
+Table A.1 links each study's DOI (or its source page when it has no DOI) and, when an open-access copy was downloaded, the PDF; the address is kept as `ReviewState.FullTextUrls`. Only `http` and `https` addresses are linked (`IsWebAddress`), so metadata from a source cannot inject a script link.
 
 `references.ris` tags the included studies with `included`. `GET /api/workspace/{id}/screened.ris` (also in the archive) exports every screened record, tagged `included`, `excluded: <reason>` with the exclusion group, or `not screened`, plus `checked by reviewer` where the reviewer looked at the decision. Imported into Zotero, the whole screening can be filtered by tag.
 
