@@ -53,6 +53,46 @@ public class ArxivSourceTests
         Assert.Single(source.LastRawResponses);
     }
 
+    private class FeedHandler(string feed) : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct) =>
+            Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(feed) });
+    }
+
+    [Fact]
+    public async Task ThePublishedVersionsDoiIsUsedWhenArxivHasOne()
+    {
+        // Issue #151: a journal_ref with the arXiv DOI gave "Applied Sciences ... https://doi.org/10.48550/arXiv...".
+        const string published = """
+            <feed xmlns="http://www.w3.org/2005/Atom" xmlns:arxiv="http://arxiv.org/schemas/atom">
+              <entry>
+                <id>http://arxiv.org/abs/2407.00334v2</id>
+                <title>Serious play in engineering education</title>
+                <summary>A study.</summary>
+                <published>2024-07-01T00:00:00Z</published>
+                <author><name>Ana Lopes</name></author>
+                <arxiv:journal_ref>Applied Sciences, Volume 14, Issue 2</arxiv:journal_ref>
+                <arxiv:doi>10.3390/app14020123</arxiv:doi>
+              </entry>
+              <entry>
+                <id>http://arxiv.org/abs/2407.00335v1</id>
+                <title>A preprint with a journal reference only</title>
+                <summary>A study.</summary>
+                <published>2024-07-01T00:00:00Z</published>
+                <author><name>Ben Ng</name></author>
+                <arxiv:journal_ref>Applied Sciences, Volume 14, Issue 2</arxiv:journal_ref>
+              </entry>
+            </feed>
+            """;
+        var source = new ArxivSource(new HttpClient(new FeedHandler(published)), TimeSpan.Zero);
+
+        var papers = await source.FetchPapersAsync("serious play", 5);
+
+        Assert.Equal("10.3390/app14020123", papers[0].Doi);
+        Assert.Equal("https://arxiv.org/abs/2407.00334v2", papers[0].Url);
+        Assert.Equal("10.48550/arXiv.2407.00335", papers[1].Doi);
+    }
+
     [Fact]
     public async Task APersistent503StillFailsTheSourceSoTheLogShowsIt()
     {

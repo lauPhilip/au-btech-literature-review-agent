@@ -96,7 +96,13 @@ public class ArxivSource : IAcademicSource
                 // produced a link that does not resolve.
                 string arxivId = id.Split("/abs/").Last();
                 string bareArxivId = Regex.Replace(arxivId, @"v\d+$", "");
-                string? doi = Regex.IsMatch(bareArxivId, @"^\d{4}\.\d{4,5}$") ? $"10.48550/arXiv.{bareArxivId}" : null;
+                string? arxivDoi = Regex.IsMatch(bareArxivId, @"^\d{4}\.\d{4,5}$") ? $"10.48550/arXiv.{bareArxivId}" : null;
+                // When the authors gave the published version's DOI (<arxiv:doi>), that is the DOI of the venue in
+                // journal_ref, so it goes in the reference; the arXiv DOI would point to the preprint (issue #151).
+                string? publisherDoi = (entry.Element(arxivNs + "doi")?.Value ?? "")
+                    .Split(new[] { ' ', ',', ';' }, StringSplitOptions.RemoveEmptyEntries)
+                    .FirstOrDefault(d => Regex.IsMatch(d, @"^10\.\d{4,9}/\S+$"));
+                string? doi = publisherDoi ?? arxivDoi;
                 string landingUrl = $"https://arxiv.org/abs/{arxivId}";
 
                 papers.Add(new AcademicPaper(id, title, summary, $"Published: {publishedYear}", authors, journalRef, doi, landingUrl));
