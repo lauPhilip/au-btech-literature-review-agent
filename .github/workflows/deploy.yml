@@ -1,0 +1,115 @@
+# Deploys the app to Simply. It is called, never run on its own:
+#   - by ci.yml on every push to master, once the build, the tests, the CSS check and the accessibility check pass;
+#   - by release.yml once a version's GitHub release is published, so the build on the server reads the new tag
+#     and its papers name the release (v0.2.1) and not a pre-release (0.2.1-alpha.0.1). See #144.
+# The caller decides whether to deploy (DEPLOY_ENABLED and, for a release, whether the tag is still master's newest
+# commit). Every deploy waits for the one before it, across both workflows (concurrency group deploy-simply).
+name: Deploy
+
+on:
+  workflow_call:
+    secrets:
+      SIMPLY_FTP_USER:
+        required: true
+      SIMPLY_FTP_PASSWORD:
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    name: Deploy to Simply
+    runs-on: ubuntu-latest
+    # Never run two deploys at the same time; a newer push waits for the running one.
+    concurrency:
+      group: deploy-simply
+      cancel-in-progress: false
+    env:
+      # Simply.com ASP hosting is Windows/IIS with only .NET Framework installed, so the app is published
+      # self-contained for win-x86, and reaches the server over FTPS (SSH exists only on Simply's PHP hosting).
+      FTP_HOST: ${{ vars.SIMPLY_FTP_HOST || 'ftp.simply.com' }}
+      REMOTE_DIR: ${{ vars.SIMPLY_REMOTE_DIR || '/public_html' }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0   # the whole history, so MinVer finds the last version tag
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Publish (self-contained, win-x86)
+        run: |
+          # MinVer names the build from the nearest tag: on a tagged commit it is that release (v0.2.1).
+          echo "Nearest tag: $(git describe --tags --always)"
+          dotnet publish AuBtechReviewAgent/AuBtechReviewAgent.csproj --configuration Release \
+            --runtime win-x86 --self-contained true -o ./publish
+          # The server keeps its own web.config, which holds the API keys; never overwrite it.
+          rm -f ./publish/web.config
+          # The "we're updating" page shown while files are uploaded (self-contained, see deploy/app_offline.htm).
+          cp deploy/app_offline.htm app_offline.htm
+
+      - name: Install lftp
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq lftp
+
+      # Add these repository secrets (Settings -> Secrets and variables -> Actions -> Secrets):
+      #   SIMPLY_FTP_USER      - the FTP username from the Simply.com control panel
+      #   SIMPLY_FTP_PASSWORD  - its password
+      # 1) app_offline.htm stops the app so its files are not locked; 2) the new files are uploaded
+      # (web.config, App_Data and WorkspaceStore on the server are left alone, and nothing is deleted there);
+      # 3) every file is checked on the server; 4) app_offline.htm is removed, which starts the new version.
+      # If any step fails, the site stays on the "Updating" page rather than running a half-updated app;
+      # re-run the job or remove the file by FTP.
+      # lftp goes on after a failed command unless told otherwise, so cmd:fail-exit stops the script (and fails the
+      # job) at the first error; without it a broken upload still removed app_offline.htm and started a half-updated
+      # app (HTTP 502.5). The pause after app_offline.htm gives IIS time to stop the app and release its files.
+      # --transfer-all uploads every file of the build. Without it the mirror skips a file whose copy on the server
+      # has the same size and a newer date, and the .NET runtime files carry their package's old date: after a
+      # build with another .NET patch was uploaded by hand, the server kept a mix of two runtimes (HTTP 502.5).
+      - name: Upload to Simply over FTPS
+        env:
+          LFTP_PASSWORD: ${{ secrets.SIMPLY_FTP_PASSWORD }}
+          FTP_USER: ${{ secrets.SIMPLY_FTP_USER }}
+        run: |
+          lftp -c "
+            set cmd:fail-exit yes;
+            set ftp:ssl-force true;
+            set ftp:ssl-protect-data true;
+            set ssl:verify-certificate yes;
+            set net:max-retries 5;
+            set net:reconnect-interval-base 5;
+            set net:timeout 30;
+            open --env-password -u \"$FTP_USER\" \"$FTP_HOST\";
+            cd \"$REMOTE_DIR\";
+            put app_offline.htm;
+            sleep 15;
+            mirror --reverse --transfer-all --parallel=2 --verbose=1 --no-perms \
+              --exclude-glob web.config --exclude-glob App_Data/ --exclude-glob WorkspaceStore/ \
+              ./publish .
+          "
+
+      # The mirror skips files it takes to be unchanged, and once left empty runtime files on the server that
+      # every later deploy kept (HTTP 502.5, 15 October 2026). This asks the server for the size of every file of
+      # the build, uploads again any that is missing or differs, and fails the job if one still differs.
+      - name: Check every file on the server
+        env:
+          LFTP_PASSWORD: ${{ secrets.SIMPLY_FTP_PASSWORD }}
+          FTP_USER: ${{ secrets.SIMPLY_FTP_USER }}
+        run: python3 deploy/verify-upload.py ./publish
+
+      - name: Start the new version
+        env:
+          LFTP_PASSWORD: ${{ secrets.SIMPLY_FTP_PASSWORD }}
+          FTP_USER: ${{ secrets.SIMPLY_FTP_USER }}
+        run: |
+          lftp -c "
+            set cmd:fail-exit yes;
+            set ftp:ssl-force true;
+            set ftp:ssl-protect-data true;
+            set ssl:verify-certificate yes;
+            open --env-password -u \"$FTP_USER\" \"$FTP_HOST\";
+            cd \"$REMOTE_DIR\";
+            rm app_offline.htm
+          "

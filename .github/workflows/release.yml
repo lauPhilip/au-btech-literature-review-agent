@@ -6,6 +6,8 @@
 # tools/ReleaseCheck/release_check.py stops the release, with the reason, if the tag is not a version or has no
 # message, if CHANGELOG.md has no section for it, if CITATION.cff's version or date-released does not match, or if
 # the notes score below 60 for Flesch Reading Ease or do not have exactly one emoji.
+# Once the release is published, the tagged commit is deployed to the server through deploy.yml, if it is still
+# master's newest commit, so the server's build names the release (#144).
 # (The Dockerfile is not built here: the app is deployed to Simply as a .NET app.) When the repository is linked
 # to Zenodo (zenodo.org -> GitHub -> switch the repository on), every GitHub release is archived there with its
 # own DOI, using the metadata in .zenodo.json.
@@ -86,3 +88,40 @@ jobs:
           if [ "$PRERELEASE" = "true" ]; then flags+=(--prerelease); fi
           gh release create "$TAG" --title "$TITLE" --notes-file release-notes.md --generate-notes \
             --verify-tag "${flags[@]}"
+
+  # The deploy on the push to master ran before this tag existed, so the server names itself a pre-release
+  # (0.2.1-alpha.0.1, "not a published release") until it is built again from the tag (#144). This deploys the
+  # tagged commit once the release is published, so the server's version and its papers name the release.
+  # A tag on an older commit is never deployed: that would roll the server back behind master.
+  is-master-head:
+    name: Is the tag master's newest commit?
+    needs: github-release
+    runs-on: ubuntu-latest
+    outputs:
+      deploy: ${{ steps.compare.outputs.deploy }}
+    steps:
+      - id: compare
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          # commits/<tag> gives the commit an annotated tag points to, not the tag object.
+          tag_sha=$(gh api "repos/${REPO}/commits/${TAG}" --jq .sha)
+          master=$(gh api "repos/${REPO}/commits/master" --jq .sha)
+          if [ "$master" = "$tag_sha" ]; then
+            echo "deploy=true" >> "$GITHUB_OUTPUT"
+            echo "The tag is on master's newest commit ${master}; deploying the release."
+          else
+            echo "deploy=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Not deployed: ${TAG} is on ${tag_sha}, but master is at ${master}. The server keeps the newer build."
+          fi
+
+  deploy:
+    name: Deploy the release
+    needs: is-master-head
+    if: needs.is-master-head.outputs.deploy == 'true' && vars.DEPLOY_ENABLED == 'true'
+    uses: ./.github/workflows/deploy.yml
+    secrets:
+      SIMPLY_FTP_USER: ${{ secrets.SIMPLY_FTP_USER }}
+      SIMPLY_FTP_PASSWORD: ${{ secrets.SIMPLY_FTP_PASSWORD }}
