@@ -62,6 +62,53 @@ public class GroundingTests
     }
 
     [Fact]
+    public async Task ARewriteThatLeavesAKeptCitationWorseIsUndone()
+    {
+        // Issue #124, from run 959b875d: a rewrite narrowed "isolation and durable execution [1, 2, 5, ...]" to
+        // "durable execution [1, 2, 5, ...]", and the papers that had backed the isolation part no longer fit.
+        const string sentence = "Agents isolate failures and audit every action [1, 2].";
+        var chat = new FakeChatService()
+            .Returns("""{"results":[{"sentence":1,"verdict":"supported","excerpt":"E1","quote":"each agent runs in its own process to isolate failures","reason":"stated"}]}""")
+            .Returns("""{"results":[{"sentence":1,"verdict":"partially_supported","excerpt":"E1","quote":"every tool call is logged","reason":"tool calls only"}]}""")
+            .Returns("""{"repairs":[{"id":1,"action":"rewrite","sentence":"Agents log every tool call [1, 2].","reason":"narrowed to tool calls"}]}""")
+            .Returns("""{"results":[{"sentence":1,"verdict":"not_supported","reason":"the page is about processes"}]}""")
+            .Returns("""{"results":[{"sentence":1,"verdict":"supported","excerpt":"E1","quote":"every tool call is logged","reason":"stated"}]}""");
+        var fields = new List<(string Field, string Text)> { ("synthesis", "Loops recover. " + sentence) };
+        var sources = new[] { WebPage(1, "In this design each agent runs in its own process to isolate failures."), WebPage(2, "In this release every tool call is logged.") };
+
+        var result = await Grounding.CheckAndRepairAsync(chat, fields, sources, new Dictionary<int, IReadOnlyList<string>>(), 2, Mlr);
+
+        Assert.Equal("Loops recover. " + sentence, Assert.Single(result.Fields).Text);
+        var repair = Assert.Single(result.Repairs);
+        Assert.Equal("reverted", repair.Action);
+        Assert.Equal(sentence, repair.After);
+        Assert.Contains("[1] supported → not_supported", repair.Note);
+        Assert.Equal(new[] { CitationSupportChecker.Supported, CitationSupportChecker.Partial }, result.Checks.Select(c => c.Verdict));
+        Assert.All(result.Checks, c => Assert.Equal(sentence, c.Sentence));
+        Assert.All(result.Checks, c => Assert.Equal(1, c.SentenceIndex));
+        Assert.Equal(5, chat.Prompts.Count);
+    }
+
+    [Fact]
+    public async Task ARewriteThatKeepsItsOtherCitationsIsKept()
+    {
+        var chat = new FakeChatService()
+            .Returns("""{"results":[{"sentence":1,"verdict":"supported","excerpt":"E1","quote":"each agent runs in its own process to isolate failures","reason":"stated"}]}""")
+            .Returns("""{"results":[{"sentence":1,"verdict":"partially_supported","excerpt":"E1","quote":"every tool call is logged","reason":"tool calls only"}]}""")
+            .Returns("""{"repairs":[{"id":1,"action":"rewrite","sentence":"Agents isolate failures and log every tool call [1, 2].","reason":"narrowed to tool calls"}]}""")
+            .Returns("""{"results":[{"sentence":1,"verdict":"supported","excerpt":"E1","quote":"each agent runs in its own process to isolate failures","reason":"stated"}]}""")
+            .Returns("""{"results":[{"sentence":1,"verdict":"supported","excerpt":"E1","quote":"every tool call is logged","reason":"stated"}]}""");
+        var fields = new List<(string Field, string Text)> { ("synthesis", "Agents isolate failures and audit every action [1, 2].") };
+        var sources = new[] { WebPage(1, "In this design each agent runs in its own process to isolate failures."), WebPage(2, "In this release every tool call is logged.") };
+
+        var result = await Grounding.CheckAndRepairAsync(chat, fields, sources, new Dictionary<int, IReadOnlyList<string>>(), 2, Mlr);
+
+        Assert.Equal("Agents isolate failures and log every tool call [1, 2].", Assert.Single(result.Fields).Text);
+        Assert.Equal("rewrite", Assert.Single(result.Repairs).Action);
+        Assert.All(result.Checks, c => Assert.Equal(CitationSupportChecker.Supported, c.Verdict));
+    }
+
+    [Fact]
     public async Task ASentenceThatCannotBeSupportedIsDeletedAndLogged()
     {
         var chat = new FakeChatService()
