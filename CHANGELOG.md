@@ -6,6 +6,16 @@ Each version's section becomes the notes of its GitHub release, so write it for 
 
 ## [Unreleased]
 
+The paper page looks tidier. The method and main.tex are the same as in 0.2.2.
+
+### Fixed
+
+Journal names and volumes on the paper page are now in italics. Before, they showed the stars that mark italics in the source text.
+
+The site now writes numbers with a point, as the paper does. The run page used to say "kappa 0,63" because the server is Danish. ✨
+
+The summary at the top of the run page now lists what rules a study out. It says "None" if you left that field empty.
+
 ## [0.2.2] - 2026-11-20
 
 The paper reads better in a few small places. The method is the same as in 0.2.1.
