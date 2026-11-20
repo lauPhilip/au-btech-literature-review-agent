@@ -112,6 +112,22 @@ public class ReviewEvidenceTests
     }
 
     [Fact]
+    public void StudiesWithNoTextAreCountedApartInTheFacts()
+    {
+        // Issue #148: a study with only a title is neither abstract-only nor non-empirical.
+        var extractions = new[]
+        {
+            new StudyExtraction { ReferenceNumber = 1, StudyType = "survey", EvidenceBasis = "full text", AppraisalCategory = "quantitative_descriptive" },
+            new StudyExtraction { ReferenceNumber = 2, StudyType = "survey", EvidenceBasis = "abstract only", AppraisalCategory = "quantitative_descriptive" },
+            new StudyExtraction { ReferenceNumber = 3, EvidenceBasis = StudyExtractor.NoText, AppraisalCategory = StudyExtractor.NotAppraised },
+        };
+
+        Assert.Equal("3 studies; full text was read for 1 and only the abstract for 1; 1 had neither an abstract nor a full text, so nothing was extracted from it; " +
+                     "0 are not empirical (position papers, system descriptions or reviews). Study designs, the complete list from the data extraction " +
+                     "(describe the designs only as listed here): survey (2); no design was extracted for 1.", SystematicEvidence.BaseFacts(extractions));
+    }
+
+    [Fact]
     public void TheShapeHoldsOnlyWhatWasCheckedInCode()
     {
         var evidence = SystematicEvidence.Build(Book(), Records, Papers, Extractions);
