@@ -116,7 +116,7 @@
 /*
  * The shared building blocks of every page. Use these instead of repeating long class lists, so the pages
  * look like one product and a change of style is made in one place. Colours come from tailwind.config.js.
- * Only buttons are rounded (rounded-btn); cards, panels, fields and labels have square corners.
+ * Buttons and fields have a 10 px radius (rounded-btn, rounded-field) and cards 16 px (rounded-card).
  */
 @layer components {
     .ui-container { @apply max-w-6xl mx-auto px-4 sm:px-6; }
@@ -134,7 +134,7 @@
     .ui-btn-sm { @apply px-3 py-1.5 text-xs; }
     .ui-btn-danger { @apply ui-btn bg-red-600 text-white hover:bg-red-700; }
 
-    .ui-card { @apply bg-white border border-gray-200 shadow-card; }
+    .ui-card { @apply bg-white border border-gray-200 rounded-card shadow-card; }
     .ui-chip { @apply inline-flex items-center gap-1.5 border px-2 py-0.5 text-xs font-medium; }
     .ui-label { @apply block text-sm font-medium text-gray-800 mb-1; }
     /* A term with a plain-language explanation on hover and keyboard focus (Components/Layout/Term.razor). */
@@ -146,7 +146,7 @@
     .ui-term:hover .ui-term-tip, .ui-term:focus .ui-term-tip, .ui-term:focus-within .ui-term-tip { @apply visible opacity-100; }
     .ui-term.ui-term-dismissed .ui-term-tip { @apply invisible opacity-0; }
     .ui-skip { @apply sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-[200] focus:bg-white focus:text-brand focus:px-4 focus:py-2 focus:font-semibold focus:shadow-lift; }
-    .ui-input { @apply w-full px-3 py-2 bg-white border border-gray-300 text-sm placeholder:text-gray-500 focus:outline-none focus:border-brand focus:ring-2 focus:ring-brand/15 transition-colors; }
+    .ui-input { @apply w-full rounded-field px-3 py-2 bg-white border border-gray-300 text-sm placeholder:text-gray-500 focus:outline-none focus:border-brand focus:ring-2 focus:ring-brand/15 transition-colors; }
     .ui-chip-ok { @apply ui-chip border-green-200 bg-verdict-okBg text-verdict-ok; }
     .ui-chip-partial { @apply ui-chip border-amber-200 bg-verdict-partialBg text-verdict-partial; }
     .ui-chip-bad { @apply ui-chip border-red-200 bg-verdict-badBg text-verdict-bad; }

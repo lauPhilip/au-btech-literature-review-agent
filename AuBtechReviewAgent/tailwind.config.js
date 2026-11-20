@@ -94,9 +94,13 @@ module.exports = {
         card: '0 1px 2px rgba(16, 24, 40, 0.04), 0 1px 3px rgba(16, 24, 40, 0.06)',
         lift: '0 12px 32px -12px rgba(12, 27, 51, 0.25), 0 2px 6px rgba(16, 24, 40, 0.06)',
       },
-      // Only buttons have rounded corners (rounded-btn); cards, panels, fields and labels are square.
+      // Rounded corners: buttons and fields 10 px, cards 16 px, the landing example panel 28 px. Chips,
+      // labels and table cells stay square.
       borderRadius: {
-        btn: '0.375rem',
+        btn: '10px',
+        field: '10px',
+        card: '16px',
+        panel: '28px',
       },
       maxWidth: {
         prose: '68ch',
