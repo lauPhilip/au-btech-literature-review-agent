@@ -46,4 +46,16 @@ public class MmatTableTests
         Assert.Equal("", MethodsSectionWriter.NotAppraisedNote(new[] { Study(1, "qualitative") }));
         Assert.StartsWith("Not shown: 1 study ([7]) was", MethodsSectionWriter.NotAppraisedNote(new[] { Study(7, "not_empirical") }));
     }
+
+    [Fact]
+    public void SectionThreePointsToTheAppendixTablesThatExist()
+    {
+        // Issue #139: the tables moved to the appendix, so the text of section 3 names them.
+        Assert.Equal("", MethodsSectionWriter.AppendixPointer(0, null));
+        Assert.Equal("Table A.1 in the appendix lists each included study.", MethodsSectionWriter.AppendixPointer(2, null));
+        Assert.Equal("Table A.1 in the appendix lists each included study.", MethodsSectionWriter.AppendixPointer(2, Array.Empty<StudyExtraction>()));
+        Assert.EndsWith("Table A.2 gives the data extracted from each study.", MethodsSectionWriter.AppendixPointer(1, new[] { Study(1, "not_empirical") }));
+        string all = MethodsSectionWriter.AppendixPointer(2, new[] { Study(1, "qualitative"), Study(2, "not_empirical") });
+        Assert.Contains("Table A.2 gives the data extracted from each study, and Table A.3 the quality appraisal", all);
+    }
 }

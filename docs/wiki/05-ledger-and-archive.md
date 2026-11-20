@@ -160,7 +160,11 @@ To check an unpacked archive by hand, recompute a file's fingerprint and compare
 
 ## How main.tex is built
 
-`main.tex` is assembled line by line in `BuildWorkspaceArchive`. All text coming from the model or from sources passes through `EscapeLatexText` (`PaperLatex.Escape`), which escapes LaTeX special characters and removes trailing spaces only, so every paragraph keeps its closing full stop. Lines of the reference list go through `PaperLatex.EscapeReference` instead, which also drops a trailing full stop, comma or slash, as a bibitem ends without one. A number raised to a number, such as "10^6" or "10^-3" in a quoted finding, is set as a power (`$10^{6}$`); any other caret stays as text. Table 3.1 names the database in a "Source" column with the same display names as the paper page (`CategoryLabel`: arXiv, Semantic Scholar, Google Scholar). The pieces come from different places:
+`main.tex` is assembled line by line in `BuildWorkspaceArchive`. All text coming from the model or from sources passes through `EscapeLatexText` (`PaperLatex.Escape`), which escapes LaTeX special characters and removes trailing spaces only, so every paragraph keeps its closing full stop. Lines of the reference list go through `PaperLatex.EscapeReference` instead, which also drops a trailing full stop, comma or slash, as a bibitem ends without one. A number raised to a number, such as "10^6" or "10^-3" in a quoted finding, is set as a power (`$10^{6}$`); any other caret stays as text. Table A.1 names the database in a "Source" column with the same display names as the paper page (`CategoryLabel`: arXiv, Semantic Scholar, Google Scholar).
+
+The tables of the included studies are not in section 3. They come after the references, on a new page under the heading "Appendix", as Table A.1 (included studies), Table A.2 (extracted data) and Table A.3 (MMAT), each with its note under it. The shared `ReviewPaper` holds them in its `AppendixLatex` slot, which `PaperLatex.Build` writes after the bibliography only when it is not empty, so the multivocal review's main.tex has no appendix. Section 3 keeps its text, the flow diagram and the charts, and its text ends with a sentence from `MethodsSectionWriter.AppendixPointer` that names the appendix tables, so the results still lead to the study characteristics and the risk of bias (PRISMA 2020 items 17 and 18). The paper page uses the same sentence and the same order. This changed in issue #139; before it, the tables were Tables 3.1 to 3.3 inside section 3.
+
+The pieces come from different places:
 
 | Part of `main.tex` | Source |
 |---|---|
@@ -169,12 +173,12 @@ To check an unpacked archive by hand, recompute a file's fingerprint and compare
 | The artifact: TikZ figure, Table 4.2 or a list | `PrismaReport.Artifact`, `ArtifactLatex`, `ArtifactBuilder.ToTikz` |
 | Table 4.1, evidence map of the thematic synthesis | `ReviewState.ThematicSynthesis`, `EvidenceMapTable` |
 | Methods sections, protocol and availability statements | `prisma-report.json`, written by `MethodsSectionWriter`; the protocol statement (section 7.1) lists the research questions among what the protocol holds when the run has them |
-| "Characteristics of the Included Studies" paragraph | `MethodsSectionWriter.IncludedSet` |
+| "Characteristics of the Included Studies" paragraph | `MethodsSectionWriter.IncludedSet`, then `MethodsSectionWriter.AppendixPointer` |
 | Discussion subsections for PRISMA items 23b to 23d, and the Conclusion section | `prisma-report.json`: `EvidenceLimitationsItem`, `ImplicationsItem`, `FutureResearchItem` and `ConclusionItem` from `ReviewWriter.WriteClosingAsync`, checked like the discussion; `ReviewLimitationsItem` (23c) from `MethodsSectionWriter.ReviewProcessLimitations`. Runs made before these existed leave them empty, and the sections are left out |
 | "Research Questions", the first subsection of the method, and the answers at the start of the Conclusion ("RQ1. question" in bold, then the answer) | `ReviewState.ResearchQuestions` and `PrismaReport.ResearchAnswers`, built by `ConclusionSection`; a run without research questions has neither |
 | PRISMA flow diagram (TikZ) | `PrismaFlowDiagram.ToTikz(PrismaFlowCounts.From(state))` |
 | Year bar chart and pie charts | computed from the included records; `LatexPie` |
-| Tables 3.1–3.3 (studies, extraction, MMAT) | `SynthesizedRecords`, `ExtractionTables` |
+| Appendix: Tables A.1–A.3 (studies, extraction, MMAT) | `SynthesizedRecords`, `ExtractionTables` |
 | Synthesis diagram | the TikZ block the model wrote in the draft |
 | Bibliography | the included records, in reference-number order |
 

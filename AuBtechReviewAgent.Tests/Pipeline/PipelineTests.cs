@@ -146,9 +146,39 @@ public class PipelineTests : IDisposable
         var appraisal = state.Extractions[0].Appraisal;
         Assert.Equal("yes", appraisal[0].Answer);
         Assert.Equal("cant_tell", appraisal[1].Answer); // "no" with a quote that is not in the paper
-        Assert.Contains("Table 3.2", tex);
+        Assert.Contains("Table A.2", tex);
         Assert.Contains("Registration and Protocol", tex);
         Assert.Contains("screened twice", File.ReadAllText(Path.Join(_root, runId.ToString("N"), "prisma-report.json")));
+    }
+
+    [Fact]
+    public async Task MainTexPutsTheTablesOfTheStudiesInAnAppendixAfterTheReferences()
+    {
+        // Issue #139: Tables 3.1 to 3.3 became Tables A.1 to A.3 after the references. Section 3 keeps its
+        // flow diagram and charts and points to the tables (PRISMA 2020 items 17 and 18); each note moves with its table.
+        string tex = await ReviewPaperTests.SystematicMainTexAsync(_root);
+        int At(string text) { int i = tex.IndexOf(text, StringComparison.Ordinal); Assert.True(i >= 0, $"main.tex has \"{text}\""); return i; }
+
+        int section3 = At(@"\section{Characteristics of the Included Studies}");
+        int results = At(@"\section{Results \& Synthesis}");
+        int references = At(@"\end{thebibliography}");
+        int appendix = At(@"\section*{Appendix}");
+
+        Assert.InRange(At("Table A.1 in the appendix lists each included study."), section3, results);
+        Assert.InRange(At("Table A.3 the quality appraisal of each study with MMAT 2018."), section3, results);
+        Assert.InRange(At("PRISMA 2020 flow diagram"), section3, results);
+        Assert.InRange(At(@"\caption{Papers per Year}"), section3, results);
+        Assert.InRange(At(@"\caption{Venue Share}"), section3, results);
+
+        Assert.True(appendix > references, "the appendix comes after the references");
+        int a1 = At(@"\textbf{Table A.1: Included studies}");
+        int a1Note = At("Table A.1 lists each included study with a short summary");
+        int a2 = At(@"\textbf{Table A.2: Extracted Study Data}");
+        int a2Note = At(@"$^{\dagger}$ The supporting quote given by the model was not found");
+        int a3 = At(@"\textbf{Table A.3: Quality Appraisal");
+        Assert.True(appendix < a1 && a1 < a1Note && a1Note < a2 && a2 < a2Note && a2Note < a3, "the tables keep their order, each with its note");
+        Assert.True(a3 < At(@"\end{document}"));
+        Assert.DoesNotMatch(@"Table 3\.[123]", tex);
     }
 
     [Fact]

@@ -61,12 +61,18 @@ public sealed class ReviewPaper
 
     /// <summary>The reference list, in reference-number order, as plain text.</summary>
     public List<string> References { get; init; } = new();
+
+    /// <summary>
+    /// Tables that come after the references, under the heading "Appendix", as LaTeX built in code: the systematic
+    /// review's tables of the included studies (Tables A.1 to A.3, issue #139). Empty means no appendix.
+    /// </summary>
+    public string AppendixLatex { get; init; } = "";
 }
 
 /// <summary>
 /// Writes a <see cref="ReviewPaper"/> as main.tex. The layout is the same for every kind of review: the title block,
 /// the abstract box, the introduction and method in two columns, the data section full width, the results,
-/// discussion and declarations in two columns, and the bibliography. Plain text is escaped here; LaTeX slots are
+/// discussion and declarations in two columns, the bibliography, and the appendix when there is one. Plain text is escaped here; LaTeX slots are
 /// written as they are. Decimals in figures need the invariant culture, which the caller sets.
 /// </summary>
 public static class PaperLatex
@@ -232,6 +238,13 @@ public static class PaperLatex
         for (int i = 0; i < paper.References.Count; i++)
             sb.AppendLine($"\\bibitem{{ref{i + 1}}} {EscapeReference(paper.References[i])}");
         sb.AppendLine(@"\end{thebibliography}");
+        if (!string.IsNullOrWhiteSpace(paper.AppendixLatex))
+        {
+            // The appendix starts on a new page after the references, as in a published review.
+            sb.AppendLine(@"\clearpage");
+            sb.AppendLine(@"\section*{Appendix}");
+            sb.Append(paper.AppendixLatex);
+        }
         sb.AppendLine(@"\end{document}");
         return sb.ToString();
     }

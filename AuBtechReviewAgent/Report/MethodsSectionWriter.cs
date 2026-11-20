@@ -270,6 +270,22 @@ public static class MethodsSectionWriter
     }
 
     /// <summary>
+    /// The sentences in section 3 that point to the tables in the appendix (issue #139), so the results still lead
+    /// the reader to the study characteristics and the risk of bias (PRISMA 2020 items 17 and 18). Table A.2 is
+    /// named only when data was extracted, and Table A.3 only when at least one study has a row in the MMAT table.
+    /// Empty when no study was included.
+    /// </summary>
+    public static string AppendixPointer(int includedStudies, IReadOnlyCollection<StudyExtraction>? extractions)
+    {
+        if (includedStudies == 0) return "";
+        string text = "Table A.1 in the appendix lists each included study.";
+        if (extractions is not { Count: > 0 }) return text;
+        return text + (extractions.Any(ShowInAppraisalTable)
+            ? " Table A.2 gives the data extracted from each study, and Table A.3 the quality appraisal of each study with MMAT 2018."
+            : " Table A.2 gives the data extracted from each study.");
+    }
+
+    /// <summary>
     /// Removes Markdown emphasis the model sometimes writes (**bold**, *italic*), which would otherwise show
     /// as literal asterisks on the page and break the LaTeX. The words are kept.
     /// </summary>
