@@ -202,7 +202,7 @@ public partial class PrismaReviewEngine
         sb.AppendLine(@"\end{minipage}");
         sb.AppendLine(@"\end{figure}");
         sb.AppendLine(@"\vspace{10pt}");
-        // \small used to come with Table 3.1 and stays here, so the rest of the paper keeps its text size.
+        // \small used to come with the tables of the studies and stays here, so the rest of the paper keeps its text size.
         sb.AppendLine(@"\small");
         sb.AppendLine(@"\vspace{10pt}");
         string dataLatex = sb.ToString();
