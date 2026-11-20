@@ -90,7 +90,7 @@ public class ReviewEvidenceTests
 
         Assert.Equal("[1] - Ana, A. (2025). Short contexts.\n[2] - Bo, B. (2024). Long contexts.", evidence.ReferenceLines());
         Assert.Equal("[2] - Bo, B. (2024). Long contexts.\n[9] - (citation unavailable)", evidence.ReferenceLines(new[] { 9, 2 }));
-        Assert.Equal("2 studies; full text was read for 1 and only the abstract for 1; 1 are not empirical (position papers, system descriptions or reviews). Most common study types: experiment (1).", evidence.BaseFacts);
+        Assert.Equal("2 studies; full text was read for 1 and only the abstract for 1; 1 are not empirical (position papers, system descriptions or reviews). Study designs, the complete list from the data extraction (describe the designs only as listed here): experiment (1); no design was extracted for 1.", evidence.BaseFacts);
     }
 
     [Fact]

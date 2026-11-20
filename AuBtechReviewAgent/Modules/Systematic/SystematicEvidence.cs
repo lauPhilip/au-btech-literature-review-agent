@@ -54,16 +54,25 @@ public static class SystematicEvidence
         return new ReviewEvidence { Sources = sources, Themes = themes, BaseFacts = BaseFacts(extractions) };
     }
 
-    /// <summary>Facts about the evidence base for the limitations paragraph, from the extraction (not the model).</summary>
+    /// <summary>
+    /// Facts about the evidence base for the discussion and the limitations, from the extraction (not the model). The
+    /// study designs are listed in full, each with its count, so a summary of the designs can only repeat the
+    /// extraction (issue #115); a study whose extraction failed or gave no design is counted as such.
+    /// </summary>
     public static string BaseFacts(IReadOnlyList<StudyExtraction> extractions)
     {
         if (extractions.Count == 0) return "(no extraction data)";
         int fullText = extractions.Count(e => e.EvidenceBasis == "full text");
         int notEmpirical = extractions.Count(e => e.AppraisalCategory == "not_empirical");
-        var types = extractions.Where(e => e.Error == null && !string.IsNullOrWhiteSpace(e.StudyType))
-            .GroupBy(e => e.StudyType.ToLowerInvariant()).OrderByDescending(g => g.Count()).Take(6)
+        var withDesign = extractions.Where(e => e.Error == null && !string.IsNullOrWhiteSpace(e.StudyType)).ToList();
+        var designs = withDesign
+            .GroupBy(e => e.StudyType.Trim().ToLowerInvariant()).OrderByDescending(g => g.Count()).ThenBy(g => g.Key, System.StringComparer.Ordinal)
             .Select(g => $"{g.Key} ({g.Count()})");
+        int noDesign = extractions.Count - withDesign.Count;
+        string designList = withDesign.Count == 0 ? "none was extracted" : string.Join(", ", designs);
         return $"{extractions.Count} studies; full text was read for {fullText} and only the abstract for {extractions.Count - fullText}; " +
-               $"{notEmpirical} are not empirical (position papers, system descriptions or reviews). Most common study types: {string.Join(", ", types)}.";
+               $"{notEmpirical} are not empirical (position papers, system descriptions or reviews). " +
+               $"Study designs, the complete list from the data extraction (describe the designs only as listed here): {designList}" +
+               (noDesign > 0 && withDesign.Count > 0 ? $"; no design was extracted for {noDesign}." : ".");
     }
 }
