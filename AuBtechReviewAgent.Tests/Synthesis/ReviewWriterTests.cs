@@ -109,6 +109,10 @@ public class ReviewWriterTests : IDisposable
         Assert.Contains("You are writing the title, abstract, rationale and objectives", prompts);
         Assert.Contains("Records identified: 3;", prompts); // the facts are counted in code
         Assert.Contains("included: 2; excluded: 1.", prompts);
+        // Issue #146: the theme's writer and its fill pass both get the theme's own counts.
+        Assert.Equal(2, Regex.Matches(prompts, "FACTS ABOUT THE STUDIES IN THIS THEME").Count);
+        // The introduction names the designs of the studies it cites, so the front matter gets each study's design too.
+        Assert.Contains("Evidence base (from the data extraction; name the design of a cited study only as given here): 2 studies;", prompts);
         Assert.Equal(5, state.Stats.CitationsChecked); // [1] in the rationale, [1] and [2] in the revised section, [1, 2] in the discussion
 
         string path = GoldenPath();

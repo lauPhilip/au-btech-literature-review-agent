@@ -6,6 +6,12 @@ Each version's section becomes the notes of its GitHub release, so write it for 
 
 ## [Unreleased]
 
+### Fixed
+
+The model now gets each study's design as a fact. Before, it could call two studies one trial, or say two studies were read from the abstract when three were. Each theme now also gets its own counts. 🧮
+
+The limits of the evidence group the designs by type. "Mixed methods case study" and "case study with mixed methods" are no longer two designs. The list is short and right.
+
 ## [0.3.0] - 2026-11-20
 
 The data taken from each study is shorter and better backed. This changes what the model is asked, so runs can differ from 0.2.3.

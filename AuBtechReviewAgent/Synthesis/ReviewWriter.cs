@@ -525,6 +525,9 @@ public static class ReviewWriter
         int paragraphs = ThematicSynthesis.ParagraphsFor(theme.Sources.Count);
         string sourceList = string.Join(", ", theme.Sources.Select(r => $"[{r}]"));
         string s = profile.Source, ss = profile.Sources;
+        // The theme's own counts (issue #146), when the module gives them; without them the prompt is as before.
+        string themeFacts = theme.Facts.Length == 0 ? ""
+            : $"\nFACTS ABOUT THE {ss.ToUpperInvariant()} IN THIS THEME ({profile.BaseFactsFrom}; use them whenever you say how these {ss} were designed or what they were read from, and do not change them): {theme.Facts}";
 
         string prompt = $$"""
             You are writing one subsection of {{profile.ResultsSection}} of {{profile.Review}}. The review used thematic synthesis; this subsection reports one theme.
@@ -532,7 +535,7 @@ public static class ReviewWriter
             REVIEW OBJECTIVE: "{{goal}}"
             {{PromptSafety.ReviewerInputNotice}}
             THEME: {{theme.Name}}. {{theme.Description}}
-            OTHER THEMES (reported in their own subsections; do not cover them here): {{(otherThemes.Length == 0 ? "none" : otherThemes)}}
+            OTHER THEMES (reported in their own subsections; do not cover them here): {{(otherThemes.Length == 0 ? "none" : otherThemes)}}{{themeFacts}}
 
             REFERENCE LIST FOR THIS THEME (cite ONLY these numbers):
             {{evidence.ReferenceLines(theme.Sources)}}
@@ -585,7 +588,7 @@ public static class ReviewWriter
             string fillPrompt = $$"""
                 You are revising one theme subsection of {{profile.ReviewShort}} so that it covers every {{s}} of the theme. The {{ss}} below belong to this theme but are not yet cited in it.
 
-                THEME: {{theme.Name}}. {{theme.Description}}
+                THEME: {{theme.Name}}. {{theme.Description}}{{themeFacts}}
 
                 REFERENCE LIST FOR THIS THEME (cite ONLY these numbers):
                 {{evidence.ReferenceLines(theme.Sources)}}

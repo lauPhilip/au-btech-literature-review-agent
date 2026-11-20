@@ -607,8 +607,8 @@ public partial class PrismaReviewEngine
             async Task<(FrontMatter? Front, (string Text, StyleDeltaLog Delta) Abstract, (string Text, StyleDeltaLog Delta) Rationale, (string Text, StyleDeltaLog Delta) Objectives)> FrontAndStyleAsync()
             {
                 var written = await ReviewWriter.WriteFrontMatterAsync(chat, WritingProfile.Systematic, query, explicitObjective,
-                    FrontMatterFacts(finalState, useThematic ? thematic!.Codebook : null, includedFacts, screeningFacts), resultSections, discussionText,
-                    referenceListMapping, referenceCount, message => _log.LogWarning("{Message}", SanitizeLogMessage(message)),
+                    FrontMatterFacts(finalState, useThematic ? thematic!.Codebook : null, includedFacts, screeningFacts) + EvidenceBaseFacts(useThematic ? thematic!.Evidence : null),
+                    resultSections, discussionText, referenceListMapping, referenceCount, message => _log.LogWarning("{Message}", SanitizeLogMessage(message)),
                     abstractRule: text => AbstractCountsProblem(text, finalState.Stats));
                 using (LlmStage.Begin("style"))
                 {
@@ -924,6 +924,14 @@ public partial class PrismaReviewEngine
             lines.Add("Wherever both the records identified and the records screened are given, every removal between them is given too, as listed above.");
         return string.Join("\n", lines);
     }
+
+    /// <summary>
+    /// The facts about the evidence base for the front matter (issue #146): the introduction names the design of the
+    /// studies it cites, so it gets each study's design and what it was read from, as the discussion does.
+    /// </summary>
+    private static string EvidenceBaseFacts(ReviewEvidence? evidence) =>
+        string.IsNullOrWhiteSpace(evidence?.BaseFacts) ? ""
+            : $"\nEvidence base (from the data extraction; name the design of a cited study only as given here): {evidence.BaseFacts}";
 
     /// <summary>The records removed before screening for a reason other than being a duplicate, as the flow diagram counts them (issue #118).</summary>
     private static string OtherRemovals(ReviewState state)
