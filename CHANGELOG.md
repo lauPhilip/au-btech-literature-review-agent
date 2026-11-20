@@ -6,6 +6,10 @@ Each version's section becomes the notes of its GitHub release, so write it for 
 
 ## [Unreleased]
 
+### Fixed
+
+The live site now runs the version you see on the Releases page. Before, it was built a moment before the tag, so its papers called a real release "not a published release". Now the site is built again from the tag once the release is out. 🏷️
+
 ## [0.2.0] - 2026-11-20
 
 This version makes the paper easier to read and harder to get wrong. We fixed the faults we found in two real runs. 🧹
