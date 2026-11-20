@@ -27,3 +27,11 @@ Bootstrap (AuBtechReviewAgent/wwwroot/lib/bootstrap)
 
 Tailwind CSS (generated file AuBtechReviewAgent/wwwroot/css/tailwind.css)
   Copyright (c) Tailwind Labs, Inc. MIT License.
+
+Inter (AuBtechReviewAgent/wwwroot/fonts/inter-latin-wght-normal.woff2)
+  Copyright 2016 The Inter Project Authors (https://github.com/rsms/inter).
+  SIL Open Font License 1.1, see AuBtechReviewAgent/wwwroot/fonts/OFL-Inter.txt.
+
+Poppins (AuBtechReviewAgent/wwwroot/fonts/poppins-latin-*-normal.woff2)
+  Copyright 2020 The Poppins Project Authors (https://github.com/itfoundry/Poppins).
+  SIL Open Font License 1.1, see AuBtechReviewAgent/wwwroot/fonts/OFL-Poppins.txt.
