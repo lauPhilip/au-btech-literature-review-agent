@@ -187,6 +187,25 @@ public class ThematicSynthesisTests : IDisposable
             ThematicSynthesis.CoverageSentence(2, 3, new[] { new UncodedStudy(3, "not coded.") }));
     }
 
+    [Fact]
+    public void MethodsTextCountsOneDisagreementInTheSingular()
+    {
+        // Issue #127: "1 disagreements" in section 2.6 of a real run.
+        var second = new SecondCoding { Kappa = 0.93, CellsCompared = 30, Disagreements = new() { "[1], \"Recovery\": first coding only" } };
+        var book = new ThematicCodebook
+        {
+            Codes = new() { new() { Id = "C1", Reference = 1, Anchor = "verified finding" } },
+            Themes = new() { new() { Id = "T1", Name = "Recovery", Studies = new() { 1 } } },
+            SecondCoding = second,
+        };
+        Assert.Contains("(1 disagreement, listed in thematic-codebook.json)", ThematicSynthesis.MethodsText(book, "fake-model", repairEnabled: false));
+
+        second.Disagreements.Add("[2], \"Recovery\": second coding only");
+        Assert.Contains("(2 disagreements, listed", ThematicSynthesis.MethodsText(book, "fake-model", repairEnabled: false));
+        second.Disagreements.Clear();
+        Assert.Contains("(0 disagreements, listed", ThematicSynthesis.MethodsText(book, "fake-model", repairEnabled: false));
+    }
+
     // ─── Full offline run ───────────────────────────────────────────────────────────────────────────────
 
     private static string Respond(string prompt)
