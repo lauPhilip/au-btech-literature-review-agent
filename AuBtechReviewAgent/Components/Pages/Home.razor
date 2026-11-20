@@ -357,6 +357,7 @@
                             @SettingRow("Questions", string.Join(" ", shownQuestions.Select((q, i) => $"RQ{i + 1}. {q}")))
                         }
                         @SettingRow("Include", !string.IsNullOrWhiteSpace(runInfo?.InclusionCriteria) ? runInfo!.InclusionCriteria : runInfo == null ? inclusionCriteria : "(see the protocol)")
+                        @SettingRow("Exclude", ExclusionShown())
                         @SettingRow("Years", runInfo is { YearFrom: > 0 } ? $"{runInfo.YearFrom}–{runInfo.YearTo}" : $"{yearFrom}–{yearTo}")
                         @SettingRow("Sources", string.Join(", ", (runInfo?.SelectedSources ?? State.SelectedSources.ToList()).Select(AuBtechReviewAgent.SourceCatalog.DisplayNameFor)))
                     </dl>
@@ -1399,6 +1400,13 @@
         </div>
     };
 
+    // The exclusion criterion is optional, so an empty one reads "None". A run from before the criteria were stored
+    // (no inclusion criterion either) points to the protocol, as the Include row does (issue #152).
+    private string ExclusionShown() =>
+        runInfo == null ? (string.IsNullOrWhiteSpace(exclusionCriteria) ? "None" : exclusionCriteria)
+        : !string.IsNullOrWhiteSpace(runInfo.ExclusionCriteria) ? runInfo.ExclusionCriteria
+        : string.IsNullOrWhiteSpace(runInfo.InclusionCriteria) ? "(see the protocol)" : "None";
+
     private static RenderFragment SettingRow(string label, string? value) => __builder =>
     {
         <div class="grid grid-cols-[5.5rem_1fr] gap-2">
@@ -1609,4 +1617,4 @@
             StateHasChanged();
         });
     }
-}
+}

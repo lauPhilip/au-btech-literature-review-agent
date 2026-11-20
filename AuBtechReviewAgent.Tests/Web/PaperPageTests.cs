@@ -54,4 +54,31 @@ public class PaperPageTests
         Assert.Equal("Table A.1 in the appendix lists each included study. Table A.2 gives the data extracted from each study, and Table A.3 the quality appraisal of each study with MMAT 2018.",
             MethodsSectionWriter.AppendixPointer(1, studies));
     }
+
+    private static string? SourceOf(params string[] path)
+    {
+        string? root = AppContext.BaseDirectory;
+        while (root != null && !File.Exists(Path.Join(root, "AuBtechReviewAgent.sln"))) root = Path.GetDirectoryName(root);
+        return root == null ? null : File.ReadAllText(Path.Join(new[] { root, "AuBtechReviewAgent", "Components" }.Concat(path).ToArray()));
+    }
+
+    [Fact]
+    public void EveryReferenceOnThePageIsShownWithItalicsNotAsterisks()
+    {
+        // Issue #128: an APA reference carries Markdown asterisks around the journal and its volume. Printed as
+        // plain text they show as "*Journal*, *14*(2)", so every place that shows one goes through ApaReference.
+        string? page = PageSource();
+        string? panel = SourceOf("Dashboard", "ScreeningReviewPanel.razor");
+        string? component = SourceOf("Paper", "ApaReference.razor");
+        if (page == null || panel == null || component == null) return; // not run from the repository (packaged tests)
+
+        Assert.Contains("<ApaReference Text=\"@citation\" />", page);
+        Assert.Contains("<ApaReference Text=\"@paperRow.ApaCitation\" />", page);
+        Assert.DoesNotContain(">@paperRow.ApaCitation<", page);
+        Assert.DoesNotContain("@includedCitations[i]", page);
+        Assert.Contains("<ApaReference Text=\"@row.Citation\" />", panel);
+        Assert.DoesNotContain(">@row.Citation<", panel);
+        Assert.Contains("ApaCitationBuilder.ItalicSpans(Text)", component);
+        Assert.Contains("<em>@span.Text</em>", component);
+    }
 }

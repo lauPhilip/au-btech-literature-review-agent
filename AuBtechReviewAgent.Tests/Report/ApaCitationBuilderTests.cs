@@ -161,4 +161,50 @@ public class ApaCitationBuilderTests
 
         Assert.Equal(new[] { "Bandi, A. (2025)", "Pajo, P. (2025)", "setiawan, L. (2026)" }, ordered);
     }
+
+    [Fact]
+    public void ItalicSpansSetTheJournalAndVolumeInItalicsWithoutAsterisks()
+    {
+        var spans = ApaCitationBuilder.ItalicSpans("Ge, Y. (2025). GridSage. *Applied Sciences*, *14*(2), 1\u201310.");
+
+        Assert.Equal(new[]
+        {
+            new ApaCitationBuilder.TextSpan("Ge, Y. (2025). GridSage. ", false),
+            new ApaCitationBuilder.TextSpan("Applied Sciences", true),
+            new ApaCitationBuilder.TextSpan(", ", false),
+            new ApaCitationBuilder.TextSpan("14", true),
+            new ApaCitationBuilder.TextSpan("(2), 1\u201310.", false),
+        }, spans);
+        Assert.DoesNotContain(spans, s => s.Text.Contains('*'));
+    }
+
+    [Fact]
+    public void ItalicSpansOfABuiltReferenceJoinBackToItsTextWithoutAsterisks()
+    {
+        var paper = Paper(venue: "Applied Sciences, Volume 14, Issue 2", doi: "10.3390/app14020001");
+        string citation = ApaCitationBuilder.Build(paper).Citation;
+
+        var spans = ApaCitationBuilder.ItalicSpans(citation);
+
+        Assert.Equal(citation.Replace("*", ""), string.Concat(spans.Select(s => s.Text)));
+        Assert.Contains(new ApaCitationBuilder.TextSpan("Applied Sciences", true), spans);
+        Assert.Contains(new ApaCitationBuilder.TextSpan("14", true), spans);
+    }
+
+    [Theory]
+    [InlineData("Plain reference without a venue.", "Plain reference without a venue.")]
+    [InlineData("An older run with one stray * asterisk.", "An older run with one stray  asterisk.")]
+    public void ItalicSpansShowTextWithoutPairedAsterisksPlain(string citation, string shown)
+    {
+        var spans = ApaCitationBuilder.ItalicSpans(citation);
+
+        Assert.Equal(new[] { new ApaCitationBuilder.TextSpan(shown, false) }, spans);
+    }
+
+    [Fact]
+    public void ItalicSpansOfNothingAreEmpty()
+    {
+        Assert.Empty(ApaCitationBuilder.ItalicSpans(null));
+        Assert.Empty(ApaCitationBuilder.ItalicSpans(""));
+    }
 }

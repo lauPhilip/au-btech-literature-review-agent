@@ -3,6 +3,9 @@ using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.RateLimiting;
 using System.Threading.RateLimiting;
 
+// Pages format numbers like the paper ("0.63", not the Danish server's "0,63"); see Web/SiteCulture.cs.
+AuBtechReviewAgent.SiteCulture.Apply();
+
 var builder = WebApplication.CreateBuilder(args);
 
 // 0. LOGGING
