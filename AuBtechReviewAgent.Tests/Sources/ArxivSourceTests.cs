@@ -55,8 +55,12 @@ public class ArxivSourceTests
 
     private class FeedHandler(string feed) : HttpMessageHandler
     {
-        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct) =>
-            Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(feed) });
+        // Returned straight from an async method, as in ScriptedHandler: the caller owns and disposes the response.
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
+        {
+            await Task.Yield();
+            return new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(feed) };
+        }
     }
 
     [Fact]
