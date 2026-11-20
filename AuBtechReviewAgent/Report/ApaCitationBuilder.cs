@@ -32,6 +32,12 @@ public static class ApaCitationBuilder
         "Scopus Indexed Journal",
     };
 
+    // "Applied Sciences, Volume 14, Issue 2", "IEEE Access, vol. 12, no. 3, pp. 10-20": a venue string (arXiv's
+    // journal_ref, mostly) that carries the volume, issue and pages after the journal's name.
+    private static readonly Regex VolumeIssuePattern = new(
+        @"^(?<name>.+?),?\s+vol(?:ume|\.)?\s*(?<vol>\d+)(?:,?\s*(?:issue|no\.?|number)\s*(?<iss>\d+))?(?:,?\s*(?:pp?\.?|pages?)\s*(?<pages>\d+(?:\s*[-\u2013]+\s*\d+)?))?\s*$",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
     private static readonly Regex ConferencePattern =
         new(@"\b(conference|proceedings|symposium|workshop|congress)\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
@@ -42,6 +48,16 @@ public static class ApaCitationBuilder
         string yearText = year > 0 ? year.ToString() : "n.d.";
         string title = CleanText(paper.Title).TrimEnd('.');
         string venue = CleanVenue(paper.JournalSource);
+        // APA 7 sets volume and issue as "*Journal*, *14*(2), 1–10", not inside the italic name (issue #151).
+        string locator = "";
+        var volumeIssue = VolumeIssuePattern.Match(venue);
+        if (volumeIssue.Success && !ConferencePattern.IsMatch(venue))
+        {
+            venue = volumeIssue.Groups["name"].Value.Trim().TrimEnd(',');
+            locator = $", *{volumeIssue.Groups["vol"].Value}*"
+                      + (volumeIssue.Groups["iss"].Success ? $"({volumeIssue.Groups["iss"].Value})" : "")
+                      + (volumeIssue.Groups["pages"].Success ? ", " + Regex.Replace(volumeIssue.Groups["pages"].Value, @"\s*[-\u2013]+\s*", "\u2013") : "");
+        }
         string link = BuildLink(paper);
         bool isArxiv = (paper.Id ?? "").Contains("arxiv.org", StringComparison.OrdinalIgnoreCase)
                        || (paper.Doi ?? "").Contains("10.48550/arxiv", StringComparison.OrdinalIgnoreCase);
@@ -57,7 +73,7 @@ public static class ApaCitationBuilder
         else if (venue.Contains("Transactions", StringComparison.OrdinalIgnoreCase))
         {
             venueType = "Transactions";
-            venuePart = $"*{venue}*.";
+            venuePart = $"*{venue}*{locator}.";
         }
         else if (ConferencePattern.IsMatch(venue))
         {
@@ -67,7 +83,7 @@ public static class ApaCitationBuilder
         else
         {
             venueType = "Journals";
-            venuePart = $"*{venue}*.";
+            venuePart = $"*{venue}*{locator}.";
         }
 
         // APA: when there is no author, the title moves into the author position.
@@ -83,7 +99,9 @@ public static class ApaCitationBuilder
             parts.Add($"{title}.");
         }
         if (!string.IsNullOrEmpty(venuePart)) parts.Add(venuePart);
-        if (!string.IsNullOrEmpty(link)) parts.Add(link);
+        // A venue with only the arXiv link: the link is the preprint, not the published version, so say so.
+        bool preprintLink = Regex.IsMatch(link, @"10\.48550/arxiv\.|//arxiv\.org/", RegexOptions.IgnoreCase);
+        if (!string.IsNullOrEmpty(link)) parts.Add(!string.IsNullOrEmpty(venue) && preprintLink ? $"Preprint: {link}" : link);
 
         return new ApaResult(string.Join(" ", parts), venueType, venue, year);
     }
