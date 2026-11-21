@@ -34,7 +34,8 @@ public class ReviewComposerTests
         Assert.Contains(">API keys</button>", html);
         // The research questions stay folded behind one button until asked for.
         Assert.DoesNotContain("id=\"f-questions\"", html);
-        Assert.Contains($"Add research questions <span class=\"font-normal text-muted\">(optional, up to {ReviewInputGuard.MaxResearchQuestions})", html);
+        Assert.Contains($"Add research questions <span class=\"font-normal text-muted max-sm:hidden\">(optional, up to {ReviewInputGuard.MaxResearchQuestions})", html);
+        Assert.Contains("min-h-[44px] justify-start", html);
     }
 
     [Fact]

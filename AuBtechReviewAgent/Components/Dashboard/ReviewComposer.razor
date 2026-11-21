@@ -10,9 +10,9 @@
     <p class="font-display text-xs font-semibold uppercase tracking-[0.14em] text-muted max-sm:hidden">
         @Method.Name · @Method.Standard · <a href="/start" class="normal-case tracking-normal text-brand underline underline-offset-2 hover:text-brand-700">change<span class="sr-only"> the review type</span></a>
     </p>
-    <h1 class="mt-2 font-display text-[clamp(26px,2.4vw,40px)] font-semibold leading-tight tracking-[-0.025em] text-heading">What should the review find out?</h1>
+    <h1 class="font-display sm:mt-2 text-[clamp(26px,2.4vw,40px)] font-semibold leading-tight tracking-[-0.025em] text-heading">What should the review find out?</h1>
 
-    <div class="ui-card mt-5 space-y-4 p-4 sm:p-6">
+    <div class="ui-card mt-4 space-y-3 p-4 sm:mt-5 sm:space-y-4 sm:p-6">
         @Notice
 
         <div>
@@ -21,7 +21,7 @@
                       maxlength="@AuBtechReviewAgent.ReviewInputGuard.MaxObjective"
                       @bind="State.ReviewObjective" @bind:event="oninput" @bind:after="Changed"
                       placeholder="e.g. Which safety mechanisms do agent frameworks use, and how are they evaluated?"
-                      class="ui-input resize-y text-lg leading-relaxed max-sm:text-base"></textarea>
+                      class="ui-input resize-y text-lg leading-relaxed max-sm:h-[4.75rem] max-sm:text-base"></textarea>
             <FieldHelp Id="h-objective" Text="The question the review answers. It guides the themes and the discussion." Value="@State.ReviewObjective" Max="AuBtechReviewAgent.ReviewInputGuard.MaxObjective" />
         </div>
 
@@ -47,15 +47,17 @@
         }
         else
         {
-            <button type="button" @onclick="ShowQuestions" class="ui-btn-ghost -ml-3 min-h-[44px] px-3">
-                <span aria-hidden="true">+</span> Add research questions <span class="font-normal text-muted">(optional, up to @AuBtechReviewAgent.ReviewInputGuard.MaxResearchQuestions)</span>
+            @* One line of text in the button, so the flex gap of ui-btn does not split it into columns. On a phone the
+               limit is left out to keep the line short; the field's own help line names it. *@
+            <button type="button" @onclick="ShowQuestions" class="ui-btn-ghost -ml-3 min-h-[44px] justify-start px-3 text-left">
+                <span><span aria-hidden="true">+ </span>Add research questions <span class="font-normal text-muted max-sm:hidden">(optional, up to @AuBtechReviewAgent.ReviewInputGuard.MaxResearchQuestions)</span></span>
             </button>
         }
 
         @Problems
 
         @* One primary action at the end of the reading path; on a phone it takes the full width. *@
-        <div class="flex flex-col-reverse gap-3 border-t border-line pt-4 sm:flex-row sm:items-center">
+        <div class="flex flex-col-reverse gap-2 border-t border-line pt-3 sm:flex-row sm:items-center sm:gap-3 sm:pt-4">
             <div class="flex flex-wrap items-center gap-x-3 gap-y-2">
                 <button type="button" @onclick="OnLoadExample" class="ui-btn-ghost min-h-[44px] px-3 max-sm:-ml-3">Try an example</button>
                 @{
