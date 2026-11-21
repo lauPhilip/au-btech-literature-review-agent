@@ -1,0 +1,72 @@
+@* The template of the five trust pages (redesign step 10): About and FAQ, Model card, Privacy, Glossary and Verify an
+   archive. From 1024 px a 240 px side list of the five pages sticks to the left, with the current page's sections
+   indented under it; the page itself is one reading card. A section link jumps inside the content area through
+   data-jump-to (wwwroot/js/review-output.js), because the page has <base href="/">. On a phone the side list is hidden. *@
+
+<div class="mx-auto w-full max-w-[1600px] px-[clamp(16px,3vw,40px)] py-6 sm:py-10">
+    <div class="grid grid-cols-1 items-start gap-8 lg:grid-cols-[240px_minmax(0,1fr)]">
+        <nav aria-label="About TraceableAI" class="sticky top-6 max-lg:hidden print:hidden">
+            <ul class="space-y-0.5 border-l border-line">
+                @foreach (var (href, label) in Pages)
+                {
+                    var pageHref = href;
+                    bool current = pageHref == Current;
+                    <li>
+                        <a href="@pageHref" aria-current="@(current ? "page" : null)"
+                           class="-ml-px block border-l-2 py-2 pl-3 pr-2 text-sm leading-snug @(current ? "border-heading bg-active font-semibold text-heading" : "border-transparent text-muted hover:border-line-field hover:text-heading")">@label</a>
+                        @if (current && Sections.Count > 0)
+                        {
+                            <ul class="pb-1">
+                                @foreach (var (id, sectionLabel) in Sections)
+                                {
+                                    var sectionId = id;
+                                    <li>
+                                        <a href="@($"{Current}#{sectionId}")" data-jump-to="@sectionId"
+                                           class="-ml-px block border-l-2 border-transparent py-1.5 pl-6 pr-2 text-[13px] leading-snug text-muted hover:border-line-field hover:text-heading">@sectionLabel</a>
+                                    </li>
+                                }
+                            </ul>
+                        }
+                    </li>
+                }
+            </ul>
+        </nav>
+
+        <article class="@(Wide ? "max-w-[1100px]" : "max-w-[880px]") w-full min-w-0 rounded-card border border-line bg-page px-5 py-6 text-base leading-relaxed text-ink [&_p]:max-w-[70ch] shadow-card sm:px-10 sm:py-10 print:max-w-none print:rounded-none print:border-0 print:p-0 print:shadow-none">
+            <header class="max-w-[70ch]">
+                <p class="font-display text-xs font-semibold uppercase tracking-[0.14em] text-muted">@Eyebrow</p>
+                <h1 class="mt-2 font-display text-[clamp(26px,2.4vw,40px)] font-semibold leading-tight tracking-[-0.025em] text-heading">@Title</h1>
+                @if (Lead != null)
+                {
+                    <p class="mt-4 text-[17px] leading-[1.7] text-muted">@Lead</p>
+                }
+            </header>
+            @ChildContent
+        </article>
+    </div>
+</div>
+
+@code {
+    /// <summary>The five trust pages, in the order of the side list (the footer links to the same pages).</summary>
+    public static readonly (string Href, string Label)[] Pages =
+    {
+        ("/about", "About and FAQ"), ("/model-card", "Model card"), ("/privacy", "Privacy"), ("/glossary", "Glossary"), ("/verify", "Verify an archive"),
+    };
+
+    /// <summary>The address of this page, one of <see cref="Pages"/>.</summary>
+    [Parameter, EditorRequired] public string Current { get; set; } = "";
+
+    /// <summary>The page's sections (id, label), listed under it in the side list.</summary>
+    [Parameter] public IReadOnlyList<(string Id, string Label)> Sections { get; set; } = Array.Empty<(string, string)>();
+
+    [Parameter, EditorRequired] public string Eyebrow { get; set; } = "";
+    [Parameter, EditorRequired] public string Title { get; set; } = "";
+
+    /// <summary>One paragraph under the title.</summary>
+    [Parameter] public RenderFragment? Lead { get; set; }
+
+    /// <summary>A wider card, for a page with wide tables or two columns (Model card, Verify).</summary>
+    [Parameter] public bool Wide { get; set; }
+
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+}
