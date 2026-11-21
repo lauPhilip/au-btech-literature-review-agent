@@ -8,8 +8,8 @@
    straight into UiStateContainer, and every change is passed up through OnChanged. *@
 
 @{
-    string body = Open switch { null => "hidden lg:block", true => "block", false => "hidden" };
-    string summary = Open switch { null => "lg:hidden", true => "hidden", false => "" };
+    string body = Open switch { null => "hidden lg:block", true => "block", _ => "hidden" };
+    string summary = Open switch { null => "lg:hidden", true => "hidden", _ => "" };
     // Opened on a phone, the whole card covers the screen and scrolls on its own.
     string sheet = Open == true ? "max-sm:fixed max-sm:inset-0 max-sm:z-50 max-sm:overflow-y-auto max-sm:rounded-none max-sm:border-0" : "";
 }
