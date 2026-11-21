@@ -1,0 +1,92 @@
+@* The citation-check panel beside a report (redesign step 8), shown from 1500 px and sticky while the report
+   scrolls. It shows the verdict bar, three filters (All, Flagged, Abstract only) and one button that opens the next
+   citation of the chosen kind in reading order; the page owns which citation is open. Under it are the run's
+   downloads. Below 1500 px the attention bar above the report steps through the flagged citations instead. *@
+
+@{
+    int count = Checks.Count(c => AuBtechReviewAgent.ReportOutline.Matches(c, Filter));
+    int next = count == 0 ? 0 : ((Position < 0 ? -1 : Position) + 1) % count + 1;
+}
+
+<aside aria-label="Citation check and downloads" class="sticky top-6 space-y-4 print:hidden">
+    <section class="ui-card p-5" aria-labelledby="check-panel-title">
+        <h2 id="check-panel-title" class="font-display text-base font-semibold text-heading">Citation check</h2>
+        @if (Checks.Count == 0)
+        {
+            <p class="mt-1 text-sm text-muted">No citations were checked in this run.</p>
+        }
+        else
+        {
+            <p class="mt-1 text-sm text-muted">@Checks.Count @(Checks.Count == 1 ? "citation" : "citations") checked against the papers.</p>
+            <div class="mt-3"><VerdictBar Counts="AuBtechReviewAgent.VerdictCounts.From(Checks)" Thin="true" /></div>
+
+            <div class="mt-4 grid grid-cols-3 gap-1" role="group" aria-label="Which citations to step through">
+                @foreach (var filter in AuBtechReviewAgent.ReportOutline.Filters)
+                {
+                    var f = filter;
+                    bool on = f.Key == Filter;
+                    int n = Checks.Count(c => AuBtechReviewAgent.ReportOutline.Matches(c, f.Key));
+                    <button type="button" aria-pressed="@(on ? "true" : "false")" @onclick="() => OnFilter.InvokeAsync(f.Key)"
+                            class="@(on ? "border-heading bg-active font-semibold text-heading" : "border-line-field bg-page text-ink hover:border-heading") flex min-h-[44px] flex-col items-center justify-center rounded-btn border px-1 text-xs leading-tight">
+                        <span>@f.Label</span><span class="font-mono text-[11px] text-muted">@n</span>
+                    </button>
+                }
+            </div>
+
+            <button type="button" class="ui-btn-primary mt-3 min-h-[44px] w-full" disabled="@(count == 0)" @onclick="() => OnNext.InvokeAsync()">
+                @AuBtechReviewAgent.ReportOutline.NextLabel(Filter)@(count > 0 ? $" · {next} of {count}" : "")
+            </button>
+            @if (count == 0)
+            {
+                <p class="mt-2 text-xs text-muted">No citations of this kind in the report.</p>
+            }
+        }
+    </section>
+
+    <section class="ui-card p-5" aria-labelledby="download-panel-title">
+        <h2 id="download-panel-title" class="font-display text-base font-semibold text-heading">Download</h2>
+        @{ string api = $"/api/workspace/{RunId}"; }
+        <ul class="mt-2 divide-y divide-line">
+            @(Row("Run archive", "Every file fingerprinted, with the LaTeX manuscript", ($"{api}/archive", "Download", "the run archive")))
+            @(Row("References", "The included studies", ($"{api}/references.bib", "BibTeX", "the references"), ($"{api}/references.ris", "RIS", "the references")))
+            @(Row("Screened records", "Every record with its decision", ($"{api}/screened.ris", "RIS", "the screened records")))
+            @if (HasProtocol)
+            {
+                @(Row("Protocol", "Written before the search", ($"{api}/protocol.md", "Open", "the protocol")))
+            }
+        </ul>
+    </section>
+</aside>
+
+@code {
+    /// <summary>Every verdict of the run's citation check.</summary>
+    [Parameter] public IReadOnlyList<AuBtechReviewAgent.CitationSupportResult> Checks { get; set; } = Array.Empty<AuBtechReviewAgent.CitationSupportResult>();
+
+    /// <summary>The chosen filter: <see cref="AuBtechReviewAgent.ReportOutline.All"/>, Flagged or AbstractOnly.</summary>
+    [Parameter] public string Filter { get; set; } = AuBtechReviewAgent.ReportOutline.Flagged;
+    [Parameter] public EventCallback<string> OnFilter { get; set; }
+
+    /// <summary>Which citation of the filter is open now, 0-based; -1 before the first.</summary>
+    [Parameter] public int Position { get; set; } = -1;
+    [Parameter] public EventCallback OnNext { get; set; }
+
+    [Parameter, EditorRequired] public Guid RunId { get; set; }
+    [Parameter] public bool HasProtocol { get; set; }
+
+    private static RenderFragment Row(string name, string about, params (string Href, string Action, string What)[] links) => __builder =>
+    {
+        <li class="flex items-center justify-between gap-3 py-2.5">
+            <span class="min-w-0">
+                <span class="block text-sm font-semibold text-ink">@name</span>
+                <span class="block text-xs leading-snug text-muted">@about</span>
+            </span>
+            <span class="flex shrink-0 gap-1.5">
+                @foreach (var link in links)
+                {
+                    var l = link;
+                    <a href="@l.Href" target="_blank" class="ui-btn-secondary ui-btn-sm min-h-[44px] min-w-[44px]">@l.Action<span class="sr-only">@($" {l.What}")</span></a>
+                }
+            </span>
+        </li>
+    };
+}
