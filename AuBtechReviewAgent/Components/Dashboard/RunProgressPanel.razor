@@ -63,7 +63,7 @@
                                     break;
                             }
                             <span class="min-w-0">
-                                <span class="block font-display text-sm font-semibold @(state == "pending" ? "text-muted" : "text-heading")">@AuBtechReviewAgent.ReviewSteps.All[index].Title <span class="sr-only">(@StateText(state))</span></span>
+                                <span class="block font-display text-sm font-semibold @(state == "pending" ? "text-muted" : "text-heading")">@AuBtechReviewAgent.ReviewSteps.All[index].Title<span class="sr-only">@($" ({StateText(state)})")</span></span>
                                 <span class="block text-sm leading-snug text-muted @(active ? "" : "max-sm:hidden")">@line</span>
                             </span>
                         </li>

@@ -154,7 +154,7 @@
                 @foreach (var link in links)
                 {
                     var l = link;
-                    <a href="@l.Href" class="ui-btn-secondary ui-btn-sm min-h-[44px] min-w-[44px]">@l.Action<span class="sr-only"> @l.What</span></a>
+                    <a href="@l.Href" class="ui-btn-secondary ui-btn-sm min-h-[44px] min-w-[44px]">@l.Action<span class="sr-only">@($" {l.What}")</span></a>
                 }
             </span>
         </li>
