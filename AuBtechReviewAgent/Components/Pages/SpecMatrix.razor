@@ -474,7 +474,7 @@ else
                 @if (!string.IsNullOrWhiteSpace(report.FutureResearchItem))
                 {
                     <div class="space-y-2">
-                        <h3 class="font-display text-base font-semibold text-heading">5.@(++discussionPart) Directions for Future Research (Item 23d)</h3>
+                        <h3 class="font-display text-base font-semibold text-heading">5.@(discussionPart + 1) Directions for Future Research (Item 23d)</h3>
                         @CitedText("futureResearchItem", report.FutureResearchItem)
                     </div>
                 }

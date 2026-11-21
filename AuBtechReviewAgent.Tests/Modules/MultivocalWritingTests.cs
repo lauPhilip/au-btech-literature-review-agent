@@ -54,7 +54,8 @@ public class MultivocalWritingTests
         Assert.Equal(new[] { ("RQ1", "theme"), ("RQ1.1", "code"), ("RQ1.2", "code"), ("RQ2", "code"), ("RQ3", "code") },
             paper.Results.Select(r => (r.Question, r.Kind)));
         var theme = paper.Results[0];
-        Assert.Equal(("synthesis-1", "Keeping the context short"), (theme.Field, theme.Heading));
+        // The heading is the theme's name from the codebook, not the model's suggestion (issue #165).
+        Assert.Equal(("synthesis-1", "Short contexts"), (theme.Field, theme.Heading));
         Assert.StartsWith("What this theme rests on: 2 sources [1, 2]", theme.Note);
         Assert.Contains("answered by counting, in code", paper.Results[3].Text);
         Assert.Contains("no theme that could be written up", paper.Results[2].Text);
@@ -174,7 +175,7 @@ public class MultivocalWritingTests
         Assert.Equal("AI-GENERATED GREY LITERATURE REVIEW", built.KindLabel);
         Assert.Equal(paper.Title, built.Title);
         Assert.EndsWith("The research questions were RQ1: Which context engineering practices do practitioners and researchers describe?; RQ1.1: Which tools and frameworks support these practices?; RQ1.2: How are the practices usually applied when an agent is built?; RQ2: How often is each practice mentioned in grey and in academic sources?; RQ3: Is the use of retrieval for context related to fewer reported agent failures?", built.Objectives);
-        Assert.Equal(new[] { "RQ1: Keeping the context short", "RQ1.1: Which tools and frameworks support these practices?" }, built.Themes.Take(2).Select(t => t.Heading));
+        Assert.Equal(new[] { "RQ1: Short contexts", "RQ1.1: Which tools and frameworks support these practices?" }, built.Themes.Take(2).Select(t => t.Heading));
         Assert.Contains(@"\begin{tabular}", built.Themes[1].Latex); // RQ1.1 answered in code, as a table
         Assert.Contains("What this theme rests on", built.Themes[0].Latex);
         Assert.Equal("Automated citation check", Assert.Single(built.DiscussionNotes).Heading);
