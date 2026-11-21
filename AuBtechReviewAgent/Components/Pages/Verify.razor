@@ -1,4 +1,5 @@
 @page "/verify"
+@layout AppLayout
 @rendermode InteractiveServer
 @inject ILogger<Verify> Logger
 
@@ -8,9 +9,7 @@
 <SeoHead Title="Verify a run archive" Path="/verify" BreadcrumbName="Verify"
          Description="Check that a TraceableAI run archive has not been changed: every file is compared with the SHA-256 fingerprint in its manifest." />
 
-<SiteHeader />
-
-<main id="main" tabindex="-1" class="flex-1 min-h-0 overflow-y-auto bg-white text-gray-900 font-sans">
+<div class="min-h-full bg-white text-gray-900 font-sans">
     <div class="ui-container py-14 lg:py-20 max-w-3xl">
         <p class="ui-eyebrow">Verify</p>
         <h1 class="ui-h1 mt-3">Check that an archive is unchanged</h1>
@@ -91,8 +90,7 @@
             }
         </div>
     </div>
-    <SiteFooter />
-</main>
+</div>
 
 @code {
     /// <summary>What the manifest's own fingerprint says: unchanged, edited, or from a version that had none.</summary>

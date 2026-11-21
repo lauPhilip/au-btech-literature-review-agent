@@ -14,7 +14,7 @@ The icons that phones and older browsers use now show the same mark on a navy ti
 
 The top bar is new. It is white, shows the mark next to the name, and has three places: New review, Review output and Metrics. On a phone they fold into a menu. The footer is now one short line with the pages about trust and a link to GitHub.
 
-Behind the scenes, the site now has a frame that keeps the top bar and the footer still while the page scrolls, and a switch for a dark theme. The pages move into the frame in the next steps, and the switch comes with them.
+Every page now sits in one frame. The top bar and the footer stay still, and only the page between them scrolls. A switch for a dark theme is ready too, but it stays hidden until the pages have their dark colours.
 
 Nothing about how a review runs has changed. These are the first steps of the redesign; the pages follow one by one.
 

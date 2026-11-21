@@ -58,7 +58,8 @@ public class FrameTests
 
         string landing = await RenderAsync<SiteHeader>("", new() { ["ShowNav"] = false, ["ShowThemeToggle"] = true });
         Assert.DoesNotContain("<nav", landing);
-        Assert.Contains("data-theme-toggle", landing);
+        // The toggle appears only once ThemeToggle.Offered is on, while the pages use fixed light colours.
+        Assert.Equal(ThemeToggle.Offered, landing.Contains("data-theme-toggle", StringComparison.Ordinal));
         Assert.Contains("href=\"/\" aria-current=\"page\"", landing);
     }
 
@@ -115,7 +116,7 @@ public class FrameTests
             int content = html.IndexOf("PAGE CONTENT", StringComparison.Ordinal);
             int footer = html.IndexOf("<footer", StringComparison.Ordinal);
             Assert.True(header >= 0 && header < content && content < footer);
-            Assert.Contains("data-theme-toggle", html);
+            Assert.Equal(ThemeToggle.Offered, html.Contains("data-theme-toggle", StringComparison.Ordinal));
         }
     }
 
@@ -137,6 +138,33 @@ public class FrameTests
         Assert.Contains("data-theme-toggle", js);
         Assert.Contains("localStorage", js);
         Assert.Contains("prefers-color-scheme", js);
+    }
+
+    [Fact]
+    public void EveryPageSitsInALayoutAndRendersOnlyItsContent()
+    {
+        string? web = WebRoot();
+        if (web == null) return; // not run from the repository
+        string app = Path.GetDirectoryName(web)!;
+        var pages = Directory.EnumerateFiles(app, "*.razor", SearchOption.AllDirectories)
+            .Where(f => !f.Contains(Path.Join("bin", ""), StringComparison.Ordinal) && !f.Contains(Path.Join("obj", ""), StringComparison.Ordinal))
+            .Select(f => (Name: Path.GetFileName(f), Text: File.ReadAllText(f)))
+            .Where(p => p.Text.Contains("@page \"", StringComparison.Ordinal))
+            .ToList();
+        Assert.True(pages.Count >= 16, $"expected every routable page, found {pages.Count}");
+
+        foreach (var (name, text) in pages)
+        {
+            string layout = name == "Landing.razor" || name == "LandingFramePreview.razor" ? "@layout LandingLayout" : "@layout AppLayout";
+            Assert.True(text.Contains(layout, StringComparison.Ordinal), $"{name} should declare {layout}");
+            // The layout renders the header, the footer and the one <main id="main">.
+            Assert.False(text.Contains("<SiteHeader", StringComparison.Ordinal), $"{name} renders its own header");
+            Assert.False(text.Contains("<SiteFooter", StringComparison.Ordinal), $"{name} renders its own footer");
+            Assert.False(text.Contains("<main", StringComparison.Ordinal), $"{name} renders its own <main>");
+        }
+
+        string routes = File.ReadAllText(Path.Join(app, "Components", "Routes.razor"));
+        Assert.Contains("DefaultLayout=\"typeof(Layout.AppLayout)\"", routes);
     }
 
     private static int Count(string text, string part)

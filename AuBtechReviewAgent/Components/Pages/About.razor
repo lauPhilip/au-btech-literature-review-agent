@@ -1,13 +1,12 @@
 @page "/about"
+@layout AppLayout
 @inject AuBtechReviewAgent.RunsOptions RunsOptions
 
 <SeoHead Title="About and FAQ" Path="/about" BreadcrumbName="About"
          Description="Who made TraceableAI, what the citation colours mean, what it can and cannot do, how to cite it, and answers to common questions."
          ExtraJsonLd="AuBtechReviewAgent.SiteSeo.ScholarlyArticleJsonLd" />
 
-<SiteHeader />
-
-<main id="main" tabindex="-1" class="flex-1 min-h-0 overflow-y-auto bg-white text-gray-900 font-sans">
+<div class="min-h-full bg-white text-gray-900 font-sans">
     <div class="ui-container py-14 lg:py-20 max-w-3xl">
         <p class="ui-eyebrow">About</p>
         <h1 class="ui-h1 mt-3">Who made TraceableAI, and why</h1>
@@ -84,8 +83,7 @@
             </p>
         </section>
     </div>
-    <SiteFooter />
-</main>
+</div>
 
 @code {
     private static readonly (string Key, string Chip)[] Verdicts =

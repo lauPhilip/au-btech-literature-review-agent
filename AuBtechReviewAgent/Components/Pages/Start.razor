@@ -1,4 +1,5 @@
 @page "/start"
+@layout AppLayout
 @inject AuBtechReviewAgent.ReviewModulesOptions ModuleOptions
 
 @* The first step of a new review: choose the kind of review. Every kind shares the same core (every claim grounded
@@ -8,9 +9,7 @@
 <SeoHead Title="Start a review" Path="/start"
          Description="Choose the kind of literature review: a PRISMA 2020 systematic review today, with multivocal, rapid, living and grey literature reviews coming soon." />
 
-<SiteHeader />
-
-<main id="main" tabindex="-1" class="flex-1 min-h-0 overflow-y-auto bg-gray-50 text-gray-900 font-sans">
+<div class="min-h-full bg-gray-50 text-gray-900 font-sans">
     <div class="ui-container py-14 lg:py-20 max-w-5xl">
         <div class="text-center max-w-2xl mx-auto">
             <p class="ui-eyebrow">Start a review</p>
@@ -78,5 +77,4 @@
             <a href="/glossary" class="text-brand underline underline-offset-2">glossary</a> explains the terms.
         </p>
     </div>
-    <SiteFooter />
-</main>
+</div>

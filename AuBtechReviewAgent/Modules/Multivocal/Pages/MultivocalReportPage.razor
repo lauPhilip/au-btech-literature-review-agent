@@ -1,4 +1,5 @@
 @page "/mlr-report/{RunId:guid}"
+@layout AppLayout
 @rendermode InteractiveServer
 @inject AuBtechReviewAgent.ReviewModulesOptions ModuleOptions
 @inject AuBtechReviewAgent.RunStore Runs
@@ -14,9 +15,6 @@
 <SeoHead Title="Grey literature review report" Path="/mlr-report" NoIndex="true"
          Description="The report of a multivocal literature review, following the Garousi et al. (2019) guidelines." />
 
-<SiteHeader Active="dashboard" DashboardHref="@($"/mlr/{RunId}")" />
-
-<main id="main" tabindex="-1" class="flex-1 min-h-0 overflow-y-auto">
 <div class="max-w-4xl w-full mx-auto p-4 lg:p-6 space-y-6">
     @if (report == null)
     {
@@ -131,7 +129,6 @@
         }
     }
 </div>
-</main>
 
 @code {
     [Parameter] public Guid RunId { get; set; }

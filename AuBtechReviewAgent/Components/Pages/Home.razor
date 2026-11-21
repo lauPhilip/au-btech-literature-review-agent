@@ -1,5 +1,6 @@
 ﻿@page "/review"
 @page "/review/{RunId:guid}"
+@layout AppLayout
 @rendermode InteractiveServer
 @implements IDisposable
 
@@ -17,9 +18,6 @@
 
 <SeoHead Title="@TabTitle()" Path="/review" NoIndex="@(RunId != null)" Description="Start a PRISMA 2020 literature review: give your question and criteria, and TraceableAI searches, screens, writes and checks every citation against the paper." />
 
-<SiteHeader Active="dashboard" DashboardHref="@(hasRun ? $"/review/{currentSessionId}" : "/review")" OutputHref="@(hasRun ? $"/spec-matrix/{currentSessionId}" : "/spec-matrix")" />
-
-<main id="main" tabindex="-1" class="flex-1 min-h-0 overflow-y-auto">
 <div class="max-w-7xl w-full mx-auto p-4 lg:p-6 space-y-4">
 
     @* Toolbar: what this page is, and the account details in small print (they matter less than the question). *@
@@ -474,7 +472,6 @@
         </section>
     </div>
 </div>
-</main>
 
 @if (showKeyModal)
 {
