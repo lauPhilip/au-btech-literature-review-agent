@@ -47,7 +47,7 @@
                         int start = from;
                         bool chosen = YearFrom == start && YearTo == DateTime.UtcNow.Year;
                         <button type="button" @onclick="() => SetYears(start)" aria-pressed="@(chosen ? "true" : "false")"
-                                class="min-h-[32px] rounded-full border px-3 py-1 text-xs @(chosen ? "border-brand bg-active text-brand" : "border-line-field text-muted hover:bg-soft")">@label</button>
+                                class="min-h-[32px] rounded-full border px-3 py-1 text-xs @(chosen ? "border-heading bg-active text-heading" : "border-line-field text-muted hover:bg-soft")">@label</button>
                     }
                 </div>
             </div>
@@ -105,7 +105,7 @@
                 {
                     var key = kind.Key;
                     bool chosen = State.ArtifactKind == key;
-                    <label class="flex min-h-[44px] cursor-pointer items-center gap-2 rounded-field border px-3 py-2 text-sm @(chosen ? "border-brand bg-active text-brand" : "border-line-field text-ink hover:bg-soft")">
+                    <label class="flex min-h-[44px] cursor-pointer items-center gap-2 rounded-field border px-3 py-2 text-sm @(chosen ? "border-heading bg-active text-heading" : "border-line-field text-ink hover:bg-soft")">
                         <input type="radio" name="artifact-kind" value="@key" checked="@chosen" disabled="@Busy" @onchange="() => ChooseArtifact(key)" class="h-4 w-4 accent-brand" />
                         <span>@ShortLabel(key)</span>
                     </label>

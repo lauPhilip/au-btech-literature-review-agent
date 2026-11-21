@@ -26,7 +26,7 @@
     <div class="mx-auto w-full max-w-[1600px] px-[clamp(16px,3vw,40px)] py-4 sm:py-10">
         @if (!string.IsNullOrEmpty(quotaNotice))
         {
-            <p class="mx-auto mb-4 max-w-[760px] text-xs text-red-700" role="alert">@quotaNotice</p>
+            <p class="mx-auto mb-4 max-w-[760px] text-xs text-not-supported" role="alert">@quotaNotice</p>
         }
         <div class="grid grid-cols-1 items-start gap-4 sm:gap-6 lg:grid-cols-[minmax(0,760px)_380px] lg:justify-center xl:gap-10 min-[1600px]:grid-cols-[minmax(0,760px)_440px]">
             <ReviewComposer Method="ReviewMethod" Quota="quotaStatus" InputCheck="inputCheck" Busy="isSearching"
@@ -34,11 +34,11 @@
                 <Notice>
                     @if (prefillNotice != null)
                     {
-                        <div class="flex flex-wrap items-center justify-between gap-2 rounded-field border border-blue-100 bg-blue-50 p-2 text-xs text-blue-900">
+                        <div class="flex flex-wrap items-center justify-between gap-2 rounded-field border border-abstract-only-border bg-abstract-only-fill p-2 text-xs text-abstract-only">
                             <span>@prefillNotice</span>
                             @if (showStartEmpty)
                             {
-                                <button type="button" @onclick="StartEmpty" class="ui-btn ui-btn-sm py-1 text-blue-900 hover:bg-blue-100">Start empty</button>
+                                <button type="button" @onclick="StartEmpty" class="ui-btn ui-btn-sm py-1 text-abstract-only hover:bg-abstract-only-fill">Start empty</button>
                             }
                         </div>
                     }
@@ -46,7 +46,7 @@
                 <Problems>
                     @if (inputCheck is { IsValid: false } failedCheck)
                     {
-                        <div class="space-y-0.5 rounded-field border border-red-200 bg-red-50 p-2 text-xs text-red-800" role="alert">
+                        <div class="space-y-0.5 rounded-field border border-not-supported-border bg-not-supported-fill p-2 text-xs text-not-supported" role="alert">
                             @foreach (var error in failedCheck.Errors)
                             {
                                 <p>@error</p>
@@ -55,7 +55,7 @@
                     }
                     else if (pendingFlagSignature != null && inputCheck != null)
                     {
-                        <div class="space-y-1 rounded-field border border-amber-200 bg-amber-50 p-2 text-xs text-amber-900" role="alert">
+                        <div class="space-y-1 rounded-field border border-partly-border bg-partly-fill p-2 text-xs text-partly" role="alert">
                             <p class="font-semibold">Some of your text reads like instructions to the language model:</p>
                             <ul class="list-disc space-y-0.5 pl-4">
                                 @foreach (var flag in inputCheck.Flags)
@@ -64,7 +64,7 @@
                                 }
                             </ul>
                             <p>The model is told to treat your fields only as the topic and criteria, so this usually changes nothing. If it is what you meant, start anyway; the warning is written to the protocol.</p>
-                            <button type="button" @onclick="ConfirmFlaggedInput" class="ui-btn ui-btn-sm bg-amber-600 text-white hover:bg-amber-700">Start anyway</button>
+                            <button type="button" @onclick="ConfirmFlaggedInput" class="ui-btn ui-btn-sm bg-partly text-page hover:opacity-90">Start anyway</button>
                         </div>
                     }
                     @* "Start review" is never silently disabled: the reason sits above it and takes you to the field. *@
@@ -73,11 +73,11 @@
                         <div class="space-y-2">
                             @if (BlockerTarget() != null)
                             {
-                                <button type="button" @onclick="GoToProblem" class="block min-h-[24px] text-left text-sm text-amber-800 underline decoration-dotted underline-offset-2 hover:text-amber-900">@blocker</button>
+                                <button type="button" @onclick="GoToProblem" class="block min-h-[24px] text-left text-sm text-partly underline decoration-dotted underline-offset-2 hover:text-partly">@blocker</button>
                             }
                             else
                             {
-                                <p class="text-sm text-amber-800">@blocker</p>
+                                <p class="text-sm text-partly">@blocker</p>
                                 @if (!quotaStatus.Allowed && quotaStatus.Tier == AuBtechReviewAgent.QuotaTier.Free)
                                 {
                                     <button type="button" @onclick="OpenKeyModal" class="ui-btn-secondary ui-btn-sm">Add your own Mistral key</button>
@@ -103,59 +103,59 @@
                             <legend class="@LabelClass">Search strings <Term Key="search-strings" Icon="true" /></legend>
                             @if (reviewedSearchStrings == null)
                             {
-                                <p id="h-strings" class="text-xs text-gray-600 leading-snug">The model adds up to three other phrasings of your query during the run. Preview them to check and edit them before anything is searched.</p>
+                                <p id="h-strings" class="text-xs text-muted leading-snug">The model adds up to three other phrasings of your query during the run. Preview them to check and edit them before anything is searched.</p>
                                 <button type="button" @onclick="PreviewSearchStrings" disabled="@(previewingStrings || string.IsNullOrWhiteSpace(searchQuery) || previewsLeft <= 0)"
-                                        class="ui-btn ui-btn-sm mt-2 border border-gray-300 text-gray-800 hover:border-brand disabled:opacity-50">
+                                        class="ui-btn ui-btn-sm mt-2 border border-line-field text-ink hover:border-heading disabled:opacity-50">
                                     @(previewingStrings ? "Asking the model…" : "Preview search strings")
                                 </button>
                             }
                             else
                             {
-                                <p id="h-strings" class="text-xs text-gray-600 leading-snug">These are searched as they are, after your query; the report records that you approved them.</p>
+                                <p id="h-strings" class="text-xs text-muted leading-snug">These are searched as they are, after your query; the report records that you approved them.</p>
                                 <ol class="mt-2 space-y-1.5">
-                                    <li class="flex items-center gap-2 text-sm text-gray-700"><span class="w-4 text-right text-xs text-gray-500">1</span><span class="truncate" title="@searchQuery">@searchQuery</span><span class="text-[10px] text-gray-500 whitespace-nowrap">(your query)</span></li>
+                                    <li class="flex items-center gap-2 text-sm text-ink"><span class="w-4 text-right text-xs text-muted">1</span><span class="truncate" title="@searchQuery">@searchQuery</span><span class="text-[10px] text-muted whitespace-nowrap">(your query)</span></li>
                                     @for (int i = 0; i < reviewedSearchStrings.Count; i++)
                                     {
                                         int index = i;
                                         <li class="flex items-center gap-2">
-                                            <span class="w-4 text-right text-xs text-gray-500">@(index + 2)</span>
+                                            <span class="w-4 text-right text-xs text-muted">@(index + 2)</span>
                                             <input type="text" aria-label="@($"Search string {index + 2}")" maxlength="@AuBtechReviewAgent.ReviewInputGuard.MaxSearchString"
                                                    value="@reviewedSearchStrings[index]" @onchange="e => reviewedSearchStrings[index] = e.Value?.ToString() ?? string.Empty" class="@InputClass py-1" />
-                                            <button type="button" @onclick="() => reviewedSearchStrings.RemoveAt(index)" class="ui-btn ui-btn-sm px-2 text-gray-600 hover:text-red-700" aria-label="@($"Remove search string {index + 2}")">✕</button>
+                                            <button type="button" @onclick="() => reviewedSearchStrings.RemoveAt(index)" class="ui-btn ui-btn-sm px-2 text-muted hover:text-not-supported" aria-label="@($"Remove search string {index + 2}")">✕</button>
                                         </li>
                                     }
                                 </ol>
                                 <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
                                     @if (reviewedSearchStrings.Count < AuBtechReviewAgent.ReviewInputGuard.MaxSearchStrings)
                                     {
-                                        <button type="button" @onclick="() => reviewedSearchStrings.Add(string.Empty)" class="text-brand font-medium hover:underline">Add a search string</button>
+                                        <button type="button" @onclick="() => reviewedSearchStrings.Add(string.Empty)" class="text-heading font-medium hover:underline">Add a search string</button>
                                     }
-                                    <button type="button" @onclick="() => reviewedSearchStrings = null" class="text-gray-600 hover:underline">Let the model choose during the run</button>
+                                    <button type="button" @onclick="() => reviewedSearchStrings = null" class="text-muted hover:underline">Let the model choose during the run</button>
                                 </div>
                                 @if (previewQuery != null && !string.Equals(previewQuery, searchQuery?.Trim(), StringComparison.OrdinalIgnoreCase))
                                 {
-                                    <p class="mt-1.5 text-[11px] text-amber-800">Your query changed after the preview. Check that these still fit.</p>
+                                    <p class="mt-1.5 text-[11px] text-partly">Your query changed after the preview. Check that these still fit.</p>
                                 }
                             }
                             @if (previewError != null)
                             {
-                                <p class="mt-1.5 text-[11px] text-red-700" role="alert">@previewError</p>
+                                <p class="mt-1.5 text-[11px] text-not-supported" role="alert">@previewError</p>
                             }
                         </fieldset>
                     </details>
                     <details class="group rounded-field border border-line">
                         <summary class="flex min-h-[44px] cursor-pointer select-none items-center justify-between px-3 py-2 text-sm text-ink">
                             <span>Advanced options</span>
-                            <span class="text-[11px] text-gray-500">@AdvancedSummary()</span>
+                            <span class="text-[11px] text-muted">@AdvancedSummary()</span>
                         </summary>
-                        <div class="px-3 pb-3 space-y-3 border-t border-gray-100 pt-3">
+                        <div class="px-3 pb-3 space-y-3 border-t border-line pt-3">
                             @Option("o-dual", "dual-screening", "Screen every record twice", "Two independent screening prompts; disagreements are kept and flagged, and the agreement (Cohen's kappa) is reported.", State.DualScreening, v => State.DualScreening = v)
                             @Option("o-chaining", "citation-chaining", "Citation chaining", "Also screen the papers the included studies cite and the papers citing them (one round, via OpenAlex).", State.CitationChaining, v => State.CitationChaining = v)
                             @Option("o-check", "screening", "Let me check the screening decisions", "The run pauses after screening so you can include or exclude papers yourself.", State.ReviewScreeningFirst, v => State.ReviewScreeningFirst = v)
                             @Option("o-peer", null, "Peer-reviewed only", "Leave out preprints and working papers before screening.", requirePeerReview, v => requirePeerReview = v)
                             <div class="flex items-center justify-between gap-3">
-                                <label for="f-max" class="text-sm text-gray-800">Records per source
-                                    <span class="block text-xs text-gray-500">@(quotaStatus.Tier == AuBtechReviewAgent.QuotaTier.Free ? $"Free tier: at most {maxResultsCeiling}." : "More records take longer.")</span>
+                                <label for="f-max" class="text-sm text-ink">Records per source
+                                    <span class="block text-xs text-muted">@(quotaStatus.Tier == AuBtechReviewAgent.QuotaTier.Free ? $"Free tier: at most {maxResultsCeiling}." : "More records take longer.")</span>
                                 </label>
                                 <input id="f-max" type="number" min="1" max="@maxResultsCeiling" @bind="maxResults" class="@InputClass w-20 text-center" />
                             </div>
@@ -178,7 +178,7 @@ else
     <p class="sr-only" role="status" aria-live="polite">@Announcement()</p>
     @if (!string.IsNullOrEmpty(quotaNotice))
     {
-        <p class="mx-auto mt-4 max-w-[760px] px-4 text-xs text-red-700" role="alert">@quotaNotice</p>
+        <p class="mx-auto mt-4 max-w-[760px] px-4 text-xs text-not-supported" role="alert">@quotaNotice</p>
     }
     @if (stage == AuBtechReviewAgent.PrismaReviewEngine.StageComplete)
     {
@@ -254,18 +254,18 @@ else
     @* A modal dialog: Escape closes it, Tab stays inside it, and focus returns to the "API keys" button. *@
     <div class="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-[100] p-4 font-sans animate-fadeIn" @onkeydown="KeyDialogKeyDown">
         <div id="key-dialog" role="dialog" aria-modal="true" aria-labelledby="key-dialog-title" aria-describedby="key-dialog-note"
-             class="bg-white border border-gray-200 w-full max-w-md shadow-lift overflow-hidden flex flex-col text-left">
-            <div class="bg-brand text-white px-5 py-4 flex justify-between items-center">
+             class="bg-page border border-line w-full max-w-md shadow-lift overflow-hidden flex flex-col text-left">
+            <div class="bg-primary text-primary-on px-5 py-4 flex justify-between items-center">
                 <div>
                     <h2 id="key-dialog-title" class="text-base font-semibold">API keys</h2>
-                    <p class="text-xs text-white/75 mt-0.5">Kept only in this browser tab</p>
+                    <p class="text-xs text-primary-on/75 mt-0.5">Kept only in this browser tab</p>
                 </div>
-                <button type="button" @onclick="CloseKeyModal" aria-label="Close" class="ui-btn ui-btn-sm text-white/80 hover:text-white hover:bg-white/10 px-2">
+                <button type="button" @onclick="CloseKeyModal" aria-label="Close" class="ui-btn ui-btn-sm text-primary-on/80 hover:text-primary-on hover:bg-primary-on/10 px-2">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
                 </button>
             </div>
-            <div class="p-5 space-y-4 overflow-y-auto text-sm text-gray-700">
-                <p id="key-dialog-note" class="bg-brand-50 border border-brand-100 text-gray-700 p-3 text-xs leading-relaxed">
+            <div class="p-5 space-y-4 overflow-y-auto text-sm text-ink">
+                <p id="key-dialog-note" class="bg-active border border-line-field text-ink p-3 text-xs leading-relaxed">
                     Your keys are kept encrypted in this browser tab only. They are not written to the server's disk or logs, and they are gone when you close the tab. With your own Mistral key the free-tier daily limit does not apply.
                 </p>
                 <div>
@@ -284,14 +284,14 @@ else
                     <label for="k-scholar" class="ui-label text-xs">Semantic Scholar API key</label>
                     <input id="k-scholar" type="password" autocomplete="off" placeholder="Optional" @bind="modalScholar" class="ui-input font-mono text-xs" />
                 </div>
-                <div class="pt-3 border-t border-gray-100">
+                <div class="pt-3 border-t border-line">
                     <label for="k-admin" class="ui-label text-xs">Developer access token</label>
                     <input id="k-admin" type="password" autocomplete="off" aria-describedby="k-admin-help" placeholder="Only for the maintainers of this deployment" @bind="modalAdminToken" class="ui-input font-mono text-xs" />
-                    <p id="k-admin-help" class="text-xs text-gray-500 mt-1">Removes the daily run limit. Set with Quota:AdminToken on the server.</p>
+                    <p id="k-admin-help" class="text-xs text-muted mt-1">Removes the daily run limit. Set with Quota:AdminToken on the server.</p>
                 </div>
             </div>
-            <div class="bg-gray-50 px-5 py-3 border-t border-gray-200 flex justify-end gap-2">
-                <button type="button" @onclick="ClearVault" class="ui-btn ui-btn-sm text-red-700 hover:bg-red-50">Clear session</button>
+            <div class="bg-soft px-5 py-3 border-t border-line flex justify-end gap-2">
+                <button type="button" @onclick="ClearVault" class="ui-btn ui-btn-sm text-not-supported hover:bg-not-supported-fill">Clear session</button>
                 <button type="button" @onclick="SaveSessionKeys" class="ui-btn-primary ui-btn-sm">Apply to session</button>
             </div>
         </div>
@@ -699,7 +699,7 @@ else
                     <h2 id="run-log-title" class="font-display text-sm font-semibold text-heading">Live log <span class="font-normal text-muted">(the run's ledger as JSON)</span></h2>
                     <button type="button" @onclick="ToggleLog" class="min-h-[44px] text-sm font-medium text-heading underline underline-offset-2">Hide</button>
                 </div>
-                <pre tabindex="0" class="max-h-[60vh] overflow-y-auto whitespace-pre-wrap break-words bg-gray-950 p-4 font-mono text-xs leading-relaxed text-green-400">@rawJsonLogs</pre>
+                <pre tabindex="0" class="max-h-[60vh] overflow-y-auto whitespace-pre-wrap break-words bg-[#0E1626] p-4 font-mono text-xs leading-relaxed text-[#5FD39A]">@rawJsonLogs</pre>
             </section>
         }
     };
@@ -1167,13 +1167,13 @@ else
         <div class="flex items-start gap-3">
             <input id="@id" type="checkbox" checked="@value" disabled="@isSearching" aria-describedby="@($"{id}-help")"
                    @onchange="e => set(e.Value is true)" class="w-4 h-4 mt-0.5 accent-brand cursor-pointer" />
-            <div class="text-sm text-gray-800">
+            <div class="text-sm text-ink">
                 <label for="@id" class="cursor-pointer select-none">@label</label>
                 @if (glossaryKey != null)
                 {
                     <Term Key="@glossaryKey" Icon="true" />
                 }
-                <span id="@($"{id}-help")" class="block text-xs text-gray-500">@help</span>
+                <span id="@($"{id}-help")" class="block text-xs text-muted">@help</span>
             </div>
         </div>
     };
@@ -1188,8 +1188,8 @@ else
     private static RenderFragment SettingRow(string label, string? value) => __builder =>
     {
         <div class="grid grid-cols-[5.5rem_1fr] gap-2">
-            <dt class="text-gray-500">@label</dt>
-            <dd class="text-gray-900 break-words">@(string.IsNullOrWhiteSpace(value) ? "–" : value)</dd>
+            <dt class="text-muted">@label</dt>
+            <dd class="text-heading break-words">@(string.IsNullOrWhiteSpace(value) ? "–" : value)</dd>
         </div>
     };
 
