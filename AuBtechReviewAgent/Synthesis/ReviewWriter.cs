@@ -569,7 +569,9 @@ public static class ReviewWriter
                     return outside.Count > 0 ? $"citation numbers {string.Join(", ", outside)} are not in the reference list." : null;
                 });
                 text = MethodsSectionWriter.StripMarkdownEmphasis(answer.Text!.Trim());
-                heading = string.IsNullOrWhiteSpace(answer.Heading) ? theme.Name : answer.Heading.Trim().TrimEnd('.');
+                // The heading is always the theme's name from the codebook, set in code, so the subsection, the overview
+                // and the evidence map name a theme the same way (issue #165). The model's own heading is not used.
+                heading = theme.Name.Trim();
             }
         }
         catch (Exception ex)
