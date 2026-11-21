@@ -28,26 +28,7 @@
                 @if (cited > 0)
                 {
                     <h2 class="font-display text-lg font-semibold text-heading">@cited @(cited == 1 ? "citation" : "citations") checked against the papers</h2>
-                    <div class="mt-3 flex h-3 w-full overflow-hidden rounded-full bg-active" role="img" aria-label="@BarSentence(s)">
-                        @Segment(s.CitationsSupported, cited, "bg-supported-chart")
-                        @Segment(s.CitationsPartiallySupported, cited, "bg-partly-chart")
-                        @Segment(s.CitationsNotSupported, cited, "bg-not-supported-chart")
-                        @Segment(s.CitationsInsufficientEvidence, cited, "bg-abstract-only-chart")
-                        @Segment(s.CitationsUnverifiable, cited, "bg-unverifiable-chart")
-                    </div>
-                    <ul class="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-sm text-ink">
-                        <li><span class="mr-1.5 inline-block h-2.5 w-2.5 bg-supported-chart" aria-hidden="true"></span>@s.CitationsSupported <Term Key="supported">supported</Term></li>
-                        <li><span class="mr-1.5 inline-block h-2.5 w-2.5 bg-partly-chart" aria-hidden="true"></span>@s.CitationsPartiallySupported <Term Key="partly-supported">partly supported</Term></li>
-                        <li><span class="mr-1.5 inline-block h-2.5 w-2.5 bg-not-supported-chart" aria-hidden="true"></span>@s.CitationsNotSupported <Term Key="not-supported">not supported</Term></li>
-                        @if (s.CitationsInsufficientEvidence > 0)
-                        {
-                            <li><span class="mr-1.5 inline-block h-2.5 w-2.5 bg-abstract-only-chart" aria-hidden="true"></span>@s.CitationsInsufficientEvidence <Term Key="abstract-only">abstract only</Term></li>
-                        }
-                        @if (s.CitationsUnverifiable > 0)
-                        {
-                            <li><span class="mr-1.5 inline-block h-2.5 w-2.5 bg-unverifiable-chart" aria-hidden="true"></span>@s.CitationsUnverifiable <Term Key="unverifiable">could not be verified</Term></li>
-                        }
-                    </ul>
+                    <div class="mt-3"><VerdictBar Counts="AuBtechReviewAgent.VerdictCounts.From(s)" Total="cited" /></div>
                     <p class="mt-2 text-sm text-muted max-sm:hidden">
                         @(flagged > 0
                             ? $"{flagged} {(flagged == 1 ? "citation is" : "citations are")} only partly or not supported. They stay in the report, marked, so you can judge them."
@@ -118,18 +99,7 @@
     }
 
     /// <summary>The bar as one sentence, for screen readers.</summary>
-    public static string BarSentence(AuBtechReviewAgent.ReviewStats s)
-    {
-        var parts = new List<string>
-        {
-            $"{s.CitationsSupported} supported",
-            $"{s.CitationsPartiallySupported} partly supported",
-            $"{s.CitationsNotSupported} not supported",
-        };
-        if (s.CitationsInsufficientEvidence > 0) parts.Add($"{s.CitationsInsufficientEvidence} abstract only");
-        if (s.CitationsUnverifiable > 0) parts.Add($"{s.CitationsUnverifiable} could not be verified");
-        return $"Of {s.CitationsChecked} citations: " + string.Join(", ", parts) + ".";
-    }
+    public static string BarSentence(AuBtechReviewAgent.ReviewStats s) => AuBtechReviewAgent.VerdictCounts.From(s).Sentence(s.CitationsChecked);
 
     private RenderFragment Files => __builder =>
     {
@@ -158,13 +128,5 @@
                 }
             </span>
         </li>
-    };
-
-    private static RenderFragment Segment(int count, int total, string color) => __builder =>
-    {
-        if (count > 0 && total > 0)
-        {
-            <div class="@color h-full border-r-2 border-white last:border-r-0" style="@($"width:{(count * 100.0 / total).ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)}%")"></div>
-        }
     };
 }
