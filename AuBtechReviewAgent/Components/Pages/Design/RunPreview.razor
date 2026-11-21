@@ -1,0 +1,86 @@
+@page "/design/run"
+@layout AppLayout
+@using Microsoft.Extensions.Hosting
+@inject Microsoft.AspNetCore.Hosting.IWebHostEnvironment Environment
+@inject NavigationManager Navigation
+@* A page that exists only in development: New review while a run is going (/design/run), when it stopped
+   (?state=stopped) and when it is done (?state=done), with sample figures. A real run cannot be started in CI, so the
+   accessibility job (tools/a11y) checks these states here and takes their screenshots. Anywhere else it answers
+   "not found". *@
+
+<SeoHead Title="Run preview" NoIndex="true" />
+
+@if (Environment.IsDevelopment())
+{
+    @if (State == "done")
+    {
+        <RunSummaryCard Stats="Done" RunId="SampleRun" Objective="@Objective">
+            <Side>@SampleCard</Side>
+        </RunSummaryCard>
+    }
+    else
+    {
+        bool stopped = State == "stopped";
+        <RunProgressPanel Stats="Going" Stage="@(stopped ? AuBtechReviewAgent.PrismaReviewEngine.StageFailed : AuBtechReviewAgent.PrismaReviewEngine.StageSynthesizing)"
+                          Running="!stopped" Objective="@Objective" SourceCount="4">
+            <Notice>
+                @if (stopped)
+                {
+                    <div class="mt-4 rounded-field border border-not-supported-border bg-not-supported-fill p-3 text-sm text-not-supported" role="alert">
+                        <p>Sample: the model did not answer in time.</p>
+                    </div>
+                }
+            </Notice>
+            <Side>@SampleCard</Side>
+        </RunProgressPanel>
+    }
+}
+
+@code {
+    [SupplyParameterFromQuery(Name = "state")] public string? State { get; set; }
+
+    private const string Objective = "Which safety and fault-tolerance mechanisms do agentic AI frameworks use, and how are they evaluated?";
+    private static readonly Guid SampleRun = Guid.Parse("00000000-0000-4000-8000-000000000007");
+
+    private readonly AuBtechReviewAgent.ReviewStats Going = new()
+    {
+        ProgressPlan = AuBtechReviewAgent.RunProgress.Plan(true, false),
+        ProgressStep = AuBtechReviewAgent.RunProgress.Extraction,
+        ProgressFraction = 0.6,
+        ProgressDetail = "9 of 14 studies",
+        ProcessingStage = AuBtechReviewAgent.PrismaReviewEngine.StageSynthesizing,
+        RunStartedUtc = DateTime.UtcNow.AddMinutes(-6),
+    };
+
+    private static readonly AuBtechReviewAgent.ReviewStats Done = new()
+    {
+        ProgressPlan = AuBtechReviewAgent.RunProgress.Plan(false, false),
+        ProgressStep = AuBtechReviewAgent.RunProgress.Done,
+        ProcessingStage = AuBtechReviewAgent.PrismaReviewEngine.StageComplete,
+        TotalIdentified = 412,
+        Included = 14,
+        ThemesIdentified = 4,
+        StudiesCitedInSynthesis = 12,
+        CitationsChecked = 60,
+        CitationsSupported = 45,
+        CitationsPartiallySupported = 9,
+        CitationsNotSupported = 3,
+        CitationsInsufficientEvidence = 2,
+        CitationsUnverifiable = 1,
+    };
+
+    // Stands in for the page's own "This run" card, so the side column has its real length.
+    private static readonly RenderFragment SampleCard = __builder =>
+    {
+        <div class="ui-card p-4 sm:p-5">
+            <h2 class="font-display text-base font-semibold text-heading">This run</h2>
+            <p class="mt-1 text-sm text-ink"><a class="break-all text-heading underline underline-offset-2" href="/review">/review/@SampleRun</a></p>
+            <p class="text-xs leading-relaxed text-muted">Sample card. On the real page it holds the link with Copy, what was asked, New review and Delete.</p>
+        </div>
+    };
+
+    protected override void OnInitialized()
+    {
+        if (!Environment.IsDevelopment()) Navigation.NotFound();
+    }
+}

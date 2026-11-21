@@ -20,6 +20,8 @@ The front page now fits on one screen. It says what TraceableAI does in one line
 
 Starting a review is simpler. The page asks one question, "What should the review find out?", in one box: your objective, your search words and, if you like, up to four research questions. The criteria sit next to it in one panel: years and databases, what to include and leave out, and the picture the review should end with. Fold the panel to one line when you are done with it. On a phone it opens over the page with a Done button. Every field and check from before is still there.
 
+While a review runs, the same page shows its seven steps, from the protocol to the citation check. Each one is ticked off, running or waiting, and the running step says what it is doing. You can close the page; the review keeps going. When it is done, the page opens with what came out: the studies, the themes and how the citations held up, in one coloured bar. One button opens the report, one goes to the citations that need a look, and every file from the run is a click away.
+
 Nothing about how a review runs has changed. These are the first steps of the redesign; the pages follow one by one.
 
 ## [0.4.0] - 2026-11-20
