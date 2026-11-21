@@ -1,20 +1,22 @@
 @* The bar at the top of a paper with the citations that need the reader's attention (module design M9, shared by
-   every kind of review): how many are partly or not supported, and buttons to step through them in reading order. *@
+   every kind of review): how many are partly or not supported, and buttons to step through them in reading order.
+   It sticks to the top of the content area while the paper scrolls. A page with the citation-check panel hides it
+   from 1500 px, where the panel does the same job (HideFromLarge). *@
 
 @if (Attention.Count > 0)
 {
-    <div class="sticky top-0 z-40 w-full max-w-[8.5in] mb-3 bg-white/95 backdrop-blur border border-amber-200 shadow px-3 py-2 flex flex-wrap items-center justify-between gap-2 font-sans text-xs print:hidden">
-        <span class="text-gray-800">
-            <span class="font-semibold text-verdict-partial">@Attention.Count @(Attention.Count == 1 ? "citation needs" : "citations need") your attention</span>
-            <span class="text-gray-500"> · @Attention.Count(c => c.Verdict == AuBtechReviewAgent.CitationSupportChecker.NotSupported) not supported, @Attention.Count(c => c.Verdict == AuBtechReviewAgent.CitationSupportChecker.Partial) partly supported</span>
+    <div class="@(HideFromLarge ? "min-[1500px]:hidden" : "") sticky top-0 z-30 mb-3 flex w-full flex-wrap items-center justify-between gap-2 rounded-card border border-partly-border bg-page/95 px-4 py-2.5 text-sm shadow-card backdrop-blur print:hidden">
+        <span class="text-ink">
+            <span class="font-semibold text-partly">@Attention.Count @(Attention.Count == 1 ? "citation needs" : "citations need") your attention</span>
+            <span class="text-muted max-sm:hidden"> · @Attention.Count(c => c.Verdict == AuBtechReviewAgent.CitationSupportChecker.NotSupported) not supported, @Attention.Count(c => c.Verdict == AuBtechReviewAgent.CitationSupportChecker.Partial) partly supported</span>
         </span>
         <span class="flex items-center gap-2">
             @if (Index >= 0)
             {
-                <span class="text-gray-500 font-mono">@(Index + 1) / @Attention.Count</span>
+                <span class="font-mono text-muted">@(Index + 1) / @Attention.Count</span>
             }
-            <button type="button" class="ui-btn-secondary ui-btn-sm" @onclick="() => OnStep.InvokeAsync(-1)">Previous</button>
-            <button type="button" class="ui-btn-primary ui-btn-sm" @onclick="() => OnStep.InvokeAsync(1)">@(Index < 0 ? "Show the first" : "Next")</button>
+            <button type="button" class="ui-btn-secondary ui-btn-sm min-h-[44px]" @onclick="() => OnStep.InvokeAsync(-1)">Previous</button>
+            <button type="button" class="ui-btn-primary ui-btn-sm min-h-[44px]" @onclick="() => OnStep.InvokeAsync(1)">@(Index < 0 ? "Show the first" : "Next")</button>
         </span>
     </div>
 }
@@ -28,4 +30,7 @@
 
     /// <summary>Called with -1 or 1 to step back or forward.</summary>
     [Parameter] public EventCallback<int> OnStep { get; set; }
+
+    /// <summary>Hide the bar from 1500 px, where the page shows its citation-check panel instead.</summary>
+    [Parameter] public bool HideFromLarge { get; set; }
 }
