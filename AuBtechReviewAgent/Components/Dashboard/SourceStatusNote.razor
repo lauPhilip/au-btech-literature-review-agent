@@ -6,7 +6,7 @@
 }
 @if (summary != null)
 {
-    <p class="border-l-2 border-amber-400 bg-amber-50 px-2.5 py-1.5 text-[11px] leading-snug text-amber-900">
+    <p class="border-l-2 border-partly-border bg-partly-fill px-2.5 py-1.5 text-[11px] leading-snug text-partly">
         <span class="font-semibold">Database status:</span> @summary
         @(Running ? " The run waits and retries, so this step may take longer." : " Reviews still work; the search step may take longer.")
     </p>
