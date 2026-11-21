@@ -23,4 +23,12 @@
     /// with this button switches the theme. App.razor writes it on &lt;html&gt; for theme.js.
     /// </summary>
     public static readonly bool FollowSystem = false;
+
+    /// <summary>
+    /// Whether the header shows this button at all. Off while the pages still use fixed light colours, so a
+    /// visitor cannot pick a dark frame around light pages; a page moves to the theme-aware colours in its own
+    /// redesign step, and the button comes back with the landing page or at the latest in step 12. SiteHeader
+    /// shows the button only when this is on and the layout asks for it (ShowThemeToggle).
+    /// </summary>
+    public static readonly bool Offered = false;
 }

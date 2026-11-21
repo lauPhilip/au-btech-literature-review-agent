@@ -58,7 +58,8 @@ public class FrameTests
 
         string landing = await RenderAsync<SiteHeader>("", new() { ["ShowNav"] = false, ["ShowThemeToggle"] = true });
         Assert.DoesNotContain("<nav", landing);
-        Assert.Contains("data-theme-toggle", landing);
+        // The toggle appears only once ThemeToggle.Offered is on, while the pages use fixed light colours.
+        Assert.Equal(ThemeToggle.Offered, landing.Contains("data-theme-toggle", StringComparison.Ordinal));
         Assert.Contains("href=\"/\" aria-current=\"page\"", landing);
     }
 
@@ -115,7 +116,7 @@ public class FrameTests
             int content = html.IndexOf("PAGE CONTENT", StringComparison.Ordinal);
             int footer = html.IndexOf("<footer", StringComparison.Ordinal);
             Assert.True(header >= 0 && header < content && content < footer);
-            Assert.Contains("data-theme-toggle", html);
+            Assert.Equal(ThemeToggle.Offered, html.Contains("data-theme-toggle", StringComparison.Ordinal));
         }
     }
 
