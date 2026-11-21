@@ -19,18 +19,17 @@
 @code {
     /// <summary>
     /// Whether a visitor who has not chosen a theme gets the dark theme when their system is set to dark.
-    /// Off until every page uses the theme-aware colours (redesign step 12); until then only a choice made
-    /// with this button switches the theme. App.razor writes it on &lt;html&gt; for theme.js.
+    /// On since redesign step 12, when every page moved to the theme-aware colours. App.razor writes it on
+    /// &lt;html&gt; for theme.js.
     /// </summary>
-    public static readonly bool FollowSystem = false;
+    public static readonly bool FollowSystem = true;
 
     /// <summary>
-    /// Whether the app pages (AppLayout) show this button. Off while those pages still use fixed light colours,
-    /// so a visitor cannot pick a dark frame around light pages; each page moves to the theme-aware colours in
-    /// its own redesign step, and this comes on in step 12. The landing page is ready for the dark theme and
-    /// always shows the button (LandingLayout).
+    /// Whether the app pages (AppLayout) show this button and can take the dark theme. On since redesign step 12,
+    /// when every page uses the theme-aware colours; the landing page always shows the button (LandingLayout).
+    /// Turn it off again only if a page goes back to fixed light colours.
     /// </summary>
-    public static readonly bool OfferedOnAppPages = false;
+    public static readonly bool OfferedOnAppPages = true;
 
     /// <summary>
     /// Whether the page at this address (relative to the site root, as NavigationManager.ToBaseRelativePath
