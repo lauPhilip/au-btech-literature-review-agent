@@ -6,6 +6,9 @@
 // ThemeToggle button is kept in localStorage. Without a choice, the system setting (prefers-color-scheme)
 // is followed only when <html> carries data-follow-system="true", which App.razor sets from
 // ThemeToggle.FollowSystem once every page uses the theme-aware colours.
+//
+// A page that is not ready for the dark theme yet (data-theme-ready="false", from ThemeToggle.ReadyFor) stays
+// light whatever was chosen; the choice is kept and applies again on the next page that is ready.
 (function () {
     'use strict';
 
@@ -24,6 +27,7 @@
     }
 
     function wanted() {
+        if (root.getAttribute('data-theme-ready') === 'false') return 'light';
         var choice = chosen || stored();
         if (choice) return choice;
         if (root.getAttribute('data-follow-system') === 'true' && media && media.matches) return 'dark';
@@ -44,7 +48,7 @@
     // drop the theme; put it back whenever data-theme changes. apply() changes nothing when it is right,
     // so this cannot loop.
     if (window.MutationObserver) {
-        new MutationObserver(apply).observe(root, { attributes: true, attributeFilter: ['data-theme', 'data-follow-system'] });
+        new MutationObserver(apply).observe(root, { attributes: true, attributeFilter: ['data-theme', 'data-follow-system', 'data-theme-ready'] });
     }
     if (media && media.addEventListener) media.addEventListener('change', apply);
     // Another tab switched the theme.
