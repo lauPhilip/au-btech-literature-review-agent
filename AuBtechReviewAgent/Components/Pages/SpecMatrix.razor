@@ -1,5 +1,6 @@
 @page "/spec-matrix"
 @page "/spec-matrix/{RunId:guid}"
+@layout AppLayout
 @rendermode InteractiveServer
 
 @using System.IO
@@ -26,9 +27,7 @@
     }
 </style>
 
-<div class="print:hidden"><SiteHeader Active="output" DashboardHref="@(State.CurrentSessionId != Guid.Empty ? $"/review/{State.CurrentSessionId}" : "/review")" OutputHref="@(State.CurrentSessionId != Guid.Empty ? $"/spec-matrix/{State.CurrentSessionId}" : "/spec-matrix")" /></div>
-
-<main id="main" tabindex="-1" class="w-full bg-gray-100 p-4 md:p-8 flex flex-col items-center justify-start min-h-screen overflow-y-auto print:block print:min-h-0 print:overflow-visible print:bg-white print:p-0 pb-16">
+<div class="w-full bg-gray-100 p-4 md:p-8 flex flex-col items-center justify-start min-h-full print:block print:min-h-0 print:overflow-visible print:bg-white print:p-0 pb-16">
 
     @if (HasReport)
     {
@@ -704,7 +703,7 @@
 
         </article>
     }
-</main>
+</div>
 
 @code {
     [Inject] private UiStateContainer State { get; set; } = default!;

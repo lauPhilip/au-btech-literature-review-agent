@@ -1,4 +1,5 @@
 @page "/metrics"
+@layout AppLayout
 @rendermode InteractiveServer
 
 @using System.Globalization
@@ -11,10 +12,7 @@
 
 <SeoHead Title="Run quality metrics" Path="/metrics" BreadcrumbName="Metrics" ExtraJsonLd="@(baseUrl => AuBtechReviewAgent.SiteSeo.DatasetJsonLd(baseUrl, Store.ReadAll().Count))" Description="How well TraceableAI's citations hold up, run by run: the share of supported, partly supported and unsupported citations, coverage and cost, grouped by app version and settings." />
 
-<SiteHeader Active="metrics" />
-
-<div class="flex-1 min-h-0 overflow-y-auto">
-<main id="main" tabindex="-1" class="max-w-7xl mx-auto px-4 sm:px-6 py-6 font-sans text-gray-800 space-y-6">
+<div class="max-w-7xl mx-auto px-4 sm:px-6 py-6 font-sans text-gray-800 space-y-6">
     <div>
         <h1 class="ui-h2">Run quality metrics</h1>
         <p class="text-xs text-gray-600 mt-1 max-w-3xl">
@@ -260,7 +258,6 @@
 
         <p class="text-[10px] text-gray-500">Stored in @Store.FilePath (one JSON object per line); each run's own copy is run-metrics.json in its archive.</p>
     }
-</main>
 </div>
 
 @code {
