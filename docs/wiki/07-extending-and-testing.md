@@ -43,6 +43,8 @@ Add an entry to `Glossary.All` in `Glossary.cs` (a key, the term, and one or two
 
 Start the app (`dotnet watch` in `AuBtechReviewAgent`), then in `tools/a11y` run `npm ci`, `npx playwright install chromium` and `node axe-check.mjs`. `BASE_URL` changes the address (default `http://localhost:5038`) and `A11Y_PAGES` the pages (default `/,/review,/metrics,/glossary`). Also try every changed page with the keyboard only: Tab through it, check that focus is always visible, and that Escape closes what it opened.
 
+`node print-check.mjs` in the same folder prints pages to PDF the way "Print or save as PDF" does and fails when a page is cut to one screen, when the top bar is printed or when the title is missing (issue #153). `PRINT_PAGES` lists the pages with the least number of A4 pages each must fill (CI: `/design/report=3,/about=1`), and `PRINT_OUT` names a folder for the PDFs; CI puts them with the screenshots in the `a11y-screenshots` artifact.
+
 ## Tests
 
 All tests are in `AuBtechReviewAgent.Tests` and run offline: no API keys, no network. Run them from the repository root with `dotnet test`; CI runs the same command. The tests sit in the same folders as the code they test (`Screening/`, `Verification/` and so on), with whole runs in `Pipeline/` and the fakes in `Support/`; the table below lists them by file name.

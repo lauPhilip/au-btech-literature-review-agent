@@ -40,6 +40,8 @@ The methods no longer put the model's name in double brackets, such as "(mistral
 
 A theme now has one name everywhere: its heading, the overview and the evidence map all use the name from the codebook. The report page and main.tex number their sections the same way, with the same headings and the declarations in the same order, so "see section 5.2" points to the same place in both.
 
+The concept map in main.tex no longer leaves wide gaps between its columns, so it is not shrunk until the text is too small to read. Printing a report, or saving it as a PDF, is now checked on every change: it must run over several pages without the top bar.
+
 ## [0.4.0] - 2026-11-20
 
 The model writes about the studies from facts, not from its own guesses. This changes what the model is asked, so runs can differ from 0.3.0.
