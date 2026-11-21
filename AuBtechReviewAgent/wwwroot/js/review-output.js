@@ -140,3 +140,45 @@ document.addEventListener('keydown', function (e) {
         t.addEventListener('mouseleave', function () { t.classList.remove('ui-term-dismissed'); }, { once: true });
     });
 });
+
+// The contents list beside a report (Components/Paper/ReportContents.razor). A link jumps to its section inside the
+// content area, which is what scrolls; like the skip link, a bare "#id" would leave the page because of <base href="/">.
+// Registered in the capture phase, so it runs before Blazor's own link handling sees the click.
+document.addEventListener('click', function (e) {
+    const link = e.target.closest && e.target.closest('[data-jump-to]');
+    if (!link || e.button !== 0 || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return;
+    const target = document.getElementById(link.getAttribute('data-jump-to'));
+    if (!target) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const still = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    target.scrollIntoView({ behavior: still ? 'auto' : 'smooth', block: 'start' });
+    if (!target.hasAttribute('tabindex')) target.setAttribute('tabindex', '-1');
+    target.focus({ preventScroll: true });
+    history.replaceState(history.state, '', link.getAttribute('href'));
+}, true);
+
+// Marks the section in view in the contents list with aria-current="location": the last section whose top has
+// passed the upper part of the content area. Runs on any scroll (the content area scrolls, not the window).
+(function () {
+    let queued = false;
+    function mark() {
+        queued = false;
+        const nav = document.querySelector('[data-report-contents]');
+        if (!nav) return;
+        const sections = document.querySelectorAll('[data-report-section]');
+        if (sections.length === 0) return;
+        let current = sections[0].id;
+        for (const section of sections) {
+            if (section.getBoundingClientRect().top <= 140) current = section.id; else break;
+        }
+        nav.querySelectorAll('[data-jump-to]').forEach(function (a) {
+            if (a.getAttribute('data-jump-to') === current) a.setAttribute('aria-current', 'location');
+            else a.removeAttribute('aria-current');
+        });
+    }
+    function queue() { if (!queued) { queued = true; requestAnimationFrame(mark); } }
+    document.addEventListener('scroll', queue, true);
+    window.addEventListener('resize', queue);
+    window.addEventListener('load', function () { setTimeout(mark, 300); });
+})();

@@ -22,6 +22,8 @@ Starting a review is simpler. The page asks one question, "What should the revie
 
 While a review runs, the same page shows its seven steps, from the protocol to the citation check. Each one is ticked off, running or waiting, and the running step says what it is doing. You can close the page; the review keeps going. When it is done, the page opens with what came out: the studies, the themes and how the citations held up, in one coloured bar. One button opens the report, one goes to the citations that need a look, and every file from the run is a click away.
 
+The report is now one calm, long page. It opens with the title, a line on what the review found and one coloured bar for how the citations held up. Every section follows in order, in larger type with shorter lines, so it reads like a paper. A new figure shows how the records flowed from search to the included studies. Each citation is a small coloured chip; open it and a card shows the passage it was checked against. On a laptop a list of sections sits on the left, and on a large screen a panel on the right steps through the citations you choose: all, flagged or abstract only. Printing, notes, re-checks and every download work as before.
+
 Nothing about how a review runs has changed. These are the first steps of the redesign; the pages follow one by one.
 
 ## [0.4.0] - 2026-11-20

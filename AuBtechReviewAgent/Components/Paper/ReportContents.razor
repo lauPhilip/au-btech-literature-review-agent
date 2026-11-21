@@ -1,0 +1,26 @@
+@* The contents list beside a report (redesign step 8), shown from 1024 px. It sticks to the top of the content area
+   while the report scrolls. Each link carries the page's own address with the section's id, and data-jump-to lets
+   wwwroot/js/review-output.js scroll inside the content area (the page has <base href="/">, so a bare "#id" would
+   leave the page). The same script marks the section in view with aria-current="location". *@
+
+<nav aria-label="Contents" class="sticky top-6 max-h-[calc(100dvh-10rem)] overflow-y-auto pb-4 print:hidden" data-report-contents>
+    <p class="px-3 font-display text-xs font-semibold uppercase tracking-[0.14em] text-muted">Contents</p>
+    <ol class="mt-2 space-y-0.5 border-l border-line">
+        @foreach (var entry in Entries)
+        {
+            var e = entry;
+            <li>
+                <a href="@($"{PageHref}#{e.Id}")" data-jump-to="@e.Id"
+                   class="@(e.Level == 2 ? "pl-6 text-[13px]" : "pl-3 text-sm") -ml-px block border-l-2 border-transparent py-1.5 pr-2 leading-snug text-muted hover:border-line-field hover:text-heading focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand aria-[current=location]:border-heading aria-[current=location]:bg-active aria-[current=location]:font-semibold aria-[current=location]:text-heading">@e.Label</a>
+            </li>
+        }
+    </ol>
+</nav>
+
+@code {
+    /// <summary>The sections in page order (<see cref="AuBtechReviewAgent.ReportOutline"/>).</summary>
+    [Parameter, EditorRequired] public IReadOnlyList<AuBtechReviewAgent.OutlineEntry> Entries { get; set; } = Array.Empty<AuBtechReviewAgent.OutlineEntry>();
+
+    /// <summary>The page's own address without a fragment, e.g. /spec-matrix/{id}.</summary>
+    [Parameter, EditorRequired] public string PageHref { get; set; } = "";
+}

@@ -1,0 +1,55 @@
+@* The stacked bar of citation verdicts, shared by the Done card on New review and the report (its summary box and
+   its citation-check panel): green, orange, red, then abstract only and could not be verified. The bar is one
+   image with a sentence for screen readers; the legend under it gives the same counts in words. *@
+
+@{
+    var c = Counts;
+    int total = Total ?? c.Total;
+}
+@if (total > 0)
+{
+    <div class="@(Thin ? "h-2" : "h-3") flex w-full overflow-hidden rounded-full bg-active" role="img" aria-label="@c.Sentence(total)">
+        @Segment(c.Supported, total, "bg-supported-chart")
+        @Segment(c.Partly, total, "bg-partly-chart")
+        @Segment(c.NotSupported, total, "bg-not-supported-chart")
+        @Segment(c.AbstractOnly, total, "bg-abstract-only-chart")
+        @Segment(c.Unverifiable, total, "bg-unverifiable-chart")
+    </div>
+    @if (Legend)
+    {
+        <ul class="@(Thin ? "mt-2 gap-x-3 text-xs" : "mt-3 gap-x-4 text-sm") flex flex-wrap gap-y-1 text-ink">
+            <li><span class="mr-1.5 inline-block h-2.5 w-2.5 bg-supported-chart" aria-hidden="true"></span>@c.Supported <Term Key="supported">supported</Term></li>
+            <li><span class="mr-1.5 inline-block h-2.5 w-2.5 bg-partly-chart" aria-hidden="true"></span>@c.Partly <Term Key="partly-supported">partly supported</Term></li>
+            <li><span class="mr-1.5 inline-block h-2.5 w-2.5 bg-not-supported-chart" aria-hidden="true"></span>@c.NotSupported <Term Key="not-supported">not supported</Term></li>
+            @if (c.AbstractOnly > 0)
+            {
+                <li><span class="mr-1.5 inline-block h-2.5 w-2.5 bg-abstract-only-chart" aria-hidden="true"></span>@c.AbstractOnly <Term Key="abstract-only">abstract only</Term></li>
+            }
+            @if (c.Unverifiable > 0)
+            {
+                <li><span class="mr-1.5 inline-block h-2.5 w-2.5 bg-unverifiable-chart" aria-hidden="true"></span>@c.Unverifiable <Term Key="unverifiable">could not be verified</Term></li>
+            }
+        </ul>
+    }
+}
+
+@code {
+    [Parameter, EditorRequired] public AuBtechReviewAgent.VerdictTally Counts { get; set; }
+
+    /// <summary>The number the bar is out of, when it differs from the sum of the counts (the run's own total).</summary>
+    [Parameter] public int? Total { get; set; }
+
+    /// <summary>Show the counts in words under the bar.</summary>
+    [Parameter] public bool Legend { get; set; } = true;
+
+    /// <summary>A slimmer bar and smaller legend, for a side panel.</summary>
+    [Parameter] public bool Thin { get; set; }
+
+    private static RenderFragment Segment(int count, int total, string color) => __builder =>
+    {
+        if (count > 0 && total > 0)
+        {
+            <div class="@color h-full border-r-2 border-white last:border-r-0" style="@($"width:{(count * 100.0 / total).ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)}%")"></div>
+        }
+    };
+}
