@@ -26,6 +26,8 @@ The report is now one calm, long page. It opens with the title, a line on what t
 
 The Metrics page now asks one question: how well do the citations hold up? Four figures answer it at the top. Then every review gets its own bar in one chart, oldest on the left, named by the start of its run ID. Three tables follow, each with a total: the share of each verdict per run, the plain counts per run, and the figures for each app version. The detail view of a single run is gone for now; its figures stay in each run's files.
 
+The pages about trust now look alike: About, the model card, privacy, the glossary and the archive check. On a laptop a list on the left takes you between them and to each part of the page you are on. The glossary has a search box and groups its words by method, verdicts and output. Checking an archive is one big box to drop it in, with the result beside it. Choosing the kind of review shows the two you can start as large cards, and a missing page now helps you on your way.
+
 Nothing about how a review runs has changed. These are the first steps of the redesign; the pages follow one by one.
 
 ## [0.4.0] - 2026-11-20
