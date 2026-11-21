@@ -140,6 +140,33 @@ public class FrameTests
         Assert.Contains("prefers-color-scheme", js);
     }
 
+    [Fact]
+    public void EveryPageSitsInALayoutAndRendersOnlyItsContent()
+    {
+        string? web = WebRoot();
+        if (web == null) return; // not run from the repository
+        string app = Path.GetDirectoryName(web)!;
+        var pages = Directory.EnumerateFiles(app, "*.razor", SearchOption.AllDirectories)
+            .Where(f => !f.Contains(Path.Join("bin", ""), StringComparison.Ordinal) && !f.Contains(Path.Join("obj", ""), StringComparison.Ordinal))
+            .Select(f => (Name: Path.GetFileName(f), Text: File.ReadAllText(f)))
+            .Where(p => p.Text.Contains("@page \"", StringComparison.Ordinal))
+            .ToList();
+        Assert.True(pages.Count >= 16, $"expected every routable page, found {pages.Count}");
+
+        foreach (var (name, text) in pages)
+        {
+            string layout = name == "Landing.razor" || name == "LandingFramePreview.razor" ? "@layout LandingLayout" : "@layout AppLayout";
+            Assert.True(text.Contains(layout, StringComparison.Ordinal), $"{name} should declare {layout}");
+            // The layout renders the header, the footer and the one <main id="main">.
+            Assert.False(text.Contains("<SiteHeader", StringComparison.Ordinal), $"{name} renders its own header");
+            Assert.False(text.Contains("<SiteFooter", StringComparison.Ordinal), $"{name} renders its own footer");
+            Assert.False(text.Contains("<main", StringComparison.Ordinal), $"{name} renders its own <main>");
+        }
+
+        string routes = File.ReadAllText(Path.Join(app, "Components", "Routes.razor"));
+        Assert.Contains("DefaultLayout=\"typeof(Layout.AppLayout)\"", routes);
+    }
+
     private static int Count(string text, string part)
     {
         int count = 0;
