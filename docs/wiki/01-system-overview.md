@@ -8,7 +8,7 @@ TraceableAI is a single ASP.NET Core process that serves a Blazor Server user in
 flowchart LR
     subgraph Browser
         L["Landing page /"]
-        D["Dashboard /review"]
+        D["New review /review"]
         R["Review Output /spec-matrix/{runId}"]
     end
 
