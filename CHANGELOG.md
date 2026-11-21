@@ -38,6 +38,8 @@ Nothing about how a review runs has changed. These are the first steps of the re
 
 The methods no longer put the model's name in double brackets, such as "(mistral-large-latest (Mistral API), temperature 0)". When the two screenings agree on most records but kappa is still low, the report now says why, so 3 of 4 with a kappa of 0.00 no longer looks like a mistake. The note under Table A.2 explains the dagger only when a value has one, and no longer points to an evidence column the table does not have.
 
+A theme now has one name everywhere: its heading, the overview and the evidence map all use the name from the codebook. The report page and main.tex number their sections the same way, with the same headings and the declarations in the same order, so "see section 5.2" points to the same place in both.
+
 ## [0.4.0] - 2026-11-20
 
 The model writes about the studies from facts, not from its own guesses. This changes what the model is asked, so runs can differ from 0.3.0.
