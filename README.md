@@ -66,7 +66,7 @@ dotnet user-secrets set "OpenSources:ContactEmail" "you@example.org"
 dotnet watch
 ```
 
-Open the address shown in the terminal, go to the dashboard, fill in your question and criteria (or press **Try an example**), and press **Start review**. A progress bar shows each step; a review of a few dozen papers takes a few minutes. Running with a local model, Docker and every setting are described in [Setup and configuration](docs/wiki/08-setup-and-configuration.md).
+Open the address shown in the terminal and press **Start a review**, or **New review** in the top bar. Write what the review should find out and your search words in the one box, set the years, databases and criteria in the panel beside it (or press **Try an example**), and press **Start review**. The page then shows the seven steps, from the protocol to the citation check, as they run; you can close it and come back. A review of a few dozen papers takes a few minutes. When it is done, **Open the report** shows it as one long page, with each citation coloured by what the check found. The switch in the top bar turns on the dark theme. Running with a local model, Docker and every setting are described in [Setup and configuration](docs/wiki/08-setup-and-configuration.md).
 
 ## Learn more
 

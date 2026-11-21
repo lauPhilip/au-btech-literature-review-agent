@@ -39,8 +39,8 @@ AuBtechReviewAgent/                 the web app
   Runs/                             what happens after a run: ownership, notes, metrics, clean-up
   Llm/                              model access, JSON answers, prompt safety, the call ledger
   Web/                              site pages' helpers: SEO, health, security headers, quota, glossary
-  Components/Pages/*.razor          the routable pages (landing, dashboard, review output, ...)
-  Components/Dashboard/*.razor      parts of the dashboard (funnel, progress, run summary, ...)
+  Components/Pages/*.razor          the routable pages (landing, New review, Review output, Metrics, ...)
+  Components/Dashboard/*.razor      parts of New review (composer, criteria, the seven steps, run summary, ...)
   Components/Layout/*.razor         header, footer, SEO tags, help terms
   wwwroot/                          static files (compiled Tailwind CSS, scripts, images)
 AuBtechReviewAgent.Tests/           xUnit tests, all offline, in the same folders as the code they test
