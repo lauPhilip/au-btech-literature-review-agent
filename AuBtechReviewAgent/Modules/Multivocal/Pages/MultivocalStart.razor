@@ -43,8 +43,8 @@
         </div>
         @if (!CardOn)
         {
-            <span class="bg-amber-50 border-amber-200 text-amber-800 border px-2.5 py-1 text-[11px] flex items-center gap-1.5" title="Visible only in Development while it is being built">
-                <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>Preview · not available yet
+            <span class="bg-partly-fill border-partly-border text-partly border px-2.5 py-1 text-[11px] flex items-center gap-1.5" title="Visible only in Development while it is being built">
+                <span class="w-1.5 h-1.5 rounded-full bg-partly-chart"></span>Preview · not available yet
             </span>
         }
     </div>
@@ -54,7 +54,7 @@
         <section class="lg:col-span-5 space-y-4 min-w-0" aria-label="Review settings">
             @if (planned != null)
             {
-                <div class="bg-white border border-line shadow-sm p-4 space-y-3">
+                <div class="bg-page border border-line shadow-sm p-4 space-y-3">
                     <div>
                         <h2 class="text-sm font-semibold text-heading">Review settings</h2>
                         <p class="text-xs font-medium text-heading">@StageLine()</p>
@@ -85,11 +85,11 @@
             }
             else if (RunId != null)
             {
-                <div class="bg-white border border-line shadow-sm p-4 text-sm text-ink">This run could not be found. It may have expired and been deleted.</div>
+                <div class="bg-page border border-line shadow-sm p-4 text-sm text-ink">This run could not be found. It may have expired and been deleted.</div>
             }
             else
             {
-                <div class="bg-white border border-line shadow-sm">
+                <div class="bg-page border border-line shadow-sm">
                     <nav class="flex border-b border-line overflow-x-auto" aria-label="Steps">
                         @for (int i = 0; i < Steps.Length; i++)
                         {
@@ -100,11 +100,11 @@
                                     class="flex-1 flex items-center justify-center gap-1.5 px-2 py-3 text-xs whitespace-nowrap border-b-2 -mb-px transition-colors @(active ? "border-heading text-heading font-semibold" : "border-transparent text-muted hover:text-heading")">
                                 @if (done && !active)
                                 {
-                                    <svg class="w-3.5 h-3.5 text-green-600" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M16.7 5.3a1 1 0 010 1.4l-8 8a1 1 0 01-1.4 0l-4-4a1 1 0 111.4-1.4L8 12.6l7.3-7.3a1 1 0 011.4 0z" clip-rule="evenodd" /></svg>
+                                    <svg class="w-3.5 h-3.5 text-supported" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M16.7 5.3a1 1 0 010 1.4l-8 8a1 1 0 01-1.4 0l-4-4a1 1 0 111.4-1.4L8 12.6l7.3-7.3a1 1 0 011.4 0z" clip-rule="evenodd" /></svg>
                                 }
                                 else
                                 {
-                                    <span class="w-4 h-4 rounded-full text-[10px] flex items-center justify-center @(active ? "bg-brand text-white" : "bg-active text-muted")">@(number + 1)</span>
+                                    <span class="w-4 h-4 rounded-full text-[10px] flex items-center justify-center @(active ? "bg-primary text-primary-on" : "bg-active text-muted")">@(number + 1)</span>
                                 }
                                 @Steps[number].Title
                             </button>
@@ -113,7 +113,7 @@
 
                     <div class="p-4 space-y-4">
                         <p class="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted">
-                            <span class="ui-chip border-brand-100 bg-brand-50 text-heading">@(GreyOnly ? "Grey Literature Review" : "Multivocal Literature Review")</span>
+                            <span class="ui-chip border-line-field bg-active text-heading">@(GreyOnly ? "Grey Literature Review" : "Multivocal Literature Review")</span>
                             <span>follows @Method.Standard</span>
                             <a href="/start" class="text-heading font-medium hover:underline">Change review type</a>
                         </p>
@@ -179,7 +179,7 @@
                             </ol>
                             @if (plan.IncludeGrey.All(a => a == false))
                             {
-                                <p class="bg-amber-50 border border-amber-200 text-amber-900 p-2 text-xs" role="status">Every answer is "no": by the guidelines, a systematic review may be enough. You can still go on.</p>
+                                <p class="bg-partly-fill border border-partly-border text-partly p-2 text-xs" role="status">Every answer is "no": by the guidelines, a systematic review may be enough. You can still go on.</p>
                             }
                         }
                         else if (step == 2)
@@ -204,7 +204,7 @@
                                         </select>
                                         @if (type is { HardForSources: true })
                                         {
-                                            <p class="text-[11px] text-amber-800 mt-1">Sources may not allow a question of this type to be answered (p. 110).</p>
+                                            <p class="text-[11px] text-partly mt-1">Sources may not allow a question of this type to be answered (p. 110).</p>
                                         }
                                         <div class="mt-1.5 flex flex-wrap gap-x-3 gap-y-1 text-xs">
                                             @if (q.Parent == null && plan.Questions.Count < AuBtechReviewAgent.MultivocalPlan.MaxQuestions)
@@ -213,7 +213,7 @@
                                             }
                                             @if (plan.Questions.Count > 1)
                                             {
-                                                <button type="button" class="text-muted hover:text-red-700 hover:underline" @onclick="() => plan.RemoveQuestion(index)">Remove @number</button>
+                                                <button type="button" class="text-muted hover:text-not-supported hover:underline" @onclick="() => plan.RemoveQuestion(index)">Remove @number</button>
                                             }
                                         </div>
                                     </li>
@@ -258,7 +258,7 @@
                                             <span class="w-4 text-right text-xs text-muted">@(index + 1)</span>
                                             <input type="text" aria-label="@($"Search string {index + 1}")" maxlength="@AuBtechReviewAgent.MultivocalPlan.MaxSearchStringLength"
                                                    value="@plan.GreySearchStrings[index]" @onchange="e => plan.GreySearchStrings[index] = e.Value?.ToString() ?? string.Empty" class="ui-input py-1" />
-                                            <button type="button" @onclick="() => plan.GreySearchStrings.RemoveAt(index)" class="ui-btn ui-btn-sm px-2 text-muted hover:text-red-700" aria-label="@($"Remove search string {index + 1}")">✕</button>
+                                            <button type="button" @onclick="() => plan.GreySearchStrings.RemoveAt(index)" class="ui-btn ui-btn-sm px-2 text-muted hover:text-not-supported" aria-label="@($"Remove search string {index + 1}")">✕</button>
                                         </li>
                                     }
                                 </ol>
@@ -298,7 +298,7 @@
                                                     <span class="w-4 text-right text-xs text-muted">@(index + 1)</span>
                                                     <input type="text" aria-label="@($"Search string for academic databases {index + 1}")" maxlength="@AuBtechReviewAgent.MultivocalPlan.MaxSearchStringLength"
                                                            value="@plan.FormalSearchStrings[index]" @onchange="e => plan.FormalSearchStrings[index] = e.Value?.ToString() ?? string.Empty" class="ui-input py-1" />
-                                                    <button type="button" @onclick="() => plan.FormalSearchStrings.RemoveAt(index)" class="ui-btn ui-btn-sm px-2 text-muted hover:text-red-700" aria-label="@($"Remove search string for academic databases {index + 1}")">✕</button>
+                                                    <button type="button" @onclick="() => plan.FormalSearchStrings.RemoveAt(index)" class="ui-btn ui-btn-sm px-2 text-muted hover:text-not-supported" aria-label="@($"Remove search string for academic databases {index + 1}")">✕</button>
                                                 </li>
                                             }
                                         </ol>
@@ -329,7 +329,7 @@
                                         }
                                         @if (proposalError != null)
                                         {
-                                            <p class="text-xs text-amber-800 mt-1.5" role="status">@proposalError</p>
+                                            <p class="text-xs text-partly mt-1.5" role="status">@proposalError</p>
                                         }
                                     </fieldset>
                                 }
@@ -381,7 +381,7 @@
                             <p class="text-xs text-muted">The protocol on the right is written from your answers. It is fixed, with a fingerprint, before anything is searched.</p>
                             @if (Problems.Count > 0)
                             {
-                                <div class="bg-amber-50 border border-amber-200 text-amber-900 p-2 text-xs space-y-0.5" role="alert">
+                                <div class="bg-partly-fill border border-partly-border text-partly p-2 text-xs space-y-0.5" role="alert">
                                     <p class="font-semibold">Before the protocol can be written:</p>
                                     <ul class="list-disc pl-4 space-y-0.5">
                                         @foreach (var item in Problems)
@@ -393,21 +393,21 @@
                             }
                             else
                             {
-                                <p class="bg-green-50 border border-green-200 text-green-800 p-2 text-xs">Everything is filled in. Check the protocol, then write it.</p>
+                                <p class="bg-supported-fill border border-supported-border text-supported p-2 text-xs">Everything is filled in. Check the protocol, then write it.</p>
                             }
                         }
                     </div>
 
                     @if (error != null)
                     {
-                        <div class="mx-4 mb-3 bg-red-50 border border-red-200 text-red-800 p-2 text-xs" role="alert">@error</div>
+                        <div class="mx-4 mb-3 bg-not-supported-fill border border-not-supported-border text-not-supported p-2 text-xs" role="alert">@error</div>
                     }
 
-                    <div class="sticky bottom-0 bg-white/95 backdrop-blur border-t border-line px-4 py-3 space-y-2">
+                    <div class="sticky bottom-0 bg-page/95 backdrop-blur border-t border-line px-4 py-3 space-y-2">
                         <p class="text-[11px] text-muted truncate" title="@SettingsLine()">@SettingsLine()</p>
                         @if (FirstProblem() is { } problem)
                         {
-                            <button type="button" @onclick="() => GoTo(problem.Step)" class="block text-left text-xs text-amber-800 underline decoration-dotted underline-offset-2 hover:text-amber-900">@problem.Text</button>
+                            <button type="button" @onclick="() => GoTo(problem.Step)" class="block text-left text-xs text-partly underline decoration-dotted underline-offset-2 hover:text-partly">@problem.Text</button>
                         }
                         <div class="flex items-center gap-2">
                             @if (step > 0)
@@ -429,7 +429,7 @@
             }
         </section>
 
-        <section class="lg:col-span-7 lg:sticky lg:top-4 min-w-0 bg-white border border-line shadow-sm overflow-hidden flex flex-col lg:max-h-[calc(100vh-8rem)]" aria-labelledby="panel-title">
+        <section class="lg:col-span-7 lg:sticky lg:top-4 min-w-0 bg-page border border-line shadow-sm overflow-hidden flex flex-col lg:max-h-[calc(100vh-8rem)]" aria-labelledby="panel-title">
             <h2 id="panel-title" class="sr-only">@(panelTab switch { "protocol" => "Protocol", "progress" => "Progress", "sources" => "Sources found", "map" => "Systematic map", "themes" => "Themes", _ => "What this review will do" })</h2>
             <div class="flex items-center justify-between border-b border-line px-3 flex-none">
                 <div class="flex" role="group" aria-label="Show">
@@ -470,7 +470,7 @@
                 <div class="flex-1 min-h-0 overflow-y-auto p-5 space-y-4 text-left bg-soft/50">
                     @if (stage == AuBtechReviewAgent.MultivocalWriter.StageChecked)
                     {
-                        <div class="bg-white border border-green-200 p-4 shadow-sm space-y-2">
+                        <div class="bg-page border border-supported-border p-4 shadow-sm space-y-2">
                             <p class="text-sm font-semibold text-heading">Your review is ready</p>
                             <p class="text-xs text-muted">The paper is written and every citation is checked against the kept page of the source it cites. Open a citation to see what the check found; the paper page has main.tex, the references and the archive.</p>
                             <div class="flex flex-wrap gap-2">
@@ -482,10 +482,10 @@
                     else if (!runRunning && AuBtechReviewAgent.MultivocalRunner.HasStepsLeft(stage))
                     {
                         var status = Runner.StatusOf(planned.RunId);
-                        <div class="bg-white border border-line p-4 shadow-sm space-y-2">
+                        <div class="bg-page border border-line p-4 shadow-sm space-y-2">
                             @if (status?.Error is { } runError)
                             {
-                                <p class="bg-red-50 border border-red-200 text-red-800 p-2 text-xs" role="alert">@runError</p>
+                                <p class="bg-not-supported-fill border border-not-supported-border text-not-supported p-2 text-xs" role="alert">@runError</p>
                             }
                             @if (!planned.Plan.HasCriteria)
                             {
@@ -531,7 +531,7 @@
                         <p class="text-xs text-muted mt-0.5">The findings of each research question grouped into themes by the model (G13). What each theme rests on is counted in code from its sources; every quote was checked against the kept page text, not the live page.</p>
                         @foreach (var note in synthesis.Notes)
                         {
-                            <p class="text-[11px] text-amber-800 mt-1">@note</p>
+                            <p class="text-[11px] text-partly mt-1">@note</p>
                         }
                     </div>
                     @foreach (var (number, question) in planned.Plan.Numbered())
@@ -552,7 +552,7 @@
                                         <span class="ui-chip border-line bg-soft text-ink text-[10px]">@theme.Sources source@(theme.Sources == 1 ? "" : "s")</span>
                                         <span class="ui-chip border-line bg-soft text-ink text-[10px]">tiers 1st @theme.FirstTier · 2nd @theme.SecondTier · 3rd @theme.ThirdTier</span>
                                         <span class="ui-chip border-line bg-soft text-ink text-[10px]">mean quality @theme.MeanQuality.ToString("0.#") of @AuBtechReviewAgent.GreyQualityChecklist.MaxPoints</span>
-                                        <span class="@(theme.EvidenceLabel.StartsWith("3rd") ? "ui-chip border-amber-200 bg-amber-50 text-amber-800" : "ui-chip border-line bg-soft text-ink") text-[10px]">@theme.EvidenceLabel</span>
+                                        <span class="@(theme.EvidenceLabel.StartsWith("3rd") ? "ui-chip border-partly-border bg-partly-fill text-partly" : "ui-chip border-line bg-soft text-ink") text-[10px]">@theme.EvidenceLabel</span>
                                     </p>
                                     @if (theme.Tensions.Count > 0)
                                     {
@@ -650,7 +650,7 @@
                     </ol>
                     @foreach (var note in map.Notes)
                     {
-                        <p class="text-[11px] text-amber-800">@note</p>
+                        <p class="text-[11px] text-partly">@note</p>
                     }
                     <div class="border border-line bg-soft p-3 text-[11px] text-ink">
                         <p class="font-medium text-ink">Recorded by code for every source, not by the model</p>
@@ -695,7 +695,7 @@
                                         {
                                             <tr class="border-t border-line">
                                                 <th scope="row" class="py-0.5 pr-2 font-normal text-left @(value == "not stated" ? "text-muted" : "text-ink") w-1/2">@value</th>
-                                                <td class="py-0.5 pr-2 w-1/3"><span class="block h-2 bg-brand/60" style="width:@((100 * sources / most).ToString(System.Globalization.CultureInfo.InvariantCulture))%"></span></td>
+                                                <td class="py-0.5 pr-2 w-1/3"><span class="block h-2 bg-primary/60" style="width:@((100 * sources / most).ToString(System.Globalization.CultureInfo.InvariantCulture))%"></span></td>
                                                 <td class="py-0.5 text-right">@sources</td>
                                             </tr>
                                         }
@@ -724,7 +724,7 @@
                                     <td class="py-1 pr-2 text-ink">@search.SearchString</td>
                                     @if (search.Error != null)
                                     {
-                                        <td class="py-1 text-red-700" colspan="2" title="@search.Error">failed</td>
+                                        <td class="py-1 text-not-supported" colspan="2" title="@search.Error">failed</td>
                                     }
                                     else
                                     {
@@ -745,11 +745,11 @@
                     }
                     @if (keepError != null)
                     {
-                        <p class="bg-red-50 border border-red-200 text-red-800 p-2 text-xs" role="alert">@keepError</p>
+                        <p class="bg-not-supported-fill border border-not-supported-border text-not-supported p-2 text-xs" role="alert">@keepError</p>
                     }
                     @if (screening != null && (screenError ?? (quality != null ? qualityError : null)) is { } tabError)
                     {
-                        <p class="bg-red-50 border border-red-200 text-red-800 p-2 text-xs" role="alert">@tabError</p>
+                        <p class="bg-not-supported-fill border border-not-supported-border text-not-supported p-2 text-xs" role="alert">@tabError</p>
                     }
                     @if (canEdit && screening != null && stage == AuBtechReviewAgent.MultivocalScreener.StageScreened)
                     {
@@ -786,11 +786,11 @@
                                         <span class="@DecisionChip(decision.Decision) text-[10px]">@DecisionLabel(decision)</span>
                                         @if (decision.NeedsLook && decision.Decision != "Error")
                                         {
-                                            <span class="ui-chip border-amber-200 bg-amber-50 text-amber-800 text-[10px]">look at this</span>
+                                            <span class="ui-chip border-partly-border bg-partly-fill text-partly text-[10px]">look at this</span>
                                         }
                                         @if (decision.Reviewed)
                                         {
-                                            <span class="ui-chip border-blue-200 bg-blue-50 text-blue-800 text-[10px]">@(decision.ModelDecision == decision.Decision ? "confirmed by you" : "changed by you")</span>
+                                            <span class="ui-chip border-abstract-only-border bg-abstract-only-fill text-abstract-only text-[10px]">@(decision.ModelDecision == decision.Decision ? "confirmed by you" : "changed by you")</span>
                                         }
                                     </p>
                                 }
@@ -851,7 +851,7 @@
                                                     <q class="block italic text-muted mt-0.5">@argument.Claim</q>
                                                     @if (!argument.ClaimFound)
                                                     {
-                                                        <p class="text-amber-800">This claim was not found word for word in the page.</p>
+                                                        <p class="text-partly">This claim was not found word for word in the page.</p>
                                                     }
                                                     <dl class="mt-1 space-y-1">
                                                         @foreach (var question in argument.Questions)
@@ -875,7 +875,7 @@
                                 @if (extracted != null)
                                 {
                                     <details class="mt-1 text-[11px] text-ink">
-                                        <summary class="cursor-pointer select-none"><span class="ui-chip border-brand/30 bg-white text-heading text-[10px]">@(extracted.Error != null ? "Not extracted" : $"Extracted · covers {(extracted.Coverage.Count > 0 ? string.Join(", ", extracted.Coverage) : "no question")}")</span></summary>
+                                        <summary class="cursor-pointer select-none"><span class="ui-chip border-heading/30 bg-page text-heading text-[10px]">@(extracted.Error != null ? "Not extracted" : $"Extracted · covers {(extracted.Coverage.Count > 0 ? string.Join(", ", extracted.Coverage) : "no question")}")</span></summary>
                                         @if (extracted.Error != null)
                                         {
                                             <p class="mt-1">@extracted.Error</p>
@@ -902,7 +902,7 @@
                                                         }
                                                         @if (item.Unsupported.Count > 0)
                                                         {
-                                                            <dd class="text-amber-800">Left out, as the quote was not found in the page: @string.Join(", ", item.Unsupported.Select(u => u.Value))</dd>
+                                                            <dd class="text-partly">Left out, as the quote was not found in the page: @string.Join(", ", item.Unsupported.Select(u => u.Value))</dd>
                                                         }
                                                     </div>
                                                 }
@@ -952,7 +952,7 @@
                                 }
                                 else if (snapshot != null)
                                 {
-                                    <p class="text-[11px] text-amber-800 mt-1">Page text not kept: @snapshot.NotKept.</p>
+                                    <p class="text-[11px] text-partly mt-1">Page text not kept: @snapshot.NotKept.</p>
                                 }
                                 @if (canEdit && (snapshot == null || snapshot.NotKept != null))
                                 {
@@ -981,12 +981,12 @@
                         {
                             var s = PlanSteps[i];
                             <li class="flex gap-3">
-                                <span class="flex-none w-6 h-6 rounded-full bg-brand/10 text-heading text-[11px] font-semibold flex items-center justify-center">@(i + 1)</span>
+                                <span class="flex-none w-6 h-6 rounded-full bg-primary/10 text-heading text-[11px] font-semibold flex items-center justify-center">@(i + 1)</span>
                                 <span class="text-xs leading-snug flex-1">
                                     <span class="font-semibold text-heading">@s.Title</span>
                                     <span class="text-muted"> · @s.Text</span>
                                 </span>
-                                <span class="@(s.Built ? "ui-chip border-green-200 bg-green-50 text-green-800" : "ui-chip border-line bg-soft text-muted") text-[10px] self-start whitespace-nowrap">@(s.Built ? "built" : "not built yet")</span>
+                                <span class="@(s.Built ? "ui-chip border-supported-border bg-supported-fill text-supported" : "ui-chip border-line bg-soft text-muted") text-[10px] self-start whitespace-nowrap">@(s.Built ? "built" : "not built yet")</span>
                             </li>
                         }
                     </ol>
@@ -1449,8 +1449,8 @@
 
     private static string QualityChip(string outcome) => outcome switch
     {
-        "Passed" => "ui-chip border-green-200 bg-green-50 text-green-800",
-        "Below threshold" => "ui-chip border-amber-200 bg-amber-50 text-amber-800",
+        "Passed" => "ui-chip border-supported-border bg-supported-fill text-supported",
+        "Below threshold" => "ui-chip border-partly-border bg-partly-fill text-partly",
         _ => "ui-chip border-line bg-soft text-muted",
     };
 
@@ -1479,10 +1479,10 @@
 
     private static string DecisionChip(string decision) => decision switch
     {
-        "Included" => "ui-chip border-green-200 bg-green-50 text-green-800",
+        "Included" => "ui-chip border-supported-border bg-supported-fill text-supported",
         "Excluded" => "ui-chip border-line bg-soft text-muted",
-        "Duplicate" => "ui-chip border-line bg-white text-muted",
-        _ => "ui-chip border-red-200 bg-red-50 text-red-800",
+        "Duplicate" => "ui-chip border-line bg-page text-muted",
+        _ => "ui-chip border-not-supported-border bg-not-supported-fill text-not-supported",
     };
 
     private AuBtechReviewAgent.PageSnapshot? SnapshotOf(string url) =>
