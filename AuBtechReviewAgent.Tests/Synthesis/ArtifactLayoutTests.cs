@@ -30,7 +30,7 @@ public class ArtifactLayoutTests
         // boxes without arrows sit in layers 0 and 1. Before the fix the map jumped from x = 4.4 to x = 22.0.
         var map = Map(ArtifactKinds.ConceptMap, ("A", "B"), ("B", "A"), ("C", "D"));
 
-        var xs = Coordinates(ReviewArtifact.ToTikz(map, s => s), 1);
+        var xs = Coordinates(ArtifactBuilder.ToTikz(map, s => s), 1);
 
         Assert.Equal(0, xs[0]);
         for (int i = 1; i < xs.Count; i++)
@@ -42,7 +42,7 @@ public class ArtifactLayoutTests
     {
         var chart = Map(ArtifactKinds.Flowchart, ("A", "B"), ("B", "A"), ("C", "D"));
 
-        var ys = Coordinates(ReviewArtifact.ToTikz(chart, s => s), 2);
+        var ys = Coordinates(ArtifactBuilder.ToTikz(chart, s => s), 2);
 
         Assert.Equal(0, ys[^1]);
         for (int i = 1; i < ys.Count; i++)
@@ -54,7 +54,7 @@ public class ArtifactLayoutTests
     {
         var map = Map(ArtifactKinds.ConceptMap, ("A", "B"), ("B", "C"));
 
-        string tikz = ReviewArtifact.ToTikz(map, s => s);
+        string tikz = ArtifactBuilder.ToTikz(map, s => s);
 
         Assert.Contains(@"\node[box] (A) at (0.0,0.0)", tikz);
         Assert.Contains(@"\node[box] (B) at (4.4,0.0)", tikz);
