@@ -23,12 +23,12 @@
     @* Ask (redesign step 6): the composer in a centred column of at most 760 px and the criteria beside it from
        1024 px (380 px wide, 440 px from 1600 px), below it on smaller screens. Running and Done keep the older
        two-column view below until redesign step 7. *@
-    <div class="mx-auto w-full max-w-[1600px] px-[clamp(16px,3vw,40px)] py-6 sm:py-10">
+    <div class="mx-auto w-full max-w-[1600px] px-[clamp(16px,3vw,40px)] py-4 sm:py-10">
         @if (!string.IsNullOrEmpty(quotaNotice))
         {
             <p class="mx-auto mb-4 max-w-[760px] text-xs text-red-700" role="alert">@quotaNotice</p>
         }
-        <div class="grid grid-cols-1 items-start gap-6 lg:grid-cols-[minmax(0,760px)_380px] lg:justify-center xl:gap-10 min-[1600px]:grid-cols-[minmax(0,760px)_440px]">
+        <div class="grid grid-cols-1 items-start gap-4 sm:gap-6 lg:grid-cols-[minmax(0,760px)_380px] lg:justify-center xl:gap-10 min-[1600px]:grid-cols-[minmax(0,760px)_440px]">
             <ReviewComposer Method="ReviewMethod" Quota="quotaStatus" InputCheck="inputCheck" Busy="isSearching"
                             OnChanged="FormChanged" OnStart="StartOrShowProblem" OnLoadExample="LoadExample" OnOpenKeys="OpenKeyModal">
                 <Notice>

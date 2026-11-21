@@ -58,17 +58,19 @@
                     {
                         var option = source;
                         bool available = IsAvailable(option.Key);
-                        <label class="flex min-h-[32px] select-none items-center gap-2 text-sm @(available ? "cursor-pointer text-ink" : "cursor-not-allowed text-muted")"
+                        <label class="flex min-h-[32px] select-none items-start gap-2 text-sm leading-snug @(available ? "cursor-pointer text-ink" : "cursor-not-allowed text-muted")"
                                title="@(available ? "" : $"Needs an {option.KeyLabel}. Add one under API keys.")">
-                            <input type="checkbox" class="h-4 w-4 accent-brand"
+                            <input type="checkbox" class="mt-0.5 h-4 w-4 shrink-0 accent-brand"
                                    checked="@(available && State.SelectedSources.Contains(option.Key))"
                                    disabled="@(!available || Busy)"
                                    @onchange="e => ToggleSource(option.Key, e)" />
-                            <span>@option.DisplayName</span>
-                            @if (!available)
-                            {
-                                <span class="text-[10px]">(needs key)</span>
-                            }
+                            <span class="min-w-0">
+                                @option.DisplayName
+                                @if (!available)
+                                {
+                                    <span class="block text-[11px]">(needs key)</span>
+                                }
+                            </span>
                         </label>
                     }
                 </div>
