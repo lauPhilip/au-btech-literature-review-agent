@@ -1,0 +1,158 @@
+@* The Ask state of New review (redesign step 6): one card that reads like a search box, with the objective, the
+   query, the optional research questions and one primary button at the end of the reading path. The fields write
+   straight into UiStateContainer, the same state the old three-step form used, and every change is passed up
+   through OnChanged so the page re-checks what is missing and saves the draft. The page supplies the notices
+   (example filled in, input check, instruction-like text, why it cannot start yet) as fragments, because they
+   depend on the criteria too. Under 640 px the eyebrow, help texts, free-tier badge and step strip are hidden so
+   the screen fits 390 × 844. *@
+
+<div class="mx-auto w-full max-w-[760px] min-w-0">
+    <p class="font-display text-xs font-semibold uppercase tracking-[0.14em] text-muted max-sm:hidden">
+        @Method.Name · @Method.Standard · <a href="/start" class="normal-case tracking-normal text-brand underline underline-offset-2 hover:text-brand-700">change<span class="sr-only"> the review type</span></a>
+    </p>
+    <h1 class="mt-2 font-display text-[clamp(26px,2.4vw,40px)] font-semibold leading-tight tracking-[-0.025em] text-heading">What should the review find out?</h1>
+
+    <div class="ui-card mt-5 space-y-4 p-4 sm:p-6">
+        @Notice
+
+        <div>
+            <label for="f-objective" class="ui-label">Review objective</label>
+            <textarea id="f-objective" rows="3" aria-describedby="h-objective" aria-invalid="@FieldHelp.Invalid(InputCheck, "Review objective")"
+                      maxlength="@AuBtechReviewAgent.ReviewInputGuard.MaxObjective"
+                      @bind="State.ReviewObjective" @bind:event="oninput" @bind:after="Changed"
+                      placeholder="e.g. Which safety mechanisms do agent frameworks use, and how are they evaluated?"
+                      class="ui-input resize-y text-lg leading-relaxed max-sm:text-base"></textarea>
+            <FieldHelp Id="h-objective" Text="The question the review answers. It guides the themes and the discussion." Value="@State.ReviewObjective" Max="AuBtechReviewAgent.ReviewInputGuard.MaxObjective" />
+        </div>
+
+        <div>
+            <label for="f-query" class="ui-label">Search query <span class="font-normal text-muted">(required)</span></label>
+            <input id="f-query" type="text" aria-required="true" aria-describedby="h-query" aria-invalid="@FieldHelp.Invalid(InputCheck, "Search query")"
+                   maxlength="@AuBtechReviewAgent.ReviewInputGuard.MaxQuery"
+                   @bind="State.SearchQuery" @bind:event="oninput" @bind:after="Changed"
+                   placeholder="e.g. agentic AI software frameworks" class="ui-input text-base" />
+            <FieldHelp Id="h-query" Text="The words sent to the databases. Short and specific works best." Value="@State.SearchQuery" Max="AuBtechReviewAgent.ReviewInputGuard.MaxQuery" />
+        </div>
+
+        @if (QuestionsShown)
+        {
+            <div>
+                <label for="f-questions" class="ui-label">Research questions <span class="font-normal text-muted">(optional)</span></label>
+                <textarea id="f-questions" rows="3" aria-describedby="h-questions" aria-invalid="@FieldHelp.Invalid(InputCheck, "Research question")"
+                          maxlength="@ResearchQuestionsMaxLength"
+                          @bind="State.ResearchQuestions" @bind:event="oninput" @bind:after="Changed"
+                          placeholder="One per line, e.g. RQ1: Which safety mechanisms do the frameworks use?" class="ui-input resize-y"></textarea>
+                <FieldHelp Id="h-questions" Text="@ResearchQuestionsHelp" Value="@State.ResearchQuestions" Max="ResearchQuestionsMaxLength" />
+            </div>
+        }
+        else
+        {
+            <button type="button" @onclick="ShowQuestions" class="ui-btn-ghost -ml-3 min-h-[44px] px-3">
+                <span aria-hidden="true">+</span> Add research questions <span class="font-normal text-muted">(optional, up to @AuBtechReviewAgent.ReviewInputGuard.MaxResearchQuestions)</span>
+            </button>
+        }
+
+        @Problems
+
+        @* One primary action at the end of the reading path; on a phone it takes the full width. *@
+        <div class="flex flex-col-reverse gap-3 border-t border-line pt-4 sm:flex-row sm:items-center">
+            <div class="flex flex-wrap items-center gap-x-3 gap-y-2">
+                <button type="button" @onclick="OnLoadExample" class="ui-btn-ghost min-h-[44px] px-3 max-sm:-ml-3">Try an example</button>
+                @{
+                    // Full class names (not built from a colour variable) so the Tailwind build can find them.
+                    var (chipBox, chipDot) = Quota.Tier switch
+                    {
+                        AuBtechReviewAgent.QuotaTier.Developer => ("bg-blue-50 border-blue-200 text-blue-800", "bg-blue-500"),
+                        AuBtechReviewAgent.QuotaTier.OwnKey => ("bg-green-50 border-green-200 text-green-800", "bg-green-500"),
+                        _ when Quota.Allowed => ("bg-amber-50 border-amber-200 text-amber-800", "bg-amber-500"),
+                        _ => ("bg-red-50 border-red-200 text-red-800", "bg-red-500"),
+                    };
+                }
+                <span class="@chipBox flex items-center gap-1.5 border px-2.5 py-1 text-[11px] max-sm:hidden" title="@BadgeTitle()">
+                    <span class="h-1.5 w-1.5 rounded-full @chipDot"></span>@BadgeText()
+                </span>
+                <button type="button" @onclick="OnOpenKeys" class="min-h-[44px] text-xs font-medium text-muted underline underline-offset-2 hover:text-brand">API keys</button>
+            </div>
+            <span class="flex-1 max-sm:hidden"></span>
+            <button type="button" @onclick="OnStart" disabled="@Busy" class="ui-btn-primary min-h-[52px] px-7 text-base max-sm:w-full">Start review</button>
+        </div>
+    </div>
+
+    @* The seven steps every systematic review takes, so the empty page explains the tool. Hidden on a phone. *@
+    <ol class="mt-5 grid grid-cols-2 gap-x-4 gap-y-3 max-sm:hidden sm:grid-cols-4 lg:grid-cols-7" aria-label="What the review does">
+        @for (int i = 0; i < PipelineSteps.Count; i++)
+        {
+            var step = PipelineSteps[i];
+            <li class="min-w-0 border-t-2 border-line pt-2">
+                <span class="block font-display text-xs font-semibold text-heading"><span class="text-muted">@(i + 1)</span> @step.Title</span>
+                <span class="block text-xs leading-snug text-muted">@step.Line</span>
+            </li>
+        }
+    </ol>
+</div>
+
+@code {
+    [Inject] private UiStateContainer State { get; set; } = default!;
+
+    /// <summary>The kind of review being composed; its name and standard make up the eyebrow.</summary>
+    [Parameter, EditorRequired] public AuBtechReviewAgent.ReviewMethod Method { get; set; } = default!;
+    /// <summary>The run quota of this browser, shown as the free-tier badge.</summary>
+    [Parameter] public AuBtechReviewAgent.QuotaStatus Quota { get; set; } = new(AuBtechReviewAgent.QuotaTier.Free, true, 0, 0, "");
+    /// <summary>The result of the last start attempt, for aria-invalid and to show the research questions it rejected.</summary>
+    [Parameter] public AuBtechReviewAgent.InputCheck? InputCheck { get; set; }
+    /// <summary>True while a run is being started; the button is then disabled.</summary>
+    [Parameter] public bool Busy { get; set; }
+    /// <summary>Shown at the top of the card, such as the note that an example was filled in.</summary>
+    [Parameter] public RenderFragment? Notice { get; set; }
+    /// <summary>Shown just above the button: input-check errors, the instruction warning and why it cannot start yet.</summary>
+    [Parameter] public RenderFragment? Problems { get; set; }
+    [Parameter] public EventCallback OnChanged { get; set; }
+    [Parameter] public EventCallback OnStart { get; set; }
+    [Parameter] public EventCallback OnLoadExample { get; set; }
+    [Parameter] public EventCallback OnOpenKeys { get; set; }
+
+    /// <summary>The seven steps in the strip under the card, with their one-line explanation.</summary>
+    public static readonly IReadOnlyList<(string Title, string Line)> PipelineSteps = new[]
+    {
+        ("Protocol", "Written first, fingerprinted"),
+        ("Search", "4 open sources"),
+        ("Screening", "Every record twice"),
+        ("Evidence", "Full texts read"),
+        ("Writing", "Theme by theme"),
+        ("Artifact", "From the findings"),
+        ("Checking", "Every citation"),
+    };
+
+    private static readonly string ResearchQuestionsHelp =
+        $"Up to {AuBtechReviewAgent.ReviewInputGuard.MaxResearchQuestions}, one per line. The protocol lists them, and the conclusion answers each one.";
+    // Room for every question plus its numbering ("RQ1: "); the guard checks each question's own length.
+    public const int ResearchQuestionsMaxLength = AuBtechReviewAgent.ReviewInputGuard.MaxResearchQuestions * (AuBtechReviewAgent.ReviewInputGuard.MaxResearchQuestion + 10);
+
+    private bool questionsOpened;
+
+    /// <summary>The questions field shows once asked for, when it has text (an example or a draft), or when the check rejected it.</summary>
+    private bool QuestionsShown => questionsOpened || !string.IsNullOrWhiteSpace(State.ResearchQuestions)
+        || FieldHelp.Invalid(InputCheck, "Research question") != null;
+
+    private void ShowQuestions() => questionsOpened = true;
+
+    private Task Changed() => OnChanged.InvokeAsync();
+
+    private string BadgeText()
+    {
+        string tier = Quota.Tier switch
+        {
+            AuBtechReviewAgent.QuotaTier.Developer => "Developer access",
+            AuBtechReviewAgent.QuotaTier.OwnKey => "Own Mistral key",
+            _ => "Free tier"
+        };
+        string counter = Quota.Limit == int.MaxValue ? "unlimited"
+            : Quota.Tier == AuBtechReviewAgent.QuotaTier.OwnKey ? $"{Quota.Remaining} of {Quota.Limit} left this hour"
+            : $"{Quota.Remaining} of {Quota.Limit} left today";
+        return $"{tier} · {counter}";
+    }
+
+    private string BadgeTitle() => Quota.ResetsUtc is { } resets
+        ? $"Runs you can still start. More {AuBtechReviewAgent.RunQuotaService.ResetText(resets - DateTime.UtcNow)}."
+        : "Runs you can still start";
+}

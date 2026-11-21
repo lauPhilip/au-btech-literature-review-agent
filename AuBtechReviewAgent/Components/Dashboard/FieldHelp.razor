@@ -1,0 +1,25 @@
+@* A short help line under a form field; the character count only appears when the text gets near the limit.
+   The id is what the field's aria-describedby points to, so screen readers read the help with the field. Under
+   640 px the help text is hidden to keep the form on one screen, but the count still shows. *@
+
+@{
+    int length = Value?.Length ?? 0;
+}
+<div id="@Id" class="mt-1 flex justify-between gap-2 text-xs leading-snug">
+    <span class="text-muted max-sm:sr-only">@Text</span>
+    @if (length > Max * 0.8)
+    {
+        <span class="ml-auto shrink-0 font-mono @(length > Max * 0.95 ? "text-red-700" : "text-amber-700")">@length / @Max</span>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public string Id { get; set; } = "";
+    [Parameter, EditorRequired] public string Text { get; set; } = "";
+    [Parameter] public string? Value { get; set; }
+    [Parameter] public int Max { get; set; }
+
+    /// <summary>"true" when the last start attempt reported a problem with this field (for aria-invalid), else null.</summary>
+    public static string? Invalid(AuBtechReviewAgent.InputCheck? check, string fieldName) =>
+        check is { IsValid: false } && check.Errors.Any(e => e.StartsWith(fieldName, StringComparison.Ordinal)) ? "true" : null;
+}
