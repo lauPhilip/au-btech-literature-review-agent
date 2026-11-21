@@ -154,58 +154,6 @@
     .ui-chip-bad { @apply ui-chip border-red-200 bg-verdict-badBg text-verdict-bad; }
 }
 
-/* Landing page: the citation check example in the hero and the moving light on the pipeline. Both stop for
-   visitors who ask their system for less motion; the first state is then shown still. */
-@layer components {
-    .tai-cycle-a { animation: tai-show-a 10s ease-in-out infinite; }
-    .tai-cycle-b { animation: tai-show-b 10s ease-in-out infinite; }
-    .tai-cite-a { animation: tai-cite-a 10s ease-in-out infinite; }
-    .tai-cite-b { animation: tai-cite-b 10s ease-in-out infinite; }
-    .tai-scan { animation: tai-scan 5s ease-in-out infinite; }
-    .tai-flow-x { animation: tai-flow-x 3.2s linear infinite; }
-    .tai-flow-y { animation: tai-flow-y 3.2s linear infinite; }
-
-    @media (prefers-reduced-motion: reduce) {
-        .tai-cycle-a, .tai-cite-a, .tai-cite-b, .tai-scan, .tai-flow-x, .tai-flow-y { animation: none; }
-        .tai-cycle-b { animation: none; opacity: 0; }
-        .tai-cite-a { background-color: rgba(19, 41, 75, 0.12); }
-        .tai-scan { transform: scaleX(1); }
-    }
-}
-
-@keyframes tai-show-a {
-    0%, 44% { opacity: 1; transform: translateY(0); }
-    50%, 94% { opacity: 0; transform: translateY(6px); }
-    100% { opacity: 1; transform: translateY(0); }
-}
-@keyframes tai-show-b {
-    0%, 44% { opacity: 0; transform: translateY(6px); }
-    50%, 94% { opacity: 1; transform: translateY(0); }
-    100% { opacity: 0; transform: translateY(6px); }
-}
-@keyframes tai-cite-a {
-    0%, 44% { background-color: rgba(19, 41, 75, 0.12); }
-    50%, 94% { background-color: transparent; }
-    100% { background-color: rgba(19, 41, 75, 0.12); }
-}
-@keyframes tai-cite-b {
-    0%, 44% { background-color: transparent; }
-    50%, 94% { background-color: rgba(180, 83, 9, 0.14); }
-    100% { background-color: transparent; }
-}
-@keyframes tai-scan {
-    0% { transform: scaleX(0); }
-    35%, 100% { transform: scaleX(1); }
-}
-@keyframes tai-flow-x {
-    from { transform: translateX(-100%); }
-    to { transform: translateX(600%); }
-}
-@keyframes tai-flow-y {
-    from { transform: translateY(-100%); }
-    to { transform: translateY(1200%); }
-}
-
 /* Landing page: the looping citation example (Components/Landing/CitationLoop.razor). Three citations take a
    third of the 12.6 s cycle each: 1.1 s "checking" (to 8.7 %), then the verdict until a third. Every moving part
    uses the same keyframes and starts at its citation's third through a negative delay; the extra -2 s puts the
