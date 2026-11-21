@@ -8,7 +8,7 @@ namespace AuBtechReviewAgent;
 public sealed record OutlineEntry(string Id, string Label, int Level);
 
 /// <summary>
-/// The sections of a systematic review's report page, in the order the page shows them, for its contents list
+/// The sections of a review's report page (the systematic review's, and the grey literature review's paper), in the order the page shows them, for its contents list
 /// (<c>Components/Paper/ReportContents.razor</c>), and the filters of its citation-check panel. The page gives each
 /// section the id listed here, so the list and the page cannot drift apart.
 /// </summary>
@@ -54,6 +54,42 @@ public static class ReportOutline
         list.Add(new(DeclarationsId, $"{DeclarationsNumber(report)} Declarations", 1));
         list.Add(new(ReferencesId, "References", 1));
         list.Add(new(AppendixId, "Appendix", 1));
+        return list;
+    }
+
+    /// <summary>The id of result subsection <paramref name="index"/> (0-based) of a multivocal paper, numbered 4.1, 4.2, … on the page.</summary>
+    public static string ResultId(int index) => $"s4-{index + 1}";
+
+    /// <summary>The summary for practitioners is section 6 of a multivocal paper when it has one.</summary>
+    public const string SummaryId = "s6";
+
+    /// <summary>The number of a multivocal paper's declarations: 7 after a summary for practitioners, 6 without one.</summary>
+    public static int DeclarationsNumber(MultivocalPaperFile paper) => paper.SummaryItems.Count > 0 ? 7 : 6;
+
+    /// <summary>The heading of a multivocal result: "RQ1: heading" for a written theme, the heading alone otherwise.</summary>
+    public static string ResultHeading(PaperResult result) =>
+        result.Kind == "theme" && !string.IsNullOrWhiteSpace(result.Question) ? $"{result.Question}: {result.Heading}" : result.Heading;
+
+    /// <summary>The contents of a multivocal paper (the grey literature review's paper page), with each result under section 4.</summary>
+    public static List<OutlineEntry> Multivocal(MultivocalPaperFile paper)
+    {
+        var list = new List<OutlineEntry>
+        {
+            new(AbstractId, "Abstract", 1),
+            new(IntroductionId, "1 Introduction", 1),
+            new(MethodologyId, "2 Method", 1),
+            new(StudiesId, "3 Data and the flow of sources", 1),
+            new(ResultsId, "4 Results", 1),
+        };
+        for (int k = 0; k < paper.Results.Count; k++)
+        {
+            string heading = ResultHeading(paper.Results[k]).Trim();
+            list.Add(new(ResultId(k), $"4.{k + 1} {(heading.Length == 0 ? "Result " + (k + 1) : heading)}", 2));
+        }
+        list.Add(new(DiscussionId, "5 Discussion", 1));
+        if (paper.SummaryItems.Count > 0) list.Add(new(SummaryId, "6 Summary for practitioners", 1));
+        list.Add(new(DeclarationsId, $"{DeclarationsNumber(paper)} Declarations", 1));
+        list.Add(new(ReferencesId, "References", 1));
         return list;
     }
 
