@@ -9,88 +9,92 @@
 <SeoHead Title="Verify a run archive" Path="/verify" BreadcrumbName="Verify"
          Description="Check that a TraceableAI run archive has not been changed: every file is compared with the SHA-256 fingerprint in its manifest." />
 
-<div class="min-h-full bg-white text-gray-900 font-sans">
-    <div class="ui-container py-14 lg:py-20 max-w-3xl">
-        <p class="ui-eyebrow">Verify</p>
-        <h1 class="ui-h1 mt-3">Check that an archive is unchanged</h1>
-        <p class="ui-lead mt-5">
-            Every run archive contains <code class="text-base font-mono bg-gray-100 px-1">manifest.json</code>, with a SHA-256
-            fingerprint of each file and of the manifest itself. Upload an archive to compare every file with its fingerprint.
-        </p>
+<DocPage Current="/verify" Eyebrow="Verify" Title="Check that an archive is unchanged" Wide="true">
+    <Lead>
+        Every run archive contains <code class="font-mono text-[15px]">manifest.json</code>, with a SHA-256 fingerprint of each file and of
+        the manifest itself. Upload an archive to compare every file with its fingerprint.
+    </Lead>
+    <ChildContent>
+        <div class="mt-8 grid grid-cols-1 items-start gap-6 xl:grid-cols-2">
+            <div>
+                <label for="archive" class="flex min-h-[220px] cursor-pointer flex-col items-center justify-center gap-2 rounded-card border-2 border-dashed border-line-field bg-soft p-6 text-center hover:border-heading focus-within:border-heading focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-heading @(checking ? "opacity-60" : "")">
+                    <svg class="h-8 w-8 text-heading" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
+                    <span class="font-display text-base font-semibold text-heading">Choose a run archive</span>
+                    <span class="text-sm text-muted">A .zip file of at most @(MaxUploadMb) MB. It is checked in memory and not stored.</span>
+                    <InputFile id="archive" OnChange="CheckAsync" accept=".zip,application/zip" disabled="@checking" aria-describedby="archive-help" class="sr-only" />
+                </label>
+                <p id="archive-help" class="mt-3 text-sm text-muted">You can also check it yourself: unzip it and compare <code class="font-mono">sha256sum</code> (or <code class="font-mono">Get-FileHash</code> in PowerShell) with the manifest.</p>
+            </div>
 
-        <div class="mt-10 ui-card p-6">
-            <label for="archive" class="ui-label">Run archive (.zip, at most @(MaxUploadMb) MB)</label>
-            <InputFile id="archive" OnChange="CheckAsync" accept=".zip,application/zip" disabled="@checking" aria-describedby="archive-help"
-                       class="block w-full text-sm text-gray-700 file:mr-4 file:rounded-btn file:border file:border-gray-300 file:bg-white file:px-4 file:py-2 file:text-sm file:font-semibold file:text-gray-800 hover:file:border-brand" />
-            <p id="archive-help" class="mt-2 text-xs text-gray-500">The file is checked in memory and not stored. You can also check it yourself: unzip it and compare <code class="font-mono">sha256sum</code> (or <code class="font-mono">Get-FileHash</code> in PowerShell) with the manifest.</p>
-        </div>
+            <div role="status" aria-live="polite">
+                @if (checking)
+                {
+                    <p class="text-ink">Checking @fileName …</p>
+                }
+                else if (error != null)
+                {
+                    <div class="rounded-card border border-not-supported-border bg-not-supported-fill p-5 text-not-supported">
+                        <p class="font-semibold">The file could not be checked</p>
+                        <p class="mt-1 text-sm">@error</p>
+                    </div>
+                }
+                else if (result is { } r)
+                {
+                    <div class="rounded-card border p-5 @(r.Unchanged ? "border-supported-border bg-supported-fill" : "border-not-supported-border bg-not-supported-fill")">
+                        <p class="flex items-center gap-2 font-display text-lg font-semibold @(r.Unchanged ? "text-supported" : "text-not-supported")">
+                            @if (r.Unchanged)
+                            {
+                                <span aria-hidden="true">✓</span><span>Unchanged: all @r.FilesListed files match their fingerprints</span>
+                            }
+                            else if (!r.HasManifest)
+                            {
+                                <span aria-hidden="true">✕</span><span>This is not a TraceableAI run archive: it has no manifest.json</span>
+                            }
+                            else
+                            {
+                                <span aria-hidden="true">✕</span><span>This archive was changed after the run</span>
+                            }
+                        </p>
+                        @if (r.HasManifest)
+                        {
+                            <p class="mt-1 text-sm text-ink">@ManifestLine(r.ManifestIntact)</p>
+                        }
+                    </div>
 
-        <div class="mt-8" role="status" aria-live="polite">
-            @if (checking)
-            {
-                <p class="text-gray-700">Checking @fileName …</p>
-            }
-            else if (error != null)
-            {
-                <div class="border border-red-200 bg-red-50 p-5 text-red-800">
-                    <p class="font-semibold">The file could not be checked</p>
-                    <p class="mt-1 text-sm">@error</p>
-                </div>
-            }
-            else if (result is { } r)
-            {
-                <div class="border p-5 @(r.Unchanged ? "border-green-200 bg-verdict-okBg" : "border-red-200 bg-verdict-badBg")">
-                    <p class="font-semibold text-lg @(r.Unchanged ? "text-verdict-ok" : "text-verdict-bad")">
-                        @if (r.Unchanged)
-                        {
-                            <span>✓ Unchanged: all @r.FilesListed files match their fingerprints</span>
-                        }
-                        else if (!r.HasManifest)
-                        {
-                            <span>✕ This is not a TraceableAI run archive: it has no manifest.json</span>
-                        }
-                        else
-                        {
-                            <span>✕ This archive was changed after the run</span>
-                        }
-                    </p>
                     @if (r.HasManifest)
                     {
-                        <p class="mt-1 text-sm text-gray-700">
-                            @ManifestLine(r.ManifestIntact)
-                        </p>
+                        <dl class="mt-5 grid grid-cols-1 gap-x-6 gap-y-2 text-sm sm:grid-cols-[10rem_1fr]">
+                            <dt class="text-muted">File</dt><dd class="break-all text-ink">@fileName</dd>
+                            <dt class="text-muted">Run</dt><dd class="break-all font-mono text-ink">@(r.RunId ?? "–")</dd>
+                            <dt class="text-muted">Archive made</dt><dd class="text-ink">@(r.CreatedUtc?.Replace("T", " ").TrimEnd('Z') ?? "–") UTC</dd>
+                            <dt class="text-muted">App version</dt><dd class="break-all text-ink">@(r.AppVersion ?? "–")</dd>
+                            <dt class="text-muted">Model</dt><dd class="text-ink">@(r.Model ?? "–")</dd>
+                            <dt class="text-muted">Protocol fingerprint</dt><dd class="break-all font-mono text-ink">@(r.ProtocolHash ?? "–")</dd>
+                        </dl>
                     }
-                </div>
 
-                @if (r.HasManifest)
-                {
-                    <dl class="mt-6 grid grid-cols-1 sm:grid-cols-[10rem_1fr] gap-x-6 gap-y-2 text-sm">
-                        <dt class="text-gray-500">File</dt><dd class="break-all">@fileName</dd>
-                        <dt class="text-gray-500">Run</dt><dd class="font-mono break-all">@(r.RunId ?? "–")</dd>
-                        <dt class="text-gray-500">Archive made</dt><dd>@(r.CreatedUtc?.Replace("T", " ").TrimEnd('Z') ?? "–") UTC</dd>
-                        <dt class="text-gray-500">App version</dt><dd class="break-all">@(r.AppVersion ?? "–")</dd>
-                        <dt class="text-gray-500">Model</dt><dd>@(r.Model ?? "–")</dd>
-                        <dt class="text-gray-500">Protocol fingerprint</dt><dd class="font-mono break-all">@(r.ProtocolHash ?? "–")</dd>
-                    </dl>
-                }
-
-                @foreach (var (title, files) in new[] { ("Changed files", r.Changed), ("Missing files", r.Missing), ("Files that are not in the manifest", r.NotListed) })
-                {
-                    @if (files.Count > 0)
+                    @foreach (var (title, files) in new[] { ("Changed files", r.Changed), ("Missing files", r.Missing), ("Files that are not in the manifest", r.NotListed) })
                     {
-                        <h2 class="ui-h3 mt-8">@title (@files.Count)</h2>
-                        <ul class="mt-2 font-mono text-xs text-gray-800 space-y-1">
-                            @foreach (var file in files.Take(200))
-                            {
-                                <li class="break-all">@file</li>
-                            }
-                        </ul>
+                        @if (files.Count > 0)
+                        {
+                            <h2 class="mt-6 font-display text-base font-semibold text-heading">@title (@files.Count)</h2>
+                            <ul class="mt-2 space-y-1 font-mono text-xs text-ink">
+                                @foreach (var file in files.Take(200))
+                                {
+                                    <li class="break-all">@file</li>
+                                }
+                            </ul>
+                        }
                     }
                 }
-            }
+                else
+                {
+                    <div class="rounded-card border border-line p-5 text-sm text-muted">The result appears here: whether every file still matches its fingerprint, and which do not.</div>
+                }
+            </div>
         </div>
-    </div>
-</div>
+    </ChildContent>
+</DocPage>
 
 @code {
     /// <summary>What the manifest's own fingerprint says: unchanged, edited, or from a version that had none.</summary>

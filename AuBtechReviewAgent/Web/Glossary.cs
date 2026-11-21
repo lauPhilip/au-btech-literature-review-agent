@@ -65,4 +65,23 @@ public static class Glossary
 
     /// <summary>The entry for a key, or null when there is none (a typo then shows plain text, not an error).</summary>
     public static Entry? Find(string key) => ByKey.TryGetValue(key, out var entry) ? entry : null;
+
+    /// <summary>The groups of the glossary page's side list, in order: how a review is done, the verdicts, and what a run gives you.</summary>
+    public static readonly IReadOnlyList<string> Groups = new[] { "Method", "Verdicts", "Output" };
+
+    private static readonly HashSet<string> VerdictKeys = new(StringComparer.OrdinalIgnoreCase) { "supported", "partly-supported", "not-supported", "abstract-only", "unverifiable" };
+    private static readonly HashSet<string> OutputKeys = new(StringComparer.OrdinalIgnoreCase) { "artifact", "archive" };
+
+    /// <summary>The group an entry belongs to (one of <see cref="Groups"/>); anything not a verdict or an output is method.</summary>
+    public static string GroupOf(Entry entry) =>
+        VerdictKeys.Contains(entry.Key) ? "Verdicts" : OutputKeys.Contains(entry.Key) ? "Output" : "Method";
+
+    /// <summary>The entries whose term or explanation contains the query (case ignored); all of them for an empty query.</summary>
+    public static IReadOnlyList<Entry> Search(string? query)
+    {
+        string q = query?.Trim() ?? "";
+        return q.Length == 0
+            ? All
+            : All.Where(e => e.Term.Contains(q, StringComparison.OrdinalIgnoreCase) || e.Explanation.Contains(q, StringComparison.OrdinalIgnoreCase)).ToList();
+    }
 }

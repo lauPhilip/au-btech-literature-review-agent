@@ -9,72 +9,94 @@
 <SeoHead Title="Start a review" Path="/start"
          Description="Choose the kind of literature review: a PRISMA 2020 systematic review today, with multivocal, rapid, living and grey literature reviews coming soon." />
 
-<div class="min-h-full bg-gray-50 text-gray-900 font-sans">
-    <div class="ui-container py-14 lg:py-20 max-w-5xl">
-        <div class="text-center max-w-2xl mx-auto">
-            <p class="ui-eyebrow">Start a review</p>
-            <h1 class="ui-h1 mt-3">What kind of review?</h1>
-            <p class="ui-lead mt-4">
-                Each kind follows its own published method. In all of them, every statement in the report is traced
-                to a quote from the source it cites.
-            </p>
-        </div>
-
-        <ul class="mt-12 grid grid-cols-1 md:grid-cols-3 gap-5" aria-label="Kinds of review">
-            @foreach (var method in AuBtechReviewAgent.ReviewMethods.All)
-            {
-                var m = method;
-                string titleId = $"method-{m.Key}";
-                var owner = AuBtechReviewAgent.ReviewModules.ForCard(m.Key);
-                bool preview = !m.Available && ModuleOptions.IsPreview(owner.Key);
-                <li class="ui-card p-6 flex flex-col @(m.Available ? "border-brand" : "bg-white/60")">
-                    <div class="flex items-start justify-between gap-3">
-                        <h2 id="@titleId" class="text-lg font-semibold leading-snug @(m.Available ? "text-gray-950" : "text-gray-600")">@m.Name</h2>
-                        @if (!m.Available)
-                        {
-                            <span class="ui-chip border-gray-200 bg-gray-50 text-gray-600 whitespace-nowrap">@(preview ? "Preview" : "Coming soon")</span>
-                        }
-                    </div>
-                    <p class="mt-1 text-xs font-medium @(m.Available ? "text-brand" : "text-gray-500")">
-                        Follows <a href="@m.StandardUrl" target="_blank" rel="noopener" class="underline underline-offset-2" title="@m.StandardReference">@m.Standard</a>
-                    </p>
-                    <p class="mt-4 text-sm leading-relaxed @(m.Available ? "text-gray-700" : "text-gray-600")">@m.Summary</p>
-                    <ul class="mt-4 space-y-1.5 text-sm @(m.Available ? "text-gray-700" : "text-gray-600")">
-                        @foreach (var highlight in m.Highlights)
-                        {
-                            <li class="flex gap-2">
-                                <svg class="w-4 h-4 mt-0.5 flex-none @(m.Available ? "text-verdict-ok" : "text-gray-400")" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M16.7 5.3a1 1 0 010 1.4l-8 8a1 1 0 01-1.4 0l-4-4a1 1 0 111.4-1.4L8 12.6l7.3-7.3a1 1 0 011.4 0z" clip-rule="evenodd" /></svg>
-                                <span>@highlight</span>
-                            </li>
-                        }
-                    </ul>
-                    <div class="mt-auto pt-6">
-                        @if (m.Available)
-                        {
-                            @* Each card starts on its own module's pages; only the systematic module's cards use its form. *@
-                            <a href="@(AuBtechReviewAgent.ReviewMethods.RunsHere(m) ? $"/review?method={m.Key}" : $"{owner.RoutePrefix}?card={m.Key}")" class="ui-btn-primary w-full" aria-describedby="@titleId">
-                                Start this review
-                                <svg class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M10.3 4.3a1 1 0 011.4 0l5 5a1 1 0 010 1.4l-5 5a1 1 0 01-1.4-1.4l3.3-3.3H4a1 1 0 110-2h9.6l-3.3-3.3a1 1 0 010-1.4z" clip-rule="evenodd" /></svg>
-                            </a>
-                        }
-                        else if (preview)
-                        {
-                            <a href="@($"{owner.RoutePrefix}?card={m.Key}")" class="ui-btn-secondary w-full" aria-describedby="@titleId">Open the preview</a>
-                            <p class="text-xs text-gray-500 mt-2">Shown here only while it is being built; not available to others yet.</p>
-                        }
-                        else
-                        {
-                            <p class="text-xs text-gray-500">Not available yet. Follow the project on
-                                <a href="@AuBtechReviewAgent.SiteSeo.RepositoryUrl" class="text-brand underline underline-offset-2">GitHub</a> to hear when it is.</p>
-                        }
-                    </div>
-                </li>
-            }
-        </ul>
-
-        <p class="ui-muted mt-10 text-center">
-            Not sure? A systematic review answers a focused question from peer-reviewed studies; the
-            <a href="/glossary" class="text-brand underline underline-offset-2">glossary</a> explains the terms.
+<div class="mx-auto w-full max-w-[1100px] px-[clamp(16px,3vw,40px)] py-6 sm:py-10">
+    <header class="max-w-[70ch]">
+        <p class="font-display text-xs font-semibold uppercase tracking-[0.14em] text-muted">Start a review</p>
+        <h1 class="mt-2 font-display text-[clamp(26px,2.4vw,40px)] font-semibold leading-tight tracking-[-0.025em] text-heading">What kind of review?</h1>
+        <p class="mt-3 text-[17px] leading-[1.7] text-muted">
+            Each kind follows its own published method. In all of them, every statement in the report is traced to a quote from the source it cites.
         </p>
-    </div>
+    </header>
+
+    <ul class="mt-8 grid grid-cols-1 gap-5 md:grid-cols-2" aria-label="Kinds of review you can start">
+        @foreach (var method in Open)
+        {
+            var m = method;
+            string titleId = $"method-{m.Key}";
+            var owner = AuBtechReviewAgent.ReviewModules.ForCard(m.Key);
+            bool preview = !m.Available;
+            <li class="ui-card flex flex-col p-6 sm:p-8">
+                <div class="flex items-start justify-between gap-3">
+                    <h2 id="@titleId" class="font-display text-xl font-semibold leading-snug text-heading">@m.Name</h2>
+                    @if (preview)
+                    {
+                        <span class="ui-chip whitespace-nowrap border-line bg-soft text-muted">Preview</span>
+                    }
+                </div>
+                <p class="mt-1 text-sm font-medium text-muted">
+                    Follows <a href="@m.StandardUrl" target="_blank" rel="noopener" class="text-heading underline underline-offset-2" title="@m.StandardReference">@m.Standard</a>
+                </p>
+                <p class="mt-4 text-base leading-relaxed text-ink">@m.Summary</p>
+                <ul class="mt-4 space-y-2 text-[15px] text-ink">
+                    @foreach (var highlight in m.Highlights)
+                    {
+                        <li class="flex gap-2">
+                            <svg class="mt-1 h-4 w-4 flex-none text-supported" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M16.7 5.3a1 1 0 010 1.4l-8 8a1 1 0 01-1.4 0l-4-4a1 1 0 111.4-1.4L8 12.6l7.3-7.3a1 1 0 011.4 0z" clip-rule="evenodd" /></svg>
+                            <span>@highlight</span>
+                        </li>
+                    }
+                </ul>
+                <div class="mt-auto pt-6">
+                    @if (!preview)
+                    {
+                        @* Each card starts on its own module's pages; only the systematic module's cards use its form. *@
+                        <a href="@(AuBtechReviewAgent.ReviewMethods.RunsHere(m) ? $"/review?method={m.Key}" : $"{owner.RoutePrefix}?card={m.Key}")" class="ui-btn-primary min-h-[52px] w-full" aria-describedby="@titleId">
+                            Start this review
+                            <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M10.3 4.3a1 1 0 011.4 0l5 5a1 1 0 010 1.4l-5 5a1 1 0 01-1.4-1.4l3.3-3.3H4a1 1 0 110-2h9.6l-3.3-3.3a1 1 0 010-1.4z" clip-rule="evenodd" /></svg>
+                        </a>
+                    }
+                    else
+                    {
+                        <a href="@($"{owner.RoutePrefix}?card={m.Key}")" class="ui-btn-secondary min-h-[52px] w-full" aria-describedby="@titleId">Open the preview</a>
+                        <p class="mt-2 text-sm text-muted">Shown here only while it is being built; not available to others yet.</p>
+                    }
+                </div>
+            </li>
+        }
+    </ul>
+
+    @if (Soon.Count > 0)
+    {
+        <section class="mt-10 max-sm:hidden" aria-labelledby="coming-soon">
+            <h2 id="coming-soon" class="font-display text-base font-semibold text-heading">Coming soon</h2>
+            <ul class="mt-3 divide-y divide-line rounded-card border border-line bg-page">
+                @foreach (var method in Soon)
+                {
+                    var m = method;
+                    <li class="flex flex-wrap items-center gap-x-4 gap-y-1 px-5 py-4">
+                        <span class="font-medium text-heading">@m.Name</span>
+                        <span class="text-sm text-muted">follows @m.Standard</span>
+                        <span class="ui-chip ml-auto whitespace-nowrap border-line bg-soft text-muted">Coming soon</span>
+                    </li>
+                }
+            </ul>
+            <p class="mt-3 text-sm text-muted">
+                Follow the project on <a href="@AuBtechReviewAgent.SiteSeo.RepositoryUrl" class="text-heading underline underline-offset-2">GitHub</a> to hear when they are ready.
+            </p>
+        </section>
+    }
+
+    <p class="mt-10 text-sm text-muted">
+        Not sure? A systematic review answers a focused question from peer-reviewed studies; the
+        <a href="/glossary" class="text-heading underline underline-offset-2">glossary</a> explains the terms.
+    </p>
 </div>
+
+@code {
+    /// <summary>The kinds that can be started here, and those in preview on this deployment.</summary>
+    private List<AuBtechReviewAgent.ReviewMethod> Open =>
+        AuBtechReviewAgent.ReviewMethods.All.Where(m => m.Available || ModuleOptions.IsPreview(AuBtechReviewAgent.ReviewModules.ForCard(m.Key).Key)).ToList();
+
+    /// <summary>The kinds that are not available yet.</summary>
+    private List<AuBtechReviewAgent.ReviewMethod> Soon => AuBtechReviewAgent.ReviewMethods.All.Except(Open).ToList();
+}

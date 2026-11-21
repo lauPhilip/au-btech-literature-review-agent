@@ -1,27 +1,59 @@
 @page "/glossary"
 @layout AppLayout
+@rendermode InteractiveServer
 
 <SeoHead Title="Glossary" Path="/glossary"
          Description="Plain-language explanations of the terms TraceableAI uses: PRISMA 2020, screening, Cohen's kappa, MMAT, citation verdicts and more." />
 
-<div class="min-h-full bg-white text-gray-900 font-sans">
-    <div class="ui-container py-14 lg:py-20 max-w-3xl">
-        <p class="ui-eyebrow">Glossary</p>
-        <h1 class="ui-h1 mt-3">The words TraceableAI uses</h1>
-        <p class="ui-lead mt-4">The same explanations appear when you hover over or tab to an underlined word or a small “?” in the app.</p>
+@* Every entry of Web/Glossary.cs in one card, grouped as Method, Verdicts and Output (the side list links to each
+   group). The search field filters as you type; without a connection to the server every entry is still shown. *@
 
-        <dl class="mt-10 divide-y divide-gray-100 border-y border-gray-100">
-            @foreach (var entry in AuBtechReviewAgent.Glossary.All)
-            {
-                <div id="@entry.Key" class="py-5 grid grid-cols-1 sm:grid-cols-[12rem_1fr] gap-1 sm:gap-6">
-                    <dt class="font-semibold text-gray-950">@entry.Term</dt>
-                    <dd class="text-gray-700 leading-relaxed">@entry.Explanation</dd>
-                </div>
-            }
-        </dl>
+<DocPage Current="/glossary" Sections="GroupSections" Eyebrow="Glossary" Title="The words TraceableAI uses">
+    <Lead>The same explanations appear when you hover over or tab to an underlined word or a small “?” in the app.</Lead>
+    <ChildContent>
+        <div class="mt-8 max-w-[760px]">
+            <label for="glossary-search" class="block text-sm font-medium text-ink">Search the glossary</label>
+            <input id="glossary-search" type="search" class="ui-input mt-1 min-h-[44px] text-base" placeholder="For example kappa or screening"
+                   autocomplete="off" @bind="query" @bind:event="oninput" aria-describedby="glossary-count" />
+            <p id="glossary-count" class="mt-2 text-sm text-muted" role="status" aria-live="polite">@CountLine</p>
+        </div>
 
-        <p class="ui-muted mt-8">
-            Something unclear or missing? <a class="text-brand font-medium underline underline-offset-2" href="https://github.com/lauPhilip/au-btech-literature-review-agent/issues">Open an issue on GitHub</a>.
+        @foreach (var group in AuBtechReviewAgent.Glossary.Groups)
+        {
+            var name = group;
+            var entries = Matches.Where(e => AuBtechReviewAgent.Glossary.GroupOf(e) == name).ToList();
+            if (entries.Count == 0) continue;
+            <section id="@GroupId(name)" class="mt-8 max-w-[760px] scroll-mt-6" aria-labelledby="@($"{GroupId(name)}-title")">
+                <h2 id="@($"{GroupId(name)}-title")" class="font-display text-xl font-semibold tracking-tight text-heading">@name</h2>
+                <dl class="mt-3 divide-y divide-line border-y border-line">
+                    @foreach (var entry in entries)
+                    {
+                        <div id="@entry.Key" class="grid grid-cols-1 gap-1 py-4 sm:grid-cols-[12rem_1fr] sm:gap-6">
+                            <dt class="font-semibold text-heading">@entry.Term</dt>
+                            <dd class="text-ink">@entry.Explanation</dd>
+                        </div>
+                    }
+                </dl>
+            </section>
+        }
+
+        <p class="mt-8 text-sm text-muted">
+            Something unclear or missing? <a class="font-medium text-heading underline underline-offset-2" href="https://github.com/lauPhilip/au-btech-literature-review-agent/issues">Open an issue on GitHub</a>.
         </p>
-    </div>
-</div>
+    </ChildContent>
+</DocPage>
+
+@code {
+    private string query = "";
+
+    private IReadOnlyList<AuBtechReviewAgent.Glossary.Entry> Matches => AuBtechReviewAgent.Glossary.Search(query);
+
+    private string CountLine => string.IsNullOrWhiteSpace(query)
+        ? $"{AuBtechReviewAgent.Glossary.All.Count} terms."
+        : Matches.Count == 0 ? "No term matches your search." : $"{Matches.Count} of {AuBtechReviewAgent.Glossary.All.Count} terms match.";
+
+    private static string GroupId(string group) => "group-" + group.ToLowerInvariant();
+
+    private static readonly IReadOnlyList<(string Id, string Label)> GroupSections =
+        AuBtechReviewAgent.Glossary.Groups.Select(g => (GroupId(g), g)).ToList();
+}

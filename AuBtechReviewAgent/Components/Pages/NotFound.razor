@@ -3,14 +3,12 @@
 
 <SeoHead Title="Page not found" NoIndex="true" />
 
-<div class="min-h-full bg-white">
-    <div class="ui-container py-20 max-w-2xl">
-        <p class="ui-eyebrow">Page not found</p>
-        <h1 class="ui-h1 mt-3">This page does not exist.</h1>
-        <p class="ui-lead mt-4">The link may be mistyped, or it pointed to a review that has been deleted. Reviews are kept for a few days after they finish.</p>
-        <div class="mt-8 flex flex-wrap gap-3">
-            <a href="/" class="ui-btn-primary">Go to the start page</a>
-            <a href="/start" class="ui-btn-secondary">Start a review</a>
-        </div>
+<div class="mx-auto flex w-full max-w-[640px] flex-col items-center px-[clamp(16px,3vw,40px)] py-12 text-center sm:py-20">
+    <BrandMark Size="96" />
+    <h1 class="mt-6 font-display text-[clamp(26px,2.4vw,40px)] font-semibold leading-tight tracking-[-0.025em] text-heading">This page does not exist</h1>
+    <p class="mt-3 max-w-[60ch] text-[17px] leading-[1.7] text-muted">The link may be mistyped, or it pointed to a review that has been deleted. Reviews are kept for a few days after they finish.</p>
+    <div class="mt-8 flex w-full flex-col gap-3 sm:w-auto sm:flex-row">
+        <a href="/review" class="ui-btn-primary min-h-[52px]">Start a new review</a>
+        <a href="/" class="ui-btn-secondary min-h-[52px]">Go to the overview</a>
     </div>
 </div>
