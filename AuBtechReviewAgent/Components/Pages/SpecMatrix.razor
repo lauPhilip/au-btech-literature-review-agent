@@ -449,31 +449,32 @@ else
 
                 @* PRISMA 2020 items 23b to 23d, which published reviews give their own headings. Runs made before they were
                    written have none of them; 23c is written in code from the run's facts. *@
+                @{ int discussionPart = 1; }
                 @if (!string.IsNullOrWhiteSpace(report.EvidenceLimitationsItem))
                 {
                     <div class="space-y-2">
-                        <h3 class="font-display text-base font-semibold text-heading">5.2 Limitations of the Evidence (Item 23b)</h3>
+                        <h3 class="font-display text-base font-semibold text-heading">5.@(++discussionPart) Limitations of the Evidence (Item 23b)</h3>
                         @CitedText("evidenceLimitationsItem", report.EvidenceLimitationsItem)
                     </div>
                 }
                 @if (!string.IsNullOrWhiteSpace(report.ReviewLimitationsItem))
                 {
                     <div class="space-y-2">
-                        <h3 class="font-display text-base font-semibold text-heading">5.3 Limitations of the Review Process (Item 23c)</h3>
+                        <h3 class="font-display text-base font-semibold text-heading">5.@(++discussionPart) Limitations of the Review Process (Item 23c)</h3>
                         <p class="text-ink">@report.ReviewLimitationsItem</p>
                     </div>
                 }
                 @if (!string.IsNullOrWhiteSpace(report.ImplicationsItem))
                 {
                     <div class="space-y-2">
-                        <h3 class="font-display text-base font-semibold text-heading">5.4 Implications for Practice and Policy (Item 23d)</h3>
+                        <h3 class="font-display text-base font-semibold text-heading">5.@(++discussionPart) Implications for Practice and Policy (Item 23d)</h3>
                         @CitedText("implicationsItem", report.ImplicationsItem)
                     </div>
                 }
                 @if (!string.IsNullOrWhiteSpace(report.FutureResearchItem))
                 {
                     <div class="space-y-2">
-                        <h3 class="font-display text-base font-semibold text-heading">5.5 Directions for Future Research (Item 23d)</h3>
+                        <h3 class="font-display text-base font-semibold text-heading">5.@(discussionPart + 1) Directions for Future Research (Item 23d)</h3>
                         @CitedText("futureResearchItem", report.FutureResearchItem)
                     </div>
                 }
@@ -504,7 +505,7 @@ else
                 <div class="space-y-2">
                     <h3 class="font-display text-base font-semibold text-heading">@(declarationsNumber).1 Registration and Protocol (Item 24)</h3>
                     <p class="text-ink">
-                        @(string.IsNullOrWhiteSpace(report.ProtocolItem) ? "No protocol was recorded for this run (it was made before protocols were written)." : report.ProtocolItem)
+                        @(string.IsNullOrWhiteSpace(report.ProtocolItem) ? AuBtechReviewAgent.PrismaReviewEngine.NoProtocolText : report.ProtocolItem)
                         @if (hasProtocol)
                         {
                             <a class="text-heading underline ml-1" href="@($"/api/workspace/{State.CurrentSessionId}/protocol.md")" target="_blank">Open protocol.md</a>

@@ -259,9 +259,13 @@ public partial class PrismaReviewEngine
         if (!string.IsNullOrWhiteSpace(report.CitationCheckSummary)) discussionNotes.Add(new("Automated Citation Check", report.CitationCheckSummary));
         if (!string.IsNullOrWhiteSpace(state?.HumanScreeningReviewOutcome)) discussionNotes.Add(new("Human Screening Review", state!.HumanScreeningReviewOutcome!));
 
-        var declarations = new List<PaperSection> { new("Support & Funding", report.SupportItem ?? "") };
-        if (!string.IsNullOrWhiteSpace(report.ProtocolItem)) declarations.Add(new("Registration and Protocol", report.ProtocolItem));
-        declarations.Add(new("Open Science Code Availability", "", (report.AvailabilityItem ?? "").Replace("_", @"\_")));
+        // The declarations in the order and with the headings of the report page (issue #169).
+        var declarations = new List<PaperSection>
+        {
+            new("Registration and Protocol", string.IsNullOrWhiteSpace(report.ProtocolItem) ? NoProtocolText : report.ProtocolItem),
+            new("Support & Funding", report.SupportItem ?? ""),
+            new("Availability of Data and Code", "", (report.AvailabilityItem ?? "").Replace("_", @"\_")),
+        };
 
         var paper = new ReviewPaper
         {
@@ -277,10 +281,12 @@ public partial class PrismaReviewEngine
             DataText = (MethodsSectionWriter.IncludedSet(records) + " " + MethodsSectionWriter.AppendixPointer(records.Count, state?.Extractions)).Trim(),
             DataLatex = dataLatex,
             ResultsText = textSynthesisOnly,
+            ResultsOverviewHeading = "Overview of the Synthesis",
             Themes = (report.SynthesisSections ?? new List<SynthesisSection>()).Select(x => new PaperSection(x.Heading, x.Text)).ToList(),
             CoverageNote = report.CoverageSummary,
             ResultsLatex = resultsLatex,
             Discussion = report.DiscussionItem ?? "",
+            DiscussionOpeningHeading = "General Interpretation",
             DiscussionNotes = discussionNotes,
             Summary = ConclusionSection(report),
             Declarations = declarations,
@@ -385,6 +391,9 @@ public partial class PrismaReviewEngine
         sb.AppendLine(@"\vspace{10pt}");
         return sb.ToString();
     }
+
+    /// <summary>What the declarations say for a run made before protocols were written, on the report page and in main.tex.</summary>
+    public const string NoProtocolText = "No protocol was recorded for this run (it was made before protocols were written).";
 
     /// <summary>Table A.2 (extracted data, with a mark where the supporting quote was found) and Table A.3 (MMAT), in the appendix.</summary>
     /// <remarks>The appendix is set in \small; each note returns to \small, not \normalsize, so A.3 matches A.1 and A.2.</remarks>
