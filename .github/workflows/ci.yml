@@ -114,6 +114,16 @@ jobs:
           npx playwright install --with-deps chromium
           node axe-check.mjs
 
+      # "Print or save as PDF" (issue #153): the made-up report must flow over several A4 pages without the app's
+      # frame, not stop at one screen. The PDF goes with the screenshots.
+      - name: Print the report to PDF
+        working-directory: tools/a11y
+        env:
+          BASE_URL: http://localhost:5038
+          PRINT_PAGES: /design/report=3,/about=1
+          PRINT_OUT: ${{ github.workspace }}/a11y-screenshots
+        run: node print-check.mjs
+
       # Screenshots of every checked page at 390, 1440 and 1920 px, so a pull request that changes markup can be
       # looked at without running the app.
       - name: Upload the screenshots
