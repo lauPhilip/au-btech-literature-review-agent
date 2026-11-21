@@ -1,0 +1,98 @@
+@* The Metrics chart (redesign step 9): every run as one 100% stacked bar of its five citation verdicts, oldest on
+   the left. The y-axis runs from 0 to 100% with a gridline every 25%; the x-axis names each bar by the first eight
+   characters of its run id, in monospace and turned on its side. Each bar has a tooltip with the date, version and
+   counts. The chart is at least 560 px wide and scrolls sideways inside its box on a phone. The same figures are in
+   the table "Verdict shares per run" under it, so the chart itself is one image with a sentence for screen readers. *@
+
+@using System.Globalization
+
+<ul class="flex flex-wrap gap-x-4 gap-y-1 text-sm text-ink">
+    <li><span class="mr-1.5 inline-block h-2.5 w-2.5 bg-supported-chart" aria-hidden="true"></span><Term Key="supported">Supported</Term></li>
+    <li><span class="mr-1.5 inline-block h-2.5 w-2.5 bg-partly-chart" aria-hidden="true"></span><Term Key="partly-supported">Partly supported</Term></li>
+    <li><span class="mr-1.5 inline-block h-2.5 w-2.5 bg-not-supported-chart" aria-hidden="true"></span><Term Key="not-supported">Not supported</Term></li>
+    <li><span class="mr-1.5 inline-block h-2.5 w-2.5 bg-abstract-only-chart" aria-hidden="true"></span>@if (Grey) { <span>Not judged from the kept text</span> } else { <Term Key="abstract-only">Abstract only</Term> }</li>
+    <li><span class="mr-1.5 inline-block h-2.5 w-2.5 bg-unverifiable-chart" aria-hidden="true"></span><Term Key="unverifiable">Could not be verified</Term></li>
+</ul>
+
+<div class="mt-4 overflow-x-auto pb-2" tabindex="0" role="region" aria-label="Chart of citation verdicts per run; scrolls sideways when it is wider than the screen">
+    <svg width="@Width" height="@Height" viewBox="0 0 @Width @Height" class="block" role="img" aria-label="@Description">
+        @foreach (var tick in new[] { 0, 25, 50, 75, 100 })
+        {
+            double y = Top + PlotHeight * (1 - tick / 100.0);
+            <line x1="@F(Left)" x2="@F(Width - 8)" y1="@F(y)" y2="@F(y)" class="stroke-line" stroke-width="1" />
+            @Text(Left - 8, y + 4, "end", $"{tick}%", "fill-muted", 12)
+        }
+        @for (int i = 0; i < Runs.Count; i++)
+        {
+            var run = Runs[i];
+            var c = run.CitationsFinal;
+            double center = Left + Slot * (i + 0.5);
+            double x = center - BarWidth / 2;
+            <g>
+                <title>@Tooltip(run)</title>
+                @foreach (var segment in AuBtechReviewAgent.MetricsOverview.Segments(c))
+                {
+                    double y = Top + PlotHeight * (1 - segment.Start - segment.Share);
+                    <rect x="@F(x)" y="@F(y)" width="@F(BarWidth)" height="@F(PlotHeight * segment.Share)" class="@Fill(segment.Verdict) stroke-page" stroke-width="1" />
+                }
+                @if (c.Total == 0)
+                {
+                    <rect x="@F(x)" y="@F(Top)" width="@F(BarWidth)" height="@F(PlotHeight)" class="fill-soft stroke-line" stroke-width="1" />
+                }
+                @RunLabel(center, Top + PlotHeight + 8, AuBtechReviewAgent.MetricsOverview.ShortId(run.RunId))
+            </g>
+        }
+        <line x1="@F(Left)" x2="@F(Width - 8)" y1="@F(Top + PlotHeight)" y2="@F(Top + PlotHeight)" class="stroke-muted" stroke-width="1" />
+        @Text(Left + (Width - 8 - Left) / 2, Height - 6, "middle", "Run ID", "fill-ink font-semibold", 13)
+    </svg>
+</div>
+<p class="mt-1 text-sm text-muted sm:hidden">Swipe the chart to see all runs.</p>
+
+@code {
+    /// <summary>The runs, oldest first.</summary>
+    [Parameter, EditorRequired] public IReadOnlyList<AuBtechReviewAgent.RunMetrics> Runs { get; set; } = Array.Empty<AuBtechReviewAgent.RunMetrics>();
+
+    /// <summary>Grey literature reviews: "abstract only" reads "not judged from the kept text".</summary>
+    [Parameter] public bool Grey { get; set; }
+
+    private const double Top = 10, PlotHeight = 220, Left = 48, LabelArea = 78, AxisTitle = 22;
+
+    // Wide slots when there are few runs, never narrower than 22 px, so the turned run id still fits.
+    private double Slot => Math.Clamp(760.0 / Math.Max(1, Runs.Count), 22, 64);
+    private double BarWidth => Math.Min(40, Slot * 0.66);
+    private int Width => (int)Math.Max(560, Math.Ceiling(Left + Runs.Count * Slot + 12));
+    private int Height => (int)(Top + PlotHeight + LabelArea + AxisTitle);
+
+    private string Description =>
+        $"Stacked bars of the share of each citation verdict in {Runs.Count} {(Runs.Count == 1 ? "run" : "runs")}, oldest on the left, labelled by run ID. " +
+        "The table Verdict shares per run below has the same figures.";
+
+    private string Tooltip(AuBtechReviewAgent.RunMetrics r)
+    {
+        var c = r.CitationsFinal;
+        string date = AuBtechReviewAgent.MetricsOverview.Completed(r.CompletedUtc);
+        string fifth = Grey ? "not judged from the kept text" : "abstract only";
+        return $"Run {AuBtechReviewAgent.MetricsOverview.ShortId(r.RunId)} · {date} · {r.ShortVersion} · {c.Total} citations: {c.Supported} supported, " +
+               $"{c.PartiallySupported} partly, {c.NotSupported} not supported, {c.InsufficientEvidence} {fifth}, {c.Unverifiable} could not be verified";
+    }
+
+    // Written out in full, so Tailwind finds the class names.
+    private static string Fill(AuBtechReviewAgent.MetricsOverview.Verdict verdict) => verdict switch
+    {
+        AuBtechReviewAgent.MetricsOverview.Verdict.Supported => "fill-supported-chart",
+        AuBtechReviewAgent.MetricsOverview.Verdict.Partly => "fill-partly-chart",
+        AuBtechReviewAgent.MetricsOverview.Verdict.NotSupported => "fill-not-supported-chart",
+        AuBtechReviewAgent.MetricsOverview.Verdict.AbstractOnly => "fill-abstract-only-chart",
+        _ => "fill-unverifiable-chart",
+    };
+
+    private static string F(double v) => v.ToString("0.#", CultureInfo.InvariantCulture);
+
+    // SVG <text> elements are written as markup, because Razor reserves the <text> tag.
+    private static MarkupString Text(double x, double y, string anchor, string content, string css, int size) =>
+        new($"<text x=\"{F(x)}\" y=\"{F(y)}\" text-anchor=\"{anchor}\" font-size=\"{size}\" class=\"{css}\">{System.Net.WebUtility.HtmlEncode(content)}</text>");
+
+    // The run id under its bar, turned to read from bottom to top and ending just under the axis.
+    private static MarkupString RunLabel(double x, double y, string id) =>
+        new($"<text x=\"{F(x)}\" y=\"{F(y)}\" transform=\"rotate(-90 {F(x)} {F(y)})\" text-anchor=\"end\" dominant-baseline=\"middle\" font-size=\"12\" class=\"fill-ink font-mono\">{System.Net.WebUtility.HtmlEncode(id)}</text>");
+}
