@@ -1,11 +1,10 @@
 ﻿@page "/Error"
+@layout AppLayout
 @using System.Diagnostics
 
 <SeoHead Title="Error" NoIndex="true" />
 
-<SiteHeader />
-
-<main id="main" tabindex="-1" class="flex-1 min-h-0 overflow-y-auto bg-white">
+<div class="min-h-full bg-white">
     <div class="ui-container py-20 max-w-2xl">
         <p class="ui-eyebrow">Something went wrong</p>
         <h1 class="ui-h1 mt-3">An error occurred while handling your request.</h1>
@@ -19,7 +18,7 @@
             <a href="https://github.com/lauPhilip/au-btech-literature-review-agent/issues" class="ui-btn-secondary">Report the problem</a>
         </div>
     </div>
-</main>
+</div>
 
 @code{
     [CascadingParameter]

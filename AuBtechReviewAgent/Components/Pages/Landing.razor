@@ -1,12 +1,11 @@
 @page "/"
+@layout LandingLayout
 @inject AuBtechReviewAgent.RunMetricsStore MetricsStore
 @inject AuBtechReviewAgent.RunStore Runs
 
 <SeoHead Title="TraceableAI · Literature reviews where every citation is checked" Path="/" StructuredData="true" />
 
-<SiteHeader Active="overview" />
-
-<main id="main" tabindex="-1" class="flex-1 min-h-0 overflow-y-auto bg-white text-gray-900 font-sans">
+<div class="flex-1 bg-white text-gray-900 font-sans">
 
     @* Hero: one message, one main action, and the product working next to it instead of an illustration. *@
     <section class="relative overflow-hidden border-b border-gray-100">
@@ -249,8 +248,7 @@ Agent frameworks rely on approval gates
         </div>
     </section>
 
-    <SiteFooter />
-</main>
+</div>
 
 @code {
     private int runCount;
