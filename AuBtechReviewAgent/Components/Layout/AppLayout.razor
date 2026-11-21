@@ -3,10 +3,11 @@
    scrolls, and a fixed footer. 100dvh rather than 100vh, so a phone's browser bars do not push the footer off
    the screen. Under 640 px the content area hides its scroll bar. On paper the frame is dropped and the
    content flows over pages. A page uses it with @layout AppLayout and renders only its content: no header,
-   footer or <main> of its own. *@
+   footer or <main> of its own. The theme toggle appears here once
+   ThemeToggle.OfferedOnAppPages is on (redesign step 12); until then these pages stay light. *@
 
 <div class="flex h-dvh w-full flex-col overflow-hidden bg-soft font-sans text-ink print:block print:h-auto print:overflow-visible print:bg-white">
-    <SiteHeader ShowThemeToggle="true" />
+    <SiteHeader ShowThemeToggle="ThemeToggle.OfferedOnAppPages" />
     <main id="main" tabindex="-1"
           class="min-h-0 flex-1 overflow-y-auto max-sm:[scrollbar-width:none] max-sm:[&::-webkit-scrollbar]:hidden print:overflow-visible">
         @Body
