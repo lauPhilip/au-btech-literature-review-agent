@@ -13,166 +13,190 @@
 
 <SeoHead Title="Review output" Path="/spec-matrix" NoIndex="true" Description="A PRISMA 2020 review report with every citation checked against the cited paper." />
 
-<style>
-    html, body {
-        background-color: #f3f4f6 !important;
-        min-height: 100vh;
-        overflow-y: auto !important;
-    }
-    @@media print {
-        body, html {
-            background: white !important;
-            overflow-y: visible !important;
-        }
-    }
-</style>
-
-<div class="w-full bg-gray-100 p-4 md:p-8 flex flex-col items-center justify-start min-h-full print:block print:min-h-0 print:overflow-visible print:bg-white print:p-0 pb-16">
-
-    @if (HasReport)
-    {
-        <div class="w-full max-w-[8.5in] mb-4 flex flex-wrap justify-end gap-2 print:hidden flex-none">
-            @if (hasProtocol)
-            {
-                <a href="@($"/api/workspace/{State.CurrentSessionId}/protocol.md")" target="_blank" class="ui-btn-secondary ui-btn-sm" title="The review plan written before the search started">Protocol</a>
-            }
-            <a href="@($"/review?from={State.CurrentSessionId}")" class="ui-btn-secondary ui-btn-sm" title="Open the dashboard with this run's question, criteria and options filled in">New review from these settings</a>
-            <a href="@($"/api/workspace/{State.CurrentSessionId}/references.bib")" target="_blank" class="ui-btn-secondary ui-btn-sm">BibTeX</a>
-            <a href="@($"/api/workspace/{State.CurrentSessionId}/references.ris")" target="_blank" class="ui-btn-secondary ui-btn-sm">RIS (Zotero / EndNote)</a>
-            <a href="@($"/api/workspace/{State.CurrentSessionId}/screened.ris")" target="_blank" class="ui-btn-secondary ui-btn-sm" title="Every screened record, tagged included or excluded with the reason, for a Zotero library of the screening">RIS, all screened</a>
-            <button type="button" @onclick="PrintReport" class="ui-btn-secondary ui-btn-sm" title="Print the report, or choose Save as PDF in the print window">Print or save as PDF</button>
-            <button @onclick="TriggerZipArchiveDownload" class="ui-btn-primary ui-btn-sm">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
-                </svg>
-                <span>Download archive (.zip)</span>
-            </button>
-            <button type="button" @onclick="CopyLink" class="ui-btn-secondary ui-btn-sm" title="Anyone with the link can read this report; only the browser that started the run can change it">@(linkCopied ? "Link copied" : "Copy link")</button>
-            @if (!canEdit)
-            {
-                <span class="text-xs text-gray-600 self-center">Read-only</span>
-            }
-            else if (!ReviewEngine.IsRunActive(State.CurrentSessionId))
-            {
-                @if (!confirmDelete)
-                {
-                    <button @onclick="() => confirmDelete = true" class="ui-btn ui-btn-sm bg-white border border-gray-300 text-red-700 hover:border-red-300 hover:bg-red-50">Delete run</button>
-                }
-                else
-                {
-                    <span class="bg-red-50 text-red-800 text-xs px-3 py-2 shadow flex items-center gap-2">
-                        Delete this run and its files for good?
-                        <button @onclick="DeleteRun" class="ui-btn-danger ui-btn-sm">Delete</button>
-                        <button @onclick="() => confirmDelete = false" class="ui-btn-secondary ui-btn-sm">Cancel</button>
-                    </span>
-                }
-            }
-        </div>
-    }
-
-    @if (!HasReport)
-    {
-        <div class="bg-amber-50 border border-amber-200 text-amber-800 p-6 text-sm max-w-xl text-center shadow-lg my-12">
-            <div class="font-bold mb-1">@(deleted ? "The run was deleted" : "No Generated PRISMA Report Available")</div>
-            <p class="text-xs text-amber-700 font-light">
+@if (!HasReport)
+{
+    <div class="mx-auto my-12 max-w-xl px-4">
+        <div class="ui-card p-6 text-center">
+            <h1 class="font-display text-lg font-semibold text-heading">@(deleted ? "The run was deleted" : "No report yet")</h1>
+            <p class="mt-1 text-sm text-muted">
                 @(deleted ? "Its ledger, report and downloaded papers have been removed from the server."
-                          : "Go back to the Dashboard, run the agent, and the review appears here when the run is complete.")
+                          : "Start a review on New review. The report appears here when the run is done.")
             </p>
+            <a href="/review" class="ui-btn-primary mt-4 min-h-[44px]">New review</a>
         </div>
-    }
-    else
-    {
-        <CitationAttentionBar Attention="AttentionList" Index="attentionIndex" OnStep="StepAttention" />
-        <article class="w-full max-w-[8.5in] bg-white shadow-lift p-6 md:p-[1in] text-gray-900 font-serif text-[11pt] leading-relaxed mx-auto border border-gray-200 print:shadow-none print:border-none print:p-0 overflow-visible">
+    </div>
+}
+else
+{
+    string runHref = $"/review/{State.CurrentSessionId}";
+    string api = $"/api/workspace/{State.CurrentSessionId}";
+    <div class="mx-auto w-full max-w-[1600px] px-[clamp(16px,3vw,40px)] py-4 sm:py-8 print:max-w-none print:p-0">
 
-            <div class="text-center space-y-3 mb-8 font-sans print:space-y-2">
-                <div class="text-[9px] tracking-widest text-gray-500 uppercase font-bold">AI-Generated Systematic Literature Review</div>
-                <h1 class="text-2xl font-bold tracking-tight font-serif text-gray-900 leading-tight">@ScrubAnchors(report.TitleItem)</h1>
+        <div class="mb-4 flex flex-wrap items-center justify-between gap-2 print:hidden">
+            <a href="@runHref" class="ui-btn-ghost min-h-[44px] px-2"><span aria-hidden="true">←</span> Back to the run</a>
+            <div class="flex flex-wrap items-center gap-2">
+                <button type="button" @onclick="PrintReport" class="ui-btn-secondary min-h-[44px] max-sm:hidden" title="Print the report, or choose Save as PDF in the print window">Print or save as PDF</button>
+                <a href="@($"{api}/archive")" class="ui-btn-primary min-h-[44px]" title="Every file of the run, fingerprinted, with the LaTeX manuscript">
+                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                    Download archive
+                </a>
+                <details class="relative">
+                    <summary class="ui-btn-secondary min-h-[44px] cursor-pointer list-none [&::-webkit-details-marker]:hidden">More<span class="sr-only"> actions for this report</span></summary>
+                    <div class="absolute right-0 z-40 mt-2 w-[min(20rem,calc(100vw-2rem))] space-y-1 rounded-card border border-line bg-page p-2 shadow-lift">
+                        <button type="button" @onclick="CopyLink" class="flex min-h-[44px] w-full items-center rounded-btn px-3 text-left text-sm text-ink hover:bg-active" title="Anyone with the link can read this report; only the browser that started the run can change it">@(linkCopied ? "Link copied" : "Copy link to this report")</button>
+                        <a href="@($"/review?from={State.CurrentSessionId}")" class="flex min-h-[44px] items-center rounded-btn px-3 text-sm text-ink hover:bg-active">New review from these settings</a>
+                        @if (hasProtocol)
+                        {
+                            <a href="@($"{api}/protocol.md")" target="_blank" class="flex min-h-[44px] items-center rounded-btn px-3 text-sm text-ink hover:bg-active">Protocol, written before the search</a>
+                        }
+                        <a href="@($"{api}/references.bib")" target="_blank" class="flex min-h-[44px] items-center rounded-btn px-3 text-sm text-ink hover:bg-active">References as BibTeX</a>
+                        <a href="@($"{api}/references.ris")" target="_blank" class="flex min-h-[44px] items-center rounded-btn px-3 text-sm text-ink hover:bg-active">References as RIS (Zotero, EndNote)</a>
+                        <a href="@($"{api}/screened.ris")" target="_blank" class="flex min-h-[44px] items-center rounded-btn px-3 text-sm text-ink hover:bg-active" title="Every screened record, tagged included or excluded with the reason">Every screened record as RIS</a>
+                        <div class="border-t border-line pt-1">
+                            @if (!canEdit)
+                            {
+                                <p class="px-3 py-2 text-xs text-muted">Read-only. Only the browser that started this run can change or delete it.</p>
+                            }
+                            else if (!ReviewEngine.IsRunActive(State.CurrentSessionId))
+                            {
+                                @if (!confirmDelete)
+                                {
+                                    <button type="button" @onclick="() => confirmDelete = true" class="flex min-h-[44px] w-full items-center rounded-btn px-3 text-left text-sm text-not-supported hover:bg-not-supported-fill">Delete run</button>
+                                }
+                                else
+                                {
+                                    <div class="space-y-2 rounded-btn bg-not-supported-fill p-3 text-sm text-not-supported" role="alert">
+                                        <p>Delete this run and its files for good?</p>
+                                        <div class="flex gap-2">
+                                            <button type="button" @onclick="DeleteRun" class="ui-btn-danger ui-btn-sm min-h-[44px]">Delete</button>
+                                            <button type="button" @onclick="() => confirmDelete = false" class="ui-btn-secondary ui-btn-sm min-h-[44px]">Cancel</button>
+                                        </div>
+                                    </div>
+                                }
+                            }
+                        </div>
+                    </div>
+                </details>
+            </div>
+        </div>
 
-                <div class="text-xs font-medium text-gray-600 font-sans">
-                    Department of Business Development and Technology, Aarhus University
-                </div>
-                <div class="text-[10px] text-gray-500 font-mono">
-                    Protocol Hash: @(string.IsNullOrWhiteSpace(report.ProtocolHash) ? "not recorded" : report.ProtocolHash) | Generated: @report.GeneratedAt
-                </div>
-                <hr class="border-gray-300 my-4" />
+        <div class="grid grid-cols-1 items-start gap-6 lg:grid-cols-[220px_minmax(0,1fr)] xl:gap-8 min-[1500px]:grid-cols-[220px_minmax(0,1fr)_350px] print:block">
+            <div class="max-lg:hidden print:hidden">
+                <ReportContents Entries="Outline" PageHref="@($"/spec-matrix/{State.CurrentSessionId}")" />
             </div>
 
-            <div class="mb-6 font-sans text-xs bg-gray-50 border border-gray-200 p-4 text-justify">
-                <span class="font-bold text-brand block mb-1 uppercase tracking-wider text-[10px]">Abstract</span>
-                <p class="text-gray-700 font-light leading-normal">@ScrubAnchors(report.AbstractItem)</p>
-            </div>
+            <div class="min-w-0">
+        <CitationAttentionBar Attention="AttentionList" Index="attentionIndex" OnStep="StepAttention" HideFromLarge="true" />
+        <article class="mx-auto w-full max-w-[880px] rounded-card border border-line bg-page px-5 py-6 text-[17px] leading-[1.7] text-ink shadow-card sm:px-10 sm:py-10 [&_blockquote]:max-w-[70ch] [&_h3]:max-w-[70ch] [&_p]:max-w-[70ch] print:max-w-none print:rounded-none print:border-0 print:p-0 print:text-[11pt] print:leading-normal print:shadow-none">
 
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6 text-justify text-xs leading-relaxed overflow-visible">
+            <header class="border-b border-line pb-6">
+                <p class="font-display text-xs font-semibold uppercase tracking-[0.14em] text-muted">Systematic review · PRISMA 2020@(dateLine.Length > 0 ? $" · {dateLine}" : "")</p>
+                <h1 class="mt-2 max-w-[24ch] font-display text-[clamp(26px,2.4vw,40px)] font-semibold leading-tight tracking-[-0.025em] text-heading">@ScrubAnchors(report.TitleItem)</h1>
+                @if (runLine.Length > 0)
+                {
+                    <p class="mt-3 text-[15px] text-muted">@runLine</p>
+                }
+                <p class="mt-1 text-xs text-muted">
+                    Department of Business Development and Technology, Aarhus University ·
+                    <span class="break-all font-mono">protocol @(string.IsNullOrWhiteSpace(report.ProtocolHash) ? "not recorded" : report.ProtocolHash)</span>
+                </p>
 
-                <div class="space-y-3 md:col-span-2 border-b border-gray-200 pb-1">
-                    <h2 class="font-sans font-bold text-sm text-brand uppercase tracking-wide">1. Introduction</h2>
-                </div>
+                @if (auditChecks.Count > 0)
+                {
+                    var counts = AuBtechReviewAgent.VerdictCounts.From(auditChecks);
+                    <div class="mt-5 rounded-card border border-line bg-soft p-4 sm:p-5 print:hidden">
+                        <h2 class="font-display text-base font-semibold text-heading">@counts.Total @(counts.Total == 1 ? "citation" : "citations") checked against the papers</h2>
+                        <div class="mt-2"><VerdictBar Counts="counts" /></div>
+                        <p class="mt-2 text-[15px] text-muted">
+                            Each number in the text is coloured by what the check found. Open one to see the passage it was checked against.
+                            @(counts.Flagged > 0 ? $"{counts.Flagged} {(counts.Flagged == 1 ? "citation is" : "citations are")} only partly or not supported; they stay in the report, marked." : "")
+                        </p>
+                    </div>
+                }
+            </header>
 
-                <div class="space-y-1">
-                    <span class="font-sans font-bold text-[10px] text-gray-500 uppercase block">1.1 Rationale (Item 3)</span>
+            <section id="@AuBtechReviewAgent.ReportOutline.AbstractId" data-report-section class="scroll-mt-20 pt-6">
+                <h2 class="font-display text-xl font-semibold tracking-tight text-heading">Abstract</h2>
+                <p class="mt-2">@ScrubAnchors(report.AbstractItem)</p>
+            </section>
+
+            <div class="space-y-10 pt-8">
+
+
+                <section id="@AuBtechReviewAgent.ReportOutline.IntroductionId" data-report-section class="scroll-mt-20 space-y-5">
+                    <h2 class="font-display text-xl font-semibold tracking-tight text-heading">1. Introduction</h2>
+
+                <div class="space-y-2">
+                    <h3 class="font-display text-base font-semibold text-heading">1.1 Rationale (Item 3)</h3>
                     @CitedText("rationaleItem", ScrubAnchors(report.RationaleItem))
                 </div>
 
-                <div class="space-y-1">
-                    <span class="font-sans font-bold text-[10px] text-gray-500 uppercase block">1.2 Objectives (Item 4)</span>
-                    <p class="text-gray-800">@ScrubAnchors(report.ObjectivesItem)</p>
+                <div class="space-y-2">
+                    <h3 class="font-display text-base font-semibold text-heading">1.2 Objectives (Item 4)</h3>
+                    <p class="text-ink">@ScrubAnchors(report.ObjectivesItem)</p>
                     @if (researchQuestions.Count > 0)
                     {
                         <ol class="space-y-1 pt-1">
                             @for (int i = 0; i < researchQuestions.Count; i++)
                             {
-                                <li class="text-gray-800"><span class="font-bold">RQ@(i + 1).</span> @researchQuestions[i]</li>
+                                <li class="text-ink"><span class="font-bold">RQ@(i + 1).</span> @researchQuestions[i]</li>
                             }
                         </ol>
                     }
                 </div>
 
-                <div class="space-y-3 md:col-span-2 border-b border-gray-200 pt-2 pb-1">
-                    <h2 class="font-sans font-bold text-sm text-brand uppercase tracking-wide">2. Methodology</h2>
+                </section>
+
+                <section id="@AuBtechReviewAgent.ReportOutline.MethodologyId" data-report-section class="scroll-mt-20 space-y-5">
+                    <h2 class="font-display text-xl font-semibold tracking-tight text-heading">2. Methodology</h2>
+
+                <div class="space-y-2">
+                    <h3 class="font-display text-base font-semibold text-heading">2.1 Eligibility Criteria (Item 5)</h3>
+                    <p class="text-ink">@ScrubAnchors(report.EligibilityItem)</p>
                 </div>
 
-                <div class="space-y-1">
-                    <span class="font-sans font-bold text-[10px] text-gray-500 uppercase block">2.1 Eligibility Criteria (Item 5)</span>
-                    <p class="text-gray-800">@ScrubAnchors(report.EligibilityItem)</p>
+                <div class="space-y-2">
+                    <h3 class="font-display text-base font-semibold text-heading">2.2 Information Sources (Item 6)</h3>
+                    <p class="text-ink">@ScrubAnchors(report.SourcesItem)</p>
                 </div>
 
-                <div class="space-y-1">
-                    <span class="font-sans font-bold text-[10px] text-gray-500 uppercase block">2.2 Information Sources (Item 6)</span>
-                    <p class="text-gray-800">@ScrubAnchors(report.SourcesItem)</p>
+                <div class="space-y-2">
+                    <h3 class="font-display text-base font-semibold text-heading">2.3 Search Execution (Item 7)</h3>
+                    <p class="text-ink">@ScrubAnchors(report.SearchStrategyItem)</p>
                 </div>
 
-                <div class="space-y-1">
-                    <span class="font-sans font-bold text-[10px] text-gray-500 uppercase block">2.3 Search Execution (Item 7)</span>
-                    <p class="text-gray-800">@ScrubAnchors(report.SearchStrategyItem)</p>
+                <div class="space-y-2">
+                    <h3 class="font-display text-base font-semibold text-heading">2.4 Selection Process (Item 8)</h3>
+                    <p class="text-ink">@ScrubAnchors(report.SelectionProcessItem)</p>
                 </div>
 
-                <div class="space-y-1">
-                    <span class="font-sans font-bold text-[10px] text-gray-500 uppercase block">2.4 Selection Process (Item 8)</span>
-                    <p class="text-gray-800">@ScrubAnchors(report.SelectionProcessItem)</p>
-                </div>
+                @if (flow != null)
+                {
+                    @FlowFigure(flow)
+                }
 
-                <div class="space-y-1 md:col-span-2">
-                    <span class="font-sans font-bold text-[10px] text-gray-500 uppercase block">2.5 Data Collection and Quality Appraisal (Items 9-11)</span>
-                    <p class="text-gray-800">@ScrubAnchors(report.BiasAssessmentItem)</p>
+                <div class="space-y-2">
+                    <h3 class="font-display text-base font-semibold text-heading">2.5 Data Collection and Quality Appraisal (Items 9-11)</h3>
+                    <p class="text-ink">@ScrubAnchors(report.BiasAssessmentItem)</p>
                 </div>
 
                 @if (!string.IsNullOrWhiteSpace(report.SynthesisMethodsItem))
                 {
-                    <div class="space-y-1 md:col-span-2">
-                        <span class="font-sans font-bold text-[10px] text-gray-500 uppercase block">2.6 Synthesis Methods (Item 13d)</span>
-                        <p class="text-gray-800">@report.SynthesisMethodsItem</p>
+                    <div class="space-y-2">
+                        <h3 class="font-display text-base font-semibold text-heading">2.6 Synthesis Methods (Item 13d)</h3>
+                        <p class="text-ink">@report.SynthesisMethodsItem</p>
                     </div>
                 }
 
-                <div class="space-y-3 md:col-span-2 border-b border-gray-200 pt-2 pb-1">
-                    <h2 class="font-sans font-bold text-sm text-brand uppercase tracking-wide">3. Characteristics of the Included Studies</h2>
-                </div>
+                </section>
 
-                <div class="md:col-span-2 space-y-2">
-                    <p class="text-gray-800 text-xs">@DataParagraph()</p>
+                <section id="@AuBtechReviewAgent.ReportOutline.StudiesId" data-report-section class="scroll-mt-20 space-y-5">
+                    <h2 class="font-display text-xl font-semibold tracking-tight text-heading">3. Characteristics of the Included Studies</h2>
 
-                    <p class="text-gray-800 text-xs pt-1">
+                <div class="space-y-2">
+                    <p>@DataParagraph()</p>
+
+                    <p>
                         @if (peerReviewOnlyToggle)
                         {
                             <span>The peer-review filter was on for this review: @passedPeerReviewCheck records passed the check and went to screening, while @failedPeerReviewCheck were excluded as un-reviewed preprints or working papers. </span>
@@ -185,37 +209,37 @@
                     </p>
                 </div>
 
-                <div class="md:col-span-2 space-y-4 font-sans pt-2 overflow-visible">
+                <div class="space-y-4 pt-2 overflow-visible">
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div class="space-y-2 border border-gray-200 p-3 bg-white print-keep">
-                            <span class="text-[11px] font-bold text-gray-800 block border-b border-gray-100 pb-1">Figure 3.1: Included Publications per Year</span>
+                        <div class="space-y-2 border border-line p-3 bg-page print-keep">
+                            <span class="text-[13px] font-bold text-ink block border-b border-line pb-1">Figure 3.1: Included Publications per Year</span>
                             <div class="space-y-2 pt-1">
                                 @{ int maxYear = Math.Max(1, publicationsByYear.Values.DefaultIfEmpty(0).Max()); }
                                 @foreach (var kvp in publicationsByYear)
                                 {
-                                    <div class="flex items-center text-[11px]">
-                                        <span class="w-10 font-mono text-gray-600 font-bold">@kvp.Key</span>
-                                        <div class="flex-1 bg-gray-100 h-3.5 mx-2 border border-gray-200/60 overflow-hidden">
-                                            <div class="bg-brand h-full transition-all" style="width: @(kvp.Value * 100 / maxYear)%"></div>
+                                    <div class="flex items-center text-[13px]">
+                                        <span class="w-10 font-mono text-muted font-bold">@kvp.Key</span>
+                                        <div class="flex-1 bg-soft h-3.5 mx-2 border border-line overflow-hidden">
+                                            <div class="bg-heading h-full transition-all" style="width: @(kvp.Value * 100 / maxYear)%"></div>
                                         </div>
-                                        <span class="w-4 font-mono text-right text-gray-900 font-bold">@kvp.Value</span>
+                                        <span class="w-4 font-mono text-right text-ink font-bold">@kvp.Value</span>
                                     </div>
                                 }
                             </div>
                         </div>
 
-                        <div class="space-y-2 border border-gray-200 p-3 bg-white print-keep">
-                            <span class="text-[11px] font-bold text-gray-800 block border-b border-gray-100 pb-1">Figure 3.2: Included Papers by Source</span>
+                        <div class="space-y-2 border border-line p-3 bg-page print-keep">
+                            <span class="text-[13px] font-bold text-ink block border-b border-line pb-1">Figure 3.2: Included Papers by Source</span>
                             <div class="space-y-2 pt-1">
                                 @{ int maxPlatform = Math.Max(1, platformShares.Select(p => p.Count).DefaultIfEmpty(0).Max()); }
                                 @foreach (var share in platformShares)
                                 {
-                                    <div class="flex items-center text-[11px] mb-1">
-                                        <span class="w-24 truncate text-gray-600 font-medium" title="@share.Label">@share.Label</span>
-                                        <div class="flex-1 bg-gray-100 h-3.5 mx-2 border border-gray-200/60 overflow-hidden">
+                                    <div class="flex items-center text-[13px] mb-1">
+                                        <span class="w-24 truncate text-muted font-medium" title="@share.Label">@share.Label</span>
+                                        <div class="flex-1 bg-soft h-3.5 mx-2 border border-line overflow-hidden">
                                             <div class="@share.Color h-full" style="width: @(share.Count * 100 / maxPlatform)%"></div>
                                         </div>
-                                        <span class="w-4 font-mono text-right text-gray-900 font-bold">@share.Count</span>
+                                        <span class="w-4 font-mono text-right text-ink font-bold">@share.Count</span>
                                     </div>
                                 }
                             </div>
@@ -223,8 +247,8 @@
                     </div>
 
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div class="space-y-2 border border-gray-200 p-3 bg-white print-keep">
-                            <span class="text-[11px] font-bold text-gray-700 block border-b border-gray-100 pb-1">Figure 3.3: Distribution by Publishing Venue Type</span>
+                        <div class="space-y-2 border border-line p-3 bg-page print-keep">
+                            <span class="text-[13px] font-bold text-ink block border-b border-line pb-1">Figure 3.3: Distribution by Publishing Venue Type</span>
                             @{
                                 int totalVenues = journalCount + conferenceCount + transactionsCount + proceedingsCount + preprintCount;
                                 double jP = totalVenues > 0 ? ((double)journalCount / totalVenues) * 360 : 0;
@@ -234,10 +258,10 @@
                                 string v1 = Deg(jP), v2 = Deg(jP + cP), v3 = Deg(jP + cP + tP), v4 = Deg(jP + cP + tP + pP);
                             }
                             <div class="flex items-center gap-6 py-2 px-1">
-                                <div class="w-16 h-14 rounded-full border border-gray-300 shadow-sm flex-none"
+                                <div class="w-16 h-14 rounded-full border border-line-field shadow-sm flex-none"
                                      style="background: conic-gradient(#0284c7 0deg @(v1)deg, #4f46e5 @(v1)deg @(v2)deg, #0d9488 @(v2)deg @(v3)deg, #b45309 @(v3)deg @(v4)deg, #dc2626 @(v4)deg 360deg);">
                                 </div>
-                                <div class="grid grid-cols-2 gap-x-4 gap-y-1 text-[10px] text-gray-600 font-mono">
+                                <div class="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-muted font-mono">
                                     <div class="flex items-center gap-1.5"><div class="w-2.5 h-2.5 bg-sky-600 "></div> Journals (@journalCount)</div>
                                     <div class="flex items-center gap-1.5"><div class="w-2.5 h-2.5 bg-indigo-600 "></div> Conferences (@conferenceCount)</div>
                                     <div class="flex items-center gap-1.5"><div class="w-2.5 h-2.5 bg-teal-600 "></div> Transactions (@transactionsCount)</div>
@@ -247,15 +271,15 @@
                             </div>
                         </div>
 
-                        <div class="space-y-2 border border-gray-200 p-3 bg-white print-keep">
-                            <span class="text-[11px] font-bold text-gray-700 block border-b border-gray-100 pb-1">Figure 3.4: Journal Quartile and Venue Tier</span>
-                            <div class="flex items-end justify-between h-28 pt-2 border-b border-gray-300 px-2">
+                        <div class="space-y-2 border border-line p-3 bg-page print-keep">
+                            <span class="text-[13px] font-bold text-ink block border-b border-line pb-1">Figure 3.4: Journal Quartile and Venue Tier</span>
+                            <div class="flex items-end justify-between h-28 pt-2 border-b border-line-field px-2">
                                 @foreach (var label in new[] { "Q1", "Q2", "Q3", "Q4", "Conf", "Preprint" })
                                 {
                                     var inTier = tableRecords.Where(r => InTier(r, label)).ToList();
                                     int totalMax = Math.Max(1, tableRecords.Count);
                                     <div class="flex flex-col items-center w-10">
-                                        <div class="w-5 bg-gray-100 border border-gray-300 overflow-hidden flex flex-col justify-end" style="height: @(inTier.Count * 90 / totalMax)px" title="@label: @inTier.Count">
+                                        <div class="w-5 bg-soft border border-line-field overflow-hidden flex flex-col justify-end" style="height: @(inTier.Count * 90 / totalMax)px" title="@label: @inTier.Count">
                                             @foreach (var share in platformShares)
                                             {
                                                 int n = inTier.Count(r => r.Category == share.Category);
@@ -265,61 +289,62 @@
                                                 }
                                             }
                                         </div>
-                                        <span class="text-[9px] font-mono font-bold mt-1 text-gray-600">@label</span>
+                                        <span class="text-xs font-mono font-bold mt-1 text-muted">@label</span>
                                     </div>
                                 }
                             </div>
-                            <div class="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-[9px] font-mono mt-2 text-gray-500">
+                            <div class="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-xs font-mono mt-2 text-muted">
                                 @foreach (var share in platformShares)
                                 {
                                     <div class="flex items-center gap-1"><div class="w-2.5 h-2.5 @share.Color "></div> @share.Label (@share.Count)</div>
                                 }
                             </div>
-                            <p class="text-[9px] text-gray-500">Quartiles from SCImago Journal Rank (SJR), exact title match only.</p>
+                            <p class="text-xs text-muted">Quartiles from SCImago Journal Rank (SJR), exact title match only.</p>
                         </div>
                     </div>
                 </div>
 
-                <div class="space-y-3 md:col-span-2 border-b border-gray-200 pt-2 pb-1">
-                    <h2 class="font-sans font-bold text-sm text-brand uppercase tracking-wide">4. Results & Synthesis</h2>
-                </div>
+                </section>
 
-                <div class="space-y-1 md:col-span-2">
-                    <span class="font-sans font-bold text-[10px] text-gray-500 uppercase block">4.1 Overview of the Synthesis (Item 20a)</span>
+                <section id="@AuBtechReviewAgent.ReportOutline.ResultsId" data-report-section class="scroll-mt-20 space-y-5">
+                    <h2 class="font-display text-xl font-semibold tracking-tight text-heading">4. Results & Synthesis</h2>
+
+                <div class="space-y-2">
+                    <h3 class="font-display text-base font-semibold text-heading">4.1 Overview of the Synthesis (Item 20a)</h3>
                     @if (auditChecks.Count > 0)
                     {
-                        <p class="font-sans text-[10px] text-gray-500 print:hidden">Click a citation number to see what the automated check found in the cited paper.</p>
+                        <p class="text-sm text-muted print:hidden">Open a citation number to see what the automated check found in the cited paper.</p>
                     }
                     @CitedText("synthesisResultsItem", ScrubAnchors(report.SynthesisResultsItem))
 
                     @for (int k = 0; k < report.SynthesisSections.Count; k++)
                     {
                         var part = report.SynthesisSections[k];
-                        <h3 class="font-sans font-bold text-[11px] text-brand mt-4">4.@(k + 2) @part.Heading</h3>
+                        <h3 id="@AuBtechReviewAgent.ReportOutline.ThemeId(k)" data-report-section class="scroll-mt-20 pt-4 font-display text-base font-semibold text-heading">4.@(k + 2) @part.Heading</h3>
                         @CitedText(part.Field, part.Text)
                     }
 
                     @if (codebook is { Themes.Count: > 0 })
                     {
-                        <div class="mt-4 font-sans">
-                            <span class="text-[10px] font-bold text-gray-500 uppercase block mb-1">Evidence map: studies by theme</span>
+                        <div class="mt-4">
+                            <h3 class="mb-2 font-display text-base font-semibold text-heading">Evidence map: studies by theme</h3>
                             <div class="overflow-x-auto print:overflow-visible" tabindex="0" role="region" aria-label="Scrolls sideways">
-                                <table class="w-full text-[10px] border border-gray-200">
-                                    <thead class="bg-gray-50 text-gray-600">
+                                <table class="w-full border border-line text-sm">
+                                    <thead class="bg-soft text-muted">
                                         <tr>
-                                            <th class="text-left p-1.5 border-b border-gray-200">Theme</th>
-                                            <th class="text-left p-1.5 border-b border-gray-200">Studies</th>
-                                            <th class="text-left p-1.5 border-b border-gray-200">Cited in its subsection</th>
+                                            <th class="border-b border-line p-2 text-left">Theme</th>
+                                            <th class="border-b border-line p-2 text-left">Studies</th>
+                                            <th class="border-b border-line p-2 text-left">Cited in its subsection</th>
                                         </tr>
                                     </thead>
                                     <tbody>
                                         @foreach (var theme in codebook.Themes)
                                         {
                                             var cov = codebook.Coverage.FirstOrDefault(c => c.ThemeId == theme.Id);
-                                            <tr class="border-b border-gray-100 align-top">
-                                                <td class="p-1.5"><span class="font-semibold">@theme.Name</span><br /><span class="text-gray-500">@theme.Description</span></td>
-                                                <td class="p-1.5 font-mono">@string.Join(", ", theme.Studies.Select(r => $"[{r}]"))</td>
-                                                <td class="p-1.5">@(cov == null ? "-" : $"{cov.CitedFinal.Count} of {cov.Studies.Count}")</td>
+                                            <tr class="border-b border-line align-top">
+                                                <td class="p-2"><span class="font-semibold">@theme.Name</span><br /><span class="text-muted">@theme.Description</span></td>
+                                                <td class="p-2 font-mono">@string.Join(", ", theme.Studies.Select(r => $"[{r}]"))</td>
+                                                <td class="p-2">@(cov == null ? "-" : $"{cov.CitedFinal.Count} of {cov.Studies.Count}")</td>
                                             </tr>
                                         }
                                     </tbody>
@@ -327,36 +352,36 @@
                             </div>
                             @if (codebook.SecondCoding?.Kappa is double kappa)
                             {
-                                <p class="text-[10px] text-gray-500 mt-1">Second, independent coding: Cohen's kappa = @kappa.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture) over @codebook.SecondCoding.CellsCompared study-theme decisions.</p>
+                                <p class="text-xs text-muted mt-1">Second, independent coding: Cohen's kappa = @kappa.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture) over @codebook.SecondCoding.CellsCompared study-theme decisions.</p>
                             }
                         </div>
                     }
                     @if (!string.IsNullOrWhiteSpace(report.CoverageSummary))
                     {
-                        <p class="text-gray-600 text-[11px] italic border-l-2 border-brand pl-2 mt-2">@report.CoverageSummary</p>
+                        <p class="border-l-2 border-heading pl-3 text-[15px] italic text-muted">@report.CoverageSummary</p>
                     }
 
                     @if (report.Artifact is { } art)
                     {
-                        <div class="mt-5 border border-gray-200 p-3 space-y-2 font-sans">
-                            <span class="text-[10px] font-bold text-gray-500 uppercase block">Artifact: @(string.IsNullOrWhiteSpace(art.Title) ? AuBtechReviewAgent.ArtifactKinds.All.FirstOrDefault(k => k.Key == art.Requested).Label : art.Title)</span>
+                        <div class="mt-5 border border-line p-3 space-y-2">
+                            <span class="text-xs font-bold text-muted uppercase block">Artifact: @(string.IsNullOrWhiteSpace(art.Title) ? AuBtechReviewAgent.ArtifactKinds.All.FirstOrDefault(k => k.Key == art.Requested).Label : art.Title)</span>
                             @if (art.Error != null)
                             {
-                                <p class="text-[11px] text-gray-600 italic">@art.Error</p>
+                                <p class="text-[13px] text-muted italic">@art.Error</p>
                             }
                             else
                             {
                                 @if (!string.IsNullOrWhiteSpace(art.Caption))
                                 {
-                                    <p class="text-[11px] text-gray-600">@art.Caption</p>
+                                    <p class="text-[13px] text-muted">@art.Caption</p>
                                 }
                                 @if (art.IsDiagram && !string.IsNullOrEmpty(mermaidDiagramCode))
                                 {
                                     @* Filled by wwwroot/js/mermaid-render.js; Blazor leaves the empty element alone. *@
-                                    <div id="mermaid-preview" class="w-full flex flex-col items-center justify-center text-center bg-gray-50 p-3 overflow-x-auto print:overflow-visible"></div>
+                                    <div id="mermaid-preview" class="w-full flex flex-col items-center justify-center text-center bg-soft p-3 overflow-x-auto print:overflow-visible"></div>
                                     @if (art.Nodes.Any(n => AuBtechReviewAgent.CitationSupportChecker.ReferencesIn(n.Label).Count > 0))
                                     {
-                                        <span class="text-[10px] font-bold text-gray-500 uppercase block pt-1">Cited boxes in the diagram</span>
+                                        <span class="text-xs font-bold text-muted uppercase block pt-1">Cited boxes in the diagram</span>
                                         @for (int k = 0; k < art.Nodes.Count; k++)
                                         {
                                             if (AuBtechReviewAgent.CitationSupportChecker.ReferencesIn(art.Nodes[k].Label).Count == 0) continue;
@@ -367,18 +392,18 @@
                                 else if (art.Kind == AuBtechReviewAgent.ArtifactKinds.Table)
                                 {
                                     <div class="overflow-x-auto print:overflow-visible" tabindex="0" role="region" aria-label="Scrolls sideways">
-                                        <table class="w-full text-[11px] border border-gray-200 align-top">
-                                            <thead class="bg-gray-50 text-gray-600 text-left">
-                                                <tr>@foreach (var col in art.Columns) { <th class="p-1.5 border-b border-gray-200">@col</th> }</tr>
+                                        <table class="w-full text-[13px] border border-line align-top">
+                                            <thead class="bg-soft text-muted text-left">
+                                                <tr>@foreach (var col in art.Columns) { <th class="p-1.5 border-b border-line">@col</th> }</tr>
                                             </thead>
                                             <tbody>
                                                 @for (int r = 0; r < art.Rows.Count; r++)
                                                 {
                                                     int row = r;
-                                                    <tr class="border-t border-gray-100 align-top">
+                                                    <tr class="border-t border-line align-top">
                                                         @for (int c = 0; c < art.Rows[row].Count; c++)
                                                         {
-                                                            <td class="p-1.5">@CitedText($"artifact-r{row + 1}c{c + 1}", art.Rows[row][c])</td>
+                                                            <td class="p-2">@CitedText($"artifact-r{row + 1}c{c + 1}", art.Rows[row][c])</td>
                                                         }
                                                     </tr>
                                                 }
@@ -400,24 +425,25 @@
                     }
                     else if (!string.IsNullOrEmpty(mermaidDiagramCode))
                     {
-                        <div class="mt-4 border border-gray-200 p-4 bg-gray-50 flex flex-col items-center justify-center font-sans print:hidden">
-                            <span class="text-[9px] font-bold text-gray-500 block mb-3 uppercase tracking-widest">Diagram</span>
+                        <div class="mt-4 border border-line p-4 bg-soft flex flex-col items-center justify-center print:hidden">
+                            <span class="text-xs font-bold text-muted block mb-3 uppercase tracking-widest">Diagram</span>
                             @* Older runs: the diagram the report draft wrote. *@
                             <div id="mermaid-preview" class="w-full flex flex-col items-center justify-center text-center"></div>
                         </div>
                     }
                 </div>
 
-                <div class="space-y-3 md:col-span-2 border-b border-gray-200 pt-2 pb-1">
-                    <h2 class="font-sans font-bold text-sm text-brand uppercase tracking-wide">5. Discussion</h2>
-                </div>
+                </section>
 
-                <div class="space-y-1 md:col-span-2">
-                    <span class="font-sans font-bold text-[10px] text-gray-500 uppercase block">5.1 General Interpretation (Item 23a)</span>
+                <section id="@AuBtechReviewAgent.ReportOutline.DiscussionId" data-report-section class="scroll-mt-20 space-y-5">
+                    <h2 class="font-display text-xl font-semibold tracking-tight text-heading">5. Discussion</h2>
+
+                <div class="space-y-2">
+                    <h3 class="font-display text-base font-semibold text-heading">5.1 General Interpretation (Item 23a)</h3>
                     @CitedText("discussionItem", report.DiscussionItem)
                     @if (!string.IsNullOrWhiteSpace(report.CitationCheckSummary))
                     {
-                        <p class="text-gray-600 text-[11px] italic border-l-2 border-brand pl-2">@report.CitationCheckSummary</p>
+                        <p class="border-l-2 border-heading pl-3 text-[15px] italic text-muted">@report.CitationCheckSummary</p>
                     }
                 </div>
 
@@ -425,150 +451,152 @@
                    written have none of them; 23c is written in code from the run's facts. *@
                 @if (!string.IsNullOrWhiteSpace(report.EvidenceLimitationsItem))
                 {
-                    <div class="space-y-1 md:col-span-2">
-                        <span class="font-sans font-bold text-[10px] text-gray-500 uppercase block">5.2 Limitations of the Evidence (Item 23b)</span>
+                    <div class="space-y-2">
+                        <h3 class="font-display text-base font-semibold text-heading">5.2 Limitations of the Evidence (Item 23b)</h3>
                         @CitedText("evidenceLimitationsItem", report.EvidenceLimitationsItem)
                     </div>
                 }
                 @if (!string.IsNullOrWhiteSpace(report.ReviewLimitationsItem))
                 {
-                    <div class="space-y-1 md:col-span-2">
-                        <span class="font-sans font-bold text-[10px] text-gray-500 uppercase block">5.3 Limitations of the Review Process (Item 23c)</span>
-                        <p class="text-gray-800">@report.ReviewLimitationsItem</p>
+                    <div class="space-y-2">
+                        <h3 class="font-display text-base font-semibold text-heading">5.3 Limitations of the Review Process (Item 23c)</h3>
+                        <p class="text-ink">@report.ReviewLimitationsItem</p>
                     </div>
                 }
                 @if (!string.IsNullOrWhiteSpace(report.ImplicationsItem))
                 {
-                    <div class="space-y-1 md:col-span-2">
-                        <span class="font-sans font-bold text-[10px] text-gray-500 uppercase block">5.4 Implications for Practice and Policy (Item 23d)</span>
+                    <div class="space-y-2">
+                        <h3 class="font-display text-base font-semibold text-heading">5.4 Implications for Practice and Policy (Item 23d)</h3>
                         @CitedText("implicationsItem", report.ImplicationsItem)
                     </div>
                 }
                 @if (!string.IsNullOrWhiteSpace(report.FutureResearchItem))
                 {
-                    <div class="space-y-1 md:col-span-2">
-                        <span class="font-sans font-bold text-[10px] text-gray-500 uppercase block">5.5 Directions for Future Research (Item 23d)</span>
+                    <div class="space-y-2">
+                        <h3 class="font-display text-base font-semibold text-heading">5.5 Directions for Future Research (Item 23d)</h3>
                         @CitedText("futureResearchItem", report.FutureResearchItem)
                     </div>
                 }
 
-                @{ int declarationsNumber = string.IsNullOrWhiteSpace(report.ConclusionItem) ? 6 : 7; }
-                @if (!string.IsNullOrWhiteSpace(report.ConclusionItem))
+                </section>
+
+                @{ int declarationsNumber = AuBtechReviewAgent.ReportOutline.DeclarationsNumber(report); }
+                @if (AuBtechReviewAgent.ReportOutline.HasConclusion(report))
                 {
-                    <div class="space-y-3 md:col-span-2 border-b border-gray-200 pt-2 pb-1">
-                        <h2 class="font-sans font-bold text-sm text-brand uppercase tracking-wide">6. Conclusion</h2>
-                    </div>
-                    @foreach (var answer in report.ResearchAnswers ?? new List<ResearchAnswer>())
-                    {
-                        <div class="space-y-1 md:col-span-2">
-                            <span class="font-sans font-bold text-[10px] text-gray-500 uppercase block">RQ@(answer.Number). @answer.Question</span>
-                            @CitedText($"researchAnswer{answer.Number}", answer.Answer)
+                    <section id="@AuBtechReviewAgent.ReportOutline.ConclusionId" data-report-section class="scroll-mt-20 space-y-5">
+                        <h2 class="font-display text-xl font-semibold tracking-tight text-heading">6. Conclusion</h2>
+                        @foreach (var answer in report.ResearchAnswers ?? new List<ResearchAnswer>())
+                        {
+                            <div class="space-y-2">
+                                <h3 class="font-display text-base font-semibold text-heading">RQ@(answer.Number). @answer.Question</h3>
+                                @CitedText($"researchAnswer{answer.Number}", answer.Answer)
+                            </div>
+                        }
+                        <div class="space-y-2">
+                            @CitedText("conclusionItem", report.ConclusionItem)
                         </div>
-                    }
-                    <div class="space-y-1 md:col-span-2">
-                        @CitedText("conclusionItem", report.ConclusionItem)
-                    </div>
+                    </section>
                 }
 
-                <div class="space-y-3 md:col-span-2 border-b border-gray-200 pt-2 pb-1">
-                    <h2 class="font-sans font-bold text-sm text-brand uppercase tracking-wide">@(declarationsNumber). Declarations</h2>
-                </div>
+                <section id="@AuBtechReviewAgent.ReportOutline.DeclarationsId" data-report-section class="scroll-mt-20 space-y-5">
+                    <h2 class="font-display text-xl font-semibold tracking-tight text-heading">@(declarationsNumber). Declarations</h2>
 
-                <div class="space-y-1">
-                    <span class="font-sans font-bold text-[10px] text-gray-500 uppercase block">@(declarationsNumber).1 Registration and Protocol (Item 24)</span>
-                    <p class="text-gray-800">
+                <div class="space-y-2">
+                    <h3 class="font-display text-base font-semibold text-heading">@(declarationsNumber).1 Registration and Protocol (Item 24)</h3>
+                    <p class="text-ink">
                         @(string.IsNullOrWhiteSpace(report.ProtocolItem) ? "No protocol was recorded for this run (it was made before protocols were written)." : report.ProtocolItem)
                         @if (hasProtocol)
                         {
-                            <a class="text-brand underline ml-1" href="@($"/api/workspace/{State.CurrentSessionId}/protocol.md")" target="_blank">Open protocol.md</a>
+                            <a class="text-heading underline ml-1" href="@($"/api/workspace/{State.CurrentSessionId}/protocol.md")" target="_blank">Open protocol.md</a>
                         }
                     </p>
                 </div>
 
-                <div class="space-y-1">
-                    <span class="font-sans font-bold text-[10px] text-gray-500 uppercase block">@(declarationsNumber).2 Support & Funding (Item 25)</span>
-                    <p class="text-gray-800">@ScrubAnchors(report.SupportItem)</p>
+                <div class="space-y-2">
+                    <h3 class="font-display text-base font-semibold text-heading">@(declarationsNumber).2 Support & Funding (Item 25)</h3>
+                    <p class="text-ink">@ScrubAnchors(report.SupportItem)</p>
                 </div>
 
-                <div class="space-y-1 md:col-span-2">
-                    <span class="font-sans font-bold text-[10px] text-gray-500 uppercase block">@(declarationsNumber).3 Availability of Data and Code (Item 27)</span>
-                    <p class="text-gray-800">@ScrubAnchors(report.AvailabilityItem)</p>
+                <div class="space-y-2">
+                    <h3 class="font-display text-base font-semibold text-heading">@(declarationsNumber).3 Availability of Data and Code (Item 27)</h3>
+                    <p class="text-ink">@ScrubAnchors(report.AvailabilityItem)</p>
                 </div>
 
                 @if (aiStatement.Length > 0)
                 {
                     @* Ready to copy into a paper or thesis; built only from what the run recorded (AiUseStatement). *@
-                    <div class="space-y-1 md:col-span-2" id="ai-use">
-                        <div class="flex items-center justify-between gap-2">
-                            <span class="font-sans font-bold text-[10px] text-gray-500 uppercase block">@(declarationsNumber).4 Use of Artificial Intelligence</span>
-                            <span class="flex gap-2 print:hidden font-sans">
-                                <button type="button" class="ui-btn-secondary ui-btn-sm" @onclick='() => CopyStatement(aiStatement, "Methods statement")'>Copy for the methods</button>
-                                <button type="button" class="ui-btn-secondary ui-btn-sm" @onclick='() => CopyStatement(aiShort, "Short declaration")'>Copy a short declaration</button>
+                    <div class="space-y-2" id="ai-use">
+                        <div class="flex flex-wrap items-center justify-between gap-2">
+                            <h3 class="font-display text-base font-semibold text-heading">@(declarationsNumber).4 Use of Artificial Intelligence</h3>
+                            <span class="flex flex-wrap gap-2 print:hidden">
+                                <button type="button" class="ui-btn-secondary ui-btn-sm min-h-[44px]" @onclick='() => CopyStatement(aiStatement, "Methods statement")'>Copy for the methods</button>
+                                <button type="button" class="ui-btn-secondary ui-btn-sm min-h-[44px]" @onclick='() => CopyStatement(aiShort, "Short declaration")'>Copy a short declaration</button>
                             </span>
                         </div>
-                        <p class="text-gray-800">@aiStatement</p>
-                        <p class="font-sans text-[10px] text-gray-500 print:hidden" role="status">@(copyNotice ?? "Edit it to fit your venue's policy on AI use before you submit.")</p>
+                        <p class="text-ink">@aiStatement</p>
+                        <p class="text-xs text-muted print:hidden" role="status">@(copyNotice ?? "Edit it to fit your venue's policy on AI use before you submit.")</p>
                     </div>
                 }
+                </section>
 
             </div>
 
-            <div class="mt-8 pt-4 border-t border-gray-200 text-left overflow-visible">
-                <h2 class="font-sans font-bold text-sm text-brand uppercase tracking-wide mb-3">References</h2>
+            <section id="@AuBtechReviewAgent.ReportOutline.ReferencesId" data-report-section class="mt-10 scroll-mt-20 border-t border-line pt-8">
+                <h2 class="mb-4 font-display text-xl font-semibold tracking-tight text-heading">References</h2>
                 @if (includedCitations.Count == 0)
                 {
-                    <p class="text-xs italic text-gray-500 font-sans">No sources were included in this run.</p>
+                    <p class="italic text-muted">No sources were included in this run.</p>
                 }
                 else
                 {
-                    <ol class="space-y-2 text-xs font-sans text-gray-800">
+                    <ol class="space-y-2 text-[15px] text-ink">
                         @for (int i = 0; i < includedCitations.Count; i++)
                         {
                             int number = i + 1;
                             string citation = includedCitations[i];
                             <li class="pl-2 leading-relaxed">
-                                <span class="font-mono font-bold text-brand mr-1">[@number]</span> - <ApaReference Text="@citation" />
+                                <span class="font-mono font-bold text-heading mr-1">[@number]</span> - <ApaReference Text="@citation" />
                             </li>
                         }
                     </ol>
                 }
-            </div>
+            </section>
 
             @* The tables of the included studies come after the references, as Tables A.1 to A.3 (issue #139). *@
-            <div id="appendix" class="mt-8 pt-4 border-t border-gray-200 text-left overflow-visible space-y-4">
-                <h2 class="font-sans font-bold text-sm text-brand uppercase tracking-wide mb-3">Appendix</h2>
+            <section id="@AuBtechReviewAgent.ReportOutline.AppendixId" data-report-section class="mt-10 scroll-mt-20 space-y-6 border-t border-line pt-8">
+                <h2 class="font-display text-xl font-semibold tracking-tight text-heading">Appendix</h2>
 
-                <div class="md:col-span-2 space-y-2 pt-4 font-sans max-w-full overflow-hidden">
-                    <span class="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">Table A.1: Included Studies</span>
-                    <div class="border border-gray-200 bg-white overflow-x-auto print:overflow-visible" tabindex="0" role="region" aria-label="Scrolls sideways">
-                        <table class="w-full text-left border-collapse text-[10px] leading-relaxed table-fixed min-w-[700px] print:min-w-0">
+                <div class="space-y-2 pt-4 max-w-full overflow-hidden">
+                    <h3 class="font-display text-base font-semibold text-heading">Table A.1: Included Studies</h3>
+                    <div class="border border-line bg-page overflow-x-auto print:overflow-visible" tabindex="0" role="region" aria-label="Scrolls sideways">
+                        <table class="w-full text-left border-collapse text-xs leading-relaxed table-fixed min-w-[700px] print:min-w-0">
                             <thead>
-                                <tr class="bg-gray-100 border-b border-gray-200 text-gray-700 font-bold font-mono text-[9px] uppercase sticky top-0 z-10">
-                                    <th class="p-2 border-r border-gray-200 w-[5%]">Ref.</th>
-                                    <th class="p-2 border-r border-gray-200 w-[17%]">Paper Name</th>
-                                    <th class="p-2 border-r border-gray-200 w-[22%]">Executive Summary</th>
-                                    <th class="p-2 border-r border-gray-200 w-[20%]">Inclusion Rationale</th>
-                                    <th class="p-2 border-r border-gray-200 w-[12%] text-center">Source</th>
+                                <tr class="bg-soft border-b border-line text-ink font-bold font-mono text-xs uppercase sticky top-0 z-10">
+                                    <th class="p-2 border-r border-line w-[5%]">Ref.</th>
+                                    <th class="p-2 border-r border-line w-[17%]">Paper Name</th>
+                                    <th class="p-2 border-r border-line w-[22%]">Executive Summary</th>
+                                    <th class="p-2 border-r border-line w-[20%]">Inclusion Rationale</th>
+                                    <th class="p-2 border-r border-line w-[12%] text-center">Source</th>
                                     <th class="p-2 w-[24%]">Citation (APA 7th)</th>
                                 </tr>
                             </thead>
-                            <tbody class="divide-y divide-gray-100 text-gray-700 font-sans">
+                            <tbody class="divide-y divide-line text-ink">
                                 @foreach (var paperRow in tableRecords)
                                 {
-                                    string badgeClass = platformShares.FirstOrDefault(p => p.Category == paperRow.Category)?.Badge ?? "text-gray-800 bg-gray-50";
-                                    <tr class="hover:bg-gray-50/40" id="@($"ref-{paperRow.ReferenceNumber}")">
-                                        <td class="p-2 font-mono text-brand font-bold border-r border-gray-150 align-top">[@paperRow.ReferenceNumber]</td>
-                                        <td class="p-2 border-r border-gray-150 align-top break-words">
-                                            <span class="font-semibold text-gray-900">@paperRow.Title</span>
+                                    string badgeClass = platformShares.FirstOrDefault(p => p.Category == paperRow.Category)?.Badge ?? "text-ink bg-soft";
+                                    <tr class="hover:bg-soft" id="@($"ref-{paperRow.ReferenceNumber}")">
+                                        <td class="p-2 font-mono text-heading font-bold border-r border-line align-top">[@paperRow.ReferenceNumber]</td>
+                                        <td class="p-2 border-r border-line align-top break-words">
+                                            <span class="font-semibold text-ink">@paperRow.Title</span>
                                             @StudyLinks(paperRow)
                                             @StudyNote(paperRow.ReferenceNumber)
                                         </td>
-                                        <td class="p-2 text-gray-600 border-r border-gray-150 align-top font-light break-words">@paperRow.Summary</td>
-                                        <td class="p-2 text-gray-600 border-r border-gray-150 align-top font-light text-[9.5px] break-words">@paperRow.InclusionRationale</td>
-                                        <td class="p-2 border-r border-gray-150 align-top text-center font-mono font-medium text-[9.5px]">
+                                        <td class="p-2 text-muted border-r border-line align-top font-light break-words">@paperRow.Summary</td>
+                                        <td class="p-2 text-muted border-r border-line align-top font-light text-xs break-words">@paperRow.InclusionRationale</td>
+                                        <td class="p-2 border-r border-line align-top text-center font-mono font-medium text-xs">
                                             <span class="px-1.5 py-0.5 @badgeClass">@AuBtechReviewAgent.PrismaReviewEngine.CategoryLabel(paperRow.Category)</span>
                                         </td>
-                                        <td class="p-2 font-mono text-[9px] text-gray-500 bg-gray-50/20 align-top leading-normal break-all"><ApaReference Text="@paperRow.ApaCitation" /></td>
+                                        <td class="p-2 font-mono text-xs text-muted bg-soft align-top leading-normal break-all"><ApaReference Text="@paperRow.ApaCitation" /></td>
                                     </tr>
                                 }
                             </tbody>
@@ -578,33 +606,33 @@
 
                 @if (extractions.Count > 0)
                 {
-                    <div class="md:col-span-2 space-y-2 pt-2 font-sans max-w-full overflow-hidden">
-                        <span class="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">Table A.2: Extracted Study Data</span>
-                        <div class="border border-gray-200 bg-white overflow-x-auto print:overflow-visible" tabindex="0" role="region" aria-label="Scrolls sideways">
-                            <table class="w-full text-left border-collapse text-[10px] leading-relaxed table-fixed min-w-[700px] print:min-w-0">
+                    <div class="space-y-2 pt-2 max-w-full overflow-hidden">
+                        <h3 class="font-display text-base font-semibold text-heading">Table A.2: Extracted Study Data</h3>
+                        <div class="border border-line bg-page overflow-x-auto print:overflow-visible" tabindex="0" role="region" aria-label="Scrolls sideways">
+                            <table class="w-full text-left border-collapse text-xs leading-relaxed table-fixed min-w-[700px] print:min-w-0">
                                 <thead>
-                                    <tr class="bg-gray-100 border-b border-gray-200 text-gray-700 font-bold font-mono text-[9px] uppercase">
-                                        <th class="p-2 border-r border-gray-200 w-[5%]">Ref.</th>
-                                        <th class="p-2 border-r border-gray-200 w-[15%]">Study type</th>
-                                        <th class="p-2 border-r border-gray-200 w-[20%]">Method</th>
-                                        <th class="p-2 border-r border-gray-200 w-[15%]">Sample</th>
+                                    <tr class="bg-soft border-b border-line text-ink font-bold font-mono text-xs uppercase">
+                                        <th class="p-2 border-r border-line w-[5%]">Ref.</th>
+                                        <th class="p-2 border-r border-line w-[15%]">Study type</th>
+                                        <th class="p-2 border-r border-line w-[20%]">Method</th>
+                                        <th class="p-2 border-r border-line w-[15%]">Sample</th>
                                         <th class="p-2 w-[45%]">Key findings</th>
                                     </tr>
                                 </thead>
-                                <tbody class="divide-y divide-gray-100 text-gray-700">
+                                <tbody class="divide-y divide-line text-ink">
                                     @foreach (var e in extractions)
                                     {
                                         <tr>
-                                            <td class="p-2 font-mono text-brand font-bold border-r border-gray-150 align-top">[@e.ReferenceNumber]</td>
+                                            <td class="p-2 font-mono text-heading font-bold border-r border-line align-top">[@e.ReferenceNumber]</td>
                                             @if (e.Error != null)
                                             {
-                                                <td colspan="4" class="p-2 text-red-700">Extraction failed for this study.</td>
+                                                <td colspan="4" class="p-2 text-not-supported">Extraction failed for this study.</td>
                                             }
                                             else
                                             {
-                                                <td class="p-2 border-r border-gray-150 align-top">@e.StudyType<span class="block text-[9px] text-gray-500">@e.EvidenceBasis</span></td>
-                                                <td class="p-2 border-r border-gray-150 align-top">@Evidence(e.Method)</td>
-                                                <td class="p-2 border-r border-gray-150 align-top">@Evidence(e.Sample)</td>
+                                                <td class="p-2 border-r border-line align-top">@e.StudyType<span class="block text-xs text-muted">@e.EvidenceBasis</span></td>
+                                                <td class="p-2 border-r border-line align-top">@Evidence(e.Method)</td>
+                                                <td class="p-2 border-r border-line align-top">@Evidence(e.Sample)</td>
                                                 <td class="p-2 align-top space-y-1">
                                                     @foreach (var f in e.KeyFindings)
                                                     {
@@ -617,37 +645,37 @@
                                 </tbody>
                             </table>
                         </div>
-                        <p class="text-[10px] text-gray-500">Hover over a value to see the quote it was taken from. <span class="text-amber-700">†</span> The quote could not be found in the paper's text, so treat the value with caution.</p>
+                        <p class="text-xs text-muted">Hover over a value to see the quote it was taken from. <span class="text-partly">†</span> The quote could not be found in the paper's text, so treat the value with caution.</p>
                     </div>
 
-                    <div class="md:col-span-2 space-y-2 pt-2 font-sans max-w-full overflow-hidden">
-                        <span class="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">Table A.3: Quality Appraisal and <Term Key="risk-of-bias">Risk of Bias</Term> (MMAT 2018)</span>
+                    <div class="space-y-2 pt-2 max-w-full overflow-hidden">
+                        <h3 class="font-display text-base font-semibold text-heading">Table A.3: Quality Appraisal and <Term Key="risk-of-bias">Risk of Bias</Term> (MMAT 2018)</h3>
                         @if (extractions.Any(AuBtechReviewAgent.MethodsSectionWriter.ShowInAppraisalTable))
                         {
-                            <div class="border border-gray-200 bg-white overflow-x-auto print:overflow-visible" tabindex="0" role="region" aria-label="Scrolls sideways">
-                                <table class="w-full text-left border-collapse text-[10px] min-w-[560px] print:min-w-0">
+                            <div class="border border-line bg-page overflow-x-auto print:overflow-visible" tabindex="0" role="region" aria-label="Scrolls sideways">
+                                <table class="w-full text-left border-collapse text-xs min-w-[560px] print:min-w-0">
                                     <thead>
-                                        <tr class="bg-gray-100 border-b border-gray-200 text-gray-700 font-bold font-mono text-[9px] uppercase">
-                                            <th class="p-2 border-r border-gray-200">Ref.</th>
-                                            <th class="p-2 border-r border-gray-200">Category</th>
+                                        <tr class="bg-soft border-b border-line text-ink font-bold font-mono text-xs uppercase">
+                                            <th class="p-2 border-r border-line">Ref.</th>
+                                            <th class="p-2 border-r border-line">Category</th>
                                             @for (int i = 1; i <= 5; i++)
                                             {
-                                                <th class="p-2 border-r border-gray-200 text-center">@i</th>
+                                                <th class="p-2 border-r border-line text-center">@i</th>
                                             }
                                             <th class="p-2 text-center" title="How many of the five questions were answered yes. MMAT does not combine them into one score.">Met</th>
                                         </tr>
                                     </thead>
-                                    <tbody class="divide-y divide-gray-100 text-gray-700">
+                                    <tbody class="divide-y divide-line text-ink">
                                         @foreach (var e in extractions.Where(AuBtechReviewAgent.MethodsSectionWriter.ShowInAppraisalTable))
                                         {
                                             <tr>
-                                                <td class="p-2 font-mono text-brand font-bold border-r border-gray-150">[@e.ReferenceNumber]</td>
-                                                <td class="p-2 border-r border-gray-150">@AppraisalCategory(e)</td>
+                                                <td class="p-2 font-mono text-heading font-bold border-r border-line">[@e.ReferenceNumber]</td>
+                                                <td class="p-2 border-r border-line">@AppraisalCategory(e)</td>
                                                 @for (int i = 0; i < 5; i++)
                                                 {
                                                     var a = i < e.Appraisal.Count ? e.Appraisal[i] : null;
                                                     var light = AuBtechReviewAgent.RiskOfBias.For(a?.Answer);
-                                                    <td class="p-2 border-r border-gray-150 text-center whitespace-nowrap @light.Text"
+                                                    <td class="p-2 border-r border-line text-center whitespace-nowrap @light.Text"
                                                         title="@(a == null ? "" : $"{a.Id} {a.Criterion}{(string.IsNullOrEmpty(a.Quote) ? "" : $" — \"{a.Quote}\"")}")">
                                                         <span class="inline-block w-2 h-2 rounded-full align-middle mr-1 @light.Dot" aria-hidden="true"></span><span class="align-middle">@light.Word</span>
                                                     </td>
@@ -658,17 +686,17 @@
                                     </tbody>
                                 </table>
                             </div>
-                            <p class="text-[10px] text-gray-500">Hover over an answer to see the question and the supporting quote. "Met" counts the questions answered yes; following MMAT's guidance it is not an overall quality score. Appraised by the language model; check before use.</p>
+                            <p class="text-xs text-muted">Hover over an answer to see the question and the supporting quote. "Met" counts the questions answered yes; following MMAT's guidance it is not an overall quality score. Appraised by the language model; check before use.</p>
                             @foreach (var category in AuBtechReviewAgent.RiskOfBias.Summarise(extractions))
                             {
-                                <figure class="mt-3 border border-gray-200 bg-white p-3">
-                                    <figcaption class="text-[10px] font-semibold text-gray-700">@category.Category.Replace('_', ' ') studies (@category.Studies): answers per question</figcaption>
+                                <figure class="mt-3 border border-line bg-page p-3">
+                                    <figcaption class="text-xs font-semibold text-ink">@category.Category.Replace('_', ' ') studies (@category.Studies): answers per question</figcaption>
                                     <div class="mt-2 space-y-1.5">
                                         @foreach (var q in category.Questions)
                                         {
-                                            <div class="grid grid-cols-[minmax(0,1fr)_8rem] sm:grid-cols-[minmax(0,1fr)_12rem] gap-2 items-center text-[10px]">
-                                                <span class="text-gray-700 leading-snug"><span class="font-mono text-gray-500">@q.Id</span> @q.Criterion</span>
-                                                <span class="flex h-3 w-full overflow-hidden bg-gray-100" role="img" aria-label="@($"{q.Yes} yes, {q.No} no, {q.CantTell} can't tell")"
+                                            <div class="grid grid-cols-[minmax(0,1fr)_8rem] sm:grid-cols-[minmax(0,1fr)_12rem] gap-2 items-center text-xs">
+                                                <span class="text-ink leading-snug"><span class="font-mono text-muted">@q.Id</span> @q.Criterion</span>
+                                                <span class="flex h-3 w-full overflow-hidden bg-soft" role="img" aria-label="@($"{q.Yes} yes, {q.No} no, {q.CantTell} can't tell")"
                                                       title="@($"{q.Yes} yes · {q.No} no · {q.CantTell} can't tell")">
                                                     @foreach (var (count, dot) in new[] { (q.Yes, "bg-verdict-ok"), (q.CantTell, "bg-verdict-partial"), (q.No, "bg-verdict-bad") })
                                                     {
@@ -681,29 +709,36 @@
                                             </div>
                                         }
                                     </div>
-                                    <p class="mt-2 text-[10px] text-gray-500"><span class="inline-block w-2 h-2 rounded-full bg-verdict-ok align-middle"></span> yes · <span class="inline-block w-2 h-2 rounded-full bg-verdict-partial align-middle"></span> can't tell · <span class="inline-block w-2 h-2 rounded-full bg-verdict-bad align-middle"></span> no</p>
+                                    <p class="mt-2 text-xs text-muted"><span class="inline-block w-2 h-2 rounded-full bg-verdict-ok align-middle"></span> yes · <span class="inline-block w-2 h-2 rounded-full bg-verdict-partial align-middle"></span> can't tell · <span class="inline-block w-2 h-2 rounded-full bg-verdict-bad align-middle"></span> no</p>
                                 </figure>
                             }
                         }
                         @if (AuBtechReviewAgent.MethodsSectionWriter.NotAppraisedNote(extractions) is { Length: > 0 } notAppraised)
                         {
-                            <p class="text-[10px] text-gray-500">@notAppraised</p>
+                            <p class="text-xs text-muted">@notAppraised</p>
                         }
                     </div>
                 }
-            </div>
+            </section>
 
-            <div class="mt-12 pt-4 border-t border-gray-200 text-center font-sans text-[9px] text-gray-500 uppercase tracking-widest">
+            <div class="mt-12 border-t border-line pt-4 text-center text-xs uppercase tracking-[0.14em] text-muted">
                 OSSYM 2026 - 8th International Open Search Symposium
             </div>
             @* Only on paper: where the printed report came from, so a printout can be traced back to its run. *@
-            <p class="hidden print:block mt-2 text-center font-sans text-[8px] text-gray-500">
+            <p class="hidden print:block mt-2 text-center text-xs text-muted">
                 Generated with TraceableAI · run @State.CurrentSessionId · @(report.GeneratedAt) · protocol @(string.IsNullOrWhiteSpace(report.ProtocolHash) ? "not recorded" : report.ProtocolHash)
             </p>
 
         </article>
-    }
-</div>
+            </div>
+
+            <div class="hidden min-[1500px]:block print:hidden">
+                <CitationCheckPanel Checks="auditChecks" Filter="@checkFilter" OnFilter="SetCheckFilter" Position="checkIndex" OnNext="StepCheck"
+                                    RunId="State.CurrentSessionId" HasProtocol="hasProtocol" />
+            </div>
+        </div>
+    </div>
+}
 
 @code {
     [Inject] private UiStateContainer State { get; set; } = default!;
@@ -725,7 +760,7 @@
 
     // Literal class names so the Tailwind build finds them.
     private static readonly string[] BarColors = { "bg-teal-500", "bg-orange-500", "bg-blue-400", "bg-yellow-400", "bg-purple-400", "bg-rose-400", "bg-lime-500", "bg-gray-400" };
-    private static readonly string[] BadgeColors = { "text-teal-800 bg-teal-50", "text-orange-800 bg-orange-50", "text-blue-800 bg-blue-50", "text-yellow-800 bg-yellow-50", "text-purple-800 bg-purple-50", "text-rose-800 bg-rose-50", "text-lime-800 bg-lime-50", "text-gray-800 bg-gray-50" };
+    private static readonly string[] BadgeColors = { "text-teal-800 bg-teal-50", "text-orange-800 bg-orange-50", "text-blue-800 bg-blue-50", "text-yellow-800 bg-yellow-50", "text-purple-800 bg-purple-50", "text-rose-800 bg-rose-50", "text-lime-800 bg-lime-50", "text-ink bg-soft" };
 
     private bool peerReviewOnlyToggle;
     private int passedPeerReviewCheck;
@@ -739,15 +774,16 @@
     // The citation marker the reader clicked: (field, sentence index, reference number).
     private (string Field, int Sentence, int Reference)? openCitation;
 
-    private bool HasReport => !deleted && report != null && !string.IsNullOrEmpty(report.TitleItem) && report.TitleItem != "Pending...";
+    // The run's figures and its PRISMA flow, for the run line and Figure 2.1; null for a run without a ledger.
+    private AuBtechReviewAgent.ReviewStats? stats;
+    private AuBtechReviewAgent.PrismaFlowCounts? flow;
+    private string runLine = "";
+    private string dateLine = "";
 
-    private void TriggerZipArchiveDownload()
-    {
-        // Full browser navigation to a real HTTP download endpoint - not JS interop pushing a base64
-        // payload over the SignalR connection, which silently fails once real source PDFs are included
-        // because that connection has a small default max message size.
-        Nav.NavigateTo($"/api/workspace/{State.CurrentSessionId}/archive", forceLoad: true);
-    }
+    /// <summary>The sections of this report, for the contents list (the page gives each the same id).</summary>
+    private List<AuBtechReviewAgent.OutlineEntry> Outline => AuBtechReviewAgent.ReportOutline.Systematic(report);
+
+    private bool HasReport => !deleted && report != null && !string.IsNullOrEmpty(report.TitleItem) && report.TitleItem != "Pending...";
 
     private void DeleteRun()
     {
@@ -771,6 +807,18 @@
 
     private static string Deg(double d) => d.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
 
+    /// <summary>One line under the title: studies and records, themes, citations checked and the app version.</summary>
+    private static string RunLine(AuBtechReviewAgent.ReviewState state)
+    {
+        var s = state.Stats;
+        var parts = new List<string> { $"{s.Included} {(s.Included == 1 ? "study" : "studies")} from {s.TotalIdentified} {(s.TotalIdentified == 1 ? "record" : "records")}" };
+        if (s.ThemesIdentified > 0) parts.Add($"{s.ThemesIdentified} {(s.ThemesIdentified == 1 ? "theme" : "themes")}");
+        if (s.CitationsChecked > 0) parts.Add($"{s.CitationsChecked} {(s.CitationsChecked == 1 ? "citation" : "citations")} checked");
+        string? version = state.RunSettings?.AppVersion;
+        if (!string.IsNullOrWhiteSpace(version)) parts.Add("TraceableAI " + AuBtechReviewAgent.ToolVersion.Display(version));
+        return string.Join(" · ", parts);
+    }
+
     private static bool InTier(IncludedPaperMetricRow r, string label) => label switch
     {
         "Conf" => r.VenueType is "Conferences" or "Proceedings",
@@ -788,14 +836,80 @@
     private string DataParagraph() => (AuBtechReviewAgent.MethodsSectionWriter.IncludedSet(tableRecords) + " " +
         AuBtechReviewAgent.MethodsSectionWriter.AppendixPointer(tableRecords.Count, extractions)).Trim();
 
+    /// <summary>
+    /// Figure 2.1: the PRISMA 2020 flow of records, from the run's own counts (PrismaFlowCounts, the same numbers as
+    /// the diagram in main.tex). Every identified record ends in exactly one box. The screening kappa sits under it.
+    /// </summary>
+    private RenderFragment FlowFigure(AuBtechReviewAgent.PrismaFlowCounts c) => __builder =>
+    {
+        int removed = c.DuplicatesRemoved + c.OutsideDateRange + c.CappedBeyondMax + c.ScreeningErrors;
+        int excluded = c.ExcludedPeerReview + c.ExcludedAtScreening;
+        var inv = System.Globalization.CultureInfo.InvariantCulture;
+        var bySource = c.IdentifiedBySource.Select(x => $"{x.Source} {x.Count}").ToList();
+        if (c.IdentifiedViaCitations > 0) bySource.Add($"citation chaining {c.IdentifiedViaCitations}");
+        string identifiedDetail = string.Join(" · ", bySource);
+        var removals = new List<string>();
+        if (c.DuplicatesRemoved > 0) removals.Add($"duplicates {c.DuplicatesRemoved}");
+        if (c.OutsideDateRange > 0) removals.Add($"outside the years {c.OutsideDateRange}");
+        if (c.CappedBeyondMax > 0) removals.Add($"over the cap per source {c.CappedBeyondMax}");
+        if (c.ScreeningErrors > 0) removals.Add($"could not be screened {c.ScreeningErrors}");
+        string removedDetail = string.Join(" · ", removals);
+        var reasons = c.ExcludedByReason.Select(x => $"{x.Reason} {x.Count}").ToList();
+        if (c.ExcludedPeerReview > 0) reasons.Add($"not peer reviewed {c.ExcludedPeerReview}");
+        string excludedDetail = string.Join(" · ", reasons);
+        string screenedLabel = stats is { DualScreened: > 0 } ? "Screened twice, independently" : "Screened";
+        <figure class="print-keep rounded-card border border-line bg-soft p-4 sm:p-5" aria-labelledby="flow-caption">
+            <figcaption id="flow-caption" class="text-[15px] font-semibold text-ink">Figure 2.1: Flow of records through the review (PRISMA 2020)</figcaption>
+            <ol class="mt-3 space-y-2 text-[15px] leading-snug">
+                @(FlowRow("Identified", c.Identified, identifiedDetail, "Removed before screening", removed, removedDetail))
+                @(FlowRow(screenedLabel, c.Screened, "Title and abstract", "Excluded", excluded, excludedDetail))
+                @(FlowRow("Included", c.Included, $"full text read {c.FullTextRetrieved} · abstract only {c.AbstractOnly}", null, 0, ""))
+            </ol>
+            @if (stats is { DualScreened: > 0 } st)
+            {
+                <p class="mt-3 text-sm text-muted">
+                    The two screenings agreed on @(st.DualScreened - st.ScreeningDisagreements) of @st.DualScreened records@(st.ScreeningKappa is double k ? $" (Cohen's kappa = {k.ToString("0.00", inv)})" : "").
+                    Disagreements were included and flagged.
+                </p>
+            }
+            @if (!c.IsConsistent)
+            {
+                <p class="mt-2 text-sm text-partly">These counts do not add up for this run (it may predate the current counting); see transparent-process.json.</p>
+            }
+        </figure>
+    };
+
+    private static RenderFragment FlowRow(string label, int count, string detail, string? sideLabel, int sideCount, string sideDetail) => __builder =>
+    {
+        <li class="grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+            <div class="border border-line-field bg-page p-3">
+                <span class="flex items-baseline justify-between gap-2"><span class="font-semibold text-ink">@label</span><span class="font-mono font-semibold text-heading">@count</span></span>
+                @if (detail.Length > 0)
+                {
+                    <span class="mt-0.5 block text-sm text-muted">@detail</span>
+                }
+            </div>
+            @if (sideLabel != null)
+            {
+                <div class="border border-dashed border-line-field p-3">
+                    <span class="flex items-baseline justify-between gap-2"><span class="text-ink">@sideLabel</span><span class="font-mono text-muted">@sideCount</span></span>
+                    @if (sideDetail.Length > 0)
+                    {
+                        <span class="mt-0.5 block text-sm text-muted">@sideDetail</span>
+                    }
+                </div>
+            }
+        </li>
+    };
+
     /// <summary>The value with its quote as a tooltip; a dagger when the quote was not found in the paper.</summary>
     private RenderFragment Evidence(AuBtechReviewAgent.EvidencedValue v) => __builder =>
     {
         bool notReported = v.Value.Equals("not reported", StringComparison.OrdinalIgnoreCase);
-        <span class="@(notReported ? "text-gray-500 italic" : "")" title="@(string.IsNullOrEmpty(v.Quote) ? "" : $"\"{v.Quote}\"")">@v.Value</span>
+        <span class="@(notReported ? "text-muted italic" : "")" title="@(string.IsNullOrEmpty(v.Quote) ? "" : $"\"{v.Quote}\"")">@v.Value</span>
         @if (!notReported && !v.QuoteVerified)
         {
-            <span class="text-amber-700" title="The supporting quote was not found in the paper's text">†</span>
+            <span class="text-partly" title="The supporting quote was not found in the paper's text">†</span>
         }
     };
 
@@ -808,6 +922,7 @@
         <CitedProse Field="@field" Text="@text" Checks="auditChecks" Open="openCitation"
                     OnToggle="@(c => ToggleCitation(c.Field, c.Sentence, c.Reference))" OnClose="CloseCitation"
                     SourceTitle="@(reference => tableRecords.FirstOrDefault(t => t.ReferenceNumber == reference)?.Title)"
+                    SourceLink="SourceLink"
                     PanelExtras="CitationExtras" />
     };
 
@@ -818,16 +933,16 @@
         @CitationNote(open)
         @if (RecheckOf(open) is { } done)
         {
-            <p class="text-[10px] text-gray-600">Checked again @done.CheckedUtc.ToString("yyyy-MM-dd HH:mm") UTC: was @VerdictLabel(done.VerdictBefore) (@done.EvidenceBefore), now @VerdictLabel(done.VerdictAfter) (@done.EvidenceAfter).</p>
+            <p class="text-xs text-muted">Checked again @done.CheckedUtc.ToString("yyyy-MM-dd HH:mm") UTC: was @VerdictLabel(done.VerdictBefore) (@done.EvidenceBefore), now @VerdictLabel(done.VerdictAfter) (@done.EvidenceAfter).</p>
         }
         @if (canEdit && check.Verdict is AuBtechReviewAgent.CitationSupportChecker.Partial or AuBtechReviewAgent.CitationSupportChecker.NotSupported)
         {
             <div class="pt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
-                <button type="button" class="ui-btn ui-btn-sm py-0.5 border border-gray-300 bg-white text-gray-800 hover:border-brand disabled:opacity-50"
+                <button type="button" class="ui-btn ui-btn-sm py-0.5 border border-line-field bg-page text-ink hover:border-heading disabled:opacity-50"
                         disabled="@(rechecking || rechecksLeft <= 0)" @onclick="() => RecheckAsync(open)">
                     @(rechecking ? "Checking again…" : "Check again")
                 </button>
-                <span class="text-[10px] text-gray-500">
+                <span class="text-xs text-muted">
                     @(rechecksLeft > 0
                         ? $"Runs the check once more{(check.EvidenceBasis == "abstract only" ? ", with the full text if an open-access copy can be found now" : " on the full text")}. {rechecksLeft} re-check{(rechecksLeft == 1 ? "" : "s")} left for this run."
                         : "This run has used its re-checks.")
@@ -836,7 +951,7 @@
         }
         @if (recheckMessage != null)
         {
-            <p class="text-[10px] @(recheckFailed ? "text-red-700" : "text-gray-700")" role="status">@recheckMessage</p>
+            <p class="text-xs @(recheckFailed ? "text-not-supported" : "text-ink")" role="status">@recheckMessage</p>
         }
     };
 
@@ -857,18 +972,18 @@
         string? sourcePage = doi == null && AuBtechReviewAgent.PrismaReviewEngine.IsWebAddress(row.Url) ? row.Url : null;
         string? pdf = fullTextUrls.TryGetValue(row.PaperId, out var u) ? u : null;
         if (doi == null && sourcePage == null && pdf == null) return;
-        <span class="mt-1 flex flex-wrap gap-x-2 text-[9.5px] print:hidden">
+        <span class="mt-1 flex flex-wrap gap-x-2 text-xs print:hidden">
             @if (doi != null)
             {
-                <a href="@doi" target="_blank" rel="noopener" class="text-brand underline underline-offset-2">DOI</a>
+                <a href="@doi" target="_blank" rel="noopener" class="text-heading underline underline-offset-2">DOI</a>
             }
             @if (sourcePage != null)
             {
-                <a href="@sourcePage" target="_blank" rel="noopener" class="text-brand underline underline-offset-2">Source page</a>
+                <a href="@sourcePage" target="_blank" rel="noopener" class="text-heading underline underline-offset-2">Source page</a>
             }
             @if (pdf != null)
             {
-                <a href="@pdf" target="_blank" rel="noopener" class="text-brand underline underline-offset-2">Open-access PDF</a>
+                <a href="@pdf" target="_blank" rel="noopener" class="text-heading underline underline-offset-2">Open-access PDF</a>
             }
         </span>
     };
@@ -890,17 +1005,17 @@
     {
         if (editingNote == id)
         {
-            <div class="mt-1.5 font-sans">
-                <label for="@($"note-{id}")" class="block text-[10px] font-semibold text-gray-700">Your note</label>
+            <div class="mt-1.5">
+                <label for="@($"note-{id}")" class="block text-xs font-semibold text-ink">Your note</label>
                 <textarea id="@($"note-{id}")" rows="2" maxlength="@AuBtechReviewAgent.RunStore.MaxNoteLength" @bind="noteDraft"
-                          class="mt-0.5 w-full border border-gray-300 p-1.5 text-[11px] font-normal text-gray-800 focus:border-brand focus:outline-none"></textarea>
+                          class="mt-0.5 w-full border border-line-field p-1.5 text-[13px] font-normal text-ink focus:border-heading focus:outline-none"></textarea>
                 <div class="mt-1 flex gap-2">
                     <button type="button" class="ui-btn-primary ui-btn-sm py-0.5" @onclick="() => SaveNoteAsync(kind, reference, field, sentence)">Save note</button>
                     <button type="button" class="ui-btn-secondary ui-btn-sm py-0.5" @onclick="() => editingNote = null">Cancel</button>
                 </div>
                 @if (noteMessage != null)
                 {
-                    <p class="mt-1 text-[10px] text-red-700" role="alert">@noteMessage</p>
+                    <p class="mt-1 text-xs text-not-supported" role="alert">@noteMessage</p>
                 }
             </div>
         }
@@ -908,13 +1023,13 @@
         {
             if (note != null)
             {
-                <p class="mt-1.5 border-l-2 border-brand pl-2 text-[10px] font-normal text-gray-700 whitespace-pre-line">
-                    <span class="font-semibold text-gray-900">Reviewer's note:</span> @note.Text
+                <p class="mt-1.5 border-l-2 border-heading pl-2 text-xs font-normal text-ink whitespace-pre-line">
+                    <span class="font-semibold text-ink">Reviewer's note:</span> @note.Text
                 </p>
             }
             if (canEdit)
             {
-                <button type="button" class="mt-1 text-[10px] font-medium text-brand hover:underline print:hidden"
+                <button type="button" class="mt-1 text-xs font-medium text-heading hover:underline print:hidden"
                         @onclick="() => { editingNote = id; noteDraft = note?.Text ?? string.Empty; noteMessage = null; }">@(note == null ? "Add a note" : "Edit note")</button>
             }
         }
@@ -1020,12 +1135,44 @@
         var list = AttentionList;
         if (list.Count == 0) return;
         attentionIndex = ((attentionIndex < 0 && delta < 0 ? 0 : attentionIndex) + delta + list.Count) % list.Count;
-        var c = list[attentionIndex];
+        await OpenAndScrollAsync(list[attentionIndex]);
+    }
+
+    // The citation-check panel (from 1500 px): which citations it steps through, and where it is.
+    private string checkFilter = AuBtechReviewAgent.ReportOutline.Flagged;
+    private int checkIndex = -1;
+
+    private void SetCheckFilter(string filter)
+    {
+        checkFilter = filter;
+        checkIndex = -1;
+    }
+
+    private async Task StepCheck()
+    {
+        var list = AuBtechReviewAgent.ReportOutline.InOrder(auditChecks, checkFilter,
+            f => AuBtechReviewAgent.CitationView.FieldRank(f, report.SynthesisSections.Select(x => x.Field).ToList()));
+        if (list.Count == 0) return;
+        checkIndex = (checkIndex + 1) % list.Count;
+        await OpenAndScrollAsync(list[checkIndex]);
+    }
+
+    private async Task OpenAndScrollAsync(AuBtechReviewAgent.CitationSupportResult c)
+    {
         openCitation = (c.Field, c.SentenceIndex, c.Reference);
         StateHasChanged();
         try { await JS.InvokeAsync<bool>("traceableReview.scrollTo", CiteId(c.Field, c.SentenceIndex, c.Reference)); }
         catch (JSException) { }
         catch (JSDisconnectedException) { }
+    }
+
+    /// <summary>Where a reader can open a source: its open-access copy, else its DOI, else its page (only http(s) addresses).</summary>
+    private string? SourceLink(int reference)
+    {
+        var row = tableRecords.FirstOrDefault(t => t.ReferenceNumber == reference);
+        if (row == null) return null;
+        if (fullTextUrls.TryGetValue(row.PaperId, out var pdf) && AuBtechReviewAgent.PrismaReviewEngine.IsWebAddress(pdf)) return pdf;
+        return DoiUrl(row.Doi) ?? (AuBtechReviewAgent.PrismaReviewEngine.IsWebAddress(row.Url) ? row.Url : null);
     }
 
     // Element to focus after the next render: the verdict box when a citation opens, the number when it closes.
@@ -1139,6 +1286,11 @@
         mermaidDiagramCode = "";
         openCitation = null;
         deleted = false;
+        stats = null;
+        flow = null;
+        runLine = dateLine = "";
+        checkFilter = AuBtechReviewAgent.ReportOutline.Flagged;
+        checkIndex = attentionIndex = -1;
 
         string folder = Runs.FolderOf(State.CurrentSessionId);
         string reportPath = Path.Join(folder, "prisma-report.json");
@@ -1160,6 +1312,10 @@
         if (state == null) return;
 
         peerReviewOnlyToggle = state.PeerReviewOnlyToggle;
+        stats = state.Stats;
+        flow = AuBtechReviewAgent.PrismaFlowCounts.From(state);
+        runLine = RunLine(state);
+        dateLine = state.CompletedUtc is DateTime done ? done.ToString("d MMMM yyyy", System.Globalization.CultureInfo.InvariantCulture) : "";
         aiStatement = AuBtechReviewAgent.AiUseStatement.Methods(state, State.CurrentSessionId);
         aiShort = AuBtechReviewAgent.AiUseStatement.Short(state);
         researchQuestions = state.ResearchQuestions?.ToList() ?? new List<string>();
