@@ -130,6 +130,30 @@ public static class MethodsSectionWriter
         return sb.ToString();
     }
 
+    /// <summary>
+    /// A model's name in brackets for the methods text, with any further details (and <paramref name="details"/>)
+    /// after commas, so a name that already carries brackets is not bracketed twice: "mistral-small-latest (Mistral
+    /// API)" with "temperature 0" becomes "(mistral-small-latest, Mistral API, temperature 0)" (issue #120).
+    /// </summary>
+    public static string ModelInBrackets(string model, string? details = null)
+    {
+        string name = (model ?? "").Trim();
+        var parts = System.Text.RegularExpressions.Regex.Match(name, @"^(.+?)\s*\((.+)\)$");
+        string inner = parts.Success ? $"{parts.Groups[1].Value.Trim()}, {parts.Groups[2].Value.Trim()}" : name;
+        return string.IsNullOrWhiteSpace(details) ? $"({inner})" : $"({inner}, {details})";
+    }
+
+    /// <summary>
+    /// A sentence for when the screenings agreed on most records but kappa is still low, as a reader would
+    /// otherwise take it for a mistake (issue #122): when nearly every record gets the same decision, most of
+    /// the agreement is expected by chance, which is what kappa takes away. Empty otherwise.
+    /// </summary>
+    public static string KappaNote(int agreed, int total, double? kappa)
+    {
+        if (kappa is not double k || total <= 0 || k >= 0.2 || agreed < 0.7 * total) return "";
+        return "Kappa is low although most decisions agree, because nearly every record got the same decision, so most of that agreement could happen by chance. ";
+    }
+
     public static string SelectionProcess(bool peerReviewOnly, ReviewStats stats, bool humanReviewRequested = false, string? humanReviewOutcome = null, string? modelName = null)
     {
         string model = string.IsNullOrWhiteSpace(modelName) ? ScreeningModelName : modelName;
@@ -141,16 +165,17 @@ public static class MethodsSectionWriter
         if (stats.DualScreened > 0)
         {
             int agreed = stats.DualScreened - stats.ScreeningDisagreements;
-            sb.Append($"Each remaining record was screened twice by a language model ({model}, temperature 0) with two independent prompts that work through the criteria in a different order, using its title, authors, date, venue and abstract as returned by the source. ");
+            sb.Append($"Each remaining record was screened twice by a language model {ModelInBrackets(model, "temperature 0")} with two independent prompts that work through the criteria in a different order, using its title, authors, date, venue and abstract as returned by the source. ");
             sb.Append($"The two screenings agreed on {agreed} of {stats.DualScreened} records");
             sb.Append(stats.ScreeningKappa is double k ? $" (Cohen's kappa = {k.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture)}); " : "; ");
             sb.Append(stats.ScreeningDisagreements == 0
                 ? "there were no disagreements to resolve. "
                 : $"the {stats.ScreeningDisagreements} disagreement{(stats.ScreeningDisagreements == 1 ? " was" : "s were")} resolved by inclusion and flagged for human attention. ");
+            sb.Append(KappaNote(agreed, stats.DualScreened, stats.ScreeningKappa));
         }
         else
         {
-            sb.Append($"Each remaining record was screened once by a language model ({model}, temperature 0) against the eligibility criteria, using its title, authors, date, venue and abstract as returned by the source. ");
+            sb.Append($"Each remaining record was screened once by a language model {ModelInBrackets(model, "temperature 0")} against the eligibility criteria, using its title, authors, date, venue and abstract as returned by the source. ");
         }
         sb.Append("Text taken from the records was passed to the model inside marked data blocks with the instruction to treat it as data, never as instructions");
         sb.Append(stats.InjectionSuspected > 0
@@ -201,7 +226,7 @@ public static class MethodsSectionWriter
             .Where(v => !v.Value.Equals("not reported", StringComparison.OrdinalIgnoreCase)).ToList();
 
         var sb = new StringBuilder();
-        sb.Append($"For each included study, a language model ({model}, temperature 0) extracted the study type, method, sample, up to three key findings and the stated limitations ");
+        sb.Append($"For each included study, a language model {ModelInBrackets(model, "temperature 0")} extracted the study type, method, sample, up to three key findings and the stated limitations ");
         sb.Append($"from the full text where it could be retrieved ({fullText} of {extractions.Count} studies) and otherwise from the abstract. ");
         sb.Append("Every extracted value had to come with a verbatim quote, which was checked against the paper's text in code");
         sb.Append(values.Count > 0 ? $"; {values.Count(v => v.QuoteVerified)} of {values.Count} quotes were found. " : ". ");

@@ -34,6 +34,10 @@ Every page now has a dark theme. The switch is in the top bar, and if you have n
 
 Nothing about how a review runs has changed. These are the first steps of the redesign; the pages follow one by one.
 
+### Fixed
+
+The methods no longer put the model's name in double brackets, such as "(mistral-large-latest (Mistral API), temperature 0)". When the two screenings agree on most records but kappa is still low, the report now says why, so 3 of 4 with a kappa of 0.00 no longer looks like a mistake. The note under Table A.2 explains the dagger only when a value has one, and no longer points to an evidence column the table does not have.
+
 ## [0.4.0] - 2026-11-20
 
 The model writes about the studies from facts, not from its own guesses. This changes what the model is asked, so runs can differ from 0.3.0.

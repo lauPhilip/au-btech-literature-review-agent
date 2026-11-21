@@ -390,7 +390,9 @@ public partial class PrismaReviewEngine
     /// <remarks>The appendix is set in \small; each note returns to \small, not \normalsize, so A.3 matches A.1 and A.2.</remarks>
     private string ExtractionTables(IReadOnlyList<StudyExtraction> extractions)
     {
-        string V(EvidencedValue v) => EscapeLatexText(v.Value) + (v.QuoteVerified ? "" : (v.Value.Equals("not reported", StringComparison.OrdinalIgnoreCase) ? "" : "$^{\\dagger}$"));
+        static bool Unverified(EvidencedValue v) => !v.QuoteVerified && !v.Value.Equals("not reported", StringComparison.OrdinalIgnoreCase);
+        static bool HasUnverifiedValue(StudyExtraction e) => e.Error == null && new[] { e.Method, e.Sample }.Concat(e.KeyFindings).Any(Unverified);
+        string V(EvidencedValue v) => EscapeLatexText(v.Value) + (Unverified(v) ? "$^{\\dagger}$" : "");
         var sb = new StringBuilder();
         sb.AppendLine(@"\begin{tabularx}{\textwidth}{>{\hsize=0.25\hsize}X >{\hsize=0.8\hsize}X >{\hsize=1.1\hsize}X >{\hsize=0.9\hsize}X >{\hsize=1.95\hsize}X}");
         sb.AppendLine(@"\multicolumn{5}{l}{\textbf{Table A.2: Extracted Study Data}} \\");
@@ -408,7 +410,9 @@ public partial class PrismaReviewEngine
             sb.AppendLine($"{{[}}{e.ReferenceNumber}{{]}} & {EscapeLatexText(e.StudyType)} & {V(e.Method)} & {V(e.Sample)} & {findings} \\\\ \\hline");
         }
         sb.AppendLine(@"\end{tabularx}");
-        sb.AppendLine(@"\vspace{2pt}\noindent\scriptsize $^{\dagger}$ The supporting quote given by the model was not found in the paper's text; treat the value with caution. Evidence: full text or abstract, see extraction.json.\small");
+        // The note explains the dagger only when a value in the table carries one (issue #168).
+        if (extractions.Any(HasUnverifiedValue))
+            sb.AppendLine(@"\vspace{2pt}\noindent\scriptsize $^{\dagger}$ The supporting quote given by the model was not found in the paper's text; treat the value with caution.\small");
         sb.AppendLine(@"\vspace{10pt}");
 
         string A(string answer) => answer switch { "yes" => "Yes", "no" => "No", _ => "?" };

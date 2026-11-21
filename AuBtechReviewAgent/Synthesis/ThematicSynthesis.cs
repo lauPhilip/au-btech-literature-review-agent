@@ -468,9 +468,9 @@ public static class ThematicSynthesis
     /// <param name="checkModelName">The model of the citation checks, when it is not <paramref name="modelName"/>.</param>
     public static string MethodsText(ThematicCodebook? book, string? modelName, bool repairEnabled, string? checkModelName = null)
     {
-        string model = string.IsNullOrWhiteSpace(modelName) ? "the language model" : $"the language model ({modelName})";
+        string model = string.IsNullOrWhiteSpace(modelName) ? "the language model" : $"the language model {MethodsSectionWriter.ModelInBrackets(modelName)}";
         // The checks are named only when another model made them, so the text says which model did what.
-        string checkedBy = string.IsNullOrWhiteSpace(checkModelName) || checkModelName == modelName ? "" : $" by a second language model ({checkModelName})";
+        string checkedBy = string.IsNullOrWhiteSpace(checkModelName) || checkModelName == modelName ? "" : $" by a second language model {MethodsSectionWriter.ModelInBrackets(checkModelName)}";
         if (book == null || book.Themes.Count == 0)
         {
             string why = book?.FallbackReason is { Length: > 0 } r ? $" Thematic coding was not used in this run: {r.TrimEnd('.')}." : "";

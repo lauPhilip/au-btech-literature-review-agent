@@ -870,6 +870,7 @@ else
                 <p class="mt-3 text-sm text-muted">
                     The two screenings agreed on @(st.DualScreened - st.ScreeningDisagreements) of @st.DualScreened records@(st.ScreeningKappa is double k ? $" (Cohen's kappa = {k.ToString("0.00", inv)})" : "").
                     Disagreements were included and flagged.
+                    @AuBtechReviewAgent.MethodsSectionWriter.KappaNote(st.DualScreened - st.ScreeningDisagreements, st.DualScreened, st.ScreeningKappa)
                 </p>
             }
             @if (!c.IsConsistent)

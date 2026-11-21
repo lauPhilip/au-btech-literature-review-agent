@@ -270,11 +270,11 @@ public class PipelineFeatureTests : IDisposable
         var stats = new ReviewStats { Screened = 10, Included = 4, Excluded = 6, DualScreened = 10, ScreeningKappa = 0.8 };
 
         string selection = MethodsSectionWriter.SelectionProcess(false, stats, modelName: options.DisplayNameFor("screening"));
-        Assert.Contains("language model (mistral-small-latest (Mistral API), temperature 0)", selection);
+        Assert.Contains("language model (mistral-small-latest, Mistral API, temperature 0)", selection);
 
         string synthesis = ThematicSynthesis.MethodsText(null, options.DisplayName, true, options.DisplayNameFor("citation-check"));
-        Assert.Contains("synthesised narratively by the language model (mistral-large-latest (Mistral API))", synthesis);
-        Assert.Contains("checked against the cited paper by a second language model (mistral-small-latest (Mistral API))", synthesis);
+        Assert.Contains("synthesised narratively by the language model (mistral-large-latest, Mistral API)", synthesis);
+        Assert.Contains("checked against the cited paper by a second language model (mistral-small-latest, Mistral API)", synthesis);
 
         // One model: the text is as before, with no second model named.
         string single = ThematicSynthesis.MethodsText(null, new LlmOptions().DisplayName, true, new LlmOptions().DisplayNameFor("citation-check"));
