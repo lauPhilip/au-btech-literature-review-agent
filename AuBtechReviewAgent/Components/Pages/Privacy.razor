@@ -1,4 +1,5 @@
 @page "/privacy"
+@layout AppLayout
 @inject AuBtechReviewAgent.RunsOptions RunsOptions
 @inject AuBtechReviewAgent.CacheOptions CacheOptions
 @inject AuBtechReviewAgent.QuotaOptions QuotaOptions
@@ -11,9 +12,7 @@
 <SeoHead Title="Privacy" Path="/privacy"
          Description="@(Grey ? "What TraceableAI stores, for how long, what it sends to the language model, the scholarly databases and the grey literature sites, and how it keeps the web pages a review cites. No accounts, no tracking." : "What TraceableAI stores, for how long, and what it sends to the language model and the scholarly databases. No accounts, no tracking.")" />
 
-<SiteHeader />
-
-<main id="main" tabindex="-1" class="flex-1 min-h-0 overflow-y-auto bg-white text-gray-900 font-sans">
+<div class="min-h-full bg-white text-gray-900 font-sans">
     <div class="ui-container py-14 lg:py-20 max-w-3xl">
         <p class="ui-eyebrow">Privacy</p>
         <h1 class="ui-h1 mt-3">What happens to your data</h1>
@@ -73,8 +72,7 @@
             <p class="mt-4 text-sm text-gray-500">Last updated October 2026. The page is generated from the app's own settings, so the periods above are the ones this server uses.</p>
         </section>
     </div>
-    <SiteFooter />
-</main>
+</div>
 
 @code {
     /// <summary>Whether the grey literature review is described: its card is on, or its module is in preview.</summary>
