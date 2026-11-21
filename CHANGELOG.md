@@ -18,6 +18,8 @@ Every page now sits in one frame. The top bar and the footer stay still, and onl
 
 The front page now fits on one screen. It says what TraceableAI does in one line and shows a real sentence from a review, with its citations checked one by one: one backed by the paper, one only in part, and one not at all. You can pause it. On a phone the example is left out, so the page fits without scrolling. The front page also has its dark theme now, with a switch in the top bar. The other pages stay light until they get their dark colours.
 
+Starting a review is simpler. The page asks one question, "What should the review find out?", in one box: your objective, your search words and, if you like, up to four research questions. The criteria sit next to it in one panel: years and databases, what to include and leave out, and the picture the review should end with. Fold the panel to one line when you are done with it. On a phone it opens over the page with a Done button. Every field and check from before is still there.
+
 Nothing about how a review runs has changed. These are the first steps of the redesign; the pages follow one by one.
 
 ## [0.4.0] - 2026-11-20
