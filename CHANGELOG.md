@@ -14,9 +14,9 @@ The icons that phones and older browsers use now show the same mark on a navy ti
 
 The top bar is new. It is white, shows the mark next to the name, and has three places: New review, Review output and Metrics. On a phone they fold into a menu. The footer is now one short line with the pages about trust and a link to GitHub.
 
-Every page now sits in one frame. The top bar and the footer stay still, and only the page between them scrolls. A switch for a dark theme is ready too, but it stays hidden until the pages have their dark colours.
+Every page now sits in one frame. The top bar and the footer stay still, and only the page between them scrolls. A switch in the top bar turns on a dark theme.
 
-The front page now fits on one screen. It says what TraceableAI does in one line and shows a real sentence from a review, with its citations checked one by one: one backed by the paper, one only in part, and one not at all. You can pause it. On a phone the example is left out, so the page fits without scrolling. The front page also has its dark theme now, with a switch in the top bar. The other pages stay light until they get their dark colours.
+The front page now fits on one screen. It says what TraceableAI does in one line and shows a real sentence from a review, with its citations checked one by one: one backed by the paper, one only in part, and one not at all. You can pause it. On a phone the example is left out, so the page fits without scrolling. The front page has its dark theme too.
 
 Starting a review is simpler. The page asks one question, "What should the review find out?", in one box: your objective, your search words and, if you like, up to four research questions. The criteria sit next to it in one panel: years and databases, what to include and leave out, and the picture the review should end with. Fold the panel to one line when you are done with it. On a phone it opens over the page with a Done button. Every field and check from before is still there.
 
@@ -29,6 +29,8 @@ The Metrics page now asks one question: how well do the citations hold up? Four 
 The pages about trust now look alike: About, the model card, privacy, the glossary and the archive check. On a laptop a list on the left takes you between them and to each part of the page you are on. The glossary has a search box and groups its words by method, verdicts and output. Checking an archive is one big box to drop it in, with the result beside it. Choosing the kind of review shows the two you can start as large cards, and a missing page now helps you on your way.
 
 The grey literature review, still in preview, now reads like the systematic one. Its paper is one long page with a list of sections, the coloured bar for how the citations held up and the same panel for stepping through them. Its data appendix and planning page got the new colours too.
+
+Every page now has a dark theme. The switch is in the top bar, and if you have not chosen, the site follows your computer's setting. The citation colours keep their meaning in both themes.
 
 Nothing about how a review runs has changed. These are the first steps of the redesign; the pages follow one by one.
 

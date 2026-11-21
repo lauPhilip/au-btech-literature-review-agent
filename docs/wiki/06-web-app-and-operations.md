@@ -66,6 +66,8 @@ Redesign step 11 gave the grey literature review's pages the same look. The pape
 
 Redesign step 12 starts by moving every remaining page and part to the theme-aware colours, so the dark theme can be offered everywhere. The shared classes in `Styles/tailwind.input.css` (`ui-card`, the buttons, `ui-input`, `ui-label`, the headings and the verdict chips) use `page`, `ink`, `muted`, `heading`, `line`, `primary` and the verdict tokens instead of fixed greys and the fixed navy; so do New review, its criteria and screening parts, the run funnel, the error page, the reconnect banner and the grey literature planning page. Status messages use the verdict colours: green for done or included, orange for a warning, red for an error or an exclusion, blue for a note. The light theme looks as before. `ThemeColoursTests` fails if a component uses a fixed grey, the fixed navy as text or a white background again (the report's theme colours and print styles are left alone).
 
+The second half of step 12 offers the dark theme on every page. `ThemeToggle.OfferedOnAppPages` is on, so `AppLayout` shows the switch and `ThemeToggle.ReadyFor` lets every page take the dark theme; `ThemeToggle.FollowSystem` is on, so a visitor who has not chosen follows the system setting (`prefers-color-scheme`) through `wwwroot/js/theme.js`. The CI accessibility job checks the main pages and the `/design` previews in the dark theme too, so a colour that falls under 4.5:1 there fails the build.
+
 The Review Output page does not follow a run live; it reads the finished files from the run folder each time it loads. Anyone with a run's link can open it, which is why run ids are random GUIDs and runs are deleted after `Runs:RetentionDays`.
 
 ### Read-only links and the edit key

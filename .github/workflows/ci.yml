@@ -97,8 +97,8 @@ jobs:
           cat app.log; exit 1
 
       # Fails on any "serious" or "critical" problem; the log lists every rule and element (tools/a11y).
-      # The landing page is checked in the dark theme too, the only real page that takes it until redesign
-      # step 12. /design/frame exists only in development: AppLayout in both themes before the app pages are ready.
+      # Since redesign step 12 every page takes the dark theme, so the main pages are checked in it too.
+      # /design/frame exists only in development: AppLayout in both themes.
       # /design/run, also development only, shows New review while a run is going, stopped and done, with sample figures.
       # /design/report, development only too, shows the report page with a made-up finished run (SampleReport).
       # /design/metrics, development only too, shows the Metrics page with made-up runs (SampleMetrics).
@@ -107,7 +107,7 @@ jobs:
         env:
           BASE_URL: http://localhost:5038
           A11Y_PAGES: /,/review,/spec-matrix,/start,/metrics,/about,/model-card,/privacy,/verify,/glossary,/not-found,/design/frame,/design/run,/design/run?state=stopped,/design/run?state=done,/design/report,/design/metrics
-          A11Y_DARK_PAGES: /,/design/frame
+          A11Y_DARK_PAGES: /,/review,/start,/metrics,/about,/model-card,/privacy,/verify,/glossary,/not-found,/design/frame,/design/run,/design/run?state=done,/design/report,/design/metrics
           A11Y_SCREENSHOTS: ${{ github.workspace }}/a11y-screenshots
         run: |
           npm ci
