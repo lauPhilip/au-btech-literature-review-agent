@@ -17,7 +17,7 @@
         }
         else
         {
-            <p class="mt-1 text-sm text-muted">@Checks.Count @(Checks.Count == 1 ? "citation" : "citations") checked against the papers.</p>
+            <p class="mt-1 text-sm text-muted">@Checks.Count @(Checks.Count == 1 ? "citation" : "citations") checked against the @(Multivocal ? "sources" : "papers").</p>
             <div class="mt-3"><VerdictBar Counts="AuBtechReviewAgent.VerdictTally.From(Checks)" Thin="true" /></div>
 
             <div class="mt-4 grid grid-cols-3 gap-1" role="group" aria-label="Which citations to step through">
@@ -48,8 +48,18 @@
         @{ string api = $"/api/workspace/{RunId}"; }
         <ul class="mt-2 divide-y divide-line">
             @(Row("Run archive", "Every file fingerprinted, with the LaTeX manuscript", ($"{api}/archive", "Download", "the run archive")))
-            @(Row("References", "The included studies", ($"{api}/references.bib", "BibTeX", "the references"), ($"{api}/references.ris", "RIS", "the references")))
-            @(Row("Screened records", "Every record with its decision", ($"{api}/screened.ris", "RIS", "the screened records")))
+            @if (Multivocal)
+            {
+                @(Row("Manuscript", "The paper as LaTeX", ($"{api}/main.tex", "main.tex", "the manuscript")))
+                @(Row("References", "The sources the paper cites", ($"{api}/references.bib", "BibTeX", "the references"), ($"{api}/references.ris", "RIS", "the references")))
+                @(Row("Screened sources", "Every source with its decision", ($"{api}/screened.ris", "RIS", "the screened sources")))
+                @(Row("Data appendix", "Guidelines table, quotations and sources", ($"/mlr-report/{RunId}", "Open", "the data appendix")))
+            }
+            else
+            {
+                @(Row("References", "The included studies", ($"{api}/references.bib", "BibTeX", "the references"), ($"{api}/references.ris", "RIS", "the references")))
+                @(Row("Screened records", "Every record with its decision", ($"{api}/screened.ris", "RIS", "the screened records")))
+            }
             @if (HasProtocol)
             {
                 @(Row("Protocol", "Written before the search", ($"{api}/protocol.md", "Open", "the protocol")))
@@ -72,6 +82,9 @@
 
     [Parameter, EditorRequired] public Guid RunId { get; set; }
     [Parameter] public bool HasProtocol { get; set; }
+
+    /// <summary>A grey literature review's paper: its downloads are the manuscript, references, screened sources and data appendix.</summary>
+    [Parameter] public bool Multivocal { get; set; }
 
     private static RenderFragment Row(string name, string about, params (string Href, string Action, string What)[] links) => __builder =>
     {

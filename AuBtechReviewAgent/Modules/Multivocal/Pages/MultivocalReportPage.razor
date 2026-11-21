@@ -15,19 +15,21 @@
 <SeoHead Title="Grey literature review report" Path="/mlr-report" NoIndex="true"
          Description="The report of a multivocal literature review, following the Garousi et al. (2019) guidelines." />
 
-<div class="max-w-4xl w-full mx-auto p-4 lg:p-6 space-y-6">
+<div class="mx-auto w-full max-w-[1600px] px-[clamp(16px,3vw,40px)] py-4 sm:py-8 print:max-w-none print:p-0">
+<article class="mx-auto w-full max-w-[880px] space-y-6 rounded-card border border-line bg-page px-5 py-6 text-base leading-relaxed text-ink shadow-card sm:px-10 sm:py-10 [&_p]:max-w-[70ch] print:max-w-none print:rounded-none print:border-0 print:p-0 print:shadow-none">
     @if (report == null)
     {
-        <div class="ui-card p-4 text-sm text-gray-700">
-            This run has no report yet: it is written once the run is synthesised. <a href="@($"/mlr/{RunId}")" class="text-brand underline underline-offset-2">Back to the review</a>
+        <div class="ui-card p-4 text-sm text-ink">
+            This run has no report yet: it is written once the run is synthesised. <a href="@($"/mlr/{RunId}")" class="text-heading underline underline-offset-2">Back to the review</a>
         </div>
     }
     else
     {
         <header class="space-y-2">
-            <p class="text-xs text-gray-500"><a href="@($"/mlr/{RunId}")" class="text-brand underline underline-offset-2">Back to the review</a> · <a href="@($"/mlr-paper/{RunId}")" class="text-brand underline underline-offset-2">The paper</a></p>
-            <h1 class="ui-h2">@report.Title</h1>
-            <ul class="text-xs text-gray-600 space-y-0.5">
+            <p class="text-xs text-muted"><a href="@($"/mlr/{RunId}")" class="text-heading underline underline-offset-2">Back to the review</a> · <a href="@($"/mlr-paper/{RunId}")" class="text-heading underline underline-offset-2">The paper</a></p>
+            <p class="font-display text-xs font-semibold uppercase tracking-[0.14em] text-muted">Data appendix · Garousi et al. (2019)</p>
+            <h1 class="max-w-[24ch] font-display text-[clamp(26px,2.4vw,40px)] font-semibold leading-tight tracking-[-0.025em] text-heading">@report.Title</h1>
+            <ul class="text-xs text-muted space-y-0.5">
                 @foreach (var line in report.Meta)
                 {
                     <li class="break-words">@line</li>
@@ -42,7 +44,7 @@
             </div>
             @if (saved)
             {
-                <p class="text-[11px] text-gray-500" role="status">Saved with the run, so the archive holds this report.</p>
+                <p class="text-[11px] text-muted" role="status">Saved with the run, so the archive holds this report.</p>
             }
         </header>
 
@@ -52,11 +54,11 @@
             <section class="space-y-3">
                 @if (current.Level == 2)
                 {
-                    <h2 class="text-lg font-semibold text-gray-900 border-b border-gray-200 pb-1">@current.Heading</h2>
+                    <h2 class="border-b border-line pb-1 font-display text-xl font-semibold tracking-tight text-heading">@current.Heading</h2>
                 }
                 else
                 {
-                    <h3 class="ui-h3">@current.Heading</h3>
+                    <h3 class="font-display text-base font-semibold text-heading">@current.Heading</h3>
                 }
                 @foreach (var block in current.Blocks)
                 {
@@ -64,10 +66,10 @@
                     @switch (b.Kind)
                     {
                         case "quote":
-                            <blockquote class="border-l-2 border-gray-300 pl-3 text-sm italic text-gray-700">@b.Text</blockquote>
+                            <blockquote class="border-l-2 border-line-field pl-3 text-sm italic text-ink">@b.Text</blockquote>
                             break;
                         case "list":
-                            <ul class="list-disc pl-5 text-sm text-gray-800 space-y-1">
+                            <ul class="list-disc pl-5 text-sm text-ink space-y-1">
                                 @foreach (var item in b.Items)
                                 {
                                     <li>@item</li>
@@ -76,25 +78,25 @@
                             break;
                         case "table":
                             <div class="overflow-x-auto" tabindex="0" role="region" aria-label="@($"Table: {current.Heading}")">
-                                <table class="min-w-full text-xs text-left border border-gray-200">
-                                    <thead class="bg-gray-50">
+                                <table class="min-w-full text-xs text-left border border-line">
+                                    <thead class="bg-soft">
                                         <tr>
                                             @foreach (var header in b.Headers)
                                             {
-                                                <th scope="col" class="px-2 py-1.5 font-semibold text-gray-700 border-b border-gray-200">@header</th>
+                                                <th scope="col" class="px-2 py-1.5 font-semibold text-ink border-b border-line">@header</th>
                                             }
                                         </tr>
                                     </thead>
                                     <tbody>
                                         @foreach (var row in b.Rows)
                                         {
-                                            <tr class="border-b border-gray-100 align-top">
+                                            <tr class="border-b border-line align-top">
                                                 @foreach (var cell in row)
                                                 {
-                                                    <td class="px-2 py-1.5 text-gray-800 break-words">
+                                                    <td class="px-2 py-1.5 text-ink break-words">
                                                         @if (AuBtechReviewAgent.PrismaReviewEngine.IsWebAddress(cell))
                                                         {
-                                                            <a href="@cell" target="_blank" rel="noopener noreferrer" class="text-brand underline underline-offset-2 break-all">@cell</a>
+                                                            <a href="@cell" target="_blank" rel="noopener noreferrer" class="text-heading underline underline-offset-2 break-all">@cell</a>
                                                         }
                                                         else
                                                         {
@@ -109,12 +111,12 @@
                             </div>
                             break;
                         default:
-                            <p class="text-sm text-gray-800 leading-relaxed">
+                            <p class="text-sm text-ink leading-relaxed">
                                 @foreach (var (text, bold) in Parts(b.Text))
                                 {
                                     if (bold)
                                     {
-                                        <strong class="font-semibold text-gray-900">@text</strong>
+                                        <strong class="font-semibold text-heading">@text</strong>
                                     }
                                     else
                                     {
@@ -128,6 +130,7 @@
             </section>
         }
     }
+</article>
 </div>
 
 @code {
