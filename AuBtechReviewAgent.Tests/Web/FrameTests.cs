@@ -58,8 +58,8 @@ public class FrameTests
 
         string landing = await RenderAsync<SiteHeader>("", new() { ["ShowNav"] = false, ["ShowThemeToggle"] = true });
         Assert.DoesNotContain("<nav", landing);
-        // The toggle appears only once ThemeToggle.Offered is on, while the pages use fixed light colours.
-        Assert.Equal(ThemeToggle.Offered, landing.Contains("data-theme-toggle", StringComparison.Ordinal));
+        // Until the next commit the toggle follows ThemeToggle.OfferedOnAppPages everywhere.
+        Assert.Equal(ThemeToggle.OfferedOnAppPages, landing.Contains("data-theme-toggle", StringComparison.Ordinal));
         Assert.Contains("href=\"/\" aria-current=\"page\"", landing);
     }
 
@@ -71,6 +71,21 @@ public class FrameTests
         Assert.Contains("<button type=\"button\" data-theme-toggle", html);
         Assert.Contains("Switch to dark theme", html);
         Assert.Contains("Switch to light theme", html);
+    }
+
+    [Theory]
+    [InlineData("", true)]
+    [InlineData("?utm=x#top", true)]
+    [InlineData("design/frame", true)]
+    [InlineData("design/landing-frame", true)]
+    [InlineData("review", false)]
+    [InlineData("review/" + RunId, false)]
+    [InlineData("metrics?kind=grey", false)]
+    [InlineData("designer", false)]
+    public void OnlyPagesReadyForTheDarkThemeCanTakeIt(string path, bool ready)
+    {
+        // Until step 12 switches on the toggle for the app pages, only the landing page and the /design pages are ready.
+        Assert.Equal(ready || ThemeToggle.OfferedOnAppPages, ThemeToggle.ReadyFor(path));
     }
 
     [Fact]
@@ -116,7 +131,7 @@ public class FrameTests
             int content = html.IndexOf("PAGE CONTENT", StringComparison.Ordinal);
             int footer = html.IndexOf("<footer", StringComparison.Ordinal);
             Assert.True(header >= 0 && header < content && content < footer);
-            Assert.Equal(ThemeToggle.Offered, html.Contains("data-theme-toggle", StringComparison.Ordinal));
+            Assert.Equal(ThemeToggle.OfferedOnAppPages, html.Contains("data-theme-toggle", StringComparison.Ordinal));
         }
     }
 
