@@ -97,14 +97,14 @@ jobs:
           cat app.log; exit 1
 
       # Fails on any "serious" or "critical" problem; the log lists every rule and element (tools/a11y).
-      # The two /design pages exist only in development: they show the redesign's frame (AppLayout and
-      # LandingLayout) before the real pages use it, and are also checked in the dark theme.
+      # The landing page is checked in the dark theme too, the only real page that takes it until redesign
+      # step 12. /design/frame exists only in development: AppLayout in both themes before the app pages are ready.
       - name: Run axe-core on the public pages
         working-directory: tools/a11y
         env:
           BASE_URL: http://localhost:5038
-          A11Y_PAGES: /,/review,/metrics,/glossary,/design/frame,/design/landing-frame
-          A11Y_DARK_PAGES: /design/frame,/design/landing-frame
+          A11Y_PAGES: /,/review,/spec-matrix,/start,/metrics,/about,/verify,/glossary,/design/frame
+          A11Y_DARK_PAGES: /,/design/frame
           A11Y_SCREENSHOTS: ${{ github.workspace }}/a11y-screenshots
         run: |
           npm ci
