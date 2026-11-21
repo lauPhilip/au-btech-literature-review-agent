@@ -109,7 +109,9 @@
    anchors that scroll into view below nothing (the top bar is not fixed, so no offset is needed). */
 @layer base {
     :focus-visible { outline: 2px solid #13294B; outline-offset: 2px; }
-    header :focus-visible, .bg-brand :focus-visible { outline-color: #ffffff; }
+    /* White on the navy fills; the light blue of the primary colour in the dark theme, where navy is not seen. */
+    .bg-brand :focus-visible { outline-color: #ffffff; }
+    [data-theme="dark"] :focus-visible { outline-color: rgb(var(--primary)); }
     [tabindex="-1"]:focus { outline: none; }
 }
 
