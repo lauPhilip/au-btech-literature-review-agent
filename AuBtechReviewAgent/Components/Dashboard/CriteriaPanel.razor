@@ -1,0 +1,234 @@
+@* The criteria of a new review (redesign step 6), in three labelled groups: Scope (years and databases), Include
+   and exclude, and Visual summary (the artifact). The search strings and the advanced options come from the page
+   as MoreOptions, folded at the end. Beside the composer from 1024 px, below it on smaller screens.
+
+   The panel folds to a one-line summary. Open is null until the reviewer chooses: the panel is then open from
+   1024 px and folded below, in CSS alone, because the server cannot know the width. Once chosen it stays open or
+   folded at every width. Opened on a phone it becomes a full-screen sheet with a Done button. The fields write
+   straight into UiStateContainer, and every change is passed up through OnChanged. *@
+
+@{
+    string body = Open switch { null => "hidden lg:block", true => "block", _ => "hidden" };
+    string summary = Open switch { null => "lg:hidden", true => "hidden", _ => "" };
+    // Opened on a phone, the whole card covers the screen and scrolls on its own.
+    string sheet = Open == true ? "max-sm:fixed max-sm:inset-0 max-sm:z-50 max-sm:overflow-y-auto max-sm:rounded-none max-sm:border-0" : "";
+}
+<section id="criteria" class="ui-card min-w-0 @sheet" aria-labelledby="criteria-title" data-open="@(Open?.ToString().ToLowerInvariant() ?? "auto")">
+    <div class="flex items-start gap-3 px-4 pb-3 pt-4 sm:px-5">
+        <div class="min-w-0 flex-1">
+            <h2 id="criteria-title" class="font-display text-base font-semibold text-heading">Criteria</h2>
+            <p class="mt-0.5 text-sm text-muted @summary" data-criteria-summary>@Summary()</p>
+        </div>
+        @if (Open == null)
+        {
+            @* Two buttons, one per width, so each says truthfully whether the panel is open there. *@
+            @Toggle("lg:hidden", false, true)
+            @Toggle("hidden lg:inline-flex", true, false)
+        }
+        else
+        {
+            @Toggle("", Open.Value, !Open.Value)
+        }
+    </div>
+
+    <div id="criteria-body" class="@body space-y-6 border-t border-line px-4 pb-5 pt-4 sm:px-5">
+        <fieldset class="space-y-3">
+            <legend class="mb-2 font-display text-sm font-semibold text-heading">Scope</legend>
+            <div>
+                <span id="l-years" class="ui-label">Publication years</span>
+                <div class="flex items-center gap-2" role="group" aria-labelledby="l-years">
+                    <input type="number" aria-label="From year" min="1900" max="@DateTime.UtcNow.Year" @bind="YearFrom" @bind:after="Changed" class="ui-input w-28" />
+                    <span class="text-muted" aria-hidden="true">–</span>
+                    <input type="number" aria-label="To year" min="1900" max="@DateTime.UtcNow.Year" @bind="YearTo" @bind:after="Changed" class="ui-input w-28" />
+                </div>
+                <div class="mt-2 flex flex-wrap gap-1.5">
+                    @foreach (var (label, from) in YearPresets)
+                    {
+                        int start = from;
+                        bool chosen = YearFrom == start && YearTo == DateTime.UtcNow.Year;
+                        <button type="button" @onclick="() => SetYears(start)" aria-pressed="@(chosen ? "true" : "false")"
+                                class="min-h-[32px] rounded-full border px-3 py-1 text-xs @(chosen ? "border-brand bg-active text-brand" : "border-line-field text-muted hover:bg-soft")">@label</button>
+                    }
+                </div>
+            </div>
+            <div id="f-sources" tabindex="-1" role="group" aria-labelledby="l-sources">
+                <span id="l-sources" class="ui-label">Databases <span class="font-normal text-muted">(at least one · @SourceCountText())</span></span>
+                <div class="grid grid-cols-2 gap-x-3 gap-y-1.5">
+                    @foreach (var source in AuBtechReviewAgent.SourceCatalog.All)
+                    {
+                        var option = source;
+                        bool available = IsAvailable(option.Key);
+                        <label class="flex min-h-[32px] select-none items-start gap-2 text-sm leading-snug @(available ? "cursor-pointer text-ink" : "cursor-not-allowed text-muted")"
+                               title="@(available ? "" : $"Needs an {option.KeyLabel}. Add one under API keys.")">
+                            <input type="checkbox" class="mt-0.5 h-4 w-4 shrink-0 accent-brand"
+                                   checked="@(available && State.SelectedSources.Contains(option.Key))"
+                                   disabled="@(!available || Busy)"
+                                   @onchange="e => ToggleSource(option.Key, e)" />
+                            <span class="min-w-0">
+                                @option.DisplayName
+                                @if (!available)
+                                {
+                                    <span class="block text-[11px]">(needs key)</span>
+                                }
+                            </span>
+                        </label>
+                    }
+                </div>
+                <div class="mt-2"><SourceStatusNote /></div>
+            </div>
+        </fieldset>
+
+        <fieldset class="space-y-3">
+            <legend class="mb-2 font-display text-sm font-semibold text-heading">Include and exclude</legend>
+            <div>
+                <label for="f-inclusion" class="ui-label">Include studies that… <span class="font-normal text-muted">(required)</span></label>
+                <textarea id="f-inclusion" rows="3" aria-required="true" aria-describedby="h-inclusion" aria-invalid="@FieldHelp.Invalid(InputCheck, "Inclusion criteria")"
+                          maxlength="@AuBtechReviewAgent.ReviewInputGuard.MaxCriteria"
+                          @bind="State.InclusionCriteria" @bind:event="oninput" @bind:after="Changed"
+                          placeholder="e.g. describe or evaluate an agent framework, with some form of evaluation" class="ui-input resize-y"></textarea>
+                <FieldHelp Id="h-inclusion" Text="What a study must be about or contain." Value="@State.InclusionCriteria" Max="AuBtechReviewAgent.ReviewInputGuard.MaxCriteria" />
+            </div>
+            <div>
+                <label for="f-exclusion" class="ui-label">Exclude studies that…</label>
+                <textarea id="f-exclusion" rows="2" aria-describedby="h-exclusion" aria-invalid="@FieldHelp.Invalid(InputCheck, "Exclusion criteria")"
+                          maxlength="@AuBtechReviewAgent.ReviewInputGuard.MaxCriteria"
+                          @bind="State.ExclusionCriteria" @bind:event="oninput" @bind:after="Changed"
+                          placeholder="e.g. are about agriculture or marketing, or are opinion pieces without evidence" class="ui-input resize-y"></textarea>
+                <FieldHelp Id="h-exclusion" Text="What rules a study out. Optional." Value="@State.ExclusionCriteria" Max="AuBtechReviewAgent.ReviewInputGuard.MaxCriteria" />
+            </div>
+        </fieldset>
+
+        <fieldset id="f-artifact">
+            <legend class="mb-2 font-display text-sm font-semibold text-heading">Visual summary <Term Key="artifact" Icon="true" /></legend>
+            <div class="grid grid-cols-2 gap-2">
+                @foreach (var kind in AuBtechReviewAgent.ArtifactKinds.All)
+                {
+                    var key = kind.Key;
+                    bool chosen = State.ArtifactKind == key;
+                    <label class="flex min-h-[44px] cursor-pointer items-center gap-2 rounded-field border px-3 py-2 text-sm @(chosen ? "border-brand bg-active text-brand" : "border-line-field text-ink hover:bg-soft")">
+                        <input type="radio" name="artifact-kind" value="@key" checked="@chosen" disabled="@Busy" @onchange="() => ChooseArtifact(key)" class="h-4 w-4 accent-brand" />
+                        <span>@ShortLabel(key)</span>
+                    </label>
+                }
+            </div>
+            @if (State.ArtifactKind != AuBtechReviewAgent.ArtifactKinds.None)
+            {
+                <textarea id="f-directive" rows="2" aria-label="What the visual summary should show" aria-describedby="h-directive" aria-invalid="@FieldHelp.Invalid(InputCheck, "Artifact target")"
+                          maxlength="@AuBtechReviewAgent.ReviewInputGuard.MaxDirective"
+                          @bind="State.SynthesisTargetDirective" @bind:event="oninput" @bind:after="Changed"
+                          placeholder="e.g. a flowchart of how the studies evaluate agent safety, from threat to mitigation" class="ui-input mt-3 resize-y"></textarea>
+                <FieldHelp Id="h-directive" Text="Built after the analysis, only from what the review found; what it cites is checked like the text." Value="@State.SynthesisTargetDirective" Max="AuBtechReviewAgent.ReviewInputGuard.MaxDirective" />
+            }
+        </fieldset>
+
+        @MoreOptions
+
+        <div class="sticky bottom-0 -mx-4 bg-page px-4 py-3 sm:hidden">
+            <button type="button" @onclick="() => SetOpen(false)" class="ui-btn-primary min-h-[52px] w-full text-base">Done</button>
+        </div>
+    </div>
+</section>
+
+@code {
+    [Inject] private UiStateContainer State { get; set; } = default!;
+
+    /// <summary>Null until the reviewer folds or opens the panel (then open from 1024 px only); true or false after.</summary>
+    [Parameter] public bool? Open { get; set; }
+    [Parameter] public EventCallback<bool?> OpenChanged { get; set; }
+    /// <summary>The name of the kind of review, first in the folded summary.</summary>
+    [Parameter] public string MethodName { get; set; } = "Systematic review";
+    /// <summary>Which databases can be searched with the keys at hand (key → available).</summary>
+    [Parameter] public IReadOnlyDictionary<string, bool> SourceAvailability { get; set; } = new Dictionary<string, bool>();
+    [Parameter] public AuBtechReviewAgent.InputCheck? InputCheck { get; set; }
+    [Parameter] public bool Busy { get; set; }
+    /// <summary>Folded extras at the end of the panel: the search strings and the advanced options.</summary>
+    [Parameter] public RenderFragment? MoreOptions { get; set; }
+    [Parameter] public EventCallback OnChanged { get; set; }
+
+    private static readonly (string Label, int From)[] YearPresets =
+        { ("Last 5 years", DateTime.UtcNow.Year - 5), ("Since 2015", 2015), ("Since 2000", 2000) };
+
+    private int YearFrom
+    {
+        get => State.DateFrom.Year;
+        set => State.DateFrom = new DateTime(Math.Clamp(value, 1900, DateTime.UtcNow.Year), 1, 1);
+    }
+
+    private int YearTo
+    {
+        get => State.DateTo.Year;
+        set => State.DateTo = new DateTime(Math.Clamp(value, 1900, DateTime.UtcNow.Year), 12, 31);
+    }
+
+    private Task Changed() => OnChanged.InvokeAsync();
+
+    private async Task SetYears(int from)
+    {
+        YearFrom = from;
+        YearTo = DateTime.UtcNow.Year;
+        await Changed();
+    }
+
+    private bool IsAvailable(string key) => SourceAvailability.TryGetValue(key, out var ok) && ok;
+
+    private int SelectedCount => State.SelectedSources.Count(IsAvailable);
+
+    private string SourceCountText()
+    {
+        int available = AuBtechReviewAgent.SourceCatalog.All.Count(s => IsAvailable(s.Key));
+        return SelectedCount == available ? $"all {available}" : $"{SelectedCount} of {available}";
+    }
+
+    private async Task ToggleSource(string key, ChangeEventArgs e)
+    {
+        if (e.Value is bool isChecked && isChecked) State.SelectedSources.Add(key);
+        else State.SelectedSources.Remove(key);
+        await Changed();
+    }
+
+    /// <summary>Choosing a kind fills in its default instruction, unless the reviewer wrote their own.</summary>
+    private async Task ChooseArtifact(string key)
+    {
+        string previous = State.ArtifactKind;
+        State.ArtifactKind = AuBtechReviewAgent.ArtifactKinds.Normalize(key);
+        string directive = State.SynthesisTargetDirective;
+        bool untouched = string.IsNullOrWhiteSpace(directive) || directive == AuBtechReviewAgent.ArtifactKinds.DefaultInstruction(previous);
+        if (untouched) State.SynthesisTargetDirective = AuBtechReviewAgent.ArtifactKinds.DefaultInstruction(State.ArtifactKind);
+        await Changed();
+    }
+
+    /// <summary>The short name of a kind of visual summary, as the options and the folded summary show it.</summary>
+    public static string ShortLabel(string kind) => kind switch
+    {
+        AuBtechReviewAgent.ArtifactKinds.ConceptMap => "Concept map",
+        AuBtechReviewAgent.ArtifactKinds.Flowchart => "Flowchart",
+        AuBtechReviewAgent.ArtifactKinds.Table => "Comparison table",
+        AuBtechReviewAgent.ArtifactKinds.Bullets => "Bullet-point list",
+        AuBtechReviewAgent.ArtifactKinds.Custom => "Custom",
+        _ => "None",
+    };
+
+    /// <summary>The folded panel in one line, such as "Systematic Literature Review · 2020–2026 · 4 databases · concept map".</summary>
+    public string Summary()
+    {
+        int sources = SelectedCount;
+        string visual = State.ArtifactKind == AuBtechReviewAgent.ArtifactKinds.None ? "no visual summary" : ShortLabel(State.ArtifactKind).ToLowerInvariant();
+        return $"{MethodName} · {YearFrom}–{YearTo} · {sources} database{(sources == 1 ? "" : "s")} · {visual}";
+    }
+
+    private async Task SetOpen(bool open)
+    {
+        Open = open;
+        await OpenChanged.InvokeAsync(open);
+    }
+
+    /// <summary>The chevron button: shown at the given widths, saying whether the panel is open there.</summary>
+    private RenderFragment Toggle(string widths, bool expanded, bool next) => __builder =>
+    {
+        <button type="button" @onclick="() => SetOpen(next)" aria-expanded="@(expanded ? "true" : "false")" aria-controls="criteria-body"
+                aria-label="@(expanded ? "Fold the criteria" : "Show the criteria")"
+                class="@widths inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-btn border border-line-field text-heading hover:bg-active">
+            <svg class="h-4 w-4 transition-transform @(expanded ? "rotate-180" : "")" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true" focusable="false"><path fill-rule="evenodd" d="M5.3 7.3a1 1 0 011.4 0L10 10.6l3.3-3.3a1 1 0 111.4 1.4l-4 4a1 1 0 01-1.4 0l-4-4a1 1 0 010-1.4z" clip-rule="evenodd" /></svg>
+        </button>
+    };
+}
