@@ -6,7 +6,7 @@
 @{
     int scan = 0;
 }
-<p class="text-gray-800">
+<p class="text-ink">
     @for (int i = 0; i < sentences.Count; i++)
     {
         int sentenceIndex = i;
@@ -32,21 +32,21 @@
                 }
                 continue;
             }
-            <span>[</span>
+            <span class="text-muted">[</span>
             var refs = AuBtechReviewAgent.CitationSupportChecker.ReferencesIn(part);
             for (int r = 0; r < refs.Count; r++)
             {
                 int reference = refs[r];
                 var check = FindCheck(Field, sentenceIndex, reference);
                 bool isOpen = Open == (Field, sentenceIndex, reference);
-                <button type="button" id="@AuBtechReviewAgent.CitationView.CiteId(Field, sentenceIndex, reference)" class="font-mono underline decoration-dotted @AuBtechReviewAgent.CitationView.VerdictText(check?.Verdict) @(isOpen ? "bg-yellow-100" : "")"
+                <button type="button" id="@AuBtechReviewAgent.CitationView.CiteId(Field, sentenceIndex, reference)" class="@Chip(check?.Verdict) @(isOpen ? "ring-2 ring-heading ring-offset-1" : "") mx-px inline-flex min-w-[1.7em] items-center justify-center border px-1 align-baseline font-mono text-[0.8em] font-semibold leading-snug hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand print:border-0 print:bg-transparent print:p-0"
                         title="@(check == null ? "Not checked" : AuBtechReviewAgent.CitationView.VerdictLabel(check.Verdict))"
                         aria-label="@($"Reference {reference}: {(check == null ? "not checked" : AuBtechReviewAgent.CitationView.VerdictLabel(check.Verdict).ToLowerInvariant())}")"
                         aria-expanded="@(isOpen ? "true" : "false")" aria-controls="@($"verdict-{Field}")"
                         @onclick="() => OnToggle.InvokeAsync((Field, sentenceIndex, reference))">@reference</button>
                 @(r < refs.Count - 1 ? ", " : "")
             }
-            <span>]</span>
+            <span class="text-muted">]</span>
         }
         @(" ")
     }
@@ -56,43 +56,53 @@
     var check = FindCheck(open.Field, open.Sentence, open.Reference);
     @* Opening a citation moves focus here; Escape or Close returns it to the citation number (WCAG 2.4.3). *@
     <div id="@($"verdict-{Field}")" tabindex="-1" role="region" aria-label="@($"What the check found for reference {open.Reference}")"
-         class="font-sans text-[11px] border border-gray-200 bg-gray-50 p-3 mt-2 space-y-1 print:hidden" @onkeydown="KeyDown">
-        <div class="flex justify-between gap-2">
-            <span class="font-bold text-brand">[@open.Reference] @(SourceTitle(open.Reference) ?? "Unknown reference")</span>
-            <button type="button" class="ui-btn ui-btn-sm py-0.5 text-gray-700 hover:bg-gray-200" @onclick="() => OnClose.InvokeAsync()">Close</button>
+         class="mt-3 space-y-2 rounded-card border border-line bg-page p-4 font-sans text-[15px] leading-relaxed text-ink shadow-card focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand print:hidden" @onkeydown="KeyDown">
+        <div class="flex items-start justify-between gap-3">
+            <div class="min-w-0">
+                @if (check != null)
+                {
+                    <span class="@Chip(check.Verdict) inline-flex border px-2 py-0.5 text-xs font-semibold">@AuBtechReviewAgent.CitationView.VerdictLabel(check.Verdict)</span>
+                }
+                <p class="mt-1.5 font-semibold text-heading">[@open.Reference] @(SourceTitle(open.Reference) ?? "Unknown reference")</p>
+            </div>
+            <button type="button" class="ui-btn-secondary ui-btn-sm min-h-[44px] shrink-0" @onclick="() => OnClose.InvokeAsync()">Close</button>
         </div>
         @if (check == null)
         {
-            <p class="text-gray-600">This citation was not part of the automated check.</p>
+            <p class="text-muted">This citation was not part of the automated check.</p>
         }
         else
         {
-            <p><span class="font-semibold @AuBtechReviewAgent.CitationView.VerdictText(check.Verdict)">@AuBtechReviewAgent.CitationView.VerdictLabel(check.Verdict)</span> <span class="text-gray-500">(checked against the @check.EvidenceBasis@(string.IsNullOrEmpty(check.EvidenceLocation) ? "" : $", {check.EvidenceLocation}"))</span></p>
+            <p class="text-sm text-muted">Checked against the @check.EvidenceBasis@(string.IsNullOrEmpty(check.EvidenceLocation) ? "" : $", {check.EvidenceLocation}").</p>
             @if (!string.IsNullOrWhiteSpace(check.AttributedText))
             {
-                <p class="text-gray-600">Checked part of the sentence: <span class="italic">"@check.AttributedText"</span></p>
+                <p class="text-muted">Checked part of the sentence: <span class="italic text-ink">"@check.AttributedText"</span></p>
             }
             @if (!string.IsNullOrWhiteSpace(check.Quote))
             {
-                <blockquote class="border-l-2 border-gray-300 pl-2 italic text-gray-700">"@check.Quote"</blockquote>
-                <p class="text-[10px] @(check.QuoteVerified ? "text-green-700" : "text-amber-700")">
+                <blockquote class="border-l-2 border-line-field pl-3 italic">"@check.Quote"</blockquote>
+                <p class="text-xs @(check.QuoteVerified ? "text-supported" : "text-partly")">
                     @(check.QuoteVerified ? $"The quote was found in the {SourceNoun}'s text." : $"The quote could not be found in the {SourceNoun}'s text.")
                 </p>
             }
             @if (!string.IsNullOrWhiteSpace(check.Reason))
             {
-                <p class="text-gray-600">@check.Reason</p>
+                <p>@check.Reason</p>
             }
             @if (!string.IsNullOrWhiteSpace(check.ThemeNote))
             {
-                <p class="text-amber-700">@check.ThemeNote</p>
+                <p class="text-partly">@check.ThemeNote</p>
             }
             @if (check.SecondVerdict != null)
             {
-                <p class="text-gray-500 text-[10px]">
+                <p class="text-xs text-muted">
                     First check: @AuBtechReviewAgent.CitationView.VerdictLabel(check.FirstVerdict). Second, independent check with more of the @(SourceNoun): @AuBtechReviewAgent.CitationView.VerdictLabel(check.SecondVerdict).
                     @(check.ResolvedBy == "second check" ? " The second check found a verbatim quote, so its verdict is shown." : "")
                 </p>
+            }
+            @if (SourceLink(open.Reference) is { } link)
+            {
+                <p><a href="@link" target="_blank" rel="noopener" class="font-semibold text-heading underline underline-offset-2">Open the @SourceNoun<span class="sr-only">@($" for reference {open.Reference}")</span></a></p>
             }
             @PanelExtras?.Invoke(check)
         }
@@ -115,6 +125,9 @@
     /// <summary>The title of a source by its reference number, for the open panel.</summary>
     [Parameter] public Func<int, string?> SourceTitle { get; set; } = _ => null;
 
+    /// <summary>A link to the source by its reference number (open-access copy, DOI or page), or null; only http(s) addresses.</summary>
+    [Parameter] public Func<int, string?> SourceLink { get; set; } = _ => null;
+
     /// <summary>What a source is, e.g. "paper" or "page".</summary>
     [Parameter] public string SourceNoun { get; set; } = "paper";
 
@@ -132,6 +145,17 @@
 
     private AuBtechReviewAgent.CitationSupportResult? FindCheck(string field, int sentence, int reference) =>
         Checks.FirstOrDefault(c => c.Field == field && c.SentenceIndex == sentence && c.Reference == reference);
+
+    // The colour of a citation's chip and of the verdict in the open card: the five verdicts, and grey when not checked.
+    private static string Chip(string? verdict) => verdict switch
+    {
+        AuBtechReviewAgent.CitationSupportChecker.Supported => "border-supported-border bg-supported-fill text-supported",
+        AuBtechReviewAgent.CitationSupportChecker.Partial => "border-partly-border bg-partly-fill text-partly",
+        AuBtechReviewAgent.CitationSupportChecker.NotSupported => "border-not-supported-border bg-not-supported-fill text-not-supported",
+        AuBtechReviewAgent.CitationSupportChecker.InsufficientEvidence => "border-abstract-only-border bg-abstract-only-fill text-abstract-only",
+        AuBtechReviewAgent.CitationSupportChecker.Unverifiable => "border-unverifiable-border bg-unverifiable-fill text-unverifiable",
+        _ => "border-line bg-soft text-muted",
+    };
 
     private Task KeyDown(KeyboardEventArgs e) => e.Key == "Escape" ? OnClose.InvokeAsync() : Task.CompletedTask;
 }
