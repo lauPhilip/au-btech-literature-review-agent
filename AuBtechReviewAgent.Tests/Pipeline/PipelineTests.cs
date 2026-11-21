@@ -174,7 +174,10 @@ public class PipelineTests : IDisposable
         int a1 = At(@"\textbf{Table A.1: Included studies}");
         int a1Note = At("Table A.1 lists each included study with a short summary");
         int a2 = At(@"\textbf{Table A.2: Extracted Study Data}");
-        int a2Note = At(@"$^{\dagger}$ The supporting quote given by the model was not found");
+        // The dagger is explained only when a value in Table A.2 carries one (issue #168).
+        int a2End = tex.IndexOf(@"\end{tabularx}", a2, StringComparison.Ordinal);
+        bool daggers = tex[a2..a2End].Contains(@"$^{\dagger}$", StringComparison.Ordinal);
+        int a2Note = daggers ? At(@"$^{\dagger}$ The supporting quote given by the model was not found") : a2End;
         int a3 = At(@"\textbf{Table A.3: Quality Appraisal");
         Assert.True(appendix < a1 && a1 < a1Note && a1Note < a2 && a2 < a2Note && a2Note < a3, "the tables keep their order, each with its note");
         Assert.True(a3 < At(@"\end{document}"));
