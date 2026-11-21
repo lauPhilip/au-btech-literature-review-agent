@@ -37,7 +37,7 @@ public class DocPageTests
 
         foreach (var (href, label) in DocPage.Pages)
             Assert.Contains($"href=\"{href}\"", html);
-        Assert.Equal(1, Regex.Matches(html, "aria-current=\"page\"").Count);
+        Assert.Single(Regex.Matches(html, "aria-current=\"page\""));
         Assert.Contains("href=\"/privacy\" aria-current=\"page\"", html);
         Assert.Contains("href=\"/privacy#stored\" data-jump-to=\"stored\"", html);
         Assert.Contains("href=\"/privacy#choices\" data-jump-to=\"choices\"", html);
