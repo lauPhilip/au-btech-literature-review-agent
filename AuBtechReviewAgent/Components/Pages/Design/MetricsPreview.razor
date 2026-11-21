@@ -1,0 +1,30 @@
+@page "/design/metrics"
+@layout AppLayout
+@using Microsoft.Extensions.Hosting
+@inject Microsoft.AspNetCore.Hosting.IWebHostEnvironment Environment
+@inject NavigationManager Navigation
+@* A page that exists only in development: the Metrics page with made-up runs (SampleMetrics) instead of the store,
+   which is empty in CI. The accessibility job (tools/a11y) checks the chart and the tables here and takes their
+   screenshots; ?kind=grey shows the grey literature tab when that review is described. Anywhere else it answers
+   "not found". *@
+
+<SeoHead Title="Metrics preview" NoIndex="true" />
+
+@if (ready)
+{
+    <AuBtechReviewAgent.Components.Pages.Metrics Sample="true" />
+}
+
+@code {
+    private bool ready;
+
+    protected override void OnInitialized()
+    {
+        if (!Environment.IsDevelopment())
+        {
+            Navigation.NotFound();
+            return;
+        }
+        ready = true;
+    }
+}

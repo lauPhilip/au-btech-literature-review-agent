@@ -101,11 +101,12 @@ jobs:
       # step 12. /design/frame exists only in development: AppLayout in both themes before the app pages are ready.
       # /design/run, also development only, shows New review while a run is going, stopped and done, with sample figures.
       # /design/report, development only too, shows the report page with a made-up finished run (SampleReport).
+      # /design/metrics, development only too, shows the Metrics page with made-up runs (SampleMetrics).
       - name: Run axe-core on the public pages
         working-directory: tools/a11y
         env:
           BASE_URL: http://localhost:5038
-          A11Y_PAGES: /,/review,/spec-matrix,/start,/metrics,/about,/verify,/glossary,/design/frame,/design/run,/design/run?state=stopped,/design/run?state=done,/design/report
+          A11Y_PAGES: /,/review,/spec-matrix,/start,/metrics,/about,/verify,/glossary,/design/frame,/design/run,/design/run?state=stopped,/design/run?state=done,/design/report,/design/metrics
           A11Y_DARK_PAGES: /,/design/frame
           A11Y_SCREENSHOTS: ${{ github.workspace }}/a11y-screenshots
         run: |
