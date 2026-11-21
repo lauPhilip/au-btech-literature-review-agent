@@ -16,6 +16,8 @@ The top bar is new. It is white, shows the mark next to the name, and has three 
 
 Every page now sits in one frame. The top bar and the footer stay still, and only the page between them scrolls. A switch for a dark theme is ready too, but it stays hidden until the pages have their dark colours.
 
+The front page now fits on one screen. It says what TraceableAI does in one line and shows a real sentence from a review, with its citations checked one by one: one backed by the paper, one only in part, and one not at all. You can pause it. On a phone the example is left out, so the page fits without scrolling. The front page also has its dark theme now, with a switch in the top bar. The other pages stay light until they get their dark colours.
+
 Nothing about how a review runs has changed. These are the first steps of the redesign; the pages follow one by one.
 
 ## [0.4.0] - 2026-11-20
