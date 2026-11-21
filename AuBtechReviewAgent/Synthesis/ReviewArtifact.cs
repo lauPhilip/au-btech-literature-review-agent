@@ -309,16 +309,20 @@ public static class ArtifactBuilder
         bool vertical = a.Kind == ArtifactKinds.Flowchart;
         var sb = new StringBuilder();
         sb.AppendLine(@"\begin{tikzpicture}[box/.style={draw, rounded corners, align=center, text width=3.2cm, font=\scriptsize, inner sep=3pt}, every edge/.style={draw, ->, thick}]");
+        // Layers are placed next to each other by their order, not their number: a cycle can push the longest path
+        // far up, and a gap of empty layers made the map so wide that it shrank to an unreadable size (issue #126).
+        int column = 0;
         foreach (var group in a.Nodes.GroupBy(n => layer[n.Id]).OrderBy(g => g.Key))
         {
             int i = 0;
             foreach (var n in group)
             {
-                double x = vertical ? i * 4.0 : group.Key * 4.4;
-                double y = vertical ? -group.Key * 2.2 : -i * 2.0;
+                double x = vertical ? i * 4.0 : column * 4.4;
+                double y = vertical ? -column * 2.2 : -i * 2.0;
                 sb.AppendLine($"\\node[box] ({n.Id}) at ({x.ToString("0.0", CultureInfo.InvariantCulture)},{y.ToString("0.0", CultureInfo.InvariantCulture)}) {{{escape(n.Label)}}};");
                 i++;
             }
+            column++;
         }
         foreach (var e in a.Edges)
         {
