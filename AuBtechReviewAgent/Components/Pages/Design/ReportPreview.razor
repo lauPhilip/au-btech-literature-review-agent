@@ -1,0 +1,32 @@
+@page "/design/report"
+@layout AppLayout
+@using Microsoft.Extensions.Hosting
+@inject Microsoft.AspNetCore.Hosting.IWebHostEnvironment Environment
+@inject NavigationManager Navigation
+@inject AuBtechReviewAgent.RunStore Runs
+@* A page that exists only in development: the report page (Review output) with a made-up finished run
+   (SampleReport), written to its run folder each time the page opens. A real run cannot be made in CI, so the
+   accessibility job (tools/a11y) checks the report here and takes its screenshots. Anywhere else it answers
+   "not found". *@
+
+<SeoHead Title="Report preview" NoIndex="true" />
+
+@if (ready)
+{
+    <AuBtechReviewAgent.Components.Pages.SpecMatrix RunId="AuBtechReviewAgent.SampleReport.RunId" />
+}
+
+@code {
+    private bool ready;
+
+    protected override void OnInitialized()
+    {
+        if (!Environment.IsDevelopment())
+        {
+            Navigation.NotFound();
+            return;
+        }
+        AuBtechReviewAgent.SampleReport.Write(Runs.FolderOf(AuBtechReviewAgent.SampleReport.RunId));
+        ready = true;
+    }
+}
