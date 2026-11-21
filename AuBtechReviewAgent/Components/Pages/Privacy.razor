@@ -12,69 +12,74 @@
 <SeoHead Title="Privacy" Path="/privacy"
          Description="@(Grey ? "What TraceableAI stores, for how long, what it sends to the language model, the scholarly databases and the grey literature sites, and how it keeps the web pages a review cites. No accounts, no tracking." : "What TraceableAI stores, for how long, and what it sends to the language model and the scholarly databases. No accounts, no tracking.")" />
 
-<div class="min-h-full bg-white text-gray-900 font-sans">
-    <div class="ui-container py-14 lg:py-20 max-w-3xl">
-        <p class="ui-eyebrow">Privacy</p>
-        <h1 class="ui-h1 mt-3">What happens to your data</h1>
-        <p class="ui-lead mt-5">
-            There are no accounts, no advertising and no tracking. TraceableAI keeps what it needs to run your review and
+<DocPage Current="/privacy" Sections="DocSections" Eyebrow="Privacy" Title="What happens to your data">
+    <Lead>
+        There are no accounts, no advertising and no tracking. TraceableAI keeps what it needs to run your review and
             show it to you, for a limited time, and nothing else.
-        </p>
+    </Lead>
+    <ChildContent>
 
-        <div class="mt-10 ui-card p-6 grid grid-cols-1 sm:grid-cols-2 gap-5 text-sm">
+
+        <div class="mt-10 rounded-card border border-line bg-page p-6 grid grid-cols-1 sm:grid-cols-2 gap-5 text-sm">
             @foreach (var (title, text) in Summary)
             {
                 <div>
-                    <p class="font-semibold text-gray-900">@title</p>
-                    <p class="text-gray-600 mt-1 leading-relaxed">@text</p>
+                    <p class="font-semibold text-heading">@title</p>
+                    <p class="text-muted mt-1">@text</p>
                 </div>
             }
         </div>
 
         @foreach (var (id, heading, paragraphs) in Sections.Where(x => Grey || x.Id != "web-pages"))
         {
-            <section class="mt-12" aria-labelledby="@id">
-                <h2 id="@id" class="ui-h2">@heading</h2>
+            <section class="mt-10 scroll-mt-6" aria-labelledby="@id">
+                <h2 id="@id" class="font-display text-xl font-semibold tracking-tight text-heading">@heading</h2>
                 @foreach (var paragraph in paragraphs)
                 {
-                    <p class="mt-4 text-gray-700 leading-relaxed">@paragraph</p>
+                    <p class="mt-4 text-ink">@paragraph</p>
                 }
             </section>
         }
 
-        <section class="mt-12" aria-labelledby="third-parties">
-            <h2 id="third-parties" class="ui-h2">Who else receives what</h2>
-            <div class="mt-5 ui-card overflow-hidden">
+        <section class="mt-10 scroll-mt-6" aria-labelledby="third-parties">
+            <h2 id="third-parties" class="font-display text-xl font-semibold tracking-tight text-heading">Who else receives what</h2>
+            <div class="mt-5 rounded-card border border-line bg-page overflow-hidden">
                 <table class="w-full text-sm">
                     <caption class="sr-only">Services that receive data during a review</caption>
-                    <thead class="bg-gray-50 text-left text-gray-600">
+                    <thead class="bg-soft text-left text-muted">
                         <tr><th scope="col" class="px-4 py-3 font-medium">Service</th><th scope="col" class="px-4 py-3 font-medium">What it receives</th></tr>
                     </thead>
-                    <tbody class="divide-y divide-gray-100 text-gray-700">
+                    <tbody class="divide-y divide-line text-ink">
                         @foreach (var (service, receives) in Grey ? ThirdParties.Concat(GreyThirdParties) : ThirdParties)
                         {
-                            <tr><th scope="row" class="px-4 py-3 text-left font-medium text-gray-900 align-top">@service</th><td class="px-4 py-3">@receives</td></tr>
+                            <tr><th scope="row" class="px-4 py-3 text-left font-medium text-heading align-top">@service</th><td class="px-4 py-3">@receives</td></tr>
                         }
                     </tbody>
                 </table>
             </div>
-            <p class="mt-4 text-gray-700 leading-relaxed">Each of these services has its own privacy policy. None of them receives your network address from TraceableAI; they see the server's.</p>
+            <p class="mt-4 text-ink">Each of these services has its own privacy policy. None of them receives your network address from TraceableAI; they see the server's.</p>
         </section>
 
-        <section class="mt-12" aria-labelledby="choices">
-            <h2 id="choices" class="ui-h2">Your choices</h2>
-            <p class="mt-4 text-gray-700 leading-relaxed">
+        <section class="mt-10 scroll-mt-6" aria-labelledby="choices">
+            <h2 id="choices" class="font-display text-xl font-semibold tracking-tight text-heading">Your choices</h2>
+            <p class="mt-4 text-ink">
                 You can delete a run and all its files at any time from its dashboard or report page. You can use your own
                 Mistral key, or run TraceableAI on your own computer with a local model, so that nothing leaves your machine
                 except the database searches. Questions about this page go to the
-                <a href="@($"{AuBtechReviewAgent.SiteSeo.RepositoryUrl}/issues")" class="text-brand underline underline-offset-2">issues on GitHub</a>.
+                <a href="@($"{AuBtechReviewAgent.SiteSeo.RepositoryUrl}/issues")" class="text-heading underline underline-offset-2">issues on GitHub</a>.
             </p>
-            <p class="mt-4 text-sm text-gray-500">Last updated October 2026. The page is generated from the app's own settings, so the periods above are the ones this server uses.</p>
+            <p class="mt-4 text-sm text-muted">Last updated October 2026. The page is generated from the app's own settings, so the periods above are the ones this server uses.</p>
         </section>
-    </div>
-</div>
+    </ChildContent>
+</DocPage>
 
 @code {
+    /// <summary>The sections listed under this page in the trust pages' side list.</summary>
+    private IReadOnlyList<(string Id, string Label)> DocSections =>
+        Sections.Where(x => Grey || x.Id != "web-pages").Select(x => (x.Id, x.Heading))
+            .Concat(new[] { ("third-parties", "Who else receives what"), ("choices", "Your choices") })
+            .ToList();
+
     /// <summary>Whether the grey literature review is described: its card is on, or its module is in preview.</summary>
     private bool Grey => ModuleOptions.Shows("grey");
 

@@ -11,43 +11,42 @@
 <SeoHead Title="Model card" Path="/model-card"
          Description="@(ModuleOptions.Shows("grey") ? "Which steps of a TraceableAI review a language model does, for systematic and grey literature reviews, how each one is checked in code, the known failure modes, and the measured citation accuracy." : "Which steps of a TraceableAI review a language model does, how each one is checked in code, the known failure modes, and the measured citation accuracy.")" />
 
-<div class="min-h-full bg-white text-gray-900 font-sans">
-    <div class="ui-container py-14 lg:py-20 max-w-4xl">
-        <p class="ui-eyebrow">Model card</p>
-        <h1 class="ui-h1 mt-3">What the model does, and how it is checked</h1>
-        <p class="ui-lead mt-5">
-            TraceableAI uses a language model for the steps that need reading and writing, and code for everything that
+<DocPage Current="/model-card" Sections="DocSections" Eyebrow="Model card" Title="What the model does, and how it is checked" Wide="true">
+    <Lead>
+        TraceableAI uses a language model for the steps that need reading and writing, and code for everything that
             can be counted or verified. This page says which is which, where it goes wrong, and how often.
-        </p>
+    </Lead>
+    <ChildContent>
 
-        <dl class="mt-10 ui-card p-6 grid grid-cols-1 sm:grid-cols-3 gap-5 text-sm">
-            <div><dt class="text-gray-500">Model on this server</dt><dd class="font-semibold text-gray-900 mt-1 break-words">@ReviewEngine.Llm.DisplayName</dd></div>
-            <div><dt class="text-gray-500">App version</dt><dd class="font-semibold text-gray-900 mt-1 break-words">@AppVersion</dd></div>
-            <div><dt class="text-gray-500">Settings for decisions</dt><dd class="font-semibold text-gray-900 mt-1">Temperature 0, structured answers validated in code</dd></div>
+
+        <dl class="mt-10 rounded-card border border-line bg-page p-6 grid grid-cols-1 sm:grid-cols-3 gap-5 text-sm">
+            <div><dt class="text-muted">Model on this server</dt><dd class="font-semibold text-heading mt-1 break-words">@ReviewEngine.Llm.DisplayName</dd></div>
+            <div><dt class="text-muted">App version</dt><dd class="font-semibold text-heading mt-1 break-words">@AppVersion</dd></div>
+            <div><dt class="text-muted">Settings for decisions</dt><dd class="font-semibold text-heading mt-1">Temperature 0, structured answers validated in code</dd></div>
         </dl>
 
-        <section class="mt-14" aria-labelledby="steps">
-            <h2 id="steps" class="ui-h2">Who decides what</h2>
+        <section class="mt-10 scroll-mt-6" aria-labelledby="steps">
+            <h2 id="steps" class="font-display text-xl font-semibold tracking-tight text-heading">Who decides what</h2>
             @if (ModuleOptions.Shows("grey"))
             {
-                <p class="mt-4 text-gray-700 leading-relaxed">In a systematic review:</p>
+                <p class="mt-4 text-ink">In a systematic review:</p>
             }
-            <div class="mt-6 ui-card overflow-x-auto" tabindex="0" role="region" aria-labelledby="steps">
+            <div class="mt-6 rounded-card border border-line bg-page overflow-x-auto" tabindex="0" role="region" aria-labelledby="steps">
                 <table class="w-full text-sm min-w-[640px]">
                     <caption class="sr-only">Each step of a review, who does it, and how it is checked</caption>
-                    <thead class="bg-gray-50 text-left text-gray-600">
+                    <thead class="bg-soft text-left text-muted">
                         <tr>
                             <th scope="col" class="px-4 py-3 font-medium">Step</th>
                             <th scope="col" class="px-4 py-3 font-medium">Done by</th>
                             <th scope="col" class="px-4 py-3 font-medium">How it is checked</th>
                         </tr>
                     </thead>
-                    <tbody class="divide-y divide-gray-100 text-gray-700 align-top">
+                    <tbody class="divide-y divide-line text-ink align-top">
                         @foreach (var (step, by, check) in Steps)
                         {
                             <tr>
-                                <th scope="row" class="px-4 py-3 text-left font-medium text-gray-900">@step</th>
-                                <td class="px-4 py-3 whitespace-nowrap"><span class="@(by == "Code" ? "ui-chip border-gray-200 bg-gray-50 text-gray-700" : "ui-chip border-brand-100 bg-brand-50 text-brand")">@by</span></td>
+                                <th scope="row" class="px-4 py-3 text-left font-medium text-heading">@step</th>
+                                <td class="px-4 py-3 whitespace-nowrap"><span class="@(by == "Code" ? "ui-chip border-line bg-soft text-ink" : "ui-chip border-brand-100 bg-brand-50 text-brand")">@by</span></td>
                                 <td class="px-4 py-3">@check</td>
                             </tr>
                         }
@@ -58,30 +57,30 @@
 
         @if (ModuleOptions.Shows("grey"))
         {
-        <section class="mt-14" aria-labelledby="grey">
-            <h2 id="grey" class="ui-h2">In a grey literature review</h2>
-            <p class="mt-4 text-gray-700 leading-relaxed">
+        <section class="mt-10 scroll-mt-6" aria-labelledby="grey">
+            <h2 id="grey" class="font-display text-xl font-semibold tracking-tight text-heading">In a grey literature review</h2>
+            <p class="mt-4 text-ink">
                 A grey literature review follows the multivocal review guidelines of Garousi et al. (2019) with the grey pool
                 only: blog posts, documentation, forum answers, repositories and reports. The same rule holds: every value,
                 quality point and citation counts only with a quote found word for word in the text of the source's page, kept
                 as a snapshot when it was read.
             </p>
-            <div class="mt-6 ui-card overflow-x-auto" tabindex="0" role="region" aria-labelledby="grey">
+            <div class="mt-6 rounded-card border border-line bg-page overflow-x-auto" tabindex="0" role="region" aria-labelledby="grey">
                 <table class="w-full text-sm min-w-[640px]">
                     <caption class="sr-only">Each step of a grey literature review, who does it, and how it is checked</caption>
-                    <thead class="bg-gray-50 text-left text-gray-600">
+                    <thead class="bg-soft text-left text-muted">
                         <tr>
                             <th scope="col" class="px-4 py-3 font-medium">Step</th>
                             <th scope="col" class="px-4 py-3 font-medium">Done by</th>
                             <th scope="col" class="px-4 py-3 font-medium">How it is checked</th>
                         </tr>
                     </thead>
-                    <tbody class="divide-y divide-gray-100 text-gray-700 align-top">
+                    <tbody class="divide-y divide-line text-ink align-top">
                         @foreach (var (step, by, check) in GreySteps)
                         {
                             <tr>
-                                <th scope="row" class="px-4 py-3 text-left font-medium text-gray-900">@step</th>
-                                <td class="px-4 py-3 whitespace-nowrap"><span class="@(by == "Code" ? "ui-chip border-gray-200 bg-gray-50 text-gray-700" : "ui-chip border-brand-100 bg-brand-50 text-brand")">@by</span></td>
+                                <th scope="row" class="px-4 py-3 text-left font-medium text-heading">@step</th>
+                                <td class="px-4 py-3 whitespace-nowrap"><span class="@(by == "Code" ? "ui-chip border-line bg-soft text-ink" : "ui-chip border-brand-100 bg-brand-50 text-brand")">@by</span></td>
                                 <td class="px-4 py-3">@check</td>
                             </tr>
                         }
@@ -91,67 +90,74 @@
             <ul class="mt-6 space-y-4">
                 @foreach (var (title, text) in GreyFailures)
                 {
-                    <li class="border-l-2 border-amber-300 pl-4">
-                        <p class="font-medium text-gray-900">@title</p>
-                        <p class="text-gray-700 leading-relaxed mt-1">@text</p>
+                    <li class="border-l-2 border-partly-border pl-4">
+                        <p class="font-medium text-heading">@title</p>
+                        <p class="text-ink mt-1">@text</p>
                     </li>
                 }
             </ul>
         </section>
         }
 
-        <section class="mt-14" aria-labelledby="measured">
-            <h2 id="measured" class="ui-h2">How well it does</h2>
+        <section class="mt-10 scroll-mt-6" aria-labelledby="measured">
+            <h2 id="measured" class="font-display text-xl font-semibold tracking-tight text-heading">How well it does</h2>
             @if (runs.Count == 0)
             {
-                <p class="mt-4 text-gray-700 leading-relaxed">No finished runs have been measured on this server yet. Every finished run adds its figures to the <a href="/metrics" class="text-brand underline underline-offset-2">Metrics page</a>.</p>
+                <p class="mt-4 text-ink">No finished runs have been measured on this server yet. Every finished run adds its figures to the <a href="/metrics" class="text-heading underline underline-offset-2">Metrics page</a>.</p>
             }
             else
             {
-                <p class="mt-4 text-gray-700 leading-relaxed">Pooled over the last @runs.Count finished systematic reviews on this server, from the same data as the <a href="/metrics" class="text-brand underline underline-offset-2">Metrics page</a>.</p>
+                <p class="mt-4 text-ink">Pooled over the last @runs.Count finished systematic reviews on this server, from the same data as the <a href="/metrics" class="text-heading underline underline-offset-2">Metrics page</a>.</p>
                 <dl class="mt-6 grid grid-cols-2 sm:grid-cols-4 gap-3">
                     @foreach (var (value, label) in Measured)
                     {
-                        <div class="ui-card px-4 py-3 flex flex-col-reverse">
-                            <dt class="text-xs text-gray-500 leading-snug mt-1">@label</dt>
-                            <dd class="text-2xl font-semibold tracking-tight text-gray-950">@value</dd>
+                        <div class="rounded-card border border-line bg-page px-4 py-3 flex flex-col-reverse">
+                            <dt class="text-xs text-muted leading-snug mt-1">@label</dt>
+                            <dd class="text-2xl font-semibold tracking-tight text-heading">@value</dd>
                         </div>
                     }
                 </dl>
             }
-            <p class="mt-5 text-gray-700 leading-relaxed">
+            <p class="mt-5 text-ink">
                 Screening accuracy against human reviewers (recall, precision, kappa) can be measured with the
-                <a href="@($"{AuBtechReviewAgent.SiteSeo.RepositoryUrl}/blob/master/docs/wiki/07-extending-and-testing.md#measuring-screening-accuracy")" class="text-brand underline underline-offset-2">screening evaluation tool</a>
+                <a href="@($"{AuBtechReviewAgent.SiteSeo.RepositoryUrl}/blob/master/docs/wiki/07-extending-and-testing.md#measuring-screening-accuracy")" class="text-heading underline underline-offset-2">screening evaluation tool</a>
                 on datasets where people made the decisions. No benchmark result is published yet.
             </p>
         </section>
 
-        <section class="mt-14" aria-labelledby="failures">
-            <h2 id="failures" class="ui-h2">Known failure modes</h2>
+        <section class="mt-10 scroll-mt-6" aria-labelledby="failures">
+            <h2 id="failures" class="font-display text-xl font-semibold tracking-tight text-heading">Known failure modes</h2>
             <ul class="mt-5 space-y-4">
                 @foreach (var (title, text) in Failures)
                 {
-                    <li class="border-l-2 border-amber-300 pl-4">
-                        <p class="font-medium text-gray-900">@title</p>
-                        <p class="text-gray-700 leading-relaxed mt-1">@text</p>
+                    <li class="border-l-2 border-partly-border pl-4">
+                        <p class="font-medium text-heading">@title</p>
+                        <p class="text-ink mt-1">@text</p>
                     </li>
                 }
             </ul>
         </section>
 
-        <section class="mt-14" aria-labelledby="use">
-            <h2 id="use" class="ui-h2">Intended use</h2>
-            <p class="mt-4 text-gray-700 leading-relaxed">
+        <section class="mt-10 scroll-mt-6" aria-labelledby="use">
+            <h2 id="use" class="font-display text-xl font-semibold tracking-tight text-heading">Intended use</h2>
+            <p class="mt-4 text-ink">
                 A co-pilot for a researcher doing a systematic, scoping@(ModuleOptions.Shows("grey") ? " or grey literature" : "") review: a documented first pass that a person checks,
                 corrects and takes responsibility for. It is not meant to publish a review without that check, to make clinical
                 or policy decisions, or to stand in for a second human screener. Every report includes a statement on AI use
                 (section 6.4) to adapt for your paper or thesis.
             </p>
         </section>
-    </div>
-</div>
+    </ChildContent>
+</DocPage>
 
 @code {
+    /// <summary>The sections listed under this page in the trust pages' side list.</summary>
+    private IReadOnlyList<(string Id, string Label)> DocSections =>
+        new (string Id, string Label)[] { ("steps", "Who decides what") }
+            .Concat(ModuleOptions.Shows("grey") ? new[] { ("grey", "In a grey literature review") } : Array.Empty<(string, string)>())
+            .Concat(new[] { ("measured", "How well it does"), ("failures", "Known failure modes"), ("use", "Intended use") })
+            .ToList();
+
     private List<AuBtechReviewAgent.RunMetrics> runs = new();
     private List<(string Value, string Label)> Measured = new();
 
