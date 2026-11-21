@@ -41,11 +41,18 @@ public sealed class ReviewPaper
     /// <summary>The results: an overview, one subsection per theme, a note on which sources are cited, and full-width blocks.</summary>
     public string ResultsHeading { get; init; } = "Results & Synthesis";
     public string ResultsText { get; init; } = "";
+
+    /// <summary>A heading over the results' opening text, so the first theme gets the same number as on the report page
+    /// ("4.1 Overview of the synthesis", then 4.2 for the first theme, issue #169); none when null.</summary>
+    public string? ResultsOverviewHeading { get; init; }
     public List<PaperSection> Themes { get; init; } = new();
     public string? CoverageNote { get; init; }
     public List<string> ResultsLatex { get; init; } = new();
 
     public string Discussion { get; init; } = "";
+
+    /// <summary>A heading over the discussion's opening text ("General interpretation"), as on the report page; none when null.</summary>
+    public string? DiscussionOpeningHeading { get; init; }
 
     /// <summary>Subsections after the discussion, such as the automated citation check.</summary>
     public List<PaperSection> DiscussionNotes { get; init; } = new();
@@ -195,6 +202,8 @@ public static class PaperLatex
 
         sb.AppendLine(@"\begin{multicols}{2}");
         sb.AppendLine($"\\section{{{Escape(paper.ResultsHeading)}}}");
+        if (!string.IsNullOrWhiteSpace(paper.ResultsOverviewHeading) && !string.IsNullOrWhiteSpace(paper.ResultsText))
+            sb.AppendLine($"\\subsection{{{Escape(paper.ResultsOverviewHeading)}}}");
         sb.AppendLine(Escape(paper.ResultsText));
         foreach (var theme in paper.Themes)
         {
@@ -212,6 +221,8 @@ public static class PaperLatex
         }
 
         sb.AppendLine(@"\section{Discussion}");
+        if (!string.IsNullOrWhiteSpace(paper.DiscussionOpeningHeading) && !string.IsNullOrWhiteSpace(paper.Discussion))
+            sb.AppendLine($"\\subsection{{{Escape(paper.DiscussionOpeningHeading)}}}");
         sb.AppendLine(Escape(paper.Discussion));
         foreach (var note in paper.DiscussionNotes)
         {
