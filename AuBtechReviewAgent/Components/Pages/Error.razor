@@ -4,14 +4,14 @@
 
 <SeoHead Title="Error" NoIndex="true" />
 
-<div class="min-h-full bg-white">
+<div class="min-h-full bg-page">
     <div class="ui-container py-20 max-w-2xl">
         <p class="ui-eyebrow">Something went wrong</p>
         <h1 class="ui-h1 mt-3">An error occurred while handling your request.</h1>
         <p class="ui-lead mt-4">Please try again. If it keeps happening, open an issue on GitHub and include the request ID below, so the error can be found in the server log.</p>
         @if (ShowRequestId)
         {
-            <p class="mt-4 text-sm text-gray-700">Request ID: <code class="font-mono bg-gray-100 px-1.5 py-0.5">@RequestId</code></p>
+            <p class="mt-4 text-sm text-ink">Request ID: <code class="font-mono bg-active px-1.5 py-0.5">@RequestId</code></p>
         }
         <div class="mt-8 flex flex-wrap gap-3">
             <a href="/" class="ui-btn-primary">Go to the start page</a>
