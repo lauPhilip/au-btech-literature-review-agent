@@ -34,9 +34,9 @@ public static class SampleMetrics
         var list = new List<RunMetrics>();
         var start = new DateTime(2026, 9, 1, 9, 0, 0, DateTimeKind.Utc);
         for (int i = 0; i < Systematic.Length; i++)
-            list.Add(Run(i, Systematic[i], start.AddDays(i * 5).AddHours(i % 7), Versions[Math.Min(2, i / 5)], grey: false));
+            list.Add(Run(i, Systematic[i], start.AddDays(i * 5.0).AddHours(i % 7.0), Versions[Math.Min(2, i / 5)], grey: false));
         for (int i = 0; i < GreyLiterature.Length; i++)
-            list.Add(Run(100 + i, GreyLiterature[i], start.AddDays(40 + i * 9), Versions[Math.Min(2, 1 + i / 2)], grey: true));
+            list.Add(Run(100 + i, GreyLiterature[i], start.AddDays(40 + i * 9.0), Versions[Math.Min(2, 1 + i / 2)], grey: true));
         return list;
     }
 
