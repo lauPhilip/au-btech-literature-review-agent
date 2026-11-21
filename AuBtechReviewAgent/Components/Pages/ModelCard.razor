@@ -1,4 +1,5 @@
 @page "/model-card"
+@layout AppLayout
 @using System.Globalization
 @inject AuBtechReviewAgent.PrismaReviewEngine ReviewEngine
 @inject AuBtechReviewAgent.RunMetricsStore MetricsStore
@@ -10,9 +11,7 @@
 <SeoHead Title="Model card" Path="/model-card"
          Description="@(ModuleOptions.Shows("grey") ? "Which steps of a TraceableAI review a language model does, for systematic and grey literature reviews, how each one is checked in code, the known failure modes, and the measured citation accuracy." : "Which steps of a TraceableAI review a language model does, how each one is checked in code, the known failure modes, and the measured citation accuracy.")" />
 
-<SiteHeader />
-
-<main id="main" tabindex="-1" class="flex-1 min-h-0 overflow-y-auto bg-white text-gray-900 font-sans">
+<div class="min-h-full bg-white text-gray-900 font-sans">
     <div class="ui-container py-14 lg:py-20 max-w-4xl">
         <p class="ui-eyebrow">Model card</p>
         <h1 class="ui-h1 mt-3">What the model does, and how it is checked</h1>
@@ -150,8 +149,7 @@
             </p>
         </section>
     </div>
-    <SiteFooter />
-</main>
+</div>
 
 @code {
     private List<AuBtechReviewAgent.RunMetrics> runs = new();
