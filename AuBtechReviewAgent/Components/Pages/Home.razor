@@ -18,259 +18,35 @@
 
 <SeoHead Title="@TabTitle()" Path="/review" NoIndex="@(RunId != null)" Description="Start a PRISMA 2020 literature review: give your question and criteria, and TraceableAI searches, screens, writes and checks every citation against the paper." />
 
-<div class="max-w-7xl w-full mx-auto p-4 lg:p-6 space-y-4">
-
-    @* Toolbar: what this page is, and the account details in small print (they matter less than the question). *@
-    <div class="flex flex-wrap items-end justify-between gap-3">
-        <div>
-            <h1 class="ui-h2">@(Composing ? "New review" : "Your review")</h1>
-            <p class="text-sm text-gray-500 mt-1">A <Term Key="prisma" Below="true">PRISMA 2020</Term> review in which every citation is checked against the paper it cites. <a href="/glossary" class="text-brand underline underline-offset-2">Glossary</a></p>
-        </div>
-        <div class="flex items-center gap-2">
-            @{
-                // Full class names (not built from a colour variable) so the Tailwind build can find them.
-                var (chipBox, chipDot) = quotaStatus.Tier switch
-                {
-                    AuBtechReviewAgent.QuotaTier.Developer => ("bg-blue-50 border-blue-200 text-blue-800", "bg-blue-500"),
-                    AuBtechReviewAgent.QuotaTier.OwnKey => ("bg-green-50 border-green-200 text-green-800", "bg-green-500"),
-                    _ when quotaStatus.Allowed => ("bg-amber-50 border-amber-200 text-amber-800", "bg-amber-500"),
-                    _ => ("bg-red-50 border-red-200 text-red-800", "bg-red-500"),
-                };
-                string tierLabel = quotaStatus.Tier switch
-                {
-                    AuBtechReviewAgent.QuotaTier.Developer => "Developer access",
-                    AuBtechReviewAgent.QuotaTier.OwnKey => "Own Mistral key",
-                    _ => "Free tier"
-                };
-                string counter = quotaStatus.Limit == int.MaxValue ? "unlimited"
-                    : quotaStatus.Tier == AuBtechReviewAgent.QuotaTier.OwnKey ? $"{quotaStatus.Remaining} of {quotaStatus.Limit} left this hour"
-                    : $"{quotaStatus.Remaining} of {quotaStatus.Limit} left today";
-            }
-            <span class="@chipBox border px-2.5 py-1 text-[11px] flex items-center gap-1.5" title="@(quotaStatus.ResetsUtc is { } resets ? $"Runs you can still start. More {AuBtechReviewAgent.RunQuotaService.ResetText(resets - DateTime.UtcNow)}." : "Runs you can still start")">
-                <span class="w-1.5 h-1.5 rounded-full @chipDot"></span>@tierLabel · @counter
-            </span>
-            <button type="button" @onclick="OpenKeyModal" class="ui-btn-secondary ui-btn-sm">
-                <svg class="w-3 h-3 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/></svg>
-                API keys
-            </button>
-        </div>
-    </div>
-    @if (!string.IsNullOrEmpty(quotaNotice))
-    {
-        <p class="text-xs text-red-700" role="alert">@quotaNotice</p>
-    }
-
-    <div class="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
-
-        <section class="lg:col-span-5 space-y-4 min-w-0" aria-label="Review settings">
-            @if (Composing)
-            {
-                <div class="bg-white border border-gray-200 shadow-sm">
-                    @* Three short steps instead of one long form. Every step can be opened directly. *@
-                    <nav class="flex border-b border-gray-200" aria-label="Steps">
-                        @foreach (var (number, title) in Steps)
-                        {
-                            bool active = formStep == number;
-                            bool done = StepDone(number);
-                            <button type="button" @onclick="() => formStep = number" aria-current="@(active ? "step" : null)"
-                                    class="flex-1 flex items-center justify-center gap-1.5 px-2 py-3 text-xs border-b-2 -mb-px transition-colors @(active ? "border-brand text-brand font-semibold" : "border-transparent text-gray-500 hover:text-gray-800")">
-                                @if (done && !active)
-                                {
-                                    <svg class="w-3.5 h-3.5 text-green-600" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M16.7 5.3a1 1 0 010 1.4l-8 8a1 1 0 01-1.4 0l-4-4a1 1 0 111.4-1.4L8 12.6l7.3-7.3a1 1 0 011.4 0z" clip-rule="evenodd" /></svg>
-                                }
-                                else
-                                {
-                                    <span class="w-4 h-4 rounded-full text-[10px] flex items-center justify-center @(active ? "bg-brand text-white" : "bg-gray-200 text-gray-600")">@number</span>
-                                }
-                                @title
-                            </button>
-                        }
-                    </nav>
-
-                    <div class="p-4 space-y-4">
-                        <p class="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-gray-600">
-                            <span class="ui-chip border-brand-100 bg-brand-50 text-brand">@ReviewMethod.Name</span>
-                            <span>follows @ReviewMethod.Standard</span>
-                            <a href="/start" class="text-brand font-medium hover:underline">Change review type</a>
-                        </p>
-                        @if (prefillNotice != null)
-                        {
-                            <div class="bg-blue-50 border border-blue-100 text-blue-900 p-2 text-xs flex flex-wrap items-center justify-between gap-2">
-                                <span>@prefillNotice</span>
-                                @if (showStartEmpty)
-                                {
-                                    <button type="button" @onclick="StartEmpty" class="ui-btn ui-btn-sm py-1 text-blue-900 hover:bg-blue-100">Start empty</button>
-                                }
-                            </div>
-                        }
-
-                        @switch (formStep)
-                        {
-                            case 1:
-                                <div class="flex items-center justify-between gap-2">
-                                    <p class="text-xs text-gray-600">What should the review find out?</p>
-                                    <button type="button" @onclick="LoadExample" class="text-xs text-brand font-medium hover:underline">Try an example</button>
-                                </div>
-                                <div>
-                                    <label for="f-query" class="@LabelClass">Search query <span class="font-normal text-gray-500">(required)</span></label>
-                                    <input id="f-query" type="text" aria-required="true" aria-describedby="h-query" aria-invalid="@Invalid("Search query")" maxlength="@AuBtechReviewAgent.ReviewInputGuard.MaxQuery" @bind="searchQuery" @bind:event="oninput"
-                                           placeholder="e.g. agentic AI software frameworks" class="@InputClass" />
-                                    @Help("h-query", "The words sent to the databases. Short and specific works best.", searchQuery, AuBtechReviewAgent.ReviewInputGuard.MaxQuery)
-                                </div>
-                                <div>
-                                    <label for="f-objective" class="@LabelClass">Review objective</label>
-                                    <textarea id="f-objective" rows="3" aria-describedby="h-objective" aria-invalid="@Invalid("Review objective")" maxlength="@AuBtechReviewAgent.ReviewInputGuard.MaxObjective" @bind="reviewObjective" @bind:event="oninput"
-                                              placeholder="e.g. Which safety mechanisms do agent frameworks use, and how are they evaluated?" class="@InputClass resize-y"></textarea>
-                                    @Help("h-objective", "The question the review answers. It guides the themes and the discussion.", reviewObjective, AuBtechReviewAgent.ReviewInputGuard.MaxObjective)
-                                </div>
-                                <div>
-                                    <label for="f-questions" class="@LabelClass">Research questions <span class="font-normal text-gray-500">(optional)</span></label>
-                                    <textarea id="f-questions" rows="3" aria-describedby="h-questions" aria-invalid="@Invalid("Research question")" maxlength="@ResearchQuestionsMaxLength" @bind="researchQuestionsText" @bind:event="oninput"
-                                              placeholder="One per line, e.g. RQ1: Which safety mechanisms do the frameworks use?" class="@InputClass resize-y"></textarea>
-                                    @Help("h-questions", ResearchQuestionsHelp, researchQuestionsText, ResearchQuestionsMaxLength)
-                                </div>
-                                break;
-
-                            case 2:
-                                <div>
-                                    <label for="f-inclusion" class="@LabelClass">Include studies that… <span class="font-normal text-gray-500">(required)</span></label>
-                                    <textarea id="f-inclusion" rows="3" aria-required="true" aria-describedby="h-inclusion" aria-invalid="@Invalid("Inclusion criteria")" maxlength="@AuBtechReviewAgent.ReviewInputGuard.MaxCriteria" @bind="inclusionCriteria" @bind:event="oninput"
-                                              placeholder="e.g. describe or evaluate an agent framework, with some form of evaluation" class="@InputClass resize-y"></textarea>
-                                    @Help("h-inclusion", "What a study must be about or contain.", inclusionCriteria, AuBtechReviewAgent.ReviewInputGuard.MaxCriteria)
-                                </div>
-                                <div>
-                                    <label for="f-exclusion" class="@LabelClass">Exclude studies that…</label>
-                                    <textarea id="f-exclusion" rows="2" aria-describedby="h-exclusion" aria-invalid="@Invalid("Exclusion criteria")" maxlength="@AuBtechReviewAgent.ReviewInputGuard.MaxCriteria" @bind="exclusionCriteria" @bind:event="oninput"
-                                              placeholder="e.g. are about agriculture or marketing, or are opinion pieces without evidence" class="@InputClass resize-y"></textarea>
-                                    @Help("h-exclusion", "What rules a study out. Optional.", exclusionCriteria, AuBtechReviewAgent.ReviewInputGuard.MaxCriteria)
-                                </div>
-                                <fieldset>
-                                    <legend class="@LabelClass">Publication years</legend>
-                                    <div class="flex items-center gap-2">
-                                        <input type="number" aria-label="From year" min="1900" max="@DateTime.UtcNow.Year" @bind="yearFrom" class="@InputClass w-28" />
-                                        <span class="text-gray-500" aria-hidden="true">–</span>
-                                        <input type="number" aria-label="To year" min="1900" max="@DateTime.UtcNow.Year" @bind="yearTo" class="@InputClass w-28" />
-                                    </div>
-                                    <div class="flex flex-wrap gap-1.5 mt-2">
-                                        @foreach (var (label, from) in YearPresets)
-                                        {
-                                            <button type="button" @onclick="() => SetYears(from)"
-                                                    class="text-xs rounded-full border px-3 py-1 min-h-[24px] @(yearFrom == from && yearTo == DateTime.UtcNow.Year ? "border-brand bg-brand/10 text-brand" : "border-gray-300 text-gray-600 hover:bg-gray-50")">@label</button>
-                                        }
-                                    </div>
-                                </fieldset>
-                                break;
-
-                            default:
-                                <div>
-                                    <label for="f-artifact" class="@LabelClass">Artifact built from the findings <Term Key="artifact" Icon="true" /></label>
-                                    <select id="f-artifact" value="@State.ArtifactKind" @onchange="HandleArtifactKind" class="@InputClass">
-                                        @foreach (var kind in AuBtechReviewAgent.ArtifactKinds.All)
-                                        {
-                                            <option value="@kind.Key">@kind.Label</option>
-                                        }
-                                    </select>
-                                    @if (State.ArtifactKind != AuBtechReviewAgent.ArtifactKinds.None)
-                                    {
-                                        <textarea id="f-directive" rows="2" aria-label="What the artifact should show" aria-describedby="h-directive" aria-invalid="@Invalid("Artifact target")" maxlength="@AuBtechReviewAgent.ReviewInputGuard.MaxDirective" @bind="synthesisTargetDirective" @bind:event="oninput"
-                                                  placeholder="e.g. a flowchart of how the studies evaluate agent safety, from threat to mitigation" class="@InputClass resize-y mt-2"></textarea>
-                                        @Help("h-directive", "Built after the analysis, only from what the review found; what it cites is checked like the text.", synthesisTargetDirective, AuBtechReviewAgent.ReviewInputGuard.MaxDirective)
-                                    }
-                                </div>
-
-                                <fieldset id="f-strings" tabindex="-1" aria-describedby="h-strings">
-                                    <legend class="@LabelClass">Search strings <Term Key="search-strings" Icon="true" /></legend>
-                                    @if (reviewedSearchStrings == null)
-                                    {
-                                        <p id="h-strings" class="text-xs text-gray-600 leading-snug">The model adds up to three other phrasings of your query during the run. Preview them to check and edit them before anything is searched.</p>
-                                        <button type="button" @onclick="PreviewSearchStrings" disabled="@(previewingStrings || string.IsNullOrWhiteSpace(searchQuery) || previewsLeft <= 0)"
-                                                class="ui-btn ui-btn-sm mt-2 border border-gray-300 text-gray-800 hover:border-brand disabled:opacity-50">
-                                            @(previewingStrings ? "Asking the model…" : "Preview search strings")
-                                        </button>
-                                    }
-                                    else
-                                    {
-                                        <p id="h-strings" class="text-xs text-gray-600 leading-snug">These are searched as they are, after your query; the report records that you approved them.</p>
-                                        <ol class="mt-2 space-y-1.5">
-                                            <li class="flex items-center gap-2 text-sm text-gray-700"><span class="w-4 text-right text-xs text-gray-500">1</span><span class="truncate" title="@searchQuery">@searchQuery</span><span class="text-[10px] text-gray-500 whitespace-nowrap">(your query)</span></li>
-                                            @for (int i = 0; i < reviewedSearchStrings.Count; i++)
-                                            {
-                                                int index = i;
-                                                <li class="flex items-center gap-2">
-                                                    <span class="w-4 text-right text-xs text-gray-500">@(index + 2)</span>
-                                                    <input type="text" aria-label="@($"Search string {index + 2}")" maxlength="@AuBtechReviewAgent.ReviewInputGuard.MaxSearchString"
-                                                           value="@reviewedSearchStrings[index]" @onchange="e => reviewedSearchStrings[index] = e.Value?.ToString() ?? string.Empty" class="@InputClass py-1" />
-                                                    <button type="button" @onclick="() => reviewedSearchStrings.RemoveAt(index)" class="ui-btn ui-btn-sm px-2 text-gray-600 hover:text-red-700" aria-label="@($"Remove search string {index + 2}")">✕</button>
-                                                </li>
-                                            }
-                                        </ol>
-                                        <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
-                                            @if (reviewedSearchStrings.Count < AuBtechReviewAgent.ReviewInputGuard.MaxSearchStrings)
-                                            {
-                                                <button type="button" @onclick="() => reviewedSearchStrings.Add(string.Empty)" class="text-brand font-medium hover:underline">Add a search string</button>
-                                            }
-                                            <button type="button" @onclick="() => reviewedSearchStrings = null" class="text-gray-600 hover:underline">Let the model choose during the run</button>
-                                        </div>
-                                        @if (previewQuery != null && !string.Equals(previewQuery, searchQuery?.Trim(), StringComparison.OrdinalIgnoreCase))
-                                        {
-                                            <p class="mt-1.5 text-[11px] text-amber-800">Your query changed after the preview. Check that these still fit.</p>
-                                        }
-                                    }
-                                    @if (previewError != null)
-                                    {
-                                        <p class="mt-1.5 text-[11px] text-red-700" role="alert">@previewError</p>
-                                    }
-                                </fieldset>
-
-                                <fieldset id="f-sources" tabindex="-1">
-                                    <legend class="@LabelClass">Sources <span class="font-normal text-gray-500">(at least one)</span></legend>
-                                    <div class="grid grid-cols-2 gap-x-3 gap-y-1.5">
-                                        @foreach (var source in AuBtechReviewAgent.SourceCatalog.All)
-                                        {
-                                            bool available = sourceAvailability.TryGetValue(source.Key, out var ok) && ok;
-                                            <label class="flex items-center gap-2 text-sm select-none @(available ? "text-gray-800 cursor-pointer" : "text-gray-500 cursor-not-allowed")"
-                                                   title="@(available ? "" : $"Needs an {source.KeyLabel}. Add one under API keys.")">
-                                                <input type="checkbox" class="w-4 h-4 accent-brand"
-                                                       checked="@(available && State.SelectedSources.Contains(source.Key))"
-                                                       disabled="@(!available || isSearching)"
-                                                       @onchange="e => ToggleSource(source.Key, e)" />
-                                                <span>@source.DisplayName</span>
-                                                @if (!available)
-                                                {
-                                                    <span class="text-[10px]">(needs key)</span>
-                                                }
-                                            </label>
-                                        }
-                                    </div>
-                                    <div class="mt-2"><SourceStatusNote /></div>
-                                </fieldset>
-
-                                @* Options most people never change: folded away, with sensible defaults. *@
-                                <details class="group border border-gray-200 ">
-                                    <summary class="cursor-pointer select-none px-3 py-2 text-sm text-gray-800 flex items-center justify-between">
-                                        <span>Advanced options</span>
-                                        <span class="text-[11px] text-gray-500">@AdvancedSummary()</span>
-                                    </summary>
-                                    <div class="px-3 pb-3 space-y-3 border-t border-gray-100 pt-3">
-                                        @Option("o-dual", "dual-screening", "Screen every record twice", "Two independent screening prompts; disagreements are kept and flagged, and the agreement (Cohen's kappa) is reported.", State.DualScreening, v => State.DualScreening = v)
-                                        @Option("o-chaining", "citation-chaining", "Citation chaining", "Also screen the papers the included studies cite and the papers citing them (one round, via OpenAlex).", State.CitationChaining, v => State.CitationChaining = v)
-                                        @Option("o-check", "screening", "Let me check the screening decisions", "The run pauses after screening so you can include or exclude papers yourself.", State.ReviewScreeningFirst, v => State.ReviewScreeningFirst = v)
-                                        @Option("o-peer", null, "Peer-reviewed only", "Leave out preprints and working papers before screening.", requirePeerReview, v => requirePeerReview = v)
-                                        <div class="flex items-center justify-between gap-3">
-                                            <label for="f-max" class="text-sm text-gray-800">Records per source
-                                                <span class="block text-xs text-gray-500">@(quotaStatus.Tier == AuBtechReviewAgent.QuotaTier.Free ? $"Free tier: at most {maxResultsCeiling}." : "More records take longer.")</span>
-                                            </label>
-                                            <input id="f-max" type="number" min="1" max="@maxResultsCeiling" @bind="maxResults" class="@InputClass w-20 text-center" />
-                                        </div>
-                                    </div>
-                                </details>
-                                break;
-                        }
-                    </div>
-
+@if (Composing)
+{
+    @* Ask (redesign step 6): the composer in a centred column of at most 760 px and the criteria beside it from
+       1024 px (380 px wide, 440 px from 1600 px), below it on smaller screens. Running and Done keep the older
+       two-column view below until redesign step 7. *@
+    <div class="mx-auto w-full max-w-[1600px] px-[clamp(16px,3vw,40px)] py-6 sm:py-10">
+        @if (!string.IsNullOrEmpty(quotaNotice))
+        {
+            <p class="mx-auto mb-4 max-w-[760px] text-xs text-red-700" role="alert">@quotaNotice</p>
+        }
+        <div class="grid grid-cols-1 items-start gap-6 lg:grid-cols-[minmax(0,760px)_380px] lg:justify-center xl:gap-10 min-[1600px]:grid-cols-[minmax(0,760px)_440px]">
+            <ReviewComposer Method="ReviewMethod" Quota="quotaStatus" InputCheck="inputCheck" Busy="isSearching"
+                            OnChanged="FormChanged" OnStart="StartOrShowProblem" OnLoadExample="LoadExample" OnOpenKeys="OpenKeyModal">
+                <Notice>
+                    @if (prefillNotice != null)
+                    {
+                        <div class="flex flex-wrap items-center justify-between gap-2 rounded-field border border-blue-100 bg-blue-50 p-2 text-xs text-blue-900">
+                            <span>@prefillNotice</span>
+                            @if (showStartEmpty)
+                            {
+                                <button type="button" @onclick="StartEmpty" class="ui-btn ui-btn-sm py-1 text-blue-900 hover:bg-blue-100">Start empty</button>
+                            }
+                        </div>
+                    }
+                </Notice>
+                <Problems>
                     @if (inputCheck is { IsValid: false } failedCheck)
                     {
-                        <div class="mx-4 mb-3 bg-red-50 border border-red-200 text-red-800 p-2 text-xs space-y-0.5" role="alert">
+                        <div class="space-y-0.5 rounded-field border border-red-200 bg-red-50 p-2 text-xs text-red-800" role="alert">
                             @foreach (var error in failedCheck.Errors)
                             {
                                 <p>@error</p>
@@ -279,9 +55,9 @@
                     }
                     else if (pendingFlagSignature != null && inputCheck != null)
                     {
-                        <div class="mx-4 mb-3 bg-amber-50 border border-amber-200 text-amber-900 p-2 text-xs space-y-1" role="alert">
+                        <div class="space-y-1 rounded-field border border-amber-200 bg-amber-50 p-2 text-xs text-amber-900" role="alert">
                             <p class="font-semibold">Some of your text reads like instructions to the language model:</p>
-                            <ul class="list-disc pl-4 space-y-0.5">
+                            <ul class="list-disc space-y-0.5 pl-4">
                                 @foreach (var flag in inputCheck.Flags)
                                 {
                                     <li>@flag.ToString()</li>
@@ -291,187 +67,285 @@
                             <button type="button" @onclick="ConfirmFlaggedInput" class="ui-btn ui-btn-sm bg-amber-600 text-white hover:bg-amber-700">Start anyway</button>
                         </div>
                     }
-
-                    @* The action stays in reach: summary of the choices, what is missing, and one primary button. *@
-                    <div class="sticky bottom-0 bg-white/95 backdrop-blur border-t border-gray-200 px-4 py-3 space-y-2">
-                        <p class="text-[11px] text-gray-500 truncate" title="@SettingsLine()">@SettingsLine()</p>
-                        @if (StartBlocker() is { } blocker)
-                        {
+                    @* "Start review" is never silently disabled: the reason sits above it and takes you to the field. *@
+                    @if (StartBlocker() is { } blocker)
+                    {
+                        <div class="space-y-2">
                             @if (BlockerTarget() != null)
                             {
-                                <button type="button" @onclick="GoToProblem" class="block text-left text-xs text-amber-800 underline decoration-dotted underline-offset-2 hover:text-amber-900">@blocker</button>
+                                <button type="button" @onclick="GoToProblem" class="block min-h-[24px] text-left text-sm text-amber-800 underline decoration-dotted underline-offset-2 hover:text-amber-900">@blocker</button>
                             }
                             else
                             {
-                                <p class="text-xs text-amber-800">@blocker</p>
+                                <p class="text-sm text-amber-800">@blocker</p>
                                 @if (!quotaStatus.Allowed && quotaStatus.Tier == AuBtechReviewAgent.QuotaTier.Free)
                                 {
                                     <button type="button" @onclick="OpenKeyModal" class="ui-btn-secondary ui-btn-sm">Add your own Mistral key</button>
                                 }
                             }
-                        }
-                        <div class="flex items-center gap-2">
-                            @if (formStep > 1)
+                        </div>
+                    }
+                </Problems>
+            </ReviewComposer>
+
+            <div class="mx-auto w-full max-w-[760px] min-w-0 lg:max-w-none">
+                <CriteriaPanel @bind-Open="criteriaOpen" MethodName="@ReviewMethod.Name" SourceAvailability="sourceAvailability"
+                               InputCheck="inputCheck" Busy="isSearching" OnChanged="FormChanged">
+                    <MoreOptions>
+                        <div class="space-y-3">
+
+                    <details class="group rounded-field border border-line" open="@(reviewedSearchStrings != null)">
+                        <summary class="flex min-h-[44px] cursor-pointer select-none items-center justify-between px-3 py-2 text-sm text-ink">
+                            <span>Search strings</span>
+                            <span class="text-[11px] text-muted">@(reviewedSearchStrings == null ? "chosen by the model" : $"{reviewedSearchStrings.Count + 1} reviewed")</span>
+                        </summary>
+                        <fieldset id="f-strings" class="px-3 pb-3 pt-3" tabindex="-1" aria-describedby="h-strings">
+                            <legend class="@LabelClass">Search strings <Term Key="search-strings" Icon="true" /></legend>
+                            @if (reviewedSearchStrings == null)
                             {
-                                <button type="button" @onclick="() => formStep--" class="ui-btn-ghost">Back</button>
-                            }
-                            <span class="flex-1"></span>
-                            @if (formStep < 3)
-                            {
-                                @if (StartBlocker() == null)
-                                {
-                                    <button type="button" @onclick="StartReviewProcess" disabled="@isSearching" class="ui-btn-secondary">Start now</button>
-                                }
-                                <button type="button" @onclick="() => formStep++" class="ui-btn-primary">Next: @Steps[formStep].Title</button>
+                                <p id="h-strings" class="text-xs text-gray-600 leading-snug">The model adds up to three other phrasings of your query during the run. Preview them to check and edit them before anything is searched.</p>
+                                <button type="button" @onclick="PreviewSearchStrings" disabled="@(previewingStrings || string.IsNullOrWhiteSpace(searchQuery) || previewsLeft <= 0)"
+                                        class="ui-btn ui-btn-sm mt-2 border border-gray-300 text-gray-800 hover:border-brand disabled:opacity-50">
+                                    @(previewingStrings ? "Asking the model…" : "Preview search strings")
+                                </button>
                             }
                             else
                             {
-                                <button type="button" @onclick="StartOrShowProblem" disabled="@isSearching"
-                                        class="ui-btn-primary">Start review</button>
-                            }
-                        </div>
-                    </div>
-                </div>
-            }
-            else
-            {
-                @* While a run is going (or done), the form becomes a compact summary of what was asked. *@
-                <div class="bg-white border border-gray-200 shadow-sm p-4 space-y-3">
-                    <div class="flex items-center justify-between gap-2">
-                        <div>
-                            <h2 class="text-sm font-semibold text-gray-900">Review settings</h2>
-                            <p class="text-xs font-medium @(StageColor())">@StageLabel()</p>
-                        </div>
-                        @if (!isSearching)
-                        {
-                            <button type="button" @onclick="StartNewDraft" class="ui-btn-primary ui-btn-sm">New review</button>
-                        }
-                    </div>
-                    <dl class="text-xs space-y-2">
-                        @SettingRow("Query", runInfo?.SearchQuery ?? searchQuery)
-                        @SettingRow("Objective", !string.IsNullOrWhiteSpace(runInfo?.ReviewObjective) ? runInfo!.ReviewObjective : runInfo == null ? reviewObjective : "(not stored for this run)")
-                        @if ((runInfo?.ResearchQuestions ?? AuBtechReviewAgent.ReviewInputGuard.ResearchQuestionLines(researchQuestionsText)) is { Count: > 0 } shownQuestions)
-                        {
-                            @SettingRow("Questions", string.Join(" ", shownQuestions.Select((q, i) => $"RQ{i + 1}. {q}")))
-                        }
-                        @SettingRow("Include", !string.IsNullOrWhiteSpace(runInfo?.InclusionCriteria) ? runInfo!.InclusionCriteria : runInfo == null ? inclusionCriteria : "(see the protocol)")
-                        @SettingRow("Exclude", ExclusionShown())
-                        @SettingRow("Years", runInfo is { YearFrom: > 0 } ? $"{runInfo.YearFrom}–{runInfo.YearTo}" : $"{yearFrom}–{yearTo}")
-                        @SettingRow("Sources", string.Join(", ", (runInfo?.SelectedSources ?? State.SelectedSources.ToList()).Select(AuBtechReviewAgent.SourceCatalog.DisplayNameFor)))
-                    </dl>
-                    <p class="text-[11px] text-gray-500 leading-snug border-t border-gray-100 pt-2">
-                        Link to this run: <a class="text-brand underline break-all" href="@($"/review/{currentSessionId}")">@($"/review/{currentSessionId}")</a>
-                        <button type="button" @onclick="CopyRunLink" class="ml-1 text-brand font-medium hover:underline">@(linkCopied ? "Copied" : "Copy link")</button>.
-                        Anyone with the link can read the run@(canEdit ? "; only this browser can change or delete it" : ""). Results are kept for @RunsOptions.RetentionDays days@(completedUtc.HasValue ? $" (until {completedUtc.Value.AddDays(RunsOptions.RetentionDays):yyyy-MM-dd} UTC)" : "").
-                    </p>
-                    @if (!isSearching && AuBtechReviewAgent.PrismaReviewEngine.IsFinishedStage(stage) && !canEdit)
-                    {
-                        <p class="text-[11px] text-gray-600">Read-only: only the browser that started this run can delete it.</p>
-                    }
-                    else if (!isSearching && AuBtechReviewAgent.PrismaReviewEngine.IsFinishedStage(stage))
-                    {
-                        <div class="flex items-center gap-2 text-[11px]">
-                            @if (!confirmDelete)
-                            {
-                                <button type="button" @onclick="() => confirmDelete = true" class="text-red-700 hover:text-red-900 underline">Delete this run</button>
-                            }
-                            else
-                            {
-                                <span class="text-red-800">Delete the run, its report and downloaded papers for good?</span>
-                                <button type="button" @onclick="DeleteRun" class="ui-btn-danger ui-btn-sm">Delete</button>
-                                <button type="button" @onclick="() => confirmDelete = false" class="ui-btn-secondary ui-btn-sm">Cancel</button>
-                            }
-                        </div>
-                    }
-                </div>
-            }
-        </section>
-
-        @* The right side follows the run: what will happen, then the progress, then the result. *@
-        <section id="run-panel" class="lg:col-span-7 lg:sticky lg:top-4 min-w-0 bg-white border border-gray-200 shadow-sm overflow-hidden flex flex-col lg:max-h-[calc(100vh-8rem)]" aria-labelledby="run-panel-title">
-            @* Screen readers hear the step changes and the end of the run, not every percent (WCAG 4.1.3). *@
-            <p class="sr-only" role="status" aria-live="polite">@Announcement()</p>
-            <h2 id="run-panel-title" class="sr-only">@PanelTitle()</h2>
-            <div class="flex items-center justify-between border-b border-gray-200 px-3 flex-none">
-                <div class="flex" role="group" aria-label="Show">
-                    <button type="button" aria-pressed="@(panelTab == "overview" ? "true" : "false")" @onclick="@(() => panelTab = "overview")"
-                            class="px-3 py-2.5 text-xs border-b-2 -mb-px @(panelTab == "overview" ? "border-brand text-brand font-semibold" : "border-transparent text-gray-500 hover:text-gray-800")">@PanelTitle()</button>
-                    @if (hasRun && !Composing)
-                    {
-                        <button type="button" aria-pressed="@(panelTab == "ledger" ? "true" : "false")" @onclick="@(() => panelTab = "ledger")"
-                                class="px-3 py-2.5 text-xs border-b-2 -mb-px @(panelTab == "ledger" ? "border-brand text-brand font-semibold" : "border-transparent text-gray-500 hover:text-gray-800")">Ledger (JSON)</button>
-                    }
-                </div>
-                <span class="text-[10px] text-gray-500 font-mono">@ReviewEngine.Llm.Model</span>
-            </div>
-
-            @if (panelTab == "ledger" && hasRun && !Composing)
-            {
-                <div class="flex-1 min-h-[20rem] bg-gray-950 p-4 font-mono text-xs text-green-400 overflow-y-auto whitespace-pre-wrap break-words leading-relaxed">@rawJsonLogs</div>
-            }
-            else if (awaitingReview && reviewLogs != null && !Composing)
-            {
-                @if (canEdit)
-                {
-                    <ScreeningReviewPanel RunId="currentSessionId" EditKey="@editKey" Logs="reviewLogs" OnSubmitted="OnScreeningReviewSubmitted" />
-                }
-                else
-                {
-                    <p class="p-4 text-sm text-gray-700">This run is waiting for the person who started it to check the screening decisions. Only the browser that started a run can do that.</p>
-                }
-            }
-            else if (Composing)
-            {
-                <RunPlanPreview SourceCount="SelectedAvailableSources().Count" YearFrom="yearFrom" YearTo="yearTo"
-                                DualScreening="State.DualScreening" CitationChaining="State.CitationChaining" HumanReview="State.ReviewScreeningFirst"
-                                ArtifactLabel="@ArtifactLabel()" />
-            }
-            else
-            {
-                <div class="flex-1 min-h-0 overflow-y-auto">
-                    @if (stage == AuBtechReviewAgent.PrismaReviewEngine.StageComplete)
-                    {
-                        <RunSummaryCard Stats="State.Stats" RunId="currentSessionId" />
-                    }
-                    <div class="p-4 space-y-4">
-                        @if (!string.IsNullOrEmpty(failureMessage))
-                        {
-                            <div class="text-sm text-red-700 bg-red-50 border border-red-200 p-2" role="alert">
-                                <p>@failureMessage</p>
-                                @if (stage is AuBtechReviewAgent.PrismaReviewEngine.StageFailed or AuBtechReviewAgent.PrismaReviewEngine.StageInterrupted)
+                                <p id="h-strings" class="text-xs text-gray-600 leading-snug">These are searched as they are, after your query; the report records that you approved them.</p>
+                                <ol class="mt-2 space-y-1.5">
+                                    <li class="flex items-center gap-2 text-sm text-gray-700"><span class="w-4 text-right text-xs text-gray-500">1</span><span class="truncate" title="@searchQuery">@searchQuery</span><span class="text-[10px] text-gray-500 whitespace-nowrap">(your query)</span></li>
+                                    @for (int i = 0; i < reviewedSearchStrings.Count; i++)
+                                    {
+                                        int index = i;
+                                        <li class="flex items-center gap-2">
+                                            <span class="w-4 text-right text-xs text-gray-500">@(index + 2)</span>
+                                            <input type="text" aria-label="@($"Search string {index + 2}")" maxlength="@AuBtechReviewAgent.ReviewInputGuard.MaxSearchString"
+                                                   value="@reviewedSearchStrings[index]" @onchange="e => reviewedSearchStrings[index] = e.Value?.ToString() ?? string.Empty" class="@InputClass py-1" />
+                                            <button type="button" @onclick="() => reviewedSearchStrings.RemoveAt(index)" class="ui-btn ui-btn-sm px-2 text-gray-600 hover:text-red-700" aria-label="@($"Remove search string {index + 2}")">✕</button>
+                                        </li>
+                                    }
+                                </ol>
+                                <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+                                    @if (reviewedSearchStrings.Count < AuBtechReviewAgent.ReviewInputGuard.MaxSearchStrings)
+                                    {
+                                        <button type="button" @onclick="() => reviewedSearchStrings.Add(string.Empty)" class="text-brand font-medium hover:underline">Add a search string</button>
+                                    }
+                                    <button type="button" @onclick="() => reviewedSearchStrings = null" class="text-gray-600 hover:underline">Let the model choose during the run</button>
+                                </div>
+                                @if (previewQuery != null && !string.Equals(previewQuery, searchQuery?.Trim(), StringComparison.OrdinalIgnoreCase))
                                 {
-                                    <p class="mt-1.5 text-xs text-red-900">
-                                        Run <span class="font-mono select-all">@currentSessionId</span> · version @AppVersionShort ·
-                                        <a href="@AuBtechReviewAgent.SiteSeo.ProblemReportUrl(currentSessionId, AppVersionShort, stage)" target="_blank" rel="noopener" class="underline underline-offset-2">Report this problem</a>
-                                        <span class="text-red-800">(the report includes the run ID and version, not your question)</span>
-                                    </p>
+                                    <p class="mt-1.5 text-[11px] text-amber-800">Your query changed after the preview. Check that these still fit.</p>
                                 }
+                            }
+                            @if (previewError != null)
+                            {
+                                <p class="mt-1.5 text-[11px] text-red-700" role="alert">@previewError</p>
+                            }
+                        </fieldset>
+                    </details>
+                    <details class="group rounded-field border border-line">
+                        <summary class="flex min-h-[44px] cursor-pointer select-none items-center justify-between px-3 py-2 text-sm text-ink">
+                            <span>Advanced options</span>
+                            <span class="text-[11px] text-gray-500">@AdvancedSummary()</span>
+                        </summary>
+                        <div class="px-3 pb-3 space-y-3 border-t border-gray-100 pt-3">
+                            @Option("o-dual", "dual-screening", "Screen every record twice", "Two independent screening prompts; disagreements are kept and flagged, and the agreement (Cohen's kappa) is reported.", State.DualScreening, v => State.DualScreening = v)
+                            @Option("o-chaining", "citation-chaining", "Citation chaining", "Also screen the papers the included studies cite and the papers citing them (one round, via OpenAlex).", State.CitationChaining, v => State.CitationChaining = v)
+                            @Option("o-check", "screening", "Let me check the screening decisions", "The run pauses after screening so you can include or exclude papers yourself.", State.ReviewScreeningFirst, v => State.ReviewScreeningFirst = v)
+                            @Option("o-peer", null, "Peer-reviewed only", "Leave out preprints and working papers before screening.", requirePeerReview, v => requirePeerReview = v)
+                            <div class="flex items-center justify-between gap-3">
+                                <label for="f-max" class="text-sm text-gray-800">Records per source
+                                    <span class="block text-xs text-gray-500">@(quotaStatus.Tier == AuBtechReviewAgent.QuotaTier.Free ? $"Free tier: at most {maxResultsCeiling}." : "More records take longer.")</span>
+                                </label>
+                                <input id="f-max" type="number" min="1" max="@maxResultsCeiling" @bind="maxResults" class="@InputClass w-20 text-center" />
                             </div>
-                        }
-                        <RunProgressPanel Stats="State.Stats" Stage="@stage" Running="isSearching" QueuePosition="queuePosition" CompletedUtc="completedUtc" />
-                        @if (isSearching && notifyPermission is "default" or "granted")
+                        </div>
+                    </details>
+                        </div>
+                    </MoreOptions>
+                </CriteriaPanel>
+            </div>
+        </div>
+    </div>
+}
+else
+{
+    <div class="max-w-7xl w-full mx-auto p-4 lg:p-6 space-y-4">
+
+        @* Toolbar: what this page is, and the account details in small print (they matter less than the question). *@
+        <div class="flex flex-wrap items-end justify-between gap-3">
+            <div>
+                <h1 class="ui-h2">Your review</h1>
+                <p class="text-sm text-gray-500 mt-1">A <Term Key="prisma" Below="true">PRISMA 2020</Term> review in which every citation is checked against the paper it cites. <a href="/glossary" class="text-brand underline underline-offset-2">Glossary</a></p>
+            </div>
+            <div class="flex items-center gap-2">
+                @{
+                    // Full class names (not built from a colour variable) so the Tailwind build can find them.
+                    var (chipBox, chipDot) = quotaStatus.Tier switch
+                    {
+                        AuBtechReviewAgent.QuotaTier.Developer => ("bg-blue-50 border-blue-200 text-blue-800", "bg-blue-500"),
+                        AuBtechReviewAgent.QuotaTier.OwnKey => ("bg-green-50 border-green-200 text-green-800", "bg-green-500"),
+                        _ when quotaStatus.Allowed => ("bg-amber-50 border-amber-200 text-amber-800", "bg-amber-500"),
+                        _ => ("bg-red-50 border-red-200 text-red-800", "bg-red-500"),
+                    };
+                    string tierLabel = quotaStatus.Tier switch
+                    {
+                        AuBtechReviewAgent.QuotaTier.Developer => "Developer access",
+                        AuBtechReviewAgent.QuotaTier.OwnKey => "Own Mistral key",
+                        _ => "Free tier"
+                    };
+                    string counter = quotaStatus.Limit == int.MaxValue ? "unlimited"
+                        : quotaStatus.Tier == AuBtechReviewAgent.QuotaTier.OwnKey ? $"{quotaStatus.Remaining} of {quotaStatus.Limit} left this hour"
+                        : $"{quotaStatus.Remaining} of {quotaStatus.Limit} left today";
+                }
+                <span class="@chipBox border px-2.5 py-1 text-[11px] flex items-center gap-1.5" title="@(quotaStatus.ResetsUtc is { } resets ? $"Runs you can still start. More {AuBtechReviewAgent.RunQuotaService.ResetText(resets - DateTime.UtcNow)}." : "Runs you can still start")">
+                    <span class="w-1.5 h-1.5 rounded-full @chipDot"></span>@tierLabel · @counter
+                </span>
+                <button type="button" @onclick="OpenKeyModal" class="ui-btn-secondary ui-btn-sm">
+                    <svg class="w-3 h-3 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/></svg>
+                    API keys
+                </button>
+            </div>
+        </div>
+        @if (!string.IsNullOrEmpty(quotaNotice))
+        {
+            <p class="text-xs text-red-700" role="alert">@quotaNotice</p>
+        }
+
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
+
+            <section class="lg:col-span-5 space-y-4 min-w-0" aria-label="Review settings">
+                    @* While a run is going (or done), the form becomes a compact summary of what was asked. *@
+                    <div class="bg-white border border-gray-200 shadow-sm p-4 space-y-3">
+                        <div class="flex items-center justify-between gap-2">
+                            <div>
+                                <h2 class="text-sm font-semibold text-gray-900">Review settings</h2>
+                                <p class="text-xs font-medium @(StageColor())">@StageLabel()</p>
+                            </div>
+                            @if (!isSearching)
+                            {
+                                <button type="button" @onclick="StartNewDraft" class="ui-btn-primary ui-btn-sm">New review</button>
+                            }
+                        </div>
+                        <dl class="text-xs space-y-2">
+                            @SettingRow("Query", runInfo?.SearchQuery ?? searchQuery)
+                            @SettingRow("Objective", !string.IsNullOrWhiteSpace(runInfo?.ReviewObjective) ? runInfo!.ReviewObjective : runInfo == null ? reviewObjective : "(not stored for this run)")
+                            @if ((runInfo?.ResearchQuestions ?? AuBtechReviewAgent.ReviewInputGuard.ResearchQuestionLines(researchQuestionsText)) is { Count: > 0 } shownQuestions)
+                            {
+                                @SettingRow("Questions", string.Join(" ", shownQuestions.Select((q, i) => $"RQ{i + 1}. {q}")))
+                            }
+                            @SettingRow("Include", !string.IsNullOrWhiteSpace(runInfo?.InclusionCriteria) ? runInfo!.InclusionCriteria : runInfo == null ? inclusionCriteria : "(see the protocol)")
+                            @SettingRow("Exclude", ExclusionShown())
+                            @SettingRow("Years", runInfo is { YearFrom: > 0 } ? $"{runInfo.YearFrom}–{runInfo.YearTo}" : $"{yearFrom}–{yearTo}")
+                            @SettingRow("Sources", string.Join(", ", (runInfo?.SelectedSources ?? State.SelectedSources.ToList()).Select(AuBtechReviewAgent.SourceCatalog.DisplayNameFor)))
+                        </dl>
+                        <p class="text-[11px] text-gray-500 leading-snug border-t border-gray-100 pt-2">
+                            Link to this run: <a class="text-brand underline break-all" href="@($"/review/{currentSessionId}")">@($"/review/{currentSessionId}")</a>
+                            <button type="button" @onclick="CopyRunLink" class="ml-1 text-brand font-medium hover:underline">@(linkCopied ? "Copied" : "Copy link")</button>.
+                            Anyone with the link can read the run@(canEdit ? "; only this browser can change or delete it" : ""). Results are kept for @RunsOptions.RetentionDays days@(completedUtc.HasValue ? $" (until {completedUtc.Value.AddDays(RunsOptions.RetentionDays):yyyy-MM-dd} UTC)" : "").
+                        </p>
+                        @if (!isSearching && AuBtechReviewAgent.PrismaReviewEngine.IsFinishedStage(stage) && !canEdit)
                         {
-                            @* Runs take minutes; people switch tabs. The tab title shows the progress, and this asks the browser to say when it is done. *@
-                            <p class="text-xs text-gray-600 flex items-center gap-2">
-                                @if (notifyPermission == "granted")
+                            <p class="text-[11px] text-gray-600">Read-only: only the browser that started this run can delete it.</p>
+                        }
+                        else if (!isSearching && AuBtechReviewAgent.PrismaReviewEngine.IsFinishedStage(stage))
+                        {
+                            <div class="flex items-center gap-2 text-[11px]">
+                                @if (!confirmDelete)
                                 {
-                                    <span>You will get a browser notification when the review is ready, if this tab is in the background.</span>
+                                    <button type="button" @onclick="() => confirmDelete = true" class="text-red-700 hover:text-red-900 underline">Delete this run</button>
                                 }
                                 else
                                 {
-                                    <button type="button" @onclick="AskForNotification" class="ui-btn-secondary ui-btn-sm">Notify me when it is ready</button>
-                                    <span>The tab title also shows the progress.</span>
+                                    <span class="text-red-800">Delete the run, its report and downloaded papers for good?</span>
+                                    <button type="button" @onclick="DeleteRun" class="ui-btn-danger ui-btn-sm">Delete</button>
+                                    <button type="button" @onclick="() => confirmDelete = false" class="ui-btn-secondary ui-btn-sm">Cancel</button>
                                 }
-                            </p>
+                            </div>
                         }
-                        <PrismaFunnel Stats="State.Stats" Removed="State.RemovedBeforeScreening" Running="isSearching"
-                                      Yields="State.SearchStringYields" ExclusionGroups="State.ExclusionGroups" />
                     </div>
+            </section>
+
+            @* The right side follows the run: what will happen, then the progress, then the result. *@
+            <section id="run-panel" class="lg:col-span-7 lg:sticky lg:top-4 min-w-0 bg-white border border-gray-200 shadow-sm overflow-hidden flex flex-col lg:max-h-[calc(100vh-8rem)]" aria-labelledby="run-panel-title">
+                @* Screen readers hear the step changes and the end of the run, not every percent (WCAG 4.1.3). *@
+                <p class="sr-only" role="status" aria-live="polite">@Announcement()</p>
+                <h2 id="run-panel-title" class="sr-only">@PanelTitle()</h2>
+                <div class="flex items-center justify-between border-b border-gray-200 px-3 flex-none">
+                    <div class="flex" role="group" aria-label="Show">
+                        <button type="button" aria-pressed="@(panelTab == "overview" ? "true" : "false")" @onclick="@(() => panelTab = "overview")"
+                                class="px-3 py-2.5 text-xs border-b-2 -mb-px @(panelTab == "overview" ? "border-brand text-brand font-semibold" : "border-transparent text-gray-500 hover:text-gray-800")">@PanelTitle()</button>
+                        @if (hasRun && !Composing)
+                        {
+                            <button type="button" aria-pressed="@(panelTab == "ledger" ? "true" : "false")" @onclick="@(() => panelTab = "ledger")"
+                                    class="px-3 py-2.5 text-xs border-b-2 -mb-px @(panelTab == "ledger" ? "border-brand text-brand font-semibold" : "border-transparent text-gray-500 hover:text-gray-800")">Ledger (JSON)</button>
+                        }
+                    </div>
+                    <span class="text-[10px] text-gray-500 font-mono">@ReviewEngine.Llm.Model</span>
                 </div>
-            }
-        </section>
+
+                @if (panelTab == "ledger" && hasRun && !Composing)
+                {
+                    <div class="flex-1 min-h-[20rem] bg-gray-950 p-4 font-mono text-xs text-green-400 overflow-y-auto whitespace-pre-wrap break-words leading-relaxed">@rawJsonLogs</div>
+                }
+                else if (awaitingReview && reviewLogs != null && !Composing)
+                {
+                    @if (canEdit)
+                    {
+                        <ScreeningReviewPanel RunId="currentSessionId" EditKey="@editKey" Logs="reviewLogs" OnSubmitted="OnScreeningReviewSubmitted" />
+                    }
+                    else
+                    {
+                        <p class="p-4 text-sm text-gray-700">This run is waiting for the person who started it to check the screening decisions. Only the browser that started a run can do that.</p>
+                    }
+                }
+                else
+                {
+                    <div class="flex-1 min-h-0 overflow-y-auto">
+                        @if (stage == AuBtechReviewAgent.PrismaReviewEngine.StageComplete)
+                        {
+                            <RunSummaryCard Stats="State.Stats" RunId="currentSessionId" />
+                        }
+                        <div class="p-4 space-y-4">
+                            @if (!string.IsNullOrEmpty(failureMessage))
+                            {
+                                <div class="text-sm text-red-700 bg-red-50 border border-red-200 p-2" role="alert">
+                                    <p>@failureMessage</p>
+                                    @if (stage is AuBtechReviewAgent.PrismaReviewEngine.StageFailed or AuBtechReviewAgent.PrismaReviewEngine.StageInterrupted)
+                                    {
+                                        <p class="mt-1.5 text-xs text-red-900">
+                                            Run <span class="font-mono select-all">@currentSessionId</span> · version @AppVersionShort ·
+                                            <a href="@AuBtechReviewAgent.SiteSeo.ProblemReportUrl(currentSessionId, AppVersionShort, stage)" target="_blank" rel="noopener" class="underline underline-offset-2">Report this problem</a>
+                                            <span class="text-red-800">(the report includes the run ID and version, not your question)</span>
+                                        </p>
+                                    }
+                                </div>
+                            }
+                            <RunProgressPanel Stats="State.Stats" Stage="@stage" Running="isSearching" QueuePosition="queuePosition" CompletedUtc="completedUtc" />
+                            @if (isSearching && notifyPermission is "default" or "granted")
+                            {
+                                @* Runs take minutes; people switch tabs. The tab title shows the progress, and this asks the browser to say when it is done. *@
+                                <p class="text-xs text-gray-600 flex items-center gap-2">
+                                    @if (notifyPermission == "granted")
+                                    {
+                                        <span>You will get a browser notification when the review is ready, if this tab is in the background.</span>
+                                    }
+                                    else
+                                    {
+                                        <button type="button" @onclick="AskForNotification" class="ui-btn-secondary ui-btn-sm">Notify me when it is ready</button>
+                                        <span>The tab title also shows the progress.</span>
+                                    }
+                                </p>
+                            }
+                            <PrismaFunnel Stats="State.Stats" Removed="State.RemovedBeforeScreening" Running="isSearching"
+                                          Yields="State.SearchStringYields" ExclusionGroups="State.ExclusionGroups" />
+                        </div>
+                    </div>
+                }
+            </section>
+        </div>
     </div>
-</div>
+}
 
 @if (showKeyModal)
 {
@@ -529,10 +403,6 @@
     private string reviewObjective { get => State.ReviewObjective; set => State.ReviewObjective = value; }
     // The research questions as typed, one per line; ReviewInputGuard.ResearchQuestionLines splits them.
     private string researchQuestionsText { get => State.ResearchQuestions; set => State.ResearchQuestions = value; }
-    // Room for every question plus its numbering ("RQ1: "); the guard checks each question's own length.
-    private static readonly string ResearchQuestionsHelp =
-        $"Up to {AuBtechReviewAgent.ReviewInputGuard.MaxResearchQuestions}, one per line. The protocol lists them, and the conclusion answers each one.";
-    private const int ResearchQuestionsMaxLength = AuBtechReviewAgent.ReviewInputGuard.MaxResearchQuestions * (AuBtechReviewAgent.ReviewInputGuard.MaxResearchQuestion + 10);
     private string inclusionCriteria { get => State.InclusionCriteria; set => State.InclusionCriteria = value; }
     private string exclusionCriteria { get => State.ExclusionCriteria; set => State.ExclusionCriteria = value; }
     private bool requirePeerReview { get => State.RequirePeerReview; set => State.RequirePeerReview = value; }
@@ -622,12 +492,6 @@
     private List<string> SelectedAvailableSources() =>
         State.SelectedSources.Where(k => sourceAvailability.TryGetValue(k, out var ok) && ok).ToList();
 
-    private void ToggleSource(string key, ChangeEventArgs e)
-    {
-        if (e.Value is bool isChecked && isChecked) State.SelectedSources.Add(key);
-        else State.SelectedSources.Remove(key);
-    }
-
     private string modalMistral = "";
     private string modalElsevier = "";
     private string modalIeee = "";
@@ -652,10 +516,9 @@
     // summary of what was asked, so the run itself gets the attention.
     private bool editingNew;
     private bool Composing => !hasRun || editingNew;
-    private int formStep = 1;
+    // The criteria panel: null until the reviewer folds or opens it (then open from 1024 px only).
+    private bool? criteriaOpen;
     private AuBtechReviewAgent.ReviewState? runInfo;
-
-    private static readonly (int Number, string Title)[] Steps = { (1, "Question"), (2, "Criteria"), (3, "Output") };
 
     private const string LabelClass = "ui-label";
     private const string InputClass = "ui-input";
@@ -671,55 +534,51 @@
         set => State.DateTo = new DateTime(Math.Clamp(value, 1900, DateTime.UtcNow.Year), 12, 31);
     }
 
-    private static readonly (string Label, int From)[] YearPresets =
-        { ("Last 5 years", DateTime.UtcNow.Year - 5), ("Since 2015", 2015), ("Since 2000", 2000) };
-
     private void SetYears(int from)
     {
         yearFrom = from;
         yearTo = DateTime.UtcNow.Year;
     }
 
-    private bool StepDone(int number) => number switch
-    {
-        1 => !string.IsNullOrWhiteSpace(searchQuery),
-        2 => !string.IsNullOrWhiteSpace(inclusionCriteria),
-        _ => SelectedAvailableSources().Count > 0,
-    };
-
     /// <summary>Why the review cannot start yet, or null when it can. Shown next to the button, not after a click.</summary>
     private string? StartBlocker()
     {
         if (!quotaStatus.Allowed) return string.IsNullOrWhiteSpace(quotaStatus.Message) ? "No runs left for now." : quotaStatus.Message;
-        if (string.IsNullOrWhiteSpace(searchQuery)) return "Add a search query (step 1).";
-        if (string.IsNullOrWhiteSpace(inclusionCriteria)) return "Say which studies to include (step 2).";
-        if (SelectedAvailableSources().Count == 0) return "Select at least one source (step 3).";
+        if (string.IsNullOrWhiteSpace(searchQuery)) return "Add a search query.";
+        if (string.IsNullOrWhiteSpace(inclusionCriteria)) return "Say which studies to include, under Criteria.";
+        if (SelectedAvailableSources().Count == 0) return "Select at least one database, under Criteria.";
         return null;
     }
 
-    /// <summary>The form step and field to go to for the current blocker, or null when no field can fix it (quota).</summary>
-    private (int Step, string FieldId)? BlockerTarget()
+    /// <summary>The field to go to for the current blocker, or null when no field can fix it (quota).</summary>
+    private string? BlockerTarget()
     {
         if (!quotaStatus.Allowed) return null;
-        if (string.IsNullOrWhiteSpace(searchQuery)) return (1, "f-query");
-        if (string.IsNullOrWhiteSpace(inclusionCriteria)) return (2, "f-inclusion");
-        if (SelectedAvailableSources().Count == 0) return (3, "f-sources");
+        if (string.IsNullOrWhiteSpace(searchQuery)) return "f-query";
+        if (string.IsNullOrWhiteSpace(inclusionCriteria)) return "f-inclusion";
+        if (SelectedAvailableSources().Count == 0) return "f-sources";
         return null;
     }
 
-    // Field to focus after the next render (the step it is on has to be shown first).
+    // Field to focus after the next render (a field in the criteria panel needs the panel open first).
     private string? pendingFocus;
 
-    private void FocusField(int step, string fieldId)
+    /// <summary>The fields that live in the criteria panel rather than in the composer.</summary>
+    private static readonly HashSet<string> CriteriaFields = new() { "f-inclusion", "f-exclusion", "f-sources", "f-directive" };
+
+    private void FocusField(string fieldId)
     {
-        formStep = step;
+        if (CriteriaFields.Contains(fieldId)) criteriaOpen = true;
         pendingFocus = fieldId;
     }
 
     private void GoToProblem()
     {
-        if (BlockerTarget() is { } target) FocusField(target.Step, target.FieldId);
+        if (BlockerTarget() is { } fieldId) FocusField(fieldId);
     }
+
+    /// <summary>Called by the composer and the criteria panel on every change, so the page re-checks what is missing and saves the draft.</summary>
+    private void FormChanged() { }
 
     /// <summary>"Start review" is never silently disabled: when something is missing it takes you there instead.</summary>
     private async Task StartOrShowProblem()
@@ -732,16 +591,11 @@
         await StartReviewProcess();
     }
 
-    /// <summary>"true" when the last start attempt reported a problem with this field (for aria-invalid).</summary>
-    private string? Invalid(string fieldName) =>
-        inputCheck is { IsValid: false } && inputCheck.Errors.Any(e => e.StartsWith(fieldName, StringComparison.Ordinal)) ? "true" : null;
-
     // The input guard names fields by these labels; this is where each one lives in the form.
-    private static readonly (string Name, int Step, string FieldId)[] FieldsByName =
+    private static readonly (string Name, string FieldId)[] FieldsByName =
     {
-        ("Search query", 1, "f-query"), ("Review objective", 1, "f-objective"), ("Research question", 1, "f-questions"),
-        ("Inclusion criteria", 2, "f-inclusion"), ("Exclusion criteria", 2, "f-exclusion"),
-        ("Artifact target", 3, "f-directive"),
+        ("Search query", "f-query"), ("Review objective", "f-objective"), ("Research question", "f-questions"),
+        ("Inclusion criteria", "f-inclusion"), ("Exclusion criteria", "f-exclusion"), ("Artifact target", "f-directive"),
     };
 
     private void FocusFirstInvalidField()
@@ -752,20 +606,10 @@
             var field = FieldsByName.FirstOrDefault(f => error.StartsWith(f.Name, StringComparison.Ordinal));
             if (field.FieldId != null)
             {
-                FocusField(field.Step, field.FieldId);
+                FocusField(field.FieldId);
                 return;
             }
         }
-    }
-
-    private string SettingsLine()
-    {
-        int sources = SelectedAvailableSources().Count;
-        var parts = new List<string> { $"{sources} source{(sources == 1 ? "" : "s")}", $"{yearFrom}–{yearTo}", $"up to {maxResults} records each" };
-        if (State.DualScreening) parts.Add("dual screening");
-        if (State.CitationChaining) parts.Add("citation chaining");
-        if (State.ArtifactKind != AuBtechReviewAgent.ArtifactKinds.None) parts.Add(ArtifactLabel()!.ToLowerInvariant());
-        return string.Join(" · ", parts);
     }
 
     private string AdvancedSummary()
@@ -777,9 +621,6 @@
         if (requirePeerReview) on.Add("peer-reviewed");
         return on.Count == 0 ? $"{maxResults} per source" : $"{string.Join(", ", on)} · {maxResults} per source";
     }
-
-    private string? ArtifactLabel() => State.ArtifactKind == AuBtechReviewAgent.ArtifactKinds.None
-        ? null : AuBtechReviewAgent.ArtifactKinds.All.FirstOrDefault(k => k.Key == State.ArtifactKind).Label;
 
     // ── Tab title, notifications and the remembered draft (speed and feel) ─────────────────────────────
 
@@ -908,7 +749,6 @@
         synthesisTargetDirective = AuBtechReviewAgent.ArtifactKinds.DefaultInstruction(State.ArtifactKind);
         prefillNotice = null;
         showStartEmpty = false;
-        formStep = 1;
         await ClearDraftAsync();
     }
 
@@ -957,7 +797,6 @@
     private void StartNewDraft()
     {
         editingNew = true;
-        formStep = 1;
         panelTab = "overview";
         confirmDelete = false;
     }
@@ -1026,7 +865,6 @@
         stage = "";
         runInfo = null;
         editingNew = true;
-        formStep = 1;
         searchQuery = old.SearchQuery;
         if (!string.IsNullOrWhiteSpace(old.ReviewObjective)) reviewObjective = old.ReviewObjective;
         researchQuestionsText = string.Join("\n", old.ResearchQuestions ?? new List<string>());
@@ -1346,37 +1184,9 @@
         stage = "";
         failureMessage = null;
         runInfo = null;
-        formStep = 1;
         Nav.NavigateTo("/review", replace: true);
     }
 
-    /// <summary>Choosing a kind fills in its default instruction, unless the reviewer wrote their own.</summary>
-    private void HandleArtifactKind(ChangeEventArgs e)
-    {
-        string previous = State.ArtifactKind;
-        State.ArtifactKind = AuBtechReviewAgent.ArtifactKinds.Normalize(e.Value?.ToString());
-        bool untouched = string.IsNullOrWhiteSpace(synthesisTargetDirective)
-            || synthesisTargetDirective == AuBtechReviewAgent.ArtifactKinds.DefaultInstruction(previous);
-        if (untouched) synthesisTargetDirective = AuBtechReviewAgent.ArtifactKinds.DefaultInstruction(State.ArtifactKind);
-    }
-
-    /// <summary>
-    /// A short help line under a field; the character count only appears when the text gets near the limit.
-    /// The id is what the field's aria-describedby points to, so screen readers read the help with the field.
-    /// </summary>
-    private RenderFragment Help(string id, string help, string? value, int max) => __builder =>
-    {
-        int length = value?.Length ?? 0;
-        <div id="@id" class="flex justify-between gap-2 mt-1 text-xs leading-snug">
-            <span class="text-gray-500">@help</span>
-            @if (length > max * 0.8)
-            {
-                <span class="font-mono shrink-0 @(length > max * 0.95 ? "text-red-700" : "text-amber-700")">@length / @max</span>
-            }
-        </div>
-    };
-
-    /// <summary>One switch in the advanced options: label, one line of help, and the checkbox.</summary>
     /// <summary>
     /// One switch in the advanced options: the checkbox, its label, a "?" with the glossary explanation (outside
     /// the label, so it does not toggle the box) and one line of help that screen readers read with the box.
@@ -1498,7 +1308,6 @@
         }
         await ClearDraftAsync();
         editingNew = false;
-        formStep = 1;
         runInfo = null;
         var request = new AuBtechReviewAgent.ReviewRequest(
             cleanQuery, cleanObjective, cleanInclusion, cleanExclusion, runMaxResults,
