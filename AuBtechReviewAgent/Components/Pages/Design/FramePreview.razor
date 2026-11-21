@@ -5,7 +5,8 @@
 @inject NavigationManager Navigation
 @* A page that exists only in development: AppLayout with sample content long enough to scroll, so the frame can
    be checked in a browser and by the accessibility job in CI (tools/a11y), which also takes its screenshots
-   here, before the real pages move onto the layout. Anywhere else it answers "not found". *@
+   here, before the real pages move onto the layout. Anywhere else it answers "not found". Each section has a link,
+   as real pages do: a scrolling area with nothing to focus cannot be scrolled by keyboard (axe: scrollable-region-focusable). *@
 
 <SeoHead Title="Frame preview" NoIndex="true" />
 
@@ -21,7 +22,7 @@
                 int number = i;
                 <section class="mt-6 rounded-card border border-line bg-page p-6">
                     <h2 class="font-display text-lg font-semibold text-heading">Sample section @number</h2>
-                    <p class="mt-2 leading-relaxed text-ink">Every cited statement in a TraceableAI review can be traced to the passage it came from. This sample text only fills the page, so the content area is taller than the screen and has to scroll between the fixed header and footer.</p>
+                    <p class="mt-2 leading-relaxed text-ink">Every cited statement in a TraceableAI review can be traced to the passage it came from. This sample text only fills the page, so the content area is taller than the screen and has to scroll between the fixed header and footer. <a href="/about" class="font-medium text-heading underline underline-offset-4">Read how a citation is checked</a>.</p>
                 </section>
             }
         </div>
