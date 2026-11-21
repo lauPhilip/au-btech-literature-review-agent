@@ -16,41 +16,41 @@
     };
 }
 
-<div class="bg-white border border-gray-200 p-4 shadow-sm flex-none text-left">
-    <span class="text-[10px] font-bold uppercase tracking-wider text-gray-500 block mb-3">PRISMA Funnel</span>
+<div class="bg-page border border-line p-4 shadow-sm flex-none text-left">
+    <span class="text-[10px] font-bold uppercase tracking-wider text-muted block mb-3">PRISMA Funnel</span>
 
     <div class="space-y-1.5 text-xs">
-        <div class="flex items-baseline justify-between p-2 bg-gray-50 border border-gray-100 ">
-            <span class="font-semibold text-gray-700"><Term Key="records">Identified</Term></span>
-            <span class="text-lg font-bold text-brand font-mono">@s.TotalIdentified</span>
+        <div class="flex items-baseline justify-between p-2 bg-soft border border-line ">
+            <span class="font-semibold text-ink"><Term Key="records">Identified</Term></span>
+            <span class="text-lg font-bold text-heading font-mono">@s.TotalIdentified</span>
         </div>
 
-        <div class="pl-4 space-y-0.5 text-[11px] text-gray-500">
+        <div class="pl-4 space-y-0.5 text-[11px] text-muted">
             @RemovalRow("Duplicates", "The same paper returned by more than one search string or source", s.DuplicatesRemoved, AuBtechReviewAgent.RemovedRecord.Duplicate)
             @RemovalRow("Outside year range", "Publication year outside the Date From / Date To range", s.OutsideDateRange, AuBtechReviewAgent.RemovedRecord.OutsideYearRange)
             @RemovalRow("Over per-source cap", "Beyond the 'max results of each source' limit", s.CappedBeyondMaxResults, AuBtechReviewAgent.RemovedRecord.OverCap)
             @if (s.ScreeningErrors > 0)
             {
-                <div class="flex justify-between text-amber-700" title="The model call failed, so these records were not screened"><span>− Could not be screened</span><span class="font-mono">@s.ScreeningErrors</span></div>
+                <div class="flex justify-between text-partly" title="The model call failed, so these records were not screened"><span>− Could not be screened</span><span class="font-mono">@s.ScreeningErrors</span></div>
             }
             @if (Running && waiting > 0)
             {
-                <div class="flex justify-between text-brand"><span>… waiting to be screened</span><span class="font-mono">@waiting</span></div>
+                <div class="flex justify-between text-heading"><span>… waiting to be screened</span><span class="font-mono">@waiting</span></div>
             }
         </div>
 
         @if (Yields is { Count: > 1 })
         {
             string? hint = AuBtechReviewAgent.SearchSaturation.Hint(Yields);
-            <details class="text-[11px] text-gray-600">
-                <summary class="cursor-pointer select-none">New records per <Term Key="search-strings">search string</Term> <span class="text-brand underline decoration-dotted">show</span></summary>
+            <details class="text-[11px] text-muted">
+                <summary class="cursor-pointer select-none">New records per <Term Key="search-strings">search string</Term> <span class="text-heading underline decoration-dotted">show</span></summary>
                 <table class="mt-1 w-full">
                     <caption class="sr-only">Records retrieved and new records per search string, in the order they were run</caption>
-                    <thead><tr class="text-[10px] text-gray-500"><th scope="col" class="text-left font-normal">Search string</th><th scope="col" class="text-right font-normal">Found</th><th scope="col" class="text-right font-normal">New</th></tr></thead>
+                    <thead><tr class="text-[10px] text-muted"><th scope="col" class="text-left font-normal">Search string</th><th scope="col" class="text-right font-normal">Found</th><th scope="col" class="text-right font-normal">New</th></tr></thead>
                     <tbody>
                         @foreach (var y in Yields)
                         {
-                            <tr class="@(y.Searches == 0 ? "text-gray-500" : "")">
+                            <tr class="@(y.Searches == 0 ? "text-muted" : "")">
                                 <td class="pr-2 py-0.5 break-words">@y.SearchString</td>
                                 <td class="text-right font-mono">@(y.Searches == 0 ? "–" : y.Retrieved.ToString())</td>
                                 <td class="text-right font-mono font-semibold">@(y.Searches == 0 ? "–" : y.New.ToString())</td>
@@ -61,22 +61,22 @@
             </details>
             @if (hint != null)
             {
-                <p class="text-[10px] text-gray-600 leading-snug"><Term Key="saturation">Saturation</Term>: @hint</p>
+                <p class="text-[10px] text-muted leading-snug"><Term Key="saturation">Saturation</Term>: @hint</p>
             }
         }
 
-        <div class="flex items-baseline justify-between p-2 bg-gray-50 border border-gray-100 ">
-            <span class="font-semibold text-gray-700"><Term Key="screening">Screened</Term></span>
-            <span class="text-lg font-bold text-gray-700 font-mono">@s.Screened</span>
+        <div class="flex items-baseline justify-between p-2 bg-soft border border-line ">
+            <span class="font-semibold text-ink"><Term Key="screening">Screened</Term></span>
+            <span class="text-lg font-bold text-ink font-mono">@s.Screened</span>
         </div>
 
         <div class="grid grid-cols-2 gap-1.5">
-            <div class="p-2 bg-red-50/60 border border-red-100 ">
-                <span class="block text-[9px] font-bold text-red-500 uppercase tracking-wider">Excluded</span>
-                <span class="text-lg font-bold text-red-600 font-mono">@excludedTotal</span>
+            <div class="p-2 bg-not-supported-fill border border-not-supported-border ">
+                <span class="block text-[9px] font-bold text-not-supported uppercase tracking-wider">Excluded</span>
+                <span class="text-lg font-bold text-not-supported font-mono">@excludedTotal</span>
                 @if (ExclusionGroups is { Count: > 0 } groups && groups.Any(g => g.Key != AuBtechReviewAgent.ExclusionReasons.Unspecified))
                 {
-                    <ul class="mt-1 space-y-0.5 text-[10px] text-red-700" aria-label="Reasons for exclusion">
+                    <ul class="mt-1 space-y-0.5 text-[10px] text-not-supported" aria-label="Reasons for exclusion">
                         @foreach (var g in groups)
                         {
                             <li class="flex justify-between gap-2"><span>@g.Label</span><span class="font-mono">@g.Count</span></li>
@@ -85,48 +85,48 @@
                 }
                 else if (s.FailedPeerReviewCheck > 0)
                 {
-                    <span class="block text-[10px] text-red-500">incl. @s.FailedPeerReviewCheck not peer reviewed</span>
+                    <span class="block text-[10px] text-not-supported">incl. @s.FailedPeerReviewCheck not peer reviewed</span>
                 }
             </div>
-            <div class="p-2 bg-green-50/60 border border-green-100 ">
-                <span class="block text-[9px] font-bold text-green-600 uppercase tracking-wider">Included</span>
-                <span class="text-lg font-bold text-green-700 font-mono">@s.Included</span>
+            <div class="p-2 bg-supported-fill border border-supported-border ">
+                <span class="block text-[9px] font-bold text-supported uppercase tracking-wider">Included</span>
+                <span class="text-lg font-bold text-supported font-mono">@s.Included</span>
                 @if (s.Included > 0 && !Running)
                 {
-                    <span class="block text-[10px] text-green-700">full text @s.FullTextRetrieved · abstract only @(Math.Max(0, s.Included - s.FullTextRetrieved))</span>
+                    <span class="block text-[10px] text-supported">full text @s.FullTextRetrieved · abstract only @(Math.Max(0, s.Included - s.FullTextRetrieved))</span>
                 }
             </div>
         </div>
 
         @if (s.IdentifiedViaCitations > 0)
         {
-            <p class="text-[10px] text-gray-500">@s.IdentifiedViaCitations of the identified records came from citation chaining.</p>
+            <p class="text-[10px] text-muted">@s.IdentifiedViaCitations of the identified records came from citation chaining.</p>
         }
         @if (s.DualScreened > 0)
         {
-            <p class="text-[10px] text-gray-500" title="Every record was screened by two independent prompts; disagreements are included and flagged">
+            <p class="text-[10px] text-muted" title="Every record was screened by two independent prompts; disagreements are included and flagged">
                 Dual screening: @(s.DualScreened - s.ScreeningDisagreements) of @s.DualScreened agreed@(s.ScreeningKappa is double k ? $" (kappa {k.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture)})" : "").
             </p>
         }
         @if (s.UncertainDecisions > 0)
         {
-            <p class="text-[10px] text-amber-700">@s.UncertainDecisions decision(s) flagged as uncertain@(s.InjectionSuspected > 0 ? $", {s.InjectionSuspected} with possible prompt injection" : "").</p>
+            <p class="text-[10px] text-partly">@s.UncertainDecisions decision(s) flagged as uncertain@(s.InjectionSuspected > 0 ? $", {s.InjectionSuspected} with possible prompt injection" : "").</p>
         }
         @if (s.CacheHits > 0)
         {
-            <p class="text-[10px] text-gray-500">@s.CacheHits search response(s) or decision(s) reused from the cache.</p>
+            <p class="text-[10px] text-muted">@s.CacheHits search response(s) or decision(s) reused from the cache.</p>
         }
         @if (s.HumanReviewed > 0)
         {
-            <p class="text-[10px] text-gray-500">You checked @s.HumanReviewed screening decisions and changed @s.HumanOverrides.</p>
+            <p class="text-[10px] text-muted">You checked @s.HumanReviewed screening decisions and changed @s.HumanOverrides.</p>
         }
         @if (!Running && s.TotalIdentified > 0 && !flow.IsConsistent)
         {
-            <p class="text-[10px] text-amber-700">These counts do not add up for this run (it may predate the current counting); see transparent-process.json.</p>
+            <p class="text-[10px] text-partly">These counts do not add up for this run (it may predate the current counting); see transparent-process.json.</p>
         }
         @if (s.CitationsChecked > 0)
         {
-            <p class="text-[10px] text-gray-500 pt-1 border-t border-gray-100">
+            <p class="text-[10px] text-muted pt-1 border-t border-line">
                 Citation check: @s.CitationsSupported supported, @s.CitationsPartiallySupported partly, @s.CitationsNotSupported not supported,
                 @s.CitationsUnverifiable unverifiable (of @s.CitationsChecked).
             </p>
@@ -151,15 +151,15 @@
         {
             <details title="@tooltip">
                 <summary class="flex justify-between cursor-pointer select-none list-none">
-                    <span>− @label <span class="text-brand underline decoration-dotted">show</span></span>
+                    <span>− @label <span class="text-heading underline decoration-dotted">show</span></span>
                     <span class="font-mono">@count</span>
                 </summary>
-                <ul class="mt-1 mb-1 ml-3 space-y-0.5 text-[10px] text-gray-600">
+                <ul class="mt-1 mb-1 ml-3 space-y-0.5 text-[10px] text-muted">
                     @foreach (var r in records)
                     {
                         <li class="leading-snug break-words">
                             @r.Title
-                            <span class="text-gray-500">(@(r.Year > 0 ? r.Year.ToString() : "n.d."), @r.Source@(r.DuplicateOf != null ? $", duplicate of {r.DuplicateOf}" : ""))</span>
+                            <span class="text-muted">(@(r.Year > 0 ? r.Year.ToString() : "n.d."), @r.Source@(r.DuplicateOf != null ? $", duplicate of {r.DuplicateOf}" : ""))</span>
                         </li>
                     }
                 </ul>

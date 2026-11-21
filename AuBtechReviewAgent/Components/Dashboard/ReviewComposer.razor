@@ -8,7 +8,7 @@
 
 <div class="mx-auto w-full max-w-[760px] min-w-0">
     <p class="font-display text-xs font-semibold uppercase tracking-[0.14em] text-muted max-sm:hidden">
-        @Method.Name · @Method.Standard · <a href="/start" class="normal-case tracking-normal text-brand underline underline-offset-2 hover:text-brand-700">change<span class="sr-only"> the review type</span></a>
+        @Method.Name · @Method.Standard · <a href="/start" class="normal-case tracking-normal text-heading underline underline-offset-2 hover:text-heading">change<span class="sr-only"> the review type</span></a>
     </p>
     <h1 class="font-display sm:mt-2 text-[clamp(26px,2.4vw,40px)] font-semibold leading-tight tracking-[-0.025em] text-heading">What should the review find out?</h1>
 
@@ -64,16 +64,16 @@
                     // Full class names (not built from a colour variable) so the Tailwind build can find them.
                     var (chipBox, chipDot) = Quota.Tier switch
                     {
-                        AuBtechReviewAgent.QuotaTier.Developer => ("bg-blue-50 border-blue-200 text-blue-800", "bg-blue-500"),
-                        AuBtechReviewAgent.QuotaTier.OwnKey => ("bg-green-50 border-green-200 text-green-800", "bg-green-500"),
-                        _ when Quota.Allowed => ("bg-amber-50 border-amber-200 text-amber-800", "bg-amber-500"),
-                        _ => ("bg-red-50 border-red-200 text-red-800", "bg-red-500"),
+                        AuBtechReviewAgent.QuotaTier.Developer => ("bg-abstract-only-fill border-abstract-only-border text-abstract-only", "bg-abstract-only-chart"),
+                        AuBtechReviewAgent.QuotaTier.OwnKey => ("bg-supported-fill border-supported-border text-supported", "bg-supported-chart"),
+                        _ when Quota.Allowed => ("bg-partly-fill border-partly-border text-partly", "bg-partly-chart"),
+                        _ => ("bg-not-supported-fill border-not-supported-border text-not-supported", "bg-not-supported-chart"),
                     };
                 }
                 <span class="@chipBox flex items-center gap-1.5 border px-2.5 py-1 text-[11px] max-sm:hidden" title="@BadgeTitle()">
                     <span class="h-1.5 w-1.5 rounded-full @chipDot"></span>@BadgeText()
                 </span>
-                <button type="button" @onclick="OnOpenKeys" class="min-h-[44px] text-xs font-medium text-muted underline underline-offset-2 hover:text-brand">API keys</button>
+                <button type="button" @onclick="OnOpenKeys" class="min-h-[44px] text-xs font-medium text-muted underline underline-offset-2 hover:text-heading">API keys</button>
             </div>
             <span class="flex-1 max-sm:hidden"></span>
             <button type="button" @onclick="OnStart" disabled="@Busy" class="ui-btn-primary min-h-[52px] px-7 text-base max-sm:w-full">Start review</button>
