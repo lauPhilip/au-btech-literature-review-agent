@@ -170,181 +170,83 @@
 }
 else
 {
-    <div class="max-w-7xl w-full mx-auto p-4 lg:p-6 space-y-4">
-
-        @* Toolbar: what this page is, and the account details in small print (they matter less than the question). *@
-        <div class="flex flex-wrap items-end justify-between gap-3">
-            <div>
-                <h1 class="ui-h2">Your review</h1>
-                <p class="text-sm text-gray-500 mt-1">A <Term Key="prisma" Below="true">PRISMA 2020</Term> review in which every citation is checked against the paper it cites. <a href="/glossary" class="text-brand underline underline-offset-2">Glossary</a></p>
-            </div>
-            <div class="flex items-center gap-2">
-                @{
-                    // Full class names (not built from a colour variable) so the Tailwind build can find them.
-                    var (chipBox, chipDot) = quotaStatus.Tier switch
-                    {
-                        AuBtechReviewAgent.QuotaTier.Developer => ("bg-blue-50 border-blue-200 text-blue-800", "bg-blue-500"),
-                        AuBtechReviewAgent.QuotaTier.OwnKey => ("bg-green-50 border-green-200 text-green-800", "bg-green-500"),
-                        _ when quotaStatus.Allowed => ("bg-amber-50 border-amber-200 text-amber-800", "bg-amber-500"),
-                        _ => ("bg-red-50 border-red-200 text-red-800", "bg-red-500"),
-                    };
-                    string tierLabel = quotaStatus.Tier switch
-                    {
-                        AuBtechReviewAgent.QuotaTier.Developer => "Developer access",
-                        AuBtechReviewAgent.QuotaTier.OwnKey => "Own Mistral key",
-                        _ => "Free tier"
-                    };
-                    string counter = quotaStatus.Limit == int.MaxValue ? "unlimited"
-                        : quotaStatus.Tier == AuBtechReviewAgent.QuotaTier.OwnKey ? $"{quotaStatus.Remaining} of {quotaStatus.Limit} left this hour"
-                        : $"{quotaStatus.Remaining} of {quotaStatus.Limit} left today";
-                }
-                <span class="@chipBox border px-2.5 py-1 text-[11px] flex items-center gap-1.5" title="@(quotaStatus.ResetsUtc is { } resets ? $"Runs you can still start. More {AuBtechReviewAgent.RunQuotaService.ResetText(resets - DateTime.UtcNow)}." : "Runs you can still start")">
-                    <span class="w-1.5 h-1.5 rounded-full @chipDot"></span>@tierLabel · @counter
-                </span>
-                <button type="button" @onclick="OpenKeyModal" class="ui-btn-secondary ui-btn-sm">
-                    <svg class="w-3 h-3 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/></svg>
-                    API keys
-                </button>
-            </div>
-        </div>
-        @if (!string.IsNullOrEmpty(quotaNotice))
-        {
-            <p class="text-xs text-red-700" role="alert">@quotaNotice</p>
-        }
-
-        <div class="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
-
-            <section class="lg:col-span-5 space-y-4 min-w-0" aria-label="Review settings">
-                    @* While a run is going (or done), the form becomes a compact summary of what was asked. *@
-                    <div class="bg-white border border-gray-200 shadow-sm p-4 space-y-3">
-                        <div class="flex items-center justify-between gap-2">
-                            <div>
-                                <h2 class="text-sm font-semibold text-gray-900">Review settings</h2>
-                                <p class="text-xs font-medium @(StageColor())">@StageLabel()</p>
-                            </div>
-                            @if (!isSearching)
-                            {
-                                <button type="button" @onclick="StartNewDraft" class="ui-btn-primary ui-btn-sm">New review</button>
-                            }
-                        </div>
-                        <dl class="text-xs space-y-2">
-                            @SettingRow("Query", runInfo?.SearchQuery ?? searchQuery)
-                            @SettingRow("Objective", !string.IsNullOrWhiteSpace(runInfo?.ReviewObjective) ? runInfo!.ReviewObjective : runInfo == null ? reviewObjective : "(not stored for this run)")
-                            @if ((runInfo?.ResearchQuestions ?? AuBtechReviewAgent.ReviewInputGuard.ResearchQuestionLines(researchQuestionsText)) is { Count: > 0 } shownQuestions)
-                            {
-                                @SettingRow("Questions", string.Join(" ", shownQuestions.Select((q, i) => $"RQ{i + 1}. {q}")))
-                            }
-                            @SettingRow("Include", !string.IsNullOrWhiteSpace(runInfo?.InclusionCriteria) ? runInfo!.InclusionCriteria : runInfo == null ? inclusionCriteria : "(see the protocol)")
-                            @SettingRow("Exclude", ExclusionShown())
-                            @SettingRow("Years", runInfo is { YearFrom: > 0 } ? $"{runInfo.YearFrom}–{runInfo.YearTo}" : $"{yearFrom}–{yearTo}")
-                            @SettingRow("Sources", string.Join(", ", (runInfo?.SelectedSources ?? State.SelectedSources.ToList()).Select(AuBtechReviewAgent.SourceCatalog.DisplayNameFor)))
-                        </dl>
-                        <p class="text-[11px] text-gray-500 leading-snug border-t border-gray-100 pt-2">
-                            Link to this run: <a class="text-brand underline break-all" href="@($"/review/{currentSessionId}")">@($"/review/{currentSessionId}")</a>
-                            <button type="button" @onclick="CopyRunLink" class="ml-1 text-brand font-medium hover:underline">@(linkCopied ? "Copied" : "Copy link")</button>.
-                            Anyone with the link can read the run@(canEdit ? "; only this browser can change or delete it" : ""). Results are kept for @RunsOptions.RetentionDays days@(completedUtc.HasValue ? $" (until {completedUtc.Value.AddDays(RunsOptions.RetentionDays):yyyy-MM-dd} UTC)" : "").
-                        </p>
-                        @if (!isSearching && AuBtechReviewAgent.PrismaReviewEngine.IsFinishedStage(stage) && !canEdit)
+    @* Running and Done (redesign step 7): RunProgressPanel shows a run that is going, waiting or stopped, and
+       RunSummaryCard a finished one, each in the same centred column as the composer with a side column beside it.
+       The page adds what only it knows: the reason a run stopped, the browser notification, the human screening
+       check, the live log, the PRISMA funnel, and the run's own card with its link, settings, Delete and New review. *@
+    @* Screen readers hear the step changes and the end of the run, not every percent (WCAG 4.1.3). *@
+    <p class="sr-only" role="status" aria-live="polite">@Announcement()</p>
+    @if (!string.IsNullOrEmpty(quotaNotice))
+    {
+        <p class="mx-auto mt-4 max-w-[760px] px-4 text-xs text-red-700" role="alert">@quotaNotice</p>
+    }
+    @if (stage == AuBtechReviewAgent.PrismaReviewEngine.StageComplete)
+    {
+        <RunSummaryCard Stats="State.Stats" RunId="currentSessionId" Objective="@ObjectiveShown()">
+            <Main>@LogPanel()</Main>
+            <Side>@RunCard()</Side>
+        </RunSummaryCard>
+    }
+    else
+    {
+        <RunProgressPanel Stats="State.Stats" Stage="@stage" Running="isSearching" QueuePosition="queuePosition" CompletedUtc="completedUtc"
+                          Objective="@ObjectiveShown()" SourceCount="SourcesShown().Count" LogShown="showLog" OnShowLog="ToggleLog">
+            <Notice>
+                @if (!string.IsNullOrEmpty(failureMessage))
+                {
+                    <div class="mt-4 rounded-field border border-not-supported-border bg-not-supported-fill p-3 text-sm text-not-supported" role="alert">
+                        <p>@failureMessage</p>
+                        @if (stage is AuBtechReviewAgent.PrismaReviewEngine.StageFailed or AuBtechReviewAgent.PrismaReviewEngine.StageInterrupted)
                         {
-                            <p class="text-[11px] text-gray-600">Read-only: only the browser that started this run can delete it.</p>
-                        }
-                        else if (!isSearching && AuBtechReviewAgent.PrismaReviewEngine.IsFinishedStage(stage))
-                        {
-                            <div class="flex items-center gap-2 text-[11px]">
-                                @if (!confirmDelete)
-                                {
-                                    <button type="button" @onclick="() => confirmDelete = true" class="text-red-700 hover:text-red-900 underline">Delete this run</button>
-                                }
-                                else
-                                {
-                                    <span class="text-red-800">Delete the run, its report and downloaded papers for good?</span>
-                                    <button type="button" @onclick="DeleteRun" class="ui-btn-danger ui-btn-sm">Delete</button>
-                                    <button type="button" @onclick="() => confirmDelete = false" class="ui-btn-secondary ui-btn-sm">Cancel</button>
-                                }
-                            </div>
+                            <p class="mt-1.5 text-xs">
+                                Run <span class="font-mono select-all">@currentSessionId</span> · version @AppVersionShort ·
+                                <a href="@AuBtechReviewAgent.SiteSeo.ProblemReportUrl(currentSessionId, AppVersionShort, stage)" target="_blank" rel="noopener" class="font-semibold underline underline-offset-2">Report this problem</a>
+                                (the report includes the run ID and version, not your question)
+                            </p>
                         }
                     </div>
-            </section>
-
-            @* The right side follows the run: what will happen, then the progress, then the result. *@
-            <section id="run-panel" class="lg:col-span-7 lg:sticky lg:top-4 min-w-0 bg-white border border-gray-200 shadow-sm overflow-hidden flex flex-col lg:max-h-[calc(100vh-8rem)]" aria-labelledby="run-panel-title">
-                @* Screen readers hear the step changes and the end of the run, not every percent (WCAG 4.1.3). *@
-                <p class="sr-only" role="status" aria-live="polite">@Announcement()</p>
-                <h2 id="run-panel-title" class="sr-only">@PanelTitle()</h2>
-                <div class="flex items-center justify-between border-b border-gray-200 px-3 flex-none">
-                    <div class="flex" role="group" aria-label="Show">
-                        <button type="button" aria-pressed="@(panelTab == "overview" ? "true" : "false")" @onclick="@(() => panelTab = "overview")"
-                                class="px-3 py-2.5 text-xs border-b-2 -mb-px @(panelTab == "overview" ? "border-brand text-brand font-semibold" : "border-transparent text-gray-500 hover:text-gray-800")">@PanelTitle()</button>
-                        @if (hasRun && !Composing)
-                        {
-                            <button type="button" aria-pressed="@(panelTab == "ledger" ? "true" : "false")" @onclick="@(() => panelTab = "ledger")"
-                                    class="px-3 py-2.5 text-xs border-b-2 -mb-px @(panelTab == "ledger" ? "border-brand text-brand font-semibold" : "border-transparent text-gray-500 hover:text-gray-800")">Ledger (JSON)</button>
-                        }
-                    </div>
-                    <span class="text-[10px] text-gray-500 font-mono">@ReviewEngine.Llm.Model</span>
-                </div>
-
-                @if (panelTab == "ledger" && hasRun && !Composing)
-                {
-                    <div class="flex-1 min-h-[20rem] bg-gray-950 p-4 font-mono text-xs text-green-400 overflow-y-auto whitespace-pre-wrap break-words leading-relaxed">@rawJsonLogs</div>
                 }
-                else if (awaitingReview && reviewLogs != null && !Composing)
+            </Notice>
+            <Notify>
+                @if (isSearching && notifyPermission is "default" or "granted")
                 {
-                    @if (canEdit)
+                    @* Runs take minutes; people switch tabs. The tab title shows the progress, and this asks the browser to say when it is done. *@
+                    @if (notifyPermission == "granted")
                     {
-                        <ScreeningReviewPanel RunId="currentSessionId" EditKey="@editKey" Logs="reviewLogs" OnSubmitted="OnScreeningReviewSubmitted" />
+                        <p class="mt-2 text-sm text-muted">You will get a browser notification when the review is ready, if this tab is in the background.</p>
                     }
                     else
                     {
-                        <p class="p-4 text-sm text-gray-700">This run is waiting for the person who started it to check the screening decisions. Only the browser that started a run can do that.</p>
+                        <button type="button" @onclick="AskForNotification" class="ui-btn-secondary mt-3 min-h-[44px] w-full">Notify me when it is ready</button>
                     }
                 }
-                else
+            </Notify>
+            <Main>
+                @if (awaitingReview && reviewLogs != null)
                 {
-                    <div class="flex-1 min-h-0 overflow-y-auto">
-                        @if (stage == AuBtechReviewAgent.PrismaReviewEngine.StageComplete)
-                        {
-                            <RunSummaryCard Stats="State.Stats" RunId="currentSessionId" />
-                        }
-                        <div class="p-4 space-y-4">
-                            @if (!string.IsNullOrEmpty(failureMessage))
-                            {
-                                <div class="text-sm text-red-700 bg-red-50 border border-red-200 p-2" role="alert">
-                                    <p>@failureMessage</p>
-                                    @if (stage is AuBtechReviewAgent.PrismaReviewEngine.StageFailed or AuBtechReviewAgent.PrismaReviewEngine.StageInterrupted)
-                                    {
-                                        <p class="mt-1.5 text-xs text-red-900">
-                                            Run <span class="font-mono select-all">@currentSessionId</span> · version @AppVersionShort ·
-                                            <a href="@AuBtechReviewAgent.SiteSeo.ProblemReportUrl(currentSessionId, AppVersionShort, stage)" target="_blank" rel="noopener" class="underline underline-offset-2">Report this problem</a>
-                                            <span class="text-red-800">(the report includes the run ID and version, not your question)</span>
-                                        </p>
-                                    }
-                                </div>
-                            }
-                            <RunProgressPanel Stats="State.Stats" Stage="@stage" Running="isSearching" QueuePosition="queuePosition" CompletedUtc="completedUtc" />
-                            @if (isSearching && notifyPermission is "default" or "granted")
-                            {
-                                @* Runs take minutes; people switch tabs. The tab title shows the progress, and this asks the browser to say when it is done. *@
-                                <p class="text-xs text-gray-600 flex items-center gap-2">
-                                    @if (notifyPermission == "granted")
-                                    {
-                                        <span>You will get a browser notification when the review is ready, if this tab is in the background.</span>
-                                    }
-                                    else
-                                    {
-                                        <button type="button" @onclick="AskForNotification" class="ui-btn-secondary ui-btn-sm">Notify me when it is ready</button>
-                                        <span>The tab title also shows the progress.</span>
-                                    }
-                                </p>
-                            }
-                            <PrismaFunnel Stats="State.Stats" Removed="State.RemovedBeforeScreening" Running="isSearching"
-                                          Yields="State.SearchStringYields" ExclusionGroups="State.ExclusionGroups" />
+                    @if (canEdit)
+                    {
+                        <div class="ui-card mt-4 flex h-[70vh] flex-col overflow-hidden">
+                            <ScreeningReviewPanel RunId="currentSessionId" EditKey="@editKey" Logs="reviewLogs" OnSubmitted="OnScreeningReviewSubmitted" />
                         </div>
-                    </div>
+                    }
+                    else
+                    {
+                        <p class="ui-card mt-4 p-4 text-sm text-ink">This run is waiting for the person who started it to check the screening decisions. Only the browser that started a run can do that.</p>
+                    }
                 }
-            </section>
-        </div>
-    </div>
+                @LogPanel()
+                <details class="ui-card mt-4 p-4 max-sm:hidden sm:p-5" open>
+                    <summary class="flex min-h-[44px] cursor-pointer items-center font-display text-sm font-semibold text-heading">Records so far</summary>
+                    <div class="mt-2">
+                        <PrismaFunnel Stats="State.Stats" Removed="State.RemovedBeforeScreening" Running="isSearching"
+                                      Yields="State.SearchStringYields" ExclusionGroups="State.ExclusionGroups" />
+                    </div>
+                </details>
+            </Main>
+            <Side>@RunCard()</Side>
+        </RunProgressPanel>
+    }
 }
 
 @if (showKeyModal)
@@ -510,7 +412,6 @@ else
     private AuBtechReviewAgent.ReviewMethod ReviewMethod => AuBtechReviewAgent.ReviewMethods.AvailableOrDefault(MethodKey);
     private Guid? prefilledFrom;
     private string? prefillNotice;
-    private string panelTab = "overview";
 
     // The form is shown while composing (no run on this page, or "New review" pressed); otherwise a compact
     // summary of what was asked, so the run itself gets the attention.
@@ -774,12 +675,103 @@ else
         return AuBtechReviewAgent.RunProgress.Steps.TryGetValue(State.Stats.ProgressStep, out var step) ? $"Now: {step.Label}." : "The run has started.";
     }
 
-    private string PanelTitle() =>
-        Composing ? "Preview"
-        : stage == AuBtechReviewAgent.PrismaReviewEngine.StageComplete ? "Result"
-        : awaitingReview ? "Your screening check"
-        : isSearching ? "Progress"
-        : StageLabel();
+
+    // ── Running and Done (redesign step 7) ─────────────────────────────────────────────────────────────
+    private bool showLog;
+
+    private void ToggleLog() => showLog = !showLog;
+
+    /// <summary>The title of a run: its objective, or its query when the run has none.</summary>
+    private string ObjectiveShown() =>
+        !string.IsNullOrWhiteSpace(runInfo?.ReviewObjective) ? runInfo!.ReviewObjective
+        : runInfo == null && !string.IsNullOrWhiteSpace(reviewObjective) ? reviewObjective
+        : runInfo?.SearchQuery ?? searchQuery;
+
+    private List<string> SourcesShown() => runInfo?.SelectedSources ?? State.SelectedSources.ToList();
+
+    /// <summary>The run's ledger as JSON, shown under the steps or the result when asked for.</summary>
+    private RenderFragment LogPanel() => __builder =>
+    {
+        if (showLog)
+        {
+            <section id="run-log" class="ui-card mt-4 overflow-hidden" aria-labelledby="run-log-title">
+                <div class="flex items-center justify-between gap-2 border-b border-line px-4 py-1">
+                    <h2 id="run-log-title" class="font-display text-sm font-semibold text-heading">Live log <span class="font-normal text-muted">(the run's ledger as JSON)</span></h2>
+                    <button type="button" @onclick="ToggleLog" class="min-h-[44px] text-sm font-medium text-heading underline underline-offset-2">Hide</button>
+                </div>
+                <pre tabindex="0" class="max-h-[60vh] overflow-y-auto whitespace-pre-wrap break-words bg-gray-950 p-4 font-mono text-xs leading-relaxed text-green-400">@rawJsonLogs</pre>
+            </section>
+        }
+    };
+
+    /// <summary>
+    /// The run's own card: its link with Copy, who can change it and how long it is kept, what was asked, the ledger
+    /// of a finished run, New review, and Delete or the read-only note. Hidden on a phone while the run is going.
+    /// </summary>
+    private RenderFragment RunCard() => __builder =>
+    {
+        bool finished = !isSearching && AuBtechReviewAgent.PrismaReviewEngine.IsFinishedStage(stage);
+        var questions = runInfo?.ResearchQuestions ?? AuBtechReviewAgent.ReviewInputGuard.ResearchQuestionLines(researchQuestionsText);
+        <div class="ui-card p-4 sm:p-5 @(isSearching ? "max-sm:hidden" : "")">
+            <h2 class="font-display text-base font-semibold text-heading">This run</h2>
+            <p class="mt-1 text-sm text-ink">
+                <a class="break-all text-heading underline underline-offset-2" href="@($"/review/{currentSessionId}")">@($"/review/{currentSessionId}")</a>
+                <button type="button" @onclick="CopyRunLink" class="ml-1 min-h-[44px] font-medium text-heading hover:underline">@(linkCopied ? "Copied" : "Copy link")</button>
+            </p>
+            <p class="text-xs leading-relaxed text-muted">
+                Anyone with the link can read the run@(canEdit ? "; only this browser can change or delete it" : ""). Results are kept for @RunsOptions.RetentionDays days@(completedUtc.HasValue ? $" (until {completedUtc.Value.AddDays(RunsOptions.RetentionDays):yyyy-MM-dd} UTC)" : "").
+            </p>
+            <details class="mt-3 border-t border-line pt-1">
+                <summary class="flex min-h-[44px] cursor-pointer items-center text-sm font-semibold text-ink">What you asked</summary>
+                <dl class="mt-1 space-y-2 text-xs">
+                    @SettingRow("Query", runInfo?.SearchQuery ?? searchQuery)
+                    @SettingRow("Objective", !string.IsNullOrWhiteSpace(runInfo?.ReviewObjective) ? runInfo!.ReviewObjective : runInfo == null ? reviewObjective : "(not stored for this run)")
+                    @if (questions is { Count: > 0 })
+                    {
+                        @SettingRow("Questions", string.Join(" ", questions.Select((q, i) => $"RQ{i + 1}. {q}")))
+                    }
+                    @SettingRow("Include", !string.IsNullOrWhiteSpace(runInfo?.InclusionCriteria) ? runInfo!.InclusionCriteria : runInfo == null ? inclusionCriteria : "(see the protocol)")
+                    @SettingRow("Exclude", ExclusionShown())
+                    @SettingRow("Years", runInfo is { YearFrom: > 0 } ? $"{runInfo.YearFrom}–{runInfo.YearTo}" : $"{yearFrom}–{yearTo}")
+                    @SettingRow("Sources", string.Join(", ", SourcesShown().Select(AuBtechReviewAgent.SourceCatalog.DisplayNameFor)))
+                    @SettingRow("Model", ReviewEngine.Llm.Model)
+                </dl>
+            </details>
+            @if (stage == AuBtechReviewAgent.PrismaReviewEngine.StageComplete)
+            {
+                <button type="button" @onclick="ToggleLog" aria-expanded="@(showLog ? "true" : "false")" class="min-h-[44px] text-sm font-medium text-heading underline underline-offset-2">@(showLog ? "Hide the ledger (JSON)" : "View the ledger (JSON)")</button>
+            }
+            @if (!isSearching)
+            {
+                <div class="mt-3 flex flex-col gap-2 border-t border-line pt-3">
+                    <button type="button" @onclick="StartNewDraft" class="ui-btn-secondary min-h-[44px] w-full">New review</button>
+                    @if (finished)
+                    {
+                        <a href="@($"/review?from={currentSessionId}")" class="ui-btn-ghost min-h-[44px] w-full">New review with these settings</a>
+                    }
+                </div>
+            }
+            @if (finished && !canEdit)
+            {
+                <p class="mt-3 text-xs text-muted">Read-only: only the browser that started this run can delete it.</p>
+            }
+            else if (finished)
+            {
+                <div class="mt-3 flex flex-wrap items-center gap-2 text-xs">
+                    @if (!confirmDelete)
+                    {
+                        <button type="button" @onclick="() => confirmDelete = true" class="min-h-[44px] text-not-supported underline underline-offset-2">Delete this run</button>
+                    }
+                    else
+                    {
+                        <span class="text-not-supported">Delete the run, its report and downloaded papers for good?</span>
+                        <button type="button" @onclick="DeleteRun" class="ui-btn-danger ui-btn-sm min-h-[44px]">Delete</button>
+                        <button type="button" @onclick="() => confirmDelete = false" class="ui-btn-secondary ui-btn-sm min-h-[44px]">Cancel</button>
+                    }
+                </div>
+            }
+        </div>
+    };
 
     /// <summary>Fills the form with a worked example, so a first-time visitor sees what good input looks like.</summary>
     private void LoadExample()
@@ -797,7 +789,7 @@ else
     private void StartNewDraft()
     {
         editingNew = true;
-        panelTab = "overview";
+        showLog = false;
         confirmDelete = false;
     }
 
@@ -949,27 +941,6 @@ else
         else reviewLogs = null;
         if (rawJson != null) rawJsonLogs = rawJson;
     }
-
-    private string StageLabel() => stage switch
-    {
-        AuBtechReviewAgent.PrismaReviewEngine.StageQueued => queuePosition > 0 ? $"Waiting in line (position {queuePosition})" : "Waiting for a free slot",
-        AuBtechReviewAgent.PrismaReviewEngine.StageScreening => "Searching and screening",
-        AuBtechReviewAgent.PrismaReviewEngine.StageAwaitingReview => "Waiting for your screening review",
-        AuBtechReviewAgent.PrismaReviewEngine.StageSynthesizing => "Writing and checking the review",
-        AuBtechReviewAgent.PrismaReviewEngine.StageComplete => "Complete",
-        AuBtechReviewAgent.PrismaReviewEngine.StageFailed => "Failed",
-        AuBtechReviewAgent.PrismaReviewEngine.StageInterrupted => "Interrupted",
-        "" => "Not found",
-        _ => stage
-    };
-
-    private string StageColor() => stage switch
-    {
-        AuBtechReviewAgent.PrismaReviewEngine.StageComplete => "text-green-700",
-        AuBtechReviewAgent.PrismaReviewEngine.StageFailed or AuBtechReviewAgent.PrismaReviewEngine.StageInterrupted or "" => "text-red-700",
-        AuBtechReviewAgent.PrismaReviewEngine.StageAwaitingReview => "text-amber-700",
-        _ => "text-brand"
-    };
 
     private void Subscribe()
     {
@@ -1267,7 +1238,7 @@ else
         int runMaxResults = Quota.MaxResultsFor(tier, maxResults);
         maxResults = runMaxResults;
         // The engine runs the same check again; these are the normalised fields.
-        panelTab = "overview";
+        showLog = false;
         prefillNotice = null;
         string cleanQuery = inputCheck.Request.Query;
         string cleanObjective = inputCheck.Request.Objective;
