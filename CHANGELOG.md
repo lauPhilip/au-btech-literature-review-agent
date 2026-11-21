@@ -24,6 +24,8 @@ While a review runs, the same page shows its seven steps, from the protocol to t
 
 The report is now one calm, long page. It opens with the title, a line on what the review found and one coloured bar for how the citations held up. Every section follows in order, in larger type with shorter lines, so it reads like a paper. A new figure shows how the records flowed from search to the included studies. Each citation is a small coloured chip; open it and a card shows the passage it was checked against. On a laptop a list of sections sits on the left, and on a large screen a panel on the right steps through the citations you choose: all, flagged or abstract only. Printing, notes, re-checks and every download work as before.
 
+The Metrics page now asks one question: how well do the citations hold up? Four figures answer it at the top. Then every review gets its own bar in one chart, oldest on the left, named by the start of its run ID. Three tables follow, each with a total: the share of each verdict per run, the plain counts per run, and the figures for each app version. The detail view of a single run is gone for now; its figures stay in each run's files.
+
 Nothing about how a review runs has changed. These are the first steps of the redesign; the pages follow one by one.
 
 ## [0.4.0] - 2026-11-20
