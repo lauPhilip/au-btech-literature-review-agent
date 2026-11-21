@@ -1,0 +1,20 @@
+@* The bare TraceableAI mark, the "reader bot", for our own pages where the background is known: the navy mark
+   on the light theme and the light mark on the dark theme (wwwroot/brand/BRAND.md). Both files are in the
+   page and CSS shows the right one, so the mark is right on the first paint. Use the tiles, not this, where
+   the background is unknown. *@
+
+<span class="inline-flex shrink-0 @Class" style="width: @(Size)px; height: @(Size)px">
+    <img src="brand/traceableai-mark-navy.svg" alt="@Alt" width="@Size" height="@Size" class="h-full w-full dark:hidden" />
+    <img src="brand/traceableai-mark-light.svg" alt="@Alt" width="@Size" height="@Size" class="hidden h-full w-full dark:block" />
+</span>
+
+@code {
+    /// <summary>Width and height in pixels.</summary>
+    [Parameter] public int Size { get; set; } = 32;
+
+    /// <summary>The text alternative. Empty (decorative) by default, for when the name "TraceableAI" is written next to it.</summary>
+    [Parameter] public string Alt { get; set; } = "";
+
+    /// <summary>Extra classes for the wrapper.</summary>
+    [Parameter] public string Class { get; set; } = "";
+}

@@ -1,10 +1,13 @@
 ﻿<!DOCTYPE html>
-<html lang="en" class="h-full w-full m-0 p-0 overflow-hidden">
+<html lang="en" class="h-full w-full m-0 p-0 overflow-hidden" data-follow-system="@(Layout.ThemeToggle.FollowSystem ? "true" : "false")">
 
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <base href="/" />
+    @* Sets data-theme on <html> before anything is painted, so a dark choice never flashes white. It must be a
+       file and not an inline script, because the Content-Security-Policy allows only scripts from this site. *@
+    <script src="@Assets["js/theme.js"]"></script>
     @* @Assets[...] gives each file a fingerprinted address (it changes when the file changes), so browsers may
        keep it for a year instead of asking again on every visit; MapStaticAssets serves it Brotli-compressed. *@
     <link rel="stylesheet" href="@Assets["app.css"]" />

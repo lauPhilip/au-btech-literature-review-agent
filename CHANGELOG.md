@@ -12,7 +12,11 @@ The site starts its new look. It now uses a deeper navy, the same one as Courseb
 
 The icons that phones and older browsers use now show the same mark on a navy tile. So does the small logo in the header, and an Android phone gets a large icon when you add the site to the home screen.
 
-Nothing about how a review runs has changed. This is the first step of the redesign; the pages follow one by one.
+The top bar is new. It is white, shows the mark next to the name, and has three places: New review, Review output and Metrics. On a phone they fold into a menu. The footer is now one short line with the pages about trust and a link to GitHub.
+
+Behind the scenes, the site now has a frame that keeps the top bar and the footer still while the page scrolls, and a switch for a dark theme. The pages move into the frame in the next steps, and the switch comes with them.
+
+Nothing about how a review runs has changed. These are the first steps of the redesign; the pages follow one by one.
 
 ## [0.4.0] - 2026-11-20
 

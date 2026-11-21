@@ -97,14 +97,30 @@ jobs:
           cat app.log; exit 1
 
       # Fails on any "serious" or "critical" problem; the log lists every rule and element (tools/a11y).
+      # The two /design pages exist only in development: they show the redesign's frame (AppLayout and
+      # LandingLayout) before the real pages use it, and are also checked in the dark theme.
       - name: Run axe-core on the public pages
         working-directory: tools/a11y
         env:
           BASE_URL: http://localhost:5038
+          A11Y_PAGES: /,/review,/metrics,/glossary,/design/frame,/design/landing-frame
+          A11Y_DARK_PAGES: /design/frame,/design/landing-frame
+          A11Y_SCREENSHOTS: ${{ github.workspace }}/a11y-screenshots
         run: |
           npm ci
           npx playwright install --with-deps chromium
           node axe-check.mjs
+
+      # Screenshots of every checked page at 390, 1440 and 1920 px, so a pull request that changes markup can be
+      # looked at without running the app.
+      - name: Upload the screenshots
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: a11y-screenshots
+          path: a11y-screenshots/
+          if-no-files-found: ignore
+          retention-days: 14
 
   # The deploy itself is in deploy.yml, which release.yml also calls once a version is published, so the
   # server then names the release and not a pre-release (#144).

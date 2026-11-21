@@ -1,31 +1,40 @@
-@* The footer of the public pages: who made it, and the pages about trust (how it works, privacy, the model,
-   checking an archive) next to the project links. *@
+@* The footer. On app pages it is one slim line that never moves: the name, and the pages about trust (About,
+   Model card, Privacy, Verify an archive, Glossary) with GitHub; on phones only About, Privacy and GitHub.
+   The landing page (Landing="true") names the department and OSSYM 2026, with Metrics, Docs and GitHub. *@
 
-<footer class="bg-white border-t border-gray-100 print:hidden">
-    <div class="ui-container py-10 grid grid-cols-2 md:grid-cols-4 gap-8 text-sm">
-        <div class="col-span-2">
-            <p class="font-semibold text-gray-900">TraceableAI</p>
-            <p class="text-gray-500 mt-1 max-w-sm">Literature reviews where every citation is checked. @AuBtechReviewAgent.SiteSeo.Organisation. Presented at OSSYM 2026.</p>
-        </div>
-        <nav aria-label="About TraceableAI">
-            <p class="font-semibold text-gray-900">About</p>
-            <ul class="mt-2 space-y-1.5 text-gray-600">
-                <li><a href="/about" class="hover:text-brand">About and FAQ</a></li>
-                <li><a href="/model-card" class="hover:text-brand">Model card</a></li>
-                <li><a href="/privacy" class="hover:text-brand">Privacy</a></li>
-                <li><a href="/verify" class="hover:text-brand">Verify an archive</a></li>
-                <li><a href="/glossary" class="hover:text-brand">Glossary</a></li>
-            </ul>
-        </nav>
-        <nav aria-label="Project">
-            <p class="font-semibold text-gray-900">Project</p>
-            <ul class="mt-2 space-y-1.5 text-gray-600">
-                <li><a href="@AuBtechReviewAgent.SiteSeo.RepositoryUrl" class="hover:text-brand">GitHub</a></li>
-                <li><a href="@($"{AuBtechReviewAgent.SiteSeo.RepositoryUrl}/blob/master/docs/wiki/README.md")" class="hover:text-brand">Developer wiki</a></li>
-                <li><a href="@($"{AuBtechReviewAgent.SiteSeo.RepositoryUrl}/blob/master/CONTRIBUTING.md")" class="hover:text-brand">Contributing</a></li>
-                <li><a href="@($"{AuBtechReviewAgent.SiteSeo.RepositoryUrl}/blob/master/SECURITY.md")" class="hover:text-brand">Security</a></li>
-                <li><a href="@($"{AuBtechReviewAgent.SiteSeo.RepositoryUrl}/blob/master/LICENSE")" class="hover:text-brand">Apache 2.0 licence</a></li>
-            </ul>
-        </nav>
+<footer class="shrink-0 border-t border-line bg-page text-sm text-muted print:hidden">
+    <div class="mx-auto flex w-full max-w-[1600px] flex-wrap items-center justify-between gap-x-6 gap-y-1 px-[clamp(16px,3vw,40px)] py-1">
+        @if (Landing)
+        {
+            <p class="py-2">@AuBtechReviewAgent.SiteSeo.Organisation · OSSYM 2026</p>
+            <nav aria-label="Project">
+                <ul class="-mx-2 flex flex-wrap items-center">
+                    <li><a href="/metrics" class="@LinkClass">Metrics</a></li>
+                    <li><a href="@($"{AuBtechReviewAgent.SiteSeo.RepositoryUrl}/blob/master/docs/wiki/README.md")" class="@LinkClass">Docs</a></li>
+                    <li><a href="@AuBtechReviewAgent.SiteSeo.RepositoryUrl" class="@LinkClass">GitHub</a></li>
+                </ul>
+            </nav>
+        }
+        else
+        {
+            <p class="py-2"><span class="font-display font-semibold text-heading">TraceableAI</span> · BTECH, AU</p>
+            <nav aria-label="About TraceableAI">
+                <ul class="-mx-2 flex flex-wrap items-center">
+                    <li><a href="/about" class="@LinkClass">About</a></li>
+                    <li class="hidden sm:block"><a href="/model-card" class="@LinkClass">Model card</a></li>
+                    <li><a href="/privacy" class="@LinkClass">Privacy</a></li>
+                    <li class="hidden sm:block"><a href="/verify" class="@LinkClass">Verify an archive</a></li>
+                    <li class="hidden sm:block"><a href="/glossary" class="@LinkClass">Glossary</a></li>
+                    <li><a href="@AuBtechReviewAgent.SiteSeo.RepositoryUrl" class="@LinkClass">GitHub</a></li>
+                </ul>
+            </nav>
+        }
     </div>
 </footer>
+
+@code {
+    /// <summary>The landing page's footer instead of the slim one of the app pages.</summary>
+    [Parameter] public bool Landing { get; set; }
+
+    private const string LinkClass = "inline-flex min-h-11 items-center px-2 underline-offset-4 hover:text-heading hover:underline";
+}

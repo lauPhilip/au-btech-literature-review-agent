@@ -1,0 +1,13 @@
+@inherits LayoutComponentBase
+@* The frame of the landing page: the header without the places (only the mark, the name and the theme toggle),
+   the page, and the landing footer. Unlike AppLayout it is a single column of at least the screen's height, so
+   a short page keeps its footer at the bottom. <html> and <body> do not scroll (App.razor), so this column
+   scrolls itself when it is taller than the screen, without a scroll bar under 640 px. *@
+
+<div class="flex h-dvh w-full flex-col overflow-y-auto bg-page font-sans text-ink max-sm:[scrollbar-width:none] max-sm:[&::-webkit-scrollbar]:hidden print:block print:h-auto print:overflow-visible print:bg-white">
+    <SiteHeader ShowNav="false" ShowThemeToggle="true" />
+    <main id="main" tabindex="-1" class="flex flex-1 flex-col">
+        @Body
+    </main>
+    <SiteFooter Landing="true" />
+</div>
