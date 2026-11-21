@@ -1,0 +1,28 @@
+@page "/design/landing-frame"
+@layout LandingLayout
+@using Microsoft.Extensions.Hosting
+@inject Microsoft.AspNetCore.Hosting.IWebHostEnvironment Environment
+@inject NavigationManager Navigation
+@* A page that exists only in development: LandingLayout with a short sample hero, so the landing frame can be
+   checked in a browser and by the accessibility job in CI (tools/a11y) before the landing page moves onto it.
+   Anywhere else it answers "not found". *@
+
+<SeoHead Title="Landing frame preview" NoIndex="true" />
+
+@if (Environment.IsDevelopment())
+{
+    <div class="mx-auto flex w-full max-w-[1600px] flex-1 flex-col justify-center px-[clamp(16px,3vw,40px)] py-8">
+        <div class="max-w-[760px]">
+            <p class="text-sm font-semibold text-muted">Development only</p>
+            <h1 class="mt-2 font-display text-3xl font-semibold tracking-tight text-heading">The landing frame</h1>
+            <p class="mt-3 text-muted">The header shows only the mark, the name and the theme toggle. The footer names the department and links to Metrics, Docs and GitHub.</p>
+        </div>
+    </div>
+}
+
+@code {
+    protected override void OnInitialized()
+    {
+        if (!Environment.IsDevelopment()) Navigation.NotFound();
+    }
+}
