@@ -1,5 +1,6 @@
 ﻿<!DOCTYPE html>
-<html lang="en" class="h-full w-full m-0 p-0 overflow-hidden" data-follow-system="@(Layout.ThemeToggle.FollowSystem ? "true" : "false")">
+<html lang="en" class="h-full w-full m-0 p-0 overflow-hidden" data-follow-system="@(Layout.ThemeToggle.FollowSystem ? "true" : "false")"
+      data-theme-ready="@(Layout.ThemeToggle.ReadyFor(Navigation.ToBaseRelativePath(Navigation.Uri)) ? "true" : "false")">
 
 <head>
     <meta charset="utf-8" />
@@ -31,7 +32,12 @@
     <ReconnectModal />
     <script src="@Assets["js/mermaid-render.js"]"></script>
     <script src="@Assets["js/review-output.js"]"></script>
+    <script src="@Assets["js/citation-loop.js"]"></script>
     <script src="@Assets["_framework/blazor.web.js"]"></script>
 </body>
 
-</html>
+</html>
+
+@* The address decides whether this page can take the dark theme (ThemeToggle.ReadyFor). Blazor's enhanced
+   navigation copies <html>'s attributes from the next page, so data-theme-ready follows every page change. *@
+@inject NavigationManager Navigation

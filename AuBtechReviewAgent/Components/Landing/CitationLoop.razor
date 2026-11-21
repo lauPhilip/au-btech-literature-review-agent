@@ -1,0 +1,110 @@
+@* The landing page's example: one sentence of a real report (run 195564c6, a review of chatbots for smoking
+   cessation, 20 November 2026) with three of its citations checked one after the other. Each first shows
+   "Checking citation N against the paper…" for 1.1 s and then its verdict for 3.1 s, 12.6 s in all. The quotes,
+   verdicts and reasons are copied from that run's citation-audit.json; the quotes are word for word.
+
+   The loop is CSS animation (.tai-loop in Styles/tailwind.input.css), so the page needs no Blazor events and
+   stays static. The button pauses and plays it (wwwroot/js/citation-loop.js); for visitors whose system asks
+   for less motion it starts paused, on the first verdict. Screen readers get the same content once, in the
+   caption, instead of the moving parts. Hidden under 640 px, so the landing page fits a phone's screen. *@
+
+<figure class="tai-loop tai-dot-grid w-full rounded-panel bg-panel p-6 max-sm:hidden lg:p-10" aria-label="Example: three citations checked against their papers">
+    <div class="mx-auto w-full max-w-[34rem] rounded-card border border-line bg-page shadow-lift" aria-hidden="true">
+        <div class="flex items-center justify-between gap-3 border-b border-line px-5 py-3">
+            <span class="text-xs font-medium text-muted">Discussion · Example report</span>
+            <span class="flex items-center gap-1.5">
+                <span class="tai-loop-anim tai-loop-dot tai-loop-1 block h-1.5 w-6 bg-line-field"></span>
+                <span class="tai-loop-anim tai-loop-dot tai-loop-2 block h-1.5 w-6 bg-line-field"></span>
+                <span class="tai-loop-anim tai-loop-dot tai-loop-3 block h-1.5 w-6 bg-line-field"></span>
+            </span>
+        </div>
+        <div class="p-5">
+            <p class="text-[15px] leading-7 text-ink">
+                While the randomized trials provide direct comparative evidence for cessation outcomes
+                [<span class="tai-loop-anim tai-loop-cite tai-loop-1 tai-loop-ok px-0.5 font-semibold text-heading">5</span>, 6, 7],
+                the remaining designs contribute supportive findings regarding proximal outcomes, acceptability, and
+                technical feasibility
+                [2, <span class="tai-loop-anim tai-loop-cite tai-loop-2 tai-loop-partly px-0.5 font-semibold text-heading">4</span>,
+                8, <span class="tai-loop-anim tai-loop-cite tai-loop-3 tai-loop-not px-0.5 font-semibold text-heading">10</span>] …
+            </p>
+            <div class="relative mt-4 h-[11.5rem]">
+                @foreach (var item in Citations)
+                {
+                    var citation = item;
+                    <div class="tai-loop-anim tai-loop-check @citation.Slot absolute inset-0 border border-line bg-soft p-4">
+                        <p class="text-sm text-muted">Checking citation @citation.Number against the paper…</p>
+                        <div class="mt-4 space-y-2.5">
+                            <div class="h-2.5 w-11/12 bg-line"></div>
+                            <div class="h-2.5 w-4/5 bg-line"></div>
+                            <div class="h-2.5 w-2/3 bg-line"></div>
+                        </div>
+                    </div>
+                    <div class="tai-loop-anim tai-loop-verdict @citation.Slot @citation.Box absolute inset-0 border p-4">
+                        <div class="flex flex-wrap items-center justify-between gap-2">
+                            <span class="@citation.Chip inline-flex items-center gap-1.5 border bg-page px-2 py-0.5 text-xs font-semibold">
+                                <svg class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true" focusable="false"><path d="@citation.Icon" /></svg>
+                                @citation.Verdict
+                            </span>
+                            <span class="text-xs text-muted">[@citation.Number] @citation.Source</span>
+                        </div>
+                        @if (citation.Quote.Length > 0)
+                        {
+                            <blockquote class="@citation.Rule mt-3 border-l-2 pl-3 text-sm leading-relaxed text-ink">“@citation.Quote”</blockquote>
+                        }
+                        else
+                        {
+                            <p class="mt-3 text-sm leading-relaxed text-ink">@citation.Reason</p>
+                        }
+                        <p class="mt-2 text-xs text-muted">@citation.Note</p>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+    <figcaption class="mx-auto mt-4 flex w-full max-w-[34rem] items-center justify-between gap-4">
+        <p class="text-xs text-muted">
+            A sentence from a real review, with three of its citations checked against the papers.
+            <span class="sr-only">
+                @foreach (var item in Citations)
+                {
+                    var citation = item;
+                    <span>Citation @citation.Number, @citation.Source: @citation.Verdict. @(citation.Quote.Length > 0 ? $"Quote: “{citation.Quote}”." : citation.Reason) @citation.Note </span>
+                }
+            </span>
+        </p>
+        <button type="button" data-loop-toggle
+                class="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-line-field bg-page text-heading transition-colors hover:bg-active">
+            <span class="sr-only"><span class="tai-loop-when-playing">Pause the example</span><span class="tai-loop-when-paused">Play the example</span></span>
+            <svg class="tai-loop-when-playing h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true" focusable="false"><path d="M6 4h3v12H6zM11 4h3v12h-3z" /></svg>
+            <svg class="tai-loop-when-paused h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true" focusable="false"><path d="M6 4l10 6-10 6z" /></svg>
+        </button>
+    </figcaption>
+</figure>
+
+@code {
+    /// <summary>One checked citation of the example, with its classes written out in full so Tailwind finds them.</summary>
+    public sealed record Citation(
+        int Number, string Slot, string Verdict, string Source, string Quote, string Reason, string Note,
+        string Box, string Chip, string Rule, string Icon);
+
+    private const string Check = "M16.7 5.3a1 1 0 010 1.4l-8 8a1 1 0 01-1.4 0l-4-4a1 1 0 111.4-1.4L8 12.6l7.3-7.3a1 1 0 011.4 0z";
+    private const string Dash = "M4 9h12v2H4z";
+    private const string Cross = "M6.3 5.3a1 1 0 011.4 0L10 7.6l2.3-2.3a1 1 0 111.4 1.4L11.4 9l2.3 2.3a1 1 0 01-1.4 1.4L10 10.4l-2.3 2.3a1 1 0 01-1.4-1.4L8.6 9 6.3 6.7a1 1 0 010-1.4z";
+
+    /// <summary>The three citations, in the order the loop shows them; from run 195564c6's citation-audit.json.</summary>
+    public static readonly IReadOnlyList<Citation> Citations = new[]
+    {
+        new Citation(5, "tai-loop-1", "Supported", "Bricker et al., 2024 · abstract",
+            "30-day, complete-case, point prevalence abstinence rates at 3-month follow-up were 63% (39/62) for QuitBot versus 38.5% (45/117) for SmokefreeTXT",
+            "", "Quote found word for word in the paper.",
+            "border-supported-border bg-supported-fill", "border-supported-border text-supported", "border-supported-border", Check),
+        new Citation(4, "tai-loop-2", "Partly supported", "Bosschaerts et al., 2025 · full text",
+            "its current capabilities were deemed effective and acceptable as a supportive tool for smoking cessation.",
+            "", "Backs acceptability, not proximal outcomes or feasibility. Kept and marked for you to check.",
+            "border-partly-border bg-partly-fill", "border-partly-border text-partly", "border-partly-border", Dash),
+        new Citation(10, "tai-loop-3", "Not supported", "Vuruma et al., 2024 · full text",
+            "", "The paper does not mention proximal outcomes, acceptability, or technical feasibility.",
+            "It stays in the report, marked in red, so you can decide what to do with it.",
+            "border-not-supported-border bg-not-supported-fill", "border-not-supported-border text-not-supported", "border-not-supported-border", Cross),
+    };
+}

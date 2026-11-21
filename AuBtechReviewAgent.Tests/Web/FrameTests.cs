@@ -58,8 +58,8 @@ public class FrameTests
 
         string landing = await RenderAsync<SiteHeader>("", new() { ["ShowNav"] = false, ["ShowThemeToggle"] = true });
         Assert.DoesNotContain("<nav", landing);
-        // The toggle appears only once ThemeToggle.Offered is on, while the pages use fixed light colours.
-        Assert.Equal(ThemeToggle.Offered, landing.Contains("data-theme-toggle", StringComparison.Ordinal));
+        // The landing page can take the dark theme, so its header always has the toggle.
+        Assert.Contains("data-theme-toggle", landing);
         Assert.Contains("href=\"/\" aria-current=\"page\"", landing);
     }
 
@@ -71,6 +71,21 @@ public class FrameTests
         Assert.Contains("<button type=\"button\" data-theme-toggle", html);
         Assert.Contains("Switch to dark theme", html);
         Assert.Contains("Switch to light theme", html);
+    }
+
+    [Theory]
+    [InlineData("", true)]
+    [InlineData("?utm=x#top", true)]
+    [InlineData("design/frame", true)]
+    [InlineData("design/landing-frame", true)]
+    [InlineData("review", false)]
+    [InlineData("review/" + RunId, false)]
+    [InlineData("metrics?kind=grey", false)]
+    [InlineData("designer", false)]
+    public void OnlyPagesReadyForTheDarkThemeCanTakeIt(string path, bool ready)
+    {
+        // Until step 12 switches on the toggle for the app pages, only the landing page and the /design pages are ready.
+        Assert.Equal(ready || ThemeToggle.OfferedOnAppPages, ThemeToggle.ReadyFor(path));
     }
 
     [Fact]
@@ -104,10 +119,10 @@ public class FrameTests
     public async Task TheLayoutsWrapThePageInOneMainBetweenHeaderAndFooter()
     {
         RenderFragment body = b => b.AddContent(0, "PAGE CONTENT");
-        foreach (var html in new[]
+        foreach (var (html, toggle) in new[]
         {
-            await RenderAsync<AppLayout>("metrics", new() { ["Body"] = body }),
-            await RenderAsync<LandingLayout>("", new() { ["Body"] = body }),
+            (await RenderAsync<AppLayout>("metrics", new() { ["Body"] = body }), ThemeToggle.OfferedOnAppPages),
+            (await RenderAsync<LandingLayout>("", new() { ["Body"] = body }), true),
         })
         {
             Assert.Equal(1, Count(html, "<main id=\"main\""));
@@ -116,7 +131,8 @@ public class FrameTests
             int content = html.IndexOf("PAGE CONTENT", StringComparison.Ordinal);
             int footer = html.IndexOf("<footer", StringComparison.Ordinal);
             Assert.True(header >= 0 && header < content && content < footer);
-            Assert.Equal(ThemeToggle.Offered, html.Contains("data-theme-toggle", StringComparison.Ordinal));
+            // The app pages get the toggle only once they can all take the dark theme; the landing page has it now.
+            Assert.Equal(toggle, html.Contains("data-theme-toggle", StringComparison.Ordinal));
         }
     }
 
@@ -131,6 +147,8 @@ public class FrameTests
         int styles = app.IndexOf("rel=\"stylesheet\"", StringComparison.Ordinal);
         Assert.True(script > 0 && script < styles && styles < head, "theme.js must load in <head> before the stylesheets");
         Assert.Contains("data-follow-system=", app);
+        // Each page says whether it can take the dark theme, and theme.js keeps the others light.
+        Assert.Contains("data-theme-ready=\"@(Layout.ThemeToggle.ReadyFor(", app);
         // The Content-Security-Policy allows no inline scripts.
         Assert.DoesNotMatch("<script>(?!</script>)", app);
 
@@ -138,6 +156,7 @@ public class FrameTests
         Assert.Contains("data-theme-toggle", js);
         Assert.Contains("localStorage", js);
         Assert.Contains("prefers-color-scheme", js);
+        Assert.Contains("data-theme-ready", js);
     }
 
     [Fact]

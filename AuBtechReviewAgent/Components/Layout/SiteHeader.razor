@@ -1,8 +1,8 @@
 @* The top bar of every page: a "Skip to content" link for keyboard users (it jumps to the element with id="main"),
    the bare mark and the name linking to the landing page, and the three places of the app with the current one
    marked. Under 640 px the places fold into a menu button. The landing page shows the bar without the places
-   (ShowNav="false"). The theme toggle is shown where the page can take the dark theme (ShowThemeToggle),
-   once ThemeToggle.Offered is on.
+   (ShowNav="false"). The theme toggle is shown where the layout asks for it (ShowThemeToggle):
+   always on the landing page, and on the app pages once ThemeToggle.OfferedOnAppPages is on.
 
    Which place is current, and where New review and Review output lead, follow from the address when the page
    does not say (Locate), so the layouts can render this bar without being told. *@
@@ -48,7 +48,7 @@
                     </details>
                 </nav>
             }
-            @if (ShowThemeToggle && ThemeToggle.Offered)
+            @if (ShowThemeToggle)
             {
                 <ThemeToggle />
             }
@@ -69,7 +69,7 @@
     /// <summary>Whether the three places are shown; the landing page has only the mark and the theme toggle.</summary>
     [Parameter] public bool ShowNav { get; set; } = true;
 
-    /// <summary>Whether the theme toggle is shown (the layouts ask for it). It appears only while ThemeToggle.Offered is on.</summary>
+    /// <summary>Whether the theme toggle is shown. LandingLayout always asks for it; AppLayout once ThemeToggle.OfferedOnAppPages is on.</summary>
     [Parameter] public bool ShowThemeToggle { get; set; }
 
     private Place current = new("", "/review", "/spec-matrix");

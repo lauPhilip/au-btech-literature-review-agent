@@ -25,10 +25,23 @@
     public static readonly bool FollowSystem = false;
 
     /// <summary>
-    /// Whether the header shows this button at all. Off while the pages still use fixed light colours, so a
-    /// visitor cannot pick a dark frame around light pages; a page moves to the theme-aware colours in its own
-    /// redesign step, and the button comes back with the landing page or at the latest in step 12. SiteHeader
-    /// shows the button only when this is on and the layout asks for it (ShowThemeToggle).
+    /// Whether the app pages (AppLayout) show this button. Off while those pages still use fixed light colours,
+    /// so a visitor cannot pick a dark frame around light pages; each page moves to the theme-aware colours in
+    /// its own redesign step, and this comes on in step 12. The landing page is ready for the dark theme and
+    /// always shows the button (LandingLayout).
     /// </summary>
-    public static readonly bool Offered = false;
+    public static readonly bool OfferedOnAppPages = false;
+
+    /// <summary>
+    /// Whether the page at this address (relative to the site root, as NavigationManager.ToBaseRelativePath
+    /// gives it) can take the dark theme. App.razor writes it on &lt;html&gt; as data-theme-ready, and theme.js
+    /// keeps every other page light, so a dark choice made on the landing page does not darken the app pages
+    /// before they are ready. The /design pages are ready because CI checks the frame on them in the dark theme.
+    /// </summary>
+    public static bool ReadyFor(string relativePath)
+    {
+        if (OfferedOnAppPages) return true;
+        string path = (relativePath ?? "").Split('?', '#')[0].Trim('/').ToLowerInvariant();
+        return path.Length == 0 || path == "design" || path.StartsWith("design/", StringComparison.Ordinal);
+    }
 }

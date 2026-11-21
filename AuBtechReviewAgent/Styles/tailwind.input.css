@@ -154,56 +154,50 @@
     .ui-chip-bad { @apply ui-chip border-red-200 bg-verdict-badBg text-verdict-bad; }
 }
 
-/* Landing page: the citation check example in the hero and the moving light on the pipeline. Both stop for
-   visitors who ask their system for less motion; the first state is then shown still. */
-@layer components {
-    .tai-cycle-a { animation: tai-show-a 10s ease-in-out infinite; }
-    .tai-cycle-b { animation: tai-show-b 10s ease-in-out infinite; }
-    .tai-cite-a { animation: tai-cite-a 10s ease-in-out infinite; }
-    .tai-cite-b { animation: tai-cite-b 10s ease-in-out infinite; }
-    .tai-scan { animation: tai-scan 5s ease-in-out infinite; }
-    .tai-flow-x { animation: tai-flow-x 3.2s linear infinite; }
-    .tai-flow-y { animation: tai-flow-y 3.2s linear infinite; }
-
-    @media (prefers-reduced-motion: reduce) {
-        .tai-cycle-a, .tai-cite-a, .tai-cite-b, .tai-scan, .tai-flow-x, .tai-flow-y { animation: none; }
-        .tai-cycle-b { animation: none; opacity: 0; }
-        .tai-cite-a { background-color: rgba(19, 41, 75, 0.12); }
-        .tai-scan { transform: scaleX(1); }
-    }
+/* Landing page: the looping citation example (Components/Landing/CitationLoop.razor). Three citations take a
+   third of the 12.6 s cycle each: 1.1 s "checking" (to 8.7 %), then the verdict until a third. Every moving part
+   uses the same keyframes and starts at its citation's third through a negative delay; the extra -2 s puts the
+   start, and the still picture when paused, on the first verdict. The pause button sets data-state on .tai-loop
+   (wwwroot/js/citation-loop.js); without one the loop plays, or stays paused when the system asks for less motion. */
+.tai-dot-grid { background-image: radial-gradient(rgb(var(--panel-dot)) 1.5px, transparent 1.5px); background-size: 22px 22px; }
+.tai-loop-anim { animation-duration: 12.6s; animation-timing-function: linear; animation-iteration-count: infinite; animation-fill-mode: both; }
+.tai-loop-check { animation-name: tai-loop-check; }
+.tai-loop-verdict { animation-name: tai-loop-verdict; }
+.tai-loop-cite { animation-name: tai-loop-cite; }
+.tai-loop-dot { animation-name: tai-loop-dot; }
+.tai-loop-1 { animation-delay: -2s; }
+.tai-loop-2 { animation-delay: -10.4s; }
+.tai-loop-3 { animation-delay: -6.2s; }
+.tai-loop-ok { --loop-ink: var(--supported); --loop-fill: var(--supported-fill); --loop-edge: var(--supported-border); }
+.tai-loop-partly { --loop-ink: var(--partly); --loop-fill: var(--partly-fill); --loop-edge: var(--partly-border); }
+.tai-loop-not { --loop-ink: var(--not-supported); --loop-fill: var(--not-supported-fill); --loop-edge: var(--not-supported-border); }
+.tai-loop .tai-loop-when-paused { display: none; }
+.tai-loop[data-state="paused"] .tai-loop-anim { animation-play-state: paused; }
+.tai-loop[data-state="paused"] .tai-loop-when-paused { display: inline; }
+.tai-loop[data-state="paused"] .tai-loop-when-playing { display: none; }
+@media (prefers-reduced-motion: reduce) {
+    .tai-loop:not([data-state="playing"]) .tai-loop-anim { animation-play-state: paused; }
+    .tai-loop:not([data-state="playing"]) .tai-loop-when-paused { display: inline; }
+    .tai-loop:not([data-state="playing"]) .tai-loop-when-playing { display: none; }
 }
 
-@keyframes tai-show-a {
-    0%, 44% { opacity: 1; transform: translateY(0); }
-    50%, 94% { opacity: 0; transform: translateY(6px); }
-    100% { opacity: 1; transform: translateY(0); }
+@keyframes tai-loop-check {
+    0%, 8% { opacity: 1; }
+    9.5%, 100% { opacity: 0; }
 }
-@keyframes tai-show-b {
-    0%, 44% { opacity: 0; transform: translateY(6px); }
-    50%, 94% { opacity: 1; transform: translateY(0); }
-    100% { opacity: 0; transform: translateY(6px); }
+@keyframes tai-loop-verdict {
+    0%, 8% { opacity: 0; transform: translateY(4px); }
+    9.5%, 31.5% { opacity: 1; transform: none; }
+    33.3%, 100% { opacity: 0; transform: none; }
 }
-@keyframes tai-cite-a {
-    0%, 44% { background-color: rgba(19, 41, 75, 0.12); }
-    50%, 94% { background-color: transparent; }
-    100% { background-color: rgba(19, 41, 75, 0.12); }
+@keyframes tai-loop-cite {
+    0%, 8% { background-color: rgb(var(--active)); color: rgb(var(--navy)); box-shadow: inset 0 0 0 1px rgb(var(--field-border)); }
+    9.5%, 31.5% { background-color: rgb(var(--loop-fill)); color: rgb(var(--loop-ink)); box-shadow: inset 0 0 0 1px rgb(var(--loop-edge)); }
+    33.3%, 100% { background-color: transparent; color: rgb(var(--navy)); box-shadow: inset 0 0 0 1px transparent; }
 }
-@keyframes tai-cite-b {
-    0%, 44% { background-color: transparent; }
-    50%, 94% { background-color: rgba(180, 83, 9, 0.14); }
-    100% { background-color: transparent; }
-}
-@keyframes tai-scan {
-    0% { transform: scaleX(0); }
-    35%, 100% { transform: scaleX(1); }
-}
-@keyframes tai-flow-x {
-    from { transform: translateX(-100%); }
-    to { transform: translateX(600%); }
-}
-@keyframes tai-flow-y {
-    from { transform: translateY(-100%); }
-    to { transform: translateY(1200%); }
+@keyframes tai-loop-dot {
+    0%, 31.5% { background-color: rgb(var(--navy)); }
+    33.3%, 100% { background-color: rgb(var(--field-border)); }
 }
 
 /* The reconnect banner (Components/Layout/ReconnectModal.razor). Blazor sets one state class on the dialog;
