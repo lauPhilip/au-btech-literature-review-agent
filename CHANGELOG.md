@@ -10,6 +10,8 @@ Each version's section becomes the notes of its GitHub release, so write it for 
 
 The site starts its new look. It now uses a deeper navy, the same one as Coursebot, and two new typefaces: Inter for text and Poppins for headings and buttons. Cards and fields have round corners. The browser tab shows the new mark, a small robot reading a book. 🤖
 
+The icons that phones and older browsers use now show the same mark on a navy tile. So does the small logo in the header, and an Android phone gets a large icon when you add the site to the home screen.
+
 Nothing about how a review runs has changed. This is the first step of the redesign; the pages follow one by one.
 
 ## [0.4.0] - 2026-11-20
