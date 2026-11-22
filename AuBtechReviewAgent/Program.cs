@@ -150,6 +150,10 @@ builder.Services.AddSingleton(AuBtechReviewAgent.ReviewModulesOptions.From(build
 // Register the storage cleanup background worker
 builder.Services.AddHostedService<AuBtechReviewAgent.SessionCleanupWorker>();
 
+// The REST API (and later the MCP server): off in production until Api:Enabled is set (see Api/README.md).
+bool apiEnabled = builder.Configuration.GetValue("Api:Enabled", builder.Environment.IsDevelopment());
+if (apiEnabled) AuBtechReviewAgent.ApiEndpoints.AddReviewApi(builder.Services);
+
 var app = builder.Build();
 
 // Classes that are not created by dependency injection (engine, sources, cache) log through AppLog.
@@ -277,6 +281,8 @@ app.MapGet("/health", () =>
 // Where to report a vulnerability (RFC 9116); see SECURITY.md.
 app.MapGet("/.well-known/security.txt", (HttpRequest request) =>
     Results.Text(AuBtechReviewAgent.SiteSeo.SecurityTxt(AuBtechReviewAgent.SiteSeo.BaseUrl(siteConfiguration, request), DateTime.UtcNow), "text/plain; charset=utf-8"));
+
+if (apiEnabled) AuBtechReviewAgent.ApiEndpoints.MapReviewApi(app);
 
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
