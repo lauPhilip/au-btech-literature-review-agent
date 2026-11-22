@@ -42,6 +42,7 @@ public static class ApiEndpoints
         var fingerprint = new ApiKeyFingerprint();
         services.AddSingleton(fingerprint);
         services.AddSingleton<ReviewApi>();
+        services.AddReviewMcp();
         // The description covers the API's own routes only, not the site's downloads or health check.
         services.AddOpenApi(options => options.ShouldInclude = description =>
             description.RelativePath?.StartsWith("api/v1/", StringComparison.OrdinalIgnoreCase) == true);
@@ -117,6 +118,7 @@ public static class ApiEndpoints
             .Produces<ApiReviewReport>().ProducesProblem(StatusCodes.Status404NotFound).ProducesProblem(StatusCodes.Status409Conflict);
 
         app.MapOpenApi(); // at OpenApiPath
+        app.MapReviewMcp();
 
         return app;
     }
