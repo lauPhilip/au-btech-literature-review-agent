@@ -25,7 +25,8 @@ public sealed record GreyReference(
     string Url,
     string Kind,
     DateTime? AccessedUtc,
-    string? WaybackUrl);
+    string? WaybackUrl,
+    DateTime? UpdatedUtc = null);
 
 /// <summary>
 /// The references of a multivocal run, and their exports: references.bib and references.ris for the sources the
@@ -73,7 +74,8 @@ public static class GreyReferences
             Url: PrismaReviewEngine.IsWebAddress(url) ? url : PrismaReviewEngine.IsWebAddress(record?.Url) ? record!.Url : "",
             Kind: record?.Kind ?? "",
             AccessedUtc: kept ? page!.AccessedUtc : null,
-            WaybackUrl: kept && PrismaReviewEngine.IsWebAddress(page!.WaybackUrl) ? page.WaybackUrl : null);
+            WaybackUrl: kept && PrismaReviewEngine.IsWebAddress(page!.WaybackUrl) ? page.WaybackUrl : null,
+            UpdatedUtc: record?.Updated);
     }
 
     /// <summary>
@@ -89,6 +91,7 @@ public static class GreyReferences
         if (r.Site.Length > 0 && !string.Equals(r.Site, r.Producer, StringComparison.OrdinalIgnoreCase)) sb.Append($"*{r.Site}*. ");
         if (r.Url.Length > 0) sb.Append(r.Url);
         var notes = new List<string>();
+        if (r.UpdatedUtc is DateTime updated) notes.Add($"last updated {Day(updated)}");
         if (r.AccessedUtc is DateTime accessed) notes.Add($"accessed {accessed.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)}");
         if (r.WaybackUrl != null) notes.Add($"archived at {r.WaybackUrl}");
         if (notes.Count > 0) sb.Append($" ({string.Join("; ", notes)})");
@@ -113,6 +116,7 @@ public static class GreyReferences
             if (r.Url.Length > 0) fields.Add(("url", r.Url));
             if (r.AccessedUtc is DateTime accessed) fields.Add(("urldate", accessed.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)));
             string note = $"Grey literature ({KindLabel(r.Kind)}); source [{r.Number}] in the TraceableAI review";
+            if (r.UpdatedUtc is DateTime updated) note += $"; last updated {Day(updated)}";
             if (r.WaybackUrl != null) note += $"; archived at {r.WaybackUrl}";
             fields.Add(("note", Bib(note)));
 
@@ -133,6 +137,7 @@ public static class GreyReferences
             AppendRis(sb, r.Producer, r.Title, r.Site, r.Year, r.Url);
             if (r.AccessedUtc is DateTime accessed) sb.AppendLine($"Y2  - {accessed.ToString("yyyy/MM/dd", CultureInfo.InvariantCulture)}");
             sb.AppendLine($"N1  - Source [{r.Number}] in the TraceableAI review");
+            if (r.UpdatedUtc is DateTime updated) sb.AppendLine($"N1  - Last updated {Day(updated)}");
             if (r.WaybackUrl != null) sb.AppendLine($"N1  - Archived at {r.WaybackUrl}");
             sb.AppendLine("KW  - TraceableAI");
             sb.AppendLine("KW  - grey literature");
@@ -229,6 +234,8 @@ public static class GreyReferences
         used.Add(candidate);
         return candidate;
     }
+
+    private static string Day(DateTime d) => d.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
 
     private static string EndWithStop(string text) => text.EndsWith('.') || text.EndsWith('?') || text.EndsWith('!') ? text : text + ".";
 
