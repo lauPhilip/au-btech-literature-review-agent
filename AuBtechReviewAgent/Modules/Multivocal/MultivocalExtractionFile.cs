@@ -29,6 +29,9 @@ public sealed class ExtractedAttribute
     /// <summary>The values the model gave whose quote was not found in the page; kept on file, never used.</summary>
     public List<ExtractedValue> Unsupported { get; set; } = new();
 
+    /// <summary>The values of an open attribute that name one of the review's own included sources; kept on file, never counted.</summary>
+    public List<ExtractedValue> OwnSource { get; set; } = new();
+
     /// <summary>True when the source states nothing for this attribute (no supported value).</summary>
     public bool NotStated => Values.Count == 0;
 }
@@ -73,6 +76,12 @@ public sealed class MultivocalExtractionFile
     public int MapVersion { get; set; }
     public List<GreyExtraction> Sources { get; set; } = new();
 
+    /// <summary>The names of open attributes merged in code (<see cref="OpenNameMerger"/>); empty for runs made before #249.</summary>
+    public List<NameMerge> NameMerges { get; set; } = new();
+
+    /// <summary>The values of open attributes left out because they name one of the review's own sources.</summary>
+    public List<OwnSourceValue> OwnSourceValues { get; set; } = new();
+
     /// <summary>How many sources have each value of an attribute: the systematic map's counts (G12), for RQs about frequency.</summary>
     public IReadOnlyList<(string Value, int Sources)> Counts(string attribute)
     {
@@ -86,4 +95,20 @@ public sealed class MultivocalExtractionFile
         if (notStated > 0) counts.Add(("not stated", notStated));
         return counts;
     }
+}
+
+/// <summary>Spellings of one name merged in code: the name kept and the spellings it replaced.</summary>
+public sealed class NameMerge
+{
+    public string Attribute { get; set; } = "";
+    public string Name { get; set; } = "";
+    public List<string> Merged { get; set; } = new();
+}
+
+/// <summary>A value of an open attribute that names one of the review's own included sources, with that source's title.</summary>
+public sealed class OwnSourceValue
+{
+    public string Attribute { get; set; } = "";
+    public string Value { get; set; } = "";
+    public string Source { get; set; } = "";
 }
