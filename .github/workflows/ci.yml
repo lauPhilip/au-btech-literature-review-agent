@@ -106,8 +106,8 @@ jobs:
         working-directory: tools/a11y
         env:
           BASE_URL: http://localhost:5038
-          A11Y_PAGES: /,/review,/spec-matrix,/start,/metrics,/about,/model-card,/privacy,/verify,/glossary,/not-found,/design/frame,/design/run,/design/run?state=stopped,/design/run?state=done,/design/report,/design/metrics
-          A11Y_DARK_PAGES: /,/review,/start,/metrics,/about,/model-card,/privacy,/verify,/glossary,/not-found,/design/frame,/design/run,/design/run?state=done,/design/report,/design/metrics
+          A11Y_PAGES: /,/review,/spec-matrix,/start,/metrics,/about,/model-card,/privacy,/verify,/glossary,/docs/api,/not-found,/design/frame,/design/run,/design/run?state=stopped,/design/run?state=done,/design/report,/design/metrics
+          A11Y_DARK_PAGES: /,/review,/start,/metrics,/about,/model-card,/privacy,/verify,/glossary,/docs/api,/not-found,/design/frame,/design/run,/design/run?state=done,/design/report,/design/metrics
           A11Y_SCREENSHOTS: ${{ github.workspace }}/a11y-screenshots
         run: |
           npm ci
