@@ -61,6 +61,21 @@ public class MetricsOverviewTests
     }
 
     [Fact]
+    public void RemovedCitationsAreAddedUpOnTheirOwnForAllRunsAndEachGroup()
+    {
+        var a = Run("a", "2026-10-01T10:00:00Z", "0.3.0", 5, 0, 0, 0, 0);
+        var b = Run("b", "2026-11-01T10:00:00Z", "0.4.0", 3, 1, 0, 0, 0);
+        var c = Run("c", "2026-11-02T10:00:00Z", "0.4.0", 4, 0, 1, 0, 0);
+        (a.Removed, b.Removed, c.Removed) = (2, 1, 3);
+
+        var overview = MetricsOverview.From(new[] { a, b, c });
+
+        Assert.Equal(6, overview.Removed);
+        Assert.Equal((4, 2), (overview.Groups[0].Removed, overview.Groups[1].Removed));
+        Assert.Equal(14, overview.Pooled.Total); // removed citations are not among the verdicts
+    }
+
+    [Fact]
     public void ABarStacksItsVerdictsFromTheBottomAndSkipsTheEmptyOnes()
     {
         var c = new VerdictCounts { Total = 10, Supported = 5, PartiallySupported = 0, NotSupported = 2, InsufficientEvidence = 2, Unverifiable = 1 };

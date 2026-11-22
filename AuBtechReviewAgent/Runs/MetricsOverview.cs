@@ -19,6 +19,9 @@ public sealed class MetricsOverview
     /// <summary>The final verdicts of every run, added up.</summary>
     public VerdictCounts Pooled { get; }
 
+    /// <summary>The citations the second repair pass removed in every run, counted apart from the verdicts.</summary>
+    public int Removed { get; }
+
     /// <summary>The included studies (kept sources) of every run, and how many of them the text cites.</summary>
     public int Included { get; }
     public int StudiesCited { get; }
@@ -33,6 +36,7 @@ public sealed class MetricsOverview
     {
         Runs = runs;
         Pooled = Pool(runs.Select(r => r.CitationsFinal));
+        Removed = runs.Sum(r => r.Removed);
         Included = runs.Sum(r => r.Included);
         StudiesCited = runs.Sum(r => r.StudiesCited);
         Groups = runs.GroupBy(r => (r.ShortVersion, r.ConfigFingerprint))
@@ -41,7 +45,7 @@ public sealed class MetricsOverview
                 string.Join(", ", g.First().Settings.Select(kv => $"{kv.Key}={kv.Value}")) + $", model={g.First().Model}",
                 g.Count(), Pool(g.Select(r => r.CitationsFinal)),
                 Mean(g.Select(r => r.ScreeningKappa)), g.Average(r => r.DurationMinutes),
-                g.Max(r => r.CompletedUtc) ?? ""))
+                g.Max(r => r.CompletedUtc) ?? "") { Removed = g.Sum(r => r.Removed) })
             .OrderByDescending(g => g.LatestUtc, StringComparer.Ordinal)
             .ToList();
     }
@@ -121,7 +125,10 @@ public sealed class MetricsOverview
     /// <summary>One verdict's part of a run's bar: where it starts and how tall it is, as shares of the bar.</summary>
     public readonly record struct BarSegment(Verdict Verdict, double Start, double Share);
 
-    /// <summary>The runs made with one app version and one set of settings.</summary>
+    /// <summary>The runs made with one app version and one set of settings, and the citations their repair removed.</summary>
     public sealed record VersionGroup(string Version, string Fingerprint, string SettingsText, int Runs, VerdictCounts Final,
-        double? ScreeningKappa, double MinutesPerRun, string LatestUtc);
+        double? ScreeningKappa, double MinutesPerRun, string LatestUtc)
+    {
+        public int Removed { get; init; }
+    }
 }
