@@ -111,7 +111,8 @@ public partial class PrismaReviewEngine
         }
         finalState.Stats.CitationsOutsideTheme = supportChecks.Count(c => c.ThemeNote != null);
 
-        var supportSummary = CitationSupportSummary.From(supportChecks);
+        var supportSummary = CitationSupportSummary.From(supportChecks, grounding.Removed.Count);
+        finalState.Stats.CitationsRemoved = supportSummary.Removed;
         finalState.Stats.CitationsChecked = supportSummary.Checked;
         finalState.Stats.CitationsSupported = supportSummary.Supported;
         finalState.Stats.CitationsPartiallySupported = supportSummary.PartiallySupported;

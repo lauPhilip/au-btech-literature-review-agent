@@ -60,7 +60,10 @@ public class CitationSupportSummary
     public int SecondCheckAgreed { get; set; }
     public int UpgradedBySecondCheck { get; set; }
 
-    public static CitationSupportSummary From(IEnumerable<CitationSupportResult> results)
+    /// <summary>Citations the second repair pass removed. They are not among the checked ones, so they are counted on their own.</summary>
+    public int Removed { get; set; }
+
+    public static CitationSupportSummary From(IEnumerable<CitationSupportResult> results, int removed = 0)
     {
         var list = results.ToList();
         return new CitationSupportSummary
@@ -74,19 +77,24 @@ public class CitationSupportSummary
             SecondChecked = list.Count(r => r.SecondVerdict != null),
             SecondCheckAgreed = list.Count(r => r.SecondVerdict != null && r.SecondVerdict == r.FirstVerdict),
             UpgradedBySecondCheck = list.Count(r => r.ResolvedBy == "second check"),
+            Removed = removed,
         };
     }
 
     /// <summary>One sentence for the report, e.g. "Of 14 citations checked, 11 were supported, ...".</summary>
     public string ToSentence()
     {
-        if (Checked == 0) return "No inline citations were available for the automated support check.";
+        if (Checked == 0 && Removed == 0) return "No inline citations were available for the automated support check.";
         string text = $"An automated check compared the part of each cited sentence attributed to a paper with the text of that paper. Of {Checked} citation{(Checked == 1 ? "" : "s")} checked, " +
                $"{Supported} {(Supported == 1 ? "was" : "were")} judged supported, {PartiallySupported} partially supported, {NotSupported} not supported, " +
                (InsufficientEvidence > 0 ? $"{InsufficientEvidence} could not be judged because only the abstract was available and it does not mention the claim, " : "") +
                $"and {Unverifiable} could not be verified.";
         if (SecondChecked > 0)
             text += $" {SecondChecked} citation{(SecondChecked == 1 ? " that was" : "s that were")} not fully supported went through a second, independent check with more of the paper's text; it agreed with the first check on {SecondCheckAgreed} and found verbatim support that raised the verdict for {UpgradedBySecondCheck}.";
+        if (Removed > 0)
+            text += Removed == 1
+                ? " 1 citation that was still not supported after the repair was removed, with its claim when no other citation backed it; it is not in the counts above and is listed under RemovedCitations in citation-audit.json."
+                : $" {Removed} citations that were still not supported after the repair were removed, with their claim when no other citation backed it; they are not in the counts above and are listed under RemovedCitations in citation-audit.json.";
         return text + " Every verdict, with the quoted evidence, is listed in citation-audit.json; these are model judgements and should be spot-checked by a human reviewer.";
     }
 }

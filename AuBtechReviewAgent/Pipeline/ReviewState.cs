@@ -125,6 +125,7 @@ public class ReviewStats
     public int StudiesCitedInSynthesis { get; set; } // Included studies cited at least once in the synthesis or discussion
     public double? CodingKappa { get; set; }        // Cohen's kappa between the two theme assignments (dual coding only)
     public int CitationsRepaired { get; set; }      // Cited sentences rewritten by the repair pass after a failed support check
+    public int CitationsRemoved { get; set; }       // Citations the second repair pass removed as still not supported; not in CitationsChecked
     public int CitationsOutsideTheme { get; set; }  // Citations in a theme subsection of a study not coded under that theme
     public int CitationsInsufficientEvidence { get; set; } // Abstract-only papers whose abstract does not mention the attributed claim
     public int CitationsSecondChecked { get; set; } // Citations given the independent second check
