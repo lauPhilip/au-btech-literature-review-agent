@@ -26,7 +26,7 @@ public static partial class ReviewWriter
             {{evidence.ReferenceLines()}}
 
             FACTS ABOUT THE EVIDENCE BASE ({{profile.BaseFactsFrom}}; use them wherever you describe the {{profile.Sources}} or how they were studied, and do not change them):
-            {{evidence.BaseFacts}}
+            {{evidence.BaseFacts}}{{LeftOutBlock(evidence, profile)}}
 
             RESULTS BY THEME:
             {{synthesis}}
@@ -46,6 +46,7 @@ public static partial class ReviewWriter
                 if (string.IsNullOrWhiteSpace(a.Text)) return "text must not be empty.";
                 var outside = ThematicSynthesis.CitedIn(a.Text).Where(r => r < 1 || r > referenceCount).ToList();
                 if (outside.Count > 0) return $"citation numbers {string.Join(", ", outside)} are not in the reference list.";
+                if (LeftOutCited(a.Text, evidence) is { } leftOut) return leftOut;
                 return OwnCountCited(a.Text, evidence.BaseFacts, synthesis) is { } own
                     ? $"\"{own}\" states this review's own count and carries a citation; the review's own counts take no citation."
                     : null;
@@ -57,5 +58,28 @@ public static partial class ReviewWriter
             warn?.Invoke($"Discussion could not be written: {ex.Message}");
             return "";
         }
+    }
+
+    /// <summary>
+    /// The sources the synthesis left out of every theme, for the discussion and the closing sections (issue #166), so
+    /// they do not lean on a study the review itself set aside. Empty when none was left out, so the prompt is as before.
+    /// </summary>
+    public static string LeftOutBlock(ReviewEvidence evidence, WritingProfile profile) => evidence.LeftOut.Count == 0 ? "" : $"""
+
+
+        {profile.Sources.ToUpperInvariant()} LEFT OUT OF THE THEMES (in the reference list, but the synthesis did not use them; do not cite them as evidence for any claim):
+        {string.Join("\n", evidence.LeftOut.Select(u => $"[{u.Reference}] {u.Reason}"))}
+        """;
+
+    /// <summary>
+    /// Why a text that cites a source left out of the themes cannot be used, or null (issue #166). Public for unit tests.
+    /// </summary>
+    public static string? LeftOutCited(string text, ReviewEvidence evidence)
+    {
+        if (evidence.LeftOut.Count == 0) return null;
+        var cited = ThematicSynthesis.CitedIn(text);
+        var used = evidence.LeftOut.Where(u => cited.Contains(u.Reference)).Select(u => $"[{u.Reference}]").ToList();
+        return used.Count == 0 ? null
+            : $"it cites {string.Join(", ", used)}, which the synthesis left out of the themes; do not use {(used.Count == 1 ? "it" : "them")} as evidence.";
     }
 }

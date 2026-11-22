@@ -69,6 +69,12 @@ public sealed class ReviewEvidence
     /// <summary>Facts about the evidence base, written in code, for the limitations of the discussion.</summary>
     public string BaseFacts { get; init; } = "";
 
+    /// <summary>
+    /// Sources the synthesis left out of every theme, with the reason (issue #166). The discussion and the closing
+    /// sections are told which they are, and may not use them as evidence. Empty when the module gives none.
+    /// </summary>
+    public IReadOnlyList<UncodedStudy> LeftOut { get; init; } = Array.Empty<UncodedStudy>();
+
     private Dictionary<int, EvidenceSource>? _byReference;
     private Dictionary<int, EvidenceSource> ByReference => _byReference ??= Sources.ToDictionary(s => s.Reference);
 
