@@ -204,4 +204,27 @@ public class MultivocalScreeningTests : IDisposable
         Assert.Empty(chat.Prompts);
         Assert.Equal(MultivocalSearcher.StageSearched, store.LoadHeader(runId)!.Stage);
     }
+
+    [Fact]
+    public async Task AnAcademicRecordGetsTheSameCriteriaStepsAndAnswerFormatIntroducedAsAcademic()
+    {
+        var chat = Model();
+        var paper = new GreyRecord("OPENALEX_W1", "Memory for LLM agents", "An abstract.", "https://doi.org/10.1/x", "Jane Doe", "Journal of Agents",
+            MultivocalSearcher.FormalKind, null, new Dictionary<string, long>());
+        var grey = paper with { Kind = "blogs" };
+
+        await MultivocalScreener.ScreenGreyAsync(chat, paper, "About agents", "", secondScreener: false);
+        await MultivocalScreener.ScreenGreyAsync(chat, grey, "About agents", "", secondScreener: false);
+
+        string formal = chat.Prompts[0], blog = chat.Prompts[1];
+        Assert.StartsWith("Evaluate the following academic source", formal);
+        Assert.Contains("- Kind of source: Academic literature, from a bibliographic database", formal);
+        Assert.Contains("Being a preprint or not peer-reviewed is not a reason to exclude it", formal);
+        Assert.StartsWith("Evaluate the following grey literature source", blog);
+        foreach (string shared in new[] { "- Inclusion Thresholds: About agents", PrismaReviewEngine.ScreeningProcedure(false).Trim(), PrismaReviewEngine.ScreeningAnswerFormat.Trim() })
+        {
+            Assert.Contains(shared, formal);
+            Assert.Contains(shared, blog);
+        }
+    }
 }

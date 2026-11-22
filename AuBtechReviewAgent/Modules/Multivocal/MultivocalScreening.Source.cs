@@ -15,6 +15,9 @@ namespace AuBtechReviewAgent;
 // Screening one source twice, with the systematic review's steps and answer format, and applying the two answers.
 public sealed partial class MultivocalScreener
 {
+    /// <summary>Part of the cache key of an academic record (block I-3): raise it whenever its prompt changes.</summary>
+    public const string FormalPromptVersion = "formal-screening-v1";
+
     private sealed record Screened(ScreeningAnswer? First, ScreeningAnswer? Second, int CacheHits, IReadOnlyList<string> Flags, string? Error);
 
     private async Task<Screened> ScreenOneAsync(IChatCompletionService chat, MultivocalPlan plan, GreyRecord record)
@@ -37,7 +40,8 @@ public sealed partial class MultivocalScreener
 
     private async Task<(ScreeningAnswer Answer, bool FromCache)> ScreenCachedAsync(IChatCompletionService chat, MultivocalPlan plan, GreyRecord r, bool secondScreener)
     {
-        string key = ReviewCache.Key(PromptVersion, secondScreener ? "second" : "first", _model, plan.InclusionCriteria, plan.ExclusionCriteria,
+        string version = r.Kind == MultivocalSearcher.FormalKind ? FormalPromptVersion : PromptVersion;
+        string key = ReviewCache.Key(version, secondScreener ? "second" : "first", _model, plan.InclusionCriteria, plan.ExclusionCriteria,
             r.Title, r.Summary, r.Site, r.Kind, r.Producer, r.Published?.ToString("yyyy-MM-dd"));
         if (_cache.TryGet<ScreeningAnswer>("grey-screening", key, out var cached) && cached != null && ScreeningAnswer.Validate(cached) == null)
             return (cached.Normalized(), true);
@@ -47,12 +51,24 @@ public sealed partial class MultivocalScreener
     }
 
     /// <summary>
-    /// The screening prompt for one grey source: the systematic review's steps and answer format, with the record
-    /// described as what it is. It is judged on its subject against the criteria, not on being grey literature.
+    /// The screening prompt for one source: the systematic review's steps and answer format, with the record described
+    /// as what it is. It is judged on its subject against the criteria, not on being grey literature; an academic
+    /// record of the formal pool (block I-3) gets the same criteria, steps and answer format, introduced as academic.
     /// </summary>
     public static async Task<ScreeningAnswer> ScreenGreyAsync(IChatCompletionService chat, GreyRecord r, string inclusion, string exclusion, bool secondScreener)
     {
-        string kind = MultivocalGuidelines.GreyTypes.FirstOrDefault(t => t.Key == r.Kind).Label ?? r.Kind;
+        bool formal = r.Kind == MultivocalSearcher.FormalKind;
+        string kind = formal ? "Academic literature, from a bibliographic database"
+            : MultivocalGuidelines.GreyTypes.FirstOrDefault(t => t.Key == r.Kind).Label ?? r.Kind;
+        string intro = formal
+            ? """
+              Evaluate the following academic source (a journal or conference paper, a preprint or a book chapter found in a bibliographic database) against the reviewer's selection criteria for a multivocal literature review.
+              Judge it by its subject against the criteria, exactly as a grey literature source would be judged. Being a preprint or not peer-reviewed is not a reason to exclude it; its quality is appraised in a later step.
+              """
+            : """
+              Evaluate the following grey literature source (a blog post, Q&A thread, code repository, report, thesis or similar) against the reviewer's selection criteria for a multivocal literature review.
+              Judge it by its subject against the criteria, exactly as an academic paper would be judged. Being grey literature, informal or not peer-reviewed is not a reason to exclude it; its quality is assessed in a later step.
+              """;
         string record = $"""
             - Title: {r.Title}
             - Kind of source: {kind}
@@ -63,8 +79,7 @@ public sealed partial class MultivocalScreener
             """;
 
         var prompt = $$"""
-            Evaluate the following grey literature source (a blog post, Q&A thread, code repository, report, thesis or similar) against the reviewer's selection criteria for a multivocal literature review.
-            Judge it by its subject against the criteria, exactly as an academic paper would be judged. Being grey literature, informal or not peer-reviewed is not a reason to exclude it; its quality is assessed in a later step.
+            {{intro}}
 
             CRITERIA DIRECTIVES (from the reviewer):
             - Inclusion Thresholds: {{inclusion}}
@@ -75,7 +90,7 @@ public sealed partial class MultivocalScreener
             {{PromptSafety.DataOnlyNotice}}
 
             SOURCE TARGET DATA:
-            {{PromptSafety.Wrap(record, "grey source metadata and summary")}}
+            {{PromptSafety.Wrap(record, formal ? "academic record metadata and abstract" : "grey source metadata and summary")}}
 
             {{PrismaReviewEngine.ScreeningProcedure(secondScreener)}}
 
