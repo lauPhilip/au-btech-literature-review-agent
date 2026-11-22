@@ -100,15 +100,23 @@ public static class MultivocalPaper
     {
         var s = audit.SupportSummary!;
         var inv = CultureInfo.InvariantCulture;
-        if (s.Checked == 0) return "No inline citations were available for the automated check.";
+        int removed = audit.RemovedCitations.Count;
+        if (s.Checked == 0 && removed == 0) return "No inline citations were available for the automated check.";
         var text = new StringBuilder();
         text.Append(inv, $"An automated check compared the part of each cited sentence attributed to a source with the text of that source's page as it was kept on the access date. Of {s.Checked} citations checked, ");
         text.Append(inv, $"{s.Supported} were judged supported, {s.PartiallySupported} partly supported and {s.NotSupported} not supported; ");
         text.Append(inv, $"{s.Unverifiable} could not be verified, most often because the model's quote was not found word for word in the kept text, or because a source's kept text was missing or had changed");
         if (s.InsufficientEvidence > 0) text.Append(inv, $", and {s.InsufficientEvidence} could not be judged from the text that was checked");
         text.Append(". A supporting verdict counts only when its quote is found verbatim in the kept text. ");
+        int firstPass = audit.Repairs.Count(r => r.Pass == 1), secondPass = audit.Repairs.Count(r => r.Pass == 2);
         if (audit.InitialSupportSummary is { } initial && audit.Repairs.Count > 0)
-            text.Append(inv, $"Before the repair, {initial.NotSupported} citations were judged not supported and {initial.PartiallySupported} partly supported; {audit.Repairs.Count} cited sentences were rewritten or lost a citation once and were checked again. ");
+        {
+            text.Append(inv, $"Before the repair, {initial.NotSupported} citations were judged not supported and {initial.PartiallySupported} partly supported; {firstPass} cited sentences were rewritten or lost a citation and were checked again");
+            if (secondPass > 0) text.Append(inv, $", and {secondPass} that were still partly supported were rewritten a second time and checked again. ");
+            else text.Append(". ");
+        }
+        if (removed > 0)
+            text.Append(inv, $"{removed} {(removed == 1 ? "citation that was still not supported after the repair was" : "citations that were still not supported after the repair were")} removed, with the claim when no other citation backed it; they are not in the counts above and are listed in citation-audit.json. ");
         if (audit.InvalidMarkersStripped > 0)
             text.Append(inv, $"{audit.InvalidMarkersStripped} citation markers that pointed outside the reference list were removed. ");
         text.Append("Every verdict, with the quoted evidence, is listed in citation-audit.json; these are model judgements and should be spot-checked by a human reviewer.");

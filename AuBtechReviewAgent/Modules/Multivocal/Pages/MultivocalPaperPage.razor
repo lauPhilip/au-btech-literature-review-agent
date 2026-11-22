@@ -31,7 +31,7 @@
 else
 {
     string api = $"/api/workspace/{RunId}";
-    var counts = AuBtechReviewAgent.VerdictTally.From(checks);
+    var counts = AuBtechReviewAgent.VerdictTally.From(checks, audit?.RemovedCitations.Count ?? 0);
     <div class="mx-auto w-full max-w-[1600px] px-[clamp(16px,3vw,40px)] py-4 sm:py-8 print:max-w-none print:p-0">
 
         <div class="mb-4 flex flex-wrap items-center justify-between gap-2 print:hidden">

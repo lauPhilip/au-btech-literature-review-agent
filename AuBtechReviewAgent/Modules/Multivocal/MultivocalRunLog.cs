@@ -123,6 +123,7 @@ public static class MultivocalRunLog
             m.CoverageShare = audit.ReferenceListSize == 0 ? 0 : Math.Round((double)audit.SourcesCited / audit.ReferenceListSize, 4);
             var checks = audit.SupportChecks;
             m.CitationsFinal = VerdictCounts.From(checks.Select(c => c.Verdict));
+            m.Removed = audit.RemovedCitations.Count;
             if (audit.InitialSupportSummary is { } initial)
                 m.CitationsInitial = new VerdictCounts
                 {
