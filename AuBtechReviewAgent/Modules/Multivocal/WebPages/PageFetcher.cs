@@ -27,7 +27,7 @@ public sealed record FetchedPage(string Url, string FinalUrl, int? Status, strin
 /// followed one at a time, so every hop is checked the same way. Only public addresses are connected to: an
 /// address that resolves to the server itself or its private network is refused, whatever the link says.
 /// </summary>
-public sealed class PageFetcher
+public sealed partial class PageFetcher
 {
     public const long MaxBytes = 10 * 1024 * 1024;
     public const int MaxRedirects = 5;
@@ -236,72 +236,4 @@ public sealed class PageFetcher
 
     private static FetchedPage NotFetched(string url, string finalUrl, int? status, string why) =>
         new(url, finalUrl, status, "", "", "", why);
-
-    private static SocketsHttpHandler PublicOnlyHandler() => new()
-    {
-        AllowAutoRedirect = false, // followed by hand, so each hop is checked
-        AutomaticDecompression = DecompressionMethods.All,
-        PooledConnectionLifetime = TimeSpan.FromMinutes(5),
-        ConnectCallback = async (context, cancel) =>
-        {
-            // Checked when connecting, not when reading the link, so a name that resolves to a private address is
-            // refused too. The address checked is the address connected to.
-            var addresses = await Dns.GetHostAddressesAsync(context.DnsEndPoint.Host, cancel);
-            var target = addresses.FirstOrDefault(IsPublic)
-                ?? throw new HttpRequestException($"{context.DnsEndPoint.Host} is not a public address");
-            var socket = new Socket(target.AddressFamily, SocketType.Stream, ProtocolType.Tcp) { NoDelay = true };
-            try
-            {
-                await socket.ConnectAsync(new IPEndPoint(target, context.DnsEndPoint.Port), cancel);
-                return new NetworkStream(socket, ownsSocket: true);
-            }
-            catch
-            {
-                socket.Dispose();
-                throw;
-            }
-        },
-    };
-
-    /// <summary>IPv4 ranges that are not on the public internet, as network and mask.</summary>
-    private static readonly (uint Network, uint Mask)[] NonPublicIPv4 = new[]
-    {
-        Range(0, 0, 8), // "this" network
-        Range(10, 0, 8), // private
-        Range(100, 64, 10), // shared address space (carrier NAT)
-        Range(127, 0, 8), // loopback
-        Range(169, 254, 16), // link-local, including cloud metadata services
-        Range(172, 16, 12), // private
-        Range(192, 0, 24), // IETF protocol assignments
-        Range(192, 168, 16), // private
-        Range(198, 18, 15), // benchmarking
-        Range(224, 0, 3), // multicast and reserved
-    };
-
-    private static (uint Network, uint Mask) Range(byte first, byte second, int prefixLength)
-    {
-        uint mask = uint.MaxValue << (32 - prefixLength);
-        return (((uint)first << 24 | (uint)second << 16) & mask, mask);
-    }
-
-    /// <summary>Whether an address is on the public internet: not this machine, a private network, link-local or multicast.</summary>
-    public static bool IsPublic(IPAddress address)
-    {
-        if (address.IsIPv4MappedToIPv6) address = address.MapToIPv4();
-        if (IPAddress.IsLoopback(address) || address.Equals(IPAddress.Any) || address.Equals(IPAddress.IPv6Any) || address.Equals(IPAddress.IPv6None))
-            return false;
-        if (address.AddressFamily == AddressFamily.InterNetwork)
-        {
-            byte[] b = address.GetAddressBytes();
-            uint value = (uint)(b[0] << 24 | b[1] << 16 | b[2] << 8 | b[3]);
-            return !NonPublicIPv4.Any(range => (value & range.Mask) == range.Network);
-        }
-        if (address.AddressFamily == AddressFamily.InterNetworkV6)
-        {
-            byte[] b = address.GetAddressBytes();
-            return !(address.IsIPv6LinkLocal || address.IsIPv6SiteLocal || address.IsIPv6Multicast
-                || (b[0] & 0xFE) == 0xFC); // unique local fc00::/7
-        }
-        return false;
-    }
 }
