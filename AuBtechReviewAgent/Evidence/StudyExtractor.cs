@@ -2,8 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
-using System.Text.RegularExpressions;
-using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 using Microsoft.SemanticKernel.ChatCompletion;
 
@@ -11,52 +9,6 @@ using Microsoft.SemanticKernel.ChatCompletion;
 using Microsoft.SemanticKernel.Connectors.MistralAI;
 
 namespace AuBtechReviewAgent;
-
-/// <summary>One extracted fact with the sentence from the paper that supports it.</summary>
-public class EvidencedValue
-{
-    public string Value { get; set; } = "";
-    public string Quote { get; set; } = "";
-    /// <summary>True when the quote was found word for word in the paper text the model was shown.</summary>
-    public bool QuoteVerified { get; set; }
-}
-
-/// <summary>One MMAT 2018 criterion and the model's answer to it.</summary>
-public class AppraisalAnswer
-{
-    public string Id { get; set; } = "";
-    public string Criterion { get; set; } = "";
-    /// <summary>yes, no or cant_tell (MMAT's own answer options).</summary>
-    public string Answer { get; set; } = "";
-    public string Quote { get; set; } = "";
-    public bool QuoteVerified { get; set; }
-}
-
-/// <summary>Data extraction and quality appraisal for one included paper (written to extraction.json).</summary>
-public class StudyExtraction
-{
-    public int ReferenceNumber { get; set; }
-    public string PaperId { get; set; } = "";
-    public string Title { get; set; } = "";
-    public string EvidenceBasis { get; set; } = "";
-    public string StudyType { get; set; } = "";
-    public EvidencedValue Method { get; set; } = new();
-    public EvidencedValue Sample { get; set; } = new();
-    public List<EvidencedValue> KeyFindings { get; set; } = new();
-    public EvidencedValue Limitations { get; set; } = new();
-
-    /// <summary>MMAT category: qualitative, quantitative_randomized, quantitative_nonrandomized, quantitative_descriptive, mixed_methods or not_empirical.</summary>
-    public string AppraisalCategory { get; set; } = "";
-    public List<AppraisalAnswer> Appraisal { get; set; } = new();
-    public string? Error { get; set; }
-    /// <summary>
-    /// What the code did beyond the model's answer, e.g. that the answer was kept after a problem the model did not
-    /// fix when it was sent back. Null when there is nothing to say.
-    /// </summary>
-    public string? Note { get; set; }
-
-    [JsonIgnore] public int AppraisalYes => Appraisal.Count(a => a.Answer == "yes");
-}
 
 /// <summary>
 /// Structured data extraction and quality appraisal per included study, the two PRISMA steps between
@@ -66,7 +18,7 @@ public class StudyExtraction
 /// Every value must come with a verbatim quote, and each quote is checked against the text in code.
 /// MMAT is not scored into a single number (its authors advise against that); the criteria are reported.
 /// </summary>
-public static class StudyExtractor
+public static partial class StudyExtractor
 {
     public static readonly IReadOnlyDictionary<string, string[]> MmatCriteria = new Dictionary<string, string[]>
     {
@@ -232,83 +184,5 @@ public static class StudyExtractor
             result.Error = $"Extraction failed: {ex.Message}";
         }
         return result;
-    }
-
-    /// <summary>The most words in a method or sample value, which is an answer, not a sentence (issue #130).</summary>
-    public const int ShortValueWords = 12;
-    /// <summary>The most words in a limitation or a finding.</summary>
-    public const int SentenceWords = 30;
-
-    /// <summary>"1.1" from "1.1", " 1.1 " or "1.1 The qualitative approach ...".</summary>
-    private static string CriterionId(string? id) => Regex.Match(id ?? "", @"\d\.\d").Value;
-
-    /// <summary>yes, no or cant_tell; "can't tell", "cannot tell" and "cant tell" mean cant_tell.</summary>
-    private static string NormalAnswer(string? answer)
-    {
-        string a = (answer ?? "").Trim().ToLowerInvariant().Replace('\u2019', '\'');
-        return a is "can't tell" or "cannot tell" or "cant tell" or "can't_tell" ? "cant_tell" : a;
-    }
-
-    private static string? BasicProblem(ExtractionAnswer a)
-    {
-        if (string.IsNullOrWhiteSpace(a.StudyType)) return "studyType is missing.";
-        if (a.AppraisalCategory != "not_empirical" && !MmatCriteria.ContainsKey(a.AppraisalCategory))
-            return $"appraisalCategory must be one of: {string.Join(", ", MmatCriteria.Keys)}, not_empirical.";
-        if (a.Appraisal != null && a.Appraisal.Any(x => !LlmJson.OneOf(NormalAnswer(x.Answer), "yes", "no", "cant_tell")))
-            return "each appraisal answer must be yes, no or cant_tell.";
-        return null;
-    }
-
-    /// <summary>
-    /// The checks an answer should pass but that are not worth losing the whole extraction for: short values that
-    /// are not the quote and keep their % signs (issue #130), and all five MMAT answers, each yes or no backed by a
-    /// quote that is in the text, not all "can't tell" when the full text was read (issue #149).
-    /// </summary>
-    internal static string? StrictProblem(ExtractionAnswer a, string evidenceText, bool fullText)
-    {
-        var fields = new List<(string Name, EvidencedValue? Value, int MaxWords)>
-        {
-            ("method", a.Method, ShortValueWords), ("sample", a.Sample, ShortValueWords), ("limitations", a.Limitations, SentenceWords),
-        };
-        var findings = a.KeyFindings ?? new();
-        for (int i = 0; i < findings.Count; i++) fields.Add(($"keyFindings[{i}]", findings[i], SentenceWords));
-        foreach (var (name, v, maxWords) in fields)
-        {
-            string value = (v?.Value ?? "").Trim(), quote = (v?.Quote ?? "").Trim();
-            if (value.Length == 0 || value.Equals("not reported", StringComparison.OrdinalIgnoreCase)) continue;
-            if (Words(value) > maxWords)
-                return $"{name}.value has {Words(value)} words; give a short value of at most {maxWords} words in your own words and keep the sentence in the quote.";
-            if (maxWords == ShortValueWords && Words(quote) > 5 && Canonical(value) == Canonical(quote))
-                return $"{name}.value repeats the quote; give a short value in your own words.";
-            foreach (Match m in Percent.Matches(quote))
-                if (Regex.IsMatch(value, $@"(?<![\d.,]){Regex.Escape(m.Groups[1].Value)}(?![\d.,]*\s?%)(?![\d.,])"))
-                    return $"{name}.value gives {m.Groups[1].Value} without the % sign that the quote has.";
-        }
-
-        if (!MmatCriteria.TryGetValue(a.AppraisalCategory, out var criteria)) return null;
-        var given = a.Appraisal ?? new();
-        var ids = criteria.Select(c => c.Split(' ')[0]).ToList();
-        var missing = ids.Where(id => !given.Any(x => CriterionId(x.Id) == id)).ToList();
-        if (missing.Count > 0)
-            return $"appraisal must answer all five criteria of {a.AppraisalCategory} by id; missing: {string.Join(", ", missing)}.";
-        foreach (var x in given.Where(x => NormalAnswer(x.Answer) != "cant_tell"))
-            if (!CitationSupportChecker.QuoteOccursIn(x.Quote, evidenceText))
-                return $"the quote for {CriterionId(x.Id)} is not in the text word for word; copy one exact sentence that shows the answer, or answer cant_tell.";
-        if (fullText && given.All(x => NormalAnswer(x.Answer) == "cant_tell"))
-            return "every criterion is cant_tell, but passages from the full text are given; answer each criterion they show with yes or no and a quote, and keep cant_tell for the rest.";
-        return null;
-    }
-
-    private static readonly Regex Percent = new(@"(\d+(?:[.,]\d+)?)\s?%", RegexOptions.CultureInvariant);
-    private static int Words(string text) => text.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries).Length;
-    private static string Canonical(string text) => Regex.Replace(text.ToLowerInvariant(), @"[^\p{L}\p{N}]+", " ").Trim();
-
-    private static EvidencedValue Verify(EvidencedValue? v, string evidenceText)
-    {
-        var value = v ?? new EvidencedValue { Value = "not reported" };
-        value.Value = (value.Value ?? "").Trim();
-        value.Quote = (value.Quote ?? "").Trim();
-        value.QuoteVerified = CitationSupportChecker.QuoteOccursIn(value.Quote, evidenceText);
-        return value;
     }
 }
