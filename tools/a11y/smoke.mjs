@@ -70,8 +70,10 @@ async function open(path) {
   const context = await browser.newContext({ viewport: { width: 1280, height: 800 } });
   const page = await context.newPage();
   const errors = [];
-  page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
+  page.on('console', m => { if (m.type() === 'error' && !m.text().startsWith('Failed to load resource')) errors.push(m.text()); });
   page.on('pageerror', e => errors.push(e.message));
+  // The browser's own "Failed to load resource" line has no address, so a failed request is reported with it.
+  page.on('response', r => { if (r.status() >= 400) errors.push(`${r.status()} ${new URL(r.url()).pathname}`); });
   const response = await page.goto(base + path, { waitUntil: 'load' });
   // Interactive pages need their live connection before a click does anything.
   await page.waitForTimeout(1500);
