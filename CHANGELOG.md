@@ -50,6 +50,8 @@ The citation repair now has a second pass. After the first repair, a citation th
 
 Removed citations are counted on their own. The report says how many there were, and the coloured bar shows them in navy, next to the verdicts. The Metrics page has a column for them in each table, and run-metrics.json keeps the number. The glossary explains what removed means.
 
+The grey literature review now counts removed citations too: in its metrics, the bar on its paper page and its LaTeX note.
+
 Downloads are now smaller on the wire. The reference lists, the protocol, main.tex and the other text files are sent compressed, and so are the site's styles and scripts. Pages load the same, only faster.
 
 Downloads are faster. The archive of a finished review is kept on the server, so a second download sends the same file at once. Before, it was built again each time. A note or a new check of a citation still gives you a fresh archive. Each download now also says when it last changed, so your browser does not fetch a file it already has.
