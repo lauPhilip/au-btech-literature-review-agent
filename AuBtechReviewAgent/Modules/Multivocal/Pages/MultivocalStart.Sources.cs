@@ -87,6 +87,10 @@ public partial class MultivocalStart
         _ => "Not screened",
     };
 
+    // The ordinal comparison == makes. The Sources found tab compares decisions through this, as CodeQL flagged the
+    // same comparisons written in its Razor markup as comparisons of identical values.
+    internal static bool Differ(string? a, string? b) => !string.Equals(a, b, StringComparison.Ordinal);
+
     internal static string DecisionChip(string decision) => decision switch
     {
         "Included" => "ui-chip border-supported-border bg-supported-fill text-supported",

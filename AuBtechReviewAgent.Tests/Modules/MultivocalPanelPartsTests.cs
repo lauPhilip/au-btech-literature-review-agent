@@ -82,7 +82,7 @@ public class MultivocalPanelPartsTests
             Attributes = new()
             {
                 new ExtractedAttribute { Attribute = "Practice", Values = new() { new ExtractedValue { Value = "Summarise", Quote = "we summarise" } }, Unsupported = new() { new ExtractedValue { Value = "Prune", Quote = "missing" } } },
-                new ExtractedAttribute { Attribute = "Tool", NotStated = true },
+                new ExtractedAttribute { Attribute = "Tool" },
             },
         };
 
@@ -123,7 +123,7 @@ public class MultivocalPanelPartsTests
             {
                 new GreyExtraction { Attributes = new() { new ExtractedAttribute { Attribute = "Practice", Values = new() { new ExtractedValue { Value = "Summarise" }, new ExtractedValue { Value = "Prune" } } } } },
                 new GreyExtraction { Attributes = new() { new ExtractedAttribute { Attribute = "Practice", Values = new() { new ExtractedValue { Value = "Summarise" } } } } },
-                new GreyExtraction { Attributes = new() { new ExtractedAttribute { Attribute = "Practice", NotStated = true } } },
+                new GreyExtraction { Attributes = new() { new ExtractedAttribute { Attribute = "Practice" } } },
             },
         };
 

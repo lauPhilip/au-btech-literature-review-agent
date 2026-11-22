@@ -87,7 +87,7 @@
                         }
                         @if (decision.Reviewed)
                         {
-                            <span class="ui-chip border-abstract-only-border bg-abstract-only-fill text-abstract-only text-[10px]">@(decision.ModelDecision == decision.Decision ? "confirmed by you" : "changed by you")</span>
+                            <span class="ui-chip border-abstract-only-border bg-abstract-only-fill text-abstract-only text-[10px]">@(MultivocalStart.Differ(decision.ModelDecision, decision.Decision) ? "changed by you" : "confirmed by you")</span>
                         }
                     </p>
                 }
@@ -115,13 +115,13 @@
                     <details class="mt-1 text-[11px] text-muted">
                         <summary class="cursor-pointer select-none text-muted">Why</summary>
                         <p class="mt-1">@decision.Reasoning</p>
-                        @if (decision.Second != null && decision.First != null && decision.First.Decision != decision.Second.Decision)
+                        @if (decision.Second != null && decision.First != null && MultivocalStart.Differ(decision.First.Decision, decision.Second.Decision))
                         {
                             <p class="mt-1">Second screening: @decision.Second.Reasoning</p>
                         }
                         @if (decision.Reviewed)
                         {
-                            <p class="mt-1">You decided: @decision.Decision@(decision.ReviewerNote != null ? $" ({decision.ReviewerNote})" : "")@(decision.ModelDecision != decision.Decision ? $"; the model had decided {decision.ModelDecision}" : "").</p>
+                            <p class="mt-1">You decided: @decision.Decision@(decision.ReviewerNote != null ? $" ({decision.ReviewerNote})" : "")@(MultivocalStart.Differ(decision.ModelDecision, decision.Decision) ? $"; the model had decided {decision.ModelDecision}" : "").</p>
                         }
                     </details>
                 }
