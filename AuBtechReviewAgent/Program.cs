@@ -141,9 +141,11 @@ builder.Services.AddSingleton(multivocalReporter); // report, written in code (p
 var multivocalWriter = new AuBtechReviewAgent.MultivocalWriter(reviewEngine.Store, multivocalReporter, multivocalPages, multivocalChat,
     llmOptions.Model, llmOptions.ScreeningParallelism, reviewEngine.Cache, metricsStore);
 builder.Services.AddSingleton(multivocalWriter); // writing and checking the paper (preview)
-builder.Services.AddSingleton(new AuBtechReviewAgent.MultivocalRunner(reviewEngine.Store, multivocalSearcher, multivocalScreener, multivocalQuality,
+var multivocalRunner = new AuBtechReviewAgent.MultivocalRunner(reviewEngine.Store, multivocalSearcher, multivocalScreener, multivocalQuality,
     multivocalMapper, multivocalExtractor, multivocalSynthesiser, multivocalPages, multivocalWriter,
-    () => AuBtechReviewAgent.LlmFactory.Create(llmOptions, mistralApiKey), llmOptions.Model)); // runs the steps one after another (preview)
+    () => AuBtechReviewAgent.LlmFactory.Create(llmOptions, mistralApiKey), llmOptions.Model);
+builder.Services.AddSingleton(multivocalRunner); // runs the steps one after another (preview)
+reviewEngine.AddCanceller(multivocalRunner.Cancel); // so CancelRun reaches grey literature runs too
 // Modules shown as a preview while they are being built (Development only; see ReviewModulesOptions).
 builder.Services.AddSingleton(AuBtechReviewAgent.ReviewModulesOptions.From(builder.Configuration, builder.Environment.IsDevelopment()));
 
