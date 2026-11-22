@@ -6,8 +6,7 @@ namespace AuBtechReviewAgent.Tests;
 /// <summary>
 /// No file in the repository over 300 lines (issue #235): code, tests, docs, workflows, scripts and data alike.
 /// The files git tracks are checked, so run folders and build output are never counted. The exceptions are files
-/// nobody writes by hand. The files still longer than the limit are listed with their length when the rule came in;
-/// each may only shrink, and comes off the list once it is split under the limit.
+/// nobody writes by hand. Every file that was longer when the rule came in has been split, so the rule has no others.
 /// </summary>
 public class FileLengthTests
 {
@@ -19,21 +18,6 @@ public class FileLengthTests
     private static readonly string[] Exceptions =
     {
         "AuBtechReviewAgent/ScimagoData/", "AuBtechReviewAgent/package-lock.json", "/wwwroot/lib/", "/wwwroot/css/tailwind.css",
-    };
-
-    private static readonly Dictionary<string, int> LongerWhenTheRuleCameIn = new()
-    {
-        ["AuBtechReviewAgent/Components/Pages/Home.razor"] = 1397,
-        ["AuBtechReviewAgent/Modules/Multivocal/MultivocalExtraction.cs"] = 344,
-        ["AuBtechReviewAgent/Modules/Multivocal/MultivocalMap.cs"] = 366,
-        ["AuBtechReviewAgent/Modules/Multivocal/MultivocalPaperParts.cs"] = 425,
-        ["AuBtechReviewAgent/Modules/Multivocal/MultivocalPlan.cs"] = 367,
-        ["AuBtechReviewAgent/Modules/Multivocal/MultivocalQuality.cs"] = 501,
-        ["AuBtechReviewAgent/Modules/Multivocal/MultivocalRunner.cs"] = 342,
-        ["AuBtechReviewAgent/Modules/Multivocal/MultivocalScreening.cs"] = 375,
-        ["AuBtechReviewAgent/Modules/Multivocal/MultivocalWriting.cs"] = 523,
-        ["AuBtechReviewAgent/Modules/Multivocal/Pages/MultivocalPaperPage.razor"] = 413,
-        ["AuBtechReviewAgent/Modules/Multivocal/WebPages/PageFetcher.cs"] = 307,
     };
 
     private static string? Root()
@@ -79,26 +63,11 @@ public class FileLengthTests
         if (files == null) return;
 
         var tooLong = files
-            .Where(f => f.Lines > Limit && !LongerWhenTheRuleCameIn.ContainsKey(f.Path))
+            .Where(f => f.Lines > Limit)
             .Select(f => $"{f.Path} ({f.Lines} lines)")
             .ToList();
 
         Assert.True(tooLong.Count == 0, "Split these files under 300 lines: " + string.Join(", ", tooLong));
-    }
-
-    [Fact]
-    public void TheListedLongFilesOnlyShrink()
-    {
-        var files = TrackedFiles();
-        if (files == null) return;
-
-        var lengths = files.ToDictionary(f => f.Path, f => f.Lines);
-        var grown = LongerWhenTheRuleCameIn
-            .Where(kv => lengths.TryGetValue(kv.Key, out int now) && now > kv.Value)
-            .Select(kv => $"{kv.Key} ({lengths[kv.Key]} lines, at most {kv.Value})")
-            .ToList();
-
-        Assert.True(grown.Count == 0, "These long files grew; split them instead: " + string.Join(", ", grown));
     }
 
     [Fact]
