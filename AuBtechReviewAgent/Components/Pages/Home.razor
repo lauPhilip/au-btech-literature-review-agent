@@ -299,236 +299,7 @@ else
 }
 
 @code {
-    [Inject] private UiStateContainer State { get; set; } = default!;
-
-    private string searchQuery { get => State.SearchQuery; set => State.SearchQuery = value; }
-    private string reviewObjective { get => State.ReviewObjective; set => State.ReviewObjective = value; }
-    // The research questions as typed, one per line; ReviewInputGuard.ResearchQuestionLines splits them.
-    private string researchQuestionsText { get => State.ResearchQuestions; set => State.ResearchQuestions = value; }
-    private string inclusionCriteria { get => State.InclusionCriteria; set => State.InclusionCriteria = value; }
-    private string exclusionCriteria { get => State.ExclusionCriteria; set => State.ExclusionCriteria = value; }
-    private bool requirePeerReview { get => State.RequirePeerReview; set => State.RequirePeerReview = value; }
-    private string synthesisTargetDirective { get => State.SynthesisTargetDirective; set => State.SynthesisTargetDirective = value; }
-
-    private string rawJsonLogs { get => State.RawJsonLogs; set => State.RawJsonLogs = value; }
-    private int totalIdentified { get => State.TotalIdentified; set => State.TotalIdentified = value; }
-    private int screenedCount { get => State.ScreenedCount; set => State.ScreenedCount = value; }
-    private int excludedCount { get => State.ExcludedCount; set => State.ExcludedCount = value; }
-    private int includedCount { get => State.IncludedCount; set => State.IncludedCount = value; }
-    private bool isSearching { get => State.IsSearching; set => State.IsSearching = value; }
-
-    private int maxResults { get; set; } = 5;
-
-    private bool showKeyModal = false;
-    private AuBtechReviewAgent.UserApiKeys? sessionKeys = null;
-
-    // Search-string preview: null until the reviewer previews (the model then chooses during the run).
-    private List<string>? reviewedSearchStrings;
-    private string? previewQuery;
-    private string? previewError;
-    private bool previewingStrings;
-    private int previewsLeft = 5; // each preview is one model call; a page gets a few
-
-    private async Task PreviewSearchStrings()
-    {
-        if (previewingStrings || previewsLeft <= 0 || string.IsNullOrWhiteSpace(searchQuery)) return;
-        previewingStrings = true;
-        previewError = null;
-        previewsLeft--;
-        try
-        {
-            var strings = await ReviewEngine.PreviewSearchStringsAsync(searchQuery, reviewObjective, inclusionCriteria, sessionKeys);
-            reviewedSearchStrings = strings.Take(AuBtechReviewAgent.ReviewInputGuard.MaxSearchStrings).ToList();
-            previewQuery = searchQuery.Trim();
-            if (reviewedSearchStrings.Count == 0)
-                previewError = "The model did not propose other phrasings. Add your own, or let the model try again during the run.";
-        }
-        catch (Exception ex)
-        {
-            Logger.LogInformation("Search-string preview failed: {Error}", ex.GetType().Name);
-            previewError = "The preview did not work just now. The model will propose the search strings during the run instead.";
-        }
-        finally
-        {
-            previewingStrings = false;
-        }
-    }
-
-    // Run quota: the client's address is read once when the component starts (from the HTTP request
-    // behind the prerender or the SignalR connection) and used as the quota key for this session.
-    private string clientAddress = "unknown";
-
-    // Captured during prerendering (a normal HTTP request, so the address is reliable) and carried into
-    // the interactive circuit through persisted component state, which Blazor Server protects with Data
-    // Protection so the browser cannot change it. The HttpContextAccessor value is only a fallback.
-    [PersistentState]
-    public string? PrerenderClientAddress { get; set; }
-    private string adminToken = "";
-    private string modalAdminToken = "";
-
-    // Result of ReviewInputGuard for the last "Start review" click, and the flags the user confirmed.
-    private AuBtechReviewAgent.InputCheck? inputCheck;
-    private string? pendingFlagSignature;
-    private string? confirmedFlagSignature;
-
-    private async Task ConfirmFlaggedInput()
-    {
-        confirmedFlagSignature = pendingFlagSignature;
-        await StartReviewProcess();
-    }
-    private string quotaNotice = "";
-    private AuBtechReviewAgent.QuotaStatus quotaStatus = new(AuBtechReviewAgent.QuotaTier.Free, true, 0, 0, "");
-    private IReadOnlyDictionary<string, bool> sourceAvailability = new Dictionary<string, bool>();
-
-    private bool hasOwnMistralKey => !string.IsNullOrWhiteSpace(sessionKeys?.MistralApiKey);
-    private AuBtechReviewAgent.QuotaTier currentTier => Quota.ResolveTier(hasOwnMistralKey, adminToken);
-    private int maxResultsCeiling => Quota.MaxResultsFor(currentTier, 50);
-
-    private void RefreshQuotaAndSources()
-    {
-        quotaStatus = Quota.GetStatus(clientAddress, currentTier);
-        sourceAvailability = ReviewEngine.GetSourceAvailability(sessionKeys);
-        if (maxResults > maxResultsCeiling) maxResults = maxResultsCeiling;
-    }
-
-    private List<string> SelectedAvailableSources() =>
-        State.SelectedSources.Where(k => sourceAvailability.TryGetValue(k, out var ok) && ok).ToList();
-
-    private string modalMistral = "";
-    private string modalElsevier = "";
-    private string modalIeee = "";
-    private string modalScholar = "";
-
-    [Inject] private AuBtechReviewAgent.RunsOptions RunsOptions { get; set; } = default!;
-
-    /// <summary>Set when the page is opened as /review/{RunId}: shows that run (and resumes following it if it is still going).</summary>
-    [Parameter] public Guid? RunId { get; set; }
-
-    /// <summary>/review?from={runId}: start a new review with the settings of an earlier run.</summary>
-    [SupplyParameterFromQuery(Name = "from")] public Guid? From { get; set; }
-
-    /// <summary>The kind of review chosen on the start page (/start); unknown or not-yet-available kinds fall back to the systematic review.</summary>
-    [SupplyParameterFromQuery(Name = "method")] public string? MethodKey { get; set; }
-    private AuBtechReviewAgent.ReviewMethod ReviewMethod => AuBtechReviewAgent.ReviewMethods.AvailableOrDefault(MethodKey);
-    private Guid? prefilledFrom;
-    private string? prefillNotice;
-
-    // The form is shown while composing (no run on this page, or "New review" pressed); otherwise a compact
-    // summary of what was asked, so the run itself gets the attention.
-    private bool editingNew;
-    private bool Composing => !hasRun || editingNew;
-    // The criteria panel: null until the reviewer folds or opens it (then open from 1024 px only).
-    private bool? criteriaOpen;
-    private AuBtechReviewAgent.ReviewState? runInfo;
-
-    private const string LabelClass = "ui-label";
-    private const string InputClass = "ui-input";
-
-    private int yearFrom
-    {
-        get => State.DateFrom.Year;
-        set => State.DateFrom = new DateTime(Math.Clamp(value, 1900, DateTime.UtcNow.Year), 1, 1);
-    }
-    private int yearTo
-    {
-        get => State.DateTo.Year;
-        set => State.DateTo = new DateTime(Math.Clamp(value, 1900, DateTime.UtcNow.Year), 12, 31);
-    }
-
-    private void SetYears(int from)
-    {
-        yearFrom = from;
-        yearTo = DateTime.UtcNow.Year;
-    }
-
-    /// <summary>Why the review cannot start yet, or null when it can. Shown next to the button, not after a click.</summary>
-    private string? StartBlocker()
-    {
-        if (!quotaStatus.Allowed) return string.IsNullOrWhiteSpace(quotaStatus.Message) ? "No runs left for now." : quotaStatus.Message;
-        if (string.IsNullOrWhiteSpace(searchQuery)) return "Add a search query.";
-        if (string.IsNullOrWhiteSpace(inclusionCriteria)) return "Say which studies to include, under Criteria.";
-        if (SelectedAvailableSources().Count == 0) return "Select at least one database, under Criteria.";
-        return null;
-    }
-
-    /// <summary>The field to go to for the current blocker, or null when no field can fix it (quota).</summary>
-    private string? BlockerTarget()
-    {
-        if (!quotaStatus.Allowed) return null;
-        if (string.IsNullOrWhiteSpace(searchQuery)) return "f-query";
-        if (string.IsNullOrWhiteSpace(inclusionCriteria)) return "f-inclusion";
-        if (SelectedAvailableSources().Count == 0) return "f-sources";
-        return null;
-    }
-
-    // Field to focus after the next render (a field in the criteria panel needs the panel open first).
-    private string? pendingFocus;
-
-    /// <summary>The fields that live in the criteria panel rather than in the composer.</summary>
-    private static readonly HashSet<string> CriteriaFields = new() { "f-inclusion", "f-exclusion", "f-sources", "f-directive" };
-
-    private void FocusField(string fieldId)
-    {
-        if (CriteriaFields.Contains(fieldId)) criteriaOpen = true;
-        pendingFocus = fieldId;
-    }
-
-    private void GoToProblem()
-    {
-        if (BlockerTarget() is { } fieldId) FocusField(fieldId);
-    }
-
-    /// <summary>Called by the composer and the criteria panel on every change, so the page re-checks what is missing and saves the draft.</summary>
-    private void FormChanged() { }
-
-    /// <summary>"Start review" is never silently disabled: when something is missing it takes you there instead.</summary>
-    private async Task StartOrShowProblem()
-    {
-        if (StartBlocker() != null)
-        {
-            GoToProblem();
-            return;
-        }
-        await StartReviewProcess();
-    }
-
-    // The input guard names fields by these labels; this is where each one lives in the form.
-    private static readonly (string Name, string FieldId)[] FieldsByName =
-    {
-        ("Search query", "f-query"), ("Review objective", "f-objective"), ("Research question", "f-questions"),
-        ("Inclusion criteria", "f-inclusion"), ("Exclusion criteria", "f-exclusion"), ("Artifact target", "f-directive"),
-    };
-
-    private void FocusFirstInvalidField()
-    {
-        if (inputCheck is not { IsValid: false }) return;
-        foreach (var error in inputCheck.Errors)
-        {
-            var field = FieldsByName.FirstOrDefault(f => error.StartsWith(f.Name, StringComparison.Ordinal));
-            if (field.FieldId != null)
-            {
-                FocusField(field.FieldId);
-                return;
-            }
-        }
-    }
-
-    private string AdvancedSummary()
-    {
-        var on = new List<string>();
-        if (State.DualScreening) on.Add("dual screening");
-        if (State.CitationChaining) on.Add("chaining");
-        if (State.ReviewScreeningFirst) on.Add("your check");
-        if (requirePeerReview) on.Add("peer-reviewed");
-        return on.Count == 0 ? $"{maxResults} per source" : $"{string.Join(", ", on)} · {maxResults} per source";
-    }
-
-    // ── Tab title, notifications and the remembered draft (speed and feel) ─────────────────────────────
-
-    // Set when a run finished while this page was open, so the tab title says so until the next run.
-    private bool finishedWhileOpen;
-    private string notifyPermission = "unsupported";
-
+    // The fragments with markup stay here; the rest of the page is in the Home.*.cs partial files.
     /// <summary>The browser tab's title: the progress while running, "✓ Review ready" when it finished here.</summary>
     private string TabTitle()
     {
@@ -569,9 +340,6 @@ else
         string Query, string Objective, string Inclusion, string Exclusion, int YearFrom, int YearTo,
         string ArtifactKind, string Directive, List<string> Sources, bool Dual, bool Chaining, bool Check, bool PeerReviewed,
         int MaxResults, DateTime SavedUtc, List<string>? SearchStrings = null, string? ResearchQuestions = null);
-
-    private string lastSavedDraft = "";
-    private bool draftRestored;
 
     private bool FormIsEmpty() =>
         string.IsNullOrWhiteSpace(searchQuery) && string.IsNullOrWhiteSpace(reviewObjective)
@@ -640,9 +408,6 @@ else
         }
     }
 
-    // Shown next to the "brought back" notice: start with an empty form instead.
-    private bool showStartEmpty;
-
     private async Task StartEmpty()
     {
         searchQuery = reviewObjective = inclusionCriteria = exclusionCriteria = researchQuestionsText = "";
@@ -675,9 +440,6 @@ else
         return AuBtechReviewAgent.RunProgress.Steps.TryGetValue(State.Stats.ProgressStep, out var step) ? $"Now: {step.Label}." : "The run has started.";
     }
 
-
-    // ── Running and Done (redesign step 7) ─────────────────────────────────────────────────────────────
-    private bool showLog;
 
     private void ToggleLog() => showLog = !showLog;
 
@@ -773,18 +535,6 @@ else
         </div>
     };
 
-    /// <summary>Fills the form with a worked example, so a first-time visitor sees what good input looks like.</summary>
-    private void LoadExample()
-    {
-        searchQuery = "agentic AI software frameworks";
-        reviewObjective = "Which safety and fault-tolerance mechanisms do agentic AI frameworks use, and how are they evaluated?";
-        researchQuestionsText = "Which safety and fault-tolerance mechanisms do agentic AI frameworks use?\nHow are these mechanisms evaluated, and with what evidence?";
-        inclusionCriteria = "Studies that describe or evaluate an agent framework or orchestration loop, with some form of evaluation.";
-        exclusionCriteria = "Studies about agriculture or marketing; opinion pieces without evidence.";
-        SetYears(2020);
-        prefillNotice = "An example review was filled in. Change anything you like, or start it as it is.";
-    }
-
     /// <summary>Opens the form for a new review, prefilled with the current settings; the shown run stays at its own link.</summary>
     private void StartNewDraft()
     {
@@ -793,56 +543,11 @@ else
         confirmDelete = false;
     }
 
-    private Guid currentSessionId
-    {
-        get => State.CurrentSessionId;
-        set => State.CurrentSessionId = value;
-    }
-    private bool hasRun => State.CurrentSessionId != Guid.Empty;
-
-    private string stage = "";
-    private int queuePosition;
-    private string? failureMessage;
-    private DateTime? completedUtc;
-    private static string AppVersionShort => AuBtechReviewAgent.RecordingChatCompletionService.AppVersion.Split('+')[0];
     private bool awaitingReview;
     private bool confirmDelete;
     private IReadOnlyList<AuBtechReviewAgent.ScreeningLog>? reviewLogs;
     private CancellationTokenSource? monitorCts;
     private bool subscribed;
-
-    protected override void OnInitialized()
-    {
-        PrerenderClientAddress ??= AuBtechReviewAgent.RunQuotaService.NormalizeClientAddress(HttpContextAccessor.HttpContext?.Connection.RemoteIpAddress);
-        clientAddress = PrerenderClientAddress;
-        RefreshQuotaAndSources();
-    }
-
-    protected override void OnParametersSet()
-    {
-        if (From is Guid from && from != Guid.Empty && from != prefilledFrom && !isSearching)
-        {
-            prefilledFrom = from;
-            PrefillFrom(from);
-            return;
-        }
-        // Opening /review/{id} (after a reload, from a bookmark, or from another device) attaches this page to
-        // that run. Opening plain /review keeps whatever run this tab already shows.
-        if (RunId is Guid id && id != Guid.Empty && (id != currentSessionId || !subscribed))
-        {
-            // A run made by another kind of review opens on that module's own pages.
-            if (AuBtechReviewAgent.ReviewModules.ElsewhereFor(Runs.LoadHeader(id), AuBtechReviewAgent.ReviewMethod.SystematicKey) is string elsewhere)
-            {
-                Nav.NavigateTo(elsewhere, replace: true);
-                return;
-            }
-            AttachToRun(id);
-        }
-        else if (hasRun && !subscribed)
-        {
-            AttachToRun(currentSessionId);
-        }
-    }
 
     /// <summary>Fills the form with an earlier run's settings (the reviewer still presses Start review).</summary>
     private void PrefillFrom(Guid id)
@@ -962,79 +667,6 @@ else
         reviewLogs = null;
         stage = AuBtechReviewAgent.PrismaReviewEngine.StageSynthesizing;
         StateHasChanged();
-    }
-
-    public void Dispose()
-    {
-        // The engine is a singleton: an event handler left behind would keep this page alive forever.
-        Unsubscribe();
-        monitorCts?.Cancel();
-        monitorCts?.Dispose();
-    }
-
-    protected override async Task OnAfterRenderAsync(bool firstRender)
-    {
-        await SaveDraftAsync();
-        await RefreshEditAccessAsync();
-        if (pendingFocus is { } fieldId)
-        {
-            pendingFocus = null;
-            try { await JS.InvokeVoidAsync("traceableReview.focus", fieldId); }
-            catch (Exception ex) when (ex is JSException or InvalidOperationException or TaskCanceledException)
-            {
-                Logger.LogDebug("Could not move focus to {Field}: {Message}", fieldId, ex.Message);
-            }
-        }
-        if (keyModalJustOpened)
-        {
-            keyModalJustOpened = false;
-            try { await JS.InvokeVoidAsync("traceableReview.trapFocus", "key-dialog"); }
-            catch (Exception ex) when (ex is JSException or InvalidOperationException or TaskCanceledException)
-            {
-                Logger.LogDebug("Could not move focus into the key dialog: {Message}", ex.Message);
-            }
-        }
-        if (firstRender)
-        {
-            try
-            {
-                var tokenResult = await SessionStorage.GetAsync<string>("developer_access_token");
-                if (tokenResult.Success && !string.IsNullOrWhiteSpace(tokenResult.Value))
-                {
-                    adminToken = modalAdminToken = tokenResult.Value;
-                }
-
-                var result = await SessionStorage.GetAsync<string>("encrypted_byok_payload");
-                if (result.Success && !string.IsNullOrWhiteSpace(result.Value))
-                {
-                    sessionKeys = JsonSerializer.Deserialize<AuBtechReviewAgent.UserApiKeys>(result.Value);
-                    
-                    if (sessionKeys != null)
-                    {
-                        modalMistral = sessionKeys.MistralApiKey ?? "";
-                        modalElsevier = sessionKeys.ElsevierApiKey ?? "";
-                        modalIeee = sessionKeys.IeeeApiKey ?? "";
-                        modalScholar = sessionKeys.ScholarApiKey ?? "";
-                    }
-                }
-                RefreshQuotaAndSources();
-                await InvokeAsync(StateHasChanged);
-            }
-            catch (Exception ex)
-            {
-                // Browser storage can be unavailable (private window, blocked storage); the page works without saved keys.
-                Logger.LogDebug("Could not restore saved keys from browser storage: {Message}", ex.Message.Replace("\r", " ").Replace("\n", " "));
-            }
-
-            // Independent of the keys above: the form draft and whether notifications are possible.
-            await RestoreDraftAsync();
-            try { notifyPermission = await JS.InvokeAsync<string>("traceableReview.notifyPermission"); }
-            catch (Exception ex) when (ex is JSException or InvalidOperationException or TaskCanceledException)
-            {
-                Logger.LogDebug("Could not read the notification permission: {Message}", ex.Message);
-            }
-            StateHasChanged();
-        }
     }
 
     // Set when the dialog opens, so the next render moves focus into it (OnAfterRenderAsync).
@@ -1177,13 +809,6 @@ else
             </div>
         </div>
     };
-
-    // The exclusion criterion is optional, so an empty one reads "None". A run from before the criteria were stored
-    // (no inclusion criterion either) points to the protocol, as the Include row does (issue #152).
-    private string ExclusionShown() =>
-        runInfo == null ? (string.IsNullOrWhiteSpace(exclusionCriteria) ? "None" : exclusionCriteria)
-        : !string.IsNullOrWhiteSpace(runInfo.ExclusionCriteria) ? runInfo.ExclusionCriteria
-        : string.IsNullOrWhiteSpace(runInfo.InclusionCriteria) ? "(see the protocol)" : "None";
 
     private static RenderFragment SettingRow(string label, string? value) => __builder =>
     {
