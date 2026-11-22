@@ -50,6 +50,8 @@ Removed citations are counted on their own. The report says how many there were,
 
 Downloads are now smaller on the wire. The reference lists, the protocol, main.tex and the other text files are sent compressed, and so are the site's styles and scripts. Pages load the same, only faster.
 
+Downloads are faster. The archive of a finished review is kept on the server, so a second download sends the same file at once. Before, it was built again each time. A note or a new check of a citation still gives you a fresh archive. Each download now also says when it last changed, so your browser does not fetch a file it already has.
+
 ### Fixed
 
 The discussion no longer leans on studies the review set aside. When a study fits none of the themes, the later sections now know which one it is and why. Only the limitations may name it. The step that builds the themes now sees the criteria every study met, so it cannot set a study aside for a reason they allow.
