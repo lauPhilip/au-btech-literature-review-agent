@@ -93,6 +93,26 @@ public class MetricsPageTests
     }
 
     [Fact]
+    public void ThePageKeepsItsMarkupAndItsStateInACodeBehind()
+    {
+        string? page = Source("Pages", "Metrics.razor");
+        string? code = Source("Pages", "Metrics.razor.cs");
+        if (page == null || code == null) return;
+
+        Assert.True(page.Split('\n').Length <= 300 && code.Split('\n').Length <= 300);
+        Assert.Contains("public partial class Metrics", code);
+        Assert.Contains("[SupplyParameterFromQuery(Name = \"kind\")]", code);
+        Assert.Contains("[Parameter] public bool Sample", code);
+        Assert.Contains("protected override async Task OnAfterRenderAsync(bool firstRender)", code);
+        Assert.Contains("Quota.ResolveTier(false, token) == AuBtechReviewAgent.QuotaTier.Developer", code);
+        Assert.Contains("SampleMetrics.Runs().Where(r => r.IsMultivocal == Grey)", code);
+        Assert.Contains("Store.ReadAll(multivocal: Grey)", code);
+        Assert.DoesNotContain("OnAfterRenderAsync", page);
+        foreach (string inject in new[] { "RunMetricsStore Store", "RunQuotaService Quota", "ProtectedSessionStorage SessionStorage", "ReviewModulesOptions ModuleOptions" })
+            Assert.Contains(inject, page);
+    }
+
+    [Fact]
     public void TheSampleRunsCoverBothKindsEveryVerdictAndHaveDistinctShortIds()
     {
         var runs = SampleMetrics.Runs();
