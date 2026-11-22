@@ -56,6 +56,8 @@ Downloads are faster. The archive of a finished review is kept on the server, so
 
 The Metrics page opens faster. The stored figures of past runs are read once and kept in memory, not read again for each visit. A new run still shows at once.
 
+A running review costs the server less. The page that follows a run checked its progress file every second and read it in full each time. Now it reads the file only when it changed.
+
 ### Fixed
 
 The discussion no longer leans on studies the review set aside. When a study fits none of the themes, the later sections now know which one it is and why. Only the limitations may name it. The step that builds the themes now sees the criteria every study met, so it cannot set a study aside for a reason they allow.
