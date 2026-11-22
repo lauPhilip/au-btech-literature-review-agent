@@ -13,7 +13,8 @@ The API is off in production until Lau turns it on. `Program.cs` reads the switc
 | `POST /api/v1/reviews` with the caller's key in `X-Mistral-Key` | 202 with the run id, the edit key, the stage and the addresses to follow |
 | `GET /api/v1/reviews/{id}` | 200 with the stage, the step of seven, the progress, the counts and, when done, the verdicts and the downloads |
 | `GET /api/v1/reviews/{id}/report` | 200 with the finished report as data; 409 while the review is not complete |
-| `GET /openapi/v1.json` | The OpenAPI description of these three calls |
+| `DELETE /api/v1/reviews/{id}` with the edit key in `X-Edit-Key` | 202 when a queued or running review was asked to stop; see below |
+| `GET /openapi/v1.json` | The OpenAPI description of these calls |
 
 The body of a start holds the New review form's fields as JSON. Only `searchWords` and `inclusion` are required, as on the form.
 
@@ -35,6 +36,12 @@ A start goes through the same checks as the form. `ReviewApi.Start` builds the s
 
 The status counts the seven steps the run view shows (`ReviewSteps`): `step` is 0 while the run waits for a slot, 1 to 7 while it works, and 7 when it is done, with `stepName` and `percent` beside it. It reads the live counters while the run is going here and the ledger otherwise. Once the run is complete, `verdicts` holds the tally of the citation checks and `downloads` the archive, the references as BibTeX and RIS, every screened record and the protocol. Anyone with a run's id can read its status, as anyone with its link can open its page. The edit key in the answer to a start is the only one there is, as on the form.
 
+## Cancelling a review
+
+`DELETE /api/v1/reviews/{id}` cancels a review the same way the Cancel button on its page does. `ReviewApi.Cancel` calls `PrismaReviewEngine.CancelRun`, the one way to cancel a run, which checks the edit key again. The key goes in the `X-Edit-Key` header; it is the one that came back with the start. A reason is optional, as `?reason=` in the address. It is cleaned to one line of at most 300 characters and written to the ledger, and without one the ledger says "No reason was given."
+
+A review that waits in line leaves it at once. A running review stops at its next safe point, before its next model call or step, so the answer is 202 and not 200: the run has been asked to stop, and its status shows the stage `Cancelled` when it has. Without an edit key the answer is 401, with the wrong one 403, and for a review that has ended, or is not running on this server, 409 with its stage.
+
 ## The report as data
 
 `GET /api/v1/reviews/{id}/report` returns what the Review output page shows, read from the run's files only: `prisma-report.json`, `citation-audit.json` and the ledger. Nothing is written or asked of the model for the API, and text is cleaned of its markers just as the page cleans it (`SpecMatrix.ScrubAnchors`). `ReviewApi.Report.cs` builds it.
@@ -55,9 +62,10 @@ Every error is a problem detail (RFC 9457, `application/problem+json`) with a ti
 | Status | When |
 |---|---|
 | 400 | The body is missing, not JSON, larger than 64 KB, or a field is wrong; `errors` lists each one |
-| 401 | There is no usable key in `X-Mistral-Key` |
+| 401 | There is no usable key in `X-Mistral-Key`, or a cancel has no `X-Edit-Key` |
+| 403 | A cancel's edit key does not fit the review |
 | 404 | No run with this id, or a run of another kind of review |
-| 409 | The report was asked for before the review was complete |
+| 409 | The report was asked for before the review was complete, or a cancel came after the review had ended |
 | 422 | A field reads like an instruction to the model; `flags` lists them |
 | 429 | Too many calls or too many reviews started; `Retry-After` says when to try again |
 | 503 | The server runs a local model, so a review could not use the caller's key |
@@ -72,6 +80,7 @@ The MCP server lets another assistant run a review as a tool. It speaks the Mode
 | `get_review_status` | The stage, the step of seven, the counts and, when done, the verdicts and the downloads |
 | `get_review_report` | The title, the abstract, the verdicts, every section, and the flagged citations (partly or not supported) |
 | `get_review_file` | `bibtex`, `ris` or `main.tex` as text, or the address of the `archive` |
+| `cancel_review` | Cancels a queued or running review with the edit key that the start returned, and an optional reason |
 
 Each tool calls `ReviewApi`, the same methods the REST API calls, so the checks, the limits and the key handling exist once. A problem comes back as a tool error with the same plain-English title and detail. A review takes minutes, so the start tool returns at once and the assistant polls the status tool. MCP answers are never compressed, because a start carries the edit key.
 
@@ -104,6 +113,7 @@ Run a systematic literature review with the TraceableAI MCP server on: $ARGUMENT
 4. When it is complete, call get_review_report. Give me the title, the abstract, the verdicts,
    and every flagged citation with its sentence, reason and quote.
 5. Offer the BibTeX through get_review_file, and the link to the review's page.
+6. If I ask you to stop, call cancel_review with the run id and the edit key.
 ```
 
 The tools treat what the command sends as data, as the form does: the fields pass the input guard, and a field that reads like an instruction to the model is refused until the caller confirms it with `acceptFlaggedInput`.
@@ -122,4 +132,4 @@ Two limits guard the API and the MCP server. Each call counts once per client ad
 
 ## Security notes
 
-The API adds two addresses and changes none of the rules in `AGENTS.md`. What a caller sends is data: it passes `ReviewInputGuard`, it goes into prompts only through `PromptSafety`, and every model answer is still checked in code. Run ids are GUIDs in the route (`{id:guid}`), so no caller text reaches a path. The log lines the API writes hold only a run id and an exception's type. The answers are sent with `Cache-Control: no-store`, because a start carries the edit key. For the same reason the answer to a start is never compressed (`ResponseCompressionSetup.DoNotCompress`): over HTTPS, compressing a secret next to text the caller chose opens the BREACH attack.
+The API adds its addresses and changes none of the rules in `AGENTS.md`. What a caller sends is data: it passes `ReviewInputGuard`, it goes into prompts only through `PromptSafety`, and every model answer is still checked in code. Run ids are GUIDs in the route (`{id:guid}`), so no caller text reaches a path. The log lines the API writes hold only a run id and an exception's type. The answers are sent with `Cache-Control: no-store`, because a start carries the edit key. For the same reason the answer to a start is never compressed (`ResponseCompressionSetup.DoNotCompress`): over HTTPS, compressing a secret next to text the caller chose opens the BREACH attack. A cancel needs the run's edit key, which `RunStore.CanEdit` compares by its hash in constant time; the key is never logged, and a wrong one changes nothing. The calls limit caps how often a key can be guessed, and an edit key is far too long to guess.

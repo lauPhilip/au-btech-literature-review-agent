@@ -73,6 +73,12 @@ public sealed record ApiProblem(int Status, string Title, string Detail, IReadOn
 /// <summary>The answer to a started review: its id, its edit key and where to follow it.</summary>
 public sealed record ReviewStarted(Guid Id, string EditKey, string Stage, ReviewLinks Links);
 
+/// <summary>
+/// The answer to a cancel: the run was asked to stop, with this reason. It ends in the stage "Cancelled" at its next
+/// safe point; follow its status to see when.
+/// </summary>
+public sealed record ReviewCancelled(Guid Id, string Reason, ReviewLinks Links);
+
 /// <summary>Addresses that always exist for a run: its status and its page on the site.</summary>
 public sealed record ReviewLinks(string Status, string Page);
 

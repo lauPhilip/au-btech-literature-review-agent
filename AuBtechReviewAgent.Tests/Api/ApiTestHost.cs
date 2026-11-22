@@ -38,7 +38,10 @@ internal sealed class ApiTestHost : WebApplicationFactory<Program>
     public LogCapture Logs { get; } = new();
     public PrismaReviewEngine Engine { get; }
 
-    public ApiTestHost(bool? enabled = true, string environment = "Development")
+    /// <summary>Set when the model is first asked; with a gate, the model then waits until the gate opens.</summary>
+    public ManualResetEventSlim ModelEntered { get; } = new(false);
+
+    public ApiTestHost(bool? enabled = true, string environment = "Development", ManualResetEventSlim? gate = null)
     {
         _enabled = enabled;
         _environment = environment;
@@ -48,7 +51,12 @@ internal sealed class ApiTestHost : WebApplicationFactory<Program>
             ChatFactory = key =>
             {
                 KeysSeenByModel.Enqueue(key);
-                return new FakeChatService().RespondsWith(PipelineTests.Respond);
+                return new FakeChatService().RespondsWith(prompt =>
+                {
+                    ModelEntered.Set();
+                    gate?.Wait(TimeSpan.FromSeconds(30));
+                    return PipelineTests.Respond(prompt);
+                });
             },
             SourceFactory = _ => new PipelineTests.FakeSource(),
             FullTextFetcher = (_, _) => Task.FromResult(new FullTextResult(Array.Empty<DocumentChunk>(), "none (test)", null)),
