@@ -50,6 +50,8 @@ public static partial class ReviewWriter
         string answerField = questions.Count == 0 ? "" : ",\"answers\":[\"answer to RQ1\"]";
         // With answers, the cited evidence is in the answers; the conclusion is the review's own reading of them (issue #124).
         string conclusionRule = questions.Count == 0 ? "" : " It takes no citations: the answers carry them, and the conclusion is the review's own reading of the answers together.";
+        // Studies left out of the themes may be named in the limitations, never used as evidence (issue #166).
+        string leftOutRule = evidence.LeftOut.Count == 0 ? "" : $" The {profile.Sources} left out of the themes may be named only in the limitations, to say they were left out; no other part cites them.";
         string prompt = $$"""
             You are writing the sections that follow the discussion of {{profile.Review}}. Its results and discussion are finished and checked; write only what they and the facts below say.
 
@@ -64,7 +66,7 @@ public static partial class ReviewWriter
             {{evidence.BaseFacts}}
 
             FACTS ABOUT THE REVIEW (counted in code):
-            {{facts}}{{questionBlock}}
+            {{facts}}{{LeftOutBlock(evidence, profile)}}{{questionBlock}}
 
             RESULTS AND DISCUSSION:
             {{results}}
@@ -74,7 +76,7 @@ public static partial class ReviewWriter
             2. "implications": one paragraph on the implications for practice and policy (item 23d): what someone acting on these findings should do or watch for, and how firm each point is.
             3. "futureResearch": one paragraph on the directions for future research (item 23d): the open questions and missing kinds of study the results show, each tied to the theme or {{profile.Sources}} it comes from.
             4. "conclusion": three to five sentences that answer the review objective in plain words, at most {{MaxConclusionWords}} words, with no new claims.{{conclusionRule}}
-            5. Every sentence that attributes something to the literature ends with an inline marker such as [3] or [2, 5], using the same {{profile.Sources}} the results cite for it. {{OwnCountRule}} Do not invent numbers, statistics or {{profile.Sources}}.{{answerRule}}
+            5. Every sentence that attributes something to the literature ends with an inline marker such as [3] or [2, 5], using the same {{profile.Sources}} the results cite for it. {{OwnCountRule}} Do not invent numbers, statistics or {{profile.Sources}}.{{leftOutRule}}{{answerRule}}
             {{ProseCleaner.PlainProseRule}}
             Respond ONLY with a valid minified JSON object:
             {"limitations":"...","implications":"...","futureResearch":"...","conclusion":"..."{{answerField}}}
@@ -84,7 +86,7 @@ public static partial class ReviewWriter
             ClosingAnswer answer;
             using (LlmStage.Begin("closing"))
                 answer = await LlmJson.GetAsync<ClosingAnswer>(chat, prompt, LlmJson.JsonMode(0.3), a => ClosingProblem(a.Limitations, a.Implications, a.FutureResearch, a.Conclusion, results + "\n" + facts + "\n" + evidence.BaseFacts, referenceCount,
-                    a.Answers, questions.Count, ownFacts: facts + "\n" + evidence.BaseFacts, results: results));
+                    a.Answers, questions.Count, ownFacts: facts + "\n" + evidence.BaseFacts, results: results, evidence: evidence));
             string Clean(string? text) => MethodsSectionWriter.StripMarkdownEmphasis(text!.Trim());
             return new ClosingSections(Clean(answer.Limitations), Clean(answer.Implications), Clean(answer.FutureResearch), Clean(answer.Conclusion),
                 questions.Count == 0 ? null : answer.Answers!.Select(Clean).ToList());
@@ -98,7 +100,7 @@ public static partial class ReviewWriter
 
     /// <summary>Why a closing answer cannot be used, or null. Public for unit tests.</summary>
     public static string? ClosingProblem(string? limitations, string? implications, string? futureResearch, string? conclusion, string known, int referenceCount,
-        IReadOnlyList<string>? answers = null, int questions = 0, string ownFacts = "", string results = "")
+        IReadOnlyList<string>? answers = null, int questions = 0, string ownFacts = "", string results = "", ReviewEvidence? evidence = null)
     {
         if (questions > 0)
         {
@@ -121,6 +123,9 @@ public static partial class ReviewWriter
         foreach (var (name, text) in parts)
             if (OwnCountCited(text!, ownFacts, results) is { } own)
                 return $"{name}: \"{own}\" states this review's own count and carries a citation; the review's own counts take no citation.";
+        if (evidence != null)
+            foreach (var (name, text) in parts.Where(p => p.Name != "limitations"))
+                if (LeftOutCited(text!, evidence) is { } used) return $"{name}: {used} Name them only in the limitations.";
         var outside = parts.SelectMany(p => ThematicSynthesis.CitedIn(p.Item2!)).Where(r => r < 1 || r > referenceCount).Distinct().ToList();
         if (outside.Count > 0) return $"citation numbers {string.Join(", ", outside)} are not in the reference list.";
         var knownNumbers = NumbersIn(known);

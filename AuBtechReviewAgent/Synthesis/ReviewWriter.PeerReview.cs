@@ -105,7 +105,8 @@ public static partial class ReviewWriter
                     var answer = await LlmJson.GetAsync<TextAnswer>(chat, revisePrompt, LlmJson.JsonMode(0.3), a =>
                         string.IsNullOrWhiteSpace(a.Text) ? "text must not be empty." : null);
                     string after = Named(MethodsSectionWriter.StripMarkdownEmphasis(answer.Text!.Trim()));
-                    string? problem = ThematicSynthesis.RevisionProblem(before, after, referenceCount);
+                    string? problem = ThematicSynthesis.RevisionProblem(before, after, referenceCount)
+                        ?? (section == null ? LeftOutCited(after, evidence) : null);
                     return new SectionRevision(group.Key, before, problem == null ? after : before, problem == null,
                         problem == null ? $"Revised in response to {group.Count()} comment(s)." : $"Revision rejected: {problem}; original kept.");
                 }
