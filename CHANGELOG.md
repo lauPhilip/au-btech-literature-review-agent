@@ -6,6 +6,10 @@ Each version's section becomes the notes of its GitHub release, so write it for 
 
 ## [Unreleased]
 
+### Added
+
+Other tools can now start a review through an API. Send the form's fields to `/api/v1/reviews` with your own Mistral key, and follow the run by its id. Your key is used for that run only and is never stored. The API gives no free reviews, and it stays off on the live site until it is switched on.
+
 ### Changed
 
 The site starts its new look. It now uses a deeper navy, the same one as Coursebot, and two new typefaces: Inter for text and Poppins for headings and buttons. Cards and fields have round corners. The browser tab shows the new mark, a small robot reading a book. 🤖
