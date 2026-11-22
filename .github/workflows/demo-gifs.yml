@@ -1,0 +1,65 @@
+name: Demo GIFs
+
+# Records the 6-second demo GIFs for the README, the wiki and talks (issue #259; tools/a11y/record-demos.mjs).
+# Started by hand from the Actions tab, and on a pull request that changes the recording, so the result can be
+# looked at before it is merged. The GIFs come back as the "demo-gifs" artifact; a pull request then adds the
+# chosen ones to docs/img/demo/. Nothing is pushed or published from here.
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [ master ]
+    paths:
+      - tools/a11y/record-demos.mjs
+      - .github/workflows/demo-gifs.yml
+
+permissions:
+  contents: read
+
+jobs:
+  record:
+    name: Record the demo GIFs
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0   # the whole history, so MinVer finds the last version tag
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
+        with:
+          dotnet-version: '10.0.x'
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '22'
+
+      # As in the accessibility check: Development, so the /design pages with made-up data exist; no real keys.
+      - name: Start the app
+        env:
+          ASPNETCORE_ENVIRONMENT: Development
+          MISTRAL_API_KEY: ci-placeholder
+        run: |
+          dotnet run --project AuBtechReviewAgent/AuBtechReviewAgent.csproj --no-launch-profile --urls http://localhost:5038 > app.log 2>&1 &
+          for i in $(seq 1 60); do curl -sf http://localhost:5038/ > /dev/null && exit 0; sleep 2; done
+          cat app.log; exit 1
+
+      - name: Record the scenes
+        working-directory: tools/a11y
+        env:
+          BASE_URL: http://localhost:5038
+          DEMO_OUT: ${{ github.workspace }}/demo-gifs
+        run: |
+          mkdir -p "$DEMO_OUT"
+          command -v ffmpeg > /dev/null || (sudo apt-get update && sudo apt-get install -y ffmpeg)
+          npm ci
+          npx playwright install --with-deps chromium
+          node record-demos.mjs | tee "$DEMO_OUT/alt-text.txt"
+
+      - name: Upload the GIFs
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: demo-gifs
+          path: demo-gifs/
+          if-no-files-found: ignore
+          retention-days: 14
