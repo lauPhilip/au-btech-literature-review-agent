@@ -20,6 +20,8 @@ You can now stop a review you started. The run stops at the next safe point, bef
 
 ### Changed
 
+A repaired sentence in a grey literature review is now checked again as a grey literature sentence, not as part of a systematic review. On a rerun the check comes from the cache.
+
 The rationale in the introduction now keeps only sentences that cite a source. A sentence from the model's general knowledge is left out, and the writing log says which.
 
 The site starts its new look. It now uses a deeper navy, the same one as Coursebot, and two new typefaces: Inter for text and Poppins for headings and buttons. Cards and fields have round corners. The browser tab shows the new mark, a small robot reading a book. 🤖
