@@ -109,7 +109,7 @@ public static partial class ReviewWriter
         {
             ("limitations", limitations), ("implications", implications), ("futureResearch", futureResearch), ("conclusion", conclusion),
         };
-        if (questions > 0) parts.AddRange(answers!.Select((a, i) => ($"answer {i + 1}", (string?)a)));
+        if (questions > 0) parts.AddRange(answers!.Select<string, (string Name, string? Text)>((a, i) => ($"answer {i + 1}", a)));
         var missing = parts.Where(p => string.IsNullOrWhiteSpace(p.Item2)).Select(p => p.Item1).ToList();
         if (missing.Count > 0) return $"{string.Join(", ", missing)} must not be empty.";
         if (conclusion!.Split(' ', StringSplitOptions.RemoveEmptyEntries).Length > MaxConclusionWords)
