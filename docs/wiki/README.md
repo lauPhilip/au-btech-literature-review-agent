@@ -16,6 +16,7 @@ The wiki describes the design as it is in the repository. When you change how so
 | [6. Web app, operations and deployment](06-web-app-and-operations.md) | Pages and endpoints, quotas, concurrency, caching, clean-up, configuration, security and CI/CD |
 | [7. Extending and testing](07-extending-and-testing.md) | How to add a source, change a prompt or add a stage without breaking reproducibility, and how the tests are organised |
 | [8. Setup and configuration](08-setup-and-configuration.md) | Keys, local models, Docker, every setting with its default, several users at once, and what the checks can and cannot catch |
+| [9. The API and the MCP server](09-api-and-mcp.md) | How another tool starts a review with its own key and follows it, the limits, and why the key is never written |
 
 ## The project in one paragraph
 
@@ -39,6 +40,7 @@ AuBtechReviewAgent/                 the web app
   Runs/                             what happens after a run: ownership, notes, metrics, clean-up
   Llm/                              model access, JSON answers, prompt safety, the call ledger
   Web/                              site pages' helpers: SEO, health, security headers, quota, glossary
+  Api/                              the REST API for other tools (off in production until Api:Enabled)
   Components/Pages/*.razor          the routable pages (landing, New review, Review output, Metrics, ...)
   Components/Dashboard/*.razor      parts of New review (composer, criteria, the seven steps, run summary, ...)
   Components/Layout/*.razor         header, footer, SEO tags, help terms
