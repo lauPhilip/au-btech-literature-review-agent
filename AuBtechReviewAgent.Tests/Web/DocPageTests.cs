@@ -84,7 +84,7 @@ public class DocPageTests
     public void EveryGlossaryEntryHasAGroupAndTheSearchFilters()
     {
         Assert.All(Glossary.All, e => Assert.Contains(Glossary.GroupOf(e), Glossary.Groups));
-        Assert.Equal(5, Glossary.All.Count(e => Glossary.GroupOf(e) == "Verdicts"));
+        Assert.Equal(6, Glossary.All.Count(e => Glossary.GroupOf(e) == "Verdicts")); // the five verdicts and removed (issue #234)
         Assert.Contains(Glossary.All, e => Glossary.GroupOf(e) == "Output");
 
         Assert.Equal(Glossary.All.Count, Glossary.Search("").Count);
