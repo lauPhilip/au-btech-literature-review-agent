@@ -73,18 +73,34 @@
                         </dl>
                     }
 
-                    @foreach (var (title, files) in new[] { ("Changed files", r.Changed), ("Missing files", r.Missing), ("Files that are not in the manifest", r.NotListed) })
+                    @if (r.Files is { Count: > 0 } listedFiles)
                     {
-                        @if (files.Count > 0)
+                        @* Every file the manifest lists, each with what the check found (issue #245). *@
+                        <h2 class="mt-6 font-display text-base font-semibold text-heading">Files in the manifest (@listedFiles.Count)</h2>
+                        <ul class="mt-2 divide-y divide-line border-y border-line text-xs">
+                            @foreach (var file in listedFiles.Take(MaxShown))
+                            {
+                                bool ok = file.Status == "Matches";
+                                <li class="flex items-center justify-between gap-3 py-1.5">
+                                    <span class="break-all font-mono text-ink">@file.Path</span>
+                                    <span class="shrink-0 font-semibold @(ok ? "text-supported" : "text-not-supported")">@file.Status</span>
+                                </li>
+                            }
+                        </ul>
+                        @if (listedFiles.Count > MaxShown)
                         {
-                            <h2 class="mt-6 font-display text-base font-semibold text-heading">@title (@files.Count)</h2>
-                            <ul class="mt-2 space-y-1 font-mono text-xs text-ink">
-                                @foreach (var file in files.Take(200))
-                                {
-                                    <li class="break-all">@file</li>
-                                }
-                            </ul>
+                            <p class="mt-2 text-xs text-muted">And @(listedFiles.Count - MaxShown) more, each listed in the archive's manifest.json.</p>
                         }
+                    }
+                    @if (r.NotListed.Count > 0)
+                    {
+                        <h2 class="mt-6 font-display text-base font-semibold text-heading">Files that are not in the manifest (@r.NotListed.Count)</h2>
+                        <ul class="mt-2 space-y-1 font-mono text-xs text-ink">
+                            @foreach (var file in r.NotListed.Take(MaxShown))
+                            {
+                                <li class="break-all">@file</li>
+                            }
+                        </ul>
                     }
                 }
                 else
@@ -97,6 +113,8 @@
 </DocPage>
 
 @code {
+    private const int MaxShown = 500;
+
     /// <summary>What the manifest's own fingerprint says: unchanged, edited, or from a version that had none.</summary>
     private static string ManifestLine(bool? intact)
     {
