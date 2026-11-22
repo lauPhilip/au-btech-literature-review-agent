@@ -23,7 +23,7 @@ public partial class PrismaReviewEngine
         await PublishAsync(ctx);
         Coordinator.OpenScreeningReview(ctx.RunId);
 
-        var decisions = await Coordinator.WaitForScreeningReviewAsync(ctx.RunId, TimeSpan.FromHours(Math.Max(1, _runsOptions.ScreeningReviewTimeoutHours)));
+        var decisions = await Coordinator.WaitForScreeningReviewAsync(ctx.RunId, TimeSpan.FromHours(Math.Max(1, _runsOptions.ScreeningReviewTimeoutHours)), ctx.Stop);
         if (decisions == null)
         {
             state.HumanScreeningReviewOutcome = $"No review was submitted within {_runsOptions.ScreeningReviewTimeoutHours} hours; the model's screening decisions were kept unchanged.";
