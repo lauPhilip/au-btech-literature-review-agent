@@ -54,34 +54,7 @@
         <section class="lg:col-span-5 space-y-4 min-w-0" aria-label="Review settings">
             @if (planned != null)
             {
-                <div class="bg-page border border-line shadow-sm p-4 space-y-3">
-                    <div>
-                        <h2 class="text-sm font-semibold text-heading">Review settings</h2>
-                        <p class="text-xs font-medium text-heading">@StageLine()</p>
-                    </div>
-                    <dl class="text-xs space-y-2">
-                        @SettingRow("Topic", planned.Plan.Topic)
-                        @SettingRow("Goal", planned.Plan.Goal)
-                        @SettingRow("Audience", AudienceLabel(planned.Plan.Audience))
-                        @SettingRow("Questions", string.Join(" ", planned.Plan.Numbered().Select(q => q.Number)))
-                        @SettingRow("Searches", string.Join(", ", planned.Plan.GreySearches.Select(AuBtechReviewAgent.MultivocalGuidelines.SearchLabel)))
-                        @SettingRow("Strings", string.Join("; ", planned.Plan.EffectiveGreySearchStrings))
-                        @if (planned.Plan.UsesFormalPool)
-                        {
-                            @SettingRow("Databases", string.Join(", ", planned.Plan.FormalDatabases.Select(AuBtechReviewAgent.SourceCatalog.DisplayNameFor)))
-                            @SettingRow("Academic", string.Join("; ", planned.Plan.EffectiveFormalSearchStrings))
-                        }
-                        @SettingRow("Threshold", $"{planned.Plan.QualityThreshold} of {AuBtechReviewAgent.MultivocalGuidelines.QualityPointsMax} points")
-                    </dl>
-                    <p class="text-[11px] text-muted leading-snug border-t border-line pt-2">
-                        Link to this run: <a class="text-heading underline break-all" href="@($"/mlr/{planned.RunId}")">@($"/mlr/{planned.RunId}")</a>.
-                        Protocol fingerprint (SHA-256): <span class="font-mono break-all">@planned.ProtocolSha256</span>
-                    </p>
-                    <div class="flex flex-wrap gap-2">
-                        <a href="@($"/api/workspace/{planned.RunId:N}/protocol.md")" class="ui-btn-secondary ui-btn-sm">Download the protocol</a>
-                        <a href="@($"/mlr?card={planned.Plan.Card}")" class="ui-btn-primary ui-btn-sm">New review</a>
-                    </div>
-                </div>
+                <MultivocalRunSettings Planned="planned" StageLine="@StageLine()" />
             }
             else if (RunId != null)
             {
@@ -733,75 +706,13 @@
             }
             else
             {
-                <div class="flex-1 min-h-0 overflow-y-auto p-5 space-y-5 text-left font-sans">
-                    <div>
-                        <h3 class="text-base font-semibold text-heading">What this review will do</h3>
-                        <p class="text-xs text-muted mt-0.5">With your current answers.@(CardOn ? "" : " The steps marked as built work in this preview; the others follow one block at a time.")</p>
-                    </div>
-                    <ol class="space-y-3">
-                        @for (int i = 0; i < PlanSteps.Count; i++)
-                        {
-                            var s = PlanSteps[i];
-                            <li class="flex gap-3">
-                                <span class="flex-none w-6 h-6 rounded-full bg-primary/10 text-heading text-[11px] font-semibold flex items-center justify-center">@(i + 1)</span>
-                                <span class="text-xs leading-snug flex-1">
-                                    <span class="font-semibold text-heading">@s.Title</span>
-                                    <span class="text-muted"> · @s.Text</span>
-                                </span>
-                                <span class="@(s.Built ? "ui-chip border-supported-border bg-supported-fill text-supported" : "ui-chip border-line bg-soft text-muted") text-[10px] self-start whitespace-nowrap">@(s.Built ? "built" : "not built yet")</span>
-                            </li>
-                        }
-                    </ol>
-                    <div class="border-t border-line pt-4">
-                        <h3 class="text-xs font-semibold text-heading mb-2">What you will get</h3>
-                        <div class="grid grid-cols-2 gap-2 text-[11px] text-ink">
-                            <div class="border border-line p-2"><span class="font-semibold block text-heading">Review paper</span>structured by the guidelines, with a summary for practitioners; every citation clickable to its quote</div>
-                            <div class="border border-line p-2"><span class="font-semibold block text-heading">LaTeX manuscript</span>plus BibTeX and RIS for your reference manager</div>
-                            <div class="border border-line p-2"><span class="font-semibold block text-heading">Systematic map</span>the sources classified by your research questions, each value with its quote</div>
-                            <div class="border border-line p-2"><span class="font-semibold block text-heading">Verifiable archive</span>protocol, sources' fingerprints and every model call</div>
-                        </div>
-                    </div>
-                </div>
+                <MultivocalPreviewTab Plan="Shown" CardOn="CardOn" />
             }
         </section>
     </div>
 </div>
 
 @code {
-    /// <summary>What the review will do, with the current answers, and which of its steps are built.</summary>
-    private IReadOnlyList<(string Title, string Text, bool Built)> PlanSteps
-    {
-        get
-        {
-            var p = Shown;
-            int searches = p.GreySearches.Count;
-            int questions = p.Numbered().Count;
-            string stop = p.StoppingRule switch
-            {
-                "effort" => $"the top {p.TopHits} hits of each search string",
-                "saturation" => "until new sources add nothing new",
-                _ => "every hit of every search string",
-            };
-            // The same stages as the systematic review's preview, in the guidelines' words; built ones are marked.
-            return new List<(string, string, bool)>
-            {
-                ("Protocol", "Your plan is written down before anything is searched, with a fingerprint.", true),
-                ("Search", p.UsesFormalPool
-                    ? $"{searches} grey literature search{(searches == 1 ? "" : "es")} and {p.FormalDatabases.Count} academic database{(p.FormalDatabases.Count == 1 ? "" : "s")}, each with its own search strings, {stop}."
-                    : $"{searches} grey literature search{(searches == 1 ? "" : "es")}, {stop}.", !p.UsesFormalPool), // the academic search comes in block I-2
-                ("Selection", p.UsesFormalPool ? "Grey and academic sources are screened twice, with the same criteria and the same care." : "Every source is screened twice against your criteria; a source the two screenings disagree on is kept and marked for you to look at.", !p.UsesFormalPool), // academic screening comes in block I-3
-                ("Quality", $"Each source is scored on Table 7; below {p.QualityThreshold} of {AuBtechReviewAgent.MultivocalGuidelines.QualityPointsMax} points it is left out. Every score rests on a quote.", true),
-                ("Map and extraction", "The sources are classified in a systematic map proposed from your research questions; every extracted value rests on a quote from the source's page.", true),
-                ("Synthesis", $"The findings are grouped into themes to answer {questions} research question{(questions == 1 ? "" : "s")}, each theme labelled with the kind and quality of the sources it rests on.", true),
-                ("Writing", "The paper is written from the findings: an outline, one section per theme, the discussion, a summary for practitioners and an automated peer review; the title and abstract last.", false),
-                ("Checking", "Every citation is compared with the kept text of the page it cites; weak ones get a second check and are repaired.", false),
-            };
-        }
-    }
-
-    private RenderFragment SettingRow(string label, string value) =>
-        @<div class="flex gap-2"><dt class="w-20 flex-none text-muted">@label</dt><dd class="text-ink min-w-0 break-words">@value</dd></div>;
-
     private AuBtechReviewAgent.GreyExtraction? ExtractionOf(string url) =>
         extractions.TryGetValue(AuBtechReviewAgent.MultivocalSearcher.AddressKey(url), out var x) ? x : null;
 
