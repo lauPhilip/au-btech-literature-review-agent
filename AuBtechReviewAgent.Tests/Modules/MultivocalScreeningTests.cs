@@ -185,23 +185,25 @@ public class MultivocalScreeningTests : IDisposable
     }
 
     [Fact]
-    public async Task ARunWithAcademicDatabasesStopsBeforeScreeningUntilTheFormalScreeningIsBuilt()
+    public async Task AnAcademicRecordGetsTheSameCriteriaStepsAndAnswerFormatIntroducedAsAcademic()
     {
-        var store = new RunStore(_root);
-        var planner = new MultivocalPlanner(store);
-        var plan = MultivocalPlan.Example();
-        plan.FormalDatabases = new List<string> { "openalex" };
-        var (runId, key) = await planner.CreateAsync(plan);
-        string folder = store.FolderOf(runId);
-        await RunHeader.WriteAsync(folder, store.LoadHeader(runId)! with { Stage = MultivocalSearcher.StageSearched });
-        await File.WriteAllTextAsync(Path.Join(folder, MultivocalSearcher.LedgerFile), System.Text.Json.JsonSerializer.Serialize(new MultivocalLedger { RunId = runId }));
         var chat = Model();
-        var screener = new MultivocalScreener(store, planner, new MultivocalSearcher(store, planner, _ => null), () => chat, parallelism: 1);
+        var paper = new GreyRecord("OPENALEX_W1", "Memory for LLM agents", "An abstract.", "https://doi.org/10.1/x", "Jane Doe", "Journal of Agents",
+            MultivocalSearcher.FormalKind, null, new Dictionary<string, long>());
+        var grey = paper with { Kind = "blogs" };
 
-        var refused = await Assert.ThrowsAsync<InvalidOperationException>(() => screener.ScreenAsync(runId, key));
+        await MultivocalScreener.ScreenGreyAsync(chat, paper, "About agents", "", secondScreener: false);
+        await MultivocalScreener.ScreenGreyAsync(chat, grey, "About agents", "", secondScreener: false);
 
-        Assert.Equal(MultivocalScreener.FormalNotBuiltMessage, refused.Message);
-        Assert.Empty(chat.Prompts);
-        Assert.Equal(MultivocalSearcher.StageSearched, store.LoadHeader(runId)!.Stage);
+        string formal = chat.Prompts[0], blog = chat.Prompts[1];
+        Assert.StartsWith("Evaluate the following academic source", formal);
+        Assert.Contains("- Kind of source: Academic literature, from a bibliographic database", formal);
+        Assert.Contains("Being a preprint or not peer-reviewed is not a reason to exclude it", formal);
+        Assert.StartsWith("Evaluate the following grey literature source", blog);
+        foreach (string shared in new[] { "- Inclusion Thresholds: About agents", PrismaReviewEngine.ScreeningProcedure(false).Trim(), PrismaReviewEngine.ScreeningAnswerFormat.Trim() })
+        {
+            Assert.Contains(shared, formal);
+            Assert.Contains(shared, blog);
+        }
     }
 }

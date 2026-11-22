@@ -70,8 +70,8 @@ public class MultivocalStartPartsTests
         Assert.Contains("6 grey literature searches, the top 100 hits of each search string.", html);
         Assert.Contains("to answer 5 research questions", html);
         Assert.Contains("below 10 of 20 points it is left out", html);
-        Assert.Equal(6, Count(html, ">built</span>"));
-        Assert.Equal(2, Count(html, ">not built yet</span>"));
+        Assert.Equal(8, Count(html, ">built</span>")); // every step of a grey literature review, writing and checking included (block G)
+        Assert.Equal(0, Count(html, ">not built yet</span>"));
         foreach (string product in new[] { "Review paper", "LaTeX manuscript", "Systematic map", "Verifiable archive" })
             Assert.Contains(product, html);
     }
@@ -87,7 +87,8 @@ public class MultivocalStartPartsTests
         Assert.DoesNotContain("The steps marked as built work in this preview", html);
         Assert.Contains("6 grey literature searches and 2 academic databases, each with its own search strings, until new sources add nothing new.", html);
         Assert.Contains("Grey and academic sources are screened twice", html);
-        Assert.Equal(5, Count(html, ">built</span>")); // the academic search is built (I-2); its screening is not yet
+        Assert.Equal(3, Count(html, ">built</span>")); // protocol, and the academic search (I-2) and screening (I-3); the rest follows in I-4 to I-6
+        Assert.Equal(5, Count(html, ">not built yet</span>"));
     }
 
     [Fact]

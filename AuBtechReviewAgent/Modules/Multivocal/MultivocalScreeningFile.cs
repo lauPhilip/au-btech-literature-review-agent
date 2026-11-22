@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
@@ -45,6 +46,10 @@ public sealed class GreyScreening
     public string? ReviewerNote { get; set; }
     public DateTime? ReviewedUtc { get; set; }
 
+    /// <summary>A source of the formal pool (an academic database's record); left out of a grey source's entry.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public bool Formal { get; set; }
+
     /// <summary>Still waiting for the reviewer: flagged and not yet looked at.</summary>
     public bool NeedsLook => Uncertain && !Reviewed;
 }
@@ -59,8 +64,20 @@ public sealed class MultivocalScreeningFile
     public string InclusionCriteria { get; set; } = "";
     public string ExclusionCriteria { get; set; } = "";
 
-    /// <summary>Cohen's kappa between the two screenings, over the sources both screened.</summary>
+    /// <summary>Cohen's kappa between the two screenings, over the sources both screened (both pools together).</summary>
     public double? Kappa { get; set; }
+
+    /// <summary>With a formal pool: Cohen's kappa of the grey sources alone; null, and left out, otherwise.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public double? KappaGrey { get; set; }
+
+    /// <summary>With a formal pool: Cohen's kappa of the formal sources alone; null, and left out, otherwise.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public double? KappaFormal { get; set; }
+
+    /// <summary>With a formal pool: the version of the prompt for academic records; null, and left out, otherwise.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? FormalPromptVersion { get; set; }
     public List<GreyScreening> Sources { get; set; } = new();
 
     public int Count(string decision) => Sources.Count(s => s.Decision == decision);
