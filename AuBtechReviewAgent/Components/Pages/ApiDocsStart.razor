@@ -1,0 +1,99 @@
+@* The API documentation page (ApiDocs.razor), part 1: the first working call. One path to it (Hick's law): the
+   request, its answer, then what to keep. Every field comes after, folded away and grouped in sevens or fewer
+   (Miller's law). The examples are ApiDocExamples, which ApiDocsPageTests checks against the real API. *@
+
+<section id="start" class="mt-12 scroll-mt-6" aria-labelledby="start-title">
+    <h2 id="start-title" class="font-display text-xl font-semibold tracking-tight text-heading">Start a review</h2>
+    <div class="mt-4 flex flex-wrap items-center gap-3 font-mono text-[15px]">
+        <span class="border border-heading px-2 py-0.5 text-xs font-semibold tracking-wide text-heading">POST</span>
+        <span class="break-all text-heading">/api/v1/reviews</span>
+    </div>
+    <p class="mt-4">
+        Send the search words and what a study must be about. Those two fields are all you need. Your key goes in the
+        <code class="@Code">X-Mistral-Key</code> header. The answer comes at once, because a review takes some minutes.
+    </p>
+    <CodeBlock Id="start-request" Label="Request" Code="@AuBtechReviewAgent.ApiDocExamples.StartCurl(BaseUrl)" />
+    <CodeBlock Id="start-answer" Label="202 Accepted" Code="@AuBtechReviewAgent.ApiDocExamples.Started(BaseUrl)" />
+    <p class="mt-4">
+        Keep the <code class="@Code">id</code> and the <code class="@Code">editKey</code>. You need the edit key to stop
+        the review, and you get it only this once.
+    </p>
+
+    <details class="group mt-6 border-y border-line">
+        <summary class="flex min-h-[48px] cursor-pointer list-none items-center justify-between gap-4 font-medium text-heading [&::-webkit-details-marker]:hidden">
+            Every field you can send
+            <span class="text-xl leading-none transition-transform group-open:rotate-45" aria-hidden="true">+</span>
+        </summary>
+        <p class="mt-1">Only the first two are required. The rest work as on the New review form.</p>
+        <div class="my-4 overflow-x-auto border border-line" tabindex="0" role="region" aria-label="Every field you can send">
+            <table class="w-full text-sm">
+                <caption class="sr-only">The fields of a review, in three groups</caption>
+                <thead class="bg-soft text-left text-muted max-sm:sr-only">
+                    <tr><th scope="col" class="px-4 py-3 font-medium">Field</th><th scope="col" class="px-4 py-3 font-medium">What it is</th></tr>
+                </thead>
+                @foreach (var (group, fields) in Fields)
+                {
+                    <tbody class="border-t border-line">
+                        <tr><th scope="colgroup" colspan="2" class="bg-page px-4 pb-1 pt-4 text-left text-xs font-semibold uppercase tracking-[0.14em] text-muted">@group</th></tr>
+                        @foreach (var (name, meaning, values) in fields)
+                        {
+                            <tr class="border-t border-line align-top">
+                                <th scope="row" class="px-4 py-3 max-sm:block max-sm:pb-0 sm:whitespace-nowrap text-left font-mono text-[13px] font-normal text-heading">@name</th>
+                                <td class="px-4 py-3 text-ink max-sm:block max-sm:pt-1">
+                                    @meaning
+                                    @if (values.Length > 0)
+                                    {
+                                        <span class="mt-1 flex flex-wrap gap-x-3 gap-y-1">
+                                            @foreach (var value in values)
+                                            {
+                                                <code class="@Code">@value</code>
+                                            }
+                                        </span>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                }
+            </table>
+        </div>
+    </details>
+</section>
+
+@code {
+    /// <summary>The address of this server, for the examples.</summary>
+    [Parameter, EditorRequired] public string BaseUrl { get; set; } = "";
+
+    private static readonly string[] NoValues = Array.Empty<string>();
+
+    public const string Code = "whitespace-nowrap font-mono text-[0.9em] text-heading";
+
+    /// <summary>Every field of the body (StartReviewBody, in camelCase), in groups of seven or fewer.</summary>
+    public static readonly (string Group, (string Name, string Meaning, string[] Values)[] Fields)[] Fields =
+    {
+        ("Required", new[]
+        {
+            ("searchWords", "The search words. They are the main search query.", NoValues),
+            ("inclusion", "What a study must be about to be included.", NoValues),
+        }),
+        ("What to look for", new[]
+        {
+            ("objective", "What the review should find out.", NoValues),
+            ("exclusion", "What leaves a study out.", NoValues),
+            ("researchQuestions", "Up to four questions. Each is answered in the conclusion.", NoValues),
+            ("searchStrings", "Up to four more search strings. Left out, the model proposes them.", NoValues),
+            ("yearFrom, yearTo", "The first and last year of publication. 0 means no limit.", NoValues),
+            ("databases", "The databases to search. Left out, every one your keys can reach.", AuBtechReviewAgent.SourceCatalog.AllKeys.ToArray()),
+        }),
+        ("Options", new[]
+        {
+            ("visualSummary", "The figure in the report, one of these.", AuBtechReviewAgent.ArtifactKinds.All.Select(k => k.Key).ToArray()),
+            ("visualSummaryNote", "What the figure should show.", NoValues),
+            ("maxResultsPerSource", "Results per database, from 1 to 50. The default is 5.", NoValues),
+            ("peerReviewOnly", "True to keep only work that was peer reviewed.", NoValues),
+            ("dualScreening", "False to screen each record once, not twice.", NoValues),
+            ("citationChaining", "True to search the references of the included studies too.", NoValues),
+            ("acceptFlaggedInput", "True to start a review whose fields read like orders to the model.", NoValues),
+        }),
+    };
+}

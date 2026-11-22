@@ -6,7 +6,7 @@
 import { chromium } from 'playwright';
 
 const base = (process.env.BASE_URL ?? 'http://localhost:5038').replace(/\/$/, '');
-const pages = ['/', '/start', '/review', '/metrics', '/about', '/model-card', '/privacy', '/glossary', '/verify',
+const pages = ['/', '/start', '/review', '/metrics', '/about', '/model-card', '/privacy', '/glossary', '/verify', '/docs/api',
   '/design/run', '/design/run?state=done', '/design/report', '/design/metrics'];
 const wait = { timeout: 10000 };
 
@@ -46,6 +46,17 @@ const flows = [
       const before = (await count.textContent())?.trim();
       await page.locator('#glossary-search').fill('kappa');
       await page.waitForFunction(b => document.querySelector('#glossary-count')?.textContent?.trim() !== b, before, wait);
+    },
+  },
+  {
+    // The page has no live connection: the copy button is handled by review-output.js. Headless Chrome may refuse
+    // the clipboard, so either answer counts; a button that does nothing does not.
+    name: 'API page: a Copy button answers',
+    path: '/docs/api',
+    async run(page) {
+      const button = page.locator('[data-copy="start-request"]');
+      await button.click(wait);
+      await page.waitForFunction(() => document.querySelector('[data-copy="start-request"]')?.textContent?.trim() !== 'Copy', null, wait);
     },
   },
   {
