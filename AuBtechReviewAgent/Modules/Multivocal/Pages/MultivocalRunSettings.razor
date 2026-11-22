@@ -1,0 +1,39 @@
+@* The settings of a planned run, on the left of /mlr/{id}: its stage, its plan, its address and the protocol's
+   fingerprint. *@
+
+<div class="bg-page border border-line shadow-sm p-4 space-y-3">
+    <div>
+        <h2 class="text-sm font-semibold text-heading">Review settings</h2>
+        <p class="text-xs font-medium text-heading">@StageLine</p>
+    </div>
+    <dl class="text-xs space-y-2">
+        @SettingRow("Topic", Planned.Plan.Topic)
+        @SettingRow("Goal", Planned.Plan.Goal)
+        @SettingRow("Audience", MultivocalStart.AudienceLabel(Planned.Plan.Audience))
+        @SettingRow("Questions", string.Join(" ", Planned.Plan.Numbered().Select(q => q.Number)))
+        @SettingRow("Searches", string.Join(", ", Planned.Plan.GreySearches.Select(AuBtechReviewAgent.MultivocalGuidelines.SearchLabel)))
+        @SettingRow("Strings", string.Join("; ", Planned.Plan.EffectiveGreySearchStrings))
+        @if (Planned.Plan.UsesFormalPool)
+        {
+            @SettingRow("Databases", string.Join(", ", Planned.Plan.FormalDatabases.Select(AuBtechReviewAgent.SourceCatalog.DisplayNameFor)))
+            @SettingRow("Academic", string.Join("; ", Planned.Plan.EffectiveFormalSearchStrings))
+        }
+        @SettingRow("Threshold", $"{Planned.Plan.QualityThreshold} of {AuBtechReviewAgent.MultivocalGuidelines.QualityPointsMax} points")
+    </dl>
+    <p class="text-[11px] text-muted leading-snug border-t border-line pt-2">
+        Link to this run: <a class="text-heading underline break-all" href="@($"/mlr/{Planned.RunId}")">@($"/mlr/{Planned.RunId}")</a>.
+        Protocol fingerprint (SHA-256): <span class="font-mono break-all">@Planned.ProtocolSha256</span>
+    </p>
+    <div class="flex flex-wrap gap-2">
+        <a href="@($"/api/workspace/{Planned.RunId:N}/protocol.md")" class="ui-btn-secondary ui-btn-sm">Download the protocol</a>
+        <a href="@($"/mlr?card={Planned.Plan.Card}")" class="ui-btn-primary ui-btn-sm">New review</a>
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public AuBtechReviewAgent.PlannedRun Planned { get; set; } = default!;
+    [Parameter] public string StageLine { get; set; } = "";
+
+    private RenderFragment SettingRow(string label, string value) =>
+        @<div class="flex gap-2"><dt class="w-20 flex-none text-muted">@label</dt><dd class="text-ink min-w-0 break-words">@value</dd></div>;
+}
