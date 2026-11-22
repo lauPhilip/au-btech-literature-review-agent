@@ -27,4 +27,31 @@ public class RunPageTests
         Assert.Contains("runInfo.ExclusionCriteria", page);
         Assert.Contains(": exclusionCriteria)", page);
     }
+
+    [Fact]
+    public void TheRunPageIsAShellWithTheRunViewAndKeyDialogAsComponents()
+    {
+        string? root = AppContext.BaseDirectory;
+        while (root != null && !File.Exists(Path.Join(root, "AuBtechReviewAgent.sln"))) root = Path.GetDirectoryName(root);
+        if (root == null) return; // not run from the repository (packaged tests)
+        string pages = Path.Join(root, "AuBtechReviewAgent", "Components", "Pages");
+
+        string shell = File.ReadAllText(Path.Join(pages, "Home.razor"));
+        Assert.Contains("<HomeRunView Page=\"this\" />", shell);
+        Assert.Contains("<HomeKeyDialog Page=\"this\" />", shell);
+
+        // The children call the page's handlers with the page as receiver, so the page renders again after a click.
+        string dialog = File.ReadAllText(Path.Join(pages, "HomeKeyDialog.razor"));
+        Assert.Contains("id=\"key-dialog\"", dialog);
+        Assert.DoesNotContain("@bind=", dialog);
+        Assert.Contains("EventCallback.Factory.Create(Page, Page.SaveSessionKeys)", dialog);
+        string run = File.ReadAllText(Path.Join(pages, "HomeRunView.razor"));
+        Assert.Contains("EventCallback.Factory.Create(Page, Page.OnScreeningReviewSubmitted)", run);
+
+        // The whole page, read back as one text, still holds what the old single file held.
+        string page = ReadPage()!;
+        Assert.Contains("StartReviewProcess", page);
+        Assert.Contains("SaveDraftAsync", page);
+        Assert.Contains("AttachToRun", page);
+    }
 }
