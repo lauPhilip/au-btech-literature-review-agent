@@ -47,7 +47,7 @@ public static class GreySourceCatalog
     public static IReadOnlyList<(string Kind, IReadOnlyList<string> Searches)> Reach(IEnumerable<string> kinds, IEnumerable<string> searches)
     {
         var chosen = searches.ToList();
-        return kinds.Select(kind => (kind, (IReadOnlyList<string>)MultivocalGuidelines.GreySearches
+        return kinds.Select<string, (string, IReadOnlyList<string>)>(kind => (kind, MultivocalGuidelines.GreySearches
             .Where(s => chosen.Contains(s.Key) && KindsFoundBy(s.Key).Contains(kind)).Select(s => s.Key).ToList())).ToList();
     }
 }
