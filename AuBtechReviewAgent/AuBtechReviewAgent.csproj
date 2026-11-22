@@ -15,6 +15,7 @@
     <PackageReference Include="Microsoft.SemanticKernel.Connectors.MistralAI" Version="1.77.0-alpha" />
     <PackageReference Include="PdfPig" Version="0.1.16" />
     <PackageReference Include="MinVer" Version="8.0.0" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.15" />
   </ItemGroup>
 
 <!-- The version comes from the git tag, and only from there (Semantic Versioning, tags vMAJOR.MINOR.PATCH).
