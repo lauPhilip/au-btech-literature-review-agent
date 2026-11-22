@@ -190,7 +190,7 @@ public static partial class ReviewWriter
             REQUIREMENTS:
             1. "title": one line, at most 25 words, no full stop, naming the topic and the kind of review.
             2. "abstract": one paragraph of 150 to 250 words: background, method, main results by theme, and what they mean. No citations. Use no number that is not in the facts or the results above.
-            3. "rationale": one or two paragraphs on why the review is needed, from what the {{profile.Sources}} report; every sentence that states something from the literature ends with an inline [n] marker, using the {{profile.Sources}} the results cite for it.
+            3. "rationale": one or two paragraphs on why the review is needed, from what the {{profile.Sources}} report; every sentence ends with an inline [n] marker, using the {{profile.Sources}} the results cite for it. Add no background from general knowledge: leave out a sentence you cannot cite, since code removes every rationale sentence without a citation.
             4. "objectives": the objective and what the review set out to answer, in two or three sentences, without citations.
             {{ProseCleaner.PlainProseRule}}
             Respond ONLY with a valid minified JSON object:
@@ -222,12 +222,42 @@ public static partial class ReviewWriter
             return "title, abstract, rationale and objectives must all be given.";
         if (a.Title.Split(' ', StringSplitOptions.RemoveEmptyEntries).Length > 25) return "the title must be at most 25 words.";
         if (ThematicSynthesis.CitedIn(a.Abstract).Count > 0 || ThematicSynthesis.CitedIn(a.Objectives).Count > 0) return "the abstract and objectives take no citations.";
+        if (ThematicSynthesis.CitedIn(a.Rationale).Count == 0) return "the rationale has no citation; every sentence of it ends with the [n] of the sources the results cite for it.";
         var outside = ThematicSynthesis.CitedIn(a.Rationale).Where(r => r < 1 || r > referenceCount).ToList();
         if (outside.Count > 0) return $"citation numbers {string.Join(", ", outside)} are not in the reference list.";
         var known = NumbersIn(allowedNumbers);
         var unknown = NumbersIn(a.Abstract).Where(n => !known.Contains(n)).ToList();
         return unknown.Count > 0 ? $"the abstract uses {string.Join(", ", unknown)}, which is in neither the facts nor the results; use only those numbers." : null;
     }
+
+    /// <summary>
+    /// The rationale with only its cited sentences (issue #248): in a live run two uncited sentences came from the
+    /// model's general knowledge, not from the sources. Every sentence without an inline [n] marker is left out, the
+    /// paragraphs are kept, and <paramref name="log"/> records what was left out for the writing ledger, or is null when
+    /// nothing was. The goal, audience and research questions are not in the rationale: they are in the objectives.
+    /// </summary>
+    public static string CitedSentencesOnly(string rationale, out StyleDeltaLog? log)
+    {
+        log = null;
+        if (string.IsNullOrWhiteSpace(rationale)) return rationale;
+        var dropped = new List<string>();
+        var paragraphs = new List<string>();
+        foreach (var paragraph in Regex.Split(rationale.Trim(), @"\n\s*\n"))
+        {
+            var sentences = CitationSupportChecker.SplitSentences(paragraph);
+            dropped.AddRange(sentences.Where(x => ThematicSynthesis.CitedIn(x).Count == 0));
+            var kept = sentences.Where(x => ThematicSynthesis.CitedIn(x).Count > 0).ToList();
+            if (kept.Count > 0) paragraphs.Add(string.Join(" ", kept));
+        }
+        if (dropped.Count == 0) return rationale;
+        string result = string.Join("\n\n", paragraphs);
+        log = new StyleDeltaLog(RationaleCitedOnlyField, rationale, result, Applied: true,
+            Note: $"Left out in code, because {(dropped.Count == 1 ? "it carries" : "they carry")} no citation: " + string.Join(" ", dropped.Select(d => $"\"{d}\"")));
+        return result;
+    }
+
+    /// <summary>The writing ledger's name for the step that keeps the rationale's cited sentences only.</summary>
+    public const string RationaleCitedOnlyField = "Rationale (cited sentences only)";
 
     /// <summary>The numbers written as digits in a text, citation markers left out.</summary>
     public static HashSet<string> NumbersIn(string text) =>
