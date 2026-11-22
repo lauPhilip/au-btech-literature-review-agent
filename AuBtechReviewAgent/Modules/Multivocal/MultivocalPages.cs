@@ -5,6 +5,7 @@ using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -36,6 +37,17 @@ public sealed class PageSnapshot
 
     /// <summary>Why the page was not kept, in words for the reviewer; null when it was.</summary>
     public string? NotKept { get; set; }
+
+    /// <summary>
+    /// For a formal source: "full text" or "abstract only", the text the source is quoted and checked against
+    /// (decision 8); null, and left out of the file, for a grey source's page.
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? TextBasis { get; set; }
+
+    /// <summary>For a formal source: where its open full text came from, or why there was none, as the systematic review says it.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? FullTextSource { get; set; }
 }
 
 /// <summary>The page snapshots of a multivocal run (multivocal-pages.json), which is in the run archive.</summary>
@@ -49,8 +61,9 @@ public sealed class MultivocalPagesFile
 /// Keeps the text of the grey sources' pages for a searched multivocal run. Only pages the run's searches found
 /// can be fetched, so the run never fetches an address typed in or made up; fetching goes through
 /// <see cref="PageFetcher"/>, which obeys robots.txt and paces each site. Keeping a page again replaces its snapshot.
+/// A formal source's text is its open full text or, without one, its abstract (MultivocalPages.Formal.cs).
 /// </summary>
-public sealed class MultivocalPages
+public sealed partial class MultivocalPages
 {
     public const string PagesFile = "multivocal-pages.json";
 
@@ -64,11 +77,20 @@ public sealed class MultivocalPages
     private readonly MultivocalSearcher _searcher;
     private readonly PageFetcher _fetcher;
 
-    public MultivocalPages(RunStore runs, MultivocalSearcher searcher, PageFetcher fetcher)
+    private readonly Func<AcademicPaper, string, Task<FullTextResult>>? _fullText;
+
+    /// <summary>The page snapshots of the run folders.</summary>
+    /// <param name="runs">The run folders.</param>
+    /// <param name="searcher">Reads the run's ledger: only sources it found are kept.</param>
+    /// <param name="fetcher">Fetches a grey source's page.</param>
+    /// <param name="fullText">Finds a formal source's open full text, as the systematic review does (into the folder
+    /// given); without it, every formal source is kept on its abstract.</param>
+    public MultivocalPages(RunStore runs, MultivocalSearcher searcher, PageFetcher fetcher, Func<AcademicPaper, string, Task<FullTextResult>>? fullText = null)
     {
         _runs = runs;
         _searcher = searcher;
         _fetcher = fetcher;
+        _fullText = fullText;
     }
 
     public MultivocalPagesFile Load(Guid runId)
@@ -110,6 +132,7 @@ public sealed class MultivocalPages
         string address = MultivocalSearcher.AddressKey(url);
         var found = ledger.Sources.FirstOrDefault(s => MultivocalSearcher.AddressKey(s.Record.Url) == address)
             ?? throw new InvalidOperationException("Only pages the searches found can be kept.");
+        if (found.Paper is { } paper) return await KeepFormalAsync(runId, found.Record, paper);
 
         var accessed = DateTime.UtcNow;
         var page = await _fetcher.FetchAsync(found.Record.Url);
@@ -125,20 +148,26 @@ public sealed class MultivocalPages
             NotKept = page.NotFetched,
         };
 
+        return await SaveAsync(runId, address, snapshot, page.NotFetched == null ? page.Text : null);
+    }
+
+    /// <summary>Writes the text (when there is one) to the run folder and the snapshot to the pages file, replacing an earlier one.</summary>
+    private async Task<PageSnapshot> SaveAsync(Guid runId, string address, PageSnapshot snapshot, string? text)
+    {
         string folder = _runs.FolderOf(runId);
         await Gate.WaitAsync();
         try
         {
-            if (page.NotFetched == null)
+            if (text != null)
             {
-                byte[] bytes = new UTF8Encoding(false).GetBytes(page.Text);
+                byte[] bytes = new UTF8Encoding(false).GetBytes(text);
                 // Named after the address, so keeping the page again replaces the old text.
                 string name = $"{TextFolder}/{Sha256(Encoding.UTF8.GetBytes(address))[..16]}.txt";
                 Directory.CreateDirectory(Path.Join(folder, TextFolder));
                 await File.WriteAllBytesAsync(Path.Join(folder, name), bytes);
                 snapshot.TextFile = name;
                 snapshot.TextSha256 = Sha256(bytes);
-                snapshot.Characters = page.Text.Length;
+                snapshot.Characters = text.Length;
             }
 
             var file = Load(runId);

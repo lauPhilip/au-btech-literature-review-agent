@@ -120,7 +120,8 @@ var multivocalChat = () => (Microsoft.SemanticKernel.ChatCompletion.IChatComplet
 var multivocalScreener = new AuBtechReviewAgent.MultivocalScreener(reviewEngine.Store, multivocalPlanner, multivocalSearcher,
     multivocalChat, reviewEngine.Cache, llmOptions.Model, llmOptions.ScreeningParallelism);
 builder.Services.AddSingleton(multivocalScreener); // grey screening (preview)
-var multivocalPages = new AuBtechReviewAgent.MultivocalPages(reviewEngine.Store, multivocalSearcher, new AuBtechReviewAgent.PageFetcher());
+var multivocalPages = new AuBtechReviewAgent.MultivocalPages(reviewEngine.Store, multivocalSearcher, new AuBtechReviewAgent.PageFetcher(),
+    (paper, folder) => AuBtechReviewAgent.DocumentRAGUtility.IngestAndChunkPaperAsync(paper, folder, openSources.ContactEmail)); // a formal source's open full text
 builder.Services.AddSingleton(multivocalPages); // page snapshots (preview)
 var multivocalQuality = new AuBtechReviewAgent.MultivocalQualityAssessor(reviewEngine.Store, multivocalPlanner, multivocalSearcher, multivocalScreener,
     multivocalPages, multivocalChat, reviewEngine.Cache, llmOptions.Model, llmOptions.ScreeningParallelism);

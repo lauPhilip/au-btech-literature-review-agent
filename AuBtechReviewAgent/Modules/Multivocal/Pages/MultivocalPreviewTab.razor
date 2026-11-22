@@ -57,7 +57,9 @@
                     ? $"{searches} grey literature search{(searches == 1 ? "" : "es")} and {p.FormalDatabases.Count} academic database{(p.FormalDatabases.Count == 1 ? "" : "s")}, each with its own search strings, {stop}."
                     : $"{searches} grey literature search{(searches == 1 ? "" : "es")}, {stop}.", true),
                 ("Selection", p.UsesFormalPool ? "Grey and academic sources are screened twice, with the same criteria and the same care." : "Every source is screened twice against your criteria; a source the two screenings disagree on is kept and marked for you to look at.", true),
-                ("Quality", $"Each source is scored on Table 7; below {p.QualityThreshold} of {MultivocalGuidelines.QualityPointsMax} points it is left out. Every score rests on a quote.", !p.UsesFormalPool), // formal appraisal comes in block I-4
+                ("Quality", p.UsesFormalPool
+                    ? $"Each grey source is scored on Table 7; below {p.QualityThreshold} of {MultivocalGuidelines.QualityPointsMax} points it is left out. Each academic source is appraised with MMAT, as in the systematic review, on its open full text or else its abstract. Every answer rests on a quote."
+                    : $"Each source is scored on Table 7; below {p.QualityThreshold} of {MultivocalGuidelines.QualityPointsMax} points it is left out. Every score rests on a quote.", true),
                 ("Map and extraction", "The sources are classified in a systematic map proposed from your research questions; every extracted value rests on a quote from the source's page.", !p.UsesFormalPool), // both pools in block I-5
                 ("Synthesis", $"The findings are grouped into themes to answer {questions} research question{(questions == 1 ? "" : "s")}, each theme labelled with the kind and quality of the sources it rests on.", !p.UsesFormalPool),
                 ("Writing", "The paper is written from the findings: an outline, one section per theme, the discussion, a summary for practitioners and an automated peer review; the title and abstract last.", !p.UsesFormalPool), // built for grey literature in block G; both pools in block I-6

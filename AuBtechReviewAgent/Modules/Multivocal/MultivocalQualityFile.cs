@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
@@ -46,6 +47,21 @@ public sealed class GreyQuality
 
     /// <summary>For an opinion piece: its main claim and the critical questions for an expert opinion (G13); null otherwise.</summary>
     public GreyArgument? Argument { get; set; }
+
+    /// <summary>
+    /// A formal source (block I-4): appraised with MMAT as in the systematic review, not scored on Table 7, and kept
+    /// whatever its appraisal, since the quality threshold applies to grey sources only. Left out for a grey source.
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public bool Formal { get; set; }
+
+    /// <summary>A formal source's extraction and MMAT appraisal, as the systematic review writes it; null for a grey source.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public StudyExtraction? Mmat { get; set; }
+
+    /// <summary>A formal source's text basis, "full text" or "abstract only" (decision 8); null for a grey source.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? TextBasis { get; set; }
 }
 
 /// <summary>One critical question about an opinion piece, and its answer.</summary>
@@ -95,6 +111,10 @@ public sealed class MultivocalQualityFile
     public int MaxPoints { get; set; } = GreyQualityChecklist.MaxPoints;
     public string ImpactRule { get; set; } = GreyQualityChecklist.ImpactRule;
     public List<GreyQuality> Sources { get; set; } = new();
+
+    /// <summary>With a formal pool: the version of the formal sources' appraisal; null, and left out, otherwise.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? FormalAppraisalVersion { get; set; }
 
     public int Count(string outcome) => Sources.Count(s => s.Outcome == outcome);
 }
