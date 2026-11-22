@@ -8,7 +8,7 @@ using Microsoft.SemanticKernel.ChatCompletion;
 
 namespace AuBtechReviewAgent;
 
-/// <summary>The grounded outline, one cited subsection per theme with its fill pass, and the discussion written from the subsections.</summary>
+/// <summary>The grounded outline, and one cited subsection per theme with its fill pass.</summary>
 public static partial class ReviewWriter
 {
     private sealed class OutlineAnswer { public List<OutlineTheme>? Themes { get; set; } }
@@ -117,7 +117,7 @@ public static partial class ReviewWriter
         string s = profile.Source, ss = profile.Sources;
         // The theme's own counts (issue #146), when the module gives them; without them the prompt is as before.
         string themeFacts = theme.Facts.Length == 0 ? ""
-            : $"\nFACTS ABOUT THE {ss.ToUpperInvariant()} IN THIS THEME ({profile.BaseFactsFrom}; use them whenever you say how these {ss} were designed or what they were read from, and do not change them): {theme.Facts}";
+            : $"\nFACTS ABOUT THE {ss.ToUpperInvariant()} IN THIS THEME ({profile.BaseFactsFrom}; use them whenever you say how these {ss} were designed, and do not change them): {theme.Facts}";
 
         string prompt = $$"""
             You are writing one subsection of {{profile.ResultsSection}} of {{profile.Review}}. The review used thematic synthesis; this subsection reports one theme.
@@ -139,6 +139,7 @@ public static partial class ReviewWriter
             2. Cite every one of these {{ss}} at least once: {{sourceList}}. A {{s}} may be cited together with others when they report the same finding ("... [3, 7, 12]").
             3. Every sentence that states a finding, comparison or claim from the literature ends with an inline marker like [3] or [2, 5]. Attribute to a {{s}} only what its findings or excerpts above actually say; prefer the verified findings. Do not invent numbers, statistics or venue names.
             4. "heading" is a short subsection title for the theme (at most 10 words, no numbering).
+            5. {{ReadingBasisRule(profile)}}
             {{ProseCleaner.PlainProseRule}}
             Respond ONLY with a valid minified JSON object:
             {"heading":"...","text":"the subsection with inline [n] citations"}
@@ -193,6 +194,7 @@ public static partial class ReviewWriter
                 {{PromptSafety.Wrap(missingEvidence, $"evidence of the {ss} not yet cited")}}
 
                 TASK: Integrate the {{ss}} {{string.Join(", ", missing.Select(r => $"[{r}]"))}} where their evidence fits: add them to the comparisons that already exist, or add sentences that relate them to the {{ss}} already discussed. Attribute to them only what their evidence above says. Keep every existing citation. If the evidence of a {{s}} does not support any statement about this theme, leave it out rather than inventing one.
+                {{ReadingBasisRule(profile)}}
                 {{ProseCleaner.PlainProseRule}}
                 Respond ONLY with a valid minified JSON object:
                 {"text":"the revised subsection with inline [n] citations"}
@@ -222,55 +224,5 @@ public static partial class ReviewWriter
         coverage.CitedFinal = ThematicSynthesis.CitedIn(text).Intersect(theme.Sources).ToList();
         coverage.NotCited = theme.Sources.Except(coverage.CitedFinal).ToList();
         return (new SynthesisSection { Field = field, ThemeId = theme.Id, Heading = heading, Text = text }, coverage);
-    }
-
-    /// <summary>The discussion, written from the theme subsections; empty when it cannot be written.</summary>
-    public static async Task<string> WriteDiscussionAsync(IChatCompletionService chat, WritingProfile profile, string topic, string goal,
-        IReadOnlyList<SynthesisSection> sections, ReviewEvidence evidence, int referenceCount, Action<string>? warn = null)
-    {
-        int paragraphs = Math.Clamp(2 + sections.Count / 2, 3, 6);
-        string synthesis = string.Join("\n\n", sections.Select(x => $"### {x.Heading}\n{x.Text}"));
-        string prompt = $$"""
-            You are writing {{profile.DiscussionSection}} of {{profile.Review}} whose results are reported theme by theme below.
-
-            REVIEW OBJECTIVE: "{{goal}}"
-            PRIMARY TOPIC: "{{topic}}"
-            {{PromptSafety.ReviewerInputNotice}}
-
-            REFERENCE LIST (cite ONLY these numbers):
-            {{evidence.ReferenceLines()}}
-
-            FACTS ABOUT THE EVIDENCE BASE ({{profile.BaseFactsFrom}}; use them wherever you describe the {{profile.Sources}} or how they were studied, and do not change them):
-            {{evidence.BaseFacts}}
-
-            RESULTS BY THEME:
-            {{synthesis}}
-
-            REQUIREMENTS:
-            1. Write about {{paragraphs}} paragraphs, separated by a blank line: {{profile.DiscussionParts}}
-            2. Interpret, do not repeat the results. Ground every claim in the results above; every sentence that attributes something to the literature ends with an inline marker such as [3] or [2, 5], using the same {{profile.Sources}} the results cite for it. {{OwnCountRule}}
-            3. Do not invent numbers, statistics or {{profile.Sources}}.
-            {{ProseCleaner.PlainProseRule}}
-            Respond ONLY with a valid minified JSON object:
-            {"text":"the discussion with inline [n] citations"}
-            """;
-        try
-        {
-            var answer = await LlmJson.GetAsync<TextAnswer>(chat, prompt, LlmJson.JsonMode(0.3), a =>
-            {
-                if (string.IsNullOrWhiteSpace(a.Text)) return "text must not be empty.";
-                var outside = ThematicSynthesis.CitedIn(a.Text).Where(r => r < 1 || r > referenceCount).ToList();
-                if (outside.Count > 0) return $"citation numbers {string.Join(", ", outside)} are not in the reference list.";
-                return OwnCountCited(a.Text, evidence.BaseFacts, synthesis) is { } own
-                    ? $"\"{own}\" states this review's own count and carries a citation; the review's own counts take no citation."
-                    : null;
-            });
-            return MethodsSectionWriter.StripMarkdownEmphasis(answer.Text!.Trim());
-        }
-        catch (Exception ex)
-        {
-            warn?.Invoke($"Discussion could not be written: {ex.Message}");
-            return "";
-        }
     }
 }

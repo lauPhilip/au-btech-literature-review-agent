@@ -72,7 +72,7 @@ public partial class PrismaReviewEngine
             ReportProgress(runId, state, RunProgress.Synthesis, RunProgress.Phase(RunProgress.SynthesisPhases, 2, 0), $"Grouping {codes.Count} codes into themes");
             using (LlmStage.Begin("thematic-codebook"))
             {
-                var (themes, unplaced) = await ThematicSynthesis.BuildCodebookAsync(chat, goal, codes, Math.Max(2, Synthesis.MaxThemes));
+                var (themes, unplaced) = await ThematicSynthesis.BuildCodebookAsync(chat, goal, codes, Math.Max(2, Synthesis.MaxThemes), CriteriaForCodebook(state));
                 book.Themes = themes;
                 book.Uncoded.AddRange(unplaced);
                 book.Uncoded = book.Uncoded.OrderBy(u => u.Reference).ToList();
@@ -139,4 +139,11 @@ public partial class PrismaReviewEngine
 
     /// <summary>Should the repair pass look at this verdict? (see <see cref="CitationRepairer.NeedsRepair"/>).</summary>
     public static bool NeedsRepair(CitationSupportResult r) => CitationRepairer.NeedsRepair(r);
+
+    /// <summary>The run's eligibility criteria as the reviewer typed them, for the codebook; empty when none was given.</summary>
+    private static string CriteriaForCodebook(ReviewState state) => string.Join("\n", new[]
+    {
+        string.IsNullOrWhiteSpace(state.InclusionCriteria) ? null : $"Include: {state.InclusionCriteria.Trim()}",
+        string.IsNullOrWhiteSpace(state.ExclusionCriteria) ? null : $"Exclude: {state.ExclusionCriteria.Trim()}",
+    }.Where(line => line != null));
 }

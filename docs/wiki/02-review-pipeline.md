@@ -67,7 +67,7 @@ The `LlmStage` names below are what `llm-calls.json` records for each call, and 
 | `thematic-coding-second` | `ThematicSynthesis.SecondCodingAsync` | `ThematicSynthesis.Codebook.cs` | Independent theme assignment, kappa (with `Synthesis:DualCoding`) |
 | `theme-sections` | `ReviewWriter.WriteThemeAsync` | `ReviewWriter.Themes.cs` | One cited subsection per theme |
 | `coverage-fill` | `ReviewWriter.WriteThemeAsync` | `ReviewWriter.Themes.cs` | Revision that adds the theme's uncited studies |
-| `discussion` | `ReviewWriter.WriteDiscussionAsync` | `ReviewWriter.Themes.cs` | Discussion written from the subsections |
+| `discussion` | `ReviewWriter.WriteDiscussionAsync` | `ReviewWriter.Discussion.cs` | Discussion written from the subsections |
 | `artifact` | `ArtifactBuilder.BuildAsync` | `ArtifactBuilder.cs` | The diagram, table or list the reviewer asked for, built from the finished results |
 | `cited-sections` | `GenerateCitedSectionsAsync` | Report | Fallback only: synthesis and discussion in one call |
 | `automated-peer-review` | `ReviewWriter.PeerReviewAsync` (fallback: `PeerReviewAndReviseAsync`) | `ReviewWriter.PeerReview.cs` / Report | Critique and revision; `peer-review-feedback.json` |

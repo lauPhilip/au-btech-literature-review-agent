@@ -52,7 +52,7 @@ public static class SystematicEvidence
             Codes = t.Studies.ToDictionary(r => r, r => (IReadOnlyList<string>)book.Codes.Where(c => c.Reference == r && t.CodeIds.Contains(c.Id)).Select(c => c.Label).ToList()),
             Facts = ThemeFacts(t.Studies, byExtraction),
         }).ToList();
-        return new ReviewEvidence { Sources = sources, Themes = themes, BaseFacts = BaseFacts(extractions) };
+        return new ReviewEvidence { Sources = sources, Themes = themes, BaseFacts = BaseFacts(extractions), LeftOut = book.Uncoded.OrderBy(u => u.Reference).ToList() };
     }
 
     /// <summary>
