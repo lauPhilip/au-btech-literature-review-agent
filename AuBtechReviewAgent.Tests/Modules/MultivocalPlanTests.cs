@@ -239,6 +239,8 @@ public class MultivocalPlanTests : IDisposable
         Assert.Contains("- LLM agent memory (proposed by the language model, accepted by the reviewer)", protocol);
         Assert.Contains("did not use: context window management.", protocol);
         Assert.Contains("Formal and grey sources are screened with the same criteria", protocol);
+        Assert.Contains("Each academic source is appraised as in the systematic review, with the Mixed Methods Appraisal Tool (MMAT, 2018)", protocol);
+        Assert.Contains("The quality threshold applies to grey sources only", protocol);
     }
 
     [Fact]
@@ -255,7 +257,11 @@ public class MultivocalPlanTests : IDisposable
         Assert.Equal("grey literature review", old.ReviewKind);
 
         foreach (var plan in new[] { grey, Complete() })
-            Assert.DoesNotContain("Where formal (academic) literature is searched", MultivocalProtocol.Write(plan, Guid.NewGuid(), DateTime.UtcNow));
+        {
+            string protocol = MultivocalProtocol.Write(plan, Guid.NewGuid(), DateTime.UtcNow);
+            Assert.DoesNotContain("Where formal (academic) literature is searched", protocol);
+            Assert.DoesNotContain("MMAT", protocol);
+        }
     }
 
     [Fact]
