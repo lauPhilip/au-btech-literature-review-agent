@@ -77,3 +77,7 @@ When you fix a bug found in a real run, add a case to `RealRunRegressionTests.cs
 ## Measuring screening accuracy
 
 `tools/ScreeningEval` runs the app's own screening prompt over a dataset where human reviewers made the inclusion decisions (any ASReview-format CSV, for example from the SYNERGY collection) and reports recall, precision, specificity, F1 and Cohen's kappa, plus every paper the model missed. The usage is in the comment at the top of `tools/ScreeningEval/Program.cs`. It uses the first screening prompt only, needs a real API key and costs one model call per paper, so run it deliberately rather than in CI.
+
+## Short files
+
+No source file is longer than 300 lines (issue #235). `Support/FileLengthTests.cs` fails when a `.cs`, `.razor`, `.js`, `.mjs` or `.css` file in the app, the tests or `tools` grows past that, except for the files that were longer when the rule came in; those are listed with their length then, may only shrink, and come off the list once they are split. Split a long file by responsibility (partial classes, child components, a `.razor.cs` code-behind), and before the split add tests that pin down what the file does wherever its tests are thin, so the same tests pass before and after. Comments say why, a rule or a source; a comment that repeats the code goes.
