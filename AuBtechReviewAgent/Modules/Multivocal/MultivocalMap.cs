@@ -11,72 +11,12 @@ using Microsoft.SemanticKernel.ChatCompletion;
 namespace AuBtechReviewAgent;
 
 /// <summary>
-/// One attribute of the systematic map (G12, Table 10): what is recorded about every source for one research question,
-/// with the values it may take, and whether a source can have several of them. An open attribute takes free text
-/// (a tool's name, say) because its values cannot be listed in advance.
-/// </summary>
-public sealed class MapAttribute
-{
-    public string Name { get; set; } = "";
-
-    /// <summary>The research question it serves, numbered as in the protocol ("RQ1", "RQ1.1").</summary>
-    public string Question { get; set; } = "";
-    public string Description { get; set; } = "";
-    public List<string> Values { get; set; } = new();
-    public bool Multiple { get; set; }
-    public bool Open { get; set; }
-
-    /// <summary>
-    /// Other research questions this attribute answers too, such as "how often is each practice mentioned?" for the
-    /// practice attribute: a question that only counts another attribute's values gets no attribute of its own.
-    /// </summary>
-    public List<string> AlsoFor { get; set; } = new();
-
-    /// <summary>Whether this attribute answers the question, as its own or as one it answers too.</summary>
-    public bool Serves(string question) => Question == question || AlsoFor.Contains(question);
-}
-
-/// <summary>One version of the map: who made it and when.</summary>
-public sealed class MapVersion
-{
-    public int Number { get; set; }
-    public DateTime CreatedUtc { get; set; }
-
-    /// <summary>"model" (proposed from the questions and the sources) or "reviewer" (edited).</summary>
-    public string By { get; set; } = "";
-    public List<MapAttribute> Attributes { get; set; } = new();
-}
-
-/// <summary>
-/// The systematic map of a multivocal run (multivocal-map.json), which is in the run archive: every version, in order,
-/// and which one was fixed for the extraction.
-/// </summary>
-public sealed class MultivocalMapFile
-{
-    public Guid RunId { get; set; }
-    public string PromptVersion { get; set; } = "";
-    public string Model { get; set; } = "";
-
-    /// <summary>How many sources the model saw when it generalised the values.</summary>
-    public int SourcesSeen { get; set; }
-
-    /// <summary>What code changed in the model's proposal, such as an attribute for a known fact that was left out.</summary>
-    public List<string> Notes { get; set; } = new();
-    public List<MapVersion> Versions { get; set; } = new();
-
-    /// <summary>The version used for the extraction; null until the reviewer fixes the map.</summary>
-    public int? FixedVersion { get; set; }
-
-    public MapVersion Latest => Versions[^1];
-}
-
-/// <summary>
 /// Builds the systematic map of a multivocal run (MLR block F, G12). The model proposes initial attributes from the
 /// research questions and generalises their values over the sources that passed the quality check, as in keyword or
 /// open coding; the reviewer then edits the map, each edit kept as a new version, and fixes it before extraction.
 /// The run goes from "Assessed" through "Mapping" to "Mapped".
 /// </summary>
-public sealed class MultivocalMapper
+public sealed partial class MultivocalMapper
 {
     public const string MapFile = "multivocal-map.json";
     public const string StageMapping = "Mapping";
@@ -209,113 +149,6 @@ public sealed class MultivocalMapper
         {
             Gate.Release();
         }
-    }
-
-    /// <summary>
-    /// Values that only say the source does not state it. Every attribute can be "not stated" for a source, decided in
-    /// code during extraction, so these are never values of their own (seen in a live run: seven attributes had one).
-    /// </summary>
-    public static readonly IReadOnlySet<string> NotStatedValues = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-    {
-        "not specified", "unspecified", "not stated", "not mentioned", "not given", "not reported", "not applicable", "unknown", "n/a", "na", "none specified",
-    };
-
-    /// <summary>
-    /// The facts the run already knows about every source, recorded by code for each one at extraction; the map never
-    /// asks the model for them.
-    /// </summary>
-    public static readonly IReadOnlyList<(string Name, string Description)> KnownFacts = new[]
-    {
-        ("Kind of source", "Blog post, Q&A, code repository, report, thesis …, from the search."),
-        ("Literature", "Grey or formal (academic), from the pool the source was found in."),
-        ("Site", "Where it was published."),
-        ("Date", "When it was published, when the search gave a date."),
-        ("Quality points", "Its score on the quality checklist, out of 20."),
-    };
-
-    /// <summary>The known facts of one source, in the order of <see cref="KnownFacts"/>.</summary>
-    public static IReadOnlyList<(string Name, string Value)> KnownFactsFor(GreyRecord record, GreyQuality? quality) => new[]
-    {
-        ("Kind of source", MultivocalGuidelines.GreyTypes.FirstOrDefault(t => t.Key == record.Kind).Label ?? record.Kind),
-        ("Literature", "Grey"),
-        ("Site", record.Site),
-        ("Date", record.Published is DateTime d ? d.ToString("yyyy-MM-dd") : "not given"),
-        ("Quality points", quality is { Outcome: not "Not assessed" } q ? $"{q.Points:0.#} of {GreyQualityChecklist.MaxPoints}" : "not assessed"),
-    };
-
-    /// <summary>"ToolOrFramework" becomes "Tool or framework"; a name with spaces is kept as written.</summary>
-    public static string PlainName(string name)
-    {
-        string n = name.Trim();
-        if (n.Contains(' ') || !System.Text.RegularExpressions.Regex.IsMatch(n, "^[A-Z][a-z]+([A-Z][a-z]+)+$", System.Text.RegularExpressions.RegexOptions.None, TimeSpan.FromSeconds(1))) return n;
-        var words = System.Text.RegularExpressions.Regex.Matches(n, "[A-Z][a-z]+", System.Text.RegularExpressions.RegexOptions.None, TimeSpan.FromSeconds(1)).Select(m => m.Value).ToList();
-        return string.Join(" ", words.Select((w, i) => i == 0 ? w : w.ToLowerInvariant()));
-    }
-
-    /// <summary>
-    /// Trims every text, makes names plain words, drops empty and repeated values and values that only say "not stated",
-    /// and keeps no values on an open attribute.
-    /// </summary>
-    public static List<MapAttribute> Clean(IEnumerable<MapAttribute> attributes) => attributes.Select(a => new MapAttribute
-    {
-        Name = PlainName(ReviewInputGuard.Normalize(a.Name ?? "", singleLine: true)),
-        Question = (a.Question ?? "").Trim().ToUpperInvariant(),
-        Description = ReviewInputGuard.Normalize(a.Description ?? "", singleLine: true),
-        Open = a.Open,
-        Multiple = a.Multiple,
-        AlsoFor = (a.AlsoFor ?? new()).Select(q => (q ?? "").Trim().ToUpperInvariant())
-            .Where(q => q.Length > 0 && q != (a.Question ?? "").Trim().ToUpperInvariant()).Distinct().ToList(),
-        Values = a.Open ? new() : (a.Values ?? new())
-            .Select(v => ReviewInputGuard.Normalize(v ?? "", singleLine: true))
-            .Where(v => v.Length > 0 && !NotStatedValues.Contains(v.TrimEnd('.')))
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .ToList(),
-    }).ToList();
-
-    /// <summary>What is wrong with a map, or null when it can be used: every attribute named once, for a question of the plan, with values unless open.</summary>
-    public static string? Problem(IReadOnlyList<MapAttribute> attributes, MultivocalPlan plan)
-    {
-        if (attributes.Count == 0) return "The map needs at least one attribute.";
-        if (attributes.Count > MaxAttributes) return $"Use at most {MaxAttributes} attributes.";
-        var questions = plan.Numbered().Select(q => q.Number).ToHashSet(StringComparer.OrdinalIgnoreCase);
-        foreach (var a in attributes)
-        {
-            if (a.Name.Length == 0) return "Give every attribute a name.";
-            if (!questions.Contains(a.Question)) return $"\"{a.Name}\" must belong to one of the research questions ({string.Join(", ", questions)}).";
-            if (a.AlsoFor.FirstOrDefault(q => !questions.Contains(q)) is { } unknown) return $"\"{a.Name}\" names {unknown} in alsoFor, which is not one of the research questions ({string.Join(", ", questions)}).";
-            if (new[] { a.Name, a.Description }.Concat(a.Values).Any(t => t.Length > MaxText)) return $"Keep every text in \"{a.Name}\" under {MaxText} characters.";
-            if (!a.Open && a.Values.Count < 2) return $"\"{a.Name}\" needs at least two values, or mark it as open text.";
-            if (a.Values.Count > MaxValues) return $"\"{a.Name}\" can have at most {MaxValues} values.";
-        }
-        var repeated = attributes.GroupBy(a => a.Name, StringComparer.OrdinalIgnoreCase).FirstOrDefault(g => g.Count() > 1);
-        return repeated != null ? $"Two attributes are called \"{repeated.Key}\"." : null;
-    }
-
-    /// <summary>
-    /// Whether an attribute only records a fact the run already knows for every source (its kind, grey or formal, site,
-    /// date or quality). Such an attribute is dropped from the model's map in code rather than sent back: a question
-    /// such as "how often in grey and in academic sources?" makes the model add one however it is told (seen in a
-    /// live run, twice in a row), and the known fact answers it anyway.
-    /// </summary>
-    public static bool IsKnownFact(MapAttribute attribute) => System.Text.RegularExpressions.Regex.IsMatch(attribute.Name,
-        @"^(source ?type|type of source|kind of source|grey or academic|grey or formal|literature( type)?|publication (date|site|year)|date|site|quality( points| score)?)$",
-        System.Text.RegularExpressions.RegexOptions.IgnoreCase, TimeSpan.FromSeconds(1));
-
-    /// <summary>
-    /// What is wrong with the model's map, beyond <see cref="Problem"/>, once the attributes for known facts are
-    /// dropped: more than three attributes for one question, or a value that is also another attribute's value.
-    /// </summary>
-    public static string? ModelProblem(IReadOnlyList<MapAttribute> proposed, MultivocalPlan plan)
-    {
-        var attributes = proposed.Where(a => !IsKnownFact(a)).ToList();
-        if (Problem(attributes, plan) is { } problem) return problem;
-        var crowded = attributes.GroupBy(a => a.Question).FirstOrDefault(g => g.Count() > MaxModelAttributesPerQuestion);
-        if (crowded != null) return $"{crowded.Key} has {crowded.Count()} attributes; give each question at most {MaxModelAttributesPerQuestion}.";
-        var shared = attributes
-            .SelectMany(a => a.Values.Where(v => !v.Equals("Other", StringComparison.OrdinalIgnoreCase)).Select(v => (Value: v, a.Name)))
-            .GroupBy(x => x.Value, StringComparer.OrdinalIgnoreCase)
-            .FirstOrDefault(g => g.Select(x => x.Name).Distinct().Count() > 1);
-        return shared != null ? $"\"{shared.Key}\" is a value of both {string.Join(" and ", shared.Select(x => $"\"{x.Name}\"").Distinct())}; keep each value in one attribute." : null;
     }
 
     /// <summary>The map prompt: attributes from the questions, values generalised over the sources.</summary>
