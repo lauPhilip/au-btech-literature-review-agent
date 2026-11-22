@@ -17,7 +17,9 @@ namespace AuBtechReviewAgent;
 /// <param name="Producer">Who wrote or published it (author, user, organisation), when known.</param>
 /// <param name="Site">Where it was published, e.g. "stackoverflow.com".</param>
 /// <param name="Kind">The kind of grey literature (a key of <see cref="MultivocalGuidelines.GreyTypes"/>).</param>
+/// <param name="Published">When it was published or created; a code repository's creation date, never its last push (#249).</param>
 /// <param name="Signals">Counts the source reports, for the quality checklist's impact item (score, views, stars).</param>
+/// <param name="Updated">When it was last changed, where the source says (a repository's last push); null for older runs.</param>
 public sealed record GreyRecord(
     string Id,
     string Title,
@@ -27,7 +29,8 @@ public sealed record GreyRecord(
     string Site,
     string Kind,
     DateTime? Published,
-    IReadOnlyDictionary<string, long> Signals);
+    IReadOnlyDictionary<string, long> Signals,
+    DateTime? Updated = null);
 
 /// <summary>
 /// A free search over grey literature (decision 1 in docs/roadmap/mlr-todo.md). Each source keeps the raw answers

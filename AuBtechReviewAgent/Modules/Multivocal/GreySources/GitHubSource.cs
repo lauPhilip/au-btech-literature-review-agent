@@ -53,9 +53,14 @@ public sealed class GitHubSource : IGreySource
                 item.TryGetProperty("owner", out var o) ? GreyJson.Str(o, "login") : "",
                 "github.com",
                 "code",
-                DateTime.TryParse(GreyJson.Str(item, "updated_at"), null, System.Globalization.DateTimeStyles.AdjustToUniversal | System.Globalization.DateTimeStyles.AssumeUniversal, out var t) ? t : null,
-                GreySourceHttp.Signals(("stars", GreyJson.Long(item, "stargazers_count")), ("forks", GreyJson.Long(item, "forks_count")))));
+                // The year a repository is cited by is the year it was created; the last push is kept as its last update (#249).
+                Date(item, "created_at"),
+                GreySourceHttp.Signals(("stars", GreyJson.Long(item, "stargazers_count")), ("forks", GreyJson.Long(item, "forks_count"))),
+                Date(item, "pushed_at") ?? Date(item, "updated_at")));
         }
         return records;
     }
+
+    private static DateTime? Date(System.Text.Json.JsonElement item, string field) =>
+        DateTime.TryParse(GreyJson.Str(item, field), null, System.Globalization.DateTimeStyles.AdjustToUniversal | System.Globalization.DateTimeStyles.AssumeUniversal, out var t) ? t : null;
 }
