@@ -209,77 +209,7 @@
             }
             else if (panelTab == "map" && map != null && planned != null)
             {
-                <div class="flex-1 min-h-0 overflow-y-auto p-5 space-y-4 text-left">
-                    <div>
-                        <h3 class="text-base font-semibold text-heading">Systematic map</h3>
-                        <p class="text-xs text-muted mt-0.5">
-                            The attributes recorded for every source (G12, Table 10). Version 1 was proposed by the model from your research questions, with values generalised over @map.SourcesSeen sources that passed.
-                            @(map.FixedVersion is int fixedNumber ? $"Version {fixedNumber} is fixed as proposed and is used for the extraction, so every source is extracted against the same attributes." : "It is fixed as proposed when the run continues.")
-                        </p>
-                    </div>
-                    <ol class="text-[11px] text-muted space-y-0.5">
-                        @foreach (var version in map.Versions)
-                        {
-                            <li>Version @version.Number · @(version.By == "model" ? "proposed by the model" : "edited by you") · @version.CreatedUtc.ToString("yyyy-MM-dd HH:mm") UTC · @version.Attributes.Count attributes@(map.FixedVersion == version.Number ? " · fixed" : "")</li>
-                        }
-                    </ol>
-                    @foreach (var note in map.Notes)
-                    {
-                        <p class="text-[11px] text-partly">@note</p>
-                    }
-                    <div class="border border-line bg-soft p-3 text-[11px] text-ink">
-                        <p class="font-medium text-ink">Recorded by code for every source, not by the model</p>
-                        <ul class="mt-1 space-y-0.5">
-                            @foreach (var (factName, factDescription) in AuBtechReviewAgent.MultivocalMapper.KnownFacts)
-                            {
-                                <li><span class="font-medium">@factName</span>: @factDescription</li>
-                            }
-                        </ul>
-                        <p class="mt-1">Every attribute can also be "not stated" for a source, so values such as "Not specified" are left out of the map.</p>
-                    </div>
-                    @{
-                        var shown = map.FixedVersion is int f ? map.Versions.First(v => v.Number == f) : map.Latest;
-                        <table class="w-full text-xs">
-                            <caption class="sr-only">The attributes of the map</caption>
-                            <thead class="text-left text-muted"><tr><th class="py-1 pr-2 font-medium">Attribute</th><th class="py-1 pr-2 font-medium">For</th><th class="py-1 font-medium">Values</th></tr></thead>
-                            <tbody>
-                                @foreach (var mapAttribute in shown.Attributes)
-                                {
-                                    <tr class="border-t border-line align-top">
-                                        <td class="py-1 pr-2"><span class="font-medium text-heading">@mapAttribute.Name</span><span class="block text-muted">@mapAttribute.Description</span></td>
-                                        <td class="py-1 pr-2">@mapAttribute.Question</td>
-                                        <td class="py-1">@(mapAttribute.Open ? "open text" : string.Join(", ", mapAttribute.Values))@(mapAttribute.Multiple ? " (several)" : "")</td>
-                                    </tr>
-                                }
-                            </tbody>
-                        </table>
-                        @if (extraction != null)
-                        {
-                            <div>
-                                <h4 class="text-sm font-semibold text-heading">How many sources have each value</h4>
-                                <p class="text-xs text-muted mt-0.5">From the @extraction.Sources.Count(x => x.Error == null) extracted sources; a source with several values counts once for each. Only values backed by a quote from the page count.</p>
-                            </div>
-                            @foreach (var mapAttribute in shown.Attributes)
-                            {
-                                var counts = extraction.Counts(mapAttribute.Name);
-                                int most = Math.Max(1, counts.Select(c => c.Sources).DefaultIfEmpty(0).Max());
-                                <table class="w-full text-xs">
-                                    <caption class="text-left font-medium text-ink pb-1">@mapAttribute.Name <span class="font-normal text-muted">(@mapAttribute.Question)</span></caption>
-                                    <tbody>
-                                        @foreach (var (value, sources) in counts)
-                                        {
-                                            <tr class="border-t border-line">
-                                                <th scope="row" class="py-0.5 pr-2 font-normal text-left @(value == "not stated" ? "text-muted" : "text-ink") w-1/2">@value</th>
-                                                <td class="py-0.5 pr-2 w-1/3"><span class="block h-2 bg-primary/60" style="width:@((100 * sources / most).ToString(System.Globalization.CultureInfo.InvariantCulture))%"></span></td>
-                                                <td class="py-0.5 text-right">@sources</td>
-                                            </tr>
-                                        }
-                                    </tbody>
-                                </table>
-                            }
-                        }
-                    }
-                </div>
+                <MultivocalMapTab Map="map" Extraction="extraction" />
             }
             else if (panelTab == "sources" && ledger != null)
             {
