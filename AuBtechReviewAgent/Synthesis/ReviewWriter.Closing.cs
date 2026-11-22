@@ -76,7 +76,7 @@ public static partial class ReviewWriter
             2. "implications": one paragraph on the implications for practice and policy (item 23d): what someone acting on these findings should do or watch for, and how firm each point is.
             3. "futureResearch": one paragraph on the directions for future research (item 23d): the open questions and missing kinds of study the results show, each tied to the theme or {{profile.Sources}} it comes from.
             4. "conclusion": three to five sentences that answer the review objective in plain words, at most {{MaxConclusionWords}} words, with no new claims.{{conclusionRule}}
-            5. Every sentence that attributes something to the literature ends with an inline marker such as [3] or [2, 5], using the same {{profile.Sources}} the results cite for it. {{OwnCountRule}} Do not invent numbers, statistics or {{profile.Sources}}.{{leftOutRule}}{{answerRule}}
+            5. Every sentence that attributes something to the literature ends with an inline marker such as [3] or [2, 5], using the same {{profile.Sources}} the results cite for it. {{OwnCountRule}} Do not invent numbers, statistics or {{profile.Sources}}.{{leftOutRule}} {{ReadingBasisRule(profile)}} This holds for the limitations too: how this review was done, including what it read, is written separately.{{answerRule}}
             {{ProseCleaner.PlainProseRule}}
             Respond ONLY with a valid minified JSON object:
             {"limitations":"...","implications":"...","futureResearch":"...","conclusion":"..."{{answerField}}}
@@ -86,7 +86,7 @@ public static partial class ReviewWriter
             ClosingAnswer answer;
             using (LlmStage.Begin("closing"))
                 answer = await LlmJson.GetAsync<ClosingAnswer>(chat, prompt, LlmJson.JsonMode(0.3), a => ClosingProblem(a.Limitations, a.Implications, a.FutureResearch, a.Conclusion, results + "\n" + facts + "\n" + evidence.BaseFacts, referenceCount,
-                    a.Answers, questions.Count, ownFacts: facts + "\n" + evidence.BaseFacts, results: results, evidence: evidence));
+                    a.Answers, questions.Count, ownFacts: facts + "\n" + evidence.BaseFacts, results: results, evidence: evidence, profile: profile));
             string Clean(string? text) => MethodsSectionWriter.StripMarkdownEmphasis(text!.Trim());
             return new ClosingSections(Clean(answer.Limitations), Clean(answer.Implications), Clean(answer.FutureResearch), Clean(answer.Conclusion),
                 questions.Count == 0 ? null : answer.Answers!.Select(Clean).ToList());
@@ -100,7 +100,7 @@ public static partial class ReviewWriter
 
     /// <summary>Why a closing answer cannot be used, or null. Public for unit tests.</summary>
     public static string? ClosingProblem(string? limitations, string? implications, string? futureResearch, string? conclusion, string known, int referenceCount,
-        IReadOnlyList<string>? answers = null, int questions = 0, string ownFacts = "", string results = "", ReviewEvidence? evidence = null)
+        IReadOnlyList<string>? answers = null, int questions = 0, string ownFacts = "", string results = "", ReviewEvidence? evidence = null, WritingProfile? profile = null)
     {
         if (questions > 0)
         {
@@ -123,6 +123,8 @@ public static partial class ReviewWriter
         foreach (var (name, text) in parts)
             if (OwnCountCited(text!, ownFacts, results) is { } own)
                 return $"{name}: \"{own}\" states this review's own count and carries a citation; the review's own counts take no citation.";
+        foreach (var (name, text) in parts)
+            if (ReadingBasisSentence(text!) is { } basis) return $"{name}: {ReadingBasisProblem(basis, profile ?? WritingProfile.Systematic)}";
         if (evidence != null)
             foreach (var (name, text) in parts.Where(p => p.Name != "limitations"))
                 if (LeftOutCited(text!, evidence) is { } used) return $"{name}: {used} Name them only in the limitations.";

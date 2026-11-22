@@ -106,7 +106,8 @@ public static partial class ReviewWriter
                         string.IsNullOrWhiteSpace(a.Text) ? "text must not be empty." : null);
                     string after = Named(MethodsSectionWriter.StripMarkdownEmphasis(answer.Text!.Trim()));
                     string? problem = ThematicSynthesis.RevisionProblem(before, after, referenceCount)
-                        ?? (section == null ? LeftOutCited(after, evidence) : null);
+                        ?? (section == null ? LeftOutCited(after, evidence) : null)
+                        ?? (section == null && ReadingBasisSentence(after) is { } basis ? ReadingBasisProblem(basis, profile) : null);
                     return new SectionRevision(group.Key, before, problem == null ? after : before, problem == null,
                         problem == null ? $"Revised in response to {group.Count()} comment(s)." : $"Revision rejected: {problem}; original kept.");
                 }
