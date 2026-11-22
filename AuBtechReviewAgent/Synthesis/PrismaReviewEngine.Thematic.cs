@@ -134,10 +134,8 @@ public partial class PrismaReviewEngine
 
     // ─── Citation repair (in Verification/CitationRepairer.cs, shared by every kind of review) ───────────────
 
-    /// <summary>Removes one reference number from the citation markers of a sentence (see <see cref="CitationRepairer.RemoveReference"/>).</summary>
     public static string RemoveReference(string sentence, int reference) => CitationRepairer.RemoveReference(sentence, reference);
 
-    /// <summary>Should the repair pass look at this verdict? (see <see cref="CitationRepairer.NeedsRepair"/>).</summary>
     public static bool NeedsRepair(CitationSupportResult r) => CitationRepairer.NeedsRepair(r);
 
     /// <summary>The run's eligibility criteria as the reviewer typed them, for the codebook; empty when none was given.</summary>
