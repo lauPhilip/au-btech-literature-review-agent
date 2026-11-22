@@ -1,0 +1,112 @@
+@using System.Text.RegularExpressions
+@* Sections 5 to 7 of the report page: the discussion, the conclusion and the declarations. The page passes itself as Page; its state stays there.
+   The copy buttons use the page as their event receiver, so the page renders again and shows that the text was copied. *@
+
+<section id="@AuBtechReviewAgent.ReportOutline.DiscussionId" data-report-section class="scroll-mt-20 space-y-5">
+    <h2 class="font-display text-xl font-semibold tracking-tight text-heading">5. Discussion</h2>
+
+<div class="space-y-2">
+    <h3 class="font-display text-base font-semibold text-heading">5.1 General Interpretation (Item 23a)</h3>
+    @Page.CitedText("discussionItem", Page.report.DiscussionItem)
+    @if (!string.IsNullOrWhiteSpace(Page.report.CitationCheckSummary))
+    {
+        <p class="border-l-2 border-heading pl-3 text-[15px] italic text-muted">@Page.report.CitationCheckSummary</p>
+    }
+</div>
+
+@* PRISMA 2020 items 23b to 23d, which published reviews give their own headings. Runs made before they were
+   written have none of them; 23c is written in code from the run's facts. *@
+@{ int discussionPart = 1; }
+@if (!string.IsNullOrWhiteSpace(Page.report.EvidenceLimitationsItem))
+{
+    <div class="space-y-2">
+        <h3 class="font-display text-base font-semibold text-heading">5.@(++discussionPart) Limitations of the Evidence (Item 23b)</h3>
+        @Page.CitedText("evidenceLimitationsItem", Page.report.EvidenceLimitationsItem)
+    </div>
+}
+@if (!string.IsNullOrWhiteSpace(Page.report.ReviewLimitationsItem))
+{
+    <div class="space-y-2">
+        <h3 class="font-display text-base font-semibold text-heading">5.@(++discussionPart) Limitations of the Review Process (Item 23c)</h3>
+        <p class="text-ink">@Page.report.ReviewLimitationsItem</p>
+    </div>
+}
+@if (!string.IsNullOrWhiteSpace(Page.report.ImplicationsItem))
+{
+    <div class="space-y-2">
+        <h3 class="font-display text-base font-semibold text-heading">5.@(++discussionPart) Implications for Practice and Policy (Item 23d)</h3>
+        @Page.CitedText("implicationsItem", Page.report.ImplicationsItem)
+    </div>
+}
+@if (!string.IsNullOrWhiteSpace(Page.report.FutureResearchItem))
+{
+    <div class="space-y-2">
+        <h3 class="font-display text-base font-semibold text-heading">5.@(discussionPart + 1) Directions for Future Research (Item 23d)</h3>
+        @Page.CitedText("futureResearchItem", Page.report.FutureResearchItem)
+    </div>
+}
+
+</section>
+
+@{ int declarationsNumber = AuBtechReviewAgent.ReportOutline.DeclarationsNumber(Page.report); }
+@if (AuBtechReviewAgent.ReportOutline.HasConclusion(Page.report))
+{
+    <section id="@AuBtechReviewAgent.ReportOutline.ConclusionId" data-report-section class="scroll-mt-20 space-y-5">
+        <h2 class="font-display text-xl font-semibold tracking-tight text-heading">6. Conclusion</h2>
+        @foreach (var answer in Page.report.ResearchAnswers ?? new List<ResearchAnswer>())
+        {
+            <div class="space-y-2">
+                <h3 class="font-display text-base font-semibold text-heading">RQ@(answer.Number). @answer.Question</h3>
+                @Page.CitedText($"researchAnswer{answer.Number}", answer.Answer)
+            </div>
+        }
+        <div class="space-y-2">
+            @Page.CitedText("conclusionItem", Page.report.ConclusionItem)
+        </div>
+    </section>
+}
+
+<section id="@AuBtechReviewAgent.ReportOutline.DeclarationsId" data-report-section class="scroll-mt-20 space-y-5">
+    <h2 class="font-display text-xl font-semibold tracking-tight text-heading">@(declarationsNumber). Declarations</h2>
+
+<div class="space-y-2">
+    <h3 class="font-display text-base font-semibold text-heading">@(declarationsNumber).1 Registration and Protocol (Item 24)</h3>
+    <p class="text-ink">
+        @(string.IsNullOrWhiteSpace(Page.report.ProtocolItem) ? AuBtechReviewAgent.PrismaReviewEngine.NoProtocolText : Page.report.ProtocolItem)
+        @if (Page.hasProtocol)
+        {
+            <a class="text-heading underline ml-1" href="@($"/api/workspace/{Page.State.CurrentSessionId}/protocol.md")" target="_blank">Open protocol.md</a>
+        }
+    </p>
+</div>
+
+<div class="space-y-2">
+    <h3 class="font-display text-base font-semibold text-heading">@(declarationsNumber).2 Support & Funding (Item 25)</h3>
+    <p class="text-ink">@SpecMatrix.ScrubAnchors(Page.report.SupportItem)</p>
+</div>
+
+<div class="space-y-2">
+    <h3 class="font-display text-base font-semibold text-heading">@(declarationsNumber).3 Availability of Data and Code (Item 27)</h3>
+    <p class="text-ink">@SpecMatrix.ScrubAnchors(Page.report.AvailabilityItem)</p>
+</div>
+
+@if (Page.aiStatement.Length > 0)
+{
+    @* Ready to copy into a paper or thesis; built only from what the run recorded (AiUseStatement). *@
+    <div class="space-y-2" id="ai-use">
+        <div class="flex flex-wrap items-center justify-between gap-2">
+            <h3 class="font-display text-base font-semibold text-heading">@(declarationsNumber).4 Use of Artificial Intelligence</h3>
+            <span class="flex flex-wrap gap-2 print:hidden">
+                <button type="button" class="ui-btn-secondary ui-btn-sm min-h-[44px]" @onclick='EventCallback.Factory.Create(Page, () => Page.CopyStatement(Page.aiStatement, "Methods statement"))'>Copy for the methods</button>
+                <button type="button" class="ui-btn-secondary ui-btn-sm min-h-[44px]" @onclick='EventCallback.Factory.Create(Page, () => Page.CopyStatement(Page.aiShort, "Short declaration"))'>Copy a short declaration</button>
+            </span>
+        </div>
+        <p class="text-ink">@Page.aiStatement</p>
+        <p class="text-xs text-muted print:hidden" role="status">@(Page.copyNotice ?? "Edit it to fit your venue's policy on AI use before you submit.")</p>
+    </div>
+}
+</section>
+
+@code {
+    [Parameter, EditorRequired] public SpecMatrix Page { get; set; } = default!;
+}
