@@ -1,0 +1,62 @@
+@* The source funnel of a review with both pools (block I-6): the grey and the academic pool side by side, from the
+   search to the extraction, each count from MultivocalPools. The themes and the paper follow below it, for both. *@
+
+<table class="w-full text-xs">
+    <caption class="sr-only">Sources of each pool from the search to the extraction</caption>
+    <thead class="text-left text-muted">
+        <tr><th class="py-1 pr-2 font-medium">Step</th><th class="py-1 pr-2 font-medium text-right">Grey</th><th class="py-1 font-medium text-right">Academic</th></tr>
+    </thead>
+    <tbody>
+        @Row("Found", Grey.Identified, Formal.Identified, true)
+        @if (Formal.DuplicatesRemoved + Formal.NoAddressRemoved > 0)
+        {
+            @Row("− Duplicates by DOI or title", null, Formal.DuplicatesRemoved, false)
+            @Row("− No web address to cite", null, Formal.NoAddressRemoved, false)
+        }
+        @if (Screened)
+        {
+            @Row("− Same title, screened once", Grey.DuplicatesAtScreening, Formal.DuplicatesAtScreening, false)
+            @if (Grey.NotScreened + Formal.NotScreened > 0)
+            {
+                @Row("− Could not be screened", Grey.NotScreened, Formal.NotScreened, false)
+            }
+            @Row("Screened twice", Grey.Screened, Formal.Screened, true)
+            <tr class="border-t border-line text-muted">
+                <th scope="row" class="py-1 pr-2 font-normal pl-3">Agreement (κ)@(Kappa is double both ? $"; both {both:0.00}" : "")</th>
+                <td class="py-1 pr-2 text-right font-mono">@KappaText(Grey.Kappa)</td>
+                <td class="py-1 text-right font-mono">@KappaText(Formal.Kappa)</td>
+            </tr>
+            @Row("− Excluded", Grey.Excluded, Formal.Excluded, false)
+            @Row("Included", Grey.Included, Formal.Included, true)
+        }
+        @if (Assessed)
+        {
+            @Row("− Below the quality threshold", Grey.BelowThreshold, null, false)
+            @Row("− Not assessed", Grey.NotAssessed, Formal.NotAssessed, false)
+            @Row("Kept: grey passed Table 7, academic appraised with MMAT", Grey.Kept, Formal.Kept, true)
+        }
+        @if (Extracted)
+        {
+            @Row("Extracted", Grey.Extracted, Formal.Extracted, true)
+            @Row("of which on the abstract only", null, Formal.AbstractOnly, false)
+        }
+    </tbody>
+</table>
+
+@code {
+    [Parameter, EditorRequired] public AuBtechReviewAgent.PoolCounts Grey { get; set; } = default!;
+    [Parameter, EditorRequired] public AuBtechReviewAgent.PoolCounts Formal { get; set; } = default!;
+    [Parameter] public double? Kappa { get; set; }
+    [Parameter] public bool Screened { get; set; }
+    [Parameter] public bool Assessed { get; set; }
+    [Parameter] public bool Extracted { get; set; }
+
+    private static string KappaText(double? kappa) => kappa is double k ? k.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture) : "–";
+
+    private static RenderFragment Row(string step, int? grey, int? formal, bool main) =>
+        @<tr class="@(main ? "border-t border-line text-ink font-medium" : "border-t border-line text-muted")">
+            <th scope="row" class="@(main ? "py-1 pr-2 font-medium" : "py-1 pr-2 font-normal pl-3")">@step</th>
+            <td class="py-1 pr-2 text-right font-mono">@(grey?.ToString() ?? "–")</td>
+            <td class="py-1 text-right font-mono">@(formal?.ToString() ?? "–")</td>
+        </tr>;
+}
