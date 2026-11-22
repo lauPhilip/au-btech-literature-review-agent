@@ -1,0 +1,77 @@
+@* A source's quality score on the Sources found tab: its points, each checklist answer of Table 7 with its reason
+   and quote, an opinion piece's claim with the critical questions (G13), or why it was not assessed. *@
+
+<details class="mt-1 text-[11px] text-ink">
+    <summary class="cursor-pointer select-none">
+        <span class="@MultivocalStart.QualityChip(Score.Outcome) text-[10px]">@(Score.Outcome == "Not assessed" ? "Quality not assessed" : $"Quality {Score.Points:0.#} of {AuBtechReviewAgent.GreyQualityChecklist.MaxPoints}")</span>
+    </summary>
+    @if (Score.NotAssessed != null)
+    {
+        <p class="mt-1">Not assessed: @Score.NotAssessed.</p>
+        @if (CanRetry)
+        {
+            string address = Score.Address;
+            <button type="button" class="ui-btn-secondary ui-btn-sm mt-1" disabled="@(Retrying == address)" @onclick="() => OnRetry.InvokeAsync(address)">@(Retrying == address ? "Assessing…" : "Try again")</button>
+        }
+    }
+    else
+    {
+        <table class="w-full mt-1">
+            <caption class="sr-only">@($"Quality checklist answers for {Title}")</caption>
+            <tbody>
+                @foreach (var item in AuBtechReviewAgent.GreyQualityChecklist.Items)
+                {
+                    var answer = Score.Answers.FirstOrDefault(x => x.Id == item.Id);
+                    <tr class="border-t border-line align-top">
+                        <th scope="row" class="py-1 pr-2 font-normal text-muted w-8">@item.Id</th>
+                        <td class="py-1 pr-2">
+                            <span class="text-ink">@item.Question</span>
+                            @if (answer != null)
+                            {
+                                <span class="block text-muted">@answer.Reason</span>
+                                @if (answer.Quote != null && answer.Basis == "model")
+                                {
+                                    <q class="block text-muted italic">@answer.Quote</q>
+                                }
+                            }
+                        </td>
+                        <td class="py-1 text-right font-medium whitespace-nowrap">@(answer?.Score.ToString("0.#") ?? "–")@(answer?.Basis == "code" ? " (code)" : "")</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+        @if (Score.Argument is { } argument)
+        {
+            <div class="mt-2 border-t border-line pt-2">
+                <p class="font-medium text-ink">Opinion piece: its claim and the critical questions (G13)</p>
+                <q class="block italic text-muted mt-0.5">@argument.Claim</q>
+                @if (!argument.ClaimFound)
+                {
+                    <p class="text-partly">This claim was not found word for word in the page.</p>
+                }
+                <dl class="mt-1 space-y-1">
+                    @foreach (var question in argument.Questions)
+                    {
+                        <div>
+                            <dt class="text-ink">@question.Question</dt>
+                            <dd class="text-muted">@question.Answer</dd>
+                            @if (question.Quote != null && question.Basis == "model")
+                            {
+                                <dd><q class="italic text-muted">@question.Quote</q></dd>
+                            }
+                        </div>
+                    }
+                </dl>
+            </div>
+        }
+    }
+</details>
+
+@code {
+    [Parameter, EditorRequired] public AuBtechReviewAgent.GreyQuality Score { get; set; } = default!;
+    [Parameter] public string Title { get; set; } = "";
+    // Whether "Try again" is offered: only in the browser that planned the run, while it stands after the quality check.
+    [Parameter] public bool CanRetry { get; set; }
+    [Parameter] public string? Retrying { get; set; }
+    [Parameter] public EventCallback<string> OnRetry { get; set; }
+}
