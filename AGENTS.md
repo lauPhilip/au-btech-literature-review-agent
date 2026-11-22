@@ -19,7 +19,7 @@ CI fails when `wwwroot/css/tailwind.css` is out of date, so rebuild and commit i
 |---|---|
 | A database or how it is queried | `Sources/` (add a class implementing `IAcademicSource`, list it in `SourceCatalog.cs` and create it in `Pipeline/PrismaReviewEngine.cs`) |
 | Search strings, duplicates, citation chaining | `Search/` |
-| The screening prompt or decisions | `Screening/PrismaReviewEngine.Screening.cs`, and raise `ScreeningPromptVersion` |
+| The screening prompt or decisions | `Screening/PrismaReviewEngine.ScreeningPrompt.cs` and `PrismaReviewEngine.Screening.cs`, and raise `ScreeningPromptVersion` |
 | Full texts, extraction, MMAT | `Evidence/` |
 | Themes, the written sections, the artifact | `Synthesis/` |
 | How citations are checked or repaired | `Verification/` (start at `Grounding.cs`; the repair is `CitationRepairer.cs`) |
