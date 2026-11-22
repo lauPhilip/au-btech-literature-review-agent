@@ -70,6 +70,18 @@ public static partial class ReviewWriter
     }
 
     /// <summary>
+    /// The prompt rule that writes each claim so its citation can back it (issue #248). The citation check judges the
+    /// part of a sentence attributed to each source, and calls it partly supported when that part adds a number, a
+    /// qualifier, a scope, a causal link or a comparison the source does not state; a claim several sources are
+    /// cited for together must be in each of them. Those are the claims the live runs lost after the repair.
+    /// </summary>
+    public static string ClaimPerCitationRule(WritingProfile profile) =>
+        $"Write so that each citation backs exactly what it is attached to: put a marker right after the claim it supports, one finding per citation, and cite several {profile.Sources} together only when each of them states the whole claim. " +
+        $"When {profile.Sources} differ, give each its own claim and marker (\"one reports X [1], while another reports Y [2]\"); never attribute a comparison, ranking or trend across {profile.Sources} to a {profile.Source} that does not make it itself. " +
+        $"Use no number, count or proportion (\"three approaches\", \"most {profile.Sources}\", \"four of six\") unless it is in the evidence or the facts above; a count of this review's own {profile.Sources} comes from those facts and takes no citation. " +
+        $"Do not add a qualifier (\"always\", \"all\", \"widely\"), a scope or a causal link that the {profile.Source} does not state.";
+
+    /// <summary>
     /// Writes one subsection per theme, at most <paramref name="parallelism"/> at a time, assembled in theme order.
     /// A theme that cannot be written is left out and its coverage says so.
     /// </summary>
@@ -140,6 +152,7 @@ public static partial class ReviewWriter
             3. Every sentence that states a finding, comparison or claim from the literature ends with an inline marker like [3] or [2, 5]. Attribute to a {{s}} only what its findings or excerpts above actually say; prefer the verified findings. Do not invent numbers, statistics or venue names.
             4. "heading" is a short subsection title for the theme (at most 10 words, no numbering).
             5. {{ReadingBasisRule(profile)}}
+            6. {{ClaimPerCitationRule(profile)}}
             {{ProseCleaner.PlainProseRule}}
             Respond ONLY with a valid minified JSON object:
             {"heading":"...","text":"the subsection with inline [n] citations"}
@@ -195,6 +208,7 @@ public static partial class ReviewWriter
 
                 TASK: Integrate the {{ss}} {{string.Join(", ", missing.Select(r => $"[{r}]"))}} where their evidence fits: add them to the comparisons that already exist, or add sentences that relate them to the {{ss}} already discussed. Attribute to them only what their evidence above says. Keep every existing citation. If the evidence of a {{s}} does not support any statement about this theme, leave it out rather than inventing one.
                 {{ReadingBasisRule(profile)}}
+                {{ClaimPerCitationRule(profile)}}
                 {{ProseCleaner.PlainProseRule}}
                 Respond ONLY with a valid minified JSON object:
                 {"text":"the revised subsection with inline [n] citations"}
