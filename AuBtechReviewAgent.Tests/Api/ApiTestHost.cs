@@ -1,4 +1,6 @@
 using System.Collections.Concurrent;
+using System.Net.Http.Json;
+using System.Text.Json;
 using System.Text;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -71,6 +73,23 @@ internal sealed class ApiTestHost : WebApplicationFactory<Program>
     {
         var until = DateTime.UtcNow + timeout;
         while (Engine.IsRunActive(runId) && DateTime.UtcNow < until) await Task.Delay(200);
+    }
+
+    /// <summary>Starts a review through the API with the given key and waits until it has finished; returns its id.</summary>
+    public async Task<Guid> RunReviewAsync(HttpClient client, string key)
+    {
+        using var response = await ReviewApiTests.PostAsync(client, ReviewApiTests.GoodBody(), key);
+        response.EnsureSuccessStatusCode();
+        var id = (await response.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
+        var until = DateTime.UtcNow.AddSeconds(90);
+        while (DateTime.UtcNow < until)
+        {
+            var status = await client.GetFromJsonAsync<JsonElement>($"/api/v1/reviews/{id}");
+            if (PrismaReviewEngine.IsFinishedStage(status.GetProperty("stage").GetString())) break;
+            await Task.Delay(750);
+        }
+        await WaitForRunAsync(id, TimeSpan.FromSeconds(30));
+        return id;
     }
 
     protected override void Dispose(bool disposing)

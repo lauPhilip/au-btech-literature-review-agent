@@ -12,6 +12,8 @@ The API is off in production until Lau turns it on. `Program.cs` reads the switc
 |---|---|
 | `POST /api/v1/reviews` with the caller's key in `X-Mistral-Key` | 202 with the run id, the edit key, the stage and the addresses to follow |
 | `GET /api/v1/reviews/{id}` | 200 with the stage, the step of seven, the progress, the counts and, when done, the verdicts and the downloads |
+| `GET /api/v1/reviews/{id}/report` | 200 with the finished report as data; 409 while the review is not complete |
+| `GET /openapi/v1.json` | The OpenAPI description of these three calls |
 
 The body of a start holds the New review form's fields as JSON. Only `searchWords` and `inclusion` are required, as on the form.
 
@@ -33,6 +35,21 @@ A start goes through the same checks as the form. `ReviewApi.Start` builds the s
 
 The status counts the seven steps the run view shows (`ReviewSteps`): `step` is 0 while the run waits for a slot, 1 to 7 while it works, and 7 when it is done, with `stepName` and `percent` beside it. It reads the live counters while the run is going here and the ledger otherwise. Once the run is complete, `verdicts` holds the tally of the citation checks and `downloads` the archive, the references as BibTeX and RIS, every screened record and the protocol. Anyone with a run's id can read its status, as anyone with its link can open its page. The edit key in the answer to a start is the only one there is, as on the form.
 
+## The report as data
+
+`GET /api/v1/reviews/{id}/report` returns what the Review output page shows, read from the run's files only: `prisma-report.json`, `citation-audit.json` and the ledger. Nothing is written or asked of the model for the API, and text is cleaned of its markers just as the page cleans it (`SpecMatrix.ScrubAnchors`). `ReviewApi.Report.cs` builds it.
+
+| Part | What it holds |
+|---|---|
+| `title`, `abstract` | As on the page |
+| `sections` | Every section in the order of `ReportOutline.Systematic`, with its id, heading, level (2 for a theme under section 4) and text; the included studies and the appendix are tables on the page, so their text is empty and their data is in `references` and `prisma` |
+| `citations` | Every checked citation: reference number, section, sentence, verdict, reason, what the check could see, and the quote when it was found word for word (`quoteVerified`), with the source's link |
+| `references` | The reference list, numbered as on the page, with the DOI and a web address (only `http` or `https`, `IsWebAddress`) |
+| `prisma` | The counts of the PRISMA 2020 flow diagram (`PrismaFlowCounts`) |
+| `appVersion`, `protocolFingerprint`, `protocolSha256` | The app version that made the run and the fingerprints of its protocol |
+
+The OpenAPI description at `/openapi/v1.json` is made by `Microsoft.AspNetCore.OpenApi` from the routes themselves, so it cannot drift from them. It covers only the routes under `/api/v1`, and it is mapped behind the same switch.
+
 Every error is a problem detail (RFC 9457, `application/problem+json`) with a title and a sentence in plain English. `ApiProblems.cs` holds all of them.
 
 | Status | When |
@@ -40,6 +57,7 @@ Every error is a problem detail (RFC 9457, `application/problem+json`) with a ti
 | 400 | The body is missing, not JSON, larger than 64 KB, or a field is wrong; `errors` lists each one |
 | 401 | There is no usable key in `X-Mistral-Key` |
 | 404 | No run with this id, or a run of another kind of review |
+| 409 | The report was asked for before the review was complete |
 | 422 | A field reads like an instruction to the model; `flags` lists them |
 | 429 | Too many calls or too many reviews started; `Retry-After` says when to try again |
 | 503 | The server runs a local model, so a review could not use the caller's key |
@@ -58,4 +76,4 @@ Two limits guard the API. Each call counts once per client address and once per 
 
 ## Security notes
 
-The API adds two addresses and changes none of the rules in `AGENTS.md`. What a caller sends is data: it passes `ReviewInputGuard`, it goes into prompts only through `PromptSafety`, and every model answer is still checked in code. Run ids are GUIDs in the route (`{id:guid}`), so no caller text reaches a path. The log lines the API writes hold only a run id and an exception's type. The answers are sent with `Cache-Control: no-store`, because a start carries the edit key.
+The API adds two addresses and changes none of the rules in `AGENTS.md`. What a caller sends is data: it passes `ReviewInputGuard`, it goes into prompts only through `PromptSafety`, and every model answer is still checked in code. Run ids are GUIDs in the route (`{id:guid}`), so no caller text reaches a path. The log lines the API writes hold only a run id and an exception's type. The answers are sent with `Cache-Control: no-store`, because a start carries the edit key. For the same reason the answer to a start is never compressed (`ResponseCompressionSetup.DoNotCompress`): over HTTPS, compressing a secret next to text the caller chose opens the BREACH attack.

@@ -26,6 +26,12 @@ public static class ApiProblems
     public static ApiProblem TooManyCalls() => new(429, "Too many calls",
         "Slow down a little. This key or this address has made too many calls in the last minute.");
 
+    public static ApiProblem NotReady(string stage) => new(409, "The report is not ready",
+        PrismaReviewEngine.IsFinishedStage(stage)
+            ? $"The review ended as \"{stage}\" without a report. Its status says why."
+            : "The review is still running. Follow its status, and ask again when the stage is \"Complete\".",
+        new Dictionary<string, object?> { ["stage"] = stage });
+
     public static ApiProblem NoRun() => new(404, "No review with this id",
         "There is no review with this id. Runs are deleted some days after they finish.");
 

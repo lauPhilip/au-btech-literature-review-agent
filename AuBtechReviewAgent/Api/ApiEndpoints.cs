@@ -30,14 +30,21 @@ public static class ApiEndpoints
     /// <summary>The largest request body a review start may have; the form's fields together are far smaller.</summary>
     public const int MaxBodyBytes = 64 * 1024;
 
+    /// <summary>Where the OpenAPI description of the API is served (Microsoft.AspNetCore.OpenApi's default address).</summary>
+    public const string OpenApiPath = "/openapi/v1.json";
+
     private static bool IsApiPath(PathString path) =>
-        path.StartsWithSegments("/api/v1", StringComparison.OrdinalIgnoreCase) || path.StartsWithSegments("/mcp", StringComparison.OrdinalIgnoreCase);
+        path.StartsWithSegments("/api/v1", StringComparison.OrdinalIgnoreCase) || path.StartsWithSegments("/mcp", StringComparison.OrdinalIgnoreCase)
+        || path.StartsWithSegments("/openapi", StringComparison.OrdinalIgnoreCase);
 
     public static IServiceCollection AddReviewApi(this IServiceCollection services)
     {
         var fingerprint = new ApiKeyFingerprint();
         services.AddSingleton(fingerprint);
         services.AddSingleton<ReviewApi>();
+        // The description covers the API's own routes only, not the site's downloads or health check.
+        services.AddOpenApi(options => options.ShouldInclude = description =>
+            description.RelativePath?.StartsWith("api/v1/", StringComparison.OrdinalIgnoreCase) == true);
         // Every call counts once per client address and once per key (an HMAC, never the key itself). The
         // limiter only looks at the API's own addresses; the site and its downloads keep their own limits.
         services.Configure<RateLimiterOptions>(options =>
@@ -79,6 +86,8 @@ public static class ApiEndpoints
 
         api.MapPost("/reviews", async (HttpContext context, ReviewApi reviews) =>
         {
+            // The answer holds the edit key, so it is never compressed (BREACH; see ResponseCompressionSetup).
+            ResponseCompressionSetup.DoNotCompress(context);
             var (body, problem) = await ReadBodyAsync(context.Request);
             if (problem != null) return Problem(problem);
             var result = reviews.Start(body, KeysFrom(context.Request),
@@ -90,10 +99,24 @@ public static class ApiEndpoints
                 return Problem(result.Problem);
             }
             return Results.Accepted(result.Value!.Links.Status, result.Value);
-        });
+        })
+            .WithName("StartReview").WithSummary("Start a systematic review with your own Mistral key (X-Mistral-Key).")
+            .Accepts<StartReviewBody>("application/json")
+            .Produces<ReviewStarted>(StatusCodes.Status202Accepted)
+            .ProducesProblem(StatusCodes.Status400BadRequest).ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status422UnprocessableEntity).ProducesProblem(StatusCodes.Status429TooManyRequests)
+            .ProducesProblem(StatusCodes.Status503ServiceUnavailable);
 
         api.MapGet("/reviews/{id:guid}", (Guid id, HttpContext context, ReviewApi reviews) =>
-            ToResult(reviews.Status(id, SiteSeo.BaseUrl(configuration, context.Request))));
+            ToResult(reviews.Status(id, SiteSeo.BaseUrl(configuration, context.Request))))
+            .WithName("GetReviewStatus").WithSummary("Where a review stands: its stage, the step of seven and its counts.")
+            .Produces<ReviewStatus>().ProducesProblem(StatusCodes.Status404NotFound);
+
+        api.MapGet("/reviews/{id:guid}/report", (Guid id, ReviewApi reviews) => ToResult(reviews.Report(id)))
+            .WithName("GetReviewReport").WithSummary("The finished report as data: sections, every citation with its verdict and quote, references and PRISMA counts.")
+            .Produces<ApiReviewReport>().ProducesProblem(StatusCodes.Status404NotFound).ProducesProblem(StatusCodes.Status409Conflict);
+
+        app.MapOpenApi(); // at OpenApiPath
 
         return app;
     }
