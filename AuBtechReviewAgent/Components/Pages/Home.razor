@@ -170,83 +170,7 @@
 }
 else
 {
-    @* Running and Done (redesign step 7): RunProgressPanel shows a run that is going, waiting or stopped, and
-       RunSummaryCard a finished one, each in the same centred column as the composer with a side column beside it.
-       The page adds what only it knows: the reason a run stopped, the browser notification, the human screening
-       check, the live log, the PRISMA funnel, and the run's own card with its link, settings, Delete and New review. *@
-    @* Screen readers hear the step changes and the end of the run, not every percent (WCAG 4.1.3). *@
-    <p class="sr-only" role="status" aria-live="polite">@Announcement()</p>
-    @if (!string.IsNullOrEmpty(quotaNotice))
-    {
-        <p class="mx-auto mt-4 max-w-[760px] px-4 text-xs text-not-supported" role="alert">@quotaNotice</p>
-    }
-    @if (stage == AuBtechReviewAgent.PrismaReviewEngine.StageComplete)
-    {
-        <RunSummaryCard Stats="State.Stats" RunId="currentSessionId" Objective="@ObjectiveShown()">
-            <Main>@LogPanel()</Main>
-            <Side>@RunCard()</Side>
-        </RunSummaryCard>
-    }
-    else
-    {
-        <RunProgressPanel Stats="State.Stats" Stage="@stage" Running="isSearching" QueuePosition="queuePosition" CompletedUtc="completedUtc"
-                          Objective="@ObjectiveShown()" SourceCount="SourcesShown().Count" LogShown="showLog" OnShowLog="ToggleLog">
-            <Notice>
-                @if (!string.IsNullOrEmpty(failureMessage))
-                {
-                    <div class="mt-4 rounded-field border border-not-supported-border bg-not-supported-fill p-3 text-sm text-not-supported" role="alert">
-                        <p>@failureMessage</p>
-                        @if (stage is AuBtechReviewAgent.PrismaReviewEngine.StageFailed or AuBtechReviewAgent.PrismaReviewEngine.StageInterrupted)
-                        {
-                            <p class="mt-1.5 text-xs">
-                                Run <span class="font-mono select-all">@currentSessionId</span> · version @AppVersionShort ·
-                                <a href="@AuBtechReviewAgent.SiteSeo.ProblemReportUrl(currentSessionId, AppVersionShort, stage)" target="_blank" rel="noopener" class="font-semibold underline underline-offset-2">Report this problem</a>
-                                (the report includes the run ID and version, not your question)
-                            </p>
-                        }
-                    </div>
-                }
-            </Notice>
-            <Notify>
-                @if (isSearching && notifyPermission is "default" or "granted")
-                {
-                    @* Runs take minutes; people switch tabs. The tab title shows the progress, and this asks the browser to say when it is done. *@
-                    @if (notifyPermission == "granted")
-                    {
-                        <p class="mt-2 text-sm text-muted">You will get a browser notification when the review is ready, if this tab is in the background.</p>
-                    }
-                    else
-                    {
-                        <button type="button" @onclick="AskForNotification" class="ui-btn-secondary mt-3 min-h-[44px] w-full">Notify me when it is ready</button>
-                    }
-                }
-            </Notify>
-            <Main>
-                @if (awaitingReview && reviewLogs != null)
-                {
-                    @if (canEdit)
-                    {
-                        <div class="ui-card mt-4 flex h-[70vh] flex-col overflow-hidden">
-                            <ScreeningReviewPanel RunId="currentSessionId" EditKey="@editKey" Logs="reviewLogs" OnSubmitted="OnScreeningReviewSubmitted" />
-                        </div>
-                    }
-                    else
-                    {
-                        <p class="ui-card mt-4 p-4 text-sm text-ink">This run is waiting for the person who started it to check the screening decisions. Only the browser that started a run can do that.</p>
-                    }
-                }
-                @LogPanel()
-                <details class="ui-card mt-4 p-4 max-sm:hidden sm:p-5" open>
-                    <summary class="flex min-h-[44px] cursor-pointer items-center font-display text-sm font-semibold text-heading">Records so far</summary>
-                    <div class="mt-2">
-                        <PrismaFunnel Stats="State.Stats" Removed="State.RemovedBeforeScreening" Running="isSearching"
-                                      Yields="State.SearchStringYields" ExclusionGroups="State.ExclusionGroups" />
-                    </div>
-                </details>
-            </Main>
-            <Side>@RunCard()</Side>
-        </RunProgressPanel>
-    }
+    <HomeRunView Page="this" />
 }
 
 @if (showKeyModal)
@@ -301,7 +225,7 @@ else
 @code {
     // The fragments with markup stay here; the rest of the page is in the Home.*.cs partial files.
     /// <summary>The run's ledger as JSON, shown under the steps or the result when asked for.</summary>
-    private RenderFragment LogPanel() => __builder =>
+    internal RenderFragment LogPanel() => __builder =>
     {
         if (showLog)
         {
@@ -319,7 +243,7 @@ else
     /// The run's own card: its link with Copy, who can change it and how long it is kept, what was asked, the ledger
     /// of a finished run, New review, and Delete or the read-only note. Hidden on a phone while the run is going.
     /// </summary>
-    private RenderFragment RunCard() => __builder =>
+    internal RenderFragment RunCard() => __builder =>
     {
         bool finished = !isSearching && AuBtechReviewAgent.PrismaReviewEngine.IsFinishedStage(stage);
         var questions = runInfo?.ResearchQuestions ?? AuBtechReviewAgent.ReviewInputGuard.ResearchQuestionLines(researchQuestionsText);
@@ -388,7 +312,7 @@ else
     /// One switch in the advanced options: the checkbox, its label, a "?" with the glossary explanation (outside
     /// the label, so it does not toggle the box) and one line of help that screen readers read with the box.
     /// </summary>
-    private RenderFragment Option(string id, string? glossaryKey, string label, string help, bool value, Action<bool> set) => __builder =>
+    internal RenderFragment Option(string id, string? glossaryKey, string label, string help, bool value, Action<bool> set) => __builder =>
     {
         <div class="flex items-start gap-3">
             <input id="@id" type="checkbox" checked="@value" disabled="@isSearching" aria-describedby="@($"{id}-help")"
@@ -404,7 +328,7 @@ else
         </div>
     };
 
-    private static RenderFragment SettingRow(string label, string? value) => __builder =>
+    internal static RenderFragment SettingRow(string label, string? value) => __builder =>
     {
         <div class="grid grid-cols-[5.5rem_1fr] gap-2">
             <dt class="text-muted">@label</dt>
