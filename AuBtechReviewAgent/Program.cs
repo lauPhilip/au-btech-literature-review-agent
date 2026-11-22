@@ -65,13 +65,11 @@ builder.Services.AddSingleton(new AuBtechReviewAgent.RunQuotaService(
     quotaOptions, builder.Environment.IsDevelopment(), builder.Environment.ContentRootPath));
 builder.Services.AddHttpContextAccessor();
 
-// Add standard interactive services to the container
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
 builder.Services.AddScoped<AuBtechReviewAgent.UiStateContainer>();
 
-// Read global environment configuration fallback boundaries securely
 // Language model: Mistral (default) or any OpenAI-compatible server, e.g. a local Ollama (see the Llm section).
 var llmOptions = builder.Configuration.GetSection("Llm").Get<AuBtechReviewAgent.LlmOptions>() ?? new AuBtechReviewAgent.LlmOptions();
 string mistralApiKey = builder.Configuration["MISTRAL_API_KEY"] ?? "";
@@ -149,7 +147,6 @@ reviewEngine.AddCanceller(multivocalRunner.Cancel); // so CancelRun reaches grey
 // Modules shown as a preview while they are being built (Development only; see ReviewModulesOptions).
 builder.Services.AddSingleton(AuBtechReviewAgent.ReviewModulesOptions.From(builder.Configuration, builder.Environment.IsDevelopment()));
 
-// Register the storage cleanup background worker
 builder.Services.AddHostedService<AuBtechReviewAgent.SessionCleanupWorker>();
 // The REST API and the MCP server: off in production until Api:Enabled is set (Api/README.md).
 bool apiEnabled = builder.Configuration.GetValue("Api:Enabled", builder.Environment.IsDevelopment());
@@ -203,7 +200,6 @@ AuBtechReviewAgent.ResponseCompressionSetup.UseTextCompression(app);
 app.UseAntiforgery();
 app.MapStaticAssets();
 
-// Apply the rate limiter policies to the application pipeline routing channel
 app.UseRateLimiter();
 
 // The run downloads, with Last-Modified, an ETag and the kept archive of a finished run (Web/WorkspaceDownloads.cs).
