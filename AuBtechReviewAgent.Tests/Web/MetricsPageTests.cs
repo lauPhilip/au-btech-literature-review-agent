@@ -73,8 +73,9 @@ public class MetricsPageTests
     [Fact]
     public void ThePageHasTheFiguresTheJumpLinksAndTheThreeTablesWithTotals()
     {
-        string? page = Source("Pages", "Metrics.razor");
-        if (page == null) return; // not run from the repository (packaged tests)
+        // The page is its markup and its code-behind together.
+        string? page = Source("Pages", "Metrics.razor") + Source("Pages", "Metrics.razor.cs");
+        if (string.IsNullOrEmpty(page)) return; // not run from the repository (packaged tests)
 
         Assert.Contains("How well the citations hold up", page);
         foreach (string id in new[] { "chart", "shares", "run-data", "by-version" })
