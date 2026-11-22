@@ -93,30 +93,6 @@ public partial class PrismaReviewEngine
         _supportStatement = string.IsNullOrWhiteSpace(supportStatement) ? DefaultSupportStatement : supportStatement.Trim();
     }
 
-    /// <summary>
-    /// For each gateway in SourceCatalog: can it be queried with the server keys plus the user's own keys?
-    /// Used by the dashboard to grey out sources that have no key.
-    /// </summary>
-    public IReadOnlyDictionary<string, bool> GetSourceAvailability(UserApiKeys? userKeys)
-    {
-        var keys = ResolveKeys(userKeys);
-        return SourceCatalog.All.ToDictionary(
-            s => s.Key,
-            s => s.KeyKind switch
-            {
-                SourceKeyKind.None => true,
-                SourceKeyKind.Elsevier => SourceCatalog.IsUsableKey(keys.Elsevier),
-                SourceKeyKind.Ieee => SourceCatalog.IsUsableKey(keys.Ieee),
-                _ => false
-            });
-    }
-
-    private (string Mistral, string Elsevier, string? Ieee, string? Scholar) ResolveKeys(UserApiKeys? userKeys) => (
-        !string.IsNullOrWhiteSpace(userKeys?.MistralApiKey) ? userKeys.MistralApiKey : _globalMistralKey,
-        !string.IsNullOrWhiteSpace(userKeys?.ElsevierApiKey) ? userKeys.ElsevierApiKey : _globalElsevierKey,
-        !string.IsNullOrWhiteSpace(userKeys?.IeeeApiKey) ? userKeys.IeeeApiKey : _globalIeeeKey,
-        !string.IsNullOrWhiteSpace(userKeys?.ScholarApiKey) ? userKeys.ScholarApiKey : _globalScholarKey);
-
     /// <summary>Default Mistral model (Llm:Model overrides it for a run; kept for tools/ScreeningEval).</summary>
     public const string ModelId = "mistral-large-latest";
 
@@ -330,54 +306,6 @@ public partial class PrismaReviewEngine
         }
     }
 
-    /// <summary>
-    /// Computes run-metrics.json from the run's own files and appends it to the metrics store. Never fails
-    /// the run: metrics are a by-product.
-    /// </summary>
-    private async Task WriteRunMetricsAsync(RunContext ctx)
-    {
-        try
-        {
-            PrismaReport? report = null;
-            string reportPath = GetReportFilePath(ctx.RunId);
-            if (File.Exists(reportPath))
-                report = JsonSerializer.Deserialize<PrismaReport>(await File.ReadAllTextAsync(reportPath));
-
-            var checks = new List<CitationSupportResult>();
-            CitationSupportSummary? initial = null;
-            int stripped = 0;
-            string auditPath = Path.Join(ctx.Workspace, "citation-audit.json");
-            if (File.Exists(auditPath))
-            {
-                using var doc = JsonDocument.Parse(await File.ReadAllTextAsync(auditPath));
-                var root = doc.RootElement;
-                if (root.TryGetProperty("SupportChecks", out var c)) checks = JsonSerializer.Deserialize<List<CitationSupportResult>>(c.GetRawText()) ?? new();
-                if (root.TryGetProperty("InitialSupportSummary", out var i)) initial = JsonSerializer.Deserialize<CitationSupportSummary>(i.GetRawText());
-                if (root.TryGetProperty("InvalidMarkersStripped", out var st) && st.TryGetInt32(out int n)) stripped = n;
-            }
-
-            var settings = new Dictionary<string, string>
-            {
-                ["Synthesis.ThematicSynthesis"] = Synthesis.ThematicSynthesis.ToString(),
-                ["Synthesis.DualCoding"] = Synthesis.DualCoding.ToString(),
-                ["Synthesis.RepairCitations"] = Synthesis.RepairCitations.ToString(),
-                ["Synthesis.SecondCitationCheck"] = Synthesis.SecondCitationCheck.ToString(),
-                ["Synthesis.MaxThemes"] = Synthesis.MaxThemes.ToString(),
-                ["DualScreening"] = ctx.Request.DualScreening.ToString(),
-                ["CitationChaining"] = ctx.Request.CitationChaining.ToString(),
-                ["PeerReviewOnly"] = ctx.Request.PeerReviewOnly.ToString(),
-            };
-            var metrics = RunMetrics.Build(ctx.RunId, ctx.State, report, checks, initial, stripped, ctx.Chat.Calls, settings);
-            await File.WriteAllTextAsync(Path.Join(ctx.Workspace, "run-metrics.json"),
-                JsonSerializer.Serialize(metrics, new JsonSerializerOptions { WriteIndented = true }));
-            MetricsStore.Append(metrics);
-        }
-        catch (Exception ex)
-        {
-            _log.LogWarning("Run {RunId}: run metrics not written: {Message}", ctx.RunId, SanitizeLogMessage(ex.Message));
-        }
-    }
-
     private async Task PublishAsync(RunContext ctx)
     {
         await SaveStateAsync(ctx.RunId, ctx.State);
@@ -459,66 +387,6 @@ public partial class PrismaReviewEngine
         {
             return null;
         }
-    }
-
-    private string SanitizeLogMessage(string message)
-    {
-        if (string.IsNullOrEmpty(message)) return string.Empty;
-        // Line breaks are removed so a crafted value cannot add fake lines to the log (log forging).
-        string oneLine = message.Replace("\r", " ").Replace("\n", " ");
-        return Regex.Replace(oneLine, @"([a-zA-Z0-9]{24,64})", "[REDACTED_API_CREDENTIAL]");
-    }
-
-    /// <summary>Lower-case title with punctuation and spacing removed, for duplicate detection.</summary>
-    public static string NormalizeTitle(string? title) =>
-        Regex.Replace(Regex.Replace((title ?? "").ToLowerInvariant(), @"[^\p{L}\p{N}]+", " "), @"\s+", " ").Trim();
-
-    /// <summary>Bare lower-case DOI ("10.x/y"), or null when there is no usable DOI.</summary>
-    public static string? NormalizeDoi(string? doi)
-    {
-        if (string.IsNullOrWhiteSpace(doi)) return null;
-        string d = Regex.Replace(doi.Trim(), @"^(https?://(dx\.)?doi\.org/|doi:)", "", RegexOptions.IgnoreCase).ToLowerInvariant();
-        return Regex.IsMatch(d, @"^10\.\d{4,9}/\S+$") ? d : null;
-    }
-
-    /// <summary>Chart category and platform label for a paper, from the prefix of its source id.</summary>
-    public static (string Category, string Platform) SourceOfPaper(string paperId) => paperId switch
-    {
-        _ when paperId.StartsWith("SCOPUS_ID:") => ("ScienceDirect", "Scopus API"),
-        _ when paperId.StartsWith("IEEE_") => ("IEEE", "IEEE Xplore API"),
-        _ when paperId.StartsWith("OPENALEX_") => ("OpenAlex", "OpenAlex API"),
-        _ when paperId.StartsWith("S2_") => ("SemanticScholar", "Semantic Scholar API"),
-        _ when paperId.StartsWith("CROSSREF_") => ("Crossref", "Crossref API"),
-        _ when paperId.StartsWith("SCHOLAR_") => ("Scholar", "Google Scholar API"),      // runs from before OpenAlex
-        _ when paperId.StartsWith("RG_") => ("ResearchGate", "ResearchGate API"),         // runs from before OpenAlex
-        _ => ("Arxiv", "arXiv API"),
-    };
-
-    /// <summary>Display names for the chart categories used in the report.</summary>
-    public static string CategoryLabel(string category) => category switch
-    {
-        "Arxiv" => "arXiv",
-        "ScienceDirect" => "ScienceDirect",
-        "IEEE" => "IEEE Xplore",
-        "SemanticScholar" => "Semantic Scholar",
-        "Scholar" => "Google Scholar",
-        _ => category,
-    };
-
-    private static string ClassifyVenueFromCitation(string? citation)
-    {
-        string c = citation ?? "";
-        if (c.Contains("Proceedings of", StringComparison.OrdinalIgnoreCase) || c.Contains("Conference", StringComparison.OrdinalIgnoreCase)) return "Conferences";
-        if (c.Contains("Transactions on", StringComparison.OrdinalIgnoreCase)) return "Transactions";
-        if (c.Contains("Journal of", StringComparison.OrdinalIgnoreCase)) return "Journals";
-        return "Preprints";
-    }
-
-    private static int ExtractYearFromCitation(string? citation)
-    {
-        if (string.IsNullOrEmpty(citation)) return 2026;
-        var yearMatch = Regex.Match(citation, @"\((20\d{2})\)");
-        return yearMatch.Success && int.TryParse(yearMatch.Groups[1].Value, out int yr) ? yr : 2026;
     }
 
     // Written to a temporary file and moved into place, so a dashboard reading the ledger never sees half a file.
