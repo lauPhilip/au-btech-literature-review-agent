@@ -20,7 +20,7 @@ Every run has a folder `WorkspaceStore/{runId}/`, where the run id is a GUID wri
 | `stylistic-transformation-ledger.json` | report generation | during synthesis | Each stylistic rewrite, before and after |
 | `reviewer-notes.json` | Review Output page | when the reviewer saves a note | The reviewer's own notes on citations and included studies (`ReviewerNote`), never sent to the model |
 | `owner.json` | dashboard | when the run starts | The SHA-256 of the run's edit key; not part of the archive |
-| `citation-audit.json` | report generation | during synthesis | Removed markers; verdict and quote per cited sentence and artifact element; repairs with before/after; summary before and after repair; studies not cited; Markdown removed from the prose |
+| `citation-audit.json` | report generation | during synthesis | Removed markers; verdict and quote per cited sentence and artifact element; repairs with before/after and their pass; citations removed by the second pass; summary before and after repair; studies not cited; Markdown removed from the prose |
 | `prisma-report.json` | report generation | at the end | The PRISMA items shown on Review Output |
 | `llm-calls.json` | `finally` block of `RunReviewAsync` | at the end | Every model call; run settings |
 | `run-metrics.json` | `WriteRunMetricsAsync` | at the end of a completed run | Quality and cost figures of the run (also appended to the metrics store) |
