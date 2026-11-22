@@ -117,8 +117,10 @@ public partial class PrismaReviewEngine
                 before.EvidenceBasis, after.EvidenceBasis, after.Quote, after.QuoteVerified, after.Reason, Llm.DisplayNameFor("citation-recheck"),
                 RecordingChatCompletionService.AppVersion.Split('+')[0]);
             rechecks.Add(JsonSerializer.SerializeToNode(entry));
-            var oldSummary = CitationSupportSummary.From(checks.Select((c, i) => i == index ? before : c));
-            var summary = CitationSupportSummary.From(checks);
+            // Citations the second repair pass removed stay counted on their own (issue #234).
+            int removed = audit["RemovedCitations"] is JsonArray gone ? gone.Count : 0;
+            var oldSummary = CitationSupportSummary.From(checks.Select((c, i) => i == index ? before : c), removed);
+            var summary = CitationSupportSummary.From(checks, removed);
             audit["SupportChecks"] = JsonSerializer.SerializeToNode(checks);
             audit["SupportSummary"] = JsonSerializer.SerializeToNode(summary);
             audit["Rechecks"] = rechecks;

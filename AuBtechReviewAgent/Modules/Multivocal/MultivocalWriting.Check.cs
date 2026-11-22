@@ -114,7 +114,7 @@ public sealed partial class MultivocalWriter
                 : "in no theme the model writes about; its findings answer a question in code or were left out"));
         }
         audit.InitialSupportSummary = grounding.BeforeRepair;
-        audit.SupportSummary = CitationSupportSummary.From(grounding.Checks);
+        audit.SupportSummary = CitationSupportSummary.From(grounding.Checks, grounding.Removed.Count);
         audit.Repairs = grounding.Repairs;
         audit.RemovedCitations = grounding.Removed;
         audit.SupportChecks = grounding.Checks;

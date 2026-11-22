@@ -132,6 +132,22 @@ public class CitationCheckDetailsTests : IDisposable
     }
 
     [Fact]
+    public void TheSummaryCountsRemovedCitationsOnTheirOwn()
+    {
+        var checks = new[] { new CitationSupportResult { Verdict = CitationSupportChecker.Supported, FirstVerdict = CitationSupportChecker.Supported } };
+
+        var summary = CitationSupportSummary.From(checks, removed: 2);
+        string sentence = summary.ToSentence();
+
+        Assert.Equal((1, 1, 2), (summary.Checked, summary.Supported, summary.Removed));
+        Assert.Contains("Of 1 citation checked, 1 was judged supported", sentence);
+        Assert.Contains(" 2 citations that were still not supported after the repair were removed, with their claim when no other citation backed it; they are not in the counts above and are listed under RemovedCitations in citation-audit.json.", sentence);
+        Assert.Contains("1 citation that was still not supported after the repair was removed", CitationSupportSummary.From(checks, 1).ToSentence());
+        Assert.DoesNotContain("removed", CitationSupportSummary.From(checks).ToSentence());
+        Assert.StartsWith("An automated check", CitationSupportSummary.From(Array.Empty<CitationSupportResult>(), 1).ToSentence());
+    }
+
+    [Fact]
     public void MarkersAreSplitFromTheTextInOrder()
     {
         Assert.Equal(new[] { ("A ", false), ("[1]", true), (" b ", false), ("[2, 3]", true), (".", false) }, CitationSupportChecker.SplitMarkers("A [1] b [2, 3]."));
