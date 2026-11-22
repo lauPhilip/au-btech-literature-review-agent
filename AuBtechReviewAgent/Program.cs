@@ -154,6 +154,7 @@ builder.Services.AddHostedService<AuBtechReviewAgent.SessionCleanupWorker>();
 // The REST API and the MCP server: off in production until Api:Enabled is set (Api/README.md).
 bool apiEnabled = builder.Configuration.GetValue("Api:Enabled", builder.Environment.IsDevelopment());
 if (apiEnabled) AuBtechReviewAgent.ApiEndpoints.AddReviewApi(builder.Services);
+AuBtechReviewAgent.ApiSwitch.Register(builder.Services, apiEnabled); // the page at /docs/api follows the switch
 
 AuBtechReviewAgent.ResponseCompressionSetup.AddTextCompression(builder.Services);
 
