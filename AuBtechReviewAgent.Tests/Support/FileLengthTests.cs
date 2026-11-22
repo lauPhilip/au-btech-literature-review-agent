@@ -1,58 +1,39 @@
+using System.Diagnostics;
 using Xunit;
 
 namespace AuBtechReviewAgent.Tests;
 
 /// <summary>
-/// No source file over 300 lines (issue #235). The files that were longer when the rule came in are listed with
-/// their length then; each may only shrink, and comes off the list once it is split under the limit.
+/// No file in the repository over 300 lines (issue #235): code, tests, docs, workflows, scripts and data alike.
+/// The files git tracks are checked, so run folders and build output are never counted. The exceptions are files
+/// nobody writes by hand. The files still longer than the limit are listed with their length when the rule came in;
+/// each may only shrink, and comes off the list once it is split under the limit.
 /// </summary>
 public class FileLengthTests
 {
     private const int Limit = 300;
 
-    private static readonly string[] Roots = { "AuBtechReviewAgent", "AuBtechReviewAgent.Tests", "tools" };
-    private static readonly string[] Extensions = { ".cs", ".razor", ".js", ".mjs", ".css" };
-    private static readonly string[] Skipped = { "/bin/", "/obj/", "/node_modules/", "/wwwroot/lib/", "/wwwroot/css/tailwind.css" };
+    private static readonly string[] Binary = { ".png", ".jpg", ".gif", ".ico", ".woff2", ".pdf" };
+
+    // Downloaded SCImago rankings, the generated npm lock file, vendored libraries and the compiled stylesheet.
+    private static readonly string[] Exceptions =
+    {
+        "AuBtechReviewAgent/ScimagoData/", "AuBtechReviewAgent/package-lock.json", "/wwwroot/lib/", "/wwwroot/css/tailwind.css",
+    };
 
     private static readonly Dictionary<string, int> LongerWhenTheRuleCameIn = new()
     {
-        ["AuBtechReviewAgent.Tests/Modules/MultivocalPaperTests.cs"] = 321,
-        ["AuBtechReviewAgent.Tests/Modules/MultivocalRunnerTests.cs"] = 315,
-        ["AuBtechReviewAgent.Tests/Modules/MultivocalSynthesisTests.cs"] = 362,
-        ["AuBtechReviewAgent.Tests/Pipeline/PipelineFeatureTests.cs"] = 328,
-        ["AuBtechReviewAgent.Tests/Report/ReviewPaperTests.cs"] = 322,
-        ["AuBtechReviewAgent.Tests/Sources/OpenSourceAndSafetyTests.cs"] = 621,
-        ["AuBtechReviewAgent.Tests/Synthesis/ThematicSynthesisTests.cs"] = 341,
         ["AuBtechReviewAgent/Components/Pages/Home.razor"] = 1397,
-        ["AuBtechReviewAgent/Components/Pages/Metrics.razor"] = 346,
-        ["AuBtechReviewAgent/Components/Pages/SpecMatrix.razor"] = 1364,
-        ["AuBtechReviewAgent/Evidence/StudyExtractor.cs"] = 314,
-        ["AuBtechReviewAgent/Llm/LlmProvider.cs"] = 329,
         ["AuBtechReviewAgent/Modules/Multivocal/MultivocalExtraction.cs"] = 344,
         ["AuBtechReviewAgent/Modules/Multivocal/MultivocalMap.cs"] = 366,
         ["AuBtechReviewAgent/Modules/Multivocal/MultivocalPaperParts.cs"] = 425,
         ["AuBtechReviewAgent/Modules/Multivocal/MultivocalPlan.cs"] = 367,
         ["AuBtechReviewAgent/Modules/Multivocal/MultivocalQuality.cs"] = 501,
-        ["AuBtechReviewAgent/Modules/Multivocal/MultivocalReport.cs"] = 542,
         ["AuBtechReviewAgent/Modules/Multivocal/MultivocalRunner.cs"] = 342,
         ["AuBtechReviewAgent/Modules/Multivocal/MultivocalScreening.cs"] = 375,
-        ["AuBtechReviewAgent/Modules/Multivocal/MultivocalSynthesis.cs"] = 798,
         ["AuBtechReviewAgent/Modules/Multivocal/MultivocalWriting.cs"] = 523,
         ["AuBtechReviewAgent/Modules/Multivocal/Pages/MultivocalPaperPage.razor"] = 413,
-        ["AuBtechReviewAgent/Modules/Multivocal/Pages/MultivocalStart.razor"] = 1567,
         ["AuBtechReviewAgent/Modules/Multivocal/WebPages/PageFetcher.cs"] = 307,
-        ["AuBtechReviewAgent/Pipeline/PrismaReviewEngine.cs"] = 549,
-        ["AuBtechReviewAgent/Pipeline/ReviewModels.cs"] = 385,
-        ["AuBtechReviewAgent/Report/MethodsSectionWriter.cs"] = 419,
-        ["AuBtechReviewAgent/Report/PrismaReviewEngine.Archive.cs"] = 491,
-        ["AuBtechReviewAgent/Report/PrismaReviewEngine.Report.cs"] = 983,
-        ["AuBtechReviewAgent/Runs/RunMetrics.cs"] = 369,
-        ["AuBtechReviewAgent/Screening/PrismaReviewEngine.Screening.cs"] = 483,
-        ["AuBtechReviewAgent/Search/PrismaReviewEngine.Search.cs"] = 380,
-        ["AuBtechReviewAgent/Synthesis/ReviewArtifact.cs"] = 335,
-        ["AuBtechReviewAgent/Synthesis/ReviewWriter.cs"] = 817,
-        ["AuBtechReviewAgent/Synthesis/ThematicSynthesis.cs"] = 495,
-        ["AuBtechReviewAgent/Verification/CitationSupportChecker.cs"] = 496,
     };
 
     private static string? Root()
@@ -62,20 +43,42 @@ public class FileLengthTests
         return root;
     }
 
-    private static IEnumerable<(string Path, int Lines)> SourceFiles(string root) =>
-        Roots.Select(r => Path.Join(root, r)).Where(Directory.Exists)
-            .SelectMany(dir => Directory.EnumerateFiles(dir, "*", SearchOption.AllDirectories))
-            .Select(file => Path.GetRelativePath(root, file).Replace('\\', '/'))
-            .Where(file => Extensions.Contains(Path.GetExtension(file)) && !Skipped.Any(s => ("/" + file).Contains(s, StringComparison.Ordinal)))
-            .Select(file => (file, File.ReadAllLines(Path.Join(root, file)).Length));
-
-    [Fact]
-    public void NoSourceFileIsLongerThan300Lines()
+    /// <summary>Every file git tracks, with its length; null when git or the repository is not there (packaged tests).</summary>
+    private static List<(string Path, int Lines)>? TrackedFiles()
     {
         string? root = Root();
-        if (root == null) return; // not run from the repository (packaged tests)
+        if (root == null) return null;
 
-        var tooLong = SourceFiles(root)
+        var git = new ProcessStartInfo("git") { RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false };
+        foreach (string arg in new[] { "-C", root, "ls-files", "-z" }) git.ArgumentList.Add(arg);
+        string listing;
+        try
+        {
+            using var process = Process.Start(git)!;
+            listing = process.StandardOutput.ReadToEnd();
+            process.WaitForExit();
+            if (process.ExitCode != 0) return null;
+        }
+        catch (System.ComponentModel.Win32Exception)
+        {
+            return null; // git is not installed
+        }
+
+        return listing.Split('\0', StringSplitOptions.RemoveEmptyEntries)
+            .Where(file => !Binary.Contains(Path.GetExtension(file).ToLowerInvariant()))
+            .Where(file => !Exceptions.Any(e => ("/" + file).Contains(e.StartsWith('/') ? e : "/" + e, StringComparison.Ordinal)))
+            .Where(file => File.Exists(Path.Join(root, file)))
+            .Select(file => (file, File.ReadAllLines(Path.Join(root, file)).Length))
+            .ToList();
+    }
+
+    [Fact]
+    public void NoFileIsLongerThan300Lines()
+    {
+        var files = TrackedFiles();
+        if (files == null) return;
+
+        var tooLong = files
             .Where(f => f.Lines > Limit && !LongerWhenTheRuleCameIn.ContainsKey(f.Path))
             .Select(f => $"{f.Path} ({f.Lines} lines)")
             .ToList();
@@ -86,15 +89,29 @@ public class FileLengthTests
     [Fact]
     public void TheListedLongFilesOnlyShrink()
     {
-        string? root = Root();
-        if (root == null) return;
+        var files = TrackedFiles();
+        if (files == null) return;
 
-        var lengths = SourceFiles(root).ToDictionary(f => f.Path, f => f.Lines);
+        var lengths = files.ToDictionary(f => f.Path, f => f.Lines);
         var grown = LongerWhenTheRuleCameIn
             .Where(kv => lengths.TryGetValue(kv.Key, out int now) && now > kv.Value)
             .Select(kv => $"{kv.Key} ({lengths[kv.Key]} lines, at most {kv.Value})")
             .ToList();
 
         Assert.True(grown.Count == 0, "These long files grew; split them instead: " + string.Join(", ", grown));
+    }
+
+    [Fact]
+    public void TheCheckSeesDocsWorkflowsAndScriptsAsWellAsCode()
+    {
+        var files = TrackedFiles();
+        if (files == null) return;
+
+        var paths = files.Select(f => f.Path).ToHashSet();
+        Assert.Contains("README.md", paths);
+        Assert.Contains(".github/workflows/ci.yml", paths);
+        Assert.Contains("tools/ReleaseCheck/release_check.py", paths);
+        Assert.DoesNotContain(paths, p => p.StartsWith("AuBtechReviewAgent/ScimagoData/", StringComparison.Ordinal));
+        Assert.DoesNotContain("AuBtechReviewAgent/package-lock.json", paths);
     }
 }
