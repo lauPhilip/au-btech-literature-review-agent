@@ -90,6 +90,20 @@ public class ReportOutlineTests
     }
 
     [Fact]
+    public void RemovedCitationsCountOnTheirOwnInTheTallyAndItsSentence()
+    {
+        var counts = VerdictTally.From(new[] { Check("a", 0, 1, CitationSupportChecker.Supported), Check("a", 1, 1, CitationSupportChecker.Partial) }, removed: 2);
+
+        Assert.Equal(new VerdictTally(1, 1, 0, 0, 0, 2), counts);
+        Assert.Equal((4, 1), (counts.Total, counts.Flagged));
+        Assert.Equal("Of 4 citations: 1 supported, 1 partly supported, 0 not supported, 2 removed.", counts.Sentence());
+
+        var stats = new ReviewStats { CitationsChecked = 10, CitationsSupported = 9, CitationsNotSupported = 1, CitationsRemoved = 3 };
+        Assert.Equal(3, VerdictTally.From(stats).Removed);
+        Assert.Equal("Of 13 citations: 9 supported, 0 partly supported, 1 not supported, 3 removed.", VerdictTally.From(stats).Sentence(13));
+    }
+
+    [Fact]
     public void TheDoneCardStillReadsTheRunsOwnTotal()
     {
         var stats = new ReviewStats { CitationsChecked = 60, CitationsSupported = 45, CitationsPartiallySupported = 9, CitationsNotSupported = 3, CitationsInsufficientEvidence = 2, CitationsUnverifiable = 1 };

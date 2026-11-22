@@ -50,11 +50,13 @@ public static class Glossary
         new Entry("partly-supported", "Partly supported",
             "The cited paper backs part of the claim, or says something close but weaker. Kept in the report and marked, so you can check it."),
         new Entry("not-supported", "Not supported",
-            "The cited paper does not back the claim. Kept in the report and marked, so it is not trusted by mistake."),
+            "The cited paper does not back the claim. Marked, so it is not trusted by mistake; the repair takes it out when it can."),
         new Entry("abstract-only", "Abstract only",
             "Only the abstract of the cited paper was available, and it does not settle the claim either way."),
         new Entry("unverifiable", "Could not be verified",
             "The check could not be completed for this citation, for example because the model call failed."),
+        new Entry("removed", "Removed",
+            "The citation was still not supported after the repair, so it was taken out, with its claim when no other citation backed it. It is counted on its own and listed in the citation audit."),
         new Entry("artifact", "Artifact",
             "A concept map, flowchart, table or list built after the analysis, only from what the review found."),
         new Entry("archive", "Run archive",
@@ -69,7 +71,7 @@ public static class Glossary
     /// <summary>The groups of the glossary page's side list, in order: how a review is done, the verdicts, and what a run gives you.</summary>
     public static readonly IReadOnlyList<string> Groups = new[] { "Method", "Verdicts", "Output" };
 
-    private static readonly HashSet<string> VerdictKeys = new(StringComparer.OrdinalIgnoreCase) { "supported", "partly-supported", "not-supported", "abstract-only", "unverifiable" };
+    private static readonly HashSet<string> VerdictKeys = new(StringComparer.OrdinalIgnoreCase) { "supported", "partly-supported", "not-supported", "abstract-only", "unverifiable", "removed" };
     private static readonly HashSet<string> OutputKeys = new(StringComparer.OrdinalIgnoreCase) { "artifact", "archive" };
 
     /// <summary>The group an entry belongs to (one of <see cref="Groups"/>); anything not a verdict or an output is method.</summary>

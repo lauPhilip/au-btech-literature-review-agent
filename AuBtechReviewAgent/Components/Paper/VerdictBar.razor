@@ -1,5 +1,6 @@
 @* The stacked bar of citation verdicts, shared by the Done card on New review and the report (its summary box and
-   its citation-check panel): green, orange, red, then abstract only and could not be verified. The bar is one
+   its citation-check panel): green, orange, red, then abstract only, could not be verified and removed (navy, the
+   heading colour, which reads in both themes). The bar is one
    image with a sentence for screen readers; the legend under it gives the same counts in words. *@
 
 @{
@@ -14,6 +15,7 @@
         @Segment(c.NotSupported, total, "bg-not-supported-chart")
         @Segment(c.AbstractOnly, total, "bg-abstract-only-chart")
         @Segment(c.Unverifiable, total, "bg-unverifiable-chart")
+        @Segment(c.Removed, total, "bg-heading")
     </div>
     @if (Legend)
     {
@@ -28,6 +30,10 @@
             @if (c.Unverifiable > 0)
             {
                 <li><span class="mr-1.5 inline-block h-2.5 w-2.5 bg-unverifiable-chart" aria-hidden="true"></span>@c.Unverifiable <Term Key="unverifiable">could not be verified</Term></li>
+            }
+            @if (c.Removed > 0)
+            {
+                <li><span class="mr-1.5 inline-block h-2.5 w-2.5 bg-heading" aria-hidden="true"></span>@c.Removed <Term Key="removed">removed</Term></li>
             }
         </ul>
     }

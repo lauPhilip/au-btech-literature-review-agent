@@ -103,13 +103,14 @@ else
 
                 @if (auditChecks.Count > 0)
                 {
-                    var counts = AuBtechReviewAgent.VerdictTally.From(auditChecks);
+                    var counts = AuBtechReviewAgent.VerdictTally.From(auditChecks, auditRemoved);
                     <div class="mt-5 rounded-card border border-line bg-soft p-4 sm:p-5 print:hidden">
                         <h2 class="font-display text-base font-semibold text-heading">@counts.Total @(counts.Total == 1 ? "citation" : "citations") checked against the papers</h2>
                         <div class="mt-2"><VerdictBar Counts="counts" /></div>
                         <p class="mt-2 text-[15px] text-muted">
                             Each number in the text is coloured by what the check found. Open one to see the passage it was checked against.
                             @(counts.Flagged > 0 ? $"{counts.Flagged} {(counts.Flagged == 1 ? "citation is" : "citations are")} only partly or not supported; they stay in the report, marked." : "")
+                            @(counts.Removed > 0 ? $"{counts.Removed} {(counts.Removed == 1 ? "citation was" : "citations were")} still not supported after the repair and {(counts.Removed == 1 ? "was" : "were")} removed; citation-audit.json lists {(counts.Removed == 1 ? "it" : "them")}." : "")
                         </p>
                     </div>
                 }

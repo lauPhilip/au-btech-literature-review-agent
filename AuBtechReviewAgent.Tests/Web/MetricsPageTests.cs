@@ -86,6 +86,10 @@ public class MetricsPageTests
         Assert.Contains("data-jump-to=\"@sectionId\"", page);
         Assert.Contains("<RunVerdictChart ", page);
         Assert.Equal(3, Count(page, "<tfoot>"));
+        // Each table counts the citations the repair removed on its own (issue #234), with the navy of the verdict bar.
+        Assert.Equal(1, Count(page, "@ThSwatch(\"Removed\", \"bg-heading\")"));
+        Assert.Equal(2, Count(page, "@Th(\"Removed\", true)"));
+        Assert.Equal(3, Count(page, "<td class=\"@TdNum\">@overview.Removed"));
         Assert.Contains("sticky top-0", page);
         // The ?kind= tabs stay, and the old per-run detail is gone (Lau chose to leave it out for now).
         Assert.Contains("/metrics?kind=", page);
@@ -126,6 +130,30 @@ public class MetricsPageTests
         Assert.All(runs, r => Assert.Equal(r.CitationsFinal.Total,
             r.CitationsFinal.Supported + r.CitationsFinal.PartiallySupported + r.CitationsFinal.NotSupported + r.CitationsFinal.InsufficientEvidence + r.CitationsFinal.Unverifiable));
         Assert.True(MetricsOverview.From(runs.Where(r => !r.IsMultivocal)).Groups.Count > 1);
+    }
+
+    [Fact]
+    public async Task TheVerdictBarShowsRemovedCitationsAsTheirOwnSegment()
+    {
+        string html = await RenderAsync<VerdictBar>(new() { ["Counts"] = new VerdictTally(6, 1, 1, 0, 0, 2) });
+
+        Assert.Contains("aria-label=\"Of 10 citations: 6 supported, 1 partly supported, 1 not supported, 2 removed.\"", html);
+        Assert.Contains("class=\"bg-heading h-full", html);
+        Assert.Contains("width:20%", html);
+        Assert.Contains("The citation was still not supported after the repair", html); // the glossary explains the legend
+
+        string none = await RenderAsync<VerdictBar>(new() { ["Counts"] = new VerdictTally(6, 1, 1, 0, 0) });
+        Assert.DoesNotContain("bg-heading", none);
+    }
+
+    private static async Task<string> RenderAsync<T>(Dictionary<string, object?> parameters) where T : IComponent
+    {
+        var services = new ServiceCollection();
+        services.AddLogging();
+        await using var provider = services.BuildServiceProvider();
+        await using var renderer = new HtmlRenderer(provider, provider.GetRequiredService<ILoggerFactory>());
+        return await renderer.Dispatcher.InvokeAsync(async () =>
+            (await renderer.RenderComponentAsync<T>(ParameterView.FromDictionary(parameters))).ToHtmlString());
     }
 
     private static async Task<string> RenderChartAsync(IReadOnlyList<RunMetrics> runs, bool grey)

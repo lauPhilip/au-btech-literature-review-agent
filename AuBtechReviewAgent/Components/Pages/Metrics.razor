@@ -92,14 +92,14 @@
 
         <section id="shares" aria-labelledby="shares-title" class="ui-card scroll-mt-6 p-5 sm:p-6">
             <h2 id="shares-title" class="font-display text-xl font-semibold tracking-tight text-heading">Verdict shares per run</h2>
-            <p class="mt-1 max-w-[70ch] text-[15px] text-muted">The chart's figures as a table, newest run first. The total pools every citation of every run.</p>
+            <p class="mt-1 max-w-[70ch] text-[15px] text-muted">The chart's figures as a table, newest run first. The total pools every citation of every run. Removed counts the citations the repair took out; they are not in the shares.</p>
             <div class="mt-4 max-h-[70vh] overflow-auto border border-line" tabindex="0" role="region" aria-labelledby="shares-title">
                 <table class="w-full border-separate border-spacing-0 text-sm">
                     <thead>
                         <tr>
                             @Th("Run") @Th("Completed (UTC)") @Th("Version") @Th("Citations", true)
                             @ThSwatch("Supported", "bg-supported-chart") @ThSwatch("Partly", "bg-partly-chart") @ThSwatch("Not supported", "bg-not-supported-chart")
-                            @ThSwatch(Grey ? "Not judged" : "Abstract only", "bg-abstract-only-chart") @ThSwatch("Not verified", "bg-unverifiable-chart")
+                            @ThSwatch(Grey ? "Not judged" : "Abstract only", "bg-abstract-only-chart") @ThSwatch("Not verified", "bg-unverifiable-chart") @ThSwatch("Removed", "bg-heading")
                         </tr>
                     </thead>
                     <tbody>
@@ -117,6 +117,7 @@
                                 <td class="@TdNum">@Pct(c.NotSupportedShare)</td>
                                 <td class="@TdNum">@Pct(c.InsufficientShare)</td>
                                 <td class="@TdNum">@Pct(c.UnverifiableShare)</td>
+                                <td class="@TdNum">@r.Removed</td>
                             </tr>
                         }
                     </tbody>
@@ -129,6 +130,7 @@
                             <td class="@TdNum">@Pct(pooled.NotSupportedShare)</td>
                             <td class="@TdNum">@Pct(pooled.InsufficientShare)</td>
                             <td class="@TdNum">@Pct(pooled.UnverifiableShare)</td>
+                            <td class="@TdNum">@overview.Removed</td>
                         </tr>
                     </tfoot>
                 </table>
@@ -139,7 +141,7 @@
             <h2 id="run-data-title" class="font-display text-xl font-semibold tracking-tight text-heading">Run data</h2>
             <p class="mt-1 max-w-[70ch] text-[15px] text-muted">
                 The counts from each run's run-metrics.json, newest first. @(Grey ? "Found is the sources the searches found; kept is those left after the quality check." : "Found is the records the searches found; included is the studies that passed both screenings.")
-                Repaired is the citations the repair pass rewrote; words count the written results and discussion.
+                Repaired is the citations the repair pass rewrote, and removed those it took out; words count the written results and discussion.
             </p>
             <div class="mt-4 max-h-[70vh] overflow-auto border border-line" tabindex="0" role="region" aria-labelledby="run-data-title">
                 <table class="w-full border-separate border-spacing-0 text-sm">
@@ -147,7 +149,7 @@
                         <tr>
                             @Th("Run") @Th("Version") @Th("Found", true) @Th(Grey ? "Kept" : "Included", true) @Th("Cited", true) @Th("Themes", true) @Th("Citations", true)
                             @Th("Supported", true) @Th("Partly", true) @Th("Not supported", true) @Th(Grey ? "Not judged" : "Abstract only", true) @Th("Not verified", true)
-                            @Th("Repaired", true) @Th("Words", true)
+                            @Th("Repaired", true) @Th("Removed", true) @Th("Words", true)
                         </tr>
                     </thead>
                     <tbody>
@@ -169,6 +171,7 @@
                                 <td class="@TdNum">@c.InsufficientEvidence</td>
                                 <td class="@TdNum">@c.Unverifiable</td>
                                 <td class="@TdNum">@r.Repaired</td>
+                                <td class="@TdNum">@r.Removed</td>
                                 <td class="@TdNum">@AuBtechReviewAgent.MetricsOverview.Words(r).ToString("N0", Culture)</td>
                             </tr>
                         }
@@ -187,6 +190,7 @@
                             <td class="@TdNum">@pooled.InsufficientEvidence.ToString("N0", Culture)</td>
                             <td class="@TdNum">@pooled.Unverifiable.ToString("N0", Culture)</td>
                             <td class="@TdNum">@overview.Runs.Sum(r => r.Repaired).ToString("N0", Culture)</td>
+                            <td class="@TdNum">@overview.Removed.ToString("N0", Culture)</td>
                             <td class="@TdNum">@overview.Runs.Sum(r => AuBtechReviewAgent.MetricsOverview.Words(r)).ToString("N0", Culture)</td>
                         </tr>
                     </tfoot>
@@ -205,7 +209,7 @@
                     <thead>
                         <tr>
                             @Th("Version") @Th("Settings") @Th("Runs", true) @Th("Supported", true) @Th("Partly", true) @Th("Not supported", true)
-                            @Th("Screening κ", true) @Th("Min / run", true)
+                            @Th("Removed", true) @Th("Screening κ", true) @Th("Min / run", true)
                         </tr>
                     </thead>
                     <tbody>
@@ -219,6 +223,7 @@
                                 <td class="@TdNum">@Pct(g.Final.SupportedShare)</td>
                                 <td class="@TdNum">@Pct(g.Final.PartialShare)</td>
                                 <td class="@TdNum">@Pct(g.Final.NotSupportedShare)</td>
+                                <td class="@TdNum">@g.Removed</td>
                                 <td class="@TdNum">@AuBtechReviewAgent.MetricsOverview.Kappa(g.ScreeningKappa)</td>
                                 <td class="@TdNum">@g.MinutesPerRun.ToString("0.0", Culture)</td>
                             </tr>
@@ -231,6 +236,7 @@
                             <td class="@TdNum">@Pct(pooled.SupportedShare)</td>
                             <td class="@TdNum">@Pct(pooled.PartialShare)</td>
                             <td class="@TdNum">@Pct(pooled.NotSupportedShare)</td>
+                            <td class="@TdNum">@overview.Removed</td>
                             <td class="@TdNum">@AuBtechReviewAgent.MetricsOverview.Kappa(overview.ScreeningKappa)</td>
                             <td class="@TdNum">@overview.MinutesPerRun.ToString("0.0", Culture)</td>
                         </tr>

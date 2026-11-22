@@ -77,6 +77,7 @@ public partial class RunMetrics
         m.SecondCheckAgreed = checks.Count(c => c.SecondVerdict != null && c.SecondVerdict == c.FirstVerdict);
         m.UpgradedBySecondCheck = checks.Count(c => c.ResolvedBy == "second check");
         m.Repaired = s.CitationsRepaired;
+        m.Removed = s.CitationsRemoved;
         m.OutsideTheme = s.CitationsOutsideTheme;
         m.InvalidMarkersStripped = strippedMarkers;
 

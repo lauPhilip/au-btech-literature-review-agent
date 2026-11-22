@@ -20,6 +20,8 @@ public partial class SpecMatrix
     internal readonly List<IncludedPaperMetricRow> tableRecords = new();
     internal readonly List<AuBtechReviewAgent.StudyExtraction> extractions = new();
     internal readonly List<AuBtechReviewAgent.CitationSupportResult> auditChecks = new();
+    /// <summary>How many citations the second repair pass removed (RemovedCitations in citation-audit.json).</summary>
+    internal int auditRemoved;
     internal AuBtechReviewAgent.ThematicCodebook? codebook;
     internal int journalCount, conferenceCount, transactionsCount, proceedingsCount, preprintCount;
 
@@ -95,6 +97,7 @@ public partial class SpecMatrix
     {
         string auditPath = Path.Join(folder, "citation-audit.json");
         auditChecks.Clear();
+        auditRemoved = 0;
         rechecks = new();
         if (File.Exists(auditPath))
         {
@@ -103,6 +106,8 @@ public partial class SpecMatrix
                 using var doc = JsonDocument.Parse(await File.ReadAllTextAsync(auditPath));
                 if (doc.RootElement.TryGetProperty("SupportChecks", out var checks))
                     auditChecks.AddRange(JsonSerializer.Deserialize<List<AuBtechReviewAgent.CitationSupportResult>>(checks.GetRawText()) ?? new());
+                if (doc.RootElement.TryGetProperty("RemovedCitations", out var removed) && removed.ValueKind == JsonValueKind.Array)
+                    auditRemoved = removed.GetArrayLength();
                 if (doc.RootElement.TryGetProperty("Rechecks", out var done))
                     rechecks = JsonSerializer.Deserialize<List<AuBtechReviewAgent.CitationRecheck>>(done.GetRawText()) ?? new();
             }

@@ -82,7 +82,7 @@ classDiagram
         FullTextRetrieved, CitationsChecked ...
         ThemesIdentified, StudiesCoded
         StudiesCitedInSynthesis, CodingKappa
-        CitationsRepaired, CitationsOutsideTheme
+        CitationsRepaired, CitationsRemoved, CitationsOutsideTheme
     }
     class ThematicCodebook {
         Codes, Themes, Uncoded
