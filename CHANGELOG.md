@@ -36,6 +36,10 @@ Nothing about how a review runs has changed. These are the first steps of the re
 
 ### Fixed
 
+The discussion no longer leans on studies the review set aside. When a study fits none of the themes, the later sections now know which one it is and why. Only the limitations may name it. The step that builds the themes now sees the criteria every study met, so it cannot set a study aside for a reason they allow.
+
+The review also stops saying again and again how many studies it read in full. The part on how the review was done says that once. A study is never said to have used the full text as its method, since that is what the review read, not what the study did.
+
 The methods no longer put the model's name in double brackets, such as "(mistral-large-latest (Mistral API), temperature 0)". When the two screenings agree on most records but kappa is still low, the report now says why, so 3 of 4 with a kappa of 0.00 no longer looks like a mistake. The note under Table A.2 explains the dagger only when a value has one, and no longer points to an evidence column the table does not have.
 
 A theme now has one name everywhere: its heading, the overview and the evidence map all use the name from the codebook. The report page and main.tex number their sections the same way, with the same headings and the declarations in the same order, so "see section 5.2" points to the same place in both.
