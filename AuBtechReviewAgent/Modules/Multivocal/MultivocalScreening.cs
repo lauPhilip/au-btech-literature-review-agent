@@ -26,6 +26,15 @@ public sealed partial class MultivocalScreener
     public const string StageScreening = "Screening";
     public const string StageScreened = "Screened";
 
+    /// <summary>
+    /// Whether the formal pool's sources can be screened (block I-3 of docs/roadmap/mlr-todo.md). Until they can, a run
+    /// planned with academic databases stops here and says why, rather than screening academic records as grey ones.
+    /// </summary>
+    public const bool FormalScreeningBuilt = false;
+
+    public const string FormalNotBuiltMessage =
+        "The academic sources cannot be screened yet; that comes in step I-3 of the roadmap. The search is on file. Plan a new review with no academic database ticked, or from the Grey Literature Review card.";
+
     /// <summary>Part of the cache key: raise it whenever the grey screening prompt changes.</summary>
     public const string PromptVersion = "grey-screening-v1";
 
@@ -108,6 +117,7 @@ public sealed partial class MultivocalScreener
         var planned = _planner.Load(runId) ?? throw new InvalidOperationException("This run has no plan.");
         if (!planned.Plan.HasCriteria) throw new InvalidOperationException("This plan has no inclusion criteria, so its sources cannot be screened. Plan a new run.");
         var ledger = _searcher.LoadLedger(runId) ?? throw new InvalidOperationException("Search the run first.");
+        if (planned.Plan.UsesFormalPool && !FormalScreeningBuilt) throw new InvalidOperationException(FormalNotBuiltMessage);
         if (!Running.TryAdd(runId, true)) throw new InvalidOperationException("This run is being screened already.");
 
         string folder = _runs.FolderOf(runId);
