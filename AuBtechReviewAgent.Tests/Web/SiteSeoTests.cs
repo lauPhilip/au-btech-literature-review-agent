@@ -24,6 +24,32 @@ public class SiteSeoTests
     }
 
     [Fact]
+    public void EveryPageInTheSitemapHasTheDayTheVersionWasBuilt()
+    {
+        XNamespace ns = "http://www.sitemaps.org/schemas/sitemap/0.9";
+        var dated = XDocument.Parse(SiteSeo.SitemapXml(Base, new DateTime(2026, 11, 22, 23, 30, 0, DateTimeKind.Utc)));
+        var undated = XDocument.Parse(SiteSeo.SitemapXml(Base));
+
+        Assert.All(dated.Descendants(ns + "url"), url => Assert.Equal("2026-11-22", url.Element(ns + "lastmod")?.Value));
+        Assert.Equal(9, dated.Descendants(ns + "lastmod").Count());
+        Assert.Empty(undated.Descendants(ns + "lastmod"));
+    }
+
+    [Fact]
+    public void ThePreviewCardIsASelfHosted1200By630Png()
+    {
+        string? root = AppContext.BaseDirectory;
+        while (root != null && !File.Exists(Path.Join(root, "AuBtechReviewAgent.sln"))) root = Path.GetDirectoryName(root);
+        if (root == null) return; // not run from the repository (packaged tests)
+
+        Assert.False(SiteSeo.SocialImagePath.Contains("://", StringComparison.Ordinal));
+        byte[] png = File.ReadAllBytes(Path.Join(root, "AuBtechReviewAgent", "wwwroot", SiteSeo.SocialImagePath));
+        Assert.Equal(new byte[] { 0x89, (byte)'P', (byte)'N', (byte)'G' }, png[..4]);
+        int Int(int at) => (png[at] << 24) | (png[at + 1] << 16) | (png[at + 2] << 8) | png[at + 3];
+        Assert.Equal((1200, 630), (Int(16), Int(20))); // the IHDR chunk's width and height
+    }
+
+    [Fact]
     public void RobotsPointsToTheSitemapAndKeepsCrawlersOutOfDownloads()
     {
         string robots = SiteSeo.RobotsTxt(Base);
@@ -40,6 +66,7 @@ public class SiteSeoTests
     [InlineData("/spec-matrix", true)]
     [InlineData("/spec-matrix/0b6b1f0e-0000-0000-0000-000000000000", true)]
     [InlineData("/Error", true)]
+    [InlineData("/design/report", true)]
     [InlineData("/", false)]
     [InlineData("/review", false)]
     [InlineData("/metrics", false)]
