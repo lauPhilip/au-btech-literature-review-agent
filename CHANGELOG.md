@@ -8,13 +8,13 @@ Each version's section becomes the notes of its GitHub release, so write it for 
 
 ### Added
 
-Other tools can now start a review through an API. Send the form's fields to `/api/v1/reviews` with your own Mistral key, and follow the run by its id. Your key is used for that run only and is never stored. The API gives no free reviews, and it stays off on the live site until it is switched on.
+Other tools can now start a review through an API. Send the form's fields to `/api/v1/reviews` with your own Mistral key, and follow the run by its id. To stop it, send a DELETE with its edit key. Your key is used for that run only and is never stored. The API gives no free reviews, and it stays off on the live site until it is switched on.
 
 The API can also hand back the finished report as data. You get each section, every citation with its verdict and quote, the references and the PRISMA counts. A description of the API is at `/openapi/v1.json`.
 
-AI assistants can run a review too. TraceableAI now has an MCP server at `/mcp`. An assistant can start a review, check on it, read the report and fetch the BibTeX, RIS or LaTeX, all with your own Mistral key.
+AI assistants can run a review too. TraceableAI now has an MCP server at `/mcp`. An assistant can start a review, check on it, read the report and fetch the BibTeX, RIS or LaTeX, all with your own Mistral key. It can also stop a review it started, with the edit key it got back.
 
-You can now stop a review you started. The run stops at the next safe point, before its next model call or step. A review that waits in line just leaves the line. The run is marked as cancelled, and the time and your reason are kept on file. Your free review for the day comes back, once a day. Only the browser that started the review can cancel it. Click "Cancel review" beside the run, and the page asks once before it acts. You can say why, if you like. Then the page shows the run as cancelled, with your reason and a button to start a new review. The button works on a phone too.
+You can now stop a review you started. The run stops at the next safe point, before its next model call or step. A review that waits in line just leaves the line. The run is marked as cancelled, and the time and your reason are kept on file. Your free review for the day comes back, once a day. Only the browser or tool that started the review can cancel it. Click "Cancel review" beside the run, and the page asks once before it acts. You can say why, if you like. Then the page shows the run as cancelled, with your reason and a button to start a new review. The button works on a phone too.
 
 ### Changed
 
