@@ -88,8 +88,9 @@ public class MultivocalStartPartsTests
         Assert.Contains("6 grey literature searches and 2 academic databases, each with its own search strings, until new sources add nothing new.", html);
         Assert.Contains("Grey and academic sources are screened twice", html);
         Assert.Contains("Each academic source is appraised with MMAT, as in the systematic review, on its open full text or else its abstract.", html);
-        Assert.Equal(4, Count(html, ">built</span>")); // protocol, and the academic search (I-2), screening (I-3) and appraisal (I-4); the rest follows in I-5 and I-6
-        Assert.Equal(4, Count(html, ">not built yet</span>"));
+        Assert.Contains("a tension between academic and grey sources is named as one between the state of the art and the state of the practice", html);
+        Assert.Equal(6, Count(html, ">built</span>")); // up to the synthesis (I-2 to I-5); writing and checking follow in I-6
+        Assert.Equal(2, Count(html, ">not built yet</span>"));
     }
 
     [Fact]
@@ -99,6 +100,8 @@ public class MultivocalStartPartsTests
         Assert.Equal("Hacker News", MultivocalStart.SearchLabel("hackernews"));
         Assert.Equal("Academic literature", MultivocalStart.KindLabel(MultivocalSearcher.FormalKind));
         Assert.Equal("Blog posts and practitioner articles", MultivocalStart.KindLabel("blogs"));
+        Assert.Equal("Academic literature, abstract only", MultivocalStart.FindingLabel(new SynthesisFinding { Literature = "formal", Kind = MultivocalSearcher.FormalKind, EvidenceBasis = "abstract only" }));
+        Assert.Equal("Blog posts and practitioner articles, 3rd tier, 12.5 points", MultivocalStart.FindingLabel(new SynthesisFinding { Kind = "blogs", Tier = 3, QualityPoints = 12.5 }));
     }
 
     private static int Count(string text, string part) => (text.Length - text.Replace(part, "").Length) / part.Length;
