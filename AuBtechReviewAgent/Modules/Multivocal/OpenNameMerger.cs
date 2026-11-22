@@ -35,9 +35,10 @@ public static class OpenNameMerger
     /// <summary>The keys of a source's own name: its title, and for a code repository ("owner/name") the name alone.</summary>
     public static IReadOnlyCollection<string> SourceKeys(string title)
     {
-        var keys = new HashSet<string>(Keys(title), StringComparer.Ordinal);
-        int slash = (title ?? "").LastIndexOf('/');
-        if (slash >= 0 && slash < title!.Length - 1) keys.UnionWith(Keys(title[(slash + 1)..]));
+        string text = title ?? "";
+        var keys = new HashSet<string>(Keys(text), StringComparer.Ordinal);
+        int slash = text.LastIndexOf('/');
+        if (slash >= 0 && slash < text.Length - 1) keys.UnionWith(Keys(text[(slash + 1)..]));
         return keys;
     }
 
