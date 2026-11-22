@@ -85,7 +85,9 @@ public class EngineHelpersTests : IDisposable
         Assert.Equal(PrismaReviewEngine.StageComplete, state.Stats.ProcessingStage);
         Assert.Equal(new[] { "arxiv", "scopus" }, state.SelectedSources);
         Assert.Equal(new[] { "scopus" }, state.UnavailableSources);
-        Assert.Equal(RunManifest.Sha256(File.ReadAllBytes(Path.Join(folder, "protocol.md"))), state.ProtocolSha256);
+        // The fingerprint is of protocol.md as written before the search; the search strings are appended after it.
+        Assert.Matches("^[0-9a-f]{64}$", state.ProtocolSha256);
+        Assert.NotEqual(RunManifest.Sha256(File.ReadAllBytes(Path.Join(folder, "protocol.md"))), state.ProtocolSha256);
         Assert.NotNull(state.CompletedUtc);
         Assert.NotNull(state.RunSettings);
         Assert.True(File.Exists(Path.Join(folder, "llm-calls.json")));
