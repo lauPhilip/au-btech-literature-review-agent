@@ -33,15 +33,14 @@ public class RunLedgerWatchTests : IDisposable
         Save(3);
         var watch = new RunLedgerWatch(Ledger);
 
-        var first = watch.Read();
-        var second = watch.Read();
-        var third = watch.Read();
+        var first = Assert.NotNull(watch.Read());
+        var second = Assert.NotNull(watch.Read());
+        var third = Assert.NotNull(watch.Read());
 
-        Assert.NotNull(first);
-        Assert.Equal(3, first.Value.State.Stats.Screened);
-        Assert.Same(first.Value.State, second!.Value.State);
-        Assert.Same(first.Value.Raw, third!.Value.Raw);
-        Assert.Equal(File.ReadAllText(Ledger), first.Value.Raw);
+        Assert.Equal(3, first.State.Stats.Screened);
+        Assert.Same(first.State, second.State);
+        Assert.Same(first.Raw, third.Raw);
+        Assert.Equal(File.ReadAllText(Ledger), first.Raw);
         Assert.Equal(1, watch.Parses);
     }
 
