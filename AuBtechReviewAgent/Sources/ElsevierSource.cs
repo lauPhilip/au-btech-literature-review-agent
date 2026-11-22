@@ -36,7 +36,6 @@ public class ElsevierSource : IAcademicSource
         string structuredQuery = string.Join(" AND ", terms);
         string encodedQuery = Uri.EscapeDataString(structuredQuery);
         
-        // ─── TARGET SCOPUS WITH STANDARD METADATA VIEW ─────────────────────
         string url = $"https://api.elsevier.com/content/search/scopus?query=ALL({encodedQuery})&count={maxResults}&view=STANDARD";
         AppLog.For<ElsevierSource>().LogDebug("Querying Scopus: {Query}", query);
 
@@ -56,7 +55,6 @@ public class ElsevierSource : IAcademicSource
 
             using JsonDocument doc = JsonDocument.Parse(jsonResponse);
 
-            // Scopus search array uses the "entry" element root
             if (doc.RootElement.TryGetProperty("search-results", out var results) &&
                 results.TryGetProperty("entry", out var entries) &&
                 entries.ValueKind == JsonValueKind.Array)
