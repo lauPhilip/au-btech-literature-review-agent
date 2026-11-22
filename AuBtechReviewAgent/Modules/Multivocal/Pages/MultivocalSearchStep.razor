@@ -24,6 +24,19 @@
         }
     </div>
     <p class="text-xs text-muted mt-1.5">No general web search engine is used: none is free and allows its results to be kept. Practitioners and authors are not contacted.</p>
+    @if (Page.plan.GreyTypes.Count > 0)
+    {
+        var reach = AuBtechReviewAgent.MultivocalProtocol.ReachLines(Page.plan);
+        <div class="mt-2 border border-line p-2" role="status">
+            <p class="text-xs font-medium text-ink">What the chosen searches can find</p>
+            <ul class="mt-1 space-y-0.5 text-xs">
+                @foreach (var line in reach)
+                {
+                    <li class="@(line.Warning ? "text-partly" : "text-muted")">@(line.Warning ? "Warning: " : "")@line.Text</li>
+                }
+            </ul>
+        </div>
+    }
 </fieldset>
 <fieldset>
     <legend class="ui-label">Search strings for grey literature</legend>

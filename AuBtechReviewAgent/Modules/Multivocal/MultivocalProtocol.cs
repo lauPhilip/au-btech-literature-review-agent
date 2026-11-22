@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 
@@ -65,6 +66,10 @@ public static class MultivocalProtocol
         sb.AppendLine("Where grey literature is searched (G7):");
         foreach (var key in plan.GreySearches)
             sb.AppendLine($"- {MultivocalGuidelines.SearchLabel(key)}");
+        sb.AppendLine();
+        sb.AppendLine("Which chosen search can find each kind (G6, G7):");
+        foreach (var line in ReachLines(plan))
+            sb.AppendLine($"- {line.Text}");
         sb.AppendLine();
         if (plan.UsesFormalPool)
         {
@@ -147,4 +152,17 @@ public static class MultivocalProtocol
         ReviewAudience.Both => "researchers and practitioners",
         _ => "not set",
     };
+
+    /// <summary>
+    /// For each kind of grey literature the plan names, the chosen searches that can find it, or a warning that none
+    /// can (#249: a live run named five kinds and searched only GitHub). Shared by the planning form and the protocol.
+    /// </summary>
+    public static IReadOnlyList<(string Text, bool Warning)> ReachLines(MultivocalPlan plan) =>
+        GreySourceCatalog.Reach(plan.GreyTypes, plan.GreySearches).Select(r =>
+        {
+            string label = MultivocalGuidelines.GreyTypes.FirstOrDefault(t => t.Key == r.Kind).Label ?? r.Kind;
+            return r.Searches.Count > 0
+                ? ($"{label}: {string.Join(", ", r.Searches.Select(MultivocalGuidelines.SearchLabel))}.", false)
+                : ($"{label}: none of the chosen searches can find this kind, so the review will likely include none.", true);
+        }).ToList();
 }
