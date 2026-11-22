@@ -13,6 +13,8 @@
 
 The readability score is 206.835 − 1.015 × (words per sentence) − 84.6 × (syllables per word). Headings, link addresses and code marks are not read, and a list item ends a sentence even without a full stop. Syllables are estimated from groups of vowels, so a score can be a point or two off a dictionary count. An emoji made of several characters, such as a flag or a family, counts once. Whether the notes explain what changed for someone running a review, and are a bit playful, is for the person who reviews the pull request.
 
+The emoji and readability checks live in `release_notes.py`; `release_check.py` reads the tag and the two files and applies them.
+
 A version with a pre-release part, such as `v0.2.0-rc.1`, is published as a pre-release. The script uses only Python's standard library.
 
 Try it on your own tag before pushing it:
@@ -21,7 +23,7 @@ Try it on your own tag before pushing it:
 python3 tools/ReleaseCheck/release_check.py v0.1.0 --notes-out release-notes.md
 ```
 
-The tests build small git repositories with good and bad tags, and also check the repository's own `CHANGELOG.md` and `CITATION.cff`, including that the `[Unreleased]` section would pass as release notes. They run in CI on every pull request:
+The tests are in three files. `test_release_feature.py` builds small git repositories with good and bad tags, `test_release_notes.py` checks the readability score and the emoji count on texts whose answer is known, and `test_release_check.py` checks each rule on its own and also checks the repository's own `CHANGELOG.md` and `CITATION.cff`, including that the `[Unreleased]` section would pass as release notes. They run in CI on every pull request:
 
 ```bash
 python3 -m unittest discover -s tools/ReleaseCheck -v
