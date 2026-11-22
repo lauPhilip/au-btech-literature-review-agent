@@ -44,6 +44,8 @@ The citation repair now has a second pass. After the first repair, a citation th
 
 Removed citations are counted on their own. The report says how many there were, and the coloured bar shows them in navy, next to the verdicts. The Metrics page has a column for them in each table, and run-metrics.json keeps the number. The glossary explains what removed means.
 
+Downloads are now smaller on the wire. The reference lists, the protocol, main.tex and the other text files are sent compressed, and so are the site's styles and scripts. Pages load the same, only faster.
+
 ### Fixed
 
 The discussion no longer leans on studies the review set aside. When a study fits none of the themes, the later sections now know which one it is and why. Only the limitations may name it. The step that builds the themes now sees the criteria every study met, so it cannot set a study aside for a reason they allow.
