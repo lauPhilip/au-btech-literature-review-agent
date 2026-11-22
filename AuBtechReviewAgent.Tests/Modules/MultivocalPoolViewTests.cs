@@ -77,6 +77,21 @@ public class MultivocalPoolViewTests : IDisposable
         Assert.DoesNotContain("Quality 0 of 20", html);
     }
 
+    [Fact]
+    public void TheSourcesTabsLeadSaysHowFarTheSelectionHasGone()
+    {
+        var grey = new MultivocalLedger { StoppingApplied = "Effort bounded." };
+        var both = new MultivocalLedger { StoppingApplied = "Effort bounded.", FormalRemoved = new() };
+
+        Assert.Equal("Effort bounded. Not screened yet.", MultivocalStart.SourcesLead(grey, null, null));
+        Assert.Equal("Effort bounded. Screened twice with the plan's criteria by mistral-large; agreement κ = 0.80; the quality check comes next.",
+            MultivocalStart.SourcesLead(grey, new MultivocalScreeningFile { Model = "mistral-large", Kappa = 0.8 }, null));
+        Assert.Equal("Effort bounded. Screened twice with the plan's criteria.", // no model named, no κ, and past the quality step
+            MultivocalStart.SourcesLead(grey, new MultivocalScreeningFile(), new MultivocalQualityFile()));
+        Assert.Equal("Effort bounded. Screened twice with the plan's criteria by mistral-large; agreement κ = 1.00 for grey, not computed for academic and 0.50 for both.",
+            MultivocalStart.SourcesLead(both, new MultivocalScreeningFile { Model = "mistral-large", Kappa = 0.5, KappaGrey = 1 }, new MultivocalQualityFile()));
+    }
+
     private static async Task<string> RenderAsync<T>(Dictionary<string, object?> parameters) where T : IComponent
     {
         var services = new ServiceCollection();

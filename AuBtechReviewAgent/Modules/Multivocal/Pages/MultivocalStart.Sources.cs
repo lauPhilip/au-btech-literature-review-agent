@@ -82,6 +82,22 @@ public partial class MultivocalStart
     };
 
     /// <summary>
+    /// The Sources found tab's lead: the stopping rule as applied, and how far the selection has gone. The model is named
+    /// only when the file names one, the agreement is given per pool for a review with both, and the quality step is
+    /// "next" only while it has not run.
+    /// </summary>
+    public static string SourcesLead(MultivocalLedger ledger, MultivocalScreeningFile? screening, MultivocalQualityFile? quality)
+    {
+        if (screening == null) return $"{ledger.StoppingApplied} Not screened yet.";
+        static string K(double? k) => k is double v ? v.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture) : "not computed";
+        string agreement = ledger.HasFormalPool
+            ? $"; agreement κ = {K(screening.KappaGrey)} for grey, {K(screening.KappaFormal)} for academic and {K(screening.Kappa)} for both"
+            : screening.Kappa is double k ? $"; agreement κ = {K(k)}" : "";
+        string by = screening.Model.Trim().Length > 0 ? $" by {screening.Model.Trim()}" : "";
+        return $"{ledger.StoppingApplied} Screened twice with the plan's criteria{by}{agreement}{(quality == null ? "; the quality check comes next." : ".")}";
+    }
+
+    /// <summary>
     /// What an academic source's kept text is (decision 8): its full text and where it came from, or its abstract alone.
     /// Null for a grey source's page.
     /// </summary>

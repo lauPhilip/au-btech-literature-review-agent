@@ -8,7 +8,7 @@
 <div class="flex-1 min-h-0 overflow-y-auto p-5 space-y-5 text-left">
     <div>
         <h3 class="text-base font-semibold text-heading">@(ledger.HasFormalPool ? "Grey and academic sources found" : "Grey sources found")</h3>
-        <p class="text-xs text-muted mt-0.5">@ledger.StoppingApplied @(screening == null ? "Not screened yet." : $"Screened twice with the plan's criteria ({screening.Model}); the quality check comes next.")</p>
+        <p class="text-xs text-muted mt-0.5">@MultivocalStart.SourcesLead(ledger, screening, quality)</p>
     </div>
     <table class="w-full text-xs">
         <caption class="sr-only">Searches and what they returned</caption>
