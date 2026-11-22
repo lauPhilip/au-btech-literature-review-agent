@@ -32,7 +32,7 @@ public sealed partial class ReviewApi
                 stats.ProgressDetail ?? "",
                 stats.QueuePosition,
                 new ReviewCounts(stats.TotalIdentified, stats.Screened, stats.Excluded, stats.Included),
-                done ? new VerdictTally(stats.CitationsChecked, stats.CitationsSupported, stats.CitationsPartiallySupported,
+                done ? new ReviewVerdicts(stats.CitationsChecked, stats.CitationsSupported, stats.CitationsPartiallySupported,
                     stats.CitationsNotSupported, stats.CitationsUnverifiable) : null,
                 PrismaReviewEngine.IsFinishedStage(stage) ? state?.FailureMessage : null,
                 stats.RunStartedUtc ?? header.StartedUtc,

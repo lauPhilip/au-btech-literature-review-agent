@@ -82,7 +82,7 @@ public sealed record ReviewDownloads(string Archive, string BibTex, string Ris, 
 public sealed record ReviewCounts(int Identified, int Screened, int Excluded, int Included);
 
 /// <summary>How the citation checks came out, as on the run's summary card.</summary>
-public sealed record VerdictTally(int Checked, int Supported, int PartlySupported, int NotSupported, int Unverifiable);
+public sealed record ReviewVerdicts(int Checked, int Supported, int PartlySupported, int NotSupported, int Unverifiable);
 
 /// <summary>
 /// Where a review stands. Step counts the seven steps the run view shows (ReviewSteps): 0 while the run waits for
@@ -98,7 +98,7 @@ public sealed record ReviewStatus(
     string Detail,
     int QueuePosition,
     ReviewCounts Counts,
-    VerdictTally? Verdicts,
+    ReviewVerdicts? Verdicts,
     string? Failure,
     DateTime? StartedUtc,
     DateTime? CompletedUtc,
