@@ -11,7 +11,7 @@ A source is a class that implements `IAcademicSource`: a `SourceName`, `FetchPap
 1. Write `XyzSource.cs` next to the others. Use `OpenSourceHttp.GetStringAsync` for an open API, so retries and the `User-Agent` are handled for you. Fill `Doi` and `PdfUrl` when the API offers them: the DOI drives de-duplication and citation chaining, and the PDF link is tried for full text.
 2. Add an entry to `SourceCatalog` with a key, a display name and the kind of API key it needs.
 3. Add the key to the `switch` in `RunReviewAsync` that creates the sources, and, if it needs a key, to `GetSourceAvailability`.
-4. Add a parser test with a saved real response, like the ones in `OpenSourceAndSafetyTests.cs`.
+4. Add a parser test with a saved real response, like the ones in `OpenSourceAdapterTests.cs`.
 
 ### Changing a prompt
 
@@ -60,7 +60,9 @@ The **module test kit** (`Modules/ModuleKit.cs` and `Modules/ModuleKitTests.cs`)
 | `CancelRunTests.cs`, `MultivocalCancelTests.cs` | Cancelling: a queued run leaves the line, a running one stops at its next safe point, frees its slot and gets its quota back, a finished run or a caller without the edit key changes nothing, a grey run stops between steps |
 | `PipelineFeatureTests.cs` | Dual screening and disagreements, injection flags, citation chaining, cache reuse, deleting a run, parallel screening order |
 | `RealRunRegressionTests.cs` | Cases taken from real runs that once went wrong |
-| `OpenSourceAndSafetyTests.cs` | Source parsers on saved real responses, rate-limit handling, PDF size limit, prompt-injection markers |
+| `OpenSourceAdapterTests.cs`, `ArxivSourceTests.cs` | Source parsers on saved real responses (OpenAlex, Semantic Scholar, Crossref, Unpaywall, arXiv), rate-limit handling and retries, the PDF size limit |
+| `SafetyAndRecordsTests.cs` | Prompt-injection markers, structured model output, the cache, the manifest, the security headers, and methods text from the run's own counts |
+| `DocPathsTests.cs` | Every file or folder the docs name in backticks exists in the repository |
 | `ArtifactAndProseTests.cs` | Markdown turned into prose, artifact validation and drawing (Mermaid, TikZ), custom requests, compacting after repair, progress that never moves back, a full run with an artifact and with none |
 | `InputGuardAndProgressTests.cs` | Input normalisation, length errors, instruction flags and the protocol entry, API key cleaning, the progress plan and percentage, monotonic progress through a full run |
 | `ArxivSourceTests.cs` | arXiv: retry on 503, a lasting 503 still fails the source, requests one at a time and spaced out |

@@ -31,7 +31,7 @@ flowchart LR
 
 You can also ask for an artifact built from the findings: a concept map, a flowchart, a comparison table or a list of recommendations. It is drawn from what the review found, and what it cites is checked like the text.
 
-In the finished report, every citation number is clickable. Click it and you see what the check found: supported, partly supported or not supported, the quote from the paper, and where in the paper it is. Green means the paper says it; orange and red stay in the report on purpose, so you know exactly where to look.
+In the finished report, every citation number is clickable. Click it and you see what the check found: supported, partly supported or not supported, the quote from the paper, and where in the paper it is. Green means the paper says it. A sentence that claims more than its paper is rewritten to fit the quote and checked again, and a citation the paper does not back at all is removed, with its claim when nothing else supports it. Every change is on file. What is still only partly supported stays orange on purpose, so you know exactly where to look.
 
 ## See it in action
 
