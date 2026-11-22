@@ -76,6 +76,15 @@ public sealed class ReviewMcpTools(ReviewApi reviews, IHttpContextAccessor http,
         [Description("bibtex, ris, main.tex or archive.")] string file) =>
         Answer(reviews.FileOf(RunId(id), file, BaseUrl));
 
+    [McpServerTool(Name = "cancel_review", Destructive = true), Description(
+        "Cancels a queued or running review, as the Cancel button on its page does. Needs the edit key that start_literature_review returned. " +
+        "The review stops at its next safe point and ends in the stage Cancelled, with the reason in its ledger.")]
+    public string CancelReview(
+        [Description("The run id.")] string id,
+        [Description("The edit key that start_literature_review returned.")] string editKey,
+        [Description("Why it is cancelled, in one line; it is kept on file.")] string? reason = null) =>
+        Answer(reviews.Cancel(RunId(id), editKey, reason, BaseUrl));
+
     /// <summary>A run id is a GUID; anything else never reaches a path.</summary>
     private static Guid RunId(string? id) =>
         Guid.TryParse(id, out var runId) ? runId : throw new McpException("The run id is not valid. Use the id that start_literature_review returned.");

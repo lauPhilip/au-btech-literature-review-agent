@@ -23,6 +23,7 @@ public static class ApiEndpoints
     public const string ElsevierKeyHeader = "X-Elsevier-Key";
     public const string IeeeKeyHeader = "X-Ieee-Key";
     public const string ScholarKeyHeader = "X-Semantic-Scholar-Key";
+    public const string EditKeyHeader = "X-Edit-Key";
 
     /// <summary>Calls per minute per client address, and per key, on every API and MCP address.</summary>
     public const int CallsPerMinute = 120;
@@ -116,6 +117,17 @@ public static class ApiEndpoints
         api.MapGet("/reviews/{id:guid}/report", (Guid id, ReviewApi reviews) => ToResult(reviews.Report(id)))
             .WithName("GetReviewReport").WithSummary("The finished report as data: sections, every citation with its verdict and quote, references and PRISMA counts.")
             .Produces<ApiReviewReport>().ProducesProblem(StatusCodes.Status404NotFound).ProducesProblem(StatusCodes.Status409Conflict);
+
+        api.MapDelete("/reviews/{id:guid}", (Guid id, string? reason, HttpContext context, ReviewApi reviews) =>
+        {
+            var result = reviews.Cancel(id, context.Request.Headers[EditKeyHeader].ToString(), reason,
+                SiteSeo.BaseUrl(configuration, context.Request));
+            return result.Problem != null ? Problem(result.Problem) : Results.Accepted(result.Value!.Links.Status, result.Value);
+        })
+            .WithName("CancelReview").WithSummary("Cancel a queued or running review with its edit key (X-Edit-Key), and an optional reason.")
+            .Produces<ReviewCancelled>(StatusCodes.Status202Accepted)
+            .ProducesProblem(StatusCodes.Status401Unauthorized).ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status404NotFound).ProducesProblem(StatusCodes.Status409Conflict);
 
         app.MapOpenApi(); // at OpenApiPath
         app.MapReviewMcp();

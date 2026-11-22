@@ -8,7 +8,7 @@ using Xunit;
 namespace AuBtechReviewAgent.Tests;
 
 /// <summary>
-/// The MCP server through the SDK's own HTTP client, against the real app with the scripted fake model: the four
+/// The MCP server through the SDK's own HTTP client, against the real app with the scripted fake model: the five
 /// tools, a whole review started and read through them, the caller's key in a header and never on file, and errors.
 /// </summary>
 [Collection(ApiCollection.Name)]
@@ -35,12 +35,12 @@ public class ReviewMcpTests
     }
 
     [Fact]
-    public async Task The_server_offers_the_four_tools()
+    public async Task The_server_offers_the_five_tools()
     {
         using var host = new ApiTestHost();
         await using var client = await ConnectAsync(host);
         var names = (await client.ListToolsAsync()).Select(t => t.Name).OrderBy(n => n, StringComparer.Ordinal).ToList();
-        Assert.Equal(new[] { "get_review_file", "get_review_report", "get_review_status", "start_literature_review" }, names);
+        Assert.Equal(new[] { "cancel_review", "get_review_file", "get_review_report", "get_review_status", "start_literature_review" }, names);
     }
 
     [Fact]
