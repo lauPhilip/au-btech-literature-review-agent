@@ -63,6 +63,9 @@ const flows = [
   },
 ];
 
+// Screens that must fit a 390 x 844 phone without scrolling (issue #244), in light and dark.
+const phoneScreens = ['/', '/review', '/design/run'];
+
 const browser = await chromium.launch(process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH } : {});
 const failures = [];
 
@@ -110,9 +113,30 @@ for (const flow of flows) {
   await context.close();
 }
 
+for (const theme of ['light', 'dark']) {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+  if (theme === 'dark') await context.addInitScript(() => localStorage.setItem('traceableai-theme', 'dark'));
+  for (const path of phoneScreens) {
+    const page = await context.newPage();
+    await page.goto(base + path, { waitUntil: 'load' });
+    await page.waitForTimeout(1500);
+    if (await page.locator('#key-dialog').isVisible()) await page.keyboard.press('Escape');
+    // The app frame scrolls inside <main>; the landing page scrolls the document.
+    const over = await page.evaluate(() => {
+      const el = document.querySelector('#main') ?? document.scrollingElement;
+      return el.scrollHeight - el.clientHeight;
+    });
+    const ok = over <= 2;
+    console.log(`${ok ? 'ok  ' : 'FAIL'} ${path} fits a phone (${theme})${ok ? '' : `: ${over} px too tall`}`);
+    if (!ok) failures.push(`${path} on a phone (${theme})`);
+    await page.close();
+  }
+  await context.close();
+}
+
 await browser.close();
 if (failures.length) {
   console.log(`\n${failures.length} smoke check(s) failed.`);
   process.exit(1);
 }
-console.log(`\nAll ${pages.length} pages and ${flows.length} flows work.`);
+console.log(`\nAll ${pages.length} pages and ${flows.length} flows work, and ${phoneScreens.length} screens fit a phone in both themes.`);
