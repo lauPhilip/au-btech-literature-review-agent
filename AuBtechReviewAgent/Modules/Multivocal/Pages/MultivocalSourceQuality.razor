@@ -1,9 +1,10 @@
 @* A source's quality score on the Sources found tab: its points, each checklist answer of Table 7 with its reason
-   and quote, an opinion piece's claim with the critical questions (G13), or why it was not assessed. *@
+   and quote, an opinion piece's claim with the critical questions (G13), or why it was not assessed. An academic
+   source shows its MMAT appraisal instead, each answer with its quote, as in the systematic review (block I-6). *@
 
 <details class="mt-1 text-[11px] text-ink">
     <summary class="cursor-pointer select-none">
-        <span class="@MultivocalStart.QualityChip(Score.Outcome) text-[10px]">@(Score.Outcome == "Not assessed" ? "Quality not assessed" : $"Quality {Score.Points:0.#} of {AuBtechReviewAgent.GreyQualityChecklist.MaxPoints}")</span>
+        <span class="@MultivocalStart.QualityChip(Score.Outcome) text-[10px]">@(Score.Outcome == "Not assessed" ? "Quality not assessed" : Score.Mmat is { } mmat ? $"MMAT: {AuBtechReviewAgent.MultivocalMapper.MmatSummary(mmat)}" : $"Quality {Score.Points:0.#} of {AuBtechReviewAgent.GreyQualityChecklist.MaxPoints}")</span>
     </summary>
     @if (Score.NotAssessed != null)
     {
@@ -13,6 +14,29 @@
             string address = Score.Address;
             <button type="button" class="ui-btn-secondary ui-btn-sm mt-1" disabled="@(Retrying == address)" @onclick="() => OnRetry.InvokeAsync(address)">@(Retrying == address ? "Assessing…" : "Try again")</button>
         }
+    }
+    else if (Score.Mmat is { } appraisal)
+    {
+        <p class="mt-1 text-muted">Appraised with MMAT on its @(Score.TextBasis ?? "kept text"); the quality threshold is for grey sources only, so it is kept.</p>
+        <table class="w-full mt-1">
+            <caption class="sr-only">@($"MMAT answers for {Title}")</caption>
+            <tbody>
+                @foreach (var answer in appraisal.Appraisal)
+                {
+                    <tr class="border-t border-line align-top">
+                        <th scope="row" class="py-1 pr-2 font-normal text-muted w-8">@answer.Id</th>
+                        <td class="py-1 pr-2">
+                            <span class="text-ink">@answer.Criterion</span>
+                            @if (answer.QuoteVerified && answer.Quote.Length > 0)
+                            {
+                                <q class="block text-muted italic">@answer.Quote</q>
+                            }
+                        </td>
+                        <td class="py-1 text-right font-medium whitespace-nowrap">@answer.Answer.Replace("cant_tell", "can't tell")</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
     }
     else
     {

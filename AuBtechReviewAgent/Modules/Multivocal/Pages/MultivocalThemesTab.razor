@@ -5,7 +5,7 @@
 <div class="flex-1 min-h-0 overflow-y-auto p-5 space-y-5 text-left">
     <div>
         <h3 class="text-base font-semibold text-heading">Themes</h3>
-        <p class="text-xs text-muted mt-0.5">The findings of each research question grouped into themes by the model (G13). What each theme rests on is counted in code from its sources; every quote was checked against the kept page text, not the live page.</p>
+        <p class="text-xs text-muted mt-0.5">The findings of each research question grouped into themes by the model (G13). What each theme rests on is counted in code from its sources; every quote was checked against the kept @(Synthesis.Findings.Any(f => f.Literature == "formal") ? "text: a grey source's page, an academic source's full text or abstract" : "page text, not the live page").</p>
         @foreach (var note in Synthesis.Notes)
         {
             <p class="text-[11px] text-partly mt-1">@note</p>

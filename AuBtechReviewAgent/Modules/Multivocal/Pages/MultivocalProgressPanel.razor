@@ -79,53 +79,63 @@
     <span class="text-[10px] font-bold uppercase tracking-wider text-muted block mb-3">Source funnel</span>
 
     <div class="space-y-1.5 text-xs">
-        @FunnelRow("Found", Ledger == null ? "–" : found.ToString(), Ledger == null ? null : $"from {Ledger.Searches.Count} search{(Ledger.Searches.Count == 1 ? "" : "es")}", true)
-        @if (Screening != null && (duplicates > 0 || notScreened > 0))
+        @if (Ledger?.HasFormalPool == true)
         {
-            <div class="pl-4 space-y-0.5 text-[11px] text-muted">
-                <div class="flex justify-between" title="The same source found under another address; that source was screened"><span>− Duplicates</span><span class="font-mono">@duplicates</span></div>
-                @if (notScreened > 0)
-                {
-                    <div class="flex justify-between text-partly" title="The model call failed, so these sources were not screened"><span>− Could not be screened</span><span class="font-mono">@notScreened</span></div>
-                }
-            </div>
+            @* Both pools side by side (block I-6); a grey literature review keeps the funnel below. *@
+            <MultivocalPoolFunnel Grey="AuBtechReviewAgent.MultivocalPools.For(false, Ledger, Screening, Quality, Extraction)"
+                                  Formal="AuBtechReviewAgent.MultivocalPools.For(true, Ledger, Screening, Quality, Extraction)"
+                                  Kappa="Screening?.Kappa" Screened="Screening != null" Assessed="Quality != null" Extracted="Extraction != null" />
         }
-
-        @FunnelRow("Screened", Screening == null ? "–" : (included + excluded).ToString(), Screening?.Kappa is double k ? $"twice; agreement κ = {k:0.00}" : null, false)
-        @if (Screening != null)
+        else
         {
-            <div class="grid grid-cols-2 gap-1.5">
-                <div class="p-2 bg-not-supported-fill border border-not-supported-border">
-                    <span class="block text-[9px] font-bold text-not-supported uppercase tracking-wider">Excluded</span>
-                    <span class="text-lg font-bold text-not-supported font-mono">@excluded</span>
-                </div>
-                <div class="p-2 bg-supported-fill border border-supported-border">
-                    <span class="block text-[9px] font-bold text-supported uppercase tracking-wider">Included</span>
-                    <span class="text-lg font-bold text-supported font-mono">@included</span>
-                    @if (toLook > 0)
+            @FunnelRow("Found", Ledger == null ? "–" : found.ToString(), Ledger == null ? null : $"from {Ledger.Searches.Count} search{(Ledger.Searches.Count == 1 ? "" : "es")}", true)
+            @if (Screening != null && (duplicates > 0 || notScreened > 0))
+            {
+                <div class="pl-4 space-y-0.5 text-[11px] text-muted">
+                    <div class="flex justify-between" title="The same source found under another address; that source was screened"><span>− Duplicates</span><span class="font-mono">@duplicates</span></div>
+                    @if (notScreened > 0)
                     {
-                        <span class="block text-[10px] text-partly">@toLook marked to look at</span>
+                        <div class="flex justify-between text-partly" title="The model call failed, so these sources were not screened"><span>− Could not be screened</span><span class="font-mono">@notScreened</span></div>
                     }
                 </div>
-            </div>
-        }
+            }
 
-        @FunnelRow("Quality", Quality == null ? "–" : Quality.Count("Passed").ToString(), Quality == null ? null : $"passed {Quality.Threshold} of {AuBtechReviewAgent.MultivocalGuidelines.QualityPointsMax} points", false)
-        @if (Quality != null && (Quality.Count("Below threshold") > 0 || Quality.Count("Not assessed") > 0))
-        {
-            <div class="pl-4 space-y-0.5 text-[11px] text-muted">
-                <div class="flex justify-between"><span>− Below the threshold</span><span class="font-mono">@Quality.Count("Below threshold")</span></div>
-                @if (Quality.Count("Not assessed") > 0)
-                {
-                    <div class="flex justify-between text-partly" title="The page could not be read"><span>− Not assessed</span><span class="font-mono">@Quality.Count("Not assessed")</span></div>
-                }
-            </div>
-        }
+            @FunnelRow("Screened", Screening == null ? "–" : (included + excluded).ToString(), Screening?.Kappa is double k ? $"twice; agreement κ = {k:0.00}" : null, false)
+            @if (Screening != null)
+            {
+                <div class="grid grid-cols-2 gap-1.5">
+                    <div class="p-2 bg-not-supported-fill border border-not-supported-border">
+                        <span class="block text-[9px] font-bold text-not-supported uppercase tracking-wider">Excluded</span>
+                        <span class="text-lg font-bold text-not-supported font-mono">@excluded</span>
+                    </div>
+                    <div class="p-2 bg-supported-fill border border-supported-border">
+                        <span class="block text-[9px] font-bold text-supported uppercase tracking-wider">Included</span>
+                        <span class="text-lg font-bold text-supported font-mono">@included</span>
+                        @if (toLook > 0)
+                        {
+                            <span class="block text-[10px] text-partly">@toLook marked to look at</span>
+                        }
+                    </div>
+                </div>
+            }
 
-        @FunnelRow("Extracted", Extraction == null ? "–" : extracted.ToString(), Map?.FixedVersion is int v ? $"against map version {v}, {Map.Versions.First(x => x.Number == v).Attributes.Count} attributes" : null, false)
-        @if (notExtracted > 0)
-        {
-            <div class="pl-4 text-[11px] text-partly flex justify-between"><span>− Could not be extracted</span><span class="font-mono">@notExtracted</span></div>
+            @FunnelRow("Quality", Quality == null ? "–" : Quality.Count("Passed").ToString(), Quality == null ? null : $"passed {Quality.Threshold} of {AuBtechReviewAgent.MultivocalGuidelines.QualityPointsMax} points", false)
+            @if (Quality != null && (Quality.Count("Below threshold") > 0 || Quality.Count("Not assessed") > 0))
+            {
+                <div class="pl-4 space-y-0.5 text-[11px] text-muted">
+                    <div class="flex justify-between"><span>− Below the threshold</span><span class="font-mono">@Quality.Count("Below threshold")</span></div>
+                    @if (Quality.Count("Not assessed") > 0)
+                    {
+                        <div class="flex justify-between text-partly" title="The page could not be read"><span>− Not assessed</span><span class="font-mono">@Quality.Count("Not assessed")</span></div>
+                    }
+                </div>
+            }
+
+            @FunnelRow("Extracted", Extraction == null ? "–" : extracted.ToString(), Map?.FixedVersion is int v ? $"against map version {v}, {Map.Versions.First(x => x.Number == v).Attributes.Count} attributes" : null, false)
+            @if (notExtracted > 0)
+            {
+                <div class="pl-4 text-[11px] text-partly flex justify-between"><span>− Could not be extracted</span><span class="font-mono">@notExtracted</span></div>
+            }
         }
 
         @FunnelRow("Themes", Synthesis == null ? "–" : Synthesis.Themes.Count.ToString(), Synthesis == null ? null : $"from {Synthesis.Findings.Count} findings", false)
