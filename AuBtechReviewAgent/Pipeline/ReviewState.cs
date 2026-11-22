@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Text.Json.Serialization;
 
 namespace AuBtechReviewAgent;
 
@@ -85,9 +86,16 @@ public class ReviewState
     // Thematic synthesis: codes, themes, coverage and (optionally) the second coding (also thematic-codebook.json).
     public ThematicCodebook? ThematicSynthesis { get; set; }
 
-    // Set when the run stopped early ("Failed" or "Interrupted" stage), so a returning user sees why.
+    // Set when the run stopped early ("Failed", "Interrupted" or "Cancelled" stage), so a returning user sees why.
     public string? FailureMessage { get; set; }
     public DateTime? CompletedUtc { get; set; }
+
+    // Set only when the owner cancelled the run: when they asked, and the reason they gave. Left out of the
+    // ledger otherwise, so a run that is not cancelled is written exactly as before.
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public DateTime? CancelledUtc { get; set; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? CancelReason { get; set; }
 }
 
 public class ReviewStats 

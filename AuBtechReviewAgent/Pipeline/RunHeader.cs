@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 
 namespace AuBtechReviewAgent;
@@ -22,6 +23,14 @@ public sealed record RunHeader(
     DateTime? CompletedUtc = null)
 {
     public const string FileName = "run.json";
+
+    /// <summary>When the run's owner cancelled it; absent from run.json for a run that was not cancelled.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public DateTime? CancelledUtc { get; init; }
+
+    /// <summary>The reason the owner gave for cancelling, as data; absent when the run was not cancelled.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? CancelReason { get; init; }
 
     private static readonly JsonSerializerOptions Json = new() { WriteIndented = true, PropertyNameCaseInsensitive = true };
 
