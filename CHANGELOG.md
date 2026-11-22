@@ -38,6 +38,8 @@ The new look changes nothing about how a review runs. These are the first steps 
 
 The citation repair now has a second pass. After the first repair, a citation that is still only partly backed is rewritten once more and checked again. A citation that is still not backed is taken out. If another citation backs the sentence, the sentence stays. If not, the sentence goes too. Each change is kept in citation-audit.json, with the sentence as it was, so nothing goes missing. Both kinds of review use it.
 
+Removed citations are counted on their own. The report says how many there were, and the coloured bar shows them in navy, next to the verdicts. The Metrics page has a column for them in each table, and run-metrics.json keeps the number. The glossary explains what removed means.
+
 ### Fixed
 
 The discussion no longer leans on studies the review set aside. When a study fits none of the themes, the later sections now know which one it is and why. Only the limitations may name it. The step that builds the themes now sees the criteria every study met, so it cannot set a study aside for a reason they allow.
