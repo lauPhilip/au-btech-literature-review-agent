@@ -73,14 +73,14 @@ public static class Grounding
             repairing?.Invoke(checks.Count(CitationRepairer.NeedsRepair));
             using (LlmStage.Begin("citation-repair"))
                 (fields, checks, repairs) = await CitationRepairer.RepairAsync(chat, fields, checks, sources, verifiedQuotes, referenceCount,
-                    options.Parallelism, options.SecondCheck, options.Review);
+                    options.Parallelism, options.SecondCheck, options.Review, cache: options.Cache);
             if (checks.Any(CitationRepairer.NeedsRepair))
             {
                 repairing?.Invoke(checks.Count(CitationRepairer.NeedsRepair));
                 SecondPassResult second;
                 using (LlmStage.Begin("citation-repair"))
                     second = await CitationRepairer.SecondPassAsync(chat, fields, checks, sources, verifiedQuotes, referenceCount,
-                        options.Parallelism, options.SecondCheck, options.Review);
+                        options.Parallelism, options.SecondCheck, options.Review, options.Cache);
                 (fields, checks, removed) = (second.Fields, second.Results, second.Removed);
                 repairs.AddRange(second.Repairs);
             }
