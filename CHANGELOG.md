@@ -12,6 +12,8 @@ Other tools can now start a review through an API. Send the form's fields to `/a
 
 The API can also hand back the finished report as data. You get each section, every citation with its verdict and quote, the references and the PRISMA counts. A description of the API is at `/openapi/v1.json`.
 
+AI assistants can run a review too. TraceableAI now has an MCP server at `/mcp`. An assistant can start a review, check on it, read the report and fetch the BibTeX, RIS or LaTeX, all with your own Mistral key.
+
 You can now stop a review you started. The run stops at the next safe point, before its next model call or step. A review that waits in line just leaves the line. The run is marked as cancelled, and the time and your reason are kept on file. Your free review for the day comes back, once a day. Only the browser that started the review can cancel it. Click "Cancel review" beside the run, and the page asks once before it acts. You can say why, if you like. Then the page shows the run as cancelled, with your reason and a button to start a new review. The button works on a phone too.
 
 ### Changed

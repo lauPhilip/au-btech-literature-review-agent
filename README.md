@@ -82,7 +82,7 @@ Open the address shown in the terminal and press **Start a review**, or **New re
 
 The [developer wiki](docs/wiki/README.md) explains how everything works, with diagrams: the [review pipeline](docs/wiki/02-review-pipeline.md), [search and screening](docs/wiki/03-search-and-screening.md), [thematic synthesis and the citation checks](docs/wiki/04-evidence-and-report.md), the [ledger and the archive](docs/wiki/05-ledger-and-archive.md), [the web app and deployment](docs/wiki/06-web-app-and-operations.md), and [how to extend and test it](docs/wiki/07-extending-and-testing.md).
 
-Other tools can start a review and read its report through [the API](docs/wiki/09-api-and-mcp.md), with their own Mistral key. Its OpenAPI description is served at `/openapi/v1.json` wherever the API is switched on.
+Other tools can start a review and read its report through [the API or the MCP server](docs/wiki/09-api-and-mcp.md), with their own Mistral key. Its OpenAPI description is served at `/openapi/v1.json` wherever the API is switched on.
 
 ## Citing TraceableAI
 
