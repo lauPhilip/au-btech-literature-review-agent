@@ -20,7 +20,8 @@ public partial class PrismaReviewEngine
         : $"{count} citations in a theme subsection refer to a study not coded under that theme and are flagged in the audit.";
 
     private sealed record CitationCheck(List<(string Field, string Text)> Fields, List<StrippedCitation> Strips, List<CitationSupportResult> Checks,
-        CitationSupportSummary Initial, CitationSupportSummary Summary, List<CitationRepair> Repairs, List<RemovedCitation> Removed);
+        CitationSupportSummary Initial, CitationSupportSummary Summary, List<CitationRepair> Repairs, List<RemovedCitation> Removed,
+        List<RepairSenseCheck> Sense);
 
     private sealed record CoverageResult(Dictionary<string, string> TextOf, SortedSet<int> Cited, List<UncodedStudy> NotCited, string Sentence);
 
@@ -121,7 +122,7 @@ public partial class PrismaReviewEngine
         finalState.Stats.CitationsInsufficientEvidence = supportSummary.InsufficientEvidence;
         finalState.Stats.CitationsSecondChecked = supportSummary.SecondChecked;
         finalState.Stats.CitationsUpgradedBySecondCheck = supportSummary.UpgradedBySecondCheck;
-        return new CitationCheck(fields, citationStrips, supportChecks, initialSummary, supportSummary, repairs, grounding.Removed);
+        return new CitationCheck(fields, citationStrips, supportChecks, initialSummary, supportSummary, repairs, grounding.Removed, grounding.Sense ?? new());
     }
 
     /// <summary>Which included studies the synthesis and discussion cite, and why the others are not cited; saved with the codebook.</summary>
@@ -211,6 +212,7 @@ public partial class PrismaReviewEngine
                 SupportSummary = supportSummary,
                 Repairs = repairs,
                 RemovedCitations = check.Removed,
+                SenseChecks = check.Sense,
                 StudiesCited = coverage.Cited.Count,
                 FormattingChanges = run.FormattingChanges,
                 NotCited = coverage.NotCited,
