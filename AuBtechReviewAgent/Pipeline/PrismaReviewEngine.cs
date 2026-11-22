@@ -191,16 +191,7 @@ public partial class PrismaReviewEngine
         foreach (var key in selectedKeys)
         {
             if (!availability.TryGetValue(key, out bool ok) || !ok) { ctx.State.UnavailableSources.Add(key); continue; }
-            ctx.Sources.Add(SourceFactory?.Invoke(key) ?? key switch
-            {
-                "arxiv" => new ArxivSource(),
-                "scopus" => new ElsevierSource(activeElsevier),
-                "ieee" => new IeeeXploreSource(activeIeee!),
-                "openalex" => new OpenAlexSource(OpenSources.ContactEmail, OpenSources.OpenAlexApiKey),
-                "semanticscholar" => new SemanticScholarSource(activeScholar ?? OpenSources.SemanticScholarApiKey),
-                "crossref" => new CrossrefSource(OpenSources.ContactEmail),
-                _ => throw new InvalidOperationException($"Unknown source key '{key}'.")
-            });
+            ctx.Sources.Add(CreateSource(key, activeElsevier, activeIeee, activeScholar));
         }
 
         Directory.CreateDirectory(ctx.Workspace);

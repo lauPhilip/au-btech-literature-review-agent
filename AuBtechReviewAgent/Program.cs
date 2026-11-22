@@ -111,7 +111,8 @@ builder.Services.AddSingleton(reviewEngine);
 builder.Services.AddSingleton(reviewEngine.Store); // the run folders, shared by every kind of review
 var multivocalPlanner = new AuBtechReviewAgent.MultivocalPlanner(reviewEngine.Store);
 builder.Services.AddSingleton(multivocalPlanner); // multivocal planning (preview)
-var multivocalSearcher = new AuBtechReviewAgent.MultivocalSearcher(reviewEngine.Store, multivocalPlanner, key => AuBtechReviewAgent.GreySourceCatalog.Create(key, openSources.ContactEmail));
+var multivocalSearcher = new AuBtechReviewAgent.MultivocalSearcher(reviewEngine.Store, multivocalPlanner, key => AuBtechReviewAgent.GreySourceCatalog.Create(key, openSources.ContactEmail),
+    reviewEngine.CreateServerSource); // the formal pool: the systematic review's databases, with the server's keys
 builder.Services.AddSingleton(multivocalSearcher); // multivocal grey searches (preview)
 // Inside a run started by the runner, the steps use the run's recording service, so their calls land in llm-calls.json.
 var multivocalChat = () => (Microsoft.SemanticKernel.ChatCompletion.IChatCompletionService?)AuBtechReviewAgent.LlmRecording.Current

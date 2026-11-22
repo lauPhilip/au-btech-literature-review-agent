@@ -122,9 +122,12 @@ public partial class MultivocalStart
         }
     }
 
-    internal static string SearchLabel(string key) =>
-        GreySourceCatalog.Create(key)?.Name ?? MultivocalGuidelines.SearchLabel(key);
+    /// <summary>A grey search's name, or an academic database's with "(academic)", since the two pools are listed together.</summary>
+    public static string SearchLabel(string key) =>
+        GreySourceCatalog.Create(key)?.Name
+        ?? (SourceCatalog.Find(key) is { } database ? $"{database.DisplayName} (academic)" : MultivocalGuidelines.SearchLabel(key));
 
-    internal static string KindLabel(string key) =>
-        MultivocalGuidelines.GreyTypes.FirstOrDefault(t => t.Key == key).Label ?? key;
+    public static string KindLabel(string key) =>
+        key == MultivocalSearcher.FormalKind ? "Academic literature"
+        : MultivocalGuidelines.GreyTypes.FirstOrDefault(t => t.Key == key).Label ?? key;
 }

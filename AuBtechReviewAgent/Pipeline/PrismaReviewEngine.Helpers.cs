@@ -25,13 +25,39 @@ public partial class PrismaReviewEngine
             });
     }
 
+    /// <summary>The gateway for a SourceCatalog key, with the given keys (or the test hook's fake).</summary>
+    private IAcademicSource CreateSource(string key, string elsevier, string? ieee, string? scholar) =>
+        SourceFactory?.Invoke(key) ?? key switch
+        {
+            "arxiv" => new ArxivSource(),
+            "scopus" => new ElsevierSource(elsevier),
+            "ieee" => new IeeeXploreSource(ieee!),
+            "openalex" => new OpenAlexSource(OpenSources.ContactEmail, OpenSources.OpenAlexApiKey),
+            "semanticscholar" => new SemanticScholarSource(scholar ?? OpenSources.SemanticScholarApiKey),
+            "crossref" => new CrossrefSource(OpenSources.ContactEmail),
+            _ => throw new InvalidOperationException($"Unknown source key '{key}'.")
+        };
+
+    /// <summary>
+    /// The gateway for a SourceCatalog key with the server's own keys, for another module's search (the multivocal
+    /// review's formal pool); null when the key is unknown or the database needs a key the server does not have.
+    /// </summary>
+    public IAcademicSource? CreateServerSource(string key)
+    {
+        if (SourceCatalog.Find(key) is not { } option) return null;
+        if (!GetSourceAvailability(null).TryGetValue(option.Key, out bool usable) || !usable) return null;
+        var keys = ResolveKeys(null);
+        return CreateSource(option.Key, keys.Elsevier, keys.Ieee, keys.Scholar);
+    }
+
     private (string Mistral, string Elsevier, string? Ieee, string? Scholar) ResolveKeys(UserApiKeys? userKeys) => (
         !string.IsNullOrWhiteSpace(userKeys?.MistralApiKey) ? userKeys.MistralApiKey : _globalMistralKey,
         !string.IsNullOrWhiteSpace(userKeys?.ElsevierApiKey) ? userKeys.ElsevierApiKey : _globalElsevierKey,
         !string.IsNullOrWhiteSpace(userKeys?.IeeeApiKey) ? userKeys.IeeeApiKey : _globalIeeeKey,
         !string.IsNullOrWhiteSpace(userKeys?.ScholarApiKey) ? userKeys.ScholarApiKey : _globalScholarKey);
 
-    private string SanitizeLogMessage(string message)
+    /// <summary>An error message on one line with anything that looks like a key redacted, for logs and ledgers.</summary>
+    public static string SanitizeLogMessage(string message)
     {
         if (string.IsNullOrEmpty(message)) return string.Empty;
         // Line breaks are removed so a crafted value cannot add fake lines to the log (log forging).

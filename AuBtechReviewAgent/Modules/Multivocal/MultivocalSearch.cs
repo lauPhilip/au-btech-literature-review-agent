@@ -5,6 +5,7 @@ using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
@@ -27,6 +28,10 @@ public sealed class GreySearchLog
     public string RawSha256 { get; set; } = "";
     public DateTime SearchedUtc { get; set; }
     public string? Error { get; set; }
+
+    /// <summary>True for a search of an academic database (the formal pool); left out of a grey search's entry.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public bool Formal { get; set; }
 }
 
 /// <summary>A grey source the searches found, with every search that found it.</summary>
@@ -34,6 +39,17 @@ public sealed class FoundGreySource
 {
     public GreyRecord Record { get; set; } = null!;
     public List<string> FoundBy { get; set; } = new();
+
+    /// <summary>
+    /// A formal source's record as the database returned it, in the systematic review's shape (authors, venue, DOI,
+    /// open-access PDF); null, and left out of the file, for a grey source.
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public AcademicPaper? Paper { get; set; }
+
+    /// <summary>Whether the source is in the formal pool (found in an academic database) rather than the grey pool.</summary>
+    [JsonIgnore]
+    public bool IsFormal => Paper != null;
 }
 
 /// <summary>A search of the plan that did not run, and why.</summary>
@@ -53,15 +69,29 @@ public sealed class MultivocalLedger
     public List<GreySearchLog> Searches { get; set; } = new();
     public List<FoundGreySource> Sources { get; set; } = new();
     public List<SkippedSearch> Skipped { get; set; } = new();
+
+    /// <summary>
+    /// Records from the academic databases that were not kept, each with its reason (a duplicate by id, DOI or title,
+    /// as in the systematic review, or no web address); null, and left out of the file, for a grey literature review.
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public List<RemovedRecord>? FormalRemoved { get; set; }
+
+    [JsonIgnore]
+    public IEnumerable<FoundGreySource> GreyPool => Sources.Where(s => !s.IsFormal);
+
+    [JsonIgnore]
+    public IEnumerable<FoundGreySource> FormalPool => Sources.Where(s => s.IsFormal);
 }
 
 /// <summary>
-/// Runs the grey literature searches of a planned multivocal run (MLR block D): every chosen search that is built,
-/// with every search string, under the plan's stopping rule. Each raw answer is saved as received with its SHA-256;
-/// the sources found are de-duplicated by address. The run goes from "Planned" through "Searching" to "Searched".
+/// Runs the searches of a planned multivocal run: the grey literature searches (MLR block D), every chosen search that
+/// is built, with every grey search string, and, for a plan with academic databases, the formal pool (block I-2,
+/// MultivocalSearch.Formal.cs), both under the plan's stopping rule. Each raw answer is saved as received with its
+/// SHA-256; grey sources are de-duplicated by address. The run goes from "Planned" through "Searching" to "Searched".
 /// Searches that are not built yet are listed as skipped, so the ledger never implies they ran.
 /// </summary>
-public sealed class MultivocalSearcher
+public sealed partial class MultivocalSearcher
 {
     public const string LedgerFile = "multivocal-ledger.json";
     public const string StageSearching = "Searching";
@@ -70,16 +100,6 @@ public sealed class MultivocalSearcher
     /// <summary>The most one search can ask for: the APIs return one page of at most 100 hits.</summary>
     public const int MaxPerSearch = 100;
 
-    /// <summary>
-    /// Whether the academic databases of a multivocal plan can be searched (block I-2 of docs/roadmap/mlr-todo.md).
-    /// Until they can, a plan that names them is refused here rather than searched for grey literature only, since its
-    /// protocol promises both pools and its paper would call it a multivocal review.
-    /// </summary>
-    public const bool FormalSearchBuilt = false;
-
-    public const string FormalNotBuiltMessage =
-        "The academic databases cannot be searched yet; that comes in step I-2 of the roadmap. Plan a new review with no academic database ticked, or from the Grey Literature Review card.";
-
     private static readonly JsonSerializerOptions Json = new() { WriteIndented = true };
     private static readonly SemaphoreSlim Gate = new(1, 1);
     private static ILogger _log => AppLog.For("AuBtechReviewAgent.MultivocalSearcher");
@@ -87,12 +107,21 @@ public sealed class MultivocalSearcher
     private readonly RunStore _runs;
     private readonly MultivocalPlanner _planner;
     private readonly Func<string, IGreySource?> _sources;
+    private readonly Func<string, IAcademicSource?>? _academic;
 
-    public MultivocalSearcher(RunStore runs, MultivocalPlanner planner, Func<string, IGreySource?>? sources = null)
+    /// <summary>A searcher over the run folders, with the grey searches and, for the formal pool, the academic databases.</summary>
+    /// <param name="runs">The run folders.</param>
+    /// <param name="planner">Reads the run's plan.</param>
+    /// <param name="sources">Opens a grey search by its key (default: the built ones in <see cref="GreySourceCatalog"/>).</param>
+    /// <param name="academic">Opens an academic database of the formal pool by its SourceCatalog key, with the server's
+    /// own key; null when the database cannot be searched here. Without it, every database is listed as skipped.</param>
+    public MultivocalSearcher(RunStore runs, MultivocalPlanner planner, Func<string, IGreySource?>? sources = null,
+        Func<string, IAcademicSource?>? academic = null)
     {
         _runs = runs;
         _planner = planner;
         _sources = sources ?? (key => GreySourceCatalog.Create(key));
+        _academic = academic;
     }
 
     /// <summary>The ledger of a searched run, or null.</summary>
@@ -112,7 +141,6 @@ public sealed class MultivocalSearcher
     {
         if (!_runs.CanEdit(runId, editKey)) throw new InvalidOperationException("Only the browser that planned this run can start its search.");
         var planned = _planner.Load(runId) ?? throw new InvalidOperationException("This run has no plan.");
-        if (planned.Plan.UsesFormalPool && !FormalSearchBuilt) throw new InvalidOperationException(FormalNotBuiltMessage);
 
         await Gate.WaitAsync();
         try
@@ -217,6 +245,7 @@ public sealed class MultivocalSearcher
                 if (plan.StoppingRule == "saturation" && log.Error == null && log.New == 0) break;
             }
         }
+        if (plan.UsesFormalPool) await SearchFormalPoolAsync(runId, rawFolder, plan, perSearch, ledger, byAddress, progress);
         return ledger;
     }
 

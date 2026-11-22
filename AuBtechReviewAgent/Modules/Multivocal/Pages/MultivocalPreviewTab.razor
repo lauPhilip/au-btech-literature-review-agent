@@ -55,7 +55,7 @@
                 ("Protocol", "Your plan is written down before anything is searched, with a fingerprint.", true),
                 ("Search", p.UsesFormalPool
                     ? $"{searches} grey literature search{(searches == 1 ? "" : "es")} and {p.FormalDatabases.Count} academic database{(p.FormalDatabases.Count == 1 ? "" : "s")}, each with its own search strings, {stop}."
-                    : $"{searches} grey literature search{(searches == 1 ? "" : "es")}, {stop}.", !p.UsesFormalPool), // the academic search comes in block I-2
+                    : $"{searches} grey literature search{(searches == 1 ? "" : "es")}, {stop}.", true),
                 ("Selection", p.UsesFormalPool ? "Grey and academic sources are screened twice, with the same criteria and the same care." : "Every source is screened twice against your criteria; a source the two screenings disagree on is kept and marked for you to look at.", !p.UsesFormalPool), // academic screening comes in block I-3
                 ("Quality", $"Each source is scored on Table 7; below {p.QualityThreshold} of {MultivocalGuidelines.QualityPointsMax} points it is left out. Every score rests on a quote.", true),
                 ("Map and extraction", "The sources are classified in a systematic map proposed from your research questions; every extracted value rests on a quote from the source's page.", true),

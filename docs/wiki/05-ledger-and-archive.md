@@ -38,7 +38,7 @@ A multivocal or grey literature review (`Modules/Multivocal/`) keeps its own fil
 | File | Written by | Contents |
 |---|---|---|
 | `run.json`, `protocol.md`, `multivocal-plan.json` | `MultivocalPlanner` | The header, the protocol with its SHA-256, and the plan it was written from |
-| `multivocal-ledger.json`, `SourceResponses/` | `MultivocalSearcher` | Every search with its raw answers, the sources found with the searches that found them, skipped searches and the stopping rule as applied |
+| `multivocal-ledger.json`, `SourceResponses/` | `MultivocalSearcher` | Every search with its raw answers, the sources found with the searches that found them, skipped searches and the stopping rule as applied. In a multivocal review with academic databases, each academic search is marked `Formal`, each source found there keeps the database's record as `Paper` (so it is in the formal pool), and `FormalRemoved` lists every academic record not kept: duplicates by id, DOI or title, as in the systematic review, and records with no web address. A grey literature review's ledger has none of these fields |
 | `multivocal-screening.json` | `MultivocalScreener` | Both screenings of every source, their agreement (κ) and the reviewer's changes |
 | `multivocal-pages.json`, `PageText/` | `MultivocalPages` | The record of each page snapshot (address after redirects, access date, SHA-256 of the text, Wayback Machine link, or why it was not fetched); the text itself is in `PageText/` |
 | `multivocal-quality.json` | `MultivocalQualityAssessor` | The checklist points of every included source with their quotes, and the threshold |

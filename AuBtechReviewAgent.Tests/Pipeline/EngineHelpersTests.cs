@@ -68,6 +68,22 @@ public class EngineHelpersTests : IDisposable
     }
 
     [Fact]
+    public void AnErrorMessageIsOneLineWithAnythingLikeAKeyRedacted() =>
+        Assert.Equal("GET ?apiKey=[REDACTED_API_CREDENTIAL] failed  403",
+            PrismaReviewEngine.SanitizeLogMessage("GET ?apiKey=abcdefghijklmnopqrstuvwxyz0123 failed\r\n403"));
+
+    [Fact]
+    public void AnotherModuleGetsADatabaseOnlyWithTheServersOwnKey()
+    {
+        var engine = new PrismaReviewEngine("m", "", null);
+        Assert.IsType<OpenAlexSource>(engine.CreateServerSource("openalex"));
+        Assert.IsType<ArxivSource>(engine.CreateServerSource("ArXiv"));
+        Assert.Null(engine.CreateServerSource("scopus"));
+        Assert.Null(engine.CreateServerSource("googlescholar"));
+        Assert.IsType<IeeeXploreSource>(new PrismaReviewEngine("m", "", "server-ieee").CreateServerSource("ieee"));
+    }
+
+    [Fact]
     public async Task AFinishedRunLeavesItsLedgerMetricsAndProtocolFingerprint()
     {
         var engine = new PrismaReviewEngine("test-key", "", null, null, null, new RunsOptions())
