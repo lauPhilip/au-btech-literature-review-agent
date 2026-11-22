@@ -14,8 +14,8 @@ namespace AuBtechReviewAgent;
 /// The synthesis of a multivocal run (MLR block F, G13): for each research question, the extracted findings are
 /// grouped into themes by the model; every finding goes into a theme or is listed as unassigned with a reason, and
 /// the tensions between sources are named. What each theme rests on (how many sources, of which outlet tiers and
-/// quality, grey or formal) is counted in code, never by the model. Formal sources join once their search is built;
-/// until then every theme says it rests on grey literature only. The run goes from "Extracted" to "Synthesised".
+/// quality, grey or formal) is counted in code, never by the model, so each theme says whether it rests on grey
+/// literature, formal literature or both (block I-5). The run goes from "Extracted" to "Synthesised".
 /// </summary>
 public sealed partial class MultivocalSynthesiser
 {
@@ -154,6 +154,7 @@ public sealed partial class MultivocalSynthesiser
         {
             sourceNumber++;
             string kind = records.TryGetValue(source.Address, out var r) ? r.Kind : "";
+            bool formal = kind == MultivocalSearcher.FormalKind;
             int index = 0;
             foreach (var attribute in source.Attributes)
             {
@@ -169,8 +170,12 @@ public sealed partial class MultivocalSynthesiser
                         Address = source.Address,
                         Title = source.Title,
                         Kind = kind,
-                        Tier = TierOf(kind),
-                        QualityPoints = points.GetValueOrDefault(source.Address),
+                        // A formal source has no outlet tier or Table 7 points (it is appraised with MMAT), and its quote
+                        // was checked against its full text or abstract (decision 8).
+                        Literature = formal ? "formal" : "grey",
+                        Tier = formal ? 0 : TierOf(kind),
+                        QualityPoints = formal ? 0 : points.GetValueOrDefault(source.Address),
+                        EvidenceBasis = formal ? source.TextBasis ?? "abstract only" : "page text",
                     });
             }
         }
@@ -200,7 +205,9 @@ public sealed partial class MultivocalSynthesiser
         theme.FirstTier = sources.Count(s => s.Literature == "grey" && s.Tier == 1);
         theme.SecondTier = sources.Count(s => s.Literature == "grey" && s.Tier == 2);
         theme.ThirdTier = sources.Count(s => s.Literature == "grey" && s.Tier == 3);
-        theme.MeanQuality = sources.Count == 0 ? 0 : Math.Round(sources.Average(s => s.QualityPoints), 1);
+        // Table 7 points are for grey sources only; a formal source is appraised with MMAT and has none.
+        var grey = sources.Where(s => s.Literature == "grey").ToList();
+        theme.MeanQuality = grey.Count == 0 ? 0 : Math.Round(grey.Average(s => s.QualityPoints), 1);
         theme.EvidenceLabel = theme.FormalSources > 0 && theme.GreySources > 0 ? "grey and formal literature"
             : theme.FormalSources > 0 ? "formal literature only"
             : theme.Sources > 0 && theme.ThirdTier == theme.Sources ? "3rd-tier grey literature only"

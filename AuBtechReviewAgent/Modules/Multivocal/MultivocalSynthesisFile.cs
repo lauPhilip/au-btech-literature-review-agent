@@ -33,6 +33,16 @@ public sealed class SynthesisTension
     public string FindingA { get; set; } = "";
     public string FindingB { get; set; } = "";
     public string Description { get; set; } = "";
+
+    /// <summary>
+    /// Where the tension lies when the question has formal findings, decided in code from the two findings' pools:
+    /// <see cref="ArtAgainstPractice"/>, "within the state of the art" or "within the state of the practice". Null,
+    /// and left out of the file, in a grey literature review.
+    /// </summary>
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public string? Between { get; set; }
+
+    public const string ArtAgainstPractice = "the state of the art against the state of the practice";
 }
 
 /// <summary>One theme of one research question, with the evidence it rests on counted in code.</summary>
@@ -53,7 +63,7 @@ public sealed class SynthesisTheme
     public int ThirdTier { get; set; }
     public double MeanQuality { get; set; }
 
-    /// <summary>"grey and formal literature", "grey literature only" or "3rd-tier grey literature only".</summary>
+    /// <summary>"grey and formal literature", "formal literature only", "grey literature only" or "3rd-tier grey literature only".</summary>
     public string EvidenceLabel { get; set; } = "";
 }
 
