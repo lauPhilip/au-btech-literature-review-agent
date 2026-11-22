@@ -58,17 +58,39 @@ public class RunMetricsStore
         }
     }
 
+    // The parsed file, kept until its length or write time changes (issue #306), so a page view does not parse it again.
+    private (long Length, DateTime Written, RunMetrics[] Runs)? _parsed;
+
     /// <summary>
     /// Every stored run of one kind, oldest first: the systematic runs, or with <paramref name="multivocal"/> the
     /// multivocal ones, so the figures of the two kinds of review are never mixed. A line that cannot be read is skipped.
+    /// The parsed lines are kept while the file's length and write time stay the same, and a new run changes both, so it
+    /// shows at once. Callers get a new list each time and must not change the runs in it, which are shared.
     /// </summary>
     public List<RunMetrics> ReadAll(bool multivocal = false)
     {
-        var list = new List<RunMetrics>();
-        if (!_options.Enabled || !File.Exists(_file)) return list;
+        if (!_options.Enabled) return new List<RunMetrics>();
+        return Parsed().Where(m => m.IsMultivocal == multivocal).OrderBy(m => m.CompletedUtc, StringComparer.Ordinal).ToList();
+    }
+
+    private RunMetrics[] Parsed()
+    {
+        lock (Lock)
+        {
+            var info = new FileInfo(_file);
+            if (!info.Exists) return Array.Empty<RunMetrics>();
+            if (_parsed is { } kept && kept.Length == info.Length && kept.Written == info.LastWriteTimeUtc) return kept.Runs;
+
+            var runs = Parse(File.ReadAllLines(_file));
+            _parsed = (info.Length, info.LastWriteTimeUtc, runs);
+            return runs;
+        }
+    }
+
+    private RunMetrics[] Parse(string[] lines)
+    {
+        var list = new List<RunMetrics>(lines.Length);
         int skipped = 0;
-        string[] lines;
-        lock (Lock) lines = File.ReadAllLines(_file);
         foreach (var line in lines)
         {
             if (string.IsNullOrWhiteSpace(line)) continue;
@@ -80,6 +102,6 @@ public class RunMetricsStore
             }
         }
         if (skipped > 0) _log.LogWarning("Skipped {Count} unreadable line(s) in {File}", skipped, _file);
-        return list.Where(m => m.IsMultivocal == multivocal).OrderBy(m => m.CompletedUtc, StringComparer.Ordinal).ToList();
+        return list.ToArray();
     }
 }
