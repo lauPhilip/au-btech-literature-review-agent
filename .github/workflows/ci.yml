@@ -124,6 +124,14 @@ jobs:
           PRINT_OUT: ${{ github.workspace }}/a11y-screenshots
         run: node print-check.mjs
 
+      # Every main page loads with a heading and no console error, and the flows a visitor uses respond: the key
+      # dialog, "Try an example", opening a citation, the glossary search and the theme switch (issue #312).
+      - name: Click through the main pages
+        working-directory: tools/a11y
+        env:
+          BASE_URL: http://localhost:5038
+        run: node smoke.mjs
+
       # Screenshots of every checked page at 390, 1440 and 1920 px, so a pull request that changes markup can be
       # looked at without running the app.
       - name: Upload the screenshots
