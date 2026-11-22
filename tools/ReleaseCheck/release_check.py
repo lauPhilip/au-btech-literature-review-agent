@@ -31,7 +31,7 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
-from release_notes import MIN_READING_EASE, count_syllables, find_emoji, reading_ease  # noqa: F401 (the tests read them here)
+from release_notes import MIN_READING_EASE, find_emoji, reading_ease
 
 # Semantic Versioning 2.0.0, from semver.org, with the "v" prefix MinVer reads (MinVerTagPrefix).
 _SEMVER = re.compile(

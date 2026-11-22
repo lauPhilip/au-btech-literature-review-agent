@@ -4,7 +4,7 @@
 
 The unit tests check each rule on its own. The feature tests build a small git repository with an annotated or a
 lightweight tag, run the script as release.yml does, and check the title, the notes and the reasons it stops.
-The notes tests check the readability score and the emoji count against texts whose answer is known.
+The readability score and the emoji count are tested on their own in test_release_notes.py.
 The last tests check the repository's own CHANGELOG.md and CITATION.cff, so a broken file is caught on the pull
 request, not on the day of a release.
 """
@@ -118,66 +118,6 @@ HARD_NOTES = """### Added
 - Comprehensive methodological documentation describing the computational infrastructure, the configuration
   parameters, and the operational responsibilities associated with institutional deployment considerations. 🎉
 """
-
-
-class SyllableTests(unittest.TestCase):
-    def test_known_words(self):
-        expected = {"the": 1, "cat": 1, "plain": 1, "makes": 1, "changed": 1, "review": 2, "table": 2,
-                    "screening": 2, "English": 2, "citation": 3, "readability": 5}
-        for word, count in expected.items():
-            with self.subTest(word=word):
-                self.assertEqual(rc.count_syllables(word), count)
-
-    def test_parts_joined_by_a_hyphen_are_added(self):
-        self.assertEqual(rc.count_syllables("full-text"), 2)
-
-    def test_numbers_count_as_one(self):
-        self.assertEqual(rc.count_syllables("2026"), 1)
-
-
-class EmojiTests(unittest.TestCase):
-    def test_plain_text_has_none(self):
-        self.assertEqual(rc.find_emoji("Plain words, a tick \u2713, a star \u2605 and a (c) sign."), [])
-
-    def test_each_emoji_is_found(self):
-        self.assertEqual(rc.find_emoji("Ready \U0001F389 set \u2728 go \u2705"), ["\U0001F389", "\u2728", "\u2705"])
-
-    def test_a_sequence_that_shows_as_one_picture_counts_once(self):
-        family = "\U0001F468\u200d\U0001F469\u200d\U0001F467"
-        thumbs = "\U0001F44D\U0001F3FD"
-        flag = "\U0001F1E9\U0001F1F0"
-        keycap = "1\ufe0f\u20e3"
-        heart = "\u2764\ufe0f"
-        for emoji in [family, thumbs, flag, keycap, heart]:
-            with self.subTest(emoji=emoji):
-                self.assertEqual(rc.find_emoji(f"a {emoji} b"), [emoji])
-
-
-class ReadingEaseTests(unittest.TestCase):
-    def test_short_plain_sentences_score_high(self):
-        score = rc.reading_ease("The cat sat on the mat. It was a good day.")
-        self.assertGreater(score, 100)
-
-    def test_long_formal_sentences_score_low(self):
-        self.assertLess(rc.reading_ease(HARD_NOTES), 0)
-
-    def test_score_follows_the_formula(self):
-        # 2 sentences, 6 words, 7 syllables: 206.835 - 1.015 x 3 - 84.6 x 7/6.
-        self.assertAlmostEqual(rc.reading_ease("Screening is fast. The cat sat."), 206.835 - 3.045 - 84.6 * 7 / 6)
-
-    def test_headings_links_and_code_marks_are_not_read(self):
-        with_markup = "### Added\n\n- The [Metrics](https://example.org/metrics/page) page is `new`."
-        self.assertAlmostEqual(rc.reading_ease(with_markup), rc.reading_ease("The Metrics page is new."))
-
-    def test_a_list_item_without_a_full_stop_ends_a_sentence(self):
-        self.assertAlmostEqual(rc.reading_ease("- The cat sat\n- The dog ran"),
-                               rc.reading_ease("The cat sat. The dog ran."))
-
-    def test_version_numbers_do_not_end_a_sentence(self):
-        self.assertAlmostEqual(rc.reading_ease("It is v0.1.0 now."), rc.reading_ease("It is v010 now."))
-
-    def test_no_words_gives_none(self):
-        self.assertIsNone(rc.reading_ease("### Added\n\n\U0001F389"))
 
 
 class NotesTests(unittest.TestCase):
