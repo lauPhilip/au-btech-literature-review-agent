@@ -1,0 +1,68 @@
+@page "/docs/api"
+@layout AppLayout
+@inject AuBtechReviewAgent.ApiSwitch Api
+@inject NavigationManager Navigation
+@inject Microsoft.Extensions.Configuration.IConfiguration Configuration
+@inject AuBtechReviewAgent.QuotaOptions QuotaOptions
+@inject AuBtechReviewAgent.RunsOptions RunsOptions
+
+@* The documentation of the REST API and the MCP server (issue #314), in the trust pages' frame. It exists only
+   while the API is on (ApiSwitch); otherwise it answers "not found" and nothing links to it. It is ordered by what
+   the reader wants: what you can do and the one thing you need, the first working call, then following, reading
+   and cancelling, the AI assistant, what goes wrong, and the key's promise with the limits. Every paragraph scores
+   60 or more on the Flesch Reading Ease (ReadingEase, checked in ApiDocsPageTests), and every example is
+   ApiDocExamples, checked against the real API. *@
+
+@if (Api.Enabled)
+{
+    <SeoHead Title="API and MCP" Path="@AuBtechReviewAgent.ApiSwitch.DocsPath"
+             Description="Start a TraceableAI literature review from your own code or AI assistant, with your own Mistral key: the calls, real examples, the MCP setup and what each error means." />
+
+    <DocPage Current="@AuBtechReviewAgent.ApiSwitch.DocsPath" Sections="Sections" Eyebrow="API and MCP" Title="Run a review from your own tools" Wide="true">
+        <Lead>
+            Start a literature review from your own code or from an AI assistant. Follow it as it runs, read the report
+            as data, and stop it if you need to. It is the same systematic review as on the website.
+        </Lead>
+        <ChildContent>
+            <div class="mt-8 grid grid-cols-1 gap-6 border-y border-line py-6 sm:grid-cols-2">
+                <div>
+                    <h2 class="font-display text-sm font-semibold uppercase tracking-[0.14em] text-muted">What you need</h2>
+                    <p class="mt-2">
+                        Your own Mistral API key. Send it in the <code class="@ApiDocsStart.Code">X-Mistral-Key</code> header
+                        when you start a review. It is used for that run only, and it is never stored.
+                    </p>
+                </div>
+                <div>
+                    <h2 class="font-display text-sm font-semibold uppercase tracking-[0.14em] text-muted">Where to send it</h2>
+                    <p class="mt-2">Every call goes to this server:</p>
+                    <p class="mt-1 break-all font-mono text-[15px] text-heading">@BaseUrl</p>
+                </div>
+            </div>
+
+            <ApiDocsStart BaseUrl="@BaseUrl" />
+            <ApiDocsFollow BaseUrl="@BaseUrl" />
+            <ApiDocsAssistant BaseUrl="@BaseUrl" />
+            <ApiDocsErrors StartsPerHour="QuotaOptions.OwnKeyRunsPerHour" RetentionDays="RunsOptions.RetentionDays" />
+        </ChildContent>
+    </DocPage>
+}
+
+@code {
+    [CascadingParameter] private Microsoft.AspNetCore.Http.HttpContext? HttpContext { get; set; }
+
+    /// <summary>The page's sections, listed under it in the side list.</summary>
+    internal static readonly IReadOnlyList<(string Id, string Label)> Sections = new[]
+    {
+        ("start", "Start a review"), ("follow", "Follow it"), ("report", "Read the report"), ("cancel", "Cancel it"),
+        ("assistant", "Use it from an AI assistant"), ("errors", "When something goes wrong"), ("key", "Your key and the limits"),
+    };
+
+    /// <summary>This server's address (Site:PublicUrl, or the address the page was asked on), for the examples.</summary>
+    private string BaseUrl => AuBtechReviewAgent.SiteSeo.BaseUrl(Configuration, HttpContext?.Request) is { Length: > 0 } url
+        ? url : Navigation.BaseUri.TrimEnd('/');
+
+    protected override void OnInitialized()
+    {
+        if (!Api.Enabled) Navigation.NotFound();
+    }
+}

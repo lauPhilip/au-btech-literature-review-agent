@@ -1,0 +1,108 @@
+@* The API documentation page (ApiDocs.razor), part 4: what goes wrong and what to do, then the key's promise and
+   the limits. The errors are grouped by when they happen, so no group has more than five rows (Miller's law); the
+   titles are ApiProblems' own, so they read exactly as the answer does. The numbers come from the running server. *@
+
+<section id="errors" class="mt-12 scroll-mt-6" aria-labelledby="errors-title">
+    <h2 id="errors-title" class="font-display text-xl font-semibold tracking-tight text-heading">When something goes wrong</h2>
+    <p class="mt-4">
+        Every error has a title and a line in plain English that says what to do. It comes as a problem detail
+        (RFC 9457), like this one.
+    </p>
+    <CodeBlock Id="error-answer" Label="401 Unauthorized" Code="@AuBtechReviewAgent.ApiDocExamples.Problem()" />
+
+    <div class="mt-6 overflow-x-auto border border-line" tabindex="0" role="region" aria-label="Errors and what to do">
+        <table class="w-full text-sm">
+            <caption class="sr-only">Each error, what it means and what to do, grouped by when it happens</caption>
+            <thead class="bg-soft text-left text-muted max-sm:sr-only">
+                <tr>
+                    <th scope="col" class="px-4 py-3 font-medium">Status</th>
+                    <th scope="col" class="px-4 py-3 font-medium">Title</th>
+                    <th scope="col" class="px-4 py-3 font-medium">What to do</th>
+                </tr>
+            </thead>
+            @foreach (var (group, rows) in Errors)
+            {
+                <tbody class="border-t border-line">
+                    <tr><th scope="colgroup" colspan="3" class="bg-page px-4 pb-1 pt-4 text-left text-xs font-semibold uppercase tracking-[0.14em] text-muted">@group</th></tr>
+                    @foreach (var (status, title, todo) in rows)
+                    {
+                        <tr class="border-t border-line align-top">
+                            <th scope="row" class="px-4 py-3 text-left font-mono text-[13px] font-semibold text-heading max-sm:block max-sm:pb-0">@status</th>
+                            <td class="px-4 py-3 text-heading max-sm:block max-sm:py-1 sm:min-w-[12rem]">@title</td>
+                            <td class="px-4 py-3 text-ink max-sm:block max-sm:pt-0 sm:min-w-[16rem]">
+                                @* A part between backticks is a name from the answer or a header, shown as code. *@
+                                @foreach (var (part, i) in todo.Split('`').Select((part, i) => (part, i)))
+                                {
+                                    if (i % 2 == 1) { <code class="@Code">@part</code> } else { @part }
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            }
+        </table>
+    </div>
+</section>
+
+<section id="key" class="mt-12 scroll-mt-6" aria-labelledby="key-title">
+    <h2 id="key-title" class="font-display text-xl font-semibold tracking-tight text-heading">Your key and the limits</h2>
+    <p class="mt-4 font-semibold text-heading">Your Mistral key is used for that run only, and it is never stored.</p>
+    <p class="mt-3">
+        It is not written to any file or log. The review uses your key, and never the server's. There are no free
+        reviews through the API, so nothing starts without a key in the <code class="@Code">X-Mistral-Key</code> header.
+    </p>
+    <p class="mt-4">
+        You may also send keys for Scopus in <code class="@Code">X-Elsevier-Key</code>, for IEEE Xplore in
+        <code class="@Code">X-Ieee-Key</code> and for Semantic Scholar in <code class="@Code">X-Semantic-Scholar-Key</code>.
+        They are kept the same way. Leave them out, and the server uses its own keys for those databases.
+    </p>
+    <p class="mt-4">
+        You can make @AuBtechReviewAgent.ApiEndpoints.CallsPerMinute calls a minute from one address, and as many with one
+        key. @StartsLine A request can be at most @(AuBtechReviewAgent.ApiEndpoints.MaxBodyBytes / 1024) KB. A review and
+        its files are kept for @RetentionDays days.
+    </p>
+    <p class="mt-4">
+        Each call is also described in the <a href="@AuBtechReviewAgent.ApiEndpoints.OpenApiPath" class="text-heading underline underline-offset-2">OpenAPI document</a>.
+        The <a href="@WikiUrl" class="text-heading underline underline-offset-2">wiki</a> explains how the API works inside.
+    </p>
+</section>
+
+@code {
+    /// <summary>Reviews one key may start in an hour (Quota:OwnKeyRunsPerHour); 0 means no limit.</summary>
+    [Parameter] public int StartsPerHour { get; set; }
+
+    /// <summary>Days a run is kept (Runs:RetentionDays).</summary>
+    [Parameter] public int RetentionDays { get; set; }
+
+    private const string Code = ApiDocsStart.Code;
+
+    private static readonly string WikiUrl = $"{AuBtechReviewAgent.SiteSeo.RepositoryUrl}/blob/master/docs/wiki/09-api-and-mcp.md";
+
+    private string StartsLine => StartsPerHour > 0
+        ? $"You can start {StartsPerHour} review{(StartsPerHour == 1 ? "" : "s")} an hour with one key, and as many from one address."
+        : "There is no limit on how many reviews you start.";
+
+    private (string Group, (string Status, string Title, string Todo)[] Rows)[] Errors => new[]
+    {
+        ("When you start a review", new[]
+        {
+            ("400", Title(AuBtechReviewAgent.ApiProblems.Invalid("", Array.Empty<string>())), "Read the list in `errors`. Fix each field, and send the request again."),
+            ("401", Title(AuBtechReviewAgent.ApiProblems.MissingKey()), "Send your Mistral key in the `X-Mistral-Key` header."),
+            ("422", Title(AuBtechReviewAgent.ApiProblems.Flagged(Array.Empty<string>())), "Check the phrases in `flags`. If they are fine, send the same request with `acceptFlaggedInput` set to true."),
+            ("429", Title(AuBtechReviewAgent.ApiProblems.TooMany(TimeSpan.Zero)) + ", or " + Title(AuBtechReviewAgent.ApiProblems.TooManyCalls()).ToLowerInvariant(),
+                "Wait, then try again. `Retry-After` says how many seconds, when it is there. Too many calls clears within a minute."),
+            ("503", Title(AuBtechReviewAgent.ApiProblems.NoMistral()), "This server runs its own model, so it cannot use your key. Start the review on the website."),
+        }),
+        ("When you follow, read or cancel it", new[]
+        {
+            ("401", Title(AuBtechReviewAgent.ApiProblems.MissingEditKey()), "Send the edit key in the `X-Edit-Key` header. It came back when you started the review."),
+            ("403", Title(AuBtechReviewAgent.ApiProblems.WrongEditKey()), "Use the edit key from this review's start. Only that key can stop it."),
+            ("404", Title(AuBtechReviewAgent.ApiProblems.NoRun()) + ", or " + Title(AuBtechReviewAgent.ApiProblems.NotSystematic()).ToLowerInvariant(),
+                $"Check the id. A review is deleted {RetentionDays} days after it starts, and the API serves systematic reviews only."),
+            ("409", Title(AuBtechReviewAgent.ApiProblems.NotReady("Searching")) + ", or " + Title(AuBtechReviewAgent.ApiProblems.NotCancellable("Complete")).ToLowerInvariant(),
+                "Ask for the status. Wait for Complete before you ask for the report. A review that has ended cannot be cancelled."),
+        }),
+    };
+
+    private static string Title(AuBtechReviewAgent.ApiProblem problem) => problem.Title;
+}
