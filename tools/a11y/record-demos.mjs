@@ -18,6 +18,8 @@ const seconds = 6;
 const pause = (page, ms) => page.waitForTimeout(ms);
 
 async function scroll(page, pixels, ms) {
+  // The page scrolls inside the frame, not the window, so the wheel has to turn over the content.
+  await page.mouse.move(size.width / 2, size.height * 0.7);
   const steps = 24;
   for (let i = 0; i < steps; i++) {
     await page.mouse.wheel(0, pixels / steps);
@@ -38,22 +40,18 @@ const scenes = [
   },
   {
     name: 'new-review',
-    alt: 'New review: the example question is filled in with one click, and the criteria panel opens beside it.',
+    alt: 'New review: a question is typed in, then the worked example fills the form, with the criteria beside it.',
     async run(page) {
       await page.goto(base + '/review');
       await pause(page, 1500);
       // Without a server key (as in CI) the page opens the API keys dialog by itself; Escape closes it.
       if (await page.locator('#key-dialog').isVisible()) await page.keyboard.press('Escape');
-      await pause(page, 300);
+      await pause(page, 500);
+      await page.locator('#f-objective').click();
+      await page.locator('#f-objective').pressSequentially('How do chatbots help people stop smoking?', { delay: 70 });
+      await pause(page, 1300);
       await page.getByRole('button', { name: 'Try an example' }).click({ timeout: 5000 });
-      await pause(page, 2500);
-      const criteria = page.locator('button[aria-controls="criteria-body"]');
-      // On a laptop the panel already sits open beside the form; the fold button shows only when it is folded.
-      if (await criteria.first().isVisible() && (await criteria.first().getAttribute('aria-expanded')) === 'false')
-        await criteria.first().click({ timeout: 3000 });
-      await pause(page, 1500);
-      await page.locator('#f-objective').scrollIntoViewIfNeeded();
-      await pause(page, 2000);
+      await pause(page, 2200);
     },
   },
   {
