@@ -133,6 +133,8 @@ public partial class PrismaReviewEngine
         if (string.IsNullOrWhiteSpace(run.Abstract)) run.Abstract = front?.Abstract ?? run.Draft.Abstract;
         if (string.IsNullOrWhiteSpace(run.Rationale)) run.Rationale = front?.Rationale ?? run.Draft.Rationale;
         if (string.IsNullOrWhiteSpace(run.Objectives)) run.Objectives = front?.Objectives ?? run.Draft.Objectives;
+        run.Rationale = ReviewWriter.CitedSentencesOnly(run.Rationale, out var uncited);
+        if (uncited != null) run.Deltas.Add(uncited);
     }
 
     /// <summary>What the front matter may say about the run, counted in code from the ledger.</summary>

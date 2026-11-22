@@ -134,7 +134,8 @@ public sealed partial class MultivocalWriter
                 return string.IsNullOrWhiteSpace(refined) ? text : refined;
             }
             file.Abstract = await Refine("Abstract", front?.Abstract);
-            file.Rationale = await Refine("Rationale", front?.Rationale);
+            file.Rationale = ReviewWriter.CitedSentencesOnly(await Refine("Rationale", front?.Rationale), out var uncited);
+            if (uncited != null) file.Style.Add(uncited);
             file.Objectives = await Refine("Objectives", front?.Objectives);
         }
         if (front == null) file.Objectives = $"The review set out to {LowerFirst(goal.TrimEnd('.'))}.";
