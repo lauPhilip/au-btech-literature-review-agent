@@ -56,7 +56,7 @@ On the Review Output page, Table A.3 in the appendix after the references shows 
 
 ## Writing the report
 
-`GeneratePrismaChecklistReportWithRAGAsync` produces the PRISMA items. It is long, but it is a straight sequence:
+`GeneratePrismaChecklistReportWithRAGAsync` (`PrismaReviewEngine.ReportDraft.cs`) produces the PRISMA items. It is a straight sequence of named steps that share one `ReportRun`: the outline and the first draft (`ReportDraft.cs`), the synthesis and discussion (`CitedSections.cs`), the front matter, artifact and closing sections (`ReportFrontMatter.cs`), and the citation check, coverage and report files (`ReportCitations.cs`), all in `Report/`:
 
 1. **Grounded context.** `GroundingContextBuilder.Build` gives every included paper its abstract plus an equal share of its most relevant chunks, each labelled with the paper's reference number, so one long PDF cannot crowd out the other papers. The total budget is about two chunks per paper (at least 40, at most 120), so a large review does not leave most papers with one chunk or none.
 2. **Outline** (`ReviewWriter.WriteOutlineAsync`, shared by every kind of review). Before any prose, the model maps the evidence into themes, each with specific claims and the reference numbers that support them. It is saved as `grounded-outline.txt` and fed into the writing steps.
