@@ -152,6 +152,8 @@ builder.Services.AddSingleton(AuBtechReviewAgent.ReviewModulesOptions.From(build
 // Register the storage cleanup background worker
 builder.Services.AddHostedService<AuBtechReviewAgent.SessionCleanupWorker>();
 
+builder.Services.AddTextCompression();
+
 var app = builder.Build();
 
 // Classes that are not created by dependency injection (engine, sources, cache) log through AppLog.
@@ -191,7 +193,9 @@ if (!app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
-app.UseStaticFiles();
+// Text data is compressed as it is sent; static files come pre-compressed from MapStaticAssets, which serves all of
+// wwwroot (UseStaticFiles before it answered first, without the compressed copies). See ResponseCompressionSetup.
+app.UseTextCompression();
 app.UseAntiforgery();
 app.MapStaticAssets();
 
