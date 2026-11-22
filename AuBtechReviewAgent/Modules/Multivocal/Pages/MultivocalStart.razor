@@ -201,171 +201,11 @@
 
             @if (panelTab == "progress" && planned != null)
             {
-                bool runRunning = Runner.IsRunning(planned.RunId);
-                <div class="flex-1 min-h-0 overflow-y-auto p-5 space-y-4 text-left bg-soft/50">
-                    @if (stage == AuBtechReviewAgent.MultivocalWriter.StageChecked)
-                    {
-                        <div class="bg-page border border-supported-border p-4 shadow-sm space-y-2">
-                            <p class="text-sm font-semibold text-heading">Your review is ready</p>
-                            <p class="text-xs text-muted">The paper is written and every citation is checked against the kept page of the source it cites. Open a citation to see what the check found; the paper page has main.tex, the references and the archive.</p>
-                            <div class="flex flex-wrap gap-2">
-                                <a href="@($"/mlr-paper/{planned.RunId}")" class="ui-btn-primary ui-btn-sm inline-block">Read the paper</a>
-                                <a href="@($"/mlr-report/{planned.RunId}")" class="ui-btn-secondary ui-btn-sm inline-block" title="The run's report written in code: guidelines table, quotations and source repository">Data appendix</a>
-                            </div>
-                        </div>
-                    }
-                    else if (!runRunning && AuBtechReviewAgent.MultivocalRunner.HasStepsLeft(stage))
-                    {
-                        var status = Runner.StatusOf(planned.RunId);
-                        <div class="bg-page border border-line p-4 shadow-sm space-y-2">
-                            @if (status?.Error is { } runError)
-                            {
-                                <p class="bg-not-supported-fill border border-not-supported-border text-not-supported p-2 text-xs" role="alert">@runError</p>
-                            }
-                            @if (!planned.Plan.HasCriteria)
-                            {
-                                <p class="text-xs text-muted">This plan was made before the form asked for inclusion criteria, so its sources cannot be screened. Plan a new run to screen.</p>
-                            }
-                            else if (!canEdit)
-                            {
-                                <p class="text-xs text-muted">The review is not finished. Only the browser that planned this run can continue it.</p>
-                            }
-                            else if (status is not { Step: "Stopped" })
-                            {
-                                <p class="text-xs text-muted">@(status?.Error != null
-                                    ? "Continue to try the step again; decisions already made come from the cache."
-                                    : "The review stopped before it was finished, for example because the server restarted. It continues from where it stopped.")</p>
-                                <button type="button" class="ui-btn-primary ui-btn-sm" @onclick="ContinueRun">Continue the review</button>
-                            }
-                        </div>
-                    }
-                    <MultivocalProgressPanel Stage="@stage" Status="Runner.StatusOf(planned.RunId)" Ledger="ledger" Screening="screening" Quality="quality"
-                                             Map="map" Extraction="extraction" Synthesis="synthesis" Paper="paper" />
-                    @if (runRunning && notifyPermission is "default" or "granted")
-                    {
-                        @* Runs take a while; people switch tabs. This asks the browser to say when the run is done, as on the systematic review's page. *@
-                        <p class="text-xs text-muted flex items-center gap-2">
-                            @if (notifyPermission == "granted")
-                            {
-                                <span>You will get a browser notification when the review is ready, if this tab is in the background.</span>
-                            }
-                            else
-                            {
-                                <button type="button" @onclick="AskForNotification" class="ui-btn-secondary ui-btn-sm">Notify me when it is ready</button>
-                            }
-                        </p>
-                    }
-                    <p class="text-[11px] text-muted">The other tabs fill as each step finishes: the sources with every decision and score, the map with what was extracted, and the themes.</p>
-                </div>
+                <MultivocalProgressTab Page="this" />
             }
             else if (panelTab == "themes" && synthesis != null && planned != null)
             {
-                <div class="flex-1 min-h-0 overflow-y-auto p-5 space-y-5 text-left">
-                    <div>
-                        <h3 class="text-base font-semibold text-heading">Themes</h3>
-                        <p class="text-xs text-muted mt-0.5">The findings of each research question grouped into themes by the model (G13). What each theme rests on is counted in code from its sources; every quote was checked against the kept page text, not the live page.</p>
-                        @foreach (var note in synthesis.Notes)
-                        {
-                            <p class="text-[11px] text-partly mt-1">@note</p>
-                        }
-                    </div>
-                    @foreach (var (number, question) in planned.Plan.Numbered())
-                    {
-                        var themes = synthesis.Themes.Where(t => t.Question == number).ToList();
-                        <section class="space-y-2">
-                            <h4 class="text-sm font-semibold text-heading">@number <span class="font-normal text-ink">@question.Text</span></h4>
-                            @if (themes.Count == 0)
-                            {
-                                <p class="text-xs text-muted">No finding answers this question in the extracted sources.</p>
-                            }
-                            @foreach (var theme in themes)
-                            {
-                                <div class="border border-line p-3 text-xs space-y-1.5">
-                                    <p class="font-medium text-heading">@theme.Name</p>
-                                    <p class="text-ink">@theme.Description</p>
-                                    <p class="flex flex-wrap gap-1.5">
-                                        <span class="ui-chip border-line bg-soft text-ink text-[10px]">@theme.Sources source@(theme.Sources == 1 ? "" : "s")</span>
-                                        <span class="ui-chip border-line bg-soft text-ink text-[10px]">tiers 1st @theme.FirstTier · 2nd @theme.SecondTier · 3rd @theme.ThirdTier</span>
-                                        <span class="ui-chip border-line bg-soft text-ink text-[10px]">mean quality @theme.MeanQuality.ToString("0.#") of @AuBtechReviewAgent.GreyQualityChecklist.MaxPoints</span>
-                                        <span class="@(theme.EvidenceLabel.StartsWith("3rd") ? "ui-chip border-partly-border bg-partly-fill text-partly" : "ui-chip border-line bg-soft text-ink") text-[10px]">@theme.EvidenceLabel</span>
-                                    </p>
-                                    @if (theme.Tensions.Count > 0)
-                                    {
-                                        <ul class="text-ink list-disc pl-4">
-                                            @foreach (var tension in theme.Tensions)
-                                            {
-                                                <li>Tension (@tension.FindingA, @tension.FindingB): @tension.Description</li>
-                                            }
-                                        </ul>
-                                    }
-                                    <details>
-                                        <summary class="cursor-pointer select-none text-muted">@theme.Findings.Count finding@(theme.Findings.Count == 1 ? "" : "s")</summary>
-                                        <ul class="mt-1 space-y-1">
-                                            @foreach (var finding in synthesis.Findings.Where(f => theme.Findings.Contains(f.Id)))
-                                            {
-                                                <li>
-                                                    <span class="font-medium">@finding.Id</span> @finding.Attribute: @finding.Value
-                                                    <span class="text-muted">· @finding.Title · @KindLabel(finding.Kind), @(finding.Tier switch { 1 => "1st", 2 => "2nd", _ => "3rd" }) tier, @finding.QualityPoints.ToString("0.#") points</span>
-                                                    <q class="block italic text-muted">@finding.Quote</q>
-                                                </li>
-                                            }
-                                        </ul>
-                                    </details>
-                                </div>
-                            }
-                            @if (synthesis.SecondPlacements.FirstOrDefault(a => a.Question == number) is { Kappa: double placementKappa } placementAgreement)
-                            {
-                                <p class="text-[11px] text-muted">Second, independent placement of the values: Cohen's κ = @placementKappa.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture) over @placementAgreement.CellsCompared value–theme decisions (@placementAgreement.Disagreements.Count disagreement@(placementAgreement.Disagreements.Count == 1 ? "" : "s")).</p>
-                            }
-                            @foreach (var other in synthesis.NotCoded.Where(n => n.Question == number))
-                            {
-                                var notCoded = other;
-                                <div class="border border-dashed border-line-field p-3 text-xs space-y-1.5">
-                                    <p class="font-medium text-heading">Not coded by the map: @notCoded.Attribute</p>
-                                    <p class="text-ink">@notCoded.Findings.Count finding@(notCoded.Findings.Count == 1 ? "" : "s") from @notCoded.Sources source@(notCoded.Sources == 1 ? "" : "s") had the value "Other": the map had no value for them, so they are in no theme. The map may need a new value.</p>
-                                    <details>
-                                        <summary class="cursor-pointer select-none text-muted">@notCoded.Findings.Count finding@(notCoded.Findings.Count == 1 ? "" : "s")</summary>
-                                        <ul class="mt-1 space-y-1">
-                                            @foreach (var finding in synthesis.Findings.Where(f => notCoded.Findings.Contains(f.Id)))
-                                            {
-                                                <li>
-                                                    <span class="font-medium">@finding.Id</span>
-                                                    <span class="text-muted">@finding.Title · @KindLabel(finding.Kind), @(finding.Tier switch { 1 => "1st", 2 => "2nd", _ => "3rd" }) tier, @finding.QualityPoints.ToString("0.#") points</span>
-                                                    <q class="block italic text-muted">@finding.Quote</q>
-                                                </li>
-                                            }
-                                        </ul>
-                                    </details>
-                                </div>
-                            }
-                        </section>
-                    }
-                    @if (synthesis.Unsupported.Count > 0)
-                    {
-                        <section>
-                            <h4 class="text-sm font-semibold text-heading">Values left out by the support check</h4>
-                            <p class="text-xs text-muted mt-0.5">Their quote is on the source's page but does not say what the value claims.</p>
-                            <ul class="text-xs text-ink list-disc pl-4 mt-1 space-y-1">
-                                @foreach (var item in synthesis.Unsupported)
-                                {
-                                    <li><span class="font-medium">@item.Finding</span> @item.Attribute: @item.Value <q class="italic text-muted">@item.Quote</q> <span class="text-muted">@item.Reason</span></li>
-                                }
-                            </ul>
-                        </section>
-                    }
-                    @if (synthesis.Unassigned.Count > 0)
-                    {
-                        <section>
-                            <h4 class="text-sm font-semibold text-heading">Findings in no theme</h4>
-                            <ul class="text-xs text-ink list-disc pl-4 mt-1">
-                                @foreach (var item in synthesis.Unassigned)
-                                {
-                                    <li>@item.Finding: @item.Reason</li>
-                                }
-                            </ul>
-                        </section>
-                    }
-                </div>
+                <MultivocalThemesTab Plan="planned.Plan" Synthesis="synthesis" />
             }
             else if (panelTab == "map" && map != null && planned != null)
             {
@@ -828,6 +668,6 @@
     private static string SearchLabel(string key) =>
         AuBtechReviewAgent.GreySourceCatalog.Create(key)?.Name ?? AuBtechReviewAgent.MultivocalGuidelines.SearchLabel(key);
 
-    private static string KindLabel(string key) =>
+    internal static string KindLabel(string key) =>
         AuBtechReviewAgent.MultivocalGuidelines.GreyTypes.FirstOrDefault(t => t.Key == key).Label ?? key;
 }

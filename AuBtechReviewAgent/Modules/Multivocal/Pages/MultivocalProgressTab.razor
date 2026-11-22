@@ -1,0 +1,79 @@
+@inherits MultivocalStartPart
+@inject AuBtechReviewAgent.MultivocalRunner Runner
+
+@* The panel's Progress tab on /mlr/{id}: "Your review is ready" with the paper and the data appendix, or what can
+   be done with a run that stopped, the run's progress and funnel, and the offer of a browser notification. *@
+
+@{
+    bool runRunning = Runner.IsRunning(planned.RunId);
+}
+<div class="flex-1 min-h-0 overflow-y-auto p-5 space-y-4 text-left bg-soft/50">
+    @if (stage == AuBtechReviewAgent.MultivocalWriter.StageChecked)
+    {
+        <div class="bg-page border border-supported-border p-4 shadow-sm space-y-2">
+            <p class="text-sm font-semibold text-heading">Your review is ready</p>
+            <p class="text-xs text-muted">The paper is written and every citation is checked against the kept page of the source it cites. Open a citation to see what the check found; the paper page has main.tex, the references and the archive.</p>
+            <div class="flex flex-wrap gap-2">
+                <a href="@($"/mlr-paper/{planned.RunId}")" class="ui-btn-primary ui-btn-sm inline-block">Read the paper</a>
+                <a href="@($"/mlr-report/{planned.RunId}")" class="ui-btn-secondary ui-btn-sm inline-block" title="The run's report written in code: guidelines table, quotations and source repository">Data appendix</a>
+            </div>
+        </div>
+    }
+    else if (!runRunning && AuBtechReviewAgent.MultivocalRunner.HasStepsLeft(stage))
+    {
+        var status = Runner.StatusOf(planned.RunId);
+        <div class="bg-page border border-line p-4 shadow-sm space-y-2">
+            @if (status?.Error is { } runError)
+            {
+                <p class="bg-not-supported-fill border border-not-supported-border text-not-supported p-2 text-xs" role="alert">@runError</p>
+            }
+            @if (!planned.Plan.HasCriteria)
+            {
+                <p class="text-xs text-muted">This plan was made before the form asked for inclusion criteria, so its sources cannot be screened. Plan a new run to screen.</p>
+            }
+            else if (!canEdit)
+            {
+                <p class="text-xs text-muted">The review is not finished. Only the browser that planned this run can continue it.</p>
+            }
+            else if (status is not { Step: "Stopped" })
+            {
+                <p class="text-xs text-muted">@(status?.Error != null
+                    ? "Continue to try the step again; decisions already made come from the cache."
+                    : "The review stopped before it was finished, for example because the server restarted. It continues from where it stopped.")</p>
+                <button type="button" class="ui-btn-primary ui-btn-sm" @onclick="Page.ContinueRun">Continue the review</button>
+            }
+        </div>
+    }
+    <MultivocalProgressPanel Stage="@stage" Status="Runner.StatusOf(planned.RunId)" Ledger="ledger" Screening="screening" Quality="quality"
+                             Map="map" Extraction="extraction" Synthesis="synthesis" Paper="paper" />
+    @if (runRunning && notifyPermission is "default" or "granted")
+    {
+        @* Runs take a while; people switch tabs. This asks the browser to say when the run is done, as on the systematic review's page. *@
+        <p class="text-xs text-muted flex items-center gap-2">
+            @if (notifyPermission == "granted")
+            {
+                <span>You will get a browser notification when the review is ready, if this tab is in the background.</span>
+            }
+            else
+            {
+                <button type="button" @onclick="Page.AskForNotification" class="ui-btn-secondary ui-btn-sm">Notify me when it is ready</button>
+            }
+        </p>
+    }
+    <p class="text-[11px] text-muted">The other tabs fill as each step finishes: the sources with every decision and score, the map with what was extracted, and the themes.</p>
+</div>
+
+@code {
+    // Shown only for a planned run.
+    private AuBtechReviewAgent.PlannedRun planned => Page.planned!;
+    private string stage => Page.stage;
+    private bool canEdit => Page.canEdit;
+    private string notifyPermission => Page.notifyPermission;
+    private AuBtechReviewAgent.MultivocalLedger? ledger => Page.ledger;
+    private AuBtechReviewAgent.MultivocalScreeningFile? screening => Page.screening;
+    private AuBtechReviewAgent.MultivocalQualityFile? quality => Page.quality;
+    private AuBtechReviewAgent.MultivocalMapFile? map => Page.map;
+    private AuBtechReviewAgent.MultivocalExtractionFile? extraction => Page.extraction;
+    private AuBtechReviewAgent.MultivocalSynthesisFile? synthesis => Page.synthesis;
+    private AuBtechReviewAgent.MultivocalPaperFile? paper => Page.paper;
+}
