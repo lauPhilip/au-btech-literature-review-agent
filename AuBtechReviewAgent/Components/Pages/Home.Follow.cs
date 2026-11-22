@@ -1,4 +1,3 @@
-using System.Text.Json;
 using Microsoft.AspNetCore.Components;
 
 namespace AuBtechReviewAgent.Components.Pages;
@@ -104,18 +103,18 @@ public partial class Home
         monitorCts = new CancellationTokenSource();
         var token = monitorCts.Token;
         Guid runId = currentSessionId;
+        // Parses the ledger only when it changed since the last tick (issue #306).
+        var ledger = new AuBtechReviewAgent.RunLedgerWatch(StatePath(runId));
 
         _ = Task.Run(async () =>
         {
             while (!token.IsCancellationRequested && isSearching && runId == currentSessionId)
             {
                 try { await Task.Delay(1000, token); } catch (TaskCanceledException) { break; }
-                string? raw = SafeRead(StatePath(runId));
-                if (raw == null) continue;
+                if (ledger.Read() is not { } read) continue;
+                var (state, raw) = read;
                 try
                 {
-                    var state = JsonSerializer.Deserialize<AuBtechReviewAgent.ReviewState>(raw);
-                    if (state == null) continue;
                     await InvokeAsync(() =>
                     {
                         if (runId != currentSessionId) return;
@@ -123,7 +122,7 @@ public partial class Home
                         StateHasChanged();
                     });
                 }
-                catch { /* the ledger was mid-write; try again next tick */ }
+                catch { /* the page went away while the state was shown; the loop ends or tries again next tick */ }
             }
         });
     }
