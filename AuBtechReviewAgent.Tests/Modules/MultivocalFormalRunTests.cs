@@ -67,7 +67,7 @@ public class MultivocalFormalRunTests : IDisposable
     public static readonly string[] FormalFields =
     {
         "Formal", "Paper", "FormalRemoved", "KappaGrey", "KappaFormal", "FormalPromptVersion",
-        "Mmat", "TextBasis", "FullTextSource", "FormalAppraisalVersion",
+        "Mmat", "TextBasis", "FullTextSource", "FormalAppraisalVersion", "Between",
     };
 
     [Fact]
@@ -96,8 +96,8 @@ public class MultivocalFormalRunTests : IDisposable
     {
         var run = await FormalKit.RunAsync(_root);
 
-        Assert.Equal("Proposing the map stopped: " + MultivocalMapper.FormalNotBuiltMessage, run.Runner.StatusOf(run.RunId)!.Error);
-        Assert.Equal(MultivocalQualityAssessor.StageAssessed, run.Store.LoadHeader(run.RunId)!.Stage);
+        Assert.Equal("Writing the paper stopped: " + MultivocalRunner.FormalPaperNotBuiltMessage, run.Runner.StatusOf(run.RunId)!.Error);
+        Assert.Equal(MultivocalSynthesiser.StageSynthesised, run.Store.LoadHeader(run.RunId)!.Stage);
     }
 
     [Fact]
@@ -146,5 +146,54 @@ public class MultivocalFormalRunTests : IDisposable
 
         Assert.DoesNotContain(run.Model.Prompts, p => p.Contains("You assess the quality of one grey") && p.Contains("agent frameworks"));
         Assert.Equal(2, run.Model.Prompts.Count(p => p.Contains("Mixed Methods Appraisal Tool")));
+    }
+
+    [Fact]
+    public async Task TheMapAndTheExtractionTakeBothPoolsEachValueWithAQuoteFromTheKeptText()
+    {
+        var run = await FormalKit.RunAsync(_root);
+
+        string mapPrompt = run.Model.Prompts.Single(p => p.Contains("You build the systematic map"));
+        Assert.Contains("(Journal of Agents, academic)", mapPrompt);
+        Assert.Contains("(blog.example.org)", mapPrompt);
+        Assert.Equal(2, run.Model.Prompts.Count(p => p.StartsWith("You extract data from one academic source", StringComparison.Ordinal) && p.Contains("SOURCE TEXT")));
+
+        var extraction = JsonSerializer.Deserialize<MultivocalExtractionFile>(File.ReadAllText(Path.Join(run.Store.FolderOf(run.RunId), MultivocalExtractor.ExtractionFile)))!;
+        var formal = extraction.Sources.Where(s => s.Formal).ToList();
+        Assert.Equal(new[] { MultivocalPages.FullTextBasis, MultivocalPages.AbstractBasis }, formal.Select(s => s.TextBasis));
+        Assert.Single(extraction.Sources, s => !s.Formal);
+        string Fact(GreyExtraction s, string name) => s.Known.Single(k => k.Name == name).Value;
+        Assert.Equal(("Formal (academic)", "not scored; MMAT qualitative, 2 of 5 criteria met", "full text"),
+            (Fact(formal[0], "Literature"), Fact(formal[0], "Quality points"), Fact(formal[0], "Text")));
+        Assert.Equal("not scored; MMAT not empirical, so not appraised", Fact(formal[1], "Quality points"));
+        Assert.All(formal, s => Assert.All(s.Attributes.SelectMany(a => a.Values), v => Assert.Equal("found", run.Pages.CheckQuote(run.RunId, s.Address, v.Quote))));
+    }
+
+    /// <summary>The tension step names the summaries against retrieval; everything else as the kit answers.</summary>
+    private static string? WithATension(string prompt) =>
+        prompt.Contains("Name the tensions") ? """{"tensions":[{"groupA":"V1","groupB":"V2","description":"V1 keeps a summary where V2 pages turns out."}]}""" : null;
+
+    [Fact]
+    public async Task EachThemeSaysInCodeWhatItRestsOnAndATensionAcrossThePoolsIsNamedAsSuch()
+    {
+        var run = await FormalKit.RunAsync(_root, WithATension);
+
+        var synthesis = JsonSerializer.Deserialize<MultivocalSynthesisFile>(File.ReadAllText(Path.Join(run.Store.FolderOf(run.RunId), MultivocalSynthesiser.SynthesisFile)))!;
+        Assert.Equal(new[] { "grey", "formal", "formal" }, synthesis.Findings.Select(f => f.Literature));
+        Assert.Equal(new[] { "page text", "full text", "abstract only" }, synthesis.Findings.Select(f => f.EvidenceBasis));
+        Assert.All(synthesis.Findings.Where(f => f.Literature == "formal"), f => Assert.Equal((0, 0.0), (f.Tier, f.QualityPoints)));
+
+        var theme = Assert.Single(synthesis.Themes);
+        Assert.Equal((3, 1, 2), (theme.Sources, theme.GreySources, theme.FormalSources));
+        Assert.Equal("grey and formal literature", theme.EvidenceLabel);
+        double greyPoints = run.Quality.Load(run.RunId)!.Sources.Single(q => !q.Formal && q.Outcome == "Passed").Points;
+        Assert.Equal(greyPoints, theme.MeanQuality); // Table 7 points of the grey sources only
+
+        var tension = Assert.Single(theme.Tensions);
+        Assert.Equal(SynthesisTension.ArtAgainstPractice, tension.Between);
+        Assert.Equal(("F1.1", "F3.1"), (tension.FindingA, tension.FindingB)); // the grey finding of V1, not the formal one, against V2's paper
+        string tensionPrompt = run.Model.Prompts.Single(p => p.Contains("Name the tensions"));
+        Assert.Contains("(2 sources, 1 academic, 1 grey)", tensionPrompt);
+        Assert.Contains("Academic sources show the state of the art and grey sources the state of the practice", tensionPrompt);
     }
 }

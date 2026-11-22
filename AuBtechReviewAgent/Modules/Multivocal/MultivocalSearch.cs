@@ -77,6 +77,10 @@ public sealed class MultivocalLedger
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public List<RemovedRecord>? FormalRemoved { get; set; }
 
+    /// <summary>Whether the run was planned with academic databases, so its ledger records the formal pool (even an empty one).</summary>
+    [JsonIgnore]
+    public bool HasFormalPool => FormalRemoved != null;
+
     [JsonIgnore]
     public IEnumerable<FoundGreySource> GreyPool => Sources.Where(s => !s.IsFormal);
 

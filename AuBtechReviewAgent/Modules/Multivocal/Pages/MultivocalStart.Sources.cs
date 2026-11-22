@@ -127,6 +127,11 @@ public partial class MultivocalStart
         GreySourceCatalog.Create(key)?.Name
         ?? (SourceCatalog.Find(key) is { } database ? $"{database.DisplayName} (academic)" : MultivocalGuidelines.SearchLabel(key));
 
+    /// <summary>What a finding's source is: its kind, outlet tier and points, or for an academic source its text basis (decision 8).</summary>
+    public static string FindingLabel(AuBtechReviewAgent.SynthesisFinding finding) => finding.Literature == "formal"
+        ? $"{KindLabel(finding.Kind)}, {finding.EvidenceBasis}"
+        : $"{KindLabel(finding.Kind)}, {finding.Tier switch { 1 => "1st", 2 => "2nd", _ => "3rd" }} tier, {finding.QualityPoints.ToString("0.#")} points";
+
     public static string KindLabel(string key) =>
         key == MultivocalSearcher.FormalKind ? "Academic literature"
         : MultivocalGuidelines.GreyTypes.FirstOrDefault(t => t.Key == key).Label ?? key;

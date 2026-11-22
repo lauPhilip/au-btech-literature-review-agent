@@ -23,15 +23,6 @@ public sealed partial class MultivocalMapper
     public const string StageMapped = "Mapped";
     public const string PromptVersion = "grey-map-v3";
 
-    /// <summary>
-    /// Whether the map, extraction and synthesis take both pools (block I-5 of docs/roadmap/mlr-todo.md). Until they
-    /// do, a run planned with academic databases stops here and says why, rather than mapping papers as grey sources.
-    /// </summary>
-    public const bool FormalMapBuilt = false;
-
-    public const string FormalNotBuiltMessage =
-        "The academic sources cannot be mapped yet; that comes in step I-5 of the roadmap. The search, the screening and the appraisal are on file. Plan a new review with no academic database ticked, or from the Grey Literature Review card.";
-
     public const int MaxAttributes = 20;
 
     /// <summary>The model may propose at most this many attributes per research question; the reviewer may add more.</summary>
@@ -84,7 +75,6 @@ public sealed partial class MultivocalMapper
         var records = (_searcher.LoadLedger(runId)?.Sources ?? new()).ToDictionary(s => MultivocalSearcher.AddressKey(s.Record.Url), s => s.Record);
         var passed = quality.Sources.Where(q => q.Outcome == "Passed" && records.ContainsKey(q.Address)).Select(q => records[q.Address]).ToList();
         if (passed.Count == 0) throw new InvalidOperationException("No source passed the quality check, so there is nothing to map.");
-        if (planned.Plan.UsesFormalPool && !FormalMapBuilt) throw new InvalidOperationException(FormalNotBuiltMessage);
         if (!Running.TryAdd(runId, true)) throw new InvalidOperationException("This run is being mapped already.");
 
         string folder = _runs.FolderOf(runId);
@@ -166,7 +156,7 @@ public sealed partial class MultivocalMapper
     {
         string questions = string.Join("\n", plan.Numbered().Select(q => $"{q.Number} ({MultivocalGuidelines.FindType(q.Question.Type)?.Name ?? "not set"}): {q.Question.Text}"));
         string list = string.Join("\n", sources.Select((s, i) =>
-            $"{i + 1}. {s.Title} ({s.Site}): {(s.Summary.Length > 300 ? s.Summary[..300] + "…" : s.Summary)}"));
+            $"{i + 1}. {s.Title} ({s.Site}{(s.Kind == MultivocalSearcher.FormalKind ? ", academic" : "")}): {(s.Summary.Length > 300 ? s.Summary[..300] + "…" : s.Summary)}"));
         var prompt = $$"""
             You build the systematic map (classification scheme) of a multivocal literature review, following Garousi et al. (2019, G12 and Table 10).
             Topic: {{PromptSafety.Wrap(plan.Topic, "review topic")}}

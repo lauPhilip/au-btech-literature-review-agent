@@ -37,14 +37,31 @@ public sealed partial class MultivocalMapper
     };
 
     /// <summary>The known facts of one source, in the order of <see cref="KnownFacts"/>.</summary>
-    public static IReadOnlyList<(string Name, string Value)> KnownFactsFor(GreyRecord record, GreyQuality? quality) => new[]
-    {
-        ("Kind of source", MultivocalGuidelines.GreyTypes.FirstOrDefault(t => t.Key == record.Kind).Label ?? record.Kind),
-        ("Literature", "Grey"),
-        ("Site", record.Site),
-        ("Date", record.Published is DateTime d ? d.ToString("yyyy-MM-dd") : "not given"),
-        ("Quality points", quality is { Outcome: not "Not assessed" } q ? $"{q.Points:0.#} of {GreyQualityChecklist.MaxPoints}" : "not assessed"),
-    };
+    public static IReadOnlyList<(string Name, string Value)> KnownFactsFor(GreyRecord record, GreyQuality? quality) =>
+        record.Kind == MultivocalSearcher.FormalKind
+            ? new[]
+            {
+                ("Kind of source", "Academic literature"),
+                ("Literature", "Formal (academic)"),
+                ("Site", record.Site),
+                ("Date", record.Published is DateTime fd ? fd.ToString("yyyy-MM-dd") : "not given"),
+                // A formal source is appraised with MMAT, not scored on Table 7 (block I-4); its text basis is recorded too (decision 8).
+                ("Quality points", quality?.Mmat is { } mmat ? $"not scored; MMAT {MmatSummary(mmat)}" : "not assessed"),
+                ("Text", quality?.TextBasis ?? "not kept"),
+            }
+            : new[]
+            {
+                ("Kind of source", MultivocalGuidelines.GreyTypes.FirstOrDefault(t => t.Key == record.Kind).Label ?? record.Kind),
+                ("Literature", "Grey"),
+                ("Site", record.Site),
+                ("Date", record.Published is DateTime d ? d.ToString("yyyy-MM-dd") : "not given"),
+                ("Quality points", quality is { Outcome: not "Not assessed" } q ? $"{q.Points:0.#} of {GreyQualityChecklist.MaxPoints}" : "not assessed"),
+            };
+
+    /// <summary>An MMAT appraisal in a few words: "qualitative, 2 of 5 criteria met", or that the study is not empirical.</summary>
+    public static string MmatSummary(StudyExtraction mmat) =>
+        mmat.Appraisal.Count == 0 ? (mmat.AppraisalCategory == StudyExtractor.NotAppraised ? "not appraised" : "not empirical, so not appraised")
+        : $"{mmat.AppraisalCategory.Replace('_', ' ')}, {mmat.AppraisalYes} of {mmat.Appraisal.Count} criteria met";
 
     /// <summary>"ToolOrFramework" becomes "Tool or framework"; a name with spaces is kept as written.</summary>
     public static string PlainName(string name)

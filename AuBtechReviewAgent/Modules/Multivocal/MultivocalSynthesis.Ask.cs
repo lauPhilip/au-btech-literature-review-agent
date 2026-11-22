@@ -66,7 +66,13 @@ public sealed partial class MultivocalSynthesiser
     public static async Task<ModelTensions> AskTensionsAsync(IChatCompletionService chat, string question, string questionText, string theme,
         IReadOnlyList<ValueGroup> groups, IReadOnlyList<SynthesisFinding> findings)
     {
-        string list = string.Join("\n", groups.Select(g => $"{g.Id} {g.Attribute}: {g.Value} ({g.Sources} source{(g.Sources == 1 ? "" : "s")}); for example {string.Join(" / ", g.Samples)}"));
+        // With formal findings (block I-5) each value says which pools its sources are in, so a disagreement between
+        // the state of the art and the state of the practice can be named; a grey literature review's prompt is unchanged.
+        bool pools = findings.Any(f => f.Literature == "formal");
+        string list = string.Join("\n", groups.Select(g => $"{g.Id} {g.Attribute}: {g.Value} ({g.Sources} source{(g.Sources == 1 ? "" : "s")}{(pools ? PoolsOf(g, findings) : "")}); for example {string.Join(" / ", g.Samples)}"));
+        string poolNote = pools
+            ? " Academic sources show the state of the art and grey sources the state of the practice; where they disagree, name it, as it matters most."
+            : "";
         var prompt = $$"""
             In a multivocal literature review, research question {{question}}: {{PromptSafety.Wrap(questionText, "research question")}}
             Theme: {{PromptSafety.Wrap(theme, "theme")}}
@@ -76,12 +82,19 @@ public sealed partial class MultivocalSynthesiser
             VALUES IN THIS THEME (id, attribute: value, sources, example quotes):
             {{PromptSafety.Wrap(list, "values")}}
 
-            Name the tensions: pairs of values whose sources disagree or contradict each other about how to do something or what works, with one sentence on how, using the values' names, not their ids. Values that are merely different, or different options, are not tensions. Only real disagreements; none is fine.
+            Name the tensions: pairs of values whose sources disagree or contradict each other about how to do something or what works, with one sentence on how, using the values' names, not their ids. Values that are merely different, or different options, are not tensions. Only real disagreements; none is fine.{{poolNote}}
 
             Respond ONLY with a valid minified JSON object of this shape:
             {"tensions":[{"groupA":"V1","groupB":"V4","description":"One sentence."}]}
             """;
         return await LlmJson.GetAsync<ModelTensions>(chat, prompt, LlmJson.JsonMode(0.2), _ => null);
+    }
+
+    /// <summary>", 1 academic, 2 grey": how many of a value's sources are in each pool.</summary>
+    private static string PoolsOf(ValueGroup group, IReadOnlyList<SynthesisFinding> findings)
+    {
+        var sources = findings.Where(f => group.Findings.Contains(f.Id)).GroupBy(f => f.Address).Select(g => g.First().Literature).ToList();
+        return $", {sources.Count(l => l == "formal")} academic, {sources.Count(l => l == "grey")} grey";
     }
 
     /// <summary>
@@ -102,7 +115,9 @@ public sealed partial class MultivocalSynthesiser
                 outside++;
                 continue;
             }
-            var pair = a.Findings.SelectMany(fa => b.Findings.Select(fb => (A: byFinding[fa], B: byFinding[fb]))).FirstOrDefault(x => x.A.Address != x.B.Address);
+            // A pair across the pools comes first, so a tension between the state of the art and of the practice is shown as one.
+            var pair = a.Findings.SelectMany(fa => b.Findings.Select(fb => (A: byFinding[fa], B: byFinding[fb])))
+                .Where(x => x.A.Address != x.B.Address).OrderBy(x => x.A.Literature == x.B.Literature ? 1 : 0).FirstOrDefault();
             if (pair.A == null)
             {
                 oneSource++;
@@ -110,7 +125,15 @@ public sealed partial class MultivocalSynthesiser
             }
             // The model sees the values by id; the reader sees their names.
             string description = ValueId.Replace(t.Description.Trim(), m => byId.TryGetValue(m.Value, out var g) ? $"\"{g.Value}\"" : "another value");
-            tensions.Add(new SynthesisTension { FindingA = pair.A.Id, FindingB = pair.B.Id, Description = $"{a.Value} against {b.Value}. {description}" });
+            tensions.Add(new SynthesisTension
+            {
+                FindingA = pair.A.Id,
+                FindingB = pair.B.Id,
+                Description = $"{a.Value} against {b.Value}. {description}",
+                Between = !findings.Any(f => f.Literature == "formal") ? null
+                    : pair.A.Literature != pair.B.Literature ? SynthesisTension.ArtAgainstPractice
+                    : pair.A.Literature == "formal" ? "within the state of the art" : "within the state of the practice",
+            });
         }
         if (outside > 0) notes.Add($"{outside} tension(s) named a value outside the theme; left out.");
         if (oneSource > 0) notes.Add($"{oneSource} tension(s) were between values of one source only; left out.");

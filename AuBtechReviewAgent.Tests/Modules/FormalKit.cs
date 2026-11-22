@@ -55,6 +55,22 @@ public static class FormalKit
             ? $$"""{"studyType":"qualitative evaluation","method":{"value":"evaluation with teams","quote":"{{FullTextOnly}}"},"sample":{"value":"twelve teams","quote":"{{FullTextOnly}}"},"keyFindings":[{"value":"Summaries halved the prompt size.","quote":"{{FullTextOnly}}"}],"limitations":{"value":"not reported","quote":""},"appraisalCategory":"qualitative","appraisal":[{"id":"1.1","answer":"yes","quote":"We keep a running summary of the conversation."},{"id":"1.2","answer":"yes","quote":"{{FullTextOnly}}"},{"id":"1.3","answer":"cant_tell","quote":""},{"id":"1.4","answer":"cant_tell","quote":""},{"id":"1.5","answer":"cant_tell","quote":""}]}"""
             : $$"""{"studyType":"position paper","method":{"value":"not reported","quote":""},"sample":{"value":"not reported","quote":""},"keyFindings":[{"value":"Old turns go to a vector store.","quote":"{{SecondAbstract}}"}],"limitations":{"value":"not reported","quote":""},"appraisalCategory":"not_empirical","appraisal":[]}""";
 
+    /// <summary>The fake model's extraction of a formal source against the kit's map: the full-text paper on summaries, the other on retrieval.</summary>
+    public static string? Extraction(string prompt) =>
+        !prompt.Contains("You extract data from one academic source") ? null
+        : prompt.Contains(FullTextOnly)
+            ? $$"""{"purpose":{"value":"Evaluates running summaries.","quote":"{{FullTextOnly}}"},"attributes":[{"attribute":"Practice","values":[{"value":"Summarisation","quote":"We keep a running summary of the conversation."}]}]}"""
+            : $$"""{"purpose":{"value":"Describes memory hierarchies.","quote":"{{SecondAbstract}}"},"attributes":[{"attribute":"Practice","values":[{"value":"Retrieval","quote":"{{SecondAbstract}}"}]}]}""";
+
+    /// <summary>The fake model's placement: every value it is given goes into the kit's one theme.</summary>
+    public static string? Placement(string prompt)
+    {
+        if (!prompt.Contains("VALUES TO PLACE")) return null;
+        string values = prompt[prompt.IndexOf("VALUES TO PLACE", StringComparison.Ordinal)..prompt.IndexOf("Place every value above", StringComparison.Ordinal)];
+        var ids = System.Text.RegularExpressions.Regex.Matches(values, @"^\s*(V\d+) ", System.Text.RegularExpressions.RegexOptions.Multiline).Select(m => m.Groups[1].Value).Distinct();
+        return "{\"placements\":[" + string.Join(",", ids.Select(id => $$"""{"group":"{{id}}","themes":["Summaries keep the context short"],"reason":""}""")) + "]}";
+    }
+
     public sealed record Run(RunStore Store, Guid RunId, string Key, MultivocalRunner Runner, MultivocalSearcher Searcher, MultivocalScreener Screener,
         MultivocalWriter Writer, MultivocalReporter Reporter, FakeChatService Model, Database Academic, MultivocalPages Pages, MultivocalQualityAssessor Quality);
 
@@ -62,7 +78,7 @@ public static class FormalKit
     public static async Task<Run> RunAsync(string root, Func<string, string?>? respond = null)
     {
         var store = new RunStore(root);
-        var model = new FakeChatService().RespondsWith(p => respond?.Invoke(p) ?? Appraisal(p) ?? ModuleKit.RespondMultivocal(p));
+        var model = new FakeChatService().RespondsWith(p => respond?.Invoke(p) ?? Appraisal(p) ?? Extraction(p) ?? Placement(p) ?? ModuleKit.RespondMultivocal(p));
         IChatCompletionService Chat() => LlmRecording.Current ?? (IChatCompletionService)model;
         var planner = new MultivocalPlanner(store);
         var plan = MultivocalPlan.Example();
