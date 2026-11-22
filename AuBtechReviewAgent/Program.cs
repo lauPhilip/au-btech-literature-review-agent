@@ -284,7 +284,7 @@ app.MapGet("/health", () =>
 app.MapGet("/.well-known/security.txt", (HttpRequest request) =>
     Results.Text(AuBtechReviewAgent.SiteSeo.SecurityTxt(AuBtechReviewAgent.SiteSeo.BaseUrl(siteConfiguration, request), DateTime.UtcNow), "text/plain; charset=utf-8"));
 
-if (apiEnabled) AuBtechReviewAgent.ApiEndpoints.MapReviewApi(app);
+if (apiEnabled) AuBtechReviewAgent.ApiEndpoints.MapReviewApi(app); else AuBtechReviewAgent.ApiEndpoints.HideReviewApi(app);
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
 

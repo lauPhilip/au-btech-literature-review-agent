@@ -98,6 +98,20 @@ public static class ApiEndpoints
         return app;
     }
 
+    /// <summary>
+    /// With the switch off nothing is mapped, but another route can still match the path by its shape and answer 405
+    /// to a POST. This makes every API address answer a plain 404 instead, so the API cannot be told from nothing.
+    /// </summary>
+    public static WebApplication HideReviewApi(this WebApplication app)
+    {
+        app.Use(async (context, next) =>
+        {
+            if (IsApiPath(context.Request.Path)) { context.Response.StatusCode = StatusCodes.Status404NotFound; return; }
+            await next(context);
+        });
+        return app;
+    }
+
     /// <summary>The caller's keys from the headers, cleaned as the form cleans them; null without a Mistral key.</summary>
     public static ApiCallerKeys? KeysFrom(HttpRequest request)
     {

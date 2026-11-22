@@ -4,7 +4,7 @@ Other tools can start a systematic review and follow it without the website. Thi
 
 ## The switch
 
-The API is off in production until Lau turns it on. `Program.cs` reads the switch as `builder.Configuration.GetValue("Api:Enabled", builder.Environment.IsDevelopment())`, so it is on in Development and off everywhere else unless `Api:Enabled` is `true` in the server's configuration. The default lives in code, not in `appsettings.json`. With the switch off, `Program.cs` neither registers the API's services nor maps its routes, so every address on this page answers 404.
+The API is off in production until Lau turns it on. `Program.cs` reads the switch as `builder.Configuration.GetValue("Api:Enabled", builder.Environment.IsDevelopment())`, so it is on in Development and off everywhere else unless `Api:Enabled` is `true` in the server's configuration. The default lives in code, not in `appsettings.json`. With the switch off, `Program.cs` neither registers the API's services nor maps its routes. `ApiEndpoints.HideReviewApi` then answers 404 for every address under `/api/v1` and `/mcp`, because another route that matches the shape of the path would otherwise answer a POST with 405.
 
 ## Starting a review and following it
 
