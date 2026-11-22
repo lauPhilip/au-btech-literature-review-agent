@@ -1,7 +1,7 @@
 // Records the demo GIFs (issue #259): one scene of 6 seconds per thing the site does, from the app running in
 // Development with its made-up sample pages (/design/run, /design/report, /design/metrics), so no model, key or real
 // run is needed. Each scene is filmed by Playwright at 1280 x 720 and turned into a GIF by ffmpeg: the last 6 s,
-// 12 frames a second, 960 px wide, with its own palette, to stay under about 2 MB.
+// 12 frames a second, 960 px wide (800 for the busiest scene), with its own palette, to stay under about 2 MB.
 //   cd tools/a11y && npm ci && BASE_URL=http://localhost:5038 DEMO_OUT=../../demo-gifs node record-demos.mjs
 // DEMO_SCENES picks scenes by name (comma-separated); all by default. A scene that fails is reported and skipped.
 import { chromium } from 'playwright';
@@ -42,7 +42,10 @@ const scenes = [
     async run(page) {
       await page.goto(base + '/review');
       await pause(page, 1500);
-      await page.getByRole('button', { name: 'Try an example' }).click();
+      // Without a server key (as in CI) the page opens the API keys dialog by itself; Escape closes it.
+      if (await page.locator('#key-dialog').isVisible()) await page.keyboard.press('Escape');
+      await pause(page, 300);
+      await page.getByRole('button', { name: 'Try an example' }).click({ timeout: 5000 });
       await pause(page, 2500);
       const criteria = page.locator('button[aria-controls="criteria-body"]');
       if (await criteria.count() > 0 && (await criteria.first().getAttribute('aria-expanded')) === 'false') await criteria.first().click();
@@ -63,6 +66,7 @@ const scenes = [
   },
   {
     name: 'report',
+    width: 800, // the open citation card changes much of the screen; a smaller GIF keeps it under 2 MB
     alt: 'The report: a citation is opened to show its verdict and the quote from the paper, then the next flagged citation.',
     async run(page) {
       await page.goto(base + '/design/report');
@@ -102,8 +106,8 @@ const scenes = [
   },
 ];
 
-function toGif(video, gif) {
-  const filter = 'fps=12,scale=960:-1:flags=lanczos,split[a][b];[a]palettegen=max_colors=128:stats_mode=diff[p];' +
+function toGif(video, gif, width) {
+  const filter = `fps=12,scale=${width}:-1:flags=lanczos,split[a][b];[a]palettegen=max_colors=128:stats_mode=diff[p];` +
     '[b][p]paletteuse=dither=bayer:bayer_scale=4:diff_mode=rectangle';
   execFileSync('ffmpeg', ['-y', '-loglevel', 'error', '-sseof', `-${seconds}`, '-i', video, '-vf', filter, '-loop', '0', gif]);
 }
@@ -127,7 +131,7 @@ for (const scene of scenes.filter(s => only.length === 0 || only.includes(s.name
   await context.close(); // the film is written when its context closes
   const video = readdirSync(dir).find(f => f.endsWith('.webm'));
   const gif = join(out, `${scene.name}.gif`);
-  toGif(join(dir, video), gif);
+  toGif(join(dir, video), gif, scene.width ?? 960);
   renameSync(join(dir, video), join(out, `${scene.name}.webm`));
   console.log(`${scene.name}: ${gif}, ${(statSync(gif).size / 1048576).toFixed(2)} MB. Alt text: ${scene.alt}`);
   made++;

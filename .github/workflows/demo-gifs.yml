@@ -2,8 +2,9 @@ name: Demo GIFs
 
 # Records the 6-second demo GIFs for the README, the wiki and talks (issue #259; tools/a11y/record-demos.mjs).
 # Started by hand from the Actions tab, and on a pull request that changes the recording, so the result can be
-# looked at before it is merged. The GIFs come back as the "demo-gifs" artifact; a pull request then adds the
-# chosen ones to docs/img/demo/. Nothing is pushed or published from here.
+# looked at before it is merged. The GIFs come back as the "demo-gifs" artifact. Started by hand, the workflow
+# also pushes them to a new branch (the publish job), from which a person opens the pull request; it never
+# writes to master.
 on:
   workflow_dispatch:
   pull_request:
@@ -63,3 +64,39 @@ jobs:
           path: demo-gifs/
           if-no-files-found: ignore
           retention-days: 14
+
+  # Only when started by hand: the GIFs go to a new branch, demo-gifs/run-<id>, under docs/img/demo/, three files a
+  # commit as the repository's commits are. A person opens the pull request from that branch, so nothing reaches
+  # master unseen. A pull request's own run stops after the artifact.
+  publish:
+    name: Push the GIFs to a branch
+    needs: record
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: demo-gifs
+          path: demo-gifs
+
+      - name: Commit the GIFs to a new branch
+        env:
+          RUN_ID: ${{ github.run_id }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -b "demo-gifs/run-$RUN_ID"
+          mkdir -p docs/img/demo
+          cp demo-gifs/*.gif docs/img/demo/
+          set -- docs/img/demo/*.gif
+          while [ "$#" -gt 0 ]; do
+            batch="$1"; shift
+            for i in 1 2; do [ "$#" -gt 0 ] && batch="$batch $1" && shift; done
+            git add $batch
+            git commit -q -m "(add): demo GIFs from the Demo GIFs workflow, run $RUN_ID" -m "Co-Authored-By: Philip Lau <philip15@live.dk>"
+          done
+          git push origin "demo-gifs/run-$RUN_ID"
