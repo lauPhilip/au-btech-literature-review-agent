@@ -117,7 +117,7 @@ public static partial class ReviewWriter
         string s = profile.Source, ss = profile.Sources;
         // The theme's own counts (issue #146), when the module gives them; without them the prompt is as before.
         string themeFacts = theme.Facts.Length == 0 ? ""
-            : $"\nFACTS ABOUT THE {ss.ToUpperInvariant()} IN THIS THEME ({profile.BaseFactsFrom}; use them whenever you say how these {ss} were designed or what they were read from, and do not change them): {theme.Facts}";
+            : $"\nFACTS ABOUT THE {ss.ToUpperInvariant()} IN THIS THEME ({profile.BaseFactsFrom}; use them whenever you say how these {ss} were designed, and do not change them): {theme.Facts}";
 
         string prompt = $$"""
             You are writing one subsection of {{profile.ResultsSection}} of {{profile.Review}}. The review used thematic synthesis; this subsection reports one theme.
@@ -139,6 +139,7 @@ public static partial class ReviewWriter
             2. Cite every one of these {{ss}} at least once: {{sourceList}}. A {{s}} may be cited together with others when they report the same finding ("... [3, 7, 12]").
             3. Every sentence that states a finding, comparison or claim from the literature ends with an inline marker like [3] or [2, 5]. Attribute to a {{s}} only what its findings or excerpts above actually say; prefer the verified findings. Do not invent numbers, statistics or venue names.
             4. "heading" is a short subsection title for the theme (at most 10 words, no numbering).
+            5. {{ReadingBasisRule(profile)}}
             {{ProseCleaner.PlainProseRule}}
             Respond ONLY with a valid minified JSON object:
             {"heading":"...","text":"the subsection with inline [n] citations"}
@@ -193,6 +194,7 @@ public static partial class ReviewWriter
                 {{PromptSafety.Wrap(missingEvidence, $"evidence of the {ss} not yet cited")}}
 
                 TASK: Integrate the {{ss}} {{string.Join(", ", missing.Select(r => $"[{r}]"))}} where their evidence fits: add them to the comparisons that already exist, or add sentences that relate them to the {{ss}} already discussed. Attribute to them only what their evidence above says. Keep every existing citation. If the evidence of a {{s}} does not support any statement about this theme, leave it out rather than inventing one.
+                {{ReadingBasisRule(profile)}}
                 {{ProseCleaner.PlainProseRule}}
                 Respond ONLY with a valid minified JSON object:
                 {"text":"the revised subsection with inline [n] citations"}

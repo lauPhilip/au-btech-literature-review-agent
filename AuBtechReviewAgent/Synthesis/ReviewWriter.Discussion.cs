@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Microsoft.SemanticKernel.ChatCompletion;
 
@@ -35,6 +36,7 @@ public static partial class ReviewWriter
             1. Write about {{paragraphs}} paragraphs, separated by a blank line: {{profile.DiscussionParts}}
             2. Interpret, do not repeat the results. Ground every claim in the results above; every sentence that attributes something to the literature ends with an inline marker such as [3] or [2, 5], using the same {{profile.Sources}} the results cite for it. {{OwnCountRule}}
             3. Do not invent numbers, statistics or {{profile.Sources}}.
+            4. {{ReadingBasisRule(profile)}}
             {{ProseCleaner.PlainProseRule}}
             Respond ONLY with a valid minified JSON object:
             {"text":"the discussion with inline [n] citations"}
@@ -47,6 +49,7 @@ public static partial class ReviewWriter
                 var outside = ThematicSynthesis.CitedIn(a.Text).Where(r => r < 1 || r > referenceCount).ToList();
                 if (outside.Count > 0) return $"citation numbers {string.Join(", ", outside)} are not in the reference list.";
                 if (LeftOutCited(a.Text, evidence) is { } leftOut) return leftOut;
+                if (ReadingBasisSentence(a.Text) is { } basis) return ReadingBasisProblem(basis, profile);
                 return OwnCountCited(a.Text, evidence.BaseFacts, synthesis) is { } own
                     ? $"\"{own}\" states this review's own count and carries a citation; the review's own counts take no citation."
                     : null;
@@ -82,4 +85,28 @@ public static partial class ReviewWriter
         return used.Count == 0 ? null
             : $"it cites {string.Join(", ", used)}, which the synthesis left out of the themes; do not use {(used.Count == 1 ? "it" : "them")} as evidence.";
     }
+
+    /// <summary>
+    /// The prompt rule on what the review read each source from (issue #167): that is the review's reading, not the
+    /// source's method, and how many were read in full is said once, by the limitations the code writes.
+    /// </summary>
+    public static string ReadingBasisRule(WritingProfile profile) =>
+        $"What a {profile.Source} was read from (its full text or only its abstract) is what this review read, not part of the {profile.Source}'s method: never describe it as the {profile.Source}'s method or design, and do not say how many {profile.Sources} were read in full text or from the abstract only. The limitations of this review say that once; do not repeat it.";
+
+    private static readonly Regex ReadingBasis = new(
+        @"\b(?:full[- ]?texts?|abstracts?)\s+(?:was|were|is|are)\s+(?:only\s+)?(?:read|available|retrieved|obtained|used)\b" +
+        @"|\b(?:read|retrieved|assessed|evaluated|appraised|analy[sz]ed|examined|reviewed)\s+(?:(?:only|solely|just)\s+)?(?:in\s+full\b|(?:through|from|via|using|on)\s+(?:the\s+|their\s+|its\s+)?(?:full[- ]?texts?|abstracts?)\b)" +
+        @"|\bfull[- ]?text\s+(?:analysis|reading)\b|\babstracts?[- ]only\b|\bonly\s+(?:the\s+|their\s+|its\s+)?abstracts?\b",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+    /// <summary>
+    /// The first sentence without a citation that says what this review read its sources from, or null (issue #167). A
+    /// cited sentence is a source's claim, for example about full-text screening, and is left alone. Public for unit tests.
+    /// </summary>
+    public static string? ReadingBasisSentence(string text) =>
+        CitationSupportChecker.SplitSentences(text ?? "").FirstOrDefault(s => ThematicSynthesis.CitedIn(s).Count == 0 && ReadingBasis.IsMatch(s));
+
+    /// <summary>The message that sends back a text with such a sentence.</summary>
+    public static string ReadingBasisProblem(string sentence, WritingProfile profile) =>
+        $"\"{sentence.Trim()}\" says what this review read the {profile.Sources} from; the limitations of this review say that once, so leave it out, and never present it as a {profile.Source}'s method.";
 }
