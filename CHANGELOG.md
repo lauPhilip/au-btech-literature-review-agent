@@ -90,6 +90,9 @@ A code repository is now cited by the year it was made, not the year of its last
 
 A question about how often something happens now gets the same answer in the paper and in the data appendix. Before, the paper counted the answer while the appendix said no theme was found.
 
+The planning form now says which kinds of grey literature each chosen search can find. It warns you when a kind you named has no search that reaches it, and the protocol says the same. Before, a plan could name five kinds and search only GitHub.
+
+
 ## [0.4.0] - 2026-11-20
 
 The model writes about the studies from facts, not from its own guesses. This changes what the model is asked, so runs can differ from 0.3.0.
