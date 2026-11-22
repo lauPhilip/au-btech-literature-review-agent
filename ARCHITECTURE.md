@@ -61,7 +61,7 @@ These rules are why the code looks the way it does. A change that breaks one of 
 
 ## Where state lives
 
-A run lives in its own folder under `WorkspaceStore/{runId}/`. The ledger is `transparent-process.json` (the `ReviewState` type in `Pipeline/ReviewModels.cs`), and the other files are described on [page 5 of the wiki](docs/wiki/05-ledger-and-archive.md). There is no database: the dashboard reads the ledger, the cache keeps answers under `App_Data/cache/`, and finished runs leave one line in the metrics store under `App_Data/metrics/`. Runs are deleted after `Runs:RetentionDays`.
+A run lives in its own folder under `WorkspaceStore/{runId}/`. The ledger is `transparent-process.json` (the `ReviewState` type in `Pipeline/ReviewState.cs`), and the other files are described on [page 5 of the wiki](docs/wiki/05-ledger-and-archive.md). There is no database: the dashboard reads the ledger, the cache keeps answers under `App_Data/cache/`, and finished runs leave one line in the metrics store under `App_Data/metrics/`. Runs are deleted after `Runs:RetentionDays`.
 
 ## What is around the app
 
