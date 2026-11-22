@@ -109,6 +109,10 @@ public sealed partial class MultivocalSearcher
     private readonly Func<string, IGreySource?> _sources;
     private readonly Func<string, IAcademicSource?>? _academic;
 
+    /// <summary>A searcher over the run folders, with the grey searches and, for the formal pool, the academic databases.</summary>
+    /// <param name="runs">The run folders.</param>
+    /// <param name="planner">Reads the run's plan.</param>
+    /// <param name="sources">Opens a grey search by its key (default: the built ones in <see cref="GreySourceCatalog"/>).</param>
     /// <param name="academic">Opens an academic database of the formal pool by its SourceCatalog key, with the server's
     /// own key; null when the database cannot be searched here. Without it, every database is listed as skipped.</param>
     public MultivocalSearcher(RunStore runs, MultivocalPlanner planner, Func<string, IGreySource?>? sources = null,
