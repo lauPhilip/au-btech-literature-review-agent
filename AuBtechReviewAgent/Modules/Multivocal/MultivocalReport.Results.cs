@@ -21,7 +21,9 @@ public sealed partial class MultivocalReporter
         {
             var section = new ReportSection { Heading = $"{number}: {question.Text}", Level = 3 };
             var themes = s.Themes.Where(t => t.Question == number).ToList();
-            if (themes.Count == 0 && !s.NotCoded.Any(n => n.Question == number))
+            bool inCode = MultivocalPaperParts.AnsweredInCode(question.Type);
+            if (inCode) section.Blocks.AddRange(CodeAnswerBlocks(input, number, question));
+            else if (themes.Count == 0 && !s.NotCoded.Any(n => n.Question == number))
                 section.Blocks.Add(ReportBlock.Paragraph(s.Unanswered.Contains(number)
                     ? "No extracted source answers this question, so the review cannot answer it from these sources."
                     : "No theme was found for this question."));
@@ -50,6 +52,26 @@ public sealed partial class MultivocalReporter
             yield return new ReportSection { Heading = "Findings in no theme", Level = 3 }
                 .With(ReportBlock.List(s.Unassigned.Select(u => $"{u.Finding}: {Sentence(u.Reason)}")));
     }
+
+    /// <summary>
+    /// A question about frequency or existence, answered as the paper answers it (#249): the same lead and the same
+    /// tables, counted in code, with the paper's reference numbers written as this report's source numbers ([S2]).
+    /// </summary>
+    public static IEnumerable<ReportBlock> CodeAnswerBlocks(MultivocalReportInput input, string number, PlannedQuestion question)
+    {
+        yield return ReportBlock.Paragraph(MultivocalPaperParts.CodeAnswerLead(input, number, question));
+        foreach (var table in MultivocalPaperParts.CodeAnswerTables(input, number))
+        {
+            yield return ReportBlock.Paragraph($"**{table.Caption}**");
+            yield return ReportBlock.Table(table.Headers, table.Rows.Select(r => r.Select(AsSourceNumbers)));
+            if (!string.IsNullOrWhiteSpace(table.Note)) yield return ReportBlock.Paragraph(AsSourceNumbers(table.Note));
+        }
+    }
+
+    private static string AsSourceNumbers(string text) =>
+        System.Text.RegularExpressions.Regex.Replace(text, @"\[(\d+(?:,\s*\d+)*)\]",
+            m => "[" + string.Join(", ", m.Groups[1].Value.Split(',').Select(n => "S" + n.Trim())) + "]",
+            System.Text.RegularExpressions.RegexOptions.None, TimeSpan.FromSeconds(1));
 
     /// <summary>
     /// The findings a theme shows: one per source, from the highest outlet tier and quality first, each value of the theme
