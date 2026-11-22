@@ -50,7 +50,7 @@ public class SecondRepairPassTests
     public async Task ANotSupportedCitationIsDroppedWhileAnotherCitationStays()
     {
         const string sentence = "Agents log every tool call [1, 2].";
-        var chat = new FakeChatService().Returns(LogsQuote).Returns(NotSupported).Returns(NoRepair);
+        var chat = new FakeChatService().Returns(LogsQuote).Returns(NotSupported).Returns(NoRepair).Returns("""{"readsWell":true,"problem":""}""");
 
         var result = await Grounding.CheckAndRepairAsync(chat, Field("Loops recover. " + sentence), new[] { Page(1, Logs), Page(2, "Prices start at ten euros.") }, NoQuotes, 2, Options);
 
@@ -62,7 +62,10 @@ public class SecondRepairPassTests
         // The kept citation keeps its verdict under the new sentence text, at its place.
         var kept = Assert.Single(result.Checks);
         Assert.Equal((1, CitationSupportChecker.Supported, "Agents log every tool call [1].", 1), (kept.Reference, kept.Verdict, kept.Sentence, kept.SentenceIndex));
-        Assert.Equal(3, chat.Prompts.Count); // the removal asks the model nothing
+        // The removal asks the model nothing; the paragraph it changed is then read for sense once (issue #248).
+        Assert.Equal(4, chat.Prompts.Count);
+        Assert.Contains("after an automated citation repair changed some of its sentences", chat.Prompts[3]);
+        Assert.Equal(RepairSense.ReadsWell, Assert.Single(result.Sense!).Outcome);
     }
 
     [Fact]

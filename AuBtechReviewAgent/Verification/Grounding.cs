@@ -12,12 +12,14 @@ namespace AuBtechReviewAgent;
 /// <param name="Repair">Whether sentences with a rejected citation are repaired and checked again, with a second pass for what is still flagged.</param>
 /// <param name="Review">How the prompts name the review, e.g. "systematic literature review".</param>
 /// <param name="Cache">Where the check's answers are kept, so the same sentence with the same evidence is not asked again; none by default.</param>
+/// <param name="SenseCheck">Whether every repaired paragraph is read for sense after the repair, and rewritten once when it does not read well (<see cref="RepairSense"/>).</param>
 public sealed record GroundingOptions(
     int Parallelism = 1,
     bool SecondCheck = true,
     bool Repair = true,
     string Review = CitationRepairer.DefaultReview,
-    CheckCache? Cache = null);
+    CheckCache? Cache = null,
+    bool SenseCheck = true);
 
 /// <summary>
 /// The checked (and possibly repaired) text, every verdict, the counts before the repair, the repair log, and the
@@ -28,14 +30,15 @@ public sealed record GroundingResult(
     List<CitationSupportResult> Checks,
     CitationSupportSummary BeforeRepair,
     List<CitationRepair> Repairs,
-    List<RemovedCitation> Removed);
+    List<RemovedCitation> Removed,
+    List<RepairSenseCheck>? Sense = null);
 
 /// <summary>
 /// The grounding check, the heart of TraceableAI, shared by every kind of review. Every cited sentence of a text is
 /// checked against the source it cites (a paper, or the text of any other source): the model must give a verdict
 /// and a verbatim quote, and the quote is looked up in the source's text in code. Sentences whose citation is
 /// rejected are repaired and checked again; a second pass rewrites what is still partly supported and removes what
-/// is still not supported. The check does not know which kind of review it serves; a module
+/// is still not supported, and every repaired paragraph is read for sense. The check does not know which kind of review it serves; a module
 /// passes its text, its numbered sources and how to name the review.
 /// </summary>
 public static class Grounding
@@ -57,6 +60,7 @@ public static class Grounding
         Action<bool, int, int>? checkProgress = null,
         Action<int>? repairing = null)
     {
+        var original = fields;
         var cited = fields.SelectMany(f => CitationSupportChecker.ExtractCitedSentences(f.Text, f.Field)).ToList();
         checking?.Invoke(cited.Sum(c => c.References.Count));
 
@@ -85,7 +89,10 @@ public static class Grounding
                 repairs.AddRange(second.Repairs);
             }
         }
-        return new GroundingResult(fields, checks, beforeRepair, repairs, removed);
+        var sense = new List<RepairSenseCheck>();
+        if (options.Repair && options.SenseCheck && repairs.Count > 0)
+            (fields, checks, sense) = await RepairSense.CheckAsync(chat, original, fields, checks, repairs, sources, verifiedQuotes, options);
+        return new GroundingResult(fields, checks, beforeRepair, repairs, removed, sense);
     }
 
     /// <summary>
