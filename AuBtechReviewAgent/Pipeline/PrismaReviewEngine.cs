@@ -38,7 +38,6 @@ public partial class PrismaReviewEngine
     public const string DefaultSupportStatement =
         "No funding statement has been declared for this review. The funding and support text can be set in the Report:SupportStatement configuration value.";
 
-    /// <summary>The folder of one run (see <see cref="RunStore.FolderOf"/>).</summary>
     private string GetWorkspaceFolderPath(Guid sessionId) => Store.FolderOf(sessionId);
 
     /// <summary>The run folders: header, edit keys, notes and deleting, shared by every kind of review.</summary>

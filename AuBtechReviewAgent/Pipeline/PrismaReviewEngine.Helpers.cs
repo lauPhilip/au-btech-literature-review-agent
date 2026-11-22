@@ -64,7 +64,6 @@ public partial class PrismaReviewEngine
         _ => ("Arxiv", "arXiv API"),
     };
 
-    /// <summary>Display names for the chart categories used in the report.</summary>
     public static string CategoryLabel(string category) => category switch
     {
         "Arxiv" => "arXiv",

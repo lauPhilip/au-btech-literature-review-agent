@@ -135,7 +135,6 @@ public partial class PrismaReviewEngine
     /// </summary>
     public bool DeleteRun(Guid runId, string? editKey = null) => Store.DeleteRun(runId, editKey);
 
-    /// <summary>The run's protocol.md, or null when there is none.</summary>
     public string? ReadProtocol(Guid runId) => Store.ReadProtocol(runId);
 
     /// <summary>Writes protocol.md before the search starts and records its fingerprint in the ledger.</summary>
