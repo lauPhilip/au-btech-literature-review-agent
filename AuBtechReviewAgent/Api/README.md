@@ -1,0 +1,7 @@
+# Api
+
+The REST API under `/api/v1`, for other tools that want to start a systematic review and follow it. It is off in production until `Api:Enabled` is set; in Development it is on. With the switch off, `Program.cs` neither registers nor maps anything from here, so every address answers 404.
+
+`ReviewApi.cs` is what the API does: `Start` checks a request exactly as the New review form does (`ReviewInputGuard`, the same run slots and queue in `RunCoordinator`) and starts the run with the caller's own keys, and `ReviewApi.Status.cs` reads where a run stands. The MCP server calls the same methods, so the logic exists once. `ApiEndpoints.cs` registers the services, the call limits and the routes. `ApiModels.cs` holds the request and answer types, `ApiProblems.cs` every error in plain English (sent as RFC 9457 problem details), and `ApiKeyFingerprint.cs` the HMAC that lets the limiter count calls per key without holding the key.
+
+Every review started here uses the caller's Mistral key from the `X-Mistral-Key` header, for that run only. It is never written to a file or a log, and the server's own key is never used instead. The developer wiki has the whole story: [9. The API and the MCP server](../../docs/wiki/09-api-and-mcp.md).

@@ -151,6 +151,9 @@ builder.Services.AddSingleton(AuBtechReviewAgent.ReviewModulesOptions.From(build
 
 // Register the storage cleanup background worker
 builder.Services.AddHostedService<AuBtechReviewAgent.SessionCleanupWorker>();
+// The REST API and the MCP server: off in production until Api:Enabled is set (Api/README.md).
+bool apiEnabled = builder.Configuration.GetValue("Api:Enabled", builder.Environment.IsDevelopment());
+if (apiEnabled) AuBtechReviewAgent.ApiEndpoints.AddReviewApi(builder.Services);
 
 AuBtechReviewAgent.ResponseCompressionSetup.AddTextCompression(builder.Services);
 
@@ -285,6 +288,7 @@ app.MapGet("/health", () =>
 app.MapGet("/.well-known/security.txt", (HttpRequest request) =>
     Results.Text(AuBtechReviewAgent.SiteSeo.SecurityTxt(AuBtechReviewAgent.SiteSeo.BaseUrl(siteConfiguration, request), DateTime.UtcNow), "text/plain; charset=utf-8"));
 
+if (apiEnabled) AuBtechReviewAgent.ApiEndpoints.MapReviewApi(app); else AuBtechReviewAgent.ApiEndpoints.HideReviewApi(app);
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
 

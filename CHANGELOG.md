@@ -8,6 +8,8 @@ Each version's section becomes the notes of its GitHub release, so write it for 
 
 ### Added
 
+Other tools can now start a review through an API. Send the form's fields to `/api/v1/reviews` with your own Mistral key, and follow the run by its id. Your key is used for that run only and is never stored. The API gives no free reviews, and it stays off on the live site until it is switched on.
+
 You can now stop a review you started. The run stops at the next safe point, before its next model call or step. A review that waits in line just leaves the line. The run is marked as cancelled, and the time and your reason are kept on file. Your free review for the day comes back, once a day. Only the browser that started the review can cancel it. Click "Cancel review" beside the run, and the page asks once before it acts. You can say why, if you like. Then the page shows the run as cancelled, with your reason and a button to start a new review. The button works on a phone too.
 
 ### Changed
