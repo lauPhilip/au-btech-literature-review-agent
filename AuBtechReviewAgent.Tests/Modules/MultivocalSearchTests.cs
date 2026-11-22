@@ -178,20 +178,23 @@ public class MultivocalSearchTests : IDisposable
     }
 
     [Fact]
-    public async Task APlanWithAcademicDatabasesIsNotSearchedForGreyLiteratureOnly()
+    public async Task APlanWithAcademicDatabasesSearchesThemTooAndMarksTheirSourcesFormal()
     {
         var (store, planner) = Services();
         var plan = Plan("stackexchange");
         plan.FormalDatabases = new List<string> { "openalex" };
+        plan.FormalSearchStrings = new List<string> { "agent loops" };
         var (runId, key) = await planner.CreateAsync(plan);
         var se = new FakeGreySource("stackexchange", (_, _) => new() { Record("https://stackoverflow.com/q/1") });
-        var searcher = new MultivocalSearcher(store, planner, _ => se);
+        var searcher = new MultivocalSearcher(store, planner, _ => se, _ => new PipelineTests.FakeSource());
 
-        var refused = await Assert.ThrowsAsync<InvalidOperationException>(() => searcher.SearchAsync(runId, key));
+        var ledger = await searcher.SearchAsync(runId, key);
 
-        Assert.Equal(MultivocalSearcher.FormalNotBuiltMessage, refused.Message);
-        Assert.Empty(se.Calls);
-        Assert.Null(searcher.LoadLedger(runId));
-        Assert.Equal(MultivocalPlanner.StagePlanned, store.LoadHeader(runId)!.Stage);
+        Assert.Single(ledger.GreyPool);
+        var formal = Assert.Single(ledger.FormalPool); // the two records without a DOI or link cannot be cited, so they are on file as removed
+        Assert.Equal("https://doi.org/10.3390/fi1234567", formal.Record.Url);
+        Assert.Equal(new[] { MultivocalSearcher.NoWebAddress, MultivocalSearcher.NoWebAddress }, ledger.FormalRemoved!.Select(r => r.Reason));
+        Assert.Contains(ledger.Searches, s => s.Formal && s.Source == "openalex" && s.SearchString == "agent loops" && s.New == 1);
+        Assert.Equal(MultivocalSearcher.StageSearched, store.LoadHeader(runId)!.Stage);
     }
 }
