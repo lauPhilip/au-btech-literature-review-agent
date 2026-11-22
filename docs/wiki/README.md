@@ -41,6 +41,7 @@ AuBtechReviewAgent/                 the web app
   Llm/                              model access, JSON answers, prompt safety, the call ledger
   Web/                              site pages' helpers: SEO, health, security headers, quota, glossary
   Api/                              the REST API for other tools (off in production until Api:Enabled)
+  Mcp/                              the MCP server at /mcp, on the same switch
   Components/Pages/*.razor          the routable pages (landing, New review, Review output, Metrics, ...)
   Components/Dashboard/*.razor      parts of New review (composer, criteria, the seven steps, run summary, ...)
   Components/Layout/*.razor         header, footer, SEO tags, help terms

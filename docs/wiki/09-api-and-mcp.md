@@ -62,6 +62,52 @@ Every error is a problem detail (RFC 9457, `application/problem+json`) with a ti
 | 429 | Too many calls or too many reviews started; `Retry-After` says when to try again |
 | 503 | The server runs a local model, so a review could not use the caller's key |
 
+## The MCP server
+
+The MCP server lets another assistant run a review as a tool. It speaks the Model Context Protocol over Streamable HTTP at `/mcp`, with the official C# SDK (`ModelContextProtocol.AspNetCore`), behind the same switch as the REST API. It is stateless: every call stands on its own, and nothing from one caller is kept for the next. The code is in `AuBtechReviewAgent/Mcp/`.
+
+| Tool | What it does |
+|---|---|
+| `start_literature_review` | Starts a review with the form's fields and returns the run id and edit key at once |
+| `get_review_status` | The stage, the step of seven, the counts and, when done, the verdicts and the downloads |
+| `get_review_report` | The title, the abstract, the verdicts, every section, and the flagged citations (partly or not supported) |
+| `get_review_file` | `bibtex`, `ris` or `main.tex` as text, or the address of the `archive` |
+
+Each tool calls `ReviewApi`, the same methods the REST API calls, so the checks, the limits and the key handling exist once. A problem comes back as a tool error with the same plain-English title and detail. A review takes minutes, so the start tool returns at once and the assistant polls the status tool. MCP answers are never compressed, because a start carries the edit key.
+
+The caller's MCP client sends its own Mistral key in the `X-Mistral-Key` header, as for the API. A client that reads a JSON configuration, such as Claude Code (`.mcp.json`), would add the server like this, with the key taken from the caller's own environment:
+
+```json
+{
+  "mcpServers": {
+    "traceableai": {
+      "type": "http",
+      "url": "https://au-btech-literature-review-agent.dk/mcp",
+      "headers": { "X-Mistral-Key": "${MISTRAL_API_KEY}" }
+    }
+  }
+}
+```
+
+### A "/literature-review" command in another tool
+
+Lau's other solution can offer a "/literature-review" command on top of this server. In Claude Code a command is a Markdown file, here `.claude/commands/literature-review.md`, whose text becomes the prompt and whose `$ARGUMENTS` is what the user typed after the command:
+
+```markdown
+Run a systematic literature review with the TraceableAI MCP server on: $ARGUMENTS
+
+1. Turn the request into search words, inclusion criteria and, if given, an objective,
+   years and up to four research questions. Ask me if the inclusion criteria are unclear.
+2. Call start_literature_review. Keep the run id and the edit key.
+3. Call get_review_status every 30 seconds until the stage is Complete, Failed or Cancelled.
+   Tell me the step (of seven) when it changes.
+4. When it is complete, call get_review_report. Give me the title, the abstract, the verdicts,
+   and every flagged citation with its sentence, reason and quote.
+5. Offer the BibTeX through get_review_file, and the link to the review's page.
+```
+
+The tools treat what the command sends as data, as the form does: the fields pass the input guard, and a field that reads like an instruction to the model is refused until the caller confirms it with `acceptFlaggedInput`.
+
 ## The caller's key
 
 Every start brings the caller's own Mistral key. The other keys are optional headers, as in the form's own keys: `X-Elsevier-Key`, `X-Ieee-Key` and `X-Semantic-Scholar-Key`. Each key is cleaned with `SecurityUtility.SanitizeApiKey`, as the form cleans it.
@@ -72,7 +118,7 @@ The key lives in the run's `ReviewRequest` and in the chat service made from it,
 
 ## Limits
 
-Two limits guard the API. Each call counts once per client address and once per key, at most 120 a minute each, on every address under `/api/v1` and `/mcp` (`ApiEndpoints.AddReviewApi`, a chained global limiter that lets every other address through). Starting a review counts again, per key and per address, at most `Quota:OwnKeyRunsPerHour` an hour, the same number the form allows with an own key. Both use ASP.NET Core's rate limiter, and neither holds a key or an address in plain text.
+Two limits guard the API and the MCP server. Each call counts once per client address and once per key, at most 120 a minute each, on every address under `/api/v1` and `/mcp` (`ApiEndpoints.AddReviewApi`, a chained global limiter that lets every other address through). Starting a review counts again, per key and per address, at most `Quota:OwnKeyRunsPerHour` an hour, the same number the form allows with an own key. Both use ASP.NET Core's rate limiter, and neither holds a key or an address in plain text.
 
 ## Security notes
 
