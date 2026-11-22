@@ -6,6 +6,10 @@ Each version's section becomes the notes of its GitHub release, so write it for 
 
 ## [Unreleased]
 
+### Added
+
+You can now stop a review you started. The run stops at the next safe point, before its next model call or step. A review that waits in line just leaves the line. The run is marked as cancelled, and the time and your reason are kept on file. Your free review for the day comes back, once a day. Only the browser that started the review can cancel it. The button on the run page comes next.
+
 ### Changed
 
 The site starts its new look. It now uses a deeper navy, the same one as Coursebot, and two new typefaces: Inter for text and Poppins for headings and buttons. Cards and fields have round corners. The browser tab shows the new mark, a small robot reading a book. 🤖
