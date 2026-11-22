@@ -185,27 +185,6 @@ public class MultivocalScreeningTests : IDisposable
     }
 
     [Fact]
-    public async Task ARunWithAcademicDatabasesStopsBeforeScreeningUntilTheFormalScreeningIsBuilt()
-    {
-        var store = new RunStore(_root);
-        var planner = new MultivocalPlanner(store);
-        var plan = MultivocalPlan.Example();
-        plan.FormalDatabases = new List<string> { "openalex" };
-        var (runId, key) = await planner.CreateAsync(plan);
-        string folder = store.FolderOf(runId);
-        await RunHeader.WriteAsync(folder, store.LoadHeader(runId)! with { Stage = MultivocalSearcher.StageSearched });
-        await File.WriteAllTextAsync(Path.Join(folder, MultivocalSearcher.LedgerFile), System.Text.Json.JsonSerializer.Serialize(new MultivocalLedger { RunId = runId }));
-        var chat = Model();
-        var screener = new MultivocalScreener(store, planner, new MultivocalSearcher(store, planner, _ => null), () => chat, parallelism: 1);
-
-        var refused = await Assert.ThrowsAsync<InvalidOperationException>(() => screener.ScreenAsync(runId, key));
-
-        Assert.Equal(MultivocalScreener.FormalNotBuiltMessage, refused.Message);
-        Assert.Empty(chat.Prompts);
-        Assert.Equal(MultivocalSearcher.StageSearched, store.LoadHeader(runId)!.Stage);
-    }
-
-    [Fact]
     public async Task AnAcademicRecordGetsTheSameCriteriaStepsAndAnswerFormatIntroducedAsAcademic()
     {
         var chat = Model();

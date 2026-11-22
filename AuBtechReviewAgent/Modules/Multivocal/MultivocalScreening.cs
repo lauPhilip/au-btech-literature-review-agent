@@ -26,15 +26,6 @@ public sealed partial class MultivocalScreener
     public const string StageScreening = "Screening";
     public const string StageScreened = "Screened";
 
-    /// <summary>
-    /// Whether the formal pool's sources can be screened (block I-3 of docs/roadmap/mlr-todo.md). Until they can, a run
-    /// planned with academic databases stops here and says why, rather than screening academic records as grey ones.
-    /// </summary>
-    public const bool FormalScreeningBuilt = false;
-
-    public const string FormalNotBuiltMessage =
-        "The academic sources cannot be screened yet; that comes in step I-3 of the roadmap. The search is on file. Plan a new review with no academic database ticked, or from the Grey Literature Review card.";
-
     /// <summary>Part of the cache key: raise it whenever the grey screening prompt changes.</summary>
     public const string PromptVersion = "grey-screening-v1";
 
@@ -117,7 +108,6 @@ public sealed partial class MultivocalScreener
         var planned = _planner.Load(runId) ?? throw new InvalidOperationException("This run has no plan.");
         if (!planned.Plan.HasCriteria) throw new InvalidOperationException("This plan has no inclusion criteria, so its sources cannot be screened. Plan a new run.");
         var ledger = _searcher.LoadLedger(runId) ?? throw new InvalidOperationException("Search the run first.");
-        if (planned.Plan.UsesFormalPool && !FormalScreeningBuilt) throw new InvalidOperationException(FormalNotBuiltMessage);
         if (!Running.TryAdd(runId, true)) throw new InvalidOperationException("This run is being screened already.");
 
         string folder = _runs.FolderOf(runId);
@@ -157,6 +147,7 @@ public sealed partial class MultivocalScreener
             Model = _model,
             InclusionCriteria = plan.InclusionCriteria,
             ExclusionCriteria = plan.ExclusionCriteria,
+            FormalPromptVersion = plan.UsesFormalPool ? FormalPromptVersion : null,
         };
 
         // The same title by the same producer under another address is screened once; the copies point to it.
@@ -165,7 +156,7 @@ public sealed partial class MultivocalScreener
         foreach (var found in ledger.Sources)
         {
             var r = found.Record;
-            var entry = new GreyScreening { Address = MultivocalSearcher.AddressKey(r.Url), Title = r.Title, Url = r.Url };
+            var entry = new GreyScreening { Address = MultivocalSearcher.AddressKey(r.Url), Title = r.Title, Url = r.Url, Formal = found.IsFormal };
             string title = SameSourceKey(r);
             if (title.Length > 0 && byTitle.TryGetValue(title, out var first))
             {
@@ -192,16 +183,28 @@ public sealed partial class MultivocalScreener
             finally { throttle.Release(); }
         }).ToList();
 
-        var pairs = new List<(bool, bool)>();
+        var pairs = new List<(bool Formal, bool First, bool Second)>();
         for (int i = 0; i < work.Count; i++)
         {
             var screened = await work[i];
             var entry = file.Sources[toScreen[i].Index];
             Apply(entry, screened, toScreen[i].Record);
-            if (screened.First != null && screened.Second != null) pairs.Add((screened.First.IsIncluded, screened.Second.IsIncluded));
+            if (screened.First != null && screened.Second != null) pairs.Add((entry.Formal, screened.First.IsIncluded, screened.Second.IsIncluded));
             progress?.Report($"{i + 1} of {work.Count} sources screened");
         }
-        if (pairs.Count > 0) file.Kappa = Math.Round(ScreeningConfusion.From(pairs).CohensKappa, 3);
+        file.Kappa = Kappa(pairs);
+        if (plan.UsesFormalPool)
+        {
+            // Each pool's agreement apart as well, since the two pools are screened from different kinds of record (G10).
+            file.KappaGrey = Kappa(pairs.Where(p => !p.Formal));
+            file.KappaFormal = Kappa(pairs.Where(p => p.Formal));
+        }
         return file;
+    }
+
+    private static double? Kappa(IEnumerable<(bool Formal, bool First, bool Second)> pairs)
+    {
+        var list = pairs.Select(p => (p.First, p.Second)).ToList();
+        return list.Count == 0 ? null : Math.Round(ScreeningConfusion.From(list).CohensKappa, 3);
     }
 }
