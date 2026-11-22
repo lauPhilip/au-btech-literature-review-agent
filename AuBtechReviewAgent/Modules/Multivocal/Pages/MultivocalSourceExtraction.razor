@@ -1,0 +1,42 @@
+@* A source's extraction on the Sources found tab: the questions it covers, its purpose, the facts code records, and
+   each attribute's values with their quotes, what it does not state and the values left out for want of a quote. *@
+
+<details class="mt-1 text-[11px] text-ink">
+    <summary class="cursor-pointer select-none"><span class="ui-chip border-heading/30 bg-page text-heading text-[10px]">@(Extracted.Error != null ? "Not extracted" : $"Extracted · covers {(Extracted.Coverage.Count > 0 ? string.Join(", ", Extracted.Coverage) : "no question")}")</span></summary>
+    @if (Extracted.Error != null)
+    {
+        <p class="mt-1">@Extracted.Error</p>
+    }
+    else
+    {
+        @if (Extracted.Purpose != null)
+        {
+            <p class="mt-1"><span class="font-medium">Purpose:</span> @Extracted.Purpose.Value <q class="italic text-muted">@Extracted.Purpose.Quote</q></p>
+        }
+        <p class="mt-1 text-muted">@string.Join(" · ", Extracted.Known.Select(k => $"{k.Name}: {k.Value}"))</p>
+        <dl class="mt-1 space-y-1">
+            @foreach (var item in Extracted.Attributes)
+            {
+                <div>
+                    <dt class="font-medium text-ink">@item.Attribute</dt>
+                    @if (item.NotStated)
+                    {
+                        <dd class="text-muted">not stated</dd>
+                    }
+                    @foreach (var value in item.Values)
+                    {
+                        <dd>@value.Value <q class="italic text-muted">@value.Quote</q></dd>
+                    }
+                    @if (item.Unsupported.Count > 0)
+                    {
+                        <dd class="text-partly">Left out, as the quote was not found in the page: @string.Join(", ", item.Unsupported.Select(u => u.Value))</dd>
+                    }
+                </div>
+            }
+        </dl>
+    }
+</details>
+
+@code {
+    [Parameter, EditorRequired] public AuBtechReviewAgent.GreyExtraction Extracted { get; set; } = default!;
+}

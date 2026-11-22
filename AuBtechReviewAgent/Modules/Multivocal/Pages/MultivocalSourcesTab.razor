@@ -108,41 +108,7 @@
                 @{ var extracted = Page.ExtractionOf(r.Url); }
                 @if (extracted != null)
                 {
-                    <details class="mt-1 text-[11px] text-ink">
-                        <summary class="cursor-pointer select-none"><span class="ui-chip border-heading/30 bg-page text-heading text-[10px]">@(extracted.Error != null ? "Not extracted" : $"Extracted · covers {(extracted.Coverage.Count > 0 ? string.Join(", ", extracted.Coverage) : "no question")}")</span></summary>
-                        @if (extracted.Error != null)
-                        {
-                            <p class="mt-1">@extracted.Error</p>
-                        }
-                        else
-                        {
-                            @if (extracted.Purpose != null)
-                            {
-                                <p class="mt-1"><span class="font-medium">Purpose:</span> @extracted.Purpose.Value <q class="italic text-muted">@extracted.Purpose.Quote</q></p>
-                            }
-                            <p class="mt-1 text-muted">@string.Join(" · ", extracted.Known.Select(k => $"{k.Name}: {k.Value}"))</p>
-                            <dl class="mt-1 space-y-1">
-                                @foreach (var item in extracted.Attributes)
-                                {
-                                    <div>
-                                        <dt class="font-medium text-ink">@item.Attribute</dt>
-                                        @if (item.NotStated)
-                                        {
-                                            <dd class="text-muted">not stated</dd>
-                                        }
-                                        @foreach (var value in item.Values)
-                                        {
-                                            <dd>@value.Value <q class="italic text-muted">@value.Quote</q></dd>
-                                        }
-                                        @if (item.Unsupported.Count > 0)
-                                        {
-                                            <dd class="text-partly">Left out, as the quote was not found in the page: @string.Join(", ", item.Unsupported.Select(u => u.Value))</dd>
-                                        }
-                                    </div>
-                                }
-                            </dl>
-                        }
-                    </details>
+                    <MultivocalSourceExtraction Extracted="extracted" />
                 }
                 @if (decision != null && decision.Reasoning.Length > 0)
                 {
