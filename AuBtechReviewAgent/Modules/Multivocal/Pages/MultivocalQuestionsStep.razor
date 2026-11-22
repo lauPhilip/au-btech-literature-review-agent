@@ -1,0 +1,44 @@
+@inherits MultivocalStartPart
+
+@* Step 3 of the planning form: the research questions and their sub-questions (G4), each with a type from
+   Table 6 (G5). *@
+
+<p class="text-xs text-muted">Tie each question to the goal and the audience, and give it a type from Table 6.</p>
+<ol class="space-y-4">
+    @foreach (var (number, question) in Page.plan.Numbered())
+    {
+        var q = question;
+        int index = Page.plan.Questions.IndexOf(q);
+        var type = AuBtechReviewAgent.MultivocalGuidelines.FindType(q.Type);
+        <li class="@(q.Parent != null ? "ml-5 pl-3 border-l-2 border-line" : "")">
+            <label for="@($"rq-{index}")" class="ui-label">@number</label>
+            <textarea id="@($"rq-{index}")" rows="2" class="ui-input resize-y" maxlength="@AuBtechReviewAgent.MultivocalPlan.MaxText" @bind="q.Text" @bind:event="oninput"></textarea>
+            <label for="@($"rqt-{index}")" class="sr-only">Type of @number</label>
+            <select id="@($"rqt-{index}")" class="ui-input mt-2" @bind="q.Type">
+                <option value="">Choose a type</option>
+                @foreach (var t in AuBtechReviewAgent.MultivocalGuidelines.QuestionTypes)
+                {
+                    <option value="@t.Key">@t.Name: @t.Pattern</option>
+                }
+            </select>
+            @if (type is { HardForSources: true })
+            {
+                <p class="text-[11px] text-partly mt-1">Sources may not allow a question of this type to be answered (p. 110).</p>
+            }
+            <div class="mt-1.5 flex flex-wrap gap-x-3 gap-y-1 text-xs">
+                @if (q.Parent == null && Page.plan.Questions.Count < AuBtechReviewAgent.MultivocalPlan.MaxQuestions)
+                {
+                    <button type="button" class="text-heading font-medium hover:underline" @onclick="() => Page.plan.AddQuestion(index)">Add a sub-question</button>
+                }
+                @if (Page.plan.Questions.Count > 1)
+                {
+                    <button type="button" class="text-muted hover:text-not-supported hover:underline" @onclick="() => Page.plan.RemoveQuestion(index)">Remove @number</button>
+                }
+            </div>
+        </li>
+    }
+</ol>
+@if (Page.plan.Questions.Count < AuBtechReviewAgent.MultivocalPlan.MaxQuestions)
+{
+    <button type="button" class="text-xs text-heading font-medium hover:underline" @onclick="() => Page.plan.AddQuestion(null)">Add a research question</button>
+}
