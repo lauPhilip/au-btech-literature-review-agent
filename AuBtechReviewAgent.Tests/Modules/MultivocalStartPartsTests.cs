@@ -87,7 +87,16 @@ public class MultivocalStartPartsTests
         Assert.DoesNotContain("The steps marked as built work in this preview", html);
         Assert.Contains("6 grey literature searches and 2 academic databases, each with its own search strings, until new sources add nothing new.", html);
         Assert.Contains("Grey and academic sources are screened twice", html);
-        Assert.Equal(4, Count(html, ">built</span>"));
+        Assert.Equal(5, Count(html, ">built</span>")); // the academic search is built (I-2); its screening is not yet
+    }
+
+    [Fact]
+    public void AnAcademicDatabaseIsNamedAsSuchBesideTheGreySearches()
+    {
+        Assert.Equal("OpenAlex (academic)", MultivocalStart.SearchLabel("openalex"));
+        Assert.Equal("Hacker News", MultivocalStart.SearchLabel("hackernews"));
+        Assert.Equal("Academic literature", MultivocalStart.KindLabel(MultivocalSearcher.FormalKind));
+        Assert.Equal("Blog posts and practitioner articles", MultivocalStart.KindLabel("blogs"));
     }
 
     private static int Count(string text, string part) => (text.Length - text.Replace(part, "").Length) / part.Length;
