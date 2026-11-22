@@ -64,7 +64,7 @@ const flows = [
 ];
 
 // Screens that must fit a 390 x 844 phone without scrolling (issue #244), in light and dark.
-const phoneScreens = ['/', '/review', '/design/run'];
+const phoneScreens = ['/', '/review', '/design/run', '/design/run?state=done'];
 
 const browser = await chromium.launch(process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH } : {});
 const failures = [];
