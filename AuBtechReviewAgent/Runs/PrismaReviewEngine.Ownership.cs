@@ -13,7 +13,6 @@ public partial class PrismaReviewEngine
     /// <summary>Creates the run folder and its edit key; returns the key, which only the starting browser keeps.</summary>
     public string ClaimRun(Guid runId) => Store.ClaimRun(runId);
 
-    /// <summary>True when the key belongs to the run (see <see cref="RunStore.CanEdit"/>).</summary>
     public bool CanEdit(Guid runId, string? editKey) => Store.CanEdit(runId, editKey);
 
     /// <summary>The example run from Runs:DemoRunId, when it is set and the run still exists.</summary>
