@@ -33,6 +33,16 @@ You can also ask for an artifact built from the findings: a concept map, a flowc
 
 In the finished report, every citation number is clickable. Click it and you see what the check found: supported, partly supported or not supported, the quote from the paper, and where in the paper it is. Green means the paper says it; orange and red stay in the report on purpose, so you know exactly where to look.
 
+## See it in action
+
+Each clip is six seconds long, recorded from the app's own sample pages by the [Demo GIFs workflow](.github/workflows/demo-gifs.yml).
+
+| | |
+|---|---|
+| ![The landing page example: three citations are checked one by one and marked supported, partly supported and not supported.](docs/img/demo/citation-check.gif)<br>**Citations checked** | ![New review: a question is typed in, then the worked example fills the form, with the criteria beside it.](docs/img/demo/new-review.gif)<br>**Starting a review** |
+| ![A running review: its seven steps with the one in progress, and then the finished run with its results.](docs/img/demo/running.gif)<br>**A review running** | ![The report: a citation is opened to show its verdict and the quote from the paper, then the next flagged citation.](docs/img/demo/report.gif)<br>**The report** |
+| ![Metrics: one bar of citation verdicts per review, then the tables of shares and counts per run.](docs/img/demo/metrics.gif)<br>**Metrics** | ![The glossary is searched for "kappa", and then the site switches to its dark theme.](docs/img/demo/glossary-and-dark.gif)<br>**Glossary and dark theme** |
+
 ## Why you can trust it more than a chatbot
 
 | | |
