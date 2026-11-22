@@ -106,6 +106,9 @@ public partial class RunMetrics
     public int SecondCheckAgreed { get; set; }
     public int UpgradedBySecondCheck { get; set; }
     public int Repaired { get; set; }
+
+    /// <summary>Citations the second repair pass removed as still not supported; not in <see cref="CitationsFinal"/>. Older files read as 0.</summary>
+    public int Removed { get; set; }
     public int OutsideTheme { get; set; }
     public int InvalidMarkersStripped { get; set; }
 

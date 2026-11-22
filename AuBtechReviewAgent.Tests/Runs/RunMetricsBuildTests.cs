@@ -20,7 +20,7 @@ public class RunMetricsBuildTests
         Stats = new ReviewStats
         {
             TotalIdentified = 10, DuplicatesRemoved = 2, Screened = 8, Included = 4, ScreeningKappa = 0.8,
-            UncertainDecisions = 1, FullTextRetrieved = 3, StudiesCitedInSynthesis = 3, CitationsRepaired = 2, CitationsOutsideTheme = 1,
+            UncertainDecisions = 1, FullTextRetrieved = 3, StudiesCitedInSynthesis = 3, CitationsRepaired = 2, CitationsOutsideTheme = 1, CitationsRemoved = 4,
         },
         SynthesizedRecords = Enumerable.Range(1, 4).Select(n => new IncludedPaperMetricRow { ReferenceNumber = n }).ToList(),
         Extractions = new List<StudyExtraction>
@@ -90,6 +90,9 @@ public class RunMetricsBuildTests
         Assert.Equal((10, 2, 8, 4, (double?)0.8, 1, 3, 0.75), (m.Identified, m.DuplicatesRemoved, m.Screened, m.Included, m.ScreeningKappa, m.UncertainDecisions, m.FullTextRetrieved, m.FullTextShare));
         Assert.Equal((2, 0.5, 1), (m.KeyFindings, m.VerifiedFindingShare, m.ExtractionErrors));
         Assert.Equal((3, 0.75, 2, 1, 5), (m.StudiesCited, m.CoverageShare, m.Repaired, m.OutsideTheme, m.InvalidMarkersStripped));
+        // Citations the second repair pass removed are a field of their own (issue #234); a file written before it reads as 0.
+        Assert.Equal(4, m.Removed);
+        Assert.Equal(0, System.Text.Json.JsonSerializer.Deserialize<RunMetrics>("""{"RunId":"old","Repaired":2}""")!.Removed);
     }
 
     [Fact]
