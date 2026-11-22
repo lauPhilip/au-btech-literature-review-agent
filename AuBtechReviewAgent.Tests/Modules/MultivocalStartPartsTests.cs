@@ -87,7 +87,7 @@ public class MultivocalStartPartsTests
         Assert.DoesNotContain("The steps marked as built work in this preview", html);
         Assert.Contains("6 grey literature searches and 2 academic databases, each with its own search strings, until new sources add nothing new.", html);
         Assert.Contains("Grey and academic sources are screened twice", html);
-        Assert.Equal(5, Count(html, ">built</span>")); // the academic search is built (I-2); its screening is not yet
+        Assert.Equal(6, Count(html, ">built</span>")); // the academic search (I-2) and screening (I-3) are built
     }
 
     [Fact]
