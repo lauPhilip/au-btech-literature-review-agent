@@ -4,7 +4,8 @@
 //
 // A11Y_DARK_PAGES lists pages that are also checked in the dark theme (the choice theme.js keeps in
 // localStorage). When A11Y_SCREENSHOTS names a folder, every checked page is also photographed there at phone,
-// laptop and large widths, in each theme it was checked in; CI uploads the folder as a workflow artifact.
+// laptop and large widths, in each theme it was checked in, and a page that scrolls also whole at 1440 px; CI uploads
+// the folder as a workflow artifact.
 import { chromium } from 'playwright';
 import { AxeBuilder } from '@axe-core/playwright';
 import { mkdirSync, readFileSync } from 'node:fs';
@@ -50,6 +51,13 @@ for (const { path, theme } of runs) {
       await page.waitForTimeout(300);
       await page.screenshot({ path: `${shots}/${name}-${width}.png` });
     }
+    // The whole page at 1440 px, so long pages can be reviewed (issue #246). The app frame scrolls inside <main>,
+    // so it is released as print mode releases it; this is the last step on the page, so nothing after it sees the change.
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.addStyleTag({ content: 'html,body,.h-dvh{height:auto!important;overflow:visible!important} #main{overflow:visible!important}' });
+    await page.waitForTimeout(300);
+    if (await page.evaluate(() => document.documentElement.scrollHeight > window.innerHeight + 2))
+      await page.screenshot({ path: `${shots}/${name}-1440-full.png`, fullPage: true });
   }
   await context.close();
 }
