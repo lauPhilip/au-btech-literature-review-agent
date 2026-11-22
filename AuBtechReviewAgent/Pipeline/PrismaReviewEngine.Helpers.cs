@@ -56,7 +56,8 @@ public partial class PrismaReviewEngine
         !string.IsNullOrWhiteSpace(userKeys?.IeeeApiKey) ? userKeys.IeeeApiKey : _globalIeeeKey,
         !string.IsNullOrWhiteSpace(userKeys?.ScholarApiKey) ? userKeys.ScholarApiKey : _globalScholarKey);
 
-    private string SanitizeLogMessage(string message)
+    /// <summary>An error message on one line with anything that looks like a key redacted, for logs and ledgers.</summary>
+    public static string SanitizeLogMessage(string message)
     {
         if (string.IsNullOrEmpty(message)) return string.Empty;
         // Line breaks are removed so a crafted value cannot add fake lines to the log (log forging).
