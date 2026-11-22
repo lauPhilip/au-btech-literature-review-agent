@@ -82,6 +82,9 @@ A theme now has one name everywhere: its heading, the overview and the evidence 
 
 The concept map in main.tex no longer leaves wide gaps between its columns, so it is not shrunk until the text is too small to read. Printing a report, or saving it as a PDF, is now checked on every change: it must run over several pages without the top bar.
 
+A question about how often something happens now gets the same answer in the paper and in the data appendix. Before, the paper counted the answer while the appendix said no theme was found.
+
+
 ## [0.4.0] - 2026-11-20
 
 The model writes about the studies from facts, not from its own guesses. This changes what the model is asked, so runs can differ from 0.3.0.
