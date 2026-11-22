@@ -23,8 +23,11 @@ public static class SiteSeo
         "Open-source PRISMA 2020 literature reviews in which every citation is checked against the paper it cites, " +
         "with the supporting quote and a complete, verifiable record of every step.";
 
-    /// <summary>Social preview image (1200×630), relative to the site root.</summary>
-    public const string SocialImagePath = "img/social-card.png";
+    /// <summary>
+    /// Social preview image (1200×630), relative to the site root. A new design gets a new file name, because link
+    /// previews are cached by address.
+    /// </summary>
+    public const string SocialImagePath = "img/og-card.png";
 
     /// <summary>The pages offered to search engines, with how often they change and their relative priority.</summary>
     public static readonly IReadOnlyList<(string Path, string ChangeFrequency, string Priority)> IndexedPages = new[]
@@ -74,13 +77,31 @@ public static class SiteSeo
     public static string Absolute(string baseUrl, string path) =>
         baseUrl.TrimEnd('/') + "/" + path.TrimStart('/');
 
+    /// <summary>When the running app was built, from its assembly file; null when that cannot be read (single-file builds).</summary>
+    public static DateTime? BuildDate()
+    {
+        try
+        {
+            string path = typeof(SiteSeo).Assembly.Location;
+            return string.IsNullOrEmpty(path) || !System.IO.File.Exists(path) ? null : System.IO.File.GetLastWriteTimeUtc(path);
+        }
+        catch (Exception ex) when (ex is System.IO.IOException or UnauthorizedAccessException or NotSupportedException)
+        {
+            return null;
+        }
+    }
+
     public static string RobotsTxt(string baseUrl) =>
         "User-agent: *\n" +
         "Allow: /\n" +
         "Disallow: /api/\n" +
         $"Sitemap: {Absolute(baseUrl, "sitemap.xml")}\n";
 
-    public static string SitemapXml(string baseUrl)
+    /// <summary>
+    /// The sitemap of the public pages. <paramref name="lastModified"/> is the day the running version was built: the
+    /// pages change only with a new version, so that is when each of them last changed.
+    /// </summary>
+    public static string SitemapXml(string baseUrl, DateTime? lastModified = null)
     {
         XNamespace ns = "http://www.sitemaps.org/schemas/sitemap/0.9";
         var doc = new XDocument(
@@ -88,14 +109,15 @@ public static class SiteSeo
             new XElement(ns + "urlset",
                 IndexedPages.Select(p => new XElement(ns + "url",
                     new XElement(ns + "loc", Absolute(baseUrl, p.Path)),
+                    lastModified is { } day ? new XElement(ns + "lastmod", day.ToUniversalTime().ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture)) : null,
                     new XElement(ns + "changefreq", p.ChangeFrequency),
                     new XElement(ns + "priority", p.Priority)))));
         return doc.Declaration + "\n" + doc.Root;
     }
 
     /// <summary>
-    /// Paths that must not appear in search results: downloads, a run's own dashboard and report, and the
-    /// error pages. Plain /review is the form and stays indexable.
+    /// Paths that must not appear in search results: downloads, a run's own dashboard and report, the error pages
+    /// and the design previews. Plain /review is the form and stays indexable.
     /// </summary>
     public static bool IsNoIndexPath(string? path)
     {
@@ -104,7 +126,8 @@ public static class SiteSeo
         return p.StartsWith("/api/", StringComparison.Ordinal)
             || p.StartsWith("/review/", StringComparison.Ordinal)
             || p == "/spec-matrix" || p.StartsWith("/spec-matrix/", StringComparison.Ordinal)
-            || p == "/not-found" || p == "/error" || p == "/health";
+            || p == "/not-found" || p == "/error" || p == "/health"
+            || p == "/design" || p.StartsWith("/design/", StringComparison.Ordinal);
     }
 
     /// <summary>

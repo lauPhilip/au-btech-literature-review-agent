@@ -264,8 +264,9 @@ app.MapGet("/api/workspace/{sessionId:guid}/mlr-report.md", (Guid sessionId) =>
 var siteConfiguration = app.Configuration;
 app.MapGet("/robots.txt", (HttpRequest request) =>
     Results.Text(AuBtechReviewAgent.SiteSeo.RobotsTxt(AuBtechReviewAgent.SiteSeo.BaseUrl(siteConfiguration, request)), "text/plain; charset=utf-8"));
+var siteBuilt = AuBtechReviewAgent.SiteSeo.BuildDate();
 app.MapGet("/sitemap.xml", (HttpRequest request) =>
-    Results.Text(AuBtechReviewAgent.SiteSeo.SitemapXml(AuBtechReviewAgent.SiteSeo.BaseUrl(siteConfiguration, request)), "application/xml; charset=utf-8"));
+    Results.Text(AuBtechReviewAgent.SiteSeo.SitemapXml(AuBtechReviewAgent.SiteSeo.BaseUrl(siteConfiguration, request), siteBuilt), "application/xml; charset=utf-8"));
 // For uptime monitoring: storage, model configuration and how the databases have been answering (SiteHealth).
 bool serverModelKey = !string.IsNullOrWhiteSpace(mistralApiKey) && !mistralApiKey.Contains("PLACEHOLDER", StringComparison.OrdinalIgnoreCase);
 app.MapGet("/health", () =>
