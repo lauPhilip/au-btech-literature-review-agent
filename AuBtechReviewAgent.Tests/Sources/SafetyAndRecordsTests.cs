@@ -1,22 +1,14 @@
-using System.Net;
 using System.Text;
 using AuBtechReviewAgent;
-using Microsoft.SemanticKernel;
-using Microsoft.SemanticKernel.ChatCompletion;
 using Xunit;
-
-#pragma warning disable SKEXP0070
-using Microsoft.SemanticKernel.Connectors.MistralAI;
 
 namespace AuBtechReviewAgent.Tests;
 
 /// <summary>
-/// The open-source adapters (OpenAlex, Semantic Scholar, Crossref, Unpaywall), the prompt-injection
-/// defences, structured model output, the cache, the manifest and the OpenAI-compatible model client.
-/// The adapters are tested on stored responses in the documented API formats; they have not been run
-/// against the live APIs from the test environment.
+/// The prompt-injection defences, structured model output, the cache, the manifest, the security headers and
+/// methods text built from the run's own counts.
 /// </summary>
-public class OpenSourceAndSafetyTests : IDisposable
+public class SafetyAndRecordsTests : IDisposable
 {
     private readonly string _root = Path.Join(Path.GetTempPath(), "oss-" + Guid.NewGuid().ToString("N"));
 
