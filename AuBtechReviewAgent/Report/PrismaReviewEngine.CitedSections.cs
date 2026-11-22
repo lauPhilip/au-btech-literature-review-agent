@@ -189,4 +189,47 @@ public partial class PrismaReviewEngine
 
         return log;
     }
+
+    /// <summary>
+    /// The synthesis and discussion: from the thematic synthesis when it wrote them, otherwise from one
+    /// citation-mandatory pass and its peer review. The peer review is saved to peer-review-feedback.json either way.
+    /// </summary>
+    private async Task WriteSynthesisAndDiscussionAsync(ReportRun run)
+    {
+        PeerReviewLog peerReview;
+        if (run.UseThematic)
+        {
+            run.Sections = run.Thematic!.Sections;
+            run.SynthesisProse = ThematicSynthesis.Overview(run.Thematic!.Codebook, run.ReferenceCount);
+            run.DiscussionText = run.Thematic!.Discussion;
+            peerReview = run.Thematic!.PeerReview ?? new PeerReviewLog { GeneratedAt = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss UTC"), Verdict = "Peer review not run" };
+        }
+        else
+        {
+            string citedSynthesis, citedDiscussion;
+            ReportProgress(run.SessionId, run.State, RunProgress.Synthesis, RunProgress.Phase(RunProgress.SynthesisPhases, 3, 0), "Writing the synthesis and discussion");
+            using (LlmStage.Begin("cited-sections"))
+                (citedSynthesis, citedDiscussion) = await GenerateCitedSectionsAsync(
+                    run.Chat, run.Query, run.Objective, run.Outline, run.ReferenceList, run.GroundedChunks, run.ReferenceCount);
+
+            // Fall back to the base multi-field draft only if the dedicated pass returned nothing.
+            if (string.IsNullOrWhiteSpace(citedSynthesis)) citedSynthesis = run.Draft.SynthesisText;
+            if (string.IsNullOrWhiteSpace(citedDiscussion)) citedDiscussion = run.Draft.Discussion;
+
+            ReportProgress(run.SessionId, run.State, RunProgress.Synthesis, RunProgress.Phase(RunProgress.SynthesisPhases, 5, 0), "Automated peer review");
+            using (LlmStage.Begin("automated-peer-review"))
+                peerReview = await PeerReviewAndReviseAsync(run.Chat, citedSynthesis, citedDiscussion, run.ReferenceList, run.Outline);
+            run.SynthesisProse = peerReview.SynthesisAfter;
+            run.DiscussionText = peerReview.DiscussionAfter;
+        }
+        try
+        {
+            string peerReviewPath = Path.Join(GetWorkspaceFolderPath(run.SessionId), "peer-review-feedback.json");
+            await File.WriteAllTextAsync(peerReviewPath, JsonSerializer.Serialize(peerReview, new JsonSerializerOptions { WriteIndented = true }));
+        }
+        catch (Exception ex)
+        {
+            _log.LogWarning("Could not save peer-review-feedback.json: {Message}", SanitizeLogMessage(ex.Message));
+        }
+    }
 }
