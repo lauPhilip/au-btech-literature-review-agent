@@ -84,6 +84,8 @@ A theme now has one name everywhere: its heading, the overview and the evidence 
 
 The concept map in main.tex no longer leaves wide gaps between its columns, so it is not shrunk until the text is too small to read. Printing a report, or saving it as a PDF, is now checked on every change: it must run over several pages without the top bar.
 
+A code repository is now cited by the year it was made, not the year of its last change. The last change is still given, as "last updated". Before, every repository was cited as 2026.
+
 ## [0.4.0] - 2026-11-20
 
 The model writes about the studies from facts, not from its own guesses. This changes what the model is asked, so runs can differ from 0.3.0.
