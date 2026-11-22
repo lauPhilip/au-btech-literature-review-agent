@@ -87,7 +87,7 @@ public partial class MultivocalStart
         _ => "Not screened",
     };
 
-    // The ordinal comparison == makes. The Sources found tab compares decisions through this, as CodeQL flagged the
+    // The same comparison as ==. The Sources found tab compares decisions through this, as CodeQL flagged the
     // same comparisons written in its Razor markup as comparisons of identical values.
     internal static bool Differ(string? a, string? b) => !string.Equals(a, b, StringComparison.Ordinal);
 
