@@ -40,7 +40,6 @@ public static class ReviewMethods
 
     public static ReviewMethod Default => All.First(m => m.Key == ReviewMethod.SystematicKey);
 
-    /// <summary>The method with this key, or null.</summary>
     public static ReviewMethod? Find(string? key) =>
         All.FirstOrDefault(m => m.Key.Equals(key?.Trim() ?? "", StringComparison.OrdinalIgnoreCase));
 

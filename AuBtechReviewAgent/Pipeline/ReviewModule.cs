@@ -47,7 +47,6 @@ public static class ReviewModules
     /// <summary>The module of every run that has no run.json (runs made before modules existed).</summary>
     public static IReviewModule Default => All[0];
 
-    /// <summary>The module with this key, or null.</summary>
     public static IReviewModule? Find(string? key) =>
         All.FirstOrDefault(m => m.Key.Equals(key?.Trim() ?? "", StringComparison.OrdinalIgnoreCase));
 
