@@ -1,0 +1,61 @@
+@* The API documentation page (ApiDocs.razor), part 2: after the start. Follow the review, read the report, cancel
+   it. Each call is laid out the same way (Jakob's law): the method and address, what to send, the request and the
+   answer right under it (proximity). A section never relies on another: the edit key's header is named again. *@
+
+<section id="follow" class="mt-12 scroll-mt-6" aria-labelledby="follow-title">
+    <h2 id="follow-title" class="font-display text-xl font-semibold tracking-tight text-heading">Follow it</h2>
+    <div class="mt-4 flex flex-wrap items-center gap-3 font-mono text-[15px]">
+        <span class="border border-heading px-2 py-0.5 text-xs font-semibold tracking-wide text-heading">GET</span>
+        <span class="break-all text-heading">/api/v1/reviews/{id}</span>
+    </div>
+    <p class="mt-4">
+        Ask for the status every 30 seconds or so. No key is needed. The <code class="@Code">stage</code> tells you where
+        the review is, and <code class="@Code">step</code> counts up from 1 to 7. When the stage is Complete, the answer
+        also holds the verdicts and the links to the files.
+    </p>
+    <CodeBlock Id="status-request" Label="Request" Code="@AuBtechReviewAgent.ApiDocExamples.StatusCurl(BaseUrl)" />
+    <CodeBlock Id="status-answer" Label="200 OK" Code="@AuBtechReviewAgent.ApiDocExamples.Status(BaseUrl)" />
+    <p class="mt-4">
+        A review ends as Complete, Failed or Cancelled. If it did not complete, <code class="@Code">failure</code> says why.
+    </p>
+</section>
+
+<section id="report" class="mt-12 scroll-mt-6" aria-labelledby="report-title">
+    <h2 id="report-title" class="font-display text-xl font-semibold tracking-tight text-heading">Read the report</h2>
+    <div class="mt-4 flex flex-wrap items-center gap-3 font-mono text-[15px]">
+        <span class="border border-heading px-2 py-0.5 text-xs font-semibold tracking-wide text-heading">GET</span>
+        <span class="break-all text-heading">/api/v1/reviews/{id}/report</span>
+    </div>
+    <p class="mt-4">
+        Once the stage is Complete, ask for the report. You get the title, the abstract and each section as text. You
+        also get each citation with its verdict and the quote it was checked against, the reference list and the PRISMA
+        counts. Nothing is written for you: it is read from the review's own files.
+    </p>
+    <CodeBlock Id="report-request" Label="Request" Code="@AuBtechReviewAgent.ApiDocExamples.ReportCurl(BaseUrl)" />
+    <CodeBlock Id="report-answer" Label="200 OK, with one item in each list" Code="@AuBtechReviewAgent.ApiDocExamples.Report" />
+</section>
+
+<section id="cancel" class="mt-12 scroll-mt-6" aria-labelledby="cancel-title">
+    <h2 id="cancel-title" class="font-display text-xl font-semibold tracking-tight text-heading">Cancel it</h2>
+    <div class="mt-4 flex flex-wrap items-center gap-3 font-mono text-[15px]">
+        <span class="border border-heading px-2 py-0.5 text-xs font-semibold tracking-wide text-heading">DELETE</span>
+        <span class="break-all text-heading">/api/v1/reviews/{id}</span>
+    </div>
+    <p class="mt-4">
+        Send the edit key in the <code class="@Code">X-Edit-Key</code> header. It came back in the answer when you
+        started the review. You may add a reason to the address, and it is kept on file.
+    </p>
+    <CodeBlock Id="cancel-request" Label="Request" Code="@AuBtechReviewAgent.ApiDocExamples.CancelCurl(BaseUrl)" />
+    <CodeBlock Id="cancel-answer" Label="202 Accepted" Code="@AuBtechReviewAgent.ApiDocExamples.Cancelled(BaseUrl)" />
+    <p class="mt-4">
+        The answer is 202, not 200. A review that waits in line stops at once. A running review stops at its next safe
+        point, and its stage then turns to Cancelled.
+    </p>
+</section>
+
+@code {
+    /// <summary>The address of this server, for the examples.</summary>
+    [Parameter, EditorRequired] public string BaseUrl { get; set; } = "";
+
+    private const string Code = ApiDocsStart.Code;
+}

@@ -1,0 +1,60 @@
+@* The API documentation page (ApiDocs.razor), part 3: the MCP server for AI assistants. The configuration comes
+   first, then what to say, then the five tools; the tool names are checked against ReviewMcpTools in a test. *@
+
+<section id="assistant" class="mt-12 scroll-mt-6" aria-labelledby="assistant-title">
+    <h2 id="assistant-title" class="font-display text-xl font-semibold tracking-tight text-heading">Use it from an AI assistant</h2>
+    <div class="mt-4 flex flex-wrap items-center gap-3 font-mono text-[15px]">
+        <span class="border border-heading px-2 py-0.5 text-xs font-semibold tracking-wide text-heading">MCP</span>
+        <span class="break-all text-heading">@AuBtechReviewAgent.McpSetup.Path</span>
+    </div>
+    <p class="mt-4">
+        AI assistants can run the same review as a set of tools, through MCP, the Model Context Protocol. Add the server
+        to your assistant, with your Mistral key in the <code class="@Code">X-Mistral-Key</code> header. For Claude Code,
+        put this in a file named <code class="@Code">.mcp.json</code> in your project.
+    </p>
+    <CodeBlock Id="mcp-config" Label=".mcp.json" Code="@AuBtechReviewAgent.ApiDocExamples.McpConfig(BaseUrl)" />
+    <p class="mt-4">
+        The key is read from your own environment, so it stays out of the file. Then ask for a review in your own
+        words, for example:
+    </p>
+    <blockquote class="mt-3 max-w-[70ch] border-l-2 border-heading pl-4 text-ink">@AuBtechReviewAgent.ApiDocExamples.McpPrompt</blockquote>
+
+    <div class="mt-6 overflow-x-auto border border-line" tabindex="0" role="region" aria-label="The tools of the MCP server">
+        <table class="w-full text-sm">
+            <caption class="sr-only">The tools of the MCP server</caption>
+            <thead class="bg-soft text-left text-muted max-sm:sr-only">
+                <tr><th scope="col" class="px-4 py-3 font-medium">Tool</th><th scope="col" class="px-4 py-3 font-medium">What it does</th></tr>
+            </thead>
+            <tbody class="divide-y divide-line">
+                @foreach (var (tool, does) in Tools)
+                {
+                    <tr class="align-top">
+                        <th scope="row" class="px-4 py-3 max-sm:block max-sm:pb-0 sm:whitespace-nowrap text-left font-mono text-[13px] font-normal text-heading">@tool</th>
+                        <td class="px-4 py-3 text-ink max-sm:block max-sm:pt-1">@does</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+    <p class="mt-4">
+        The tools call the same code as the API. The checks, the limits and the key work the same way, and an error
+        comes back with the same words.
+    </p>
+</section>
+
+@code {
+    /// <summary>The address of this server, for the configuration.</summary>
+    [Parameter, EditorRequired] public string BaseUrl { get; set; } = "";
+
+    private const string Code = ApiDocsStart.Code;
+
+    /// <summary>Every tool of ReviewMcpTools, in the order a review uses them.</summary>
+    public static readonly (string Tool, string Does)[] Tools =
+    {
+        ("start_literature_review", "Starts a review with the same fields as the API. Returns the id and the edit key at once."),
+        ("get_review_status", "Says where the review is: the stage, the step of seven and the counts."),
+        ("get_review_report", "Gives the finished report, and each citation that is not fully supported."),
+        ("get_review_file", "Gives the BibTeX, the RIS or the paper as LaTeX, or the link to the archive."),
+        ("cancel_review", "Stops a review. It needs the edit key from the start."),
+    };
+}
