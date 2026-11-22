@@ -133,7 +133,7 @@ classDiagram
     ReviewState ..> PrismaReport : written alongside
 ```
 
-Most of these live in `ReviewModels.cs`; `StudyExtraction` is in `StudyExtractor.cs`, `CitationSupportResult` in `CitationSupportChecker.cs`, and `RunSettingsRecord` with `LlmCallRecord` in `LlmCallRecorder.cs`. `AcademicPaper` is the common shape every source returns (id, title, abstract, date, authors, venue, DOI, URL, PDF link).
+Most of these live in `ReviewModels.cs`; `StudyExtraction` is in `StudyExtraction.cs`, `CitationSupportResult` in `CitationSupportChecker.cs`, and `RunSettingsRecord` with `LlmCallRecord` in `LlmCallRecorder.cs`. `AcademicPaper` is the common shape every source returns (id, title, abstract, date, authors, venue, DOI, URL, PDF link).
 
 A few rules keep the ledger readable years later. Records are **added, never removed**: a duplicate is a `RemovedRecord` with a reason, a failed screening is a `ScreeningLog` with decision "Error". Counts in `ReviewStats` are **derived from the same events** as the lists, which is what lets `PrismaFlowCounts.From(state).IsConsistent` check that the PRISMA flow adds up. And the ledger is **JSON with property names as in the classes**; renaming a property breaks reading older runs, so add new ones instead of renaming.
 
