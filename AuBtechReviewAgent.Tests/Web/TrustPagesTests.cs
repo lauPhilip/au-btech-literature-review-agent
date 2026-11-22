@@ -110,6 +110,9 @@ public class TrustPagesTests
         Assert.True(check.ManifestIntact == true);
         Assert.Equal(2, check.FilesListed);
         Assert.Equal("3f2b6c1e-8a44-4d0b-9c1a-5e7f0a1b2c3d", check.RunId);
+        // Issue #245: every listed file is reported, not only the ones that failed.
+        Assert.Equal(2, check.Files!.Count);
+        Assert.All(check.Files, f => Assert.Equal("Matches", f.Status));
     }
 
     [Fact]
@@ -126,6 +129,9 @@ public class TrustPagesTests
         Assert.Equal(new[] { "protocol.md" }, check.Changed);
         Assert.Equal(new[] { "ledger/screening.json" }, check.Missing);
         Assert.Equal(new[] { "extra.txt" }, check.NotListed);
+        Assert.Equal("Changed", check.Files!.Single(f => f.Path == "protocol.md").Status);
+        Assert.Equal("Missing", check.Files!.Single(f => f.Path == "ledger/screening.json").Status);
+        Assert.DoesNotContain(check.Files!, f => f.Path == "extra.txt"); // not in the manifest, so listed apart
     }
 
     [Fact]
