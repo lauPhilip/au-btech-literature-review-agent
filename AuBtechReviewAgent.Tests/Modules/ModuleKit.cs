@@ -104,7 +104,7 @@ public static class ModuleKit
     private const string PageWords = "We keep a running summary of the conversation. Retrieval brings in only the documents the agent needs.";
 
     /// <summary>The web for the multivocal run: the poisoned post, and 404 for everything else (robots.txt included, which allows all).</summary>
-    private sealed class KitWeb : HttpMessageHandler
+    internal sealed class KitWeb : HttpMessageHandler
     {
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) =>
             Task.FromResult(request.RequestUri!.AbsolutePath == "/post"
@@ -117,7 +117,7 @@ public static class ModuleKit
     }
 
     /// <summary>One grey search: a post whose summary and page carry the injection, and a source whose address is the bad link.</summary>
-    private sealed class KitGreySource : IGreySource
+    internal sealed class KitGreySource : IGreySource
     {
         public string Key => "stackexchange";
         public string Name => "Fake";
@@ -130,7 +130,7 @@ public static class ModuleKit
     }
 
     /// <summary>The fake model of the multivocal run: every source included, every quote taken from the kept page.</summary>
-    private static string RespondMultivocal(string prompt) =>
+    internal static string RespondMultivocal(string prompt) =>
         prompt.Contains("You assess the quality of one grey") ? JsonSerializer.Serialize(new { answers = GreyQualityChecklist.ModelItems.Select(i => new { id = i.Id, score = 1, reason = "Because.", quote = "We keep a running summary of the conversation." }) })
         : prompt.Contains("SOURCE TARGET DATA") ? """{"decision":"Included","reasoning":"On context engineering.","briefSummary":"A post.","confidence":"high"}"""
         : prompt.Contains("You build the systematic map") ? """{"attributes":[{"name":"Practice","question":"RQ1","description":"The practice described.","values":["Retrieval","Summarisation","Other"],"multiple":true,"open":false}]}"""
