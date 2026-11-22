@@ -1,0 +1,122 @@
+@using System.Text.RegularExpressions
+@* Section 3 of the report page: the characteristics of the included studies, with Figures 3.1 to 3.4. The page passes itself as Page; its state stays there. *@
+
+<section id="@AuBtechReviewAgent.ReportOutline.StudiesId" data-report-section class="scroll-mt-20 space-y-5">
+    <h2 class="font-display text-xl font-semibold tracking-tight text-heading">3. Characteristics of the Included Studies</h2>
+
+<div class="space-y-2">
+    <p>@Page.DataParagraph()</p>
+
+    <p>
+        @if (Page.peerReviewOnlyToggle)
+        {
+            <span>The peer-review filter was on for this review: @Page.passedPeerReviewCheck records passed the check and went to screening, while @Page.failedPeerReviewCheck were excluded as un-reviewed preprints or working papers. </span>
+        }
+        else
+        {
+            <span>The peer-review filter was off, so preprints and other un-reviewed records could be included. </span>
+        }
+        <span>In total, @Page.tableRecords.Count papers were included for data extraction.</span>
+    </p>
+</div>
+
+<div class="space-y-4 pt-2 overflow-visible">
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div class="space-y-2 border border-line p-3 bg-page print-keep">
+            <span class="text-[13px] font-bold text-ink block border-b border-line pb-1">Figure 3.1: Included Publications per Year</span>
+            <div class="space-y-2 pt-1">
+                @{ int maxYear = Math.Max(1, Page.publicationsByYear.Values.DefaultIfEmpty(0).Max()); }
+                @foreach (var kvp in Page.publicationsByYear)
+                {
+                    <div class="flex items-center text-[13px]">
+                        <span class="w-10 font-mono text-muted font-bold">@kvp.Key</span>
+                        <div class="flex-1 bg-soft h-3.5 mx-2 border border-line overflow-hidden">
+                            <div class="bg-heading h-full transition-all" style="width: @(kvp.Value * 100 / maxYear)%"></div>
+                        </div>
+                        <span class="w-4 font-mono text-right text-ink font-bold">@kvp.Value</span>
+                    </div>
+                }
+            </div>
+        </div>
+
+        <div class="space-y-2 border border-line p-3 bg-page print-keep">
+            <span class="text-[13px] font-bold text-ink block border-b border-line pb-1">Figure 3.2: Included Papers by Source</span>
+            <div class="space-y-2 pt-1">
+                @{ int maxPlatform = Math.Max(1, Page.platformShares.Select(p => p.Count).DefaultIfEmpty(0).Max()); }
+                @foreach (var share in Page.platformShares)
+                {
+                    <div class="flex items-center text-[13px] mb-1">
+                        <span class="w-24 truncate text-muted font-medium" title="@share.Label">@share.Label</span>
+                        <div class="flex-1 bg-soft h-3.5 mx-2 border border-line overflow-hidden">
+                            <div class="@share.Color h-full" style="width: @(share.Count * 100 / maxPlatform)%"></div>
+                        </div>
+                        <span class="w-4 font-mono text-right text-ink font-bold">@share.Count</span>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div class="space-y-2 border border-line p-3 bg-page print-keep">
+            <span class="text-[13px] font-bold text-ink block border-b border-line pb-1">Figure 3.3: Distribution by Publishing Venue Type</span>
+            @{
+                int totalVenues = Page.journalCount + Page.conferenceCount + Page.transactionsCount + Page.proceedingsCount + Page.preprintCount;
+                double jP = totalVenues > 0 ? ((double)Page.journalCount / totalVenues) * 360 : 0;
+                double cP = totalVenues > 0 ? ((double)Page.conferenceCount / totalVenues) * 360 : 0;
+                double tP = totalVenues > 0 ? ((double)Page.transactionsCount / totalVenues) * 360 : 0;
+                double pP = totalVenues > 0 ? ((double)Page.proceedingsCount / totalVenues) * 360 : 0;
+                string v1 = SpecMatrix.Deg(jP), v2 = SpecMatrix.Deg(jP + cP), v3 = SpecMatrix.Deg(jP + cP + tP), v4 = SpecMatrix.Deg(jP + cP + tP + pP);
+            }
+            <div class="flex items-center gap-6 py-2 px-1">
+                <div class="w-16 h-14 rounded-full border border-line-field shadow-sm flex-none"
+                     style="background: conic-gradient(#0284c7 0deg @(v1)deg, #4f46e5 @(v1)deg @(v2)deg, #0d9488 @(v2)deg @(v3)deg, #b45309 @(v3)deg @(v4)deg, #dc2626 @(v4)deg 360deg);">
+                </div>
+                <div class="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-muted font-mono">
+                    <div class="flex items-center gap-1.5"><div class="w-2.5 h-2.5 bg-sky-600 "></div> Journals (@Page.journalCount)</div>
+                    <div class="flex items-center gap-1.5"><div class="w-2.5 h-2.5 bg-indigo-600 "></div> Conferences (@Page.conferenceCount)</div>
+                    <div class="flex items-center gap-1.5"><div class="w-2.5 h-2.5 bg-teal-600 "></div> Transactions (@Page.transactionsCount)</div>
+                    <div class="flex items-center gap-1.5"><div class="w-2.5 h-2.5 bg-amber-700 "></div> Proceedings (@Page.proceedingsCount)</div>
+                    <div class="flex items-center gap-1.5"><div class="w-2.5 h-2.5 bg-red-600 "></div> Preprints (@Page.preprintCount)</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="space-y-2 border border-line p-3 bg-page print-keep">
+            <span class="text-[13px] font-bold text-ink block border-b border-line pb-1">Figure 3.4: Journal Quartile and Venue Tier</span>
+            <div class="flex items-end justify-between h-28 pt-2 border-b border-line-field px-2">
+                @foreach (var label in new[] { "Q1", "Q2", "Q3", "Q4", "Conf", "Preprint" })
+                {
+                    var inTier = Page.tableRecords.Where(r => SpecMatrix.InTier(r, label)).ToList();
+                    int totalMax = Math.Max(1, Page.tableRecords.Count);
+                    <div class="flex flex-col items-center w-10">
+                        <div class="w-5 bg-soft border border-line-field overflow-hidden flex flex-col justify-end" style="height: @(inTier.Count * 90 / totalMax)px" title="@label: @inTier.Count">
+                            @foreach (var share in Page.platformShares)
+                            {
+                                int n = inTier.Count(r => r.Category == share.Category);
+                                if (n > 0)
+                                {
+                                    <div class="@share.Color" style="height: @(n * 100 / Math.Max(1, inTier.Count))%"></div>
+                                }
+                            }
+                        </div>
+                        <span class="text-xs font-mono font-bold mt-1 text-muted">@label</span>
+                    </div>
+                }
+            </div>
+            <div class="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-xs font-mono mt-2 text-muted">
+                @foreach (var share in Page.platformShares)
+                {
+                    <div class="flex items-center gap-1"><div class="w-2.5 h-2.5 @share.Color "></div> @share.Label (@share.Count)</div>
+                }
+            </div>
+            <p class="text-xs text-muted">Quartiles from SCImago Journal Rank (SJR), exact title match only.</p>
+        </div>
+    </div>
+</div>
+
+</section>
+
+@code {
+    [Parameter, EditorRequired] public SpecMatrix Page { get; set; } = default!;
+}
