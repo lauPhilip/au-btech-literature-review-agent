@@ -1,6 +1,6 @@
 # 3. Search and screening
 
-This page covers the first half of a run: turning a question into a list of screened records. The code is in `PrismaReviewEngine.Search.cs` and `PrismaReviewEngine.Screening.cs`, with one class per bibliographic source.
+This page covers the first half of a run: turning a question into a list of screened records. The code is in `PrismaReviewEngine.Search.cs`, with the search strings in `PrismaReviewEngine.SearchStrings.cs` and citation chaining in `PrismaReviewEngine.Chaining.cs`, and in `PrismaReviewEngine.Screening.cs`, with the prompts in `PrismaReviewEngine.ScreeningPrompt.cs` and the human review in `PrismaReviewEngine.ScreeningReview.cs`, with one class per bibliographic source.
 
 ## From question to candidates
 
