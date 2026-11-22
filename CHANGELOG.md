@@ -70,6 +70,8 @@ A running review costs the server less. The page that follows a run checked its 
 
 The discussion no longer says the limitations twice. The prompt asks for each part once. If the answer still has two paragraphs on the limitations, the code merges them into one and drops the sentences that only repeat. A note on file says what was dropped.
 
+A grey literature review now counts each tool once. Names that clearly match, such as "MemGPT" and "Letta (MemGPT)", are merged by fixed rules, and the merge is listed in the data appendix. A tool that is one of the review's own sources is not counted as a tool.
+
 The discussion no longer leans on studies the review set aside. When a study fits none of the themes, the later sections now know which one it is and why. Only the limitations may name it. The step that builds the themes now sees the criteria every study met, so it cannot set a study aside for a reason they allow.
 
 The review also stops saying again and again how many studies it read in full. The part on how the review was done says that once. A study is never said to have used the full text as its method, since that is what the review read, not what the study did.

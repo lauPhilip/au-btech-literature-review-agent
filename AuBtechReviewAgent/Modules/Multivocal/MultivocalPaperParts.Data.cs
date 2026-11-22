@@ -95,7 +95,8 @@ public static partial class MultivocalPaperParts
         }
         int extracted = input.Extraction.Sources.Count(x => x.Error == null);
         return new PaperTable("The systematic map as counts", new[] { "Attribute", "Question", "Value", "Sources" }, rows,
-            $"Counted in code from the {extracted} extracted sources; a source with several values counts once for each, and only values whose quote was found in the kept page and judged to support the value count.");
+            $"Counted in code from the {extracted} extracted sources; a source with several values counts once for each, and only values whose quote was found in the kept page and judged to support the value count." +
+            (OpenNameMerger.Summary(input.Extraction) is { } merged ? " " + merged : ""));
     }
 
     /// <summary>

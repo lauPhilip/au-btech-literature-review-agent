@@ -101,6 +101,7 @@ public sealed class MultivocalExtractor
                 progress?.Report($"{i + 1} of {work.Count} sources extracted");
             }
 
+            OpenNameMerger.Apply(file, fixedMap, planned.Plan);
             await SafeFile.WriteAllTextAsync(Path.Join(folder, ExtractionFile), JsonSerializer.Serialize(file, Json));
             await RunHeader.WriteAsync(folder, header with { Stage = StageExtracted });
             return file;
@@ -183,11 +184,13 @@ public sealed class MultivocalExtractor
             return extracted;
         }).ToList();
 
-        var questions = plan.Numbered().Select(q => q.Number).ToList();
-        result.Coverage = questions
-            .Where(q => map.Attributes.Any(a => a.Serves(q) && result.Attributes.Any(x => x.Attribute == a.Name && !x.NotStated)))
-            .ToList();
+        result.Coverage = CoverageOf(result, map, plan);
     }
+
+    /// <summary>The research questions a source informs: those served by an attribute with at least one supported value.</summary>
+    public static List<string> CoverageOf(GreyExtraction source, MapVersion map, MultivocalPlan plan) => plan.Numbered().Select(q => q.Number)
+        .Where(q => map.Attributes.Any(a => a.Serves(q) && source.Attributes.Any(x => x.Attribute == a.Name && !x.NotStated)))
+        .ToList();
 
     /// <summary>A closed attribute's value as the map writes it ("retrieval" becomes "Retrieval").</summary>
     private static string Canonical(MapAttribute attribute, string value) =>

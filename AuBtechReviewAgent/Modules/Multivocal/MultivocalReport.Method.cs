@@ -120,7 +120,10 @@ public sealed partial class MultivocalReporter
             $"The language model proposed the attributes of the systematic map from the research questions, with values generalised over {Count(map.SourcesSeen, "source")} that passed the quality check. " +
             $"The reviewer {(edited > 0 ? $"edited it {Count(edited, "time")}" : "kept it as proposed")}, and version {fixedMap.Number} was fixed before any source was extracted. " +
             $"{Num(extracted)} sources were extracted against it{(failed > 0 ? $" and {Num(failed)} could not be" : "")}; every value rests on a quote found in the kept text of the source's page, and what a page does not state was recorded as not stated. " +
-            "The kind of each source, whether it is grey or formal literature, its site, date and quality points were recorded in code."));
+            "The kind of each source, whether it is grey or formal literature, its site, date and quality points were recorded in code." +
+            (input.Extraction.NameMerges.Count + input.Extraction.OwnSourceValues.Count > 0
+                ? $" For the open attributes, names were merged in code only where they match when case, punctuation, spaces and hyphens are ignored, or where one is given in brackets after the other ({Count(input.Extraction.NameMerges.Count, "merge")}), and {Count(input.Extraction.OwnSourceValues.Count, "value")} naming one of the review's own sources {(input.Extraction.OwnSourceValues.Count == 1 ? "was" : "were")} not counted; the data appendix lists both."
+                : "")));
         section.Blocks.Add(ReportBlock.Table(new[] { "Attribute", "Question", "Values" },
             fixedMap.Attributes.Select(a => new[] { a.Name, a.Question, a.Open ? "open (named by each source)" : string.Join(", ", a.Values) })));
         return section;

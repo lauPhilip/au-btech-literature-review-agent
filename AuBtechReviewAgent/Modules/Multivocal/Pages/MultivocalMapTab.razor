@@ -68,6 +68,10 @@
                         }
                     </tbody>
                 </table>
+                @if (AuBtechReviewAgent.OpenNameMerger.Summary(Extraction, mapAttribute.Name) is { } merged)
+                {
+                    <p class="text-xs text-muted">@merged</p>
+                }
             }
         }
     }
