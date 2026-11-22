@@ -68,6 +68,8 @@ A running review costs the server less. The page that follows a run checked its 
 
 ### Fixed
 
+The rationale in the introduction now keeps only sentences that cite a source. A sentence from the model's general knowledge is left out, and the writing log says which.
+
 The discussion no longer says the limitations twice. The prompt asks for each part once. If the answer still has two paragraphs on the limitations, the code merges them into one and drops the sentences that only repeat. A note on file says what was dropped.
 
 The discussion no longer leans on studies the review set aside. When a study fits none of the themes, the later sections now know which one it is and why. Only the limitations may name it. The step that builds the themes now sees the criteria every study met, so it cannot set a study aside for a reason they allow.
