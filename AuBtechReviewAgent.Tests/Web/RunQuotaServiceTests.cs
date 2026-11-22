@@ -84,6 +84,29 @@ public class RunQuotaServiceTests : IDisposable
     }
 
     [Fact]
+    public void ACancelledRunIsGivenBackOncePerAddressPerDay()
+    {
+        var quota = Create(new QuotaOptions { FreeRunsPerDay = 1, GlobalFreeRunsPerDay = 50 });
+        var cancelled = new RunCancelledException(new OperationCanceledException(), CancellationToken.None);
+
+        quota.TryReserve("1.2.3.4", QuotaTier.Free, out _, out var first);
+        Assert.True(quota.GiveBackAfter(first!, cancelled));
+        Assert.Equal(1, quota.GetStatus("1.2.3.4", QuotaTier.Free).Remaining);
+
+        // Cancelling again the same day does not give a second free run.
+        quota.TryReserve("1.2.3.4", QuotaTier.Free, out _, out var second);
+        Assert.False(quota.GiveBackAfter(second!, cancelled));
+        Assert.Equal(0, quota.GetStatus("1.2.3.4", QuotaTier.Free).Remaining);
+
+        // A run that failed is still always given back, and the next day a cancelled one is again.
+        Assert.True(quota.GiveBackAfter(second!, new TaskCanceledException("A timeout")));
+        _now = _now.AddDays(1);
+        quota.TryReserve("1.2.3.4", QuotaTier.Free, out _, out var third);
+        Assert.True(quota.GiveBackAfter(third!, cancelled));
+        Assert.Equal(1, quota.GetStatus("1.2.3.4", QuotaTier.Free).Remaining);
+    }
+
+    [Fact]
     public void GlobalCeilingBlocksNewAddresses()
     {
         var quota = Create(new QuotaOptions { FreeRunsPerDay = 3, GlobalFreeRunsPerDay = 2 });

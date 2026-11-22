@@ -116,9 +116,13 @@ public class RecordingChatCompletionService : IChatCompletionService
     private readonly Func<int, TimeSpan> _backoff;
     private readonly List<LlmCallRecord> _calls = new();
     private readonly object _lock = new();
+    private readonly CancellationToken _stop;
 
-    public RecordingChatCompletionService(IChatCompletionService inner, string model, int maxAttempts = 4, Func<int, TimeSpan>? backoff = null)
+    /// <summary>Wraps one run's chat service, retrying temporary errors and recording every call.</summary>
+    /// <param name="stop">Cancelled when the run's owner cancels the run: from then on no new call is made or recorded.</param>
+    public RecordingChatCompletionService(IChatCompletionService inner, string model, int maxAttempts = 4, Func<int, TimeSpan>? backoff = null, CancellationToken stop = default)
     {
+        _stop = stop;
         _inner = inner;
         _model = model;
         _maxAttempts = Math.Max(1, maxAttempts);
@@ -135,6 +139,7 @@ public class RecordingChatCompletionService : IChatCompletionService
     public async Task<IReadOnlyList<ChatMessageContent>> GetChatMessageContentsAsync(
         ChatHistory chatHistory, PromptExecutionSettings? executionSettings = null, Kernel? kernel = null, CancellationToken cancellationToken = default)
     {
+        _stop.ThrowIfCancellationRequested(); // the safe point between two model calls
         string prompt = string.Join("\n", chatHistory.Select(m => m.Content));
         var record = new LlmCallRecord
         {

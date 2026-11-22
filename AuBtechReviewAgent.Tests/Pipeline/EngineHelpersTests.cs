@@ -37,14 +37,15 @@ public class EngineHelpersTests : IDisposable
     [Fact]
     public void TheStagesAndWhichOfThemAreFinishedAreFixed()
     {
-        Assert.Equal(new[] { "Queued", "Screening", "AwaitingScreeningReview", "Synthesizing", "Complete", "Failed", "Interrupted" }, new[]
+        Assert.Equal(new[] { "Queued", "Screening", "AwaitingScreeningReview", "Synthesizing", "Complete", "Failed", "Interrupted", "Cancelled" }, new[]
         {
             PrismaReviewEngine.StageQueued, PrismaReviewEngine.StageScreening, PrismaReviewEngine.StageAwaitingReview, PrismaReviewEngine.StageSynthesizing,
-            PrismaReviewEngine.StageComplete, PrismaReviewEngine.StageFailed, PrismaReviewEngine.StageInterrupted,
+            PrismaReviewEngine.StageComplete, PrismaReviewEngine.StageFailed, PrismaReviewEngine.StageInterrupted, PrismaReviewEngine.StageCancelled,
         });
         Assert.True(PrismaReviewEngine.IsFinishedStage("Complete"));
         Assert.True(PrismaReviewEngine.IsFinishedStage("Failed"));
         Assert.True(PrismaReviewEngine.IsFinishedStage("Interrupted"));
+        Assert.True(PrismaReviewEngine.IsFinishedStage("Cancelled"));
         Assert.False(PrismaReviewEngine.IsFinishedStage("Synthesizing"));
         Assert.False(PrismaReviewEngine.IsFinishedStage(null));
         Assert.Equal("mistral-large-latest", PrismaReviewEngine.ModelId);

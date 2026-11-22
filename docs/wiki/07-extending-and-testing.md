@@ -57,6 +57,7 @@ The **module test kit** (`Modules/ModuleKit.cs` and `Modules/ModuleKitTests.cs`)
 |---|---|
 | `ModuleKit.cs`, `ModuleKitTests.cs` | The rules of `AGENTS.md`, checked for every kind of review on a poisoned fake run |
 | `PipelineTests.cs` | Whole runs end to end: archive contents, manifest verification, protocol, human review pause, interrupted runs |
+| `CancelRunTests.cs`, `MultivocalCancelTests.cs` | Cancelling: a queued run leaves the line, a running one stops at its next safe point, frees its slot and gets its quota back, a finished run or a caller without the edit key changes nothing, a grey run stops between steps |
 | `PipelineFeatureTests.cs` | Dual screening and disagreements, injection flags, citation chaining, cache reuse, deleting a run, parallel screening order |
 | `RealRunRegressionTests.cs` | Cases taken from real runs that once went wrong |
 | `OpenSourceAndSafetyTests.cs` | Source parsers on saved real responses, rate-limit handling, PDF size limit, prompt-injection markers |

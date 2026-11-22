@@ -169,9 +169,9 @@ public partial class Home
             }
             catch (Exception ex)
             {
-                // The run failed: give the quota slot back. The reason is stored in the run's ledger, and the
-                // engine has logged the error with the run ID.
-                if (lease != null) Quota.Refund(lease);
+                // The run failed or was cancelled: give the quota slot back (a cancelled one once a day). The
+                // reason is stored in the run's ledger, and the engine has logged it with the run ID.
+                if (lease != null) Quota.GiveBackAfter(lease, ex);
                 Logger.LogDebug("Run {RunId} ended with {Error}", runId, ex.GetType().Name);
             }
             finally

@@ -26,7 +26,7 @@ public sealed record MultivocalRunStatus(bool Running, string Step, string? Prog
 /// goes through one recording service (<see cref="LlmRecording"/>), labelled with the step, and is added to the
 /// run's llm-calls.json after each step.
 /// </summary>
-public sealed class MultivocalRunner
+public sealed partial class MultivocalRunner
 {
     private static ILogger _log => AppLog.For("AuBtechReviewAgent.MultivocalRunner");
 
@@ -155,7 +155,7 @@ public sealed class MultivocalRunner
             for (int guard = 0; guard < 12; guard++)
             {
                 string stage = _runs.LoadHeader(runId)?.Stage ?? throw new InvalidOperationException("This run could not be found.");
-                if (!HasStepsLeft(stage)) break;
+                if (!HasStepsLeft(stage) || await StoppedAsync(runId)) break;
                 step = StepFor(stage);
                 Set(runId, new MultivocalRunStatus(true, step, null, null));
                 string thisStep = step; // the loop changes step; a late line must keep the name of the step that sent it
@@ -167,7 +167,7 @@ public sealed class MultivocalRunner
             }
             // The metrics of a run checked in this start, from its files and the call log written after the last step.
             if (checkedNow && _writer != null) await _writer.WriteMetricsAsync(runId);
-            Set(runId, new MultivocalRunStatus(false, "Done", null, null));
+            if (StatusOf(runId)?.Step != PrismaReviewEngine.StageCancelled) Set(runId, new MultivocalRunStatus(false, "Done", null, null));
         }
         catch (Exception ex) when (ex is InvalidOperationException or ArgumentException or LlmOutputException or HttpRequestException or TaskCanceledException)
         {

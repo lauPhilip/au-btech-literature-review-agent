@@ -60,7 +60,7 @@ public record QuotaLease(string Bucket, DateTime ReservedAtUtc, bool CountsTowar
 /// Client addresses are never stored: each is replaced by an HMAC with a random per-install secret, which
 /// is enough to count runs but cannot be turned back into an IP address.
 /// </summary>
-public class RunQuotaService
+public partial class RunQuotaService
 {
     private const string GlobalFreeBucket = "global-free";
 

@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Text.Json;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 
@@ -19,6 +20,8 @@ public partial class PrismaReviewEngine
         public required ReviewState State { get; init; }
         public required RecordingChatCompletionService Chat { get; init; }
         public required string Workspace { get; init; }
+        /// <summary>Cancelled when the run's owner cancels the run, through CancelRun.</summary>
+        public CancellationToken Stop { get; init; }
         public List<IAcademicSource> Sources { get; } = new();
         public Dictionary<string, AcademicPaper> Papers { get; } = new(StringComparer.Ordinal);
         public Dictionary<string, List<DocumentChunk>> Chunks { get; } = new(StringComparer.Ordinal);
@@ -42,10 +45,10 @@ public partial class PrismaReviewEngine
         OnProgressUpdated?.Invoke(ctx.RunId, ctx.State.Stats);
     }
 
-    /// <summary>Waits for a run slot, showing the run's place in line while it waits.</summary>
+    /// <summary>Waits for a run slot, showing the run's place in line while it waits; a cancelled run leaves the line.</summary>
     private async Task<IDisposable> AcquireSlotAsync(RunContext ctx)
     {
-        var acquire = Coordinator.AcquireSlotAsync(ctx.RunId);
+        var acquire = Coordinator.AcquireSlotAsync(ctx.RunId, ctx.Stop);
         string stageBefore = ctx.State.Stats.ProcessingStage;
         while (!acquire.IsCompleted)
         {
