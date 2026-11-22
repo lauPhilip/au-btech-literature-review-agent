@@ -134,6 +134,8 @@ Two limits guard the API and the MCP server. Each call counts once per client ad
 
 ## The documentation page
 
+![The API and MCP page at 1280 px: the side list of trust pages with the page's own sections under it, the title "Run a review from your own tools", what you need, where to send it, and the start of "Start a review".](https://raw.githubusercontent.com/lauPhilip/au-btech-literature-review-agent/master/docs/img/pages/api-docs.png)
+
 `/docs/api` (`Components/Pages/ApiDocs.razor` and its parts `ApiDocsStart`, `ApiDocsFollow`, `ApiDocsAssistant` and `ApiDocsErrors`) sits with the other trust pages in `DocPage`. It follows the switch through `ApiSwitch` (`Web/ApiSwitch.cs`), which `Program.cs` registers from the same `Api:Enabled` value: with the switch off the page answers 404 and the side list leaves it out, and it is never in the sitemap. With the switch on, `ApiSwitch` also gives the OpenAPI description a line of text and an `externalDocs` link to the page.
 
 Every request and answer on the page is in `Web/ApiDocExamples.cs`. `ApiDocsPageTests` sends the example start and cancel to the real API with the fake model, and checks that every example answer has exactly the property names and nesting of the real one. The 401 example is built from `ApiProblems.MissingKey`, and the error table takes its titles from `ApiProblems`, so a changed message shows on the page. The same tests check that the fields table names every property of `StartReviewBody` and the tools table every tool of `ReviewMcpTools`.

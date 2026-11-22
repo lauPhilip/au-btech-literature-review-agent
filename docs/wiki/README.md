@@ -42,8 +42,10 @@ AuBtechReviewAgent/                 the web app
   Web/                              site pages' helpers: SEO, health, security headers, quota, glossary
   Api/                              the REST API for other tools (off in production until Api:Enabled)
   Mcp/                              the MCP server at /mcp, on the same switch
+  Modules/                          one folder per kind of review that has its own pages (Multivocal/, Systematic/)
   Components/Pages/*.razor          the routable pages (landing, New review, Review output, Metrics, ...)
   Components/Dashboard/*.razor      parts of New review (composer, criteria, the seven steps, run summary, ...)
+  Components/Paper/*.razor          the parts of a paper page that every kind of review shares
   Components/Layout/*.razor         header, footer, SEO tags, help terms
   wwwroot/                          static files (compiled Tailwind CSS, scripts, images)
 AuBtechReviewAgent.Tests/           xUnit tests, all offline, in the same folders as the code they test
