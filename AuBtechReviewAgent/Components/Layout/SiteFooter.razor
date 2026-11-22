@@ -1,5 +1,6 @@
 @* The footer. On app pages it is one slim line that never moves: the name, and the pages about trust (About,
-   Model card, Privacy, Verify an archive, Glossary) with GitHub; on phones only About, Privacy and GitHub.
+   Model card, Privacy, Verify an archive, Glossary) with GitHub; on phones only the name, About, Privacy and GitHub,
+   so it stays one line at 390 px (issue #244).
    The landing page (Landing="true") names the department and OSSYM 2026, with Metrics, Docs and GitHub. *@
 
 <footer class="shrink-0 border-t border-line bg-page text-sm text-muted print:hidden">
@@ -17,7 +18,7 @@
         }
         else
         {
-            <p class="py-2"><span class="font-display font-semibold text-heading">TraceableAI</span> · BTECH, AU</p>
+            <p class="py-2"><span class="font-display font-semibold text-heading">TraceableAI</span><span class="max-sm:hidden"> · BTECH, AU</span></p>
             <nav aria-label="About TraceableAI">
                 <ul class="-mx-2 flex flex-wrap items-center">
                     <li><a href="/about" class="@LinkClass">About</a></li>
