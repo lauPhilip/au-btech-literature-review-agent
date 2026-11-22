@@ -32,6 +32,18 @@ public static class ApiProblems
             : "The review is still running. Follow its status, and ask again when the stage is \"Complete\".",
         new Dictionary<string, object?> { ["stage"] = stage });
 
+    public static ApiProblem MissingEditKey() => new(401, "The edit key is missing",
+        "Send the review's edit key in the X-Edit-Key header. It came back with the review when it started.");
+
+    public static ApiProblem WrongEditKey() => new(403, "The edit key does not fit",
+        "Only the edit key that came back when this review started can cancel it.");
+
+    public static ApiProblem NotCancellable(string stage) => new(409, "The review is not running",
+        PrismaReviewEngine.IsFinishedStage(stage)
+            ? $"The review has already ended as \"{stage}\", so there is nothing to cancel."
+            : "The review is not running on this server, or it is being cancelled already. Its status shows where it stands.",
+        new Dictionary<string, object?> { ["stage"] = stage });
+
     public static ApiProblem NoRun() => new(404, "No review with this id",
         "There is no review with this id. Runs are deleted some days after they finish.");
 
