@@ -26,15 +26,18 @@ public sealed record GreyReference(
     string Kind,
     DateTime? AccessedUtc,
     string? WaybackUrl,
-    DateTime? UpdatedUtc = null);
+    DateTime? UpdatedUtc = null,
+    AcademicPaper? Paper = null,
+    string? TextBasis = null);
 
 /// <summary>
 /// The references of a multivocal run, and their exports: references.bib and references.ris for the sources the
 /// results rest on, and screened.ris for every source that was screened, tagged with its decision, as the
 /// systematic review exports its studies (<see cref="BibliographyExporter"/>). Everything here is written in code
-/// from the run's files; nothing comes from the model.
+/// from the run's files; nothing comes from the model. A formal source is cited as the systematic review cites a
+/// study (GreyReferences.Formal.cs).
 /// </summary>
-public static class GreyReferences
+public static partial class GreyReferences
 {
     public const string BibFile = "references.bib";
     public const string RisFile = "references.ris";
@@ -48,10 +51,12 @@ public static class GreyReferences
     {
         var numbers = MultivocalReporter.SourceNumbers(extraction);
         var records = Records(ledger);
+        var papers = Papers(ledger);
         var snapshots = pages.Pages.GroupBy(p => MultivocalSearcher.AddressKey(p.Url)).ToDictionary(g => g.Key, g => g.First());
         return extraction.Sources
             .Where(s => numbers.ContainsKey(s.Address))
-            .Select(s => Reference(numbers[s.Address], s.Address, records.GetValueOrDefault(s.Address), snapshots.GetValueOrDefault(s.Address), s.Title, s.Url))
+            .Select(s => Reference(numbers[s.Address], s.Address, records.GetValueOrDefault(s.Address), snapshots.GetValueOrDefault(s.Address), s.Title, s.Url)
+                with { Paper = papers.GetValueOrDefault(s.Address), TextBasis = snapshots.GetValueOrDefault(s.Address)?.TextBasis })
             .OrderBy(r => r.Number)
             .ToList();
     }
@@ -84,6 +89,7 @@ public static class GreyReferences
     /// </summary>
     public static string Line(GreyReference r)
     {
+        if (r.Paper != null) return FormalLine(r);
         var sb = new StringBuilder();
         sb.Append(r.Producer.Length > 0 ? r.Producer : "Unknown producer");
         sb.Append($" ({(r.Year is int y ? y.ToString(CultureInfo.InvariantCulture) : "n.d.")}). ");
@@ -105,6 +111,11 @@ public static class GreyReferences
         var used = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var r in references.OrderBy(r => r.Number))
         {
+            if (r.Paper != null)
+            {
+                sb.Append(FormalBibTeX(r, used));
+                continue;
+            }
             var fields = new List<(string, string)>
             {
                 // Double braces: a producer is often an organisation, and BibTeX would split "Acme Labs" into a first and last name.
@@ -134,6 +145,11 @@ public static class GreyReferences
         var sb = new StringBuilder();
         foreach (var r in references.OrderBy(r => r.Number))
         {
+            if (r.Paper != null)
+            {
+                sb.Append(FormalRis(r));
+                continue;
+            }
             AppendRis(sb, r.Producer, r.Title, r.Site, r.Year, r.Url);
             if (r.AccessedUtc is DateTime accessed) sb.AppendLine($"Y2  - {accessed.ToString("yyyy/MM/dd", CultureInfo.InvariantCulture)}");
             sb.AppendLine($"N1  - Source [{r.Number}] in the TraceableAI review");
@@ -158,9 +174,15 @@ public static class GreyReferences
     public static string ToScreenedRis(MultivocalLedger ledger, MultivocalScreeningFile screening, IReadOnlyDictionary<string, int>? numbers = null)
     {
         var records = Records(ledger);
+        var papers = Papers(ledger);
         var sb = new StringBuilder();
         foreach (var s in screening.Sources)
         {
+            if (papers.GetValueOrDefault(s.Address) is { } paper)
+            {
+                sb.Append(FormalScreenedRis(s, paper, numbers));
+                continue;
+            }
             var record = records.GetValueOrDefault(s.Address);
             string site = OneLine(record?.Site ?? "");
             string producer = record?.Producer is { Length: > 0 } p ? p : site;
@@ -169,21 +191,27 @@ public static class GreyReferences
             sb.AppendLine("KW  - TraceableAI");
             sb.AppendLine("KW  - grey literature");
             if (record?.Kind is { Length: > 0 } kind) sb.AppendLine($"KW  - {KindLabel(kind).ToLowerInvariant()}");
-            sb.AppendLine("KW  - " + s.Decision switch
-            {
-                "Included" => "included",
-                "Excluded" => "excluded: " + ExclusionReasons.Label(s.ExclusionReason).ToLowerInvariant(),
-                "Duplicate" => "duplicate",
-                _ => "not screened",
-            });
-            if (s.NeedsLook) sb.AppendLine("KW  - marked to look at");
-            if (s.Reviewed) sb.AppendLine("KW  - checked by reviewer");
-            if (numbers != null && numbers.TryGetValue(s.Address, out int n)) sb.AppendLine($"N1  - Source [{n}] in the TraceableAI review");
-            if (!string.IsNullOrWhiteSpace(s.Reasoning)) sb.AppendLine($"N1  - Screening: {OneLine(s.Reasoning)}");
-            sb.AppendLine("ER  - ");
-            sb.AppendLine();
+            AppendDecision(sb, s, numbers);
         }
         return sb.ToString();
+    }
+
+    /// <summary>A screened source's decision tags and notes, and the end of its record; the same for both pools.</summary>
+    private static void AppendDecision(StringBuilder sb, GreyScreening s, IReadOnlyDictionary<string, int>? numbers)
+    {
+        sb.AppendLine("KW  - " + s.Decision switch
+        {
+            "Included" => "included",
+            "Excluded" => "excluded: " + ExclusionReasons.Label(s.ExclusionReason).ToLowerInvariant(),
+            "Duplicate" => "duplicate",
+            _ => "not screened",
+        });
+        if (s.NeedsLook) sb.AppendLine("KW  - marked to look at");
+        if (s.Reviewed) sb.AppendLine("KW  - checked by reviewer");
+        if (numbers != null && numbers.TryGetValue(s.Address, out int n)) sb.AppendLine($"N1  - Source [{n}] in the TraceableAI review");
+        if (!string.IsNullOrWhiteSpace(s.Reasoning)) sb.AppendLine($"N1  - Screening: {OneLine(s.Reasoning)}");
+        sb.AppendLine("ER  - ");
+        sb.AppendLine();
     }
 
     /// <summary>
