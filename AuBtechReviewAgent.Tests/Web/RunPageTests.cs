@@ -54,4 +54,36 @@ public class RunPageTests
         Assert.Contains("SaveDraftAsync", page);
         Assert.Contains("AttachToRun", page);
     }
+
+    [Fact]
+    public void OnlyTheBrowserWithTheEditKeyGetsCancelReviewAndItAsksFirst()
+    {
+        string? page = ReadPage();
+        if (page == null) return; // not run from the repository (packaged tests)
+
+        // Shown beside a run that is alive here, to the browser with the edit key; the engine checks the key again.
+        Assert.Contains("@if (CanCancel)", page);
+        Assert.Contains("CanCancel => !Composing && canEdit && currentSessionId != Guid.Empty && ReviewEngine.IsRunActive(currentSessionId)", page);
+        Assert.Contains("ReviewEngine.CancelRun(runId, editKey, cancelReason)", page);
+
+        // An inline confirm, no browser dialog; every handler re-renders the page.
+        Assert.Contains("<CancelRunCard Asking=\"ConfirmingCancel\"", page);
+        Assert.DoesNotContain("confirm(", page);
+        string run = File.ReadAllText(Path.Join(Pages(), "HomeRunView.razor"));
+        foreach (string handler in new[] { "AskToCancel", "KeepRunning", "CancelReview", "StartNewDraft" })
+            Assert.Contains($"EventCallback.Factory.Create(Page, Page.{handler})", run);
+        Assert.Contains("EventCallback.Factory.Create<string>(Page, Page.SetCancelReason)", run);
+
+        // A cancelled run shows the reason from its ledger and a way to start again, not "Report this problem".
+        int cancelled = page.IndexOf("@if (cancelled)", StringComparison.Ordinal);
+        Assert.True(cancelled >= 0);
+        Assert.Contains("Start a new review", page[cancelled..page.IndexOf("Report this problem", StringComparison.Ordinal)]);
+    }
+
+    private static string Pages()
+    {
+        string? root = AppContext.BaseDirectory;
+        while (root != null && !File.Exists(Path.Join(root, "AuBtechReviewAgent.sln"))) root = Path.GetDirectoryName(root);
+        return Path.Join(root!, "AuBtechReviewAgent", "Components", "Pages");
+    }
 }

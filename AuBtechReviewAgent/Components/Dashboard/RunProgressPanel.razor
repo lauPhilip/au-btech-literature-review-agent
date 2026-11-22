@@ -11,7 +11,8 @@
 
 @{
     int percent = AuBtechReviewAgent.RunProgress.Percent(Stats);
-    bool failed = Stage is AuBtechReviewAgent.PrismaReviewEngine.StageFailed or AuBtechReviewAgent.PrismaReviewEngine.StageInterrupted;
+    bool failed = Stage is AuBtechReviewAgent.PrismaReviewEngine.StageFailed or AuBtechReviewAgent.PrismaReviewEngine.StageInterrupted
+        or AuBtechReviewAgent.PrismaReviewEngine.StageCancelled;
     bool queued = Stage == AuBtechReviewAgent.PrismaReviewEngine.StageQueued;
     bool waitingForYou = Stage == AuBtechReviewAgent.PrismaReviewEngine.StageAwaitingReview;
     int current = AuBtechReviewAgent.ReviewSteps.Current(Stats, Stage);
@@ -161,6 +162,7 @@
     {
         string of = $"step {AuBtechReviewAgent.ReviewSteps.Number(current)} of {AuBtechReviewAgent.ReviewSteps.Count}";
         if (Stage == AuBtechReviewAgent.PrismaReviewEngine.StageInterrupted) return $"Review interrupted · {of}";
+        if (Stage == AuBtechReviewAgent.PrismaReviewEngine.StageCancelled) return $"Review cancelled · {of}";
         if (failed) return $"Review stopped · {of}";
         if (queued) return QueuePosition > 0 ? $"Review waiting · number {QueuePosition} in line" : "Review waiting for a free slot";
         if (waitingForYou) return $"Review paused · {of}";
@@ -195,6 +197,7 @@
         if (Stage == AuBtechReviewAgent.PrismaReviewEngine.StageAwaitingReview) return "Waiting for your screening decisions";
         if (Stage == AuBtechReviewAgent.PrismaReviewEngine.StageFailed) return "The run stopped with an error";
         if (Stage == AuBtechReviewAgent.PrismaReviewEngine.StageInterrupted) return "The run was interrupted";
+        if (Stage == AuBtechReviewAgent.PrismaReviewEngine.StageCancelled) return "The run was cancelled";
         return AuBtechReviewAgent.RunProgress.Steps.TryGetValue(Stats.ProgressStep, out var d) ? d.Label : "Writing the protocol";
     }
 

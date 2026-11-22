@@ -120,6 +120,47 @@ public class RunViewTests
     }
 
     [Fact]
+    public async Task ACancelledRunSaysSoAndMarksTheStepItStoppedAt()
+    {
+        string html = await RenderAsync<RunProgressPanel>(new()
+        {
+            ["Stats"] = Running(RunProgress.Screening, 0.4),
+            ["Stage"] = PrismaReviewEngine.StageCancelled,
+        });
+
+        Assert.Contains("Review cancelled · step 3 of 7", html);
+        Assert.Contains("The run was cancelled", html);
+        Assert.Contains("(stopped here)", html);
+        Assert.Contains(">stopped", html);
+        Assert.DoesNotContain("You can close this page", html);
+    }
+
+    [Fact]
+    public async Task TheCancelCardAsksOnceBeforeItActsAndStaysOnAPhone()
+    {
+        string first = await RenderAsync<CancelRunCard>(new());
+        Assert.Contains(">Cancel review</button>", first);
+        Assert.Contains("class=\"ui-btn-secondary", first);
+        Assert.DoesNotContain("Yes, cancel", first);
+        Assert.DoesNotContain("max-sm:hidden", first);
+
+        string asking = await RenderAsync<CancelRunCard>(new() { ["Asking"] = true, ["Reason"] = "Wrong question" });
+        Assert.Contains("Cancel this review?", asking);
+        Assert.Contains("<label for=\"cancel-reason\"", asking);
+        Assert.Contains("id=\"cancel-reason\" type=\"text\" maxlength=\"300\" value=\"Wrong question\"", asking);
+        Assert.Contains(">Yes, cancel the review</button>", asking);
+        Assert.Contains(">Keep it running</button>", asking);
+        Assert.DoesNotContain(">Cancel review</button>", asking);
+
+        string requested = await RenderAsync<CancelRunCard>(new() { ["Asking"] = true, ["Requested"] = true });
+        Assert.Contains("role=\"status\">Cancelling.", requested);
+        Assert.DoesNotContain("<button", requested);
+
+        string problem = await RenderAsync<CancelRunCard>(new() { ["Problem"] = "It may have just finished." });
+        Assert.Contains("role=\"alert\">It may have just finished.</p>", problem);
+    }
+
+    [Fact]
     public async Task AFinishedRunOpensWithTheOutcomeAndOnePrimaryAction()
     {
         string html = await RenderAsync<RunSummaryCard>(new()
