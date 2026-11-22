@@ -2,6 +2,7 @@ using System.Net;
 using System.Text.Json;
 using ModelContextProtocol.Client;
 using ModelContextProtocol.Protocol;
+using Microsoft.AspNetCore.Mvc.Testing;
 using Xunit;
 
 namespace AuBtechReviewAgent.Tests;
@@ -83,6 +84,7 @@ public class ReviewMcpTests
             Assert.Contains(expected, JsonDocument.Parse(text).RootElement.GetProperty("content").GetString());
         }
         (error, text) = await CallAsync(client, "get_review_file", new() { ["id"] = id.ToString(), ["file"] = "archive" });
+        Assert.False(error, text);
         Assert.EndsWith($"/api/workspace/{id}/archive", JsonDocument.Parse(text).RootElement.GetProperty("address").GetString());
 
         Assert.All(host.KeysSeenByModel, key => Assert.Equal(Key, key));
@@ -109,10 +111,36 @@ public class ReviewMcpTests
     }
 
     [Fact]
+    public async Task The_MCP_answer_with_the_edit_key_is_never_compressed()
+    {
+        using var host = new ApiTestHost();
+        // Over HTTPS, as on the server: the opt-out is for HTTPS answers, where BREACH applies.
+        var client = host.CreateClient(new WebApplicationFactoryClientOptions { BaseAddress = new Uri("https://localhost") });
+        client.DefaultRequestHeaders.AcceptEncoding.ParseAdd("gzip, br");
+        client.DefaultRequestHeaders.Accept.ParseAdd("application/json");
+        client.DefaultRequestHeaders.Accept.ParseAdd("text/event-stream");
+        client.DefaultRequestHeaders.Add(ApiEndpoints.MistralKeyHeader, Key);
+        const string call = """
+            {"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"start_literature_review",
+             "arguments":{"searchWords":"agent loops","inclusion":"Agent architecture","databases":["arxiv"],"visualSummary":"none"}}}
+            """;
+        using var body = new StringContent(call, System.Text.Encoding.UTF8, "application/json");
+        using var response = await client.PostAsync(McpSetup.Path, body);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        // The SDK may mark its event stream "identity"; anything else would be a compression.
+        Assert.All(response.Content.Headers.ContentEncoding, encoding => Assert.Equal("identity", encoding));
+        string text = await response.Content.ReadAsStringAsync();
+        Assert.Contains("editKey", text);
+        var id = Guid.Parse(System.Text.RegularExpressions.Regex.Match(text, "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}").Value);
+        await host.WaitForRunAsync(id, TimeSpan.FromSeconds(90));
+    }
+
+    [Fact]
     public async Task With_the_switch_off_there_is_no_MCP_server()
     {
         using var host = new ApiTestHost(enabled: false);
-        using var response = await host.CreateClient().PostAsync(McpSetup.Path, new StringContent("{}"));
+        using var body = new StringContent("{}");
+        using var response = await host.CreateClient().PostAsync(McpSetup.Path, body);
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 }
