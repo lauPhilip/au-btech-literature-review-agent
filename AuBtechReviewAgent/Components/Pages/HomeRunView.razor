@@ -1,0 +1,81 @@
+@* Running and Done (redesign step 7): RunProgressPanel shows a run that is going, waiting or stopped, and
+   RunSummaryCard a finished one, each in the same centred column as the composer with a side column beside it.
+   The page adds what only it knows: the reason a run stopped, the browser notification, the human screening
+   check, the live log, the PRISMA funnel, and the run's own card with its link, settings, Delete and New review. *@
+@* Screen readers hear the step changes and the end of the run, not every percent (WCAG 4.1.3). *@
+<p class="sr-only" role="status" aria-live="polite">@Page.Announcement()</p>
+@if (!string.IsNullOrEmpty(Page.quotaNotice))
+{
+    <p class="mx-auto mt-4 max-w-[760px] px-4 text-xs text-not-supported" role="alert">@Page.quotaNotice</p>
+}
+@if (Page.stage == AuBtechReviewAgent.PrismaReviewEngine.StageComplete)
+{
+    <RunSummaryCard Stats="Page.State.Stats" RunId="Page.currentSessionId" Objective="@Page.ObjectiveShown()">
+        <Main>@Page.LogPanel()</Main>
+        <Side>@Page.RunCard()</Side>
+    </RunSummaryCard>
+}
+else
+{
+    <RunProgressPanel Stats="Page.State.Stats" Stage="@Page.stage" Running="Page.isSearching" QueuePosition="Page.queuePosition" CompletedUtc="Page.completedUtc"
+                      Objective="@Page.ObjectiveShown()" SourceCount="Page.SourcesShown().Count" LogShown="Page.showLog" OnShowLog="EventCallback.Factory.Create(Page, Page.ToggleLog)">
+        <Notice>
+            @if (!string.IsNullOrEmpty(Page.failureMessage))
+            {
+                <div class="mt-4 rounded-field border border-not-supported-border bg-not-supported-fill p-3 text-sm text-not-supported" role="alert">
+                    <p>@Page.failureMessage</p>
+                    @if (Page.stage is AuBtechReviewAgent.PrismaReviewEngine.StageFailed or AuBtechReviewAgent.PrismaReviewEngine.StageInterrupted)
+                    {
+                        <p class="mt-1.5 text-xs">
+                            Run <span class="font-mono select-all">@Page.currentSessionId</span> · version @Home.AppVersionShort ·
+                            <a href="@AuBtechReviewAgent.SiteSeo.ProblemReportUrl(Page.currentSessionId, Home.AppVersionShort, Page.stage)" target="_blank" rel="noopener" class="font-semibold underline underline-offset-2">Report this problem</a>
+                            (the report includes the run ID and version, not your question)
+                        </p>
+                    }
+                </div>
+            }
+        </Notice>
+        <Notify>
+            @if (Page.isSearching && Page.notifyPermission is "default" or "granted")
+            {
+                @* Runs take minutes; people switch tabs. The tab title shows the progress, and this asks the browser to say when it is done. *@
+                @if (Page.notifyPermission == "granted")
+                {
+                    <p class="mt-2 text-sm text-muted">You will get a browser notification when the review is ready, if this tab is in the background.</p>
+                }
+                else
+                {
+                    <button type="button" @onclick="EventCallback.Factory.Create(Page, Page.AskForNotification)" class="ui-btn-secondary mt-3 min-h-[44px] w-full">Notify me when it is ready</button>
+                }
+            }
+        </Notify>
+        <Main>
+            @if (Page.awaitingReview && Page.reviewLogs != null)
+            {
+                @if (Page.canEdit)
+                {
+                    <div class="ui-card mt-4 flex h-[70vh] flex-col overflow-hidden">
+                        <ScreeningReviewPanel RunId="Page.currentSessionId" EditKey="@Page.editKey" Logs="Page.reviewLogs" OnSubmitted="EventCallback.Factory.Create(Page, Page.OnScreeningReviewSubmitted)" />
+                    </div>
+                }
+                else
+                {
+                    <p class="ui-card mt-4 p-4 text-sm text-ink">This run is waiting for the person who started it to check the screening decisions. Only the browser that started a run can do that.</p>
+                }
+            }
+            @Page.LogPanel()
+            <details class="ui-card mt-4 p-4 max-sm:hidden sm:p-5" open>
+                <summary class="flex min-h-[44px] cursor-pointer items-center font-display text-sm font-semibold text-heading">Records so far</summary>
+                <div class="mt-2">
+                    <PrismaFunnel Stats="Page.State.Stats" Removed="Page.State.RemovedBeforeScreening" Running="Page.isSearching"
+                                  Yields="Page.State.SearchStringYields" ExclusionGroups="Page.State.ExclusionGroups" />
+                </div>
+            </details>
+        </Main>
+        <Side>@Page.RunCard()</Side>
+    </RunProgressPanel>
+}
+
+@code {
+    [Parameter, EditorRequired] public Home Page { get; set; } = default!;
+}
