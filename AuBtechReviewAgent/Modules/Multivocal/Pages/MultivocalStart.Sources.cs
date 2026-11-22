@@ -76,7 +76,20 @@ public partial class MultivocalStart
         "excluded" => ledger!.Sources.Where(f => DecisionOf(f.Record.Url)?.Decision == "Excluded"),
         "look" => ledger!.Sources.Where(f => DecisionOf(f.Record.Url) is { NeedsLook: true }),
         "duplicates" => ledger!.Sources.Where(f => DecisionOf(f.Record.Url)?.Decision == "Duplicate"),
+        "grey" => ledger!.GreyPool,
+        "academic" => ledger!.FormalPool,
         _ => ledger!.Sources,
+    };
+
+    /// <summary>
+    /// What an academic source's kept text is (decision 8): its full text and where it came from, or its abstract alone.
+    /// Null for a grey source's page.
+    /// </summary>
+    public static string? TextBasisLine(PageSnapshot snapshot) => snapshot.TextBasis switch
+    {
+        null => null,
+        MultivocalPages.FullTextBasis => $"Full text kept {snapshot.AccessedUtc:yyyy-MM-dd HH:mm} UTC from {snapshot.FullTextSource ?? "an open-access copy"} · {snapshot.Characters:N0} characters · SHA-256 {snapshot.TextSha256[..Math.Min(12, snapshot.TextSha256.Length)]}…",
+        _ => $"Abstract only: no open full text ({(snapshot.FullTextSource ?? "none").Replace("none (", "").TrimEnd(')')}), so quotes come from the abstract · SHA-256 {snapshot.TextSha256[..Math.Min(12, snapshot.TextSha256.Length)]}…",
     };
 
     internal static string DecisionLabel(GreyScreening d) => d.Decision switch
