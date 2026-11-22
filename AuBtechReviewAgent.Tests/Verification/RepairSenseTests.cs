@@ -127,4 +127,15 @@ public class RepairSenseTests : IDisposable
         Assert.Empty(result.Sense!);
         Assert.DoesNotContain(chat.Prompts, p => p.Contains("after an automated citation repair"));
     }
+
+    [Fact]
+    public void TheGreyLiteratureAuditKeepsTheSenseChecksAndAnOldAuditStillLoads()
+    {
+        var old = System.Text.Json.JsonSerializer.Deserialize<MultivocalCitationAudit>("""{"ReferenceListSize":2,"Repairs":[]}""")!;
+        Assert.Empty(old.SenseChecks);
+
+        var audit = new MultivocalCitationAudit { SenseChecks = { new RepairSenseCheck("synthesis-1", Repaired, Rewrite, RepairSense.Rewritten, "note") } };
+        var back = System.Text.Json.JsonSerializer.Deserialize<MultivocalCitationAudit>(System.Text.Json.JsonSerializer.Serialize(audit))!;
+        Assert.Equal(audit.SenseChecks, back.SenseChecks);
+    }
 }
