@@ -37,14 +37,14 @@ public static partial class CitationRepairer
     public static async Task<SecondPassResult> SecondPassAsync(
         IChatCompletionService chat, List<(string Field, string Text)> fields, List<CitationSupportResult> results,
         IReadOnlyList<ReferencedPaper> papers, IReadOnlyDictionary<int, IReadOnlyList<string>> findings, int referenceCount,
-        int parallelism = 1, bool secondCheck = false, string review = DefaultReview)
+        int parallelism = 1, bool secondCheck = false, string review = DefaultReview, CheckCache? cache = null)
     {
         var repairs = new List<CitationRepair>();
         if (results.Any(NeedsRewrite))
         {
             List<CitationRepair> rewritten;
             (fields, results, rewritten) = await RepairAsync(chat, fields, results, papers, findings, referenceCount,
-                parallelism, secondCheck, review, NeedsRewrite);
+                parallelism, secondCheck, review, NeedsRewrite, cache);
             repairs.AddRange(rewritten.Select(r => r with { Pass = 2 }));
         }
         var removal = RemoveUnsupported(fields, results);
