@@ -1,7 +1,7 @@
 // Records the demo GIFs (issue #259): one scene of 6 seconds per thing the site does, from the app running in
 // Development with its made-up sample pages (/design/run, /design/report, /design/metrics), so no model, key or real
 // run is needed. Each scene is filmed by Playwright at 1280 x 720 and turned into a GIF by ffmpeg: the last 6 s,
-// 12 frames a second, 960 px wide (720 for the busiest scene), with its own palette, to stay under about 2 MB.
+// 12 frames a second, 960 px wide (720 for the two busiest scenes), with its own palette, to stay under about 2 MB.
 //   cd tools/a11y && npm ci && BASE_URL=http://localhost:5038 DEMO_OUT=../../demo-gifs node record-demos.mjs
 // DEMO_SCENES picks scenes by name (comma-separated); all by default. A scene that fails is reported and skipped.
 import { chromium } from 'playwright';
@@ -66,7 +66,7 @@ const scenes = [
   },
   {
     name: 'report',
-    width: 720, // the open citation card changes much of the screen; a smaller GIF keeps it under 2 MB
+    width: 720, // the open citation card changes much of the screen, which made the GIF 3.4 MB at 960 px
     alt: 'The report: a citation is opened to show its verdict and the quote from the paper, then the next flagged citation.',
     async run(page) {
       await page.goto(base + '/design/report');
@@ -83,6 +83,7 @@ const scenes = [
   },
   {
     name: 'metrics',
+    width: 720, // scrolling changes every frame, which made the GIF 4 MB at 960 px
     alt: 'Metrics: one bar of citation verdicts per review, then the tables of shares and counts per run.',
     async run(page) {
       await page.goto(base + '/design/metrics');
