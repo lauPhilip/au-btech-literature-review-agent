@@ -2,6 +2,8 @@
 
 Other tools can start a systematic review and follow it without the website. This page covers the REST API under `/api/v1`, how it keeps the caller's key out of every file, and the limits that apply to it. The code is in `AuBtechReviewAgent/Api/`.
 
+This page is for people who work on the code. For people who use the API, the site has its own page at [`/docs/api`](https://au-btech-literature-review-agent.dk/docs/api), shown only while the API is on: the first call, following, the report, cancelling, the MCP setup, every error with what to do, and the key's promise. See "The documentation page" below.
+
 ## The switch
 
 The API is off in production until Lau turns it on. `Program.cs` reads the switch as `builder.Configuration.GetValue("Api:Enabled", builder.Environment.IsDevelopment())`, so it is on in Development and off everywhere else unless `Api:Enabled` is `true` in the server's configuration. The default lives in code, not in `appsettings.json`. With the switch off, `Program.cs` neither registers the API's services nor maps its routes. `ApiEndpoints.HideReviewApi` then answers 404 for every address under `/api/v1` and `/mcp`, because another route that matches the shape of the path would otherwise answer a POST with 405.
@@ -129,6 +131,14 @@ The key lives in the run's `ReviewRequest` and in the chat service made from it,
 ## Limits
 
 Two limits guard the API and the MCP server. Each call counts once per client address and once per key, at most 120 a minute each, on every address under `/api/v1` and `/mcp` (`ApiEndpoints.AddReviewApi`, a chained global limiter that lets every other address through). Starting a review counts again, per key and per address, at most `Quota:OwnKeyRunsPerHour` an hour, the same number the form allows with an own key. Both use ASP.NET Core's rate limiter, and neither holds a key or an address in plain text.
+
+## The documentation page
+
+`/docs/api` (`Components/Pages/ApiDocs.razor` and its parts `ApiDocsStart`, `ApiDocsFollow`, `ApiDocsAssistant` and `ApiDocsErrors`) sits with the other trust pages in `DocPage`. It follows the switch through `ApiSwitch` (`Web/ApiSwitch.cs`), which `Program.cs` registers from the same `Api:Enabled` value: with the switch off the page answers 404 and the side list leaves it out, and it is never in the sitemap. With the switch on, `ApiSwitch` also gives the OpenAPI description a line of text and an `externalDocs` link to the page.
+
+Every request and answer on the page is in `Web/ApiDocExamples.cs`. `ApiDocsPageTests` sends the example start and cancel to the real API with the fake model, and checks that every example answer has exactly the property names and nesting of the real one. The 401 example is built from `ApiProblems.MissingKey`, and the error table takes its titles from `ApiProblems`, so a changed message shows on the page. The same tests check that the fields table names every property of `StartReviewBody` and the tools table every tool of `ReviewMcpTools`.
+
+Every paragraph, table cell and quote on the page must score 60 or more on the Flesch Reading Ease, the bar of the release notes. `Web/ReadingEase.cs` is the C# twin of `reading_ease` in `tools/ReleaseCheck/release_notes.py`, and a test reads the page and scores each one, leaving out code. The code blocks (`Components/Layout/CodeBlock.razor`) have a large Copy button that works without a live connection: `wwwroot/js/review-output.js` handles every `data-copy` button.
 
 ## Security notes
 
