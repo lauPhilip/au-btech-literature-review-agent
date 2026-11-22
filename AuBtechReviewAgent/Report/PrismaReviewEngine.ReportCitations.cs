@@ -20,7 +20,7 @@ public partial class PrismaReviewEngine
         : $"{count} citations in a theme subsection refer to a study not coded under that theme and are flagged in the audit.";
 
     private sealed record CitationCheck(List<(string Field, string Text)> Fields, List<StrippedCitation> Strips, List<CitationSupportResult> Checks,
-        CitationSupportSummary Initial, CitationSupportSummary Summary, List<CitationRepair> Repairs);
+        CitationSupportSummary Initial, CitationSupportSummary Summary, List<CitationRepair> Repairs, List<RemovedCitation> Removed);
 
     private sealed record CoverageResult(Dictionary<string, string> TextOf, SortedSet<int> Cited, List<UncodedStudy> NotCited, string Sentence);
 
@@ -85,8 +85,8 @@ public partial class PrismaReviewEngine
         // extraction quotes are given to the check as evidence too: they are what the synthesis was written from.
         var verifiedFindings = (finalState.Extractions ?? new List<StudyExtraction>())
             .ToDictionary(e => e.ReferenceNumber, e => (IReadOnlyList<string>)ThematicSynthesis.VerifiedFindings(e).Select(f => f.Finding.Quote).ToList());
-        // Repair: sentences whose citation was rejected are rewritten once from the cited paper's evidence
-        // (or lose that citation) and checked again. Before and after go into citation-audit.json. The check
+        // Repair: sentences whose citation was rejected are rewritten from the cited paper's evidence (or lose that
+        // citation) and checked again; a second pass removes what is still not supported (issue #135). Before and after go into citation-audit.json. The check
         // and the repair are shared by every kind of review (Verification/Grounding.cs).
         var grounding = await Grounding.CheckAndRepairAsync(chat, fields, papersForCheck, verifiedFindings, referenceCount,
             new GroundingOptions(Llm.ScreeningParallelism, Synthesis.SecondCitationCheck, Synthesis.RepairCitations),
@@ -100,7 +100,7 @@ public partial class PrismaReviewEngine
         var supportChecks = grounding.Checks;
         var initialSummary = grounding.BeforeRepair;
         var repairs = grounding.Repairs;
-        finalState.Stats.CitationsRepaired = repairs.Count(r => r.Action is "rewrite" or "drop_citation" or "delete");
+        finalState.Stats.CitationsRepaired = repairs.Count(r => r.Pass == 1 && r.Action is ("rewrite" or "drop_citation" or "delete"));
 
         // Theme consistency: a subsection citing a study that was not coded under its theme is flagged (not removed).
         var themeOfField = sections.ToDictionary(s => s.Field, s => thematic?.Codebook.Themes.FirstOrDefault(t => t.Id == s.ThemeId));
@@ -120,7 +120,7 @@ public partial class PrismaReviewEngine
         finalState.Stats.CitationsInsufficientEvidence = supportSummary.InsufficientEvidence;
         finalState.Stats.CitationsSecondChecked = supportSummary.SecondChecked;
         finalState.Stats.CitationsUpgradedBySecondCheck = supportSummary.UpgradedBySecondCheck;
-        return new CitationCheck(fields, citationStrips, supportChecks, initialSummary, supportSummary, repairs);
+        return new CitationCheck(fields, citationStrips, supportChecks, initialSummary, supportSummary, repairs, grounding.Removed);
     }
 
     /// <summary>Which included studies the synthesis and discussion cite, and why the others are not cited; saved with the codebook.</summary>
@@ -209,6 +209,7 @@ public partial class PrismaReviewEngine
                 InitialSupportSummary = initialSummary,
                 SupportSummary = supportSummary,
                 Repairs = repairs,
+                RemovedCitations = check.Removed,
                 StudiesCited = coverage.Cited.Count,
                 FormattingChanges = run.FormattingChanges,
                 NotCited = coverage.NotCited,

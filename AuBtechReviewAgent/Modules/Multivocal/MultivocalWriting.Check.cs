@@ -116,6 +116,7 @@ public sealed partial class MultivocalWriter
         audit.InitialSupportSummary = grounding.BeforeRepair;
         audit.SupportSummary = CitationSupportSummary.From(grounding.Checks);
         audit.Repairs = grounding.Repairs;
+        audit.RemovedCitations = grounding.Removed;
         audit.SupportChecks = grounding.Checks;
         file.CheckedUtc = DateTime.UtcNow;
         file.Checks = audit.SupportSummary;

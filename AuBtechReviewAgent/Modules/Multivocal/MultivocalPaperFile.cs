@@ -75,6 +75,7 @@ public sealed class MultivocalCitationAudit
     public CitationSupportSummary? InitialSupportSummary { get; set; }
     public CitationSupportSummary? SupportSummary { get; set; }
     public List<CitationRepair> Repairs { get; set; } = new();
+    public List<RemovedCitation> RemovedCitations { get; set; } = new();
     public int SourcesCited { get; set; }
     public List<FormattingChange> FormattingChanges { get; set; } = new();
     public List<UncitedSource> NotCited { get; set; } = new();
