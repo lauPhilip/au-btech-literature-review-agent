@@ -63,12 +63,12 @@ The `LlmStage` names below are what `llm-calls.json` records for each call, and 
 | `front-matter` | `ReviewWriter.WriteFrontMatterAsync` | `ReviewWriter.cs` | Title, abstract, rationale and objectives, written last from the checked sections; numbers from code |
 | `style` | `StylisticRefinerUtility.RefineAcademicProseAsync` | `StylisticRefinerUtility.cs` | Abstract, rationale and objectives rewritten; `stylistic-transformation-ledger.json` |
 | `thematic-coding` | `ThematicSynthesis.CodeStudiesAsync` | `ThematicSynthesis.cs` | Codes per study, anchored to verified findings |
-| `thematic-codebook` | `ThematicSynthesis.BuildCodebookAsync` | `ThematicSynthesis.cs` | Themes built from the codes |
-| `thematic-coding-second` | `ThematicSynthesis.SecondCodingAsync` | `ThematicSynthesis.cs` | Independent theme assignment, kappa (with `Synthesis:DualCoding`) |
+| `thematic-codebook` | `ThematicSynthesis.BuildCodebookAsync` | `ThematicSynthesis.Codebook.cs` | Themes built from the codes |
+| `thematic-coding-second` | `ThematicSynthesis.SecondCodingAsync` | `ThematicSynthesis.Codebook.cs` | Independent theme assignment, kappa (with `Synthesis:DualCoding`) |
 | `theme-sections` | `ReviewWriter.WriteThemeAsync` | `ReviewWriter.Themes.cs` | One cited subsection per theme |
 | `coverage-fill` | `ReviewWriter.WriteThemeAsync` | `ReviewWriter.Themes.cs` | Revision that adds the theme's uncited studies |
 | `discussion` | `ReviewWriter.WriteDiscussionAsync` | `ReviewWriter.Themes.cs` | Discussion written from the subsections |
-| `artifact` | `ArtifactBuilder.BuildAsync` | `ReviewArtifact.cs` | The diagram, table or list the reviewer asked for, built from the finished results |
+| `artifact` | `ArtifactBuilder.BuildAsync` | `ArtifactBuilder.cs` | The diagram, table or list the reviewer asked for, built from the finished results |
 | `cited-sections` | `GenerateCitedSectionsAsync` | Report | Fallback only: synthesis and discussion in one call |
 | `automated-peer-review` | `ReviewWriter.PeerReviewAsync` (fallback: `PeerReviewAndReviseAsync`) | `ReviewWriter.PeerReview.cs` / Report | Critique and revision; `peer-review-feedback.json` |
 | `citation-check` | `CitationSupportChecker.CheckAsync` | `CitationSupportChecker.cs` | Verdict and quote per citation, judged on the attributed part of the sentence, with a second check for partly and not supported ones; `citation-audit.json` |

@@ -1,0 +1,167 @@
+using System;
+using System.Collections.Generic;
+using System.Globalization;
+using System.Linq;
+using System.Text;
+using System.Text.Json.Serialization;
+using System.Threading;
+using System.Threading.Tasks;
+using Microsoft.SemanticKernel.ChatCompletion;
+
+namespace AuBtechReviewAgent;
+
+/// <summary>The codebook of the thematic synthesis: themes built from the codes, and the second, independent coding.</summary>
+public static partial class ThematicSynthesis
+{
+    private sealed class CodebookAnswer { public List<ThemeAnswer>? Themes { get; set; } public List<UnassignedAnswer>? Unassigned { get; set; } }
+    private sealed class ThemeAnswer { public string Name { get; set; } = ""; public string Description { get; set; } = ""; public List<string>? Codes { get; set; } }
+    private sealed class UnassignedAnswer { public string Code { get; set; } = ""; public string Reason { get; set; } = ""; }
+
+    /// <summary>
+    /// Groups the codes into descriptive themes. The model must place every coded study in at least one theme
+    /// (through one of its codes) or say why its codes fit none; the answer is rejected otherwise.
+    /// </summary>
+    public static async Task<(List<Theme> Themes, List<UncodedStudy> Unplaced)> BuildCodebookAsync(
+        IChatCompletionService chat, string objective, IReadOnlyList<ThematicCode> codes, int maxThemes)
+    {
+        var studies = codes.Select(c => c.Reference).Distinct().ToList();
+        var (min, max) = ThemeRange(studies.Count, maxThemes);
+        var ids = codes.Select(c => c.Id).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        string codeList = string.Join("\n", codes.Select(c => $"{c.Id} [study {c.Reference}]: {c.Label}"));
+
+        string prompt = $$"""
+            You are building the codebook for the thematic synthesis of a systematic literature review: group the codes below into descriptive themes.
+
+            REVIEW OBJECTIVE: "{{objective}}"
+            {{PromptSafety.ReviewerInputNotice}}
+
+            {{PromptSafety.DataOnlyNotice}}
+
+            {{PromptSafety.Wrap(codeList, "codes, each with the study it came from")}}
+
+            TASK: Group the codes into {{min}} to {{max}} themes. A theme names a pattern that several studies share and that answers part of the objective; it is not a single study. Give each theme a short name (at most 8 words) and a one- or two-sentence description of what unites its codes.
+            - Put every code in the theme it fits best; a code may also go into a second theme if it clearly belongs to both.
+            - Every study should end up in at least one theme. Only leave a code out if it does not bear on the objective; list it under "unassigned" with a reason.
+            - Use only the code ids listed above.
+            Respond ONLY with a minified JSON object:
+            {"themes":[{"name":"...","description":"...","codes":["C1","C4"]}],"unassigned":[{"code":"C9","reason":"..."}]}
+            """;
+
+        var answer = await LlmJson.GetAsync<CodebookAnswer>(chat, prompt, PrismaReviewEngine.JsonMode(0.1), a =>
+        {
+            if (a.Themes == null || a.Themes.Count == 0) return "themes must be a non-empty list.";
+            if (a.Themes.Count > max) return $"give at most {max} themes.";
+            if (a.Themes.Any(t => string.IsNullOrWhiteSpace(t.Name) || t.Codes == null || t.Codes.Count == 0)) return "every theme needs a name and at least one code.";
+            var unknown = a.Themes.SelectMany(t => t.Codes!).Concat((a.Unassigned ?? new()).Select(u => u.Code)).Where(c => !ids.Contains(c.Trim())).Distinct().ToList();
+            if (unknown.Count > 0) return $"unknown code ids: {string.Join(", ", unknown.Take(10))}.";
+            var unplaced = StudiesWithoutTheme(codes, a.Themes.Select(t => t.Codes!), (a.Unassigned ?? new()).Select(u => u.Code));
+            if (unplaced.Count > 0)
+                return $"studies {string.Join(", ", unplaced)} are in no theme and none of their codes is listed as unassigned. Place one of their codes in the best fitting theme, or list the codes under unassigned with a reason.";
+            return null;
+        });
+
+        var byId = codes.ToDictionary(c => c.Id, StringComparer.OrdinalIgnoreCase);
+        var themes = answer.Themes!.Select((t, i) =>
+        {
+            var codeIds = t.Codes!.Select(c => c.Trim().ToUpperInvariant()).Where(byId.ContainsKey).Distinct().ToList();
+            return new Theme
+            {
+                Id = $"T{i + 1}",
+                Name = t.Name.Trim().TrimEnd('.'),
+                Description = t.Description.Trim(),
+                CodeIds = codeIds,
+                Studies = codeIds.Select(c => byId[c].Reference).Distinct().OrderBy(r => r).ToList(),
+            };
+        }).Where(t => t.Studies.Count > 0).ToList();
+
+        var placed = themes.SelectMany(t => t.Studies).ToHashSet();
+        var reasons = (answer.Unassigned ?? new()).Where(u => byId.ContainsKey(u.Code.Trim()))
+            .GroupBy(u => byId[u.Code.Trim()].Reference).ToDictionary(g => g.Key, g => g.First().Reason);
+        var unplacedStudies = studies.Where(s => !placed.Contains(s)).OrderBy(s => s)
+            .Select(s => new UncodedStudy(s, reasons.TryGetValue(s, out var r) && !string.IsNullOrWhiteSpace(r) ? $"Codes left out of the themes: {r.Trim()}" : "Codes left out of the themes."))
+            .ToList();
+        return (themes, unplacedStudies);
+    }
+
+    /// <summary>Coded studies that are in no theme and have none of their codes listed as unassigned.</summary>
+    public static List<int> StudiesWithoutTheme(IReadOnlyList<ThematicCode> codes, IEnumerable<IEnumerable<string>> themeCodes, IEnumerable<string> unassigned)
+    {
+        var assigned = themeCodes.SelectMany(c => c).Select(c => c.Trim()).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var left = unassigned.Select(c => c.Trim()).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        return codes.GroupBy(c => c.Reference)
+            .Where(g => !g.Any(c => assigned.Contains(c.Id)) && !g.Any(c => left.Contains(c.Id)))
+            .Select(g => g.Key).OrderBy(r => r).ToList();
+    }
+
+    // ─── 3. Second, independent coding ──────────────────────────────────────────────────────────────────
+
+    private sealed class SecondAnswer { public List<SecondStudy>? Studies { get; set; } }
+    private sealed class SecondStudy { public int Ref { get; set; } public List<string>? Themes { get; set; } }
+
+    /// <summary>
+    /// A second coder sees only the theme names and descriptions and each study's codes, and assigns the
+    /// studies to themes. Agreement with the first assignment is Cohen's kappa over every study × theme cell.
+    /// The second coding is reported; it does not change the themes.
+    /// </summary>
+    public static async Task<SecondCoding> SecondCodingAsync(IChatCompletionService chat, IReadOnlyList<Theme> themes, IReadOnlyList<ThematicCode> codes)
+    {
+        var studies = themes.SelectMany(t => t.Studies).Distinct().OrderBy(r => r).ToList();
+        var themeIds = themes.Select(t => t.Id).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        string themeList = string.Join("\n", themes.Select(t => $"{t.Id}: {t.Name}. {t.Description}"));
+        string studyList = string.Join("\n", studies.Select(s => $"Study {s}: {string.Join("; ", codes.Where(c => c.Reference == s).Select(c => c.Label))}"));
+
+        string prompt = $$"""
+            You are the second, independent coder in the thematic synthesis of a systematic literature review. The themes are fixed; assign each study to every theme its codes belong to.
+
+            {{PromptSafety.DataOnlyNotice}}
+
+            THEMES:
+            {{themeList}}
+
+            {{PromptSafety.Wrap(studyList, "each study's codes")}}
+
+            Respond ONLY with a minified JSON object listing every study:
+            {"studies":[{"ref":3,"themes":["T1"]}]}
+            """;
+        try
+        {
+            var answer = await LlmJson.GetAsync<SecondAnswer>(chat, prompt, PrismaReviewEngine.JsonMode(0.0), a =>
+            {
+                if (a.Studies == null) return "studies must be a list.";
+                var missing = studies.Except(a.Studies.Select(s => s.Ref)).ToList();
+                if (missing.Count > 0) return $"every study needs an entry; missing: {string.Join(", ", missing.Take(15))}.";
+                return (a.Studies.SelectMany(s => s.Themes ?? new()).FirstOrDefault(t => !themeIds.Contains(t.Trim())) is string bad) ? $"unknown theme id {bad}." : null;
+            });
+            var second = answer.Studies!.GroupBy(s => s.Ref).ToDictionary(g => g.Key,
+                g => g.SelectMany(s => s.Themes ?? new()).Select(t => t.Trim().ToUpperInvariant()).ToHashSet());
+            return CompareCodings(themes, second);
+        }
+        catch (Exception ex)
+        {
+            return new SecondCoding { Error = $"The second coding failed: {ex.GetType().Name}." };
+        }
+    }
+
+    /// <summary>Cohen's kappa between the first assignment (theme study lists) and a second one, cell by cell.</summary>
+    public static SecondCoding CompareCodings(IReadOnlyList<Theme> themes, IReadOnlyDictionary<int, HashSet<string>> second)
+    {
+        var result = new SecondCoding();
+        var pairs = new List<(bool, bool)>();
+        foreach (var study in themes.SelectMany(t => t.Studies).Distinct().OrderBy(r => r))
+        {
+            second.TryGetValue(study, out var assigned);
+            foreach (var t in themes)
+            {
+                bool first = t.Studies.Contains(study);
+                bool other = assigned != null && assigned.Contains(t.Id.ToUpperInvariant());
+                pairs.Add((first, other));
+                if (first != other)
+                    result.Disagreements.Add($"Study {study}, {t.Id} ({t.Name}): {(first ? "first coding only" : "second coding only")}");
+            }
+        }
+        result.CellsCompared = pairs.Count;
+        result.Agreements = pairs.Count(p => p.Item1 == p.Item2);
+        result.Kappa = pairs.Count == 0 ? null : Math.Round(ScreeningConfusion.From(pairs).CohensKappa, 3);
+        return result;
+    }
+}
