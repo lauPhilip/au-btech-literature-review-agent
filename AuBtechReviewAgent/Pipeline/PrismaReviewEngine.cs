@@ -104,8 +104,9 @@ public partial class PrismaReviewEngine
     public const string StageComplete = "Complete";
     public const string StageFailed = "Failed";
     public const string StageInterrupted = "Interrupted";
+    public const string StageCancelled = "Cancelled";
 
-    public static bool IsFinishedStage(string? stage) => stage is StageComplete or StageFailed or StageInterrupted;
+    public static bool IsFinishedStage(string? stage) => stage is StageComplete or StageFailed or StageInterrupted or StageCancelled;
 
     /// <summary>True while the run is queued, running or waiting for a screening review in this process.</summary>
     public bool IsRunActive(Guid runId) => Coordinator.IsActive(runId);
@@ -135,12 +136,12 @@ public partial class PrismaReviewEngine
         if (!inputCheck.IsValid) throw new ArgumentException(string.Join(" ", inputCheck.Errors));
         request = inputCheck.Request;
 
-        Coordinator.Register(sessionId);
+        var stop = Coordinator.Register(sessionId);
         var (activeMistral, activeElsevier, activeIeee, activeScholar) = ResolveKeys(request.UserKeys);
 
         // With Llm:FastModel set, the screenings and citation checks go to it (StageRoutedChatService).
         IChatCompletionService innerChat = ChatFactory != null ? ChatFactory(activeMistral) : LlmFactory.CreateForReview(Llm, activeMistral);
-        var chat = new RecordingChatCompletionService(innerChat, Llm.Model);
+        var chat = new RecordingChatCompletionService(innerChat, Llm.Model, stop: stop);
 
         int yearFrom = request.YearFrom, yearTo = request.YearTo;
         if (yearFrom > 0 && yearTo > 0 && yearFrom > yearTo) (yearFrom, yearTo) = (yearTo, yearFrom);
@@ -161,6 +162,7 @@ public partial class PrismaReviewEngine
             Request = request,
             Chat = chat,
             Workspace = GetWorkspaceFolderPath(sessionId),
+            Stop = stop,
             State = new ReviewState
             {
                 SearchQuery = request.Query,
@@ -221,7 +223,9 @@ public partial class PrismaReviewEngine
                 ctx.State.Stats.ProcessingStage = StageScreening;
                 await PublishAsync(ctx);
                 await SearchAndScreenAsync(ctx, yearFrom, yearTo);
+                stop.ThrowIfCancellationRequested();
                 if (request.CitationChaining) await ChainCitationsAsync(ctx, yearFrom, yearTo);
+                stop.ThrowIfCancellationRequested();
                 FinishDualScreeningStats(ctx);
                 await PublishAsync(ctx);
             }
@@ -233,11 +237,16 @@ public partial class PrismaReviewEngine
 
             using (await AcquireSlotAsync(ctx))
             {
+                stop.ThrowIfCancellationRequested();
                 ctx.State.Stats.ProcessingStage = StageSynthesizing;
                 await PublishAsync(ctx);
                 await RetrieveFullTextsAsync(ctx);
+                stop.ThrowIfCancellationRequested();
                 await SynthesizeAsync(ctx);
             }
+            // The last safe point: after it the run is finished, and a late cancel changes nothing.
+            Coordinator.Close(sessionId);
+            stop.ThrowIfCancellationRequested();
 
             ctx.State.Stats.ProcessingStage = StageComplete;
             ctx.State.Stats.ProgressStep = RunProgress.Done;
@@ -245,6 +254,11 @@ public partial class PrismaReviewEngine
             ctx.State.Stats.ProgressDetail = "";
             ctx.State.CompletedUtc = DateTime.UtcNow;
             await PublishAsync(ctx);
+        }
+        catch (Exception ex) when (stop.IsCancellationRequested)
+        {
+            await EndCancelledAsync(ctx);
+            throw new RunCancelledException(ex, stop);
         }
         catch (Exception ex)
         {
@@ -265,7 +279,8 @@ public partial class PrismaReviewEngine
             {
                 ctx.State.RunSettings = chat.Summarize(RecordingChatCompletionService.AppVersion);
                 await SaveStateAsync(sessionId, ctx.State);
-                await RunHeader.WriteAsync(ctx.Workspace, header with { Stage = ctx.State.Stats.ProcessingStage, CompletedUtc = ctx.State.CompletedUtc });
+                await RunHeader.WriteAsync(ctx.Workspace, header with { Stage = ctx.State.Stats.ProcessingStage, CompletedUtc = ctx.State.CompletedUtc,
+                    CancelledUtc = ctx.State.CancelledUtc, CancelReason = ctx.State.CancelReason });
                 await File.WriteAllTextAsync(Path.Join(ctx.Workspace, "llm-calls.json"),
                     JsonSerializer.Serialize(new { ctx.State.RunSettings, Calls = chat.Calls }, new JsonSerializerOptions { WriteIndented = true }));
             }
