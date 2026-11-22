@@ -23,8 +23,11 @@ public static class SiteSeo
         "Open-source PRISMA 2020 literature reviews in which every citation is checked against the paper it cites, " +
         "with the supporting quote and a complete, verifiable record of every step.";
 
-    /// <summary>Social preview image (1200×630), relative to the site root.</summary>
-    public const string SocialImagePath = "img/social-card.png";
+    /// <summary>
+    /// Social preview image (1200×630), relative to the site root. A new design gets a new file name, because link
+    /// previews are cached by address.
+    /// </summary>
+    public const string SocialImagePath = "img/og-card.png";
 
     /// <summary>The pages offered to search engines, with how often they change and their relative priority.</summary>
     public static readonly IReadOnlyList<(string Path, string ChangeFrequency, string Priority)> IndexedPages = new[]
