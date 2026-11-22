@@ -56,7 +56,7 @@ public class RunLedgerWatchTests : IDisposable
         Assert.Equal(4, watch.Read()!.Value.State.Stats.Screened);
 
         // A longer file with the same write time. The state's timestamps drop trailing zeros when written, so its length
-        // varies by a few characters from run to run; a stage name 30 characters longer keeps it longer every time.
+        // varies by a few characters from run to run; a stage name 26 characters longer keeps it longer every time.
         Save(12, start.AddSeconds(1), "Screening the records a second time");
         Assert.Equal(12, watch.Read()!.Value.State.Stats.Screened);
         Assert.Equal(3, watch.Parses);
