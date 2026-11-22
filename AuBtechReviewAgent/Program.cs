@@ -198,69 +198,8 @@ app.MapStaticAssets();
 // Apply the rate limiter policies to the application pipeline routing channel
 app.UseRateLimiter();
 
-// The download endpoints use the one engine instance created above instead of taking it as a handler
-// parameter: every handler parameter counts as request input for static analysis, and the engine is not.
-// Serve the workspace footprint (.zip) as a real HTTP download instead of streaming it through the
-// Blazor Server SignalR connection: that connection has a small default max message size, so pushing a
-// base64-encoded zip through JS interop silently fails once a run has real downloaded source PDFs in it.
-app.MapGet("/api/workspace/{sessionId:guid}/archive", (Guid sessionId) =>
-{
-    byte[] zipBytes = reviewEngine.GenerateWorkspaceArchiveFromDisk(sessionId);
-    bool multivocal = false;
-    if (zipBytes.Length == 0)
-    {
-        zipBytes = multivocalWriter.Archive(sessionId); // a multivocal run has no systematic review state
-        multivocal = zipBytes.Length > 0;
-    }
-    if (zipBytes.Length == 0)
-    {
-        return Results.NotFound();
-    }
-
-    string fileName = multivocal ? $"MLR_Run_Archive_{DateTime.UtcNow:yyyyMMdd}.zip" : $"PRISMA_Evaluation_Footprint_{DateTime.UtcNow:yyyyMMdd}.zip";
-    return Results.File(zipBytes, "application/zip", fileName);
-}).RequireRateLimiting("ArchiveDownloadPolicy");
-
-// The included papers (or a multivocal run's grey sources) as BibTeX or RIS, for Zotero / EndNote / Mendeley.
-app.MapGet("/api/workspace/{sessionId:guid}/references.{format}", (Guid sessionId, string format) =>
-{
-    if (format is not ("bib" or "ris")) return Results.NotFound();
-    string? content = reviewEngine.ExportReferences(sessionId, format) ?? multivocalReporter.ExportReferences(sessionId, format);
-    if (content == null) return Results.NotFound();
-    string mime = format == "bib" ? "application/x-bibtex" : "application/x-research-info-systems";
-    return Results.File(System.Text.Encoding.UTF8.GetBytes(content), mime, $"references.{format}");
-}).RequireRateLimiting("ArchiveDownloadPolicy");
-
-// Every screened record as RIS, tagged "included" or "excluded: reason", for a Zotero library of the screening.
-app.MapGet("/api/workspace/{sessionId:guid}/screened.ris", (Guid sessionId) =>
-{
-    string? content = reviewEngine.ExportReferences(sessionId, "screened") ?? multivocalReporter.ExportReferences(sessionId, "screened");
-    return content == null ? Results.NotFound()
-        : Results.File(System.Text.Encoding.UTF8.GetBytes(content), "application/x-research-info-systems", "screened.ris");
-}).RequireRateLimiting("ArchiveDownloadPolicy");
-
-// The protocol written before the search (PRISMA item 24), linked from the Review Output page.
-app.MapGet("/api/workspace/{sessionId:guid}/protocol.md", (Guid sessionId) =>
-{
-    string? text = reviewEngine.Store.ReadProtocol(sessionId);
-    return text == null ? Results.NotFound() : Results.Text(text, "text/markdown; charset=utf-8");
-}).RequireRateLimiting("ArchiveDownloadPolicy");
-
-// The paper of a checked multivocal run as LaTeX, built in code from its files (MLR G-8).
-app.MapGet("/api/workspace/{sessionId:guid}/main.tex", (Guid sessionId) =>
-{
-    string? tex = multivocalWriter.MainTex(sessionId);
-    return tex == null ? Results.NotFound()
-        : Results.File(new System.Text.UTF8Encoding(false).GetBytes(tex), "application/x-tex; charset=utf-8", AuBtechReviewAgent.MultivocalPaper.MainTexFile);
-}).RequireRateLimiting("ArchiveDownloadPolicy");
-
-// The report of a synthesised multivocal run, written in code from its files (MLR block G).
-app.MapGet("/api/workspace/{sessionId:guid}/mlr-report.md", (Guid sessionId) =>
-{
-    string? text = multivocalReporter.Build(sessionId)?.ToMarkdown();
-    return text == null ? Results.NotFound()
-        : Results.File(System.Text.Encoding.UTF8.GetBytes(text), "text/markdown; charset=utf-8", AuBtechReviewAgent.MultivocalReporter.ReportFile);
-}).RequireRateLimiting("ArchiveDownloadPolicy");
+// The run downloads, with Last-Modified, an ETag and the kept archive of a finished run (Web/WorkspaceDownloads.cs).
+AuBtechReviewAgent.WorkspaceDownloads.MapWorkspaceDownloads(app, reviewEngine, multivocalWriter, multivocalReporter);
 
 // For search engines: which pages to crawl, and the list of public pages (see SiteSeo).
 var siteConfiguration = app.Configuration;
