@@ -150,7 +150,7 @@ public class RunMetricsBuildTests
 
         var m = Build(state, Report());
         Assert.True(m.ThematicSynthesisUsed);
-        Assert.Equal((2, 4, 0.75, 3, 1, (double?)0.6, (string?)"fell back"), (m.Themes, m.Codes, m.AnchoredCodeShare, m.StudiesCoded, m.StudiesUncoded, m.CodingKappa, m.FallbackReason));
+        Assert.Equal((2, 4, 0.75, 3, 1, (double?)0.6, "fell back"), (m.Themes, m.Codes, m.AnchoredCodeShare, m.StudiesCoded, m.StudiesUncoded, m.CodingKappa, m.FallbackReason));
 
         var notWritten = Build(state, new PrismaReport());
         Assert.False(notWritten.ThematicSynthesisUsed);
