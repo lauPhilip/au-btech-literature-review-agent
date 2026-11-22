@@ -1,0 +1,26 @@
+@* A block of code with a label and a large Copy button (Fitts's law), for the API documentation page. The button
+   needs no live connection: wwwroot/js/review-output.js copies the text of the element its data-copy names with
+   traceableReview.copyText, and says so in the button and in a status line for screen readers. From 640 px long lines
+   wrap; on a phone they scroll sideways, so JSON keeps its shape, and the block takes keyboard focus (axe:
+   scrollable-region-focusable). *@
+
+<figure class="mt-4 min-w-0 border border-line">
+    <div class="flex items-center justify-between gap-4 border-b border-line bg-soft py-1.5 pl-4 pr-1.5">
+        <figcaption class="font-mono text-[13px] text-ink">@Label</figcaption>
+        <button type="button" data-copy="@Id" aria-label="@($"Copy {Label}")"
+                class="ui-btn-secondary min-h-[44px] min-w-[96px] px-4">Copy</button>
+    </div>
+    <pre id="@Id" tabindex="0" aria-label="@Label"
+         class="overflow-x-auto whitespace-pre bg-[#0E1626] px-4 py-4 font-mono text-[12px] leading-6 dark:bg-[#070B14] sm:whitespace-pre-wrap sm:text-[13px] sm:[overflow-wrap:anywhere] text-[#F2F5FA] focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[#9DB4E0]">@Code</pre>
+    <span class="sr-only" role="status" data-copy-status="@Id"></span>
+</figure>
+
+@code {
+    /// <summary>A unique id on the page; the Copy button copies the element with this id.</summary>
+    [Parameter, EditorRequired] public string Id { get; set; } = "";
+
+    /// <summary>What the block holds, such as "Request" or "202 Accepted".</summary>
+    [Parameter, EditorRequired] public string Label { get; set; } = "";
+
+    [Parameter, EditorRequired] public string Code { get; set; } = "";
+}
