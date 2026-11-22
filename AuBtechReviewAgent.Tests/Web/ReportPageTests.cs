@@ -20,7 +20,7 @@ public class ReportPageTests
     [Fact]
     public void EverySectionInTheContentsListHasItsIdOnThePage()
     {
-        string? page = Source("Pages", "SpecMatrix.razor");
+        string? page = ReportPageSource.Read();
         if (page == null) return; // not run from the repository (packaged tests)
 
         foreach (string id in new[] { "AbstractId", "IntroductionId", "MethodologyId", "StudiesId", "ResultsId", "DiscussionId", "ConclusionId", "DeclarationsId", "ReferencesId", "AppendixId" })
@@ -33,7 +33,7 @@ public class ReportPageTests
     [Fact]
     public void TheReportKeepsWhatTheOldPageCouldDo()
     {
-        string? page = Source("Pages", "SpecMatrix.razor");
+        string? page = ReportPageSource.Read();
         if (page == null) return;
 
         // Printing, the archive, the exports, the link, a new review from the settings, deleting, notes and re-checks.
@@ -87,5 +87,31 @@ public class ReportPageTests
         {
             if (Directory.Exists(folder)) Directory.Delete(folder, recursive: true);
         }
+    }
+
+    [Fact]
+    public void TheReportPageIsAShellWithOneComponentPerSection()
+    {
+        string? root = AppContext.BaseDirectory;
+        while (root != null && !File.Exists(Path.Join(root, "AuBtechReviewAgent.sln"))) root = Path.GetDirectoryName(root);
+        if (root == null) return;
+        string pages = Path.Join(root, "AuBtechReviewAgent", "Components", "Pages");
+        string shell = File.ReadAllText(Path.Join(pages, "SpecMatrix.razor"));
+
+        // The sections in the order of the report, each given the page itself.
+        int last = -1;
+        foreach (string section in new[] { "Introduction", "Studies", "Results", "Discussion", "Appendix" })
+        {
+            int at = shell.IndexOf($"<SpecMatrix{section} Page=\"this\" />", StringComparison.Ordinal);
+            Assert.True(at > last, $"SpecMatrix{section} comes next on the page");
+            last = at;
+            string component = File.ReadAllText(Path.Join(pages, $"SpecMatrix{section}.razor"));
+            Assert.Contains("[Parameter, EditorRequired] public SpecMatrix Page { get; set; }", component);
+            Assert.DoesNotContain("@onclick=\"() =>", component);
+        }
+        // The citations, notes and re-checks stay on the page, so a click renders the page again.
+        foreach (string kept in new[] { "internal RenderFragment CitedText", "CitationExtras", "internal RenderFragment NoteBlock" })
+            Assert.Contains(kept, shell);
+        Assert.Contains("EventCallback.Factory.Create(Page, () => Page.CopyStatement(", File.ReadAllText(Path.Join(pages, "SpecMatrixDiscussion.razor")));
     }
 }

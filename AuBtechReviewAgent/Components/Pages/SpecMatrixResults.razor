@@ -1,0 +1,135 @@
+@using System.Text.RegularExpressions
+@* Section 4 of the report page: the results, one sub-section per theme, and the visual summary. The page passes itself as Page; its state stays there. *@
+
+<section id="@AuBtechReviewAgent.ReportOutline.ResultsId" data-report-section class="scroll-mt-20 space-y-5">
+    <h2 class="font-display text-xl font-semibold tracking-tight text-heading">4. Results & Synthesis</h2>
+
+<div class="space-y-2">
+    <h3 class="font-display text-base font-semibold text-heading">4.1 Overview of the Synthesis (Item 20a)</h3>
+    @if (Page.auditChecks.Count > 0)
+    {
+        <p class="text-sm text-muted print:hidden">Open a citation number to see what the automated check found in the cited paper.</p>
+    }
+    @Page.CitedText("synthesisResultsItem", SpecMatrix.ScrubAnchors(Page.report.SynthesisResultsItem))
+
+    @for (int k = 0; k < Page.report.SynthesisSections.Count; k++)
+    {
+        var part = Page.report.SynthesisSections[k];
+        <h3 id="@AuBtechReviewAgent.ReportOutline.ThemeId(k)" data-report-section class="scroll-mt-20 pt-4 font-display text-base font-semibold text-heading">4.@(k + 2) @part.Heading</h3>
+        @Page.CitedText(part.Field, part.Text)
+    }
+
+    @if (Page.codebook is { Themes.Count: > 0 })
+    {
+        <div class="mt-4">
+            <h3 class="mb-2 font-display text-base font-semibold text-heading">Evidence map: studies by theme</h3>
+            <div class="overflow-x-auto print:overflow-visible" tabindex="0" role="region" aria-label="Scrolls sideways">
+                <table class="w-full border border-line text-sm">
+                    <thead class="bg-soft text-muted">
+                        <tr>
+                            <th class="border-b border-line p-2 text-left">Theme</th>
+                            <th class="border-b border-line p-2 text-left">Studies</th>
+                            <th class="border-b border-line p-2 text-left">Cited in its subsection</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var theme in Page.codebook.Themes)
+                        {
+                            var cov = Page.codebook.Coverage.FirstOrDefault(c => c.ThemeId == theme.Id);
+                            <tr class="border-b border-line align-top">
+                                <td class="p-2"><span class="font-semibold">@theme.Name</span><br /><span class="text-muted">@theme.Description</span></td>
+                                <td class="p-2 font-mono">@string.Join(", ", theme.Studies.Select(r => $"[{r}]"))</td>
+                                <td class="p-2">@(cov == null ? "-" : $"{cov.CitedFinal.Count} of {cov.Studies.Count}")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+            @if (Page.codebook.SecondCoding?.Kappa is double kappa)
+            {
+                <p class="text-xs text-muted mt-1">Second, independent coding: Cohen's kappa = @kappa.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture) over @Page.codebook.SecondCoding.CellsCompared study-theme decisions.</p>
+            }
+        </div>
+    }
+    @if (!string.IsNullOrWhiteSpace(Page.report.CoverageSummary))
+    {
+        <p class="border-l-2 border-heading pl-3 text-[15px] italic text-muted">@Page.report.CoverageSummary</p>
+    }
+
+    @if (Page.report.Artifact is { } art)
+    {
+        <div class="mt-5 border border-line p-3 space-y-2">
+            <span class="text-xs font-bold text-muted uppercase block">Artifact: @(string.IsNullOrWhiteSpace(art.Title) ? AuBtechReviewAgent.ArtifactKinds.All.FirstOrDefault(k => k.Key == art.Requested).Label : art.Title)</span>
+            @if (art.Error != null)
+            {
+                <p class="text-[13px] text-muted italic">@art.Error</p>
+            }
+            else
+            {
+                @if (!string.IsNullOrWhiteSpace(art.Caption))
+                {
+                    <p class="text-[13px] text-muted">@art.Caption</p>
+                }
+                @if (art.IsDiagram && !string.IsNullOrEmpty(Page.mermaidDiagramCode))
+                {
+                    @* Filled by wwwroot/js/mermaid-render.js; Blazor leaves the empty element alone. *@
+                    <div id="mermaid-preview" class="w-full flex flex-col items-center justify-center text-center bg-soft p-3 overflow-x-auto print:overflow-visible"></div>
+                    @if (art.Nodes.Any(n => AuBtechReviewAgent.CitationSupportChecker.ReferencesIn(n.Label).Count > 0))
+                    {
+                        <span class="text-xs font-bold text-muted uppercase block pt-1">Cited boxes in the diagram</span>
+                        @for (int k = 0; k < art.Nodes.Count; k++)
+                        {
+                            if (AuBtechReviewAgent.CitationSupportChecker.ReferencesIn(art.Nodes[k].Label).Count == 0) continue;
+                            @Page.CitedText($"artifact-n{k + 1}", art.Nodes[k].Label)
+                        }
+                    }
+                }
+                else if (art.Kind == AuBtechReviewAgent.ArtifactKinds.Table)
+                {
+                    <div class="overflow-x-auto print:overflow-visible" tabindex="0" role="region" aria-label="Scrolls sideways">
+                        <table class="w-full text-[13px] border border-line align-top">
+                            <thead class="bg-soft text-muted text-left">
+                                <tr>@foreach (var col in art.Columns) { <th class="p-1.5 border-b border-line">@col</th> }</tr>
+                            </thead>
+                            <tbody>
+                                @for (int r = 0; r < art.Rows.Count; r++)
+                                {
+                                    int row = r;
+                                    <tr class="border-t border-line align-top">
+                                        @for (int c = 0; c < art.Rows[row].Count; c++)
+                                        {
+                                            <td class="p-2">@Page.CitedText($"artifact-r{row + 1}c{c + 1}", art.Rows[row][c])</td>
+                                        }
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+                else
+                {
+                    <ul class="list-disc pl-5 space-y-1">
+                        @for (int b = 0; b < art.Bullets.Count; b++)
+                        {
+                            <li>@Page.CitedText($"artifact-b{b + 1}", art.Bullets[b])</li>
+                        }
+                    </ul>
+                }
+            }
+        </div>
+    }
+    else if (!string.IsNullOrEmpty(Page.mermaidDiagramCode))
+    {
+        <div class="mt-4 border border-line p-4 bg-soft flex flex-col items-center justify-center print:hidden">
+            <span class="text-xs font-bold text-muted block mb-3 uppercase tracking-widest">Diagram</span>
+            @* Older runs: the diagram the report draft wrote. *@
+            <div id="mermaid-preview" class="w-full flex flex-col items-center justify-center text-center"></div>
+        </div>
+    }
+</div>
+
+</section>
+
+@code {
+    [Parameter, EditorRequired] public SpecMatrix Page { get; set; } = default!;
+}
