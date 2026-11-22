@@ -175,51 +175,7 @@ else
 
 @if (showKeyModal)
 {
-    @* A modal dialog: Escape closes it, Tab stays inside it, and focus returns to the "API keys" button. *@
-    <div class="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-[100] p-4 font-sans animate-fadeIn" @onkeydown="KeyDialogKeyDown">
-        <div id="key-dialog" role="dialog" aria-modal="true" aria-labelledby="key-dialog-title" aria-describedby="key-dialog-note"
-             class="bg-page border border-line w-full max-w-md shadow-lift overflow-hidden flex flex-col text-left">
-            <div class="bg-primary text-primary-on px-5 py-4 flex justify-between items-center">
-                <div>
-                    <h2 id="key-dialog-title" class="text-base font-semibold">API keys</h2>
-                    <p class="text-xs text-primary-on/75 mt-0.5">Kept only in this browser tab</p>
-                </div>
-                <button type="button" @onclick="CloseKeyModal" aria-label="Close" class="ui-btn ui-btn-sm text-primary-on/80 hover:text-primary-on hover:bg-primary-on/10 px-2">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-                </button>
-            </div>
-            <div class="p-5 space-y-4 overflow-y-auto text-sm text-ink">
-                <p id="key-dialog-note" class="bg-active border border-line-field text-ink p-3 text-xs leading-relaxed">
-                    Your keys are kept encrypted in this browser tab only. They are not written to the server's disk or logs, and they are gone when you close the tab. With your own Mistral key the free-tier daily limit does not apply.
-                </p>
-                <div>
-                    <label for="k-mistral" class="ui-label text-xs">Mistral API key</label>
-                    <input id="k-mistral" type="password" autocomplete="off" placeholder="Uses the server key when empty" @bind="modalMistral" class="ui-input font-mono text-xs" />
-                </div>
-                <div>
-                    <label for="k-elsevier" class="ui-label text-xs">Elsevier (Scopus / ScienceDirect) API key</label>
-                    <input id="k-elsevier" type="password" autocomplete="off" placeholder="Uses the server key when empty" @bind="modalElsevier" class="ui-input font-mono text-xs" />
-                </div>
-                <div>
-                    <label for="k-ieee" class="ui-label text-xs">IEEE Xplore API key</label>
-                    <input id="k-ieee" type="password" autocomplete="off" placeholder="Optional" @bind="modalIeee" class="ui-input font-mono text-xs" />
-                </div>
-                <div>
-                    <label for="k-scholar" class="ui-label text-xs">Semantic Scholar API key</label>
-                    <input id="k-scholar" type="password" autocomplete="off" placeholder="Optional" @bind="modalScholar" class="ui-input font-mono text-xs" />
-                </div>
-                <div class="pt-3 border-t border-line">
-                    <label for="k-admin" class="ui-label text-xs">Developer access token</label>
-                    <input id="k-admin" type="password" autocomplete="off" aria-describedby="k-admin-help" placeholder="Only for the maintainers of this deployment" @bind="modalAdminToken" class="ui-input font-mono text-xs" />
-                    <p id="k-admin-help" class="text-xs text-muted mt-1">Removes the daily run limit. Set with Quota:AdminToken on the server.</p>
-                </div>
-            </div>
-            <div class="bg-soft px-5 py-3 border-t border-line flex justify-end gap-2">
-                <button type="button" @onclick="ClearVault" class="ui-btn ui-btn-sm text-not-supported hover:bg-not-supported-fill">Clear session</button>
-                <button type="button" @onclick="SaveSessionKeys" class="ui-btn-primary ui-btn-sm">Apply to session</button>
-            </div>
-        </div>
-    </div>
+    <HomeKeyDialog Page="this" />
 }
 
 @code {
