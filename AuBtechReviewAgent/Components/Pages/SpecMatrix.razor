@@ -742,100 +742,95 @@ else
 }
 
 @code {
-    [Inject] private UiStateContainer State { get; set; } = default!;
-
-    /// <summary>Set when the page is opened as /spec-matrix/{RunId}, so a report can be reopened from a link.</summary>
-    [Parameter] public Guid? RunId { get; set; }
-
-    private PrismaReport report = new PrismaReport();
-    private List<string> includedCitations = new();
-    private Dictionary<string, int> publicationsByYear = new();
-    private readonly List<IncludedPaperMetricRow> tableRecords = new();
-    private readonly List<AuBtechReviewAgent.StudyExtraction> extractions = new();
-    private readonly List<AuBtechReviewAgent.CitationSupportResult> auditChecks = new();
-    private AuBtechReviewAgent.ThematicCodebook? codebook;
-    private int journalCount, conferenceCount, transactionsCount, proceedingsCount, preprintCount;
-
-    private sealed record PlatformShare(string Category, string Label, int Count, string Color, string Badge);
-    private List<PlatformShare> platformShares = new();
-
-    // Literal class names so the Tailwind build finds them.
-    private static readonly string[] BarColors = { "bg-teal-500", "bg-orange-500", "bg-blue-400", "bg-yellow-400", "bg-purple-400", "bg-rose-400", "bg-lime-500", "bg-unverifiable-chart" };
-    private static readonly string[] BadgeColors = { "text-teal-800 bg-teal-50", "text-orange-800 bg-orange-50", "text-blue-800 bg-blue-50", "text-yellow-800 bg-yellow-50", "text-purple-800 bg-purple-50", "text-rose-800 bg-rose-50", "text-lime-800 bg-lime-50", "text-ink bg-soft" };
-
-    private bool peerReviewOnlyToggle;
-    private int passedPeerReviewCheck;
-    private int failedPeerReviewCheck;
-    private bool hasProtocol;
-    private bool confirmDelete;
-    private bool deleted;
-
-    private string mermaidDiagramCode = "";
-
-    // The citation marker the reader clicked: (field, sentence index, reference number).
-    private (string Field, int Sentence, int Reference)? openCitation;
-
-    // The run's figures and its PRISMA flow, for the run line and Figure 2.1; null for a run without a ledger.
-    private AuBtechReviewAgent.ReviewStats? stats;
-    private AuBtechReviewAgent.PrismaFlowCounts? flow;
-    private string runLine = "";
-    private string dateLine = "";
-
-    /// <summary>The sections of this report, for the contents list (the page gives each the same id).</summary>
-    private List<AuBtechReviewAgent.OutlineEntry> Outline => AuBtechReviewAgent.ReportOutline.Systematic(report);
-
-    private bool HasReport => !deleted && report != null && !string.IsNullOrEmpty(report.TitleItem) && report.TitleItem != "Pending...";
-
-    private void DeleteRun()
+    /// <summary>
+    /// Renders text with every [n] as a button, with the shared paper component (Components/Paper/CitedProse.razor);
+    /// this page adds its reviewer notes and the re-check to an open citation's panel.
+    /// </summary>
+    internal RenderFragment CitedText(string field, string text) => __builder =>
     {
-        confirmDelete = false;
-        if (Runs.DeleteRun(State.CurrentSessionId, editKey))
-        {
-            deleted = true;
-            State.CurrentSessionId = Guid.Empty;
-            report = new PrismaReport();
-        }
-    }
-
-    private static string ScrubAnchors(string rawText)
-    {
-        if (string.IsNullOrWhiteSpace(rawText)) return "";
-        string clean = Regex.Replace(rawText, @"\[MERMAID_START\].*?\[MERMAID_END\]", "", RegexOptions.Singleline);
-        clean = Regex.Replace(clean, @"\[TIKZ_START\].*?\[TIKZ_END\]", "", RegexOptions.Singleline);
-        clean = Regex.Replace(clean, @"\[Source Context Anchor \d+.*?\]", "").Trim();
-        return AuBtechReviewAgent.MethodsSectionWriter.StripMarkdownEmphasis(clean);
-    }
-
-    private static string Deg(double d) => d.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
-
-    /// <summary>One line under the title: studies and records, themes, citations checked and the app version.</summary>
-    private static string RunLine(AuBtechReviewAgent.ReviewState state)
-    {
-        var s = state.Stats;
-        var parts = new List<string> { $"{s.Included} {(s.Included == 1 ? "study" : "studies")} from {s.TotalIdentified} {(s.TotalIdentified == 1 ? "record" : "records")}" };
-        if (s.ThemesIdentified > 0) parts.Add($"{s.ThemesIdentified} {(s.ThemesIdentified == 1 ? "theme" : "themes")}");
-        if (s.CitationsChecked > 0) parts.Add($"{s.CitationsChecked} {(s.CitationsChecked == 1 ? "citation" : "citations")} checked");
-        string? version = state.RunSettings?.AppVersion;
-        if (!string.IsNullOrWhiteSpace(version)) parts.Add("TraceableAI " + AuBtechReviewAgent.ToolVersion.Display(version));
-        return string.Join(" · ", parts);
-    }
-
-    private static bool InTier(IncludedPaperMetricRow r, string label) => label switch
-    {
-        "Conf" => r.VenueType is "Conferences" or "Proceedings",
-        "Preprint" => r.VenueType is "Preprints" or "Other",
-        _ => (r.Quartile ?? "").Equals(label, StringComparison.OrdinalIgnoreCase),
+        <CitedProse Field="@field" Text="@text" Checks="auditChecks" Open="openCitation"
+                    OnToggle="@(c => ToggleCitation(c.Field, c.Sentence, c.Reference))" OnClose="CloseCitation"
+                    SourceTitle="@(reference => tableRecords.FirstOrDefault(t => t.ReferenceNumber == reference)?.Title)"
+                    SourceLink="SourceLink"
+                    PanelExtras="CitationExtras" />
     };
 
-    private static string AppraisalCategory(AuBtechReviewAgent.StudyExtraction e) =>
-        e.Error != null ? "not appraised" :
-        e.AppraisalCategory == "not_empirical" ? "not empirical (MMAT does not apply)" :
-        e.AppraisalCategory.Replace('_', ' ');
+    /// <summary>What this page adds to an open citation's panel: the reviewer's note, a past re-check and the "Check again" button.</summary>
+    internal RenderFragment<AuBtechReviewAgent.CitationSupportResult> CitationExtras => check => __builder =>
+    {
+        if (openCitation is not { } open) return;
+        @CitationNote(open)
+        @if (RecheckOf(open) is { } done)
+        {
+            <p class="text-xs text-muted">Checked again @done.CheckedUtc.ToString("yyyy-MM-dd HH:mm") UTC: was @VerdictLabel(done.VerdictBefore) (@done.EvidenceBefore), now @VerdictLabel(done.VerdictAfter) (@done.EvidenceAfter).</p>
+        }
+        @if (canEdit && check.Verdict is AuBtechReviewAgent.CitationSupportChecker.Partial or AuBtechReviewAgent.CitationSupportChecker.NotSupported)
+        {
+            <div class="pt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
+                <button type="button" class="ui-btn ui-btn-sm py-0.5 border border-line-field bg-page text-ink hover:border-heading disabled:opacity-50"
+                        disabled="@(rechecking || rechecksLeft <= 0)" @onclick="() => RecheckAsync(open)">
+                    @(rechecking ? "Checking again…" : "Check again")
+                </button>
+                <span class="text-xs text-muted">
+                    @(rechecksLeft > 0
+                        ? $"Runs the check once more{(check.EvidenceBasis == "abstract only" ? ", with the full text if an open-access copy can be found now" : " on the full text")}. {rechecksLeft} re-check{(rechecksLeft == 1 ? "" : "s")} left for this run."
+                        : "This run has used its re-checks.")
+                </span>
+            </div>
+        }
+        @if (recheckMessage != null)
+        {
+            <p class="text-xs @(recheckFailed ? "text-not-supported" : "text-ink")" role="status">@recheckMessage</p>
+        }
+    };
 
-    /// <summary>A one-paragraph description of the included set, built only from the run's own data.</summary>
-    // Section 3 points to the tables in the appendix (issue #139), with the same sentence as main.tex.
-    private string DataParagraph() => (AuBtechReviewAgent.MethodsSectionWriter.IncludedSet(tableRecords) + " " +
-        AuBtechReviewAgent.MethodsSectionWriter.AppendixPointer(tableRecords.Count, extractions)).Trim();
+    internal RenderFragment StudyNote(int reference) => __builder =>
+    {
+        var note = notes.FirstOrDefault(n => n.IsFor(AuBtechReviewAgent.ReviewerNote.Study, reference));
+        @NoteBlock($"study-{reference}", note, AuBtechReviewAgent.ReviewerNote.Study, reference, "", -1)
+    };
+
+    internal RenderFragment CitationNote((string Field, int Sentence, int Reference) c) => __builder =>
+    {
+        var note = notes.FirstOrDefault(n => n.IsFor(AuBtechReviewAgent.ReviewerNote.Citation, c.Reference, c.Field, c.Sentence));
+        @NoteBlock($"citation-{c.Field}-{c.Sentence}-{c.Reference}", note, AuBtechReviewAgent.ReviewerNote.Citation, c.Reference, c.Field, c.Sentence)
+    };
+
+    /// <summary>A note as text for every reader; with the edit key, an Add/Edit button and a small form.</summary>
+    internal RenderFragment NoteBlock(string id, AuBtechReviewAgent.ReviewerNote? note, string kind, int reference, string field, int sentence) => __builder =>
+    {
+        if (editingNote == id)
+        {
+            <div class="mt-1.5">
+                <label for="@($"note-{id}")" class="block text-xs font-semibold text-ink">Your note</label>
+                <textarea id="@($"note-{id}")" rows="2" maxlength="@AuBtechReviewAgent.RunStore.MaxNoteLength" @bind="noteDraft"
+                          class="mt-0.5 w-full border border-line-field p-1.5 text-[13px] font-normal text-ink focus:border-heading focus:outline-none"></textarea>
+                <div class="mt-1 flex gap-2">
+                    <button type="button" class="ui-btn-primary ui-btn-sm py-0.5" @onclick="() => SaveNoteAsync(kind, reference, field, sentence)">Save note</button>
+                    <button type="button" class="ui-btn-secondary ui-btn-sm py-0.5" @onclick="() => editingNote = null">Cancel</button>
+                </div>
+                @if (noteMessage != null)
+                {
+                    <p class="mt-1 text-xs text-not-supported" role="alert">@noteMessage</p>
+                }
+            </div>
+        }
+        else
+        {
+            if (note != null)
+            {
+                <p class="mt-1.5 border-l-2 border-heading pl-2 text-xs font-normal text-ink whitespace-pre-line">
+                    <span class="font-semibold text-ink">Reviewer's note:</span> @note.Text
+                </p>
+            }
+            if (canEdit)
+            {
+                <button type="button" class="mt-1 text-xs font-medium text-heading hover:underline print:hidden"
+                        @onclick="() => { editingNote = id; noteDraft = note?.Text ?? string.Empty; noteMessage = null; }">@(note == null ? "Add a note" : "Edit note")</button>
+            }
+        }
+    };
+
 
     /// <summary>
     /// Figure 2.1: the PRISMA 2020 flow of records, from the run's own counts (PrismaFlowCounts, the same numbers as
@@ -904,6 +899,7 @@ else
         </li>
     };
 
+
     /// <summary>The value with its quote as a tooltip; a dagger when the quote was not found in the paper.</summary>
     private RenderFragment Evidence(AuBtechReviewAgent.EvidencedValue v) => __builder =>
     {
@@ -914,58 +910,6 @@ else
             <span class="text-partly" title="The supporting quote was not found in the paper's text">†</span>
         }
     };
-
-    /// <summary>
-    /// Renders text with every [n] as a button, with the shared paper component (Components/Paper/CitedProse.razor);
-    /// this page adds its reviewer notes and the re-check to an open citation's panel.
-    /// </summary>
-    private RenderFragment CitedText(string field, string text) => __builder =>
-    {
-        <CitedProse Field="@field" Text="@text" Checks="auditChecks" Open="openCitation"
-                    OnToggle="@(c => ToggleCitation(c.Field, c.Sentence, c.Reference))" OnClose="CloseCitation"
-                    SourceTitle="@(reference => tableRecords.FirstOrDefault(t => t.ReferenceNumber == reference)?.Title)"
-                    SourceLink="SourceLink"
-                    PanelExtras="CitationExtras" />
-    };
-
-    /// <summary>What this page adds to an open citation's panel: the reviewer's note, a past re-check and the "Check again" button.</summary>
-    private RenderFragment<AuBtechReviewAgent.CitationSupportResult> CitationExtras => check => __builder =>
-    {
-        if (openCitation is not { } open) return;
-        @CitationNote(open)
-        @if (RecheckOf(open) is { } done)
-        {
-            <p class="text-xs text-muted">Checked again @done.CheckedUtc.ToString("yyyy-MM-dd HH:mm") UTC: was @VerdictLabel(done.VerdictBefore) (@done.EvidenceBefore), now @VerdictLabel(done.VerdictAfter) (@done.EvidenceAfter).</p>
-        }
-        @if (canEdit && check.Verdict is AuBtechReviewAgent.CitationSupportChecker.Partial or AuBtechReviewAgent.CitationSupportChecker.NotSupported)
-        {
-            <div class="pt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
-                <button type="button" class="ui-btn ui-btn-sm py-0.5 border border-line-field bg-page text-ink hover:border-heading disabled:opacity-50"
-                        disabled="@(rechecking || rechecksLeft <= 0)" @onclick="() => RecheckAsync(open)">
-                    @(rechecking ? "Checking again…" : "Check again")
-                </button>
-                <span class="text-xs text-muted">
-                    @(rechecksLeft > 0
-                        ? $"Runs the check once more{(check.EvidenceBasis == "abstract only" ? ", with the full text if an open-access copy can be found now" : " on the full text")}. {rechecksLeft} re-check{(rechecksLeft == 1 ? "" : "s")} left for this run."
-                        : "This run has used its re-checks.")
-                </span>
-            </div>
-        }
-        @if (recheckMessage != null)
-        {
-            <p class="text-xs @(recheckFailed ? "text-not-supported" : "text-ink")" role="status">@recheckMessage</p>
-        }
-    };
-
-    // ── Links and reviewer notes ─────────────────────────────────────────────────────────────────
-    private Dictionary<string, string> fullTextUrls = new();
-    private List<AuBtechReviewAgent.ReviewerNote> notes = new();
-    private string? editingNote;     // which note is open for editing: "study-3" or "citation-field-2-3"
-    private string noteDraft = "";
-    private string? noteMessage;
-
-    private static string? DoiUrl(string? doi) =>
-        string.IsNullOrWhiteSpace(doi) ? null : "https://doi.org/" + Uri.EscapeDataString(doi.Trim()).Replace("%2F", "/");
 
     /// <summary>DOI and open-access PDF links under a study's title (only http(s) addresses are linked).</summary>
     private RenderFragment StudyLinks(IncludedPaperMetricRow row) => __builder =>
@@ -989,376 +933,4 @@ else
             }
         </span>
     };
-
-    private RenderFragment StudyNote(int reference) => __builder =>
-    {
-        var note = notes.FirstOrDefault(n => n.IsFor(AuBtechReviewAgent.ReviewerNote.Study, reference));
-        @NoteBlock($"study-{reference}", note, AuBtechReviewAgent.ReviewerNote.Study, reference, "", -1)
-    };
-
-    private RenderFragment CitationNote((string Field, int Sentence, int Reference) c) => __builder =>
-    {
-        var note = notes.FirstOrDefault(n => n.IsFor(AuBtechReviewAgent.ReviewerNote.Citation, c.Reference, c.Field, c.Sentence));
-        @NoteBlock($"citation-{c.Field}-{c.Sentence}-{c.Reference}", note, AuBtechReviewAgent.ReviewerNote.Citation, c.Reference, c.Field, c.Sentence)
-    };
-
-    /// <summary>A note as text for every reader; with the edit key, an Add/Edit button and a small form.</summary>
-    private RenderFragment NoteBlock(string id, AuBtechReviewAgent.ReviewerNote? note, string kind, int reference, string field, int sentence) => __builder =>
-    {
-        if (editingNote == id)
-        {
-            <div class="mt-1.5">
-                <label for="@($"note-{id}")" class="block text-xs font-semibold text-ink">Your note</label>
-                <textarea id="@($"note-{id}")" rows="2" maxlength="@AuBtechReviewAgent.RunStore.MaxNoteLength" @bind="noteDraft"
-                          class="mt-0.5 w-full border border-line-field p-1.5 text-[13px] font-normal text-ink focus:border-heading focus:outline-none"></textarea>
-                <div class="mt-1 flex gap-2">
-                    <button type="button" class="ui-btn-primary ui-btn-sm py-0.5" @onclick="() => SaveNoteAsync(kind, reference, field, sentence)">Save note</button>
-                    <button type="button" class="ui-btn-secondary ui-btn-sm py-0.5" @onclick="() => editingNote = null">Cancel</button>
-                </div>
-                @if (noteMessage != null)
-                {
-                    <p class="mt-1 text-xs text-not-supported" role="alert">@noteMessage</p>
-                }
-            </div>
-        }
-        else
-        {
-            if (note != null)
-            {
-                <p class="mt-1.5 border-l-2 border-heading pl-2 text-xs font-normal text-ink whitespace-pre-line">
-                    <span class="font-semibold text-ink">Reviewer's note:</span> @note.Text
-                </p>
-            }
-            if (canEdit)
-            {
-                <button type="button" class="mt-1 text-xs font-medium text-heading hover:underline print:hidden"
-                        @onclick="() => { editingNote = id; noteDraft = note?.Text ?? string.Empty; noteMessage = null; }">@(note == null ? "Add a note" : "Edit note")</button>
-            }
-        }
-    };
-
-    private async Task SaveNoteAsync(string kind, int reference, string field, int sentence)
-    {
-        bool saved = await Runs.SaveNoteAsync(State.CurrentSessionId, editKey, kind, reference, noteDraft, field, sentence);
-        if (saved)
-        {
-            notes = Runs.LoadNotes(State.CurrentSessionId).ToList();
-            editingNote = null;
-            noteMessage = null;
-        }
-        else
-        {
-            noteMessage = "The note could not be saved. Only the browser that started this run can add notes.";
-        }
-    }
-
-    // Re-checking one citation after the run (PrismaReviewEngine.RecheckCitationAsync).
-    private List<AuBtechReviewAgent.CitationRecheck> rechecks = new();
-    private int rechecksLeft;
-    private bool rechecking;
-    private string? recheckMessage;
-    private bool recheckFailed;
-
-    /// <summary>Reads the verdicts and re-checks from citation-audit.json (and, after a re-check, the report's check sentence).</summary>
-    private async Task LoadAuditAsync(string folder, bool reloadReport = true)
-    {
-        string auditPath = Path.Join(folder, "citation-audit.json");
-        auditChecks.Clear();
-        rechecks = new();
-        if (File.Exists(auditPath))
-        {
-            try
-            {
-                using var doc = JsonDocument.Parse(await File.ReadAllTextAsync(auditPath));
-                if (doc.RootElement.TryGetProperty("SupportChecks", out var checks))
-                    auditChecks.AddRange(JsonSerializer.Deserialize<List<AuBtechReviewAgent.CitationSupportResult>>(checks.GetRawText()) ?? new());
-                if (doc.RootElement.TryGetProperty("Rechecks", out var done))
-                    rechecks = JsonSerializer.Deserialize<List<AuBtechReviewAgent.CitationRecheck>>(done.GetRawText()) ?? new();
-            }
-            catch (Exception ex) when (ex is JsonException or IOException) { auditChecks.Clear(); rechecks = new(); }
-        }
-        rechecksLeft = auditChecks.Count == 0 ? 0 : Math.Max(0, AuBtechReviewAgent.PrismaReviewEngine.MaxRechecksPerRun - rechecks.Count);
-
-        string reportPath = Path.Join(folder, "prisma-report.json");
-        if (reloadReport && File.Exists(reportPath))
-        {
-            try
-            {
-                var updated = JsonSerializer.Deserialize<PrismaReport>(await File.ReadAllTextAsync(reportPath), new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
-                if (updated != null) report.CitationCheckSummary = updated.CitationCheckSummary;
-            }
-            catch (Exception ex) when (ex is JsonException or IOException) { }
-        }
-    }
-
-    private AuBtechReviewAgent.CitationRecheck? RecheckOf((string Field, int Sentence, int Reference) c) =>
-        rechecks.LastOrDefault(r => r.Field == c.Field && r.SentenceIndex == c.Sentence && r.Reference == c.Reference);
-
-    private async Task RecheckAsync((string Field, int Sentence, int Reference) c)
-    {
-        if (rechecking) return;
-        rechecking = true;
-        recheckMessage = null;
-        recheckFailed = false;
-        try
-        {
-            var result = await ReviewEngine.RecheckCitationAsync(State.CurrentSessionId, c.Field, c.Sentence, c.Reference, editKey: editKey);
-            await LoadAuditAsync(Runs.FolderOf(State.CurrentSessionId));
-            recheckMessage = $"Checked again: {VerdictLabel(result.Verdict).ToLowerInvariant()}, against the {result.EvidenceBasis}.";
-        }
-        catch (AuBtechReviewAgent.PrismaReviewEngine.RecheckException ex)
-        {
-            recheckMessage = ex.Message;
-            recheckFailed = true;
-        }
-        catch (Exception ex) when (ex is not OperationCanceledException)
-        {
-            recheckMessage = "The check could not be run just now (the model or the paper's server did not answer). Try again later.";
-            recheckFailed = true;
-        }
-        finally
-        {
-            rechecking = false;
-        }
-    }
-
-    private AuBtechReviewAgent.CitationSupportResult? FindCheck(string field, int sentence, int reference) =>
-        auditChecks.FirstOrDefault(c => c.Field == field && c.SentenceIndex == sentence && c.Reference == reference);
-
-    private static string CiteId(string field, int sentence, int reference) => AuBtechReviewAgent.CitationView.CiteId(field, sentence, reference);
-
-    // Citations that need a reader's attention (partly or not supported), in the order they appear in the report.
-    private List<AuBtechReviewAgent.CitationSupportResult> AttentionList =>
-        AuBtechReviewAgent.CitationView.Attention(auditChecks, f => AuBtechReviewAgent.CitationView.FieldRank(f, report.SynthesisSections.Select(x => x.Field).ToList()));
-    private int attentionIndex = -1;
-
-    private async Task StepAttention(int delta)
-    {
-        var list = AttentionList;
-        if (list.Count == 0) return;
-        attentionIndex = ((attentionIndex < 0 && delta < 0 ? 0 : attentionIndex) + delta + list.Count) % list.Count;
-        await OpenAndScrollAsync(list[attentionIndex]);
-    }
-
-    // The citation-check panel (from 1500 px): which citations it steps through, and where it is.
-    private string checkFilter = AuBtechReviewAgent.ReportOutline.Flagged;
-    private int checkIndex = -1;
-
-    private void SetCheckFilter(string filter)
-    {
-        checkFilter = filter;
-        checkIndex = -1;
-    }
-
-    private async Task StepCheck()
-    {
-        var list = AuBtechReviewAgent.ReportOutline.InOrder(auditChecks, checkFilter,
-            f => AuBtechReviewAgent.CitationView.FieldRank(f, report.SynthesisSections.Select(x => x.Field).ToList()));
-        if (list.Count == 0) return;
-        checkIndex = (checkIndex + 1) % list.Count;
-        await OpenAndScrollAsync(list[checkIndex]);
-    }
-
-    private async Task OpenAndScrollAsync(AuBtechReviewAgent.CitationSupportResult c)
-    {
-        openCitation = (c.Field, c.SentenceIndex, c.Reference);
-        StateHasChanged();
-        try { await JS.InvokeAsync<bool>("traceableReview.scrollTo", CiteId(c.Field, c.SentenceIndex, c.Reference)); }
-        catch (JSException) { }
-        catch (JSDisconnectedException) { }
-    }
-
-    /// <summary>Where a reader can open a source: its open-access copy, else its DOI, else its page (only http(s) addresses).</summary>
-    private string? SourceLink(int reference)
-    {
-        var row = tableRecords.FirstOrDefault(t => t.ReferenceNumber == reference);
-        if (row == null) return null;
-        if (fullTextUrls.TryGetValue(row.PaperId, out var pdf) && AuBtechReviewAgent.PrismaReviewEngine.IsWebAddress(pdf)) return pdf;
-        return DoiUrl(row.Doi) ?? (AuBtechReviewAgent.PrismaReviewEngine.IsWebAddress(row.Url) ? row.Url : null);
-    }
-
-    // Element to focus after the next render: the verdict box when a citation opens, the number when it closes.
-    private string? pendingFocus;
-
-    private void ToggleCitation(string field, int sentence, int reference)
-    {
-        bool closing = openCitation == (field, sentence, reference);
-        openCitation = closing ? null : (field, sentence, reference);
-        pendingFocus = closing ? null : $"verdict-{field}";
-    }
-
-    // The statement on AI use for this run (section 6.4), and the confirmation after copying it.
-    private string aiStatement = "";
-    private string aiShort = "";
-    private List<string> researchQuestions = new();
-    private string? copyNotice;
-
-    private async Task CopyStatement(string text, string what)
-    {
-        bool copied = false;
-        try { copied = await JS.InvokeAsync<bool>("traceableReview.copyText", text); }
-        catch (JSException) { /* the browser refused the clipboard; the text stays on the page to select by hand */ }
-        catch (JSDisconnectedException) { /* the tab was closed */ }
-        copyNotice = copied ? $"{what} copied. Edit it to fit your venue's policy on AI use before you submit." : "Copying is not allowed here; select the text and copy it by hand.";
-    }
-
-    private async Task PrintReport()
-    {
-        try { await JS.InvokeVoidAsync("traceableReview.print"); }
-        catch (JSException) { /* printing is a convenience; Ctrl+P works too */ }
-        catch (JSDisconnectedException) { /* the tab was closed */ }
-    }
-
-    private void CloseCitation()
-    {
-        if (openCitation is { } open) pendingFocus = CiteId(open.Field, open.Sentence, open.Reference);
-        openCitation = null;
-    }
-
-    private static string VerdictLabel(string? verdict) => AuBtechReviewAgent.CitationView.VerdictLabel(verdict);
-    private static string VerdictText(string? verdict) => AuBtechReviewAgent.CitationView.VerdictText(verdict);
-
-    // The run's edit key from this browser's storage: only the browser that started the run can change it.
-    private string? editKey;
-    private Guid editKeyFor;
-    private bool canEdit;
-    private bool linkCopied;
-
-    private async Task CopyLink()
-    {
-        try { linkCopied = await JS.InvokeAsync<bool>("traceableReview.copyLink"); }
-        catch (Exception ex) when (ex is JSException or JSDisconnectedException or TaskCanceledException) { linkCopied = false; }
-    }
-
-    protected override async Task OnAfterRenderAsync(bool firstRender)
-    {
-        if (State.CurrentSessionId != Guid.Empty && editKeyFor != State.CurrentSessionId)
-        {
-            editKeyFor = State.CurrentSessionId;
-            try { editKey = await JS.InvokeAsync<string?>("traceableReview.getEditKey", State.CurrentSessionId.ToString()); }
-            catch (Exception ex) when (ex is JSException or JSDisconnectedException or TaskCanceledException) { editKey = null; }
-            bool allowed = Runs.CanEdit(State.CurrentSessionId, editKey);
-            if (allowed != canEdit) { canEdit = allowed; StateHasChanged(); }
-        }
-        if (pendingFocus is { } focusId)
-        {
-            pendingFocus = null;
-            try { await JS.InvokeAsync<bool>("traceableReview.focus", focusId); }
-            catch (JSException) { /* moving focus is a convenience; the page works without it */ }
-            catch (JSDisconnectedException) { /* the tab was closed */ }
-        }
-        if (!string.IsNullOrEmpty(mermaidDiagramCode))
-        {
-            try
-            {
-                await JS.InvokeAsync<bool>("traceableMermaid.render", "mermaid-preview", mermaidDiagramCode);
-            }
-            catch (JSException) { }
-            catch (JSDisconnectedException) { }
-        }
-    }
-
-    protected override async Task OnParametersSetAsync()
-    {
-        if (RunId is Guid id && id != Guid.Empty)
-        {
-            // A run made by another kind of review has its own report page.
-            if (AuBtechReviewAgent.ReviewModules.ElsewhereFor(Runs.LoadHeader(id), AuBtechReviewAgent.ReviewMethod.SystematicKey) is string elsewhere)
-            {
-                Nav.NavigateTo(elsewhere, replace: true);
-                return;
-            }
-            State.CurrentSessionId = id;
-        }
-
-        report = new PrismaReport();
-        includedCitations = new();
-        tableRecords.Clear();
-        extractions.Clear();
-        auditChecks.Clear();
-        codebook = null;
-        publicationsByYear = new();
-        platformShares = new();
-        journalCount = conferenceCount = transactionsCount = proceedingsCount = preprintCount = 0;
-        peerReviewOnlyToggle = false;
-        aiStatement = aiShort = "";
-        researchQuestions = new();
-        copyNotice = null;
-        passedPeerReviewCheck = failedPeerReviewCheck = 0;
-        mermaidDiagramCode = "";
-        openCitation = null;
-        deleted = false;
-        stats = null;
-        flow = null;
-        runLine = dateLine = "";
-        checkFilter = AuBtechReviewAgent.ReportOutline.Flagged;
-        checkIndex = attentionIndex = -1;
-
-        string folder = Runs.FolderOf(State.CurrentSessionId);
-        string reportPath = Path.Join(folder, "prisma-report.json");
-        hasProtocol = File.Exists(Path.Join(folder, "protocol.md"));
-
-        if (File.Exists(reportPath))
-        {
-            try
-            {
-                string content = await File.ReadAllTextAsync(reportPath);
-                report = JsonSerializer.Deserialize<PrismaReport>(content, new JsonSerializerOptions { PropertyNameCaseInsensitive = true }) ?? new PrismaReport();
-            }
-            catch { report = new PrismaReport(); }
-        }
-
-        await LoadAuditAsync(folder, reloadReport: false);
-
-        var state = ReviewEngine.LoadState(State.CurrentSessionId);
-        if (state == null) return;
-
-        peerReviewOnlyToggle = state.PeerReviewOnlyToggle;
-        stats = state.Stats;
-        flow = AuBtechReviewAgent.PrismaFlowCounts.From(state);
-        runLine = RunLine(state);
-        dateLine = state.CompletedUtc is DateTime done ? done.ToString("d MMMM yyyy", System.Globalization.CultureInfo.InvariantCulture) : "";
-        aiStatement = AuBtechReviewAgent.AiUseStatement.Methods(state, State.CurrentSessionId);
-        aiShort = AuBtechReviewAgent.AiUseStatement.Short(state);
-        researchQuestions = state.ResearchQuestions?.ToList() ?? new List<string>();
-        passedPeerReviewCheck = state.Stats.PassedPeerReviewCheck;
-        failedPeerReviewCheck = state.Stats.FailedPeerReviewCheck;
-        if (state.Extractions != null) extractions.AddRange(state.Extractions);
-        codebook = state.ThematicSynthesis;
-
-        // Older runs have ReferenceNumber = 0 everywhere; OrderBy is stable, so they keep their order.
-        tableRecords.AddRange(state.SynthesizedRecords.OrderBy(r => r.ReferenceNumber));
-        fullTextUrls = state.FullTextUrls ?? new();
-        notes = Runs.LoadNotes(State.CurrentSessionId).ToList();
-        includedCitations = tableRecords.Select(r => r.ApaCitation.Trim().TrimEnd('.')).ToList();
-
-        platformShares = tableRecords
-            .GroupBy(r => string.IsNullOrWhiteSpace(r.Category) ? "Other" : r.Category)
-            .OrderByDescending(g => g.Count()).ThenBy(g => g.Key, StringComparer.Ordinal)
-            .Select((g, i) => new PlatformShare(g.Key, AuBtechReviewAgent.PrismaReviewEngine.CategoryLabel(g.Key), g.Count(),
-                BarColors[i % BarColors.Length], BadgeColors[i % BadgeColors.Length]))
-            .ToList();
-
-        publicationsByYear = tableRecords
-            .GroupBy(r => r.Year > 0 ? r.Year.ToString() : "n.d.")
-            .OrderBy(g => g.Key == "n.d." ? "9999" : g.Key, StringComparer.Ordinal)
-            .ToDictionary(g => g.Key, g => g.Count());
-
-        journalCount = tableRecords.Count(r => r.VenueType == "Journals");
-        transactionsCount = tableRecords.Count(r => r.VenueType == "Transactions");
-        conferenceCount = tableRecords.Count(r => r.VenueType == "Conferences");
-        proceedingsCount = tableRecords.Count(r => r.VenueType == "Proceedings");
-        preprintCount = tableRecords.Count - journalCount - transactionsCount - conferenceCount - proceedingsCount;
-
-        if (report.Artifact is { IsDiagram: true, Error: null } artifactDiagram)
-        {
-            mermaidDiagramCode = artifactDiagram.Mermaid;
-        }
-        else if (!string.IsNullOrEmpty(report.SynthesisResultsItem))
-        {
-            var mermaidMatch = Regex.Match(report.SynthesisResultsItem, @"\[MERMAID_START\](.*?)\[MERMAID_END\]", RegexOptions.Singleline);
-            // Older runs stored the model's diagram unrepaired; clean it here as well.
-            if (mermaidMatch.Success) mermaidDiagramCode = AuBtechReviewAgent.MermaidSanitizer.Sanitize(mermaidMatch.Groups[1].Value.Trim());
-        }
-    }
 }
