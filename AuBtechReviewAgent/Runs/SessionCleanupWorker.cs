@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Hosting;
@@ -82,12 +83,12 @@ public class SessionCleanupWorker : BackgroundService
 
     public static DateTime LastActivityUtc(string dir)
     {
-        DateTime newest = Directory.GetLastWriteTimeUtc(dir);
-        foreach (var file in Directory.EnumerateFiles(dir, "*", SearchOption.AllDirectories))
-        {
-            DateTime t = File.GetLastWriteTimeUtc(file);
-            if (t > newest) newest = t;
-        }
-        return newest;
+        // A kept archive (RunArchiveCache) is written when someone downloads the run. That is not activity, so neither
+        // the kept file nor the folder time it changes keeps the run longer; the folder's time counts only when it is empty.
+        var times = Directory.EnumerateFiles(dir, "*", SearchOption.AllDirectories)
+            .Where(f => !RunArchiveCache.IsCacheFile(Path.GetFileName(f)))
+            .Select(f => File.GetLastWriteTimeUtc(f))
+            .ToList();
+        return times.Count == 0 ? Directory.GetLastWriteTimeUtc(dir) : times.Max();
     }
 }
