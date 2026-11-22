@@ -17,9 +17,9 @@ public class RunLedgerWatchTests : IDisposable
 
     public void Dispose() => TestFolders.TryDelete(_root);
 
-    private void Save(int screened, DateTime? written = null)
+    private void Save(int screened, DateTime? written = null, string stage = "Screening")
     {
-        var state = new ReviewState { Stats = new ReviewStats { Screened = screened, ProcessingStage = "Screening" } };
+        var state = new ReviewState { Stats = new ReviewStats { Screened = screened, ProcessingStage = stage } };
         // The engine writes a new file and moves it into place, so the write time changes with every save.
         string part = Ledger + "." + Guid.NewGuid().ToString("N") + ".tmp";
         File.WriteAllText(part, JsonSerializer.Serialize(state, new JsonSerializerOptions { WriteIndented = true }));
@@ -55,7 +55,9 @@ public class RunLedgerWatchTests : IDisposable
         Save(4, start.AddSeconds(1)); // the same length, a later write time
         Assert.Equal(4, watch.Read()!.Value.State.Stats.Screened);
 
-        Save(12, start.AddSeconds(1)); // a longer file in the same second
+        // A longer file with the same write time. The state's timestamps drop trailing zeros when written, so its length
+        // varies by a few characters from run to run; a stage name 26 characters longer keeps it longer every time.
+        Save(12, start.AddSeconds(1), "Screening the records a second time");
         Assert.Equal(12, watch.Read()!.Value.State.Stats.Screened);
         Assert.Equal(3, watch.Parses);
     }
