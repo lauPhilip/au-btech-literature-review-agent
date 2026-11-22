@@ -13,7 +13,7 @@ public sealed partial class ReviewApi
 {
     private static readonly JsonSerializerOptions ReadOptions = new() { PropertyNameCaseInsensitive = true };
 
-    public ApiResult<ReviewReport> Report(Guid runId)
+    public ApiResult<ApiReviewReport> Report(Guid runId)
     {
         var header = _engine.LoadHeader(runId);
         if (header == null) return ApiProblems.NoRun();
@@ -29,23 +29,23 @@ public sealed partial class ReviewApi
         var references = ReferencesOf(state);
         var links = references.GroupBy(r => r.Number).ToDictionary(g => g.Key, g => g.First().Link);
         var citations = ChecksOf(folder)
-            .Select(c => new ReportCitation(c.Reference, c.Field, c.SentenceIndex, c.Sentence, c.Verdict,
+            .Select(c => new ApiReportCitation(c.Reference, c.Field, c.SentenceIndex, c.Sentence, c.Verdict,
                 c.QuoteVerified && !string.IsNullOrWhiteSpace(c.Quote) ? c.Quote : null, c.QuoteVerified,
                 c.EvidenceBasis, c.Reason, links.GetValueOrDefault(c.Reference)))
             .ToList();
 
         var sections = ReportOutline.Systematic(report)
-            .Select(entry => new ReportSection(entry.Id, entry.Label, entry.Level, SectionText(entry.Id, report, state, references)))
+            .Select(entry => new ApiReportSection(entry.Id, entry.Label, entry.Level, SectionText(entry.Id, report, state, references)))
             .ToList();
 
-        return ApiResult<ReviewReport>.Ok(new ReviewReport(runId, SpecMatrix.ScrubAnchors(report.TitleItem),
+        return ApiResult<ApiReviewReport>.Ok(new ApiReviewReport(runId, SpecMatrix.ScrubAnchors(report.TitleItem),
             SpecMatrix.ScrubAnchors(report.AbstractItem), sections, citations, references, PrismaOf(state),
             state.RunSettings?.AppVersion ?? "", string.IsNullOrEmpty(report.ProtocolHash) ? state.ProtocolHash : report.ProtocolHash,
             state.ProtocolSha256, state.CompletedUtc));
     }
 
     /// <summary>The text of one section, from the fields the page shows in it, in the page's order.</summary>
-    private static string SectionText(string id, PrismaReport r, ReviewState state, IReadOnlyList<ReportReference> references)
+    private static string SectionText(string id, PrismaReport r, ReviewState state, IReadOnlyList<ApiReportReference> references)
     {
         for (int k = 0; k < r.SynthesisSections.Count; k++)
             if (id == ReportOutline.ThemeId(k)) return Join(r.SynthesisSections[k].Text);
@@ -73,13 +73,13 @@ public sealed partial class ReviewApi
         parts.Select(p => SpecMatrix.ScrubAnchors(p ?? "")).Where(p => p.Length > 0));
 
     /// <summary>The included studies in reference order, as the page numbers them, with a link only to a web address.</summary>
-    private static List<ReportReference> ReferencesOf(ReviewState state) => state.SynthesizedRecords
+    private static List<ApiReportReference> ReferencesOf(ReviewState state) => state.SynthesizedRecords
         .OrderBy(r => r.ReferenceNumber)
         .Select((r, i) =>
         {
             string? doi = PrismaReviewEngine.NormalizeDoi(r.Doi);
             string? link = doi != null ? "https://doi.org/" + doi : PrismaReviewEngine.IsWebAddress(r.Url) ? r.Url : null;
-            return new ReportReference(r.ReferenceNumber > 0 ? r.ReferenceNumber : i + 1, r.ApaCitation.Trim().TrimEnd('.'), doi, link);
+            return new ApiReportReference(r.ReferenceNumber > 0 ? r.ReferenceNumber : i + 1, r.ApaCitation.Trim().TrimEnd('.'), doi, link);
         })
         .ToList();
 
@@ -104,12 +104,12 @@ public sealed partial class ReviewApi
         catch (Exception ex) when (ex is JsonException or IOException) { return null; }
     }
 
-    private static ReportPrismaCounts PrismaOf(ReviewState state)
+    private static ApiPrismaCounts PrismaOf(ReviewState state)
     {
         var c = PrismaFlowCounts.From(state);
-        return new ReportPrismaCounts(c.Identified, c.IdentifiedBySource.Select(s => new SourceCount(s.Source, s.Count)).ToList(),
+        return new ApiPrismaCounts(c.Identified, c.IdentifiedBySource.Select(s => new ApiSourceCount(s.Source, s.Count)).ToList(),
             c.IdentifiedViaCitations, c.DuplicatesRemoved, c.OutsideDateRange, c.CappedBeyondMax, c.Screened, c.ScreeningErrors,
-            c.ExcludedPeerReview, c.ExcludedAtScreening, c.ExcludedByReason.Select(r => new ReasonCount(r.Reason, r.Count)).ToList(),
+            c.ExcludedPeerReview, c.ExcludedAtScreening, c.ExcludedByReason.Select(r => new ApiReasonCount(r.Reason, r.Count)).ToList(),
             c.Included, c.FullTextRetrieved, c.AbstractOnly);
     }
 }

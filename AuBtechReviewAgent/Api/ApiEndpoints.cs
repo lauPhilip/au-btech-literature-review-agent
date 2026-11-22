@@ -114,7 +114,7 @@ public static class ApiEndpoints
 
         api.MapGet("/reviews/{id:guid}/report", (Guid id, ReviewApi reviews) => ToResult(reviews.Report(id)))
             .WithName("GetReviewReport").WithSummary("The finished report as data: sections, every citation with its verdict and quote, references and PRISMA counts.")
-            .Produces<ReviewReport>().ProducesProblem(StatusCodes.Status404NotFound).ProducesProblem(StatusCodes.Status409Conflict);
+            .Produces<ApiReviewReport>().ProducesProblem(StatusCodes.Status404NotFound).ProducesProblem(StatusCodes.Status409Conflict);
 
         app.MapOpenApi(); // at OpenApiPath
 
