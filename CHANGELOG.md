@@ -28,6 +28,8 @@ The Metrics page now asks one question: how well do the citations hold up? Four 
 
 The pages about trust now look alike: About, the model card, privacy, the glossary and the archive check. On a laptop a list on the left takes you between them and to each part of the page you are on. The glossary has a search box and groups its words by method, verdicts and output. Checking an archive is one big box to drop it in, with the result beside it. Choosing the kind of review shows the two you can start as large cards, and a missing page now helps you on your way.
 
+A link to the site now shows a new preview card in the new look. The page you see while a new version goes live has the new look too, in light and dark. The sitemap now tells search engines when each page last changed.
+
 The grey literature review, still in preview, now reads like the systematic one. Its paper is one long page with a list of sections, the coloured bar for how the citations held up and the same panel for stepping through them. Its data appendix and planning page got the new colours too.
 
 Every page now has a dark theme. The switch is in the top bar, and if you have not chosen, the site follows your computer's setting. The citation colours keep their meaning in both themes.
