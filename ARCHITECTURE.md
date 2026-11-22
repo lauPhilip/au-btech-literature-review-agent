@@ -33,6 +33,7 @@ flowchart LR
 | `Llm/` | Talking to the model, reading JSON answers, recording every call, prompt safety | `LlmJson.cs` |
 | `Web/` | The website around the review: SEO, `/health`, security headers, quota, glossary | `SiteSeo.cs` |
 | `Api/` | The REST API for other tools, with the caller's own key; off in production until `Api:Enabled` | `ReviewApi.cs` |
+| `Mcp/` | The MCP server at `/mcp`, whose tools call the same `ReviewApi`; behind the same switch | `ReviewMcpTools.cs` |
 | `Modules/` | One folder per kind of review: its recipe of steps, ledger, pages and report; each declares its cards on the start page | `README.md`, `Systematic/SystematicModule.cs` |
 | `Components/` | The Blazor UI: `Pages/` (routable pages), `Dashboard/` (parts of the run view), `Layout/` (shared) | `Pages/Home.razor` |
 
