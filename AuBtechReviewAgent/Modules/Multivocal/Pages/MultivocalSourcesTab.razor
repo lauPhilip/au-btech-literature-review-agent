@@ -1,0 +1,216 @@
+@inherits MultivocalStartPart
+@inject AuBtechReviewAgent.MultivocalRunner Runner
+
+@* The panel's Sources found tab: every search with its hits, the searches skipped, and the sources found, each with
+   its screening decision and why, its quality score, its extracted values and its kept page. In the browser that
+   planned the run, a decision can be kept or changed and a page's text kept. *@
+
+<div class="flex-1 min-h-0 overflow-y-auto p-5 space-y-5 text-left">
+    <div>
+        <h3 class="text-base font-semibold text-heading">Grey sources found</h3>
+        <p class="text-xs text-muted mt-0.5">@ledger.StoppingApplied @(screening == null ? "Not screened yet." : $"Screened twice with the plan's criteria ({screening.Model}); the quality check comes next.")</p>
+    </div>
+    <table class="w-full text-xs">
+        <caption class="sr-only">Searches and what they returned</caption>
+        <thead class="text-left text-muted"><tr><th class="py-1 pr-2 font-medium">Search</th><th class="py-1 pr-2 font-medium">String</th><th class="py-1 pr-2 font-medium text-right">Hits</th><th class="py-1 font-medium text-right">New</th></tr></thead>
+        <tbody>
+            @foreach (var search in ledger.Searches)
+            {
+                <tr class="border-t border-line">
+                    <td class="py-1 pr-2">@MultivocalStart.SearchLabel(search.Source)</td>
+                    <td class="py-1 pr-2 text-ink">@search.SearchString</td>
+                    @if (search.Error != null)
+                    {
+                        <td class="py-1 text-not-supported" colspan="2" title="@search.Error">failed</td>
+                    }
+                    else
+                    {
+                        <td class="py-1 pr-2 text-right">@search.Returned</td>
+                        <td class="py-1 text-right">@search.New</td>
+                    }
+                </tr>
+            }
+        </tbody>
+    </table>
+    @if (ledger.Skipped.Count > 0)
+    {
+        <p class="text-[11px] text-muted">Not run: @string.Join("; ", ledger.Skipped.Select(x => $"{MultivocalStart.SearchLabel(x.Source)} ({x.Reason.TrimEnd('.').ToLowerInvariant()})")).</p>
+    }
+    @if (canEdit)
+    {
+        <p class="text-[11px] text-muted">"Keep page text" fetches the page once, if the site's robots.txt allows it, and keeps its text with this run so quotes can be checked against it. Only the address, date and fingerprint go into the archive.</p>
+    }
+    @if (keepError != null)
+    {
+        <p class="bg-not-supported-fill border border-not-supported-border text-not-supported p-2 text-xs" role="alert">@keepError</p>
+    }
+    @if (screening != null && (screenError ?? (quality != null ? qualityError : null)) is { } tabError)
+    {
+        <p class="bg-not-supported-fill border border-not-supported-border text-not-supported p-2 text-xs" role="alert">@tabError</p>
+    }
+    @if (canEdit && screening != null && stage == AuBtechReviewAgent.MultivocalScreener.StageScreened)
+    {
+        <p class="text-[11px] text-muted">Look at the flagged decisions before scoring the quality: keep or change each one, with a note if you like. The model's decision stays on file next to yours.</p>
+    }
+    @if (screening != null)
+    {
+        <div class="flex items-center justify-between gap-3">
+            <label for="source-filter" class="text-xs text-ink">Show</label>
+            <select id="source-filter" class="ui-input py-1 text-xs w-auto" @bind="Page.sourceFilter">
+                @if (quality != null)
+                {
+                    <option value="passed">Passed the quality check (@quality.Count("Passed"))</option>
+                    <option value="below">Below the threshold (@quality.Count("Below threshold"))</option>
+                    <option value="unassessed">Not assessed (@quality.Count("Not assessed"))</option>
+                }
+                <option value="included">Included (@screening.Count("Included"))</option>
+                <option value="look">To look at (@screening.Sources.Count(x => x.NeedsLook))</option>
+                <option value="excluded">Excluded (@screening.Count("Excluded"))</option>
+                <option value="duplicates">Duplicates (@screening.Count("Duplicate"))</option>
+                <option value="all">All (@ledger.Sources.Count)</option>
+            </select>
+        </div>
+    }
+    <ol class="space-y-3">
+        @foreach (var found in Page.ShownSources())
+        {
+            var r = found.Record;
+            var decision = Page.DecisionOf(r.Url);
+            <li class="border-t border-line pt-3">
+                @if (decision != null)
+                {
+                    <p class="flex flex-wrap items-center gap-1.5 mb-1">
+                        <span class="@MultivocalStart.DecisionChip(decision.Decision) text-[10px]">@MultivocalStart.DecisionLabel(decision)</span>
+                        @if (decision.NeedsLook && decision.Decision != "Error")
+                        {
+                            <span class="ui-chip border-partly-border bg-partly-fill text-partly text-[10px]">look at this</span>
+                        }
+                        @if (decision.Reviewed)
+                        {
+                            <span class="ui-chip border-abstract-only-border bg-abstract-only-fill text-abstract-only text-[10px]">@(decision.ModelDecision == decision.Decision ? "confirmed by you" : "changed by you")</span>
+                        }
+                    </p>
+                }
+                <a href="@r.Url" target="_blank" rel="noopener noreferrer" class="text-sm font-medium text-heading hover:underline">@r.Title</a>
+                <p class="text-[11px] text-muted mt-0.5">
+                    @r.Site · @MultivocalStart.KindLabel(r.Kind)@(r.Producer.Length > 0 ? $" · {r.Producer}" : "")@(r.Published is DateTime d ? $" · {d:yyyy-MM-dd}" : "")@(r.Signals.Count > 0 ? " · " + string.Join(", ", r.Signals.Select(x => $"{x.Key} {x.Value}")) : "")
+                </p>
+                @if (r.Summary.Length > 0)
+                {
+                    <p class="text-xs text-ink mt-1 line-clamp-3">@r.Summary</p>
+                }
+                @{ var score = Page.QualityOf(r.Url); }
+                @if (score != null)
+                {
+                    <MultivocalSourceQuality Score="score" Title="@r.Title" Retrying="@retrying" OnRetry="Page.RetryAsync"
+                                             CanRetry="@(canEdit && stage == AuBtechReviewAgent.MultivocalQualityAssessor.StageAssessed && planned != null && !Runner.IsRunning(planned.RunId))" />
+                }
+                @{ var extracted = Page.ExtractionOf(r.Url); }
+                @if (extracted != null)
+                {
+                    <details class="mt-1 text-[11px] text-ink">
+                        <summary class="cursor-pointer select-none"><span class="ui-chip border-heading/30 bg-page text-heading text-[10px]">@(extracted.Error != null ? "Not extracted" : $"Extracted · covers {(extracted.Coverage.Count > 0 ? string.Join(", ", extracted.Coverage) : "no question")}")</span></summary>
+                        @if (extracted.Error != null)
+                        {
+                            <p class="mt-1">@extracted.Error</p>
+                        }
+                        else
+                        {
+                            @if (extracted.Purpose != null)
+                            {
+                                <p class="mt-1"><span class="font-medium">Purpose:</span> @extracted.Purpose.Value <q class="italic text-muted">@extracted.Purpose.Quote</q></p>
+                            }
+                            <p class="mt-1 text-muted">@string.Join(" · ", extracted.Known.Select(k => $"{k.Name}: {k.Value}"))</p>
+                            <dl class="mt-1 space-y-1">
+                                @foreach (var item in extracted.Attributes)
+                                {
+                                    <div>
+                                        <dt class="font-medium text-ink">@item.Attribute</dt>
+                                        @if (item.NotStated)
+                                        {
+                                            <dd class="text-muted">not stated</dd>
+                                        }
+                                        @foreach (var value in item.Values)
+                                        {
+                                            <dd>@value.Value <q class="italic text-muted">@value.Quote</q></dd>
+                                        }
+                                        @if (item.Unsupported.Count > 0)
+                                        {
+                                            <dd class="text-partly">Left out, as the quote was not found in the page: @string.Join(", ", item.Unsupported.Select(u => u.Value))</dd>
+                                        }
+                                    </div>
+                                }
+                            </dl>
+                        }
+                    </details>
+                }
+                @if (decision != null && decision.Reasoning.Length > 0)
+                {
+                    <details class="mt-1 text-[11px] text-muted">
+                        <summary class="cursor-pointer select-none text-muted">Why</summary>
+                        <p class="mt-1">@decision.Reasoning</p>
+                        @if (decision.Second != null && decision.First != null && decision.First.Decision != decision.Second.Decision)
+                        {
+                            <p class="mt-1">Second screening: @decision.Second.Reasoning</p>
+                        }
+                        @if (decision.Reviewed)
+                        {
+                            <p class="mt-1">You decided: @decision.Decision@(decision.ReviewerNote != null ? $" ({decision.ReviewerNote})" : "")@(decision.ModelDecision != decision.Decision ? $"; the model had decided {decision.ModelDecision}" : "").</p>
+                        }
+                    </details>
+                }
+                @if (canEdit && decision != null && decision.Decision != "Duplicate" && stage == AuBtechReviewAgent.MultivocalScreener.StageScreened && planned != null && !Runner.IsRunning(planned.RunId))
+                {
+                    string address = decision.Address;
+                    <div class="mt-1.5 flex flex-wrap items-center gap-1.5">
+                        <label class="sr-only" for="@($"note-{address.GetHashCode():x}")">@($"Your note on {r.Title}")</label>
+                        <input id="@($"note-{address.GetHashCode():x}")" type="text" maxlength="300" placeholder="Note (optional)" class="ui-input py-0.5 text-[11px] w-40"
+                               value="@(reviewNotes.GetValueOrDefault(address) ?? "")" @onchange="e => reviewNotes[address] = e.Value?.ToString() ?? string.Empty" />
+                        @if (decision.Decision != "Included" || decision.NeedsLook)
+                        {
+                            <button type="button" class="ui-btn-secondary ui-btn-sm py-0.5" disabled="@(reviewing == address)" @onclick="() => Page.ReviewAsync(address, true)">@(decision.Decision == "Included" ? "Keep it" : "Include")</button>
+                        }
+                        @if (decision.Decision != "Excluded" || decision.NeedsLook)
+                        {
+                            <button type="button" class="ui-btn-secondary ui-btn-sm py-0.5" disabled="@(reviewing == address)" @onclick="() => Page.ReviewAsync(address, false)">@(decision.Decision == "Excluded" ? "Keep it out" : "Exclude")</button>
+                        }
+                    </div>
+                }
+                @{ var snapshot = Page.SnapshotOf(r.Url); }
+                @if (snapshot is { NotKept: null })
+                {
+                    <p class="text-[11px] text-muted mt-1">
+                        Page text kept @snapshot.AccessedUtc.ToString("yyyy-MM-dd HH:mm") UTC · @snapshot.Characters.ToString("N0") characters · SHA-256 @snapshot.TextSha256[..12]… ·
+                        <a href="@snapshot.WaybackUrl" target="_blank" rel="noopener noreferrer" class="text-heading hover:underline">Wayback Machine</a>
+                    </p>
+                }
+                else if (snapshot != null)
+                {
+                    <p class="text-[11px] text-partly mt-1">Page text not kept: @snapshot.NotKept.</p>
+                }
+                @if (canEdit && (snapshot == null || snapshot.NotKept != null))
+                {
+                    bool busy = keeping.Contains(r.Url);
+                    <button type="button" class="ui-btn-secondary ui-btn-sm mt-1.5" disabled="@busy" @onclick="() => Page.KeepPageAsync(r.Url)"
+                            aria-label="@($"Keep the page text of {r.Title}")">@(busy ? "Fetching…" : snapshot == null ? "Keep page text" : "Try again")</button>
+                }
+            </li>
+        }
+    </ol>
+</div>
+
+@code {
+    private AuBtechReviewAgent.MultivocalLedger ledger => Page.ledger!; // the tab is shown only once there is a ledger
+    private AuBtechReviewAgent.MultivocalScreeningFile? screening => Page.screening;
+    private AuBtechReviewAgent.MultivocalQualityFile? quality => Page.quality;
+    private AuBtechReviewAgent.PlannedRun? planned => Page.planned;
+    private string stage => Page.stage;
+    private bool canEdit => Page.canEdit;
+    private string? keepError => Page.keepError;
+    private string? screenError => Page.screenError;
+    private string? qualityError => Page.qualityError;
+    private string? reviewing => Page.reviewing;
+    private string? retrying => Page.retrying;
+    private HashSet<string> keeping => Page.keeping;
+    private Dictionary<string, string> reviewNotes => Page.reviewNotes;
+}
