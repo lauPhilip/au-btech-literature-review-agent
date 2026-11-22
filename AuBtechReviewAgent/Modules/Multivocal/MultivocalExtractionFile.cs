@@ -55,6 +55,14 @@ public sealed class GreyExtraction
     public List<ExtractedAttribute> Attributes { get; set; } = new();
     public string? Error { get; set; }
     public bool FromCache { get; set; }
+
+    /// <summary>A formal source (block I-5), extracted from its kept full text or abstract; left out for a grey source.</summary>
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
+    public bool Formal { get; set; }
+
+    /// <summary>A formal source's text basis, "full text" or "abstract only" (decision 8); null for a grey source.</summary>
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public string? TextBasis { get; set; }
 }
 
 /// <summary>A fact about a source that code records.</summary>

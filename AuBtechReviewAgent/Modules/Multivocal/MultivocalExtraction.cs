@@ -24,6 +24,9 @@ public sealed class MultivocalExtractor
     public const string StageExtracted = "Extracted";
     public const string PromptVersion = "grey-extraction-v1";
 
+    /// <summary>Part of the cache key of a formal source's extraction, whose prompt names it as academic (block I-5).</summary>
+    public const string FormalPromptVersion = "formal-extraction-v1";
+
     private static readonly JsonSerializerOptions Json = new() { WriteIndented = true };
     private static readonly ConcurrentDictionary<Guid, bool> Running = new();
     private static ILogger _log => AppLog.For("AuBtechReviewAgent.MultivocalExtractor");
@@ -127,6 +130,7 @@ public sealed class MultivocalExtractor
             Title = record.Title,
             Url = record.Url,
             Known = MultivocalMapper.KnownFactsFor(record, quality).Select(f => new KnownFact { Name = f.Name, Value = f.Value }).ToList(),
+            Formal = record.Kind == MultivocalSearcher.FormalKind,
         };
         string? text = snapshot is { NotKept: null } ? _pages.ReadText(runId, snapshot) : null;
         if (text == null)
@@ -135,11 +139,12 @@ public sealed class MultivocalExtractor
             return result;
         }
         result.TextSha256 = snapshot!.TextSha256;
+        if (result.Formal) result.TextBasis = snapshot.TextBasis;
         string forModel = text.Length <= MultivocalQualityAssessor.MaxTextForModel ? text : text[..MultivocalQualityAssessor.MaxTextForModel];
 
         try
         {
-            string key = ReviewCache.Key(PromptVersion, _model, JsonSerializer.Serialize(map.Attributes), plan.Topic, record.Title, snapshot.TextSha256);
+            string key = ReviewCache.Key(result.Formal ? FormalPromptVersion : PromptVersion, _model, JsonSerializer.Serialize(map.Attributes), plan.Topic, record.Title, snapshot.TextSha256);
             ModelExtraction answer;
             if (_cache.TryGet<ModelExtraction>("grey-extraction", key, out var cached) && cached != null && ModelExtraction.Problem(cached, map) == null)
             {
@@ -206,8 +211,12 @@ public sealed class MultivocalExtractor
             - Address: {record.Url}
             - Published on: {record.Site}
             """;
+        // A formal source (block I-5) is named as academic, and its text is its open full text or its abstract.
+        bool formal = record.Kind == MultivocalSearcher.FormalKind;
+        string kind = formal ? "academic source (a paper from a bibliographic database)" : "grey literature source";
+        string textHeading = formal ? "SOURCE TEXT (its open full text, or its abstract when no full text is open; the only evidence you may use)" : "PAGE TEXT (the only evidence you may use)";
         var prompt = $$"""
-            You extract data from one grey literature source for a multivocal literature review (Garousi et al. 2019, G12), against the review's systematic map.
+            You extract data from one {{kind}} for a multivocal literature review (Garousi et al. 2019, G12), against the review's systematic map.
             The review is about: {{PromptSafety.Wrap(plan.Topic, "review topic")}}
 
             {{PromptSafety.DataOnlyNotice}}
@@ -215,8 +224,8 @@ public sealed class MultivocalExtractor
             SOURCE:
             {{PromptSafety.Wrap(about, "source metadata")}}
 
-            PAGE TEXT (the only evidence you may use):
-            {{PromptSafety.Wrap(text, "page text")}}
+            {{textHeading}}:
+            {{PromptSafety.Wrap(text, formal ? "source text" : "page text")}}
 
             ATTRIBUTES OF THE MAP (from the reviewer):
             {{PromptSafety.Wrap(attributes, "map attributes")}}
