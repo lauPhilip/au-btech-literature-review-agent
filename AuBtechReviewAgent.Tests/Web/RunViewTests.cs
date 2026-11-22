@@ -181,6 +181,19 @@ public class RunViewTests
     }
 
     [Fact]
+    public async Task OnAPhoneThePagesOwnCardFoldsInWithTheFiles()
+    {
+        RenderFragment side = b => b.AddMarkupContent(0, "<div class=\"ui-card\"><h2>This run</h2></div>");
+        string html = await RenderAsync<RunSummaryCard>(new() { ["Stats"] = Finished(), ["RunId"] = Run, ["Side"] = side });
+
+        // Issue #244: one folded line on a phone, holding the files and the page's card without its own frame.
+        Assert.Contains($"This run and its {RunSummaryCard.FileCount} files</summary>", html);
+        Assert.Contains("[&_.ui-card]:border-0", html);
+        Assert.Equal(2, Count(html, "<h2>This run</h2>")); // once in the phone's fold, once beside the card from 640 px
+        Assert.Contains("<div class=\"max-sm:hidden\"><div class=\"ui-card\"><h2>This run</h2>", html);
+    }
+
+    [Fact]
     public async Task AFinishedRunListsEverythingItProducedAndFoldsTheListOnAPhone()
     {
         string html = await RenderAsync<RunSummaryCard>(new() { ["Stats"] = Finished(), ["RunId"] = Run });
