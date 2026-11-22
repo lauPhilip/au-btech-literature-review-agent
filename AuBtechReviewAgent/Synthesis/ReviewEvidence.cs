@@ -84,7 +84,6 @@ public sealed class ReviewEvidence
     public string ReferenceLines(IEnumerable<int> references) =>
         string.Join("\n", references.OrderBy(r => r).Select(r => $"[{r}] - {(ByReference.TryGetValue(r, out var s) && s.ReferenceLine != null ? s.ReferenceLine : "(citation unavailable)")}"));
 
-    /// <summary>The reference-list lines of every source.</summary>
     public string ReferenceLines() => ReferenceLines(Sources.Where(s => s.ReferenceLine != null).Select(s => s.Reference));
 
     /// <summary>

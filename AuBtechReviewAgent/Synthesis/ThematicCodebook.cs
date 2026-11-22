@@ -26,7 +26,6 @@ public class SynthesisOptions
     /// <summary>Give partly supported and not supported citations a second, independent check with more excerpts.</summary>
     public bool SecondCitationCheck { get; set; } = true;
 
-    /// <summary>Upper limit on the number of themes in the codebook.</summary>
     public int MaxThemes { get; set; } = 8;
 
     /// <summary>Studies per coding call.</summary>

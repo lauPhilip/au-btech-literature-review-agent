@@ -20,7 +20,6 @@ public static class RunArchiveCache
 
     private static ILogger _log => AppLog.For("AuBtechReviewAgent.RunArchiveCache");
 
-    /// <summary>The kept archive's file name for a stamp.</summary>
     public static string FileName(RunFolderStamp stamp) => Prefix + stamp.Key + Suffix;
 
     /// <summary>A kept archive, or one being written; the clean-up does not count it as activity.</summary>
