@@ -10,10 +10,6 @@ namespace AuBtechReviewAgent;
 /// </summary>
 public record StrippedCitation(string Field, string InvalidMarker, int ReferenceListSize, string Action);
 
-/// <summary>
-/// The outcome of validating one block of text: the text with invalid markers removed,
-/// and the list of markers that were stripped.
-/// </summary>
 public record CitationValidationResult(string CleanedText, IReadOnlyList<StrippedCitation> Stripped);
 
 /// <summary>

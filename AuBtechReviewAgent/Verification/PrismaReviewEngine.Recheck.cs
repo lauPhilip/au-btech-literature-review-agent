@@ -34,7 +34,6 @@ public partial class PrismaReviewEngine
 
     public sealed class RecheckException(string message) : Exception(message);
 
-    /// <summary>How many re-checks a run has left.</summary>
     public int RechecksLeft(Guid runId)
     {
         try

@@ -88,6 +88,5 @@ public partial class PrismaReviewEngine
         return perspectives;
     }
 
-    /// <summary>Settings for a prompt that must answer with a JSON object (see <see cref="LlmJson.JsonMode"/>).</summary>
     internal static MistralAIPromptExecutionSettings JsonMode(double temperature) => LlmJson.JsonMode(temperature);
 }
