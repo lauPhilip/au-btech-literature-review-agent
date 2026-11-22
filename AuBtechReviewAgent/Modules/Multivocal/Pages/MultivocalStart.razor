@@ -126,61 +126,9 @@
                             }
                         </div>
 
-                        @if (step == 0)
+                        @if (step is 0 or 1)
                         {
-                            <div>
-                                <label for="p-topic" class="ui-label">Topic <span class="font-normal text-muted">(required)</span></label>
-                                <input id="p-topic" class="ui-input" maxlength="@AuBtechReviewAgent.MultivocalPlan.MaxText" @bind="plan.Topic" @bind:event="oninput" placeholder="e.g. context engineering for LLM agents" aria-describedby="h-topic" />
-                                <p id="h-topic" class="text-xs text-muted mt-1">What the review is about, in a few words.</p>
-                            </div>
-                            <div>
-                                <label for="p-goal" class="ui-label">Goal <span class="font-normal text-muted">(required)</span></label>
-                                <textarea id="p-goal" rows="3" class="ui-input resize-y" maxlength="@AuBtechReviewAgent.MultivocalPlan.MaxText" @bind="plan.Goal" @bind:event="oninput" aria-describedby="h-goal"
-                                          placeholder="e.g. Map the practices developers use to decide what goes into an agent's context window."></textarea>
-                                <p id="h-goal" class="text-xs text-muted mt-1">What the review is for. It guides the research questions.</p>
-                            </div>
-                            <div>
-                                <label for="p-existing" class="ui-label">Existing reviews</label>
-                                <textarea id="p-existing" rows="2" class="ui-input resize-y" maxlength="@AuBtechReviewAgent.MultivocalPlan.MaxText" @bind="plan.ExistingReviews" @bind:event="oninput" aria-describedby="h-existing"></textarea>
-                                <p id="h-existing" class="text-xs text-muted mt-1">Name the reviews you found and what this one adds. Leave empty if you found none.</p>
-                            </div>
-                            <fieldset>
-                                <legend class="ui-label">Who is the review for? <span class="font-normal text-muted">(required)</span></legend>
-                                <div class="flex flex-wrap gap-x-5 gap-y-1.5 text-sm text-ink">
-                                    @foreach (var audience in Enum.GetValues<AuBtechReviewAgent.ReviewAudience>())
-                                    {
-                                        var a = audience;
-                                        <label class="inline-flex items-center gap-2 cursor-pointer">
-                                            <input type="radio" name="audience" class="w-4 h-4 accent-brand" checked="@(plan.Audience == a)" @onchange="() => plan.Audience = a" />
-                                            @AudienceLabel(a)
-                                        </label>
-                                    }
-                                </div>
-                            </fieldset>
-                        }
-                        else if (step == 1)
-                        {
-                            <p class="text-xs text-muted">One or more "yes" answers suggest including grey literature (Table 4).</p>
-                            <ol class="space-y-3">
-                                @for (int i = 0; i < AuBtechReviewAgent.MultivocalGuidelines.IncludeGreyQuestions.Count; i++)
-                                {
-                                    int q = i;
-                                    <li>
-                                        <fieldset class="flex flex-col sm:flex-row sm:items-start gap-2 sm:gap-4">
-                                            <legend class="sr-only">Question @(q + 1)</legend>
-                                            <span class="text-sm text-ink flex-1"><span class="text-muted">@(q + 1).</span> @AuBtechReviewAgent.MultivocalGuidelines.IncludeGreyQuestions[q]</span>
-                                            <span class="flex gap-4 text-sm flex-none">
-                                                <label class="inline-flex items-center gap-1.5 cursor-pointer"><input type="radio" name="@($"g3-{q}")" class="w-4 h-4 accent-brand" checked="@(plan.IncludeGrey[q] == true)" @onchange="() => plan.IncludeGrey[q] = true" /> Yes</label>
-                                                <label class="inline-flex items-center gap-1.5 cursor-pointer"><input type="radio" name="@($"g3-{q}")" class="w-4 h-4 accent-brand" checked="@(plan.IncludeGrey[q] == false)" @onchange="() => plan.IncludeGrey[q] = false" /> No</label>
-                                            </span>
-                                        </fieldset>
-                                    </li>
-                                }
-                            </ol>
-                            @if (plan.IncludeGrey.All(a => a == false))
-                            {
-                                <p class="bg-partly-fill border border-partly-border text-partly p-2 text-xs" role="status">Every answer is "no": by the guidelines, a systematic review may be enough. You can still go on.</p>
-                            }
+                            <MultivocalNeedStep Page="this" />
                         }
                         else if (step == 2)
                         {
