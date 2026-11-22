@@ -54,6 +54,8 @@ The grey literature review now counts removed citations too: in its metrics, the
 
 On a phone, the main screens now fit without scrolling. A finished review folds the run's files and details into one line that opens with a tap.
 
+Checking an archive now lists every file in it, each marked Matches, Changed or Missing.
+
 Downloads are now smaller on the wire. The reference lists, the protocol, main.tex and the other text files are sent compressed, and so are the site's styles and scripts. Pages load the same, only faster.
 
 Downloads are faster. The archive of a finished review is kept on the server, so a second download sends the same file at once. Before, it was built again each time. A note or a new check of a citation still gives you a fresh archive. Each download now also says when it last changed, so your browser does not fetch a file it already has.

@@ -72,10 +72,14 @@ public static class RunManifest
         return string.Equals(Sha256(Encoding.UTF8.GetBytes(node.ToJsonString())), recorded.GetValue<string>(), StringComparison.Ordinal);
     }
 
+    /// <summary>One file the manifest lists, and what the check found: "Matches", "Changed" or "Missing".</summary>
+    public record ArchiveFileStatus(string Path, string Status);
+
     /// <summary>What checking a downloaded archive found (see <see cref="CheckArchive"/>).</summary>
     public record ArchiveCheck(
         bool HasManifest, bool? ManifestIntact, int FilesListed, IReadOnlyList<string> Changed, IReadOnlyList<string> Missing,
-        IReadOnlyList<string> NotListed, string? RunId, string? CreatedUtc, string? AppVersion, string? Model, string? ProtocolHash)
+        IReadOnlyList<string> NotListed, string? RunId, string? CreatedUtc, string? AppVersion, string? Model, string? ProtocolHash,
+        IReadOnlyList<ArchiveFileStatus>? Files = null)
     {
         /// <summary>Every listed file is present and unchanged, nothing was added, and the manifest is untouched.</summary>
         public bool Unchanged => HasManifest && ManifestIntact != false && Changed.Count == 0 && Missing.Count == 0 && NotListed.Count == 0;
@@ -128,8 +132,11 @@ public static class RunManifest
         var listedPaths = listed.Select(f => f.Path).ToHashSet(StringComparer.Ordinal);
         var notListed = files.Keys.Where(k => k != "manifest.json" && !listedPaths.Contains(k)).OrderBy(k => k, StringComparer.Ordinal).ToList();
 
+        // Every listed file in the manifest's order, so a reader sees the whole archive and not only what failed (#245).
+        var statuses = listed.Select(f => new ArchiveFileStatus(f.Path,
+            !files.TryGetValue(f.Path, out var content) ? "Missing" : Sha256(content) == f.Sha ? "Matches" : "Changed")).ToList();
         return new ArchiveCheck(true, ManifestIsIntact(manifest), listed.Count, changed, missing, notListed,
-            Str("RunId"), Str("CreatedUtc"), Str("AppVersion"), Str("Model"), Str("ProtocolHash"));
+            Str("RunId"), Str("CreatedUtc"), Str("AppVersion"), Str("Model"), Str("ProtocolHash"), statuses);
     }
 }
 
