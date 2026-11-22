@@ -171,14 +171,14 @@ public class MultivocalReportTests
     }
 
     [Fact]
-    public void ARunThatIsNotSynthesisedHasNoReport()
+    public async Task ARunThatIsNotSynthesisedHasNoReport()
     {
         string root = Path.Join(Path.GetTempPath(), "mlrreport-" + Guid.NewGuid().ToString("N"));
         try
         {
             var store = new RunStore(root);
             var planner = new MultivocalPlanner(store);
-            var (runId, _) = planner.CreateAsync(MultivocalPlan.Example()).GetAwaiter().GetResult();
+            var (runId, _) = await planner.CreateAsync(MultivocalPlan.Example());
             var searcher = new MultivocalSearcher(store, planner, _ => throw new InvalidOperationException());
             var pages = new MultivocalPages(store, searcher, new PageFetcher(new HttpClientHandler(), _ => Task.CompletedTask));
             var model = new FakeChatService();
