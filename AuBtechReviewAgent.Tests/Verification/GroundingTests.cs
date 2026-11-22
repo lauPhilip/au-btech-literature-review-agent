@@ -54,10 +54,14 @@ public class GroundingTests
 
         var result = await Grounding.CheckAndRepairAsync(chat, fields, sources, new Dictionary<int, IReadOnlyList<string>>(), 2, Mlr);
 
-        var repair = Assert.Single(result.Repairs);
-        Assert.Equal("rejected", repair.Action);
-        Assert.Equal("The platform is the safest on the market [1].", Assert.Single(result.Fields).Text);
+        // The rewrite is rejected, so the citation is still not supported and the second pass removes the sentence
+        // in code (issue #135); the rejected rewrite never reaches the text.
+        Assert.Equal(new[] { ("rejected", 1), ("delete", 2) }, result.Repairs.Select(r => (r.Action, r.Pass)));
+        Assert.Equal("The platform is the safest on the market [1].", result.Repairs[0].After);
+        Assert.Equal("", Assert.Single(result.Fields).Text);
+        Assert.Equal(1, Assert.Single(result.Removed).Reference);
         Assert.Equal(1, result.BeforeRepair.NotSupported);
+        Assert.Equal(2, chat.Prompts.Count);
         Assert.Contains("You are correcting citations in a multivocal literature review.", chat.Prompts[1]);
     }
 
@@ -72,21 +76,22 @@ public class GroundingTests
             .Returns("""{"results":[{"sentence":1,"verdict":"partially_supported","excerpt":"E1","quote":"every tool call is logged","reason":"tool calls only"}]}""")
             .Returns("""{"repairs":[{"id":1,"action":"rewrite","sentence":"Agents log every tool call [1, 2].","reason":"narrowed to tool calls"}]}""")
             .Returns("""{"results":[{"sentence":1,"verdict":"not_supported","reason":"the page is about processes"}]}""")
-            .Returns("""{"results":[{"sentence":1,"verdict":"supported","excerpt":"E1","quote":"every tool call is logged","reason":"stated"}]}""");
+            .Returns("""{"results":[{"sentence":1,"verdict":"supported","excerpt":"E1","quote":"every tool call is logged","reason":"stated"}]}""")
+            .Returns("""{"repairs":[]}"""); // the second pass asks again about [2], still partly supported, and gets nothing
         var fields = new List<(string Field, string Text)> { ("synthesis", "Loops recover. " + sentence) };
         var sources = new[] { WebPage(1, "In this design each agent runs in its own process to isolate failures."), WebPage(2, "In this release every tool call is logged.") };
 
         var result = await Grounding.CheckAndRepairAsync(chat, fields, sources, new Dictionary<int, IReadOnlyList<string>>(), 2, Mlr);
 
         Assert.Equal("Loops recover. " + sentence, Assert.Single(result.Fields).Text);
-        var repair = Assert.Single(result.Repairs);
-        Assert.Equal("reverted", repair.Action);
+        Assert.Equal(new[] { ("reverted", 1), ("none", 2) }, result.Repairs.Select(r => (r.Action, r.Pass)));
+        var repair = result.Repairs[0];
         Assert.Equal(sentence, repair.After);
         Assert.Contains("[1] supported → not_supported", repair.Note);
         Assert.Equal(new[] { CitationSupportChecker.Supported, CitationSupportChecker.Partial }, result.Checks.Select(c => c.Verdict));
         Assert.All(result.Checks, c => Assert.Equal(sentence, c.Sentence));
         Assert.All(result.Checks, c => Assert.Equal(1, c.SentenceIndex));
-        Assert.Equal(5, chat.Prompts.Count);
+        Assert.Equal(6, chat.Prompts.Count);
     }
 
     [Fact]

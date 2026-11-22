@@ -9,8 +9,8 @@ using Microsoft.SemanticKernel.ChatCompletion;
 
 namespace AuBtechReviewAgent;
 
-/// <summary>One sentence changed (or left alone) by the citation repair pass, as written to citation-audit.json.</summary>
-public record CitationRepair(string Field, string Before, string After, string Action, IReadOnlyList<int> FlaggedReferences, string InitialVerdicts, string Note);
+/// <summary>One sentence changed (or left alone) by the citation repair, as written to citation-audit.json; Pass is 1 or 2.</summary>
+public record CitationRepair(string Field, string Before, string After, string Action, IReadOnlyList<int> FlaggedReferences, string InitialVerdicts, string Note, int Pass = 1);
 
 /// <summary>
 /// The citation repair pass, shared by every kind of review. Sentences whose citation the support check rejected
@@ -18,7 +18,7 @@ public record CitationRepair(string Field, string Before, string After, string A
 /// a citation. Only the changed sentences are checked again. Every decision goes into the repair log
 /// (citation-audit.json), so nothing is changed silently.
 /// </summary>
-public static class CitationRepairer
+public static partial class CitationRepairer
 {
     /// <summary>How the prompts name the review when no other kind is given.</summary>
     public const string DefaultReview = "systematic literature review";
@@ -84,15 +84,16 @@ public static class CitationRepairer
     /// For every sentence with a rejected citation: one call per section asks the model to rewrite the sentence
     /// from the cited paper's evidence, to drop that citation, or to delete the sentence. A rewrite may only keep
     /// or remove the sentence's own citations (never add new ones). The changed sentences are checked again;
-    /// unchanged sentences keep their verdicts. Returns the new texts, the merged results and the repair log.
+    /// unchanged sentences keep their verdicts. <paramref name="needsRepair"/> picks the citations to repair (<see cref="NeedsRepair"/>
+    /// by default). Returns the new texts, the merged results and the repair log.
     /// </summary>
     public static async Task<(List<(string Field, string Text)> Fields, List<CitationSupportResult> Results, List<CitationRepair> Repairs)> RepairAsync(
         IChatCompletionService chat, List<(string Field, string Text)> fields, List<CitationSupportResult> results,
         IReadOnlyList<ReferencedPaper> papers, IReadOnlyDictionary<int, IReadOnlyList<string>> findings, int referenceCount,
-        int parallelism = 1, bool secondCheck = false, string review = DefaultReview)
+        int parallelism = 1, bool secondCheck = false, string review = DefaultReview, Func<CitationSupportResult, bool>? needsRepair = null)
     {
         var repairs = new List<CitationRepair>();
-        var flagged = results.Where(NeedsRepair).ToList();
+        var flagged = results.Where(needsRepair ?? NeedsRepair).ToList();
         if (flagged.Count == 0) return (fields, results, repairs);
 
         var byRef = papers.ToDictionary(p => p.ReferenceNumber);

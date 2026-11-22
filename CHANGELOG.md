@@ -34,7 +34,9 @@ The grey literature review, still in preview, now reads like the systematic one.
 
 Every page now has a dark theme. The switch is in the top bar, and if you have not chosen, the site follows your computer's setting. The citation colours keep their meaning in both themes.
 
-Nothing about how a review runs has changed. These are the first steps of the redesign; the pages follow one by one.
+The new look changes nothing about how a review runs. These are the first steps of the redesign; the pages follow one by one.
+
+The citation repair now has a second pass. After the first repair, a citation that is still only partly backed is rewritten once more and checked again. A citation that is still not backed is taken out. If another citation backs the sentence, the sentence stays. If not, the sentence goes too. Each change is kept in citation-audit.json, with the sentence as it was, so nothing goes missing. Both kinds of review use it.
 
 ### Fixed
 

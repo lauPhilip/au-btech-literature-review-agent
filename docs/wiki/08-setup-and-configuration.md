@@ -82,7 +82,7 @@ All of these can be set in `appsettings.json` (non-secret values only), user sec
 | `Cache:ScreeningDecisionDays` | 90 | How long a screening decision is reused |
 | `Synthesis:ThematicSynthesis` | true | Code the studies and write one subsection per theme |
 | `Synthesis:DualCoding` | true | Second, independent theme assignment with Cohen's kappa |
-| `Synthesis:RepairCitations` | true | Rewrite partly and not supported citations once, then check again |
+| `Synthesis:RepairCitations` | true | Rewrite partly and not supported citations, then check again; a second pass rewrites what is still partly supported and removes what is still not supported |
 | `Synthesis:SecondCitationCheck` | true | Independent second check of partly and not supported citations |
 | `Synthesis:MaxThemes` | 8 | Upper limit on themes |
 | `Synthesis:CodingBatchSize` | 6 | Studies per coding call |

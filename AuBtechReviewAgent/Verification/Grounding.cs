@@ -9,7 +9,7 @@ namespace AuBtechReviewAgent;
 /// <summary>How a review runs the grounding check on its text.</summary>
 /// <param name="Parallelism">How many sources are checked at the same time.</param>
 /// <param name="SecondCheck">Whether citations that are not fully supported get a second, independent check.</param>
-/// <param name="Repair">Whether sentences with a rejected citation are repaired once and checked again.</param>
+/// <param name="Repair">Whether sentences with a rejected citation are repaired and checked again, with a second pass for what is still flagged.</param>
 /// <param name="Review">How the prompts name the review, e.g. "systematic literature review".</param>
 /// <param name="Cache">Where the check's answers are kept, so the same sentence with the same evidence is not asked again; none by default.</param>
 public sealed record GroundingOptions(
@@ -19,25 +19,30 @@ public sealed record GroundingOptions(
     string Review = CitationRepairer.DefaultReview,
     CheckCache? Cache = null);
 
-/// <summary>The checked (and possibly repaired) text, every verdict, the counts before the repair, and the repair log.</summary>
+/// <summary>
+/// The checked (and possibly repaired) text, every verdict, the counts before the repair, the repair log, and the
+/// citations the second pass removed (no longer in <see cref="Checks"/>, so they are counted on their own).
+/// </summary>
 public sealed record GroundingResult(
     List<(string Field, string Text)> Fields,
     List<CitationSupportResult> Checks,
     CitationSupportSummary BeforeRepair,
-    List<CitationRepair> Repairs);
+    List<CitationRepair> Repairs,
+    List<RemovedCitation> Removed);
 
 /// <summary>
 /// The grounding check, the heart of TraceableAI, shared by every kind of review. Every cited sentence of a text is
 /// checked against the source it cites (a paper, or the text of any other source): the model must give a verdict
 /// and a verbatim quote, and the quote is looked up in the source's text in code. Sentences whose citation is
-/// rejected are repaired once and checked again. The check does not know which kind of review it serves; a module
+/// rejected are repaired and checked again; a second pass rewrites what is still partly supported and removes what
+/// is still not supported. The check does not know which kind of review it serves; a module
 /// passes its text, its numbered sources and how to name the review.
 /// </summary>
 public static class Grounding
 {
     /// <summary>
-    /// Checks every citation in the fields against its source, then repairs rejected citations once (when
-    /// <see cref="GroundingOptions.Repair"/> is set). <paramref name="checking"/> is told how many citations will be
+    /// Checks every citation in the fields against its source, then repairs rejected citations (when
+    /// <see cref="GroundingOptions.Repair"/> is set), with a second pass when the first leaves citations flagged. <paramref name="checking"/> is told how many citations will be
     /// checked, <paramref name="checkProgress"/> how far each pass has come, and <paramref name="repairing"/> how
     /// many citations go to the repair pass.
     /// </summary>
@@ -62,14 +67,25 @@ public static class Grounding
         var beforeRepair = CitationSupportSummary.From(checks);
 
         var repairs = new List<CitationRepair>();
+        var removed = new List<RemovedCitation>();
         if (options.Repair && checks.Any(CitationRepairer.NeedsRepair))
         {
             repairing?.Invoke(checks.Count(CitationRepairer.NeedsRepair));
             using (LlmStage.Begin("citation-repair"))
                 (fields, checks, repairs) = await CitationRepairer.RepairAsync(chat, fields, checks, sources, verifiedQuotes, referenceCount,
                     options.Parallelism, options.SecondCheck, options.Review);
+            if (checks.Any(CitationRepairer.NeedsRepair))
+            {
+                repairing?.Invoke(checks.Count(CitationRepairer.NeedsRepair));
+                SecondPassResult second;
+                using (LlmStage.Begin("citation-repair"))
+                    second = await CitationRepairer.SecondPassAsync(chat, fields, checks, sources, verifiedQuotes, referenceCount,
+                        options.Parallelism, options.SecondCheck, options.Review);
+                (fields, checks, removed) = (second.Fields, second.Results, second.Removed);
+                repairs.AddRange(second.Repairs);
+            }
         }
-        return new GroundingResult(fields, checks, beforeRepair, repairs);
+        return new GroundingResult(fields, checks, beforeRepair, repairs, removed);
     }
 
     /// <summary>
