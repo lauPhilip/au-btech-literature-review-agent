@@ -118,6 +118,7 @@ public class RecordingChatCompletionService : IChatCompletionService
     private readonly object _lock = new();
     private readonly CancellationToken _stop;
 
+    /// <summary>Wraps one run's chat service, retrying temporary errors and recording every call.</summary>
     /// <param name="stop">Cancelled when the run's owner cancels the run: from then on no new call is made or recorded.</param>
     public RecordingChatCompletionService(IChatCompletionService inner, string model, int maxAttempts = 4, Func<int, TimeSpan>? backoff = null, CancellationToken stop = default)
     {
