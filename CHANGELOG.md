@@ -20,6 +20,8 @@ You can now stop a review you started. The run stops at the next safe point, bef
 
 ### Changed
 
+A repaired paragraph now has to read well, not only be supported. After the repair, each changed paragraph is read once for sense. If it reads badly, it is rewritten once from its supported claims, and every citation in it is checked again. The rewrite stays only if all of them hold. The audit file lists each paragraph and what happened to it.
+
 A repaired sentence in a grey literature review is now checked again as a grey literature sentence, not as part of a systematic review. On a rerun the check comes from the cache.
 
 The rationale in the introduction now keeps only sentences that cite a source. A sentence from the model's general knowledge is left out, and the writing log says which.
