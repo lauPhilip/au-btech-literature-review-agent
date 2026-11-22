@@ -28,6 +28,15 @@ public sealed partial class MultivocalQualityAssessor
     /// <summary>Part of the cache key: raise it whenever the quality prompt changes.</summary>
     public const string PromptVersion = "grey-quality-v2";
 
+    /// <summary>
+    /// Whether the formal pool's full texts and appraisal are built (block I-4 of docs/roadmap/mlr-todo.md). Until they
+    /// are, a run planned with academic databases stops here and says why, rather than scoring papers on Table 7.
+    /// </summary>
+    public const bool FormalAppraisalBuilt = false;
+
+    public const string FormalNotBuiltMessage =
+        "The academic sources cannot be appraised yet; that comes in step I-4 of the roadmap. The search and the screening are on file. Plan a new review with no academic database ticked, or from the Grey Literature Review card.";
+
     /// <summary>At most this much of a page is sent to the model; a quote must come from this part.</summary>
     public const int MaxTextForModel = 40_000;
 
@@ -106,6 +115,7 @@ public sealed partial class MultivocalQualityAssessor
         var planned = _planner.Load(runId) ?? throw new InvalidOperationException("This run has no plan.");
         var ledger = _searcher.LoadLedger(runId) ?? throw new InvalidOperationException("Search the run first.");
         var screening = _screener.Load(runId) ?? throw new InvalidOperationException("Screen the sources first.");
+        if (planned.Plan.UsesFormalPool && !FormalAppraisalBuilt) throw new InvalidOperationException(FormalNotBuiltMessage);
         if (!Running.TryAdd(runId, true)) throw new InvalidOperationException("This run is being assessed already.");
 
         string folder = _runs.FolderOf(runId);
