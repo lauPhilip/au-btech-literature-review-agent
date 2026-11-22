@@ -70,16 +70,17 @@ public class MultivocalFormalSearchTests : IDisposable
         var db = new FormalKit.Database();
         var (_, _, ledger) = await Search(k => k == "openalex" ? db : k == "arxiv" ? new Xml() : null);
 
-        var formal = Assert.Single(ledger.FormalPool); // arXiv's paper has the same title as OpenAlex's first
+        Assert.Equal(2, ledger.FormalPool.Count()); // arXiv's paper has the same title as OpenAlex's first, which is left out
+        var formal = ledger.FormalPool.First();
         Assert.Equal("arxiv:1", formal.Paper!.Id);
         Assert.Equal(new[] { "arxiv: context AND agents", "arxiv: agent memory", "openalex: context AND agents", "openalex: agent memory" }, formal.FoundBy);
         Assert.Equal("Ana", formal.Record.Producer);
         Assert.Equal(MultivocalSearcher.FormalKind, formal.Record.Kind);
         Assert.Equal(new DateTime(2025, 1, 2), formal.Record.Published);
         var removed = ledger.FormalRemoved!;
-        Assert.Equal(5, removed.Count(r => r.Reason == RemovedRecord.Duplicate));
+        Assert.Equal(6, removed.Count(r => r.Reason == RemovedRecord.Duplicate));
         Assert.Equal(2, removed.Count(r => r.Reason == MultivocalSearcher.NoWebAddress));
-        Assert.All(removed.Where(r => r.Reason == RemovedRecord.Duplicate), r => Assert.Equal("arxiv:1", r.DuplicateOf));
+        Assert.Equal(5, removed.Count(r => r.DuplicateOf == "arxiv:1"));
         Assert.Equal(2, ledger.GreyPool.Count());
     }
 
@@ -92,7 +93,7 @@ public class MultivocalFormalSearchTests : IDisposable
         Assert.Equal(2, failed.Count);
         Assert.All(failed, s => Assert.Contains("HttpRequestException", s.Error));
         Assert.All(failed, s => Assert.DoesNotContain("abcdefghijklmnopqrstuvwxyz0123", s.Error));
-        Assert.Single(ledger.FormalPool);
+        Assert.Equal(2, ledger.FormalPool.Count());
         Assert.Contains(ledger.Skipped, s => s.Source == "scopus" && s.Reason == "Needs a key this server does not have.");
     }
 
