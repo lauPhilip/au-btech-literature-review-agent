@@ -86,6 +86,8 @@ The concept map in main.tex no longer leaves wide gaps between its columns, so i
 
 A code repository is now cited by the year it was made, not the year of its last change. The last change is still given, as "last updated". Before, every repository was cited as 2026.
 
+A question about how often something happens now gets the same answer in the paper and in the data appendix. Before, the paper counted the answer while the appendix said no theme was found.
+
 ## [0.4.0] - 2026-11-20
 
 The model writes about the studies from facts, not from its own guesses. This changes what the model is asked, so runs can differ from 0.3.0.
