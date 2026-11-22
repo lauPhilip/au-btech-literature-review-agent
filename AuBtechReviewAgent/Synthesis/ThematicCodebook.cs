@@ -98,5 +98,9 @@ public class ThematicCodebook
     public List<UncodedStudy> NotCited { get; set; } = new();
     public string? FallbackReason { get; set; }
 
+    /// <summary>What code changed in the written text, such as limitations merged into one paragraph; null when nothing was.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public List<string>? WritingNotes { get; set; }
+
     [JsonIgnore] public IEnumerable<int> CodedStudies => Themes.SelectMany(t => t.Studies).Distinct().OrderBy(r => r);
 }

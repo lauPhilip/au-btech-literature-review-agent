@@ -33,7 +33,7 @@ public static partial class ReviewWriter
             {{synthesis}}
 
             REQUIREMENTS:
-            1. Write about {{paragraphs}} paragraphs, separated by a blank line: {{profile.DiscussionParts}}
+            1. Write about {{paragraphs}} paragraphs, separated by a blank line: {{profile.DiscussionParts}} {{EachPartOnceRule}}
             2. Interpret, do not repeat the results. Ground every claim in the results above; every sentence that attributes something to the literature ends with an inline marker such as [3] or [2, 5], using the same {{profile.Sources}} the results cite for it. {{OwnCountRule}}
             3. Do not invent numbers, statistics or {{profile.Sources}}.
             4. {{ReadingBasisRule(profile)}}
@@ -54,13 +54,71 @@ public static partial class ReviewWriter
                     ? $"\"{own}\" states this review's own count and carries a citation; the review's own counts take no citation."
                     : null;
             });
-            return MethodsSectionWriter.StripMarkdownEmphasis(answer.Text!.Trim());
+            string text = OneLimitationsParagraph(MethodsSectionWriter.StripMarkdownEmphasis(answer.Text!.Trim()), out string? merged);
+            if (merged != null) warn?.Invoke(merged);
+            return text;
         }
         catch (Exception ex)
         {
             warn?.Invoke($"Discussion could not be written: {ex.Message}");
             return "";
         }
+    }
+
+    /// <summary>
+    /// The prompt rule that asks for each part of the discussion once (issue #248): in a live run the last two
+    /// paragraphs both described the limitations in nearly the same words.
+    /// </summary>
+    public const string EachPartOnceRule =
+        "Write each part once, in the order given: a part may take more than one paragraph, but no later paragraph comes back to a part already written or says its points again.";
+
+    private static readonly Regex LimitationsOpening = new(@"\b(?:limitations?|caveats?|shortcomings?)\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+    /// <summary>
+    /// The discussion with its limitations in one paragraph (issue #248). A paragraph whose first sentence speaks of
+    /// limitations is a limitations paragraph; when there are several, they become one, in the place of the first,
+    /// and a sentence that says again what an earlier one said (most of its words are the same, and it cites nothing the
+    /// earlier one does not) is left out, so no citation is lost. Nothing
+    /// else changes. <paramref name="note"/> says what was merged and dropped, for the run's files, or is null when
+    /// nothing was. Public for unit tests.
+    /// </summary>
+    public static string OneLimitationsParagraph(string text, out string? note)
+    {
+        note = null;
+        var paragraphs = Regex.Split(text.Trim(), @"\n\s*\n").Select(p => p.Trim()).Where(p => p.Length > 0).ToList();
+        var limits = paragraphs.Select((p, i) => (p, i))
+            .Where(x => CitationSupportChecker.SplitSentences(x.p).FirstOrDefault() is { } first && LimitationsOpening.IsMatch(first))
+            .Select(x => x.i).ToList();
+        if (limits.Count < 2) return text;
+
+        var kept = CitationSupportChecker.SplitSentences(paragraphs[limits[0]]).ToList();
+        var dropped = new List<string>();
+        foreach (var sentence in limits.Skip(1).SelectMany(i => CitationSupportChecker.SplitSentences(paragraphs[i])))
+            (kept.Any(k => SaysAgain(sentence, k) && ThematicSynthesis.CitedIn(sentence).All(ThematicSynthesis.CitedIn(k).Contains)) ? dropped : kept).Add(sentence);
+        paragraphs[limits[0]] = string.Join(" ", kept);
+        foreach (int i in limits.Skip(1).Reverse()) paragraphs.RemoveAt(i);
+        note = $"The discussion described the limitations in {limits.Count} paragraphs; they were merged into one in code" +
+               (dropped.Count == 0 ? "." : $", and {dropped.Count} sentence{(dropped.Count == 1 ? "" : "s")} that said again what an earlier one said {(dropped.Count == 1 ? "was" : "were")} left out: " +
+                string.Join(" ", dropped.Select(d => $"\"{d}\"")));
+        return string.Join("\n\n", paragraphs);
+    }
+
+    private static readonly HashSet<string> RepeatIgnoredWords = new(StringComparer.Ordinal)
+        { "this", "that", "these", "those", "which", "with", "from", "were", "have", "been", "their", "they", "also", "more", "most", "such", "into", "than", "only", "both", "each", "some" };
+
+    /// <summary>
+    /// Whether a sentence says again what an earlier one said: of their words of four letters or more (common words and
+    /// citation markers left out), the shared ones are at least 60 % of the shorter sentence's and half of the longer's.
+    /// </summary>
+    private static bool SaysAgain(string sentence, string earlier)
+    {
+        static HashSet<string> Words(string s) => Regex.Matches(Regex.Replace(s, @"\[[^\]]*\]", ""), @"\p{L}{4,}")
+            .Select(m => m.Value.ToLowerInvariant()).Where(w => !RepeatIgnoredWords.Contains(w)).ToHashSet();
+        var a = Words(sentence);
+        var b = Words(earlier);
+        if (a.Count == 0 || b.Count == 0) return false;
+        int shared = a.Count(b.Contains);
+        return shared * 5 >= Math.Min(a.Count, b.Count) * 3 && shared * 2 >= Math.Max(a.Count, b.Count);
     }
 
     /// <summary>

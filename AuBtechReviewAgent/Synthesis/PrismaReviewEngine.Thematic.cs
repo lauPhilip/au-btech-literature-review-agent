@@ -122,7 +122,11 @@ public partial class PrismaReviewEngine
         // 5. Discussion from the subsections
         ReportProgress(runId, state, RunProgress.Synthesis, RunProgress.Phase(RunProgress.SynthesisPhases, 4, 0), "Writing the discussion");
         using (LlmStage.Begin("discussion"))
-            result.Discussion = await ReviewWriter.WriteDiscussionAsync(chat, profile, query, goal, result.Sections, evidence, referenceCount, Warn);
+            result.Discussion = await ReviewWriter.WriteDiscussionAsync(chat, profile, query, goal, result.Sections, evidence, referenceCount, message =>
+            {
+                Warn(message);
+                (book.WritingNotes ??= new()).Add(message);
+            });
 
         // 6. Peer review, per section, with the same coverage guard as the fill pass
         ReportProgress(runId, state, RunProgress.Synthesis, RunProgress.Phase(RunProgress.SynthesisPhases, 5, 0), "Automated peer review");

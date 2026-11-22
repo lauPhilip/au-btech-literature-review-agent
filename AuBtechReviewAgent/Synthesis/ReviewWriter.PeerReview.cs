@@ -107,7 +107,8 @@ public static partial class ReviewWriter
                     string after = Named(MethodsSectionWriter.StripMarkdownEmphasis(answer.Text!.Trim()));
                     string? problem = ThematicSynthesis.RevisionProblem(before, after, referenceCount)
                         ?? (section == null ? LeftOutCited(after, evidence) : null)
-                        ?? (section == null && ReadingBasisSentence(after) is { } basis ? ReadingBasisProblem(basis, profile) : null);
+                        ?? (section == null && ReadingBasisSentence(after) is { } basis ? ReadingBasisProblem(basis, profile) : null)
+                        ?? (section == null && OneLimitationsParagraph(after, out _) != after ? "it describes the limitations in more than one paragraph" : null);
                     return new SectionRevision(group.Key, before, problem == null ? after : before, problem == null,
                         problem == null ? $"Revised in response to {group.Count()} comment(s)." : $"Revision rejected: {problem}; original kept.");
                 }
