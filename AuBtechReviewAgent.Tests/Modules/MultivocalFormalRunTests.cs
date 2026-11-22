@@ -96,7 +96,55 @@ public class MultivocalFormalRunTests : IDisposable
     {
         var run = await FormalKit.RunAsync(_root);
 
-        Assert.Equal("Scoring the quality stopped: " + MultivocalQualityAssessor.FormalNotBuiltMessage, run.Runner.StatusOf(run.RunId)!.Error);
-        Assert.Equal(MultivocalScreener.StageScreened, run.Store.LoadHeader(run.RunId)!.Stage);
+        Assert.Equal("Proposing the map stopped: " + MultivocalMapper.FormalNotBuiltMessage, run.Runner.StatusOf(run.RunId)!.Error);
+        Assert.Equal(MultivocalQualityAssessor.StageAssessed, run.Store.LoadHeader(run.RunId)!.Stage);
+    }
+
+    [Fact]
+    public async Task AFormalSourceIsKeptOnItsOpenFullTextOrItsAbstractAndTheQuoteCheckUsesThatText()
+    {
+        var run = await FormalKit.RunAsync(_root);
+
+        var ledger = run.Searcher.LoadLedger(run.RunId)!;
+        string full = MultivocalSearcher.AddressKey(ledger.FormalPool.First().Record.Url);
+        string onAbstract = MultivocalSearcher.AddressKey(ledger.FormalPool.Last().Record.Url);
+        var pages = run.Pages.Load(run.RunId).Pages;
+        var fullPage = pages.Single(p => MultivocalSearcher.AddressKey(p.Url) == full);
+        var abstractPage = pages.Single(p => MultivocalSearcher.AddressKey(p.Url) == onAbstract);
+        Assert.Equal((MultivocalPages.FullTextBasis, "open-access link from the source", "https://example.org/w1.pdf"), (fullPage.TextBasis, fullPage.FullTextSource, fullPage.FinalUrl));
+        Assert.Equal((MultivocalPages.AbstractBasis, "none (no open-access copy known)"), (abstractPage.TextBasis, abstractPage.FullTextSource));
+        Assert.Equal(FormalKit.SecondAbstract, run.Pages.ReadText(run.RunId, abstractPage));
+        Assert.Equal("", abstractPage.WaybackUrl); // no web page was read, so there is no capture to point to
+
+        Assert.Equal("found", run.Pages.CheckQuote(run.RunId, full, FormalKit.FullTextOnly));
+        Assert.Equal("not found", run.Pages.CheckQuote(run.RunId, onAbstract, FormalKit.FullTextOnly));
+        Assert.Equal("found", run.Pages.CheckQuote(run.RunId, onAbstract, FormalKit.SecondAbstract));
+    }
+
+    [Fact]
+    public async Task FormalSourcesAreAppraisedWithMmatAndTheThresholdAppliesToGreySourcesOnly()
+    {
+        var run = await FormalKit.RunAsync(_root);
+
+        var quality = run.Quality.Load(run.RunId)!;
+        Assert.Equal(MultivocalQualityAssessor.FormalAppraisalVersion, quality.FormalAppraisalVersion);
+        var formal = quality.Sources.Where(q => q.Formal).ToList();
+        Assert.Equal(2, formal.Count);
+        Assert.All(formal, q => Assert.Equal(("Passed", 0.0), (q.Outcome, q.Points))); // kept whatever the appraisal; no Table 7 points
+        Assert.All(formal, q => Assert.Empty(q.Answers));
+
+        var withFullText = formal[0].Mmat!;
+        Assert.Equal(("full text", "qualitative"), (withFullText.EvidenceBasis, withFullText.AppraisalCategory));
+        Assert.Equal(new[] { "yes", "yes", "cant_tell", "cant_tell", "cant_tell" }, withFullText.Appraisal.Select(a => a.Answer));
+        Assert.All(withFullText.Appraisal.Where(a => a.Answer == "yes"), a => Assert.True(a.QuoteVerified));
+        Assert.Equal(MultivocalPages.FullTextBasis, formal[0].TextBasis);
+
+        var onAbstract = formal[1].Mmat!;
+        Assert.Equal(("abstract only", "not_empirical"), (onAbstract.EvidenceBasis, onAbstract.AppraisalCategory));
+        Assert.True(onAbstract.KeyFindings.Single().QuoteVerified);
+        Assert.Equal(MultivocalPages.AbstractBasis, formal[1].TextBasis);
+
+        Assert.DoesNotContain(run.Model.Prompts, p => p.Contains("You assess the quality of one grey") && p.Contains("agent frameworks"));
+        Assert.Equal(2, run.Model.Prompts.Count(p => p.Contains("Mixed Methods Appraisal Tool")));
     }
 }
