@@ -141,8 +141,5 @@ public sealed partial class MultivocalWriter
         return (file, outline);
     }
 
-    // ---------- Checking ----------
-
-
     private static string LowerFirst(string text) => text.Length == 0 ? text : char.ToLowerInvariant(text[0]) + text[1..];
 }
