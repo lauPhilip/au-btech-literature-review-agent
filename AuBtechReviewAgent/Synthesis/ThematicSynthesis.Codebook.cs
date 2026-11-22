@@ -22,17 +22,20 @@ public static partial class ThematicSynthesis
     /// (through one of its codes) or say why its codes fit none; the answer is rejected otherwise.
     /// </summary>
     public static async Task<(List<Theme> Themes, List<UncodedStudy> Unplaced)> BuildCodebookAsync(
-        IChatCompletionService chat, string objective, IReadOnlyList<ThematicCode> codes, int maxThemes)
+        IChatCompletionService chat, string objective, IReadOnlyList<ThematicCode> codes, int maxThemes, string criteria = "")
     {
         var studies = codes.Select(c => c.Reference).Distinct().ToList();
         var (min, max) = ThemeRange(studies.Count, maxThemes);
         var ids = codes.Select(c => c.Id).ToHashSet(StringComparer.OrdinalIgnoreCase);
         string codeList = string.Join("\n", codes.Select(c => $"{c.Id} [study {c.Reference}]: {c.Label}"));
 
+        // Every study here was included, so a reason to leave it out may not contradict the criteria it met (issue #166).
+        string criteriaBlock = string.IsNullOrWhiteSpace(criteria) ? "" : $"\nELIGIBILITY CRITERIA (every study below met them and was included):\n{criteria.Trim()}\n";
+        string criteriaRule = string.IsNullOrWhiteSpace(criteria) ? "" : " Never leave a code out because its study is outside the topic, population, setting or intervention: every study met the eligibility criteria above, and a reason must not contradict them.";
         string prompt = $$"""
             You are building the codebook for the thematic synthesis of a systematic literature review: group the codes below into descriptive themes.
 
-            REVIEW OBJECTIVE: "{{objective}}"
+            REVIEW OBJECTIVE: "{{objective}}"{{criteriaBlock}}
             {{PromptSafety.ReviewerInputNotice}}
 
             {{PromptSafety.DataOnlyNotice}}
@@ -41,7 +44,7 @@ public static partial class ThematicSynthesis
 
             TASK: Group the codes into {{min}} to {{max}} themes. A theme names a pattern that several studies share and that answers part of the objective; it is not a single study. Give each theme a short name (at most 8 words) and a one- or two-sentence description of what unites its codes.
             - Put every code in the theme it fits best; a code may also go into a second theme if it clearly belongs to both.
-            - Every study should end up in at least one theme. Only leave a code out if it does not bear on the objective; list it under "unassigned" with a reason.
+            - Every study should end up in at least one theme. Only leave a code out if it does not bear on the objective; list it under "unassigned" with a reason.{{criteriaRule}}
             - Use only the code ids listed above.
             Respond ONLY with a minified JSON object:
             {"themes":[{"name":"...","description":"...","codes":["C1","C4"]}],"unassigned":[{"code":"C9","reason":"..."}]}
