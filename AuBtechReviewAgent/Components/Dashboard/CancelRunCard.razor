@@ -1,0 +1,51 @@
+@* Cancel review (issue #197): a side card beside a queued, running or waiting review, shown only to the browser
+   with the run's edit key. It is the one side card a phone still shows. The first click only asks; the second,
+   with an optional reason, cancels through the page (PrismaReviewEngine.CancelRun). The page keeps the state, so
+   it can render again after each click. *@
+
+<div class="ui-card p-4 sm:p-5">
+    <h2 class="font-display text-base font-semibold text-heading">Stop this review</h2>
+    @if (Requested)
+    {
+        <p class="mt-1 text-sm leading-relaxed text-muted" role="status">Cancelling. The review stops before its next step or model call.</p>
+    }
+    else if (!Asking)
+    {
+        <p class="mt-1 text-sm leading-relaxed text-muted">Started the wrong review? You can cancel it.</p>
+        @if (!string.IsNullOrEmpty(Problem))
+        {
+            <p class="mt-2 text-sm text-not-supported" role="alert">@Problem</p>
+        }
+        <button type="button" @onclick="OnAsk" class="ui-btn-secondary mt-3 min-h-[44px] w-full">Cancel review</button>
+    }
+    else
+    {
+        <p class="mt-1 text-sm leading-relaxed text-ink">Cancel this review? It stops before its next step. What it did so far stays on file until the run is deleted. Your free review for today comes back, once a day.</p>
+        <label for="cancel-reason" class="ui-label mt-3">Why are you cancelling? (optional)</label>
+        <input id="cancel-reason" type="text" maxlength="300" value="@Reason" @oninput="ReasonChanged" class="ui-input" />
+        <div class="mt-3 flex flex-col gap-2">
+            <button type="button" @onclick="OnConfirm" class="ui-btn-danger min-h-[44px] w-full">Yes, cancel the review</button>
+            <button type="button" @onclick="OnKeep" class="ui-btn-secondary min-h-[44px] w-full">Keep it running</button>
+        </div>
+    }
+</div>
+
+@code {
+    /// <summary>True after the first click: the card asks before it acts.</summary>
+    [Parameter] public bool Asking { get; set; }
+
+    /// <summary>True once the run was asked to stop; it ends at its next safe point.</summary>
+    [Parameter] public bool Requested { get; set; }
+
+    /// <summary>Why the review could not be cancelled, when it could not.</summary>
+    [Parameter] public string? Problem { get; set; }
+
+    [Parameter] public string Reason { get; set; } = "";
+
+    [Parameter] public EventCallback OnAsk { get; set; }
+    [Parameter] public EventCallback OnKeep { get; set; }
+    [Parameter] public EventCallback OnConfirm { get; set; }
+    [Parameter] public EventCallback<string> OnReason { get; set; }
+
+    private Task ReasonChanged(ChangeEventArgs e) => OnReason.InvokeAsync(e.Value?.ToString() ?? "");
+}
