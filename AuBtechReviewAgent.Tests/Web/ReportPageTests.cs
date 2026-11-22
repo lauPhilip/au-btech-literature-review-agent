@@ -20,7 +20,7 @@ public class ReportPageTests
     [Fact]
     public void EverySectionInTheContentsListHasItsIdOnThePage()
     {
-        string? page = Source("Pages", "SpecMatrix.razor");
+        string? page = ReportPageSource.Read();
         if (page == null) return; // not run from the repository (packaged tests)
 
         foreach (string id in new[] { "AbstractId", "IntroductionId", "MethodologyId", "StudiesId", "ResultsId", "DiscussionId", "ConclusionId", "DeclarationsId", "ReferencesId", "AppendixId" })
@@ -33,7 +33,7 @@ public class ReportPageTests
     [Fact]
     public void TheReportKeepsWhatTheOldPageCouldDo()
     {
-        string? page = Source("Pages", "SpecMatrix.razor");
+        string? page = ReportPageSource.Read();
         if (page == null) return;
 
         // Printing, the archive, the exports, the link, a new review from the settings, deleting, notes and re-checks.

@@ -11,12 +11,7 @@ namespace AuBtechReviewAgent.Tests;
 /// </summary>
 public class PaperPageTests
 {
-    private static string? PageSource()
-    {
-        string? root = AppContext.BaseDirectory;
-        while (root != null && !File.Exists(Path.Join(root, "AuBtechReviewAgent.sln"))) root = Path.GetDirectoryName(root);
-        return root == null ? null : File.ReadAllText(Path.Join(root, "AuBtechReviewAgent", "Components", "Pages", "SpecMatrix.razor"));
-    }
+    private static string? PageSource() => ReportPageSource.Read();
 
     [Fact]
     public void TheTablesOfTheStudiesComeAfterTheReferencesAsAnAppendix()
