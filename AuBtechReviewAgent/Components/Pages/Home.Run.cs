@@ -49,6 +49,7 @@ public partial class Home
         if (stage == AuBtechReviewAgent.PrismaReviewEngine.StageComplete) return "The review is complete. The report is ready.";
         if (stage == AuBtechReviewAgent.PrismaReviewEngine.StageFailed) return "The run failed. " + (failureMessage ?? "");
         if (stage == AuBtechReviewAgent.PrismaReviewEngine.StageInterrupted) return "The run was interrupted.";
+        if (stage == AuBtechReviewAgent.PrismaReviewEngine.StageCancelled) return failureMessage ?? "The run was cancelled.";
         if (awaitingReview) return "The run is waiting for you to check the screening decisions.";
         if (stage == AuBtechReviewAgent.PrismaReviewEngine.StageQueued) return "The run is waiting for a free slot.";
         return AuBtechReviewAgent.RunProgress.Steps.TryGetValue(State.Stats.ProgressStep, out var step) ? $"Now: {step.Label}." : "The run has started.";
