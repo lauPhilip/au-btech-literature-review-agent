@@ -137,18 +137,24 @@ public static class MultivocalPaper
     public static string AiUse(MultivocalReportInput input, MultivocalPaperFile paper)
     {
         var inv = CultureInfo.InvariantCulture;
-        string model = string.IsNullOrWhiteSpace(paper.Model) ? "a large language model" : $"the large language model {paper.Model}";
+        var others = OtherModels(input, paper);
+        string model = string.IsNullOrWhiteSpace(paper.Model) ? "a large language model"
+            : others.Count == 0 ? $"the large language model {paper.Model}"
+            : $"the large language models {paper.Model} and {JoinList(others.Select(o => o.Model).ToList())}";
+        string subject = others.Count == 0 ? "The model was" : "The models were";
         var text = new StringBuilder();
         text.Append(inv, $"This review was conducted with TraceableAI (version {RecordingChatCompletionService.AppVersion.Split('+')[0]}), an open-source tool, following the multivocal literature review guidelines of Garousi et al. (2019), with {model}, in {paper.WrittenUtc.ToString("MMMM yyyy", inv)} (run {input.Planned.RunId}). ");
+        if (others.Count > 0)
+            text.Append($"Of these, {string.Join("; ", others.Select(o => $"{o.Model} answered {JoinList(o.Tasks)}"))}, and {paper.Model} did every other step that used a model. ");
         text.Append("The protocol was written by the authors and fingerprinted before the search. ");
         if (input.Ledger.HasFormalPool)
         {
-            text.Append(MultivocalFormalText.AiUseTasks(input));
+            text.Append(MultivocalFormalText.AiUseTasks(input, subject));
             text.Append(MultivocalFormalText.AiUseKappa(input));
         }
         else
         {
-            text.Append("The model was used for screening the grey sources twice against the criteria, scoring their quality on the guidelines' checklist, proposing the systematic map, extracting each source's values, checking that each value's quote supports it, grouping the findings into themes, writing the theme sections, the discussion, the summary for practitioners and the title, abstract and introduction, and checking each citation against the kept page of the source it cites. ");
+            text.Append(subject).Append(" used for screening the grey sources twice against the criteria, scoring their quality on the guidelines' checklist, proposing the systematic map, extracting each source's values, checking that each value's quote supports it, grouping the findings into themes, writing the theme sections, the discussion, the summary for practitioners and the title, abstract and introduction, and checking each citation against the kept page of the source it cites. ");
             text.Append("Every value, quality point and citation verdict counts only with a quote found verbatim in the kept page text; the method, the counts, the figures, the answers to questions about frequency or existence and the references were written in code. ");
             if (input.Screening.Kappa is double k) text.Append(inv, $"The two screenings agreed with Cohen's kappa = {k:0.00}. ");
         }
@@ -160,6 +166,29 @@ public static class MultivocalPaper
         text.Append("The authors reviewed the output and take full responsibility for the content.");
         return text.ToString();
     }
+
+    /// <summary>
+    /// The models other than the paper's that answered a step (Llm:FastModel), each with what it did, from the run's
+    /// files: the screening file names the screenings' model and the paper file the citation checks' model.
+    /// </summary>
+    private static List<(string Model, List<string> Tasks)> OtherModels(MultivocalReportInput input, MultivocalPaperFile paper)
+    {
+        var steps = new List<(string Model, string Task)>();
+        string main = paper.Model.Trim();
+        if (main.Length == 0) return new();
+        string screening = input.Screening.Model.Trim();
+        if (screening.Length > 0 && screening != main) steps.Add((screening, "both screenings of every source"));
+        string check = paper.CheckModel?.Trim() ?? "";
+        if (check.Length > 0 && check != main) steps.Add((check, "the citation checks"));
+        return steps.GroupBy(s => s.Model, StringComparer.Ordinal).Select(g => (g.Key, g.Select(s => s.Task).ToList())).ToList();
+    }
+
+    private static string JoinList(IReadOnlyList<string> items) => items.Count switch
+    {
+        0 => "",
+        1 => items[0],
+        _ => string.Join(", ", items.Take(items.Count - 1)) + " and " + items[^1],
+    };
 
     private static string Short(string sha) => string.IsNullOrWhiteSpace(sha) ? "(not recorded)" : sha.Length > 16 ? sha[..16] : sha;
 }

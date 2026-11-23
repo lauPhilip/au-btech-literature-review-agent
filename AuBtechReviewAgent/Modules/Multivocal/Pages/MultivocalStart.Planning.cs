@@ -178,7 +178,7 @@ public partial class MultivocalStart
         plan = MultivocalPlan.Example(plan.Card);
         if (!plan.IsGreyOnly)
         {
-            plan.FormalDatabases = SourceCatalog.AllKeys.Where(FormalAvailable).ToList();
+            plan.FormalDatabases = MultivocalPlan.ExampleFormalDatabases.Where(FormalAvailable).ToList();
             plan.FormalSearchStrings = new List<string> { "context engineering large language model agents", "LLM agent memory management" };
         }
         error = null;

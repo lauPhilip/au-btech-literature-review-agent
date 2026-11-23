@@ -115,7 +115,7 @@ public static partial class RepairSense
     /// <summary>A validated JSON answer, taken from the review cache when the same prompt was answered before by the same model.</summary>
     private static async Task<T> CachedAsync<T>(IChatCompletionService chat, string prompt, CheckCache? cache, Func<T, string?> validate) where T : class
     {
-        string? key = cache == null ? null : ReviewCache.Key(PromptVersion, cache.Model, prompt);
+        string? key = cache == null ? null : ReviewCache.Key(PromptVersion, cache.SenseModel ?? cache.Model, prompt);
         if (key != null && cache!.Cache.TryGet<T>(CacheKind, key, out var hit) && hit != null && validate(hit) == null) return hit;
         var answer = await LlmJson.GetAsync(chat, prompt, LlmJson.JsonMode(0.0), validate);
         if (key != null) cache!.Cache.Set(CacheKind, key, answer);

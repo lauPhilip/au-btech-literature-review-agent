@@ -39,19 +39,23 @@ public sealed partial class MultivocalScreener
     private readonly MultivocalSearcher _searcher;
     private readonly Func<IChatCompletionService> _chat;
     private readonly ReviewCache _cache;
-    private readonly string _model;
+    private readonly Func<string, string> _modelFor;
     private readonly int _parallelism;
 
-    /// <summary>A screener that asks <paramref name="chat"/>'s model, several sources at a time.</summary>
+    /// <summary>
+    /// A screener that asks <paramref name="chat"/>'s model, several sources at a time. <paramref name="modelFor"/> names
+    /// the model that answers a stage ("screening", "screening-second") when a fast model takes them (Llm:FastModel);
+    /// without it, <paramref name="model"/> answers both.
+    /// </summary>
     public MultivocalScreener(RunStore runs, MultivocalPlanner planner, MultivocalSearcher searcher, Func<IChatCompletionService> chat,
-        ReviewCache? cache = null, string model = "", int parallelism = 4)
+        ReviewCache? cache = null, string model = "", int parallelism = 4, Func<string, string>? modelFor = null)
     {
         _runs = runs;
         _planner = planner;
         _searcher = searcher;
         _chat = chat;
         _cache = cache ?? ReviewCache.Disabled;
-        _model = model;
+        _modelFor = modelFor ?? (_ => model);
         _parallelism = Math.Max(1, parallelism);
     }
 
@@ -144,7 +148,7 @@ public sealed partial class MultivocalScreener
             RunId = runId,
             ScreenedUtc = DateTime.UtcNow,
             PromptVersion = PromptVersion,
-            Model = _model,
+            Model = _modelFor(FirstStage),
             InclusionCriteria = plan.InclusionCriteria,
             ExclusionCriteria = plan.ExclusionCriteria,
             FormalPromptVersion = plan.UsesFormalPool ? FormalPromptVersion : null,

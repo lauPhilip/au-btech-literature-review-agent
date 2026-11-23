@@ -18,6 +18,13 @@ public sealed partial class MultivocalScreener
     /// <summary>Part of the cache key of an academic record (block I-3): raise it whenever its prompt changes.</summary>
     public const string FormalPromptVersion = "formal-screening-v1";
 
+    /// <summary>
+    /// The stages that label the two screenings' calls, as in the systematic review, so a chat service routed by stage
+    /// (<see cref="StageRoutedChatService"/>) sends them to the fast model, inside the runner or outside it.
+    /// </summary>
+    public const string FirstStage = "screening";
+    public const string SecondStage = "screening-second";
+
     private sealed record Screened(ScreeningAnswer? First, ScreeningAnswer? Second, int CacheHits, IReadOnlyList<string> Flags, string? Error);
 
     private async Task<Screened> ScreenOneAsync(IChatCompletionService chat, MultivocalPlan plan, GreyRecord record)
@@ -41,11 +48,15 @@ public sealed partial class MultivocalScreener
     private async Task<(ScreeningAnswer Answer, bool FromCache)> ScreenCachedAsync(IChatCompletionService chat, MultivocalPlan plan, GreyRecord r, bool secondScreener)
     {
         string version = r.Kind == MultivocalSearcher.FormalKind ? FormalPromptVersion : PromptVersion;
-        string key = ReviewCache.Key(version, secondScreener ? "second" : "first", _model, plan.InclusionCriteria, plan.ExclusionCriteria,
+        string stage = secondScreener ? SecondStage : FirstStage;
+        // Keyed on the model that answers this stage, so a decision of the main model is not reused as the fast model's.
+        string key = ReviewCache.Key(version, secondScreener ? "second" : "first", _modelFor(stage), plan.InclusionCriteria, plan.ExclusionCriteria,
             r.Title, r.Summary, r.Site, r.Kind, r.Producer, r.Published?.ToString("yyyy-MM-dd"));
         if (_cache.TryGet<ScreeningAnswer>("grey-screening", key, out var cached) && cached != null && ScreeningAnswer.Validate(cached) == null)
             return (cached.Normalized(), true);
-        var answer = await ScreenGreyAsync(chat, r, plan.InclusionCriteria, plan.ExclusionCriteria, secondScreener);
+        ScreeningAnswer answer;
+        using (LlmStage.Begin(stage))
+            answer = await ScreenGreyAsync(chat, r, plan.InclusionCriteria, plan.ExclusionCriteria, secondScreener);
         _cache.Set("grey-screening", key, answer);
         return (answer, false);
     }
