@@ -4,12 +4,9 @@
    is doing now (LiveActivityLine with MultivocalLiveActivity), which also has the run's polite live region. The topic
    is the reviewer's text and is shown as text. *@
 
-@{
-    var line = AuBtechReviewAgent.MultivocalLiveActivity.For(Status, Found);
-}
 <p class="font-display text-xs font-semibold uppercase tracking-[0.14em] @(Stopped ? "text-not-supported" : "text-muted")">@EyebrowFor(Stage, Status)</p>
 <h1 class="mt-1 font-display text-[clamp(22px,2vw,32px)] font-semibold leading-tight tracking-[-0.025em] text-heading line-clamp-3 sm:mt-2">@(string.IsNullOrWhiteSpace(Topic) ? "Your review" : Topic)</h1>
-<LiveActivityLine Line="line" Announce="true" Class="mt-2" />
+<LiveActivityLine Line="AuBtechReviewAgent.MultivocalLiveActivity.For(Status, Found)" Announce="true" Class="mt-2" />
 
 @code {
     /// <summary>The run's topic, shown as the title.</summary>
