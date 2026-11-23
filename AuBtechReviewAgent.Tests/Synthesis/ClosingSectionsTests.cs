@@ -20,7 +20,9 @@ public class ClosingSectionsTests : IDisposable
 
     private static string Respond(string prompt) => prompt.Contains("You are writing the sections that follow the discussion of")
         ? $$"""{"limitations":"The evidence rests on abstracts only [1].","implications":"Teams should add supervisor checks [1].","futureResearch":"Field trials of governance layers are needed [2].","conclusion":"{{Conclusion}}","answers":["{{Answer}}"]}"""
-        : ReviewWriterTests.Respond(prompt);
+        : prompt.Contains("You are writing the Discussion section") // the discussion call writes the answer first (issue #446)
+            ? $$"""{"answers":["{{Answer}}"],"text":"Recovery and audits complement each other [1, 2]."}"""
+            : ReviewWriterTests.Respond(prompt);
 
     [Fact]
     public async Task TheClosingSectionsAnswerTheResearchQuestionAndReachTheReportAndMainTex()

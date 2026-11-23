@@ -22,6 +22,9 @@ public class ResearchQuestionWritingTests : IDisposable
     {
         if (prompt.Contains("You are building the codebook"))
             return """{"themes":[{"name":"Recovery and oversight","description":"How agent loops recover and are overseen.","codes":["C1","C2"],"questions":["RQ1"]}],"unassigned":[],"unanswered":[{"question":"RQ2","reason":"No study certifies agent loops."}]}""";
+        // The discussion call writes the answer to RQ1 first (issue #446).
+        if (prompt.Contains("You are writing the Discussion section"))
+            return $$"""{"answers":["{{Answer}}"],"text":"Recovery and audits complement each other [1, 2]."}""";
         if (prompt.Contains("You are writing the sections that follow the discussion of"))
             return $$"""{"limitations":"The evidence rests on abstracts only [1].","implications":"Teams should add supervisor checks [1].","futureResearch":"Certification of agent loops needs study [2].","conclusion":"Safe agent loops need recovery and oversight, while certification is still open.","answers":["{{Answer}}"]}""";
         return ReviewWriterTests.Respond(prompt);
