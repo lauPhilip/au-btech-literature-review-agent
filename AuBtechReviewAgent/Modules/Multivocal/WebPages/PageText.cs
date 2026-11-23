@@ -9,7 +9,8 @@ namespace AuBtechReviewAgent;
 /// The readable text of a web page, as kept in its snapshot (decision 2): the page's main content when it marks
 /// one (&lt;main&gt;, else the longest &lt;article&gt;), else the body without navigation, headers, footers, sidebars and
 /// forms. Paragraphs stay on their own lines, so a quote can be found again. The same HTML always gives the same
-/// text, so the SHA-256 of a snapshot only changes when the page does.
+/// text, so the SHA-256 of a snapshot only changes when the page does. Text a reader never sees is taken out first
+/// (#369, <see cref="HiddenText"/>): hidden elements and invisible characters, with comments, scripts and the like.
 /// </summary>
 public static class PageText
 {
@@ -22,14 +23,27 @@ public static class PageText
     public static string TitleOf(string html)
     {
         var m = Regex.Match(html, @"<title\b[^>]*>(.*?)</title>", Options, Timeout);
-        return m.Success ? Clean(WebUtility.HtmlDecode(Regex.Replace(m.Groups[1].Value, "<[^>]+>", "", Options, Timeout))) : "";
+        return m.Success ? Clean(HiddenText.RemoveInvisible(WebUtility.HtmlDecode(Regex.Replace(m.Groups[1].Value, "<[^>]+>", "", Options, Timeout))).Text) : "";
     }
 
-    public static string FromHtml(string html)
+    public static string FromHtml(string html) => Read(html).Text;
+
+    /// <summary>
+    /// The page's readable text, with what was taken out because a reader never sees it. The text of comments,
+    /// noscript and template blocks was never kept; it is returned with the hidden text for the scan, but not counted.
+    /// </summary>
+    public static CleanedText Read(string html)
     {
-        // Never part of the text: comments, scripts, styles and embedded things.
+        var hidden = new System.Text.StringBuilder();
+        foreach (Match m in Regex.Matches(html, @"<!--(.*?)-->|<(noscript|template)\b[^>]*>(.*?)</\2\s*>", Options, Timeout))
+            if (HiddenText.TextOf(m.Groups[1].Success ? m.Groups[1].Value : m.Groups[3].Value) is { Length: > 0 } t) hidden.Append(t).Append('\n');
+
+        // Never part of the text: comments, scripts, styles and embedded things; then what the page hides.
         string page = Regex.Replace(html, @"<!--.*?-->", " ", Options, Timeout);
         page = Regex.Replace(page, @"<(script|style|noscript|template|svg|iframe|object|canvas)\b[^>]*>.*?</\1\s*>", " ", Options, Timeout);
+        var dropped = HiddenText.DropHiddenHtml(page);
+        page = dropped.Text;
+        hidden.Append(dropped.Hidden);
 
         string content;
         var main = Regex.Match(page, @"<main\b[^>]*>(.*)</main\s*>", Options, Timeout);
@@ -52,11 +66,19 @@ public static class PageText
         content = Regex.Replace(content, @"</?(p|div|section|article|li|ul|ol|dl|dt|dd|tr|table|thead|tbody|h[1-6]|blockquote|pre|figure|figcaption|header|footer|main)\b[^>]*>", "\n", Options, Timeout);
         content = Regex.Replace(content, @"</?(td|th)\b[^>]*>", " ", Options, Timeout);
         content = Regex.Replace(content, "<[^>]+>", "", Options, Timeout);
-        return Lines(WebUtility.HtmlDecode(content));
+        var clean = HiddenText.RemoveInvisible(WebUtility.HtmlDecode(content));
+        return new CleanedText(Lines(clean.Text), clean.InvisibleCharacters, dropped.HiddenElements, hidden.Append(clean.Hidden).ToString());
     }
 
     /// <summary>Plain text (a .txt page or a PDF's text) in the same line form as an HTML page's.</summary>
-    public static string FromPlainText(string text) => Lines(text);
+    public static string FromPlainText(string text) => ReadPlain(text).Text;
+
+    /// <summary>Plain text in line form, with its invisible characters taken out and counted.</summary>
+    public static CleanedText ReadPlain(string text)
+    {
+        var clean = HiddenText.RemoveInvisible(text);
+        return clean with { Text = Lines(clean.Text) };
+    }
 
     private static string Lines(string text)
     {
