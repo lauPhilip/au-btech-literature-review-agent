@@ -1,11 +1,12 @@
 using AuBtechReviewAgent;
+using AuBtechReviewAgent.Modules.Multivocal.Pages;
 using Xunit;
 
 namespace AuBtechReviewAgent.Tests;
 
 /// <summary>
 /// The live line of a running multivocal review (MultivocalLiveActivity), from the runner's step and the progress
-/// lines its steps report.
+/// lines its steps report, and the head of the run view ("Review running · step n of 8").
 /// </summary>
 public class MultivocalLiveActivityTests
 {
@@ -64,5 +65,15 @@ public class MultivocalLiveActivityTests
     {
         Assert.Null(MultivocalLiveActivity.For(null));
         Assert.Null(MultivocalLiveActivity.For(new MultivocalRunStatus(false, "Done", null, null)));
+    }
+
+    [Fact]
+    public void TheHeadNamesTheStepOfEight()
+    {
+        Assert.Equal("Review running · step 2 of 8", MultivocalRunHeader.EyebrowFor(MultivocalScreener.StageScreening, new MultivocalRunStatus(true, "Screening", null, null)));
+        Assert.Equal("Review running · step 1 of 8", MultivocalRunHeader.EyebrowFor(MultivocalSearcher.StageSearching, new MultivocalRunStatus(true, "Searching", null, null)));
+        Assert.Equal("Review stopped · step 8 of 8", MultivocalRunHeader.EyebrowFor(MultivocalWriter.StageChecking, new MultivocalRunStatus(false, "Checking the citations", null, "stopped")));
+        Assert.Equal("Review not finished · step 3 of 8", MultivocalRunHeader.EyebrowFor(MultivocalScreener.StageScreened, null));
+        Assert.Equal("Review complete", MultivocalRunHeader.EyebrowFor(MultivocalWriter.StageChecked, null));
     }
 }

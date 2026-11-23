@@ -1,0 +1,51 @@
+@page "/design/mlr-run"
+@layout AppLayout
+@using Microsoft.Extensions.Hosting
+@using AuBtechReviewAgent.Modules.Multivocal.Pages
+@inject Microsoft.AspNetCore.Hosting.IWebHostEnvironment Environment
+@inject NavigationManager Navigation
+@* A page that exists only in development: the head and progress panel of a running multivocal review, with sample
+   figures (/design/mlr-run screening, ?state=search searching, ?state=writing writing). A real run cannot be made
+   in CI, so screenshots and the accessibility checks use this. Anywhere else it answers "not found". *@
+
+<SeoHead Title="Multivocal run preview" NoIndex="true" />
+
+@if (Environment.IsDevelopment())
+{
+    <div class="max-w-7xl w-full mx-auto p-4 lg:p-6 space-y-4">
+        <div class="min-w-0 max-w-[760px]">
+            <MultivocalRunHeader Topic="@Topic" Stage="@SampleStage" Status="Status" Found="@SampleFound" />
+            <p class="text-sm text-muted mt-2">A grey literature review following Garousi et al. (2019), in which every citation will be checked against its source.</p>
+        </div>
+        <div class="max-w-[760px]">
+            <MultivocalProgressPanel Stage="@SampleStage" Status="Status" />
+        </div>
+    </div>
+}
+
+@code {
+    [SupplyParameterFromQuery(Name = "state")] public string? State { get; set; }
+
+    private const string Topic = "How do practitioners make agentic AI systems tolerate faults at runtime?";
+
+    private string SampleStage => State switch
+    {
+        "search" => AuBtechReviewAgent.MultivocalSearcher.StageSearching,
+        "writing" => AuBtechReviewAgent.MultivocalWriter.StageWriting,
+        _ => AuBtechReviewAgent.MultivocalScreener.StageScreening,
+    };
+
+    private string? SampleFound => State == "search" ? null : State == "writing" ? "312 found · 41 included" : "312 found";
+
+    private AuBtechReviewAgent.MultivocalRunStatus Status => State switch
+    {
+        "search" => new(true, "Searching", "3 of 12 searches · GitHub: \"agent runtime fault tolerance\"", null, DateTime.UtcNow.AddMinutes(-1)),
+        "writing" => new(true, "Writing the paper", "2 of 6 writing steps · theme sections: 3 of 7 written", null, DateTime.UtcNow.AddMinutes(-48)),
+        _ => new(true, "Screening", "119 of 312 sources screened", null, DateTime.UtcNow.AddMinutes(-9)),
+    };
+
+    protected override void OnInitialized()
+    {
+        if (!Environment.IsDevelopment()) Navigation.NotFound();
+    }
+}
