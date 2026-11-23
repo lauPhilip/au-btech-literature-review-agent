@@ -172,13 +172,17 @@ public static partial class ReviewWriter
     /// sources like any other sentence. A module can add its own check on the abstract (<paramref name="abstractRule"/>,
     /// null when the abstract is fine), such as the systematic review's rule that its record counts add up. With research
     /// questions the prompt lists them, and the objectives are written in code from them (<see cref="ObjectivesFromQuestions"/>)
-    /// instead of by the model. Returns null when no acceptable answer comes back.
+    /// instead of by the model. The answers to the research questions and the conclusion, when they are written before it
+    /// (issue #446), are given as checked text, so the abstract states the review's reading as they do. Returns null when
+    /// no acceptable answer comes back.
     /// </summary>
     public static async Task<FrontMatter?> WriteFrontMatterAsync(IChatCompletionService chat, WritingProfile profile, string topic, string goal,
         string facts, IReadOnlyList<SynthesisSection> sections, string discussion, string referenceLines, int referenceCount, Action<string>? warn = null,
-        Func<string, string?>? abstractRule = null, IReadOnlyList<string>? questions = null)
+        Func<string, string?>? abstractRule = null, IReadOnlyList<string>? questions = null, IReadOnlyList<string>? answers = null, string? conclusion = null)
     {
         string results = string.Join("\n\n", sections.Select(x => $"### {x.Heading}\n{x.Text}")) + $"\n\n### Discussion\n{discussion}";
+        string readingBlock = (answers is { Count: > 0 } ? $"\n\nANSWERS TO THE RESEARCH QUESTIONS (written and checked before this step; the abstract's results and what they mean agree with them):\n{AnswerLines(answers)}" : "")
+            + (string.IsNullOrWhiteSpace(conclusion) ? "" : $"\n\nCONCLUSION (written and checked before this step; the abstract ends on the same reading, in its own words):\n{conclusion.Trim()}");
         string? codeObjectives = ObjectivesFromQuestions(questions);
         string objectivesRule = codeObjectives == null ? "\"objectives\": the objective and what the review set out to answer, in two or three sentences, without citations."
             : "\"objectives\" are written in code from the research questions above; do not write them.";
@@ -197,7 +201,7 @@ public static partial class ReviewWriter
             {{referenceLines}}
 
             RESULTS AND DISCUSSION:
-            {{results}}
+            {{results}}{{readingBlock}}
 
             REQUIREMENTS:
             1. "title": one line, at most 25 words, no full stop, naming the topic and the kind of review.
@@ -208,7 +212,7 @@ public static partial class ReviewWriter
             Respond ONLY with a valid minified JSON object:
             {"title":"...","abstract":"...","rationale":"... [n] ..."{{objectivesField}}}
             """;
-        string allowedNumbers = facts + "\n" + results;
+        string allowedNumbers = facts + "\n" + results + readingBlock;
         try
         {
             using (LlmStage.Begin("front-matter"))
