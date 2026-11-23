@@ -83,7 +83,7 @@ public partial class PrismaReviewEngine
     public PrismaReviewEngine(string mistralApiKey, string elsevierApiKey, string? ieeeApiKey = null, string? scholarApiKey = null, string? supportStatement = null, RunsOptions? runsOptions = null)
     {
         _runsOptions = runsOptions ?? new RunsOptions();
-        Coordinator = new RunCoordinator(_runsOptions.MaxConcurrentRuns);
+        Coordinator = new RunCoordinator(_runsOptions);
         Store = new RunStore(Path.Join(Directory.GetCurrentDirectory(), "WorkspaceStore"), _runsOptions, Coordinator.IsActive);
         _globalMistralKey = mistralApiKey;
         _globalElsevierKey = elsevierApiKey;
@@ -132,7 +132,11 @@ public partial class PrismaReviewEngine
         // text fields are normalised, too-long fields stop the run before anything is spent, and
         // instruction-like phrases are recorded in the protocol and the ledger.
         var inputCheck = ReviewInputGuard.Check(request);
-        if (!inputCheck.IsValid) throw new ArgumentException(string.Join(" ", inputCheck.Errors));
+        if (!inputCheck.IsValid)
+        {
+            Coordinator.Withdraw(sessionId); // an admitted run gives its place in line back
+            throw new ArgumentException(string.Join(" ", inputCheck.Errors));
+        }
         request = inputCheck.Request;
 
         var stop = Coordinator.Register(sessionId);
