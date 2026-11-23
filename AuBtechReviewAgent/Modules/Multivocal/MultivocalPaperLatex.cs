@@ -154,9 +154,9 @@ public static class MultivocalPaper
         }
         else
         {
-            text.Append(subject).Append(" used for screening the grey sources twice against the criteria, scoring their quality on the guidelines' checklist, proposing the systematic map, extracting each source's values, checking that each value's quote supports it, grouping the findings into themes, writing the theme sections, the discussion, the summary for practitioners and the title, abstract and introduction, and checking each citation against the kept page of the source it cites. ");
+            text.Append(subject).Append(" used for ").Append(MultivocalScreeningText.AiUseTask(input.Screening, "the grey sources", "the criteria")).Append(", scoring their quality on the guidelines' checklist, proposing the systematic map, extracting each source's values, checking that each value's quote supports it, grouping the findings into themes, writing the theme sections, the discussion, the summary for practitioners and the title, abstract and introduction, and checking each citation against the kept page of the source it cites. ");
             text.Append("Every value, quality point and citation verdict counts only with a quote found verbatim in the kept page text; the method, the counts, the figures, the answers to questions about frequency or existence and the references were written in code. ");
-            if (input.Screening.Kappa is double k) text.Append(inv, $"The two screenings agreed with Cohen's kappa = {k:0.00}. ");
+            text.Append(MultivocalScreeningText.AiUseAgreement(input.Screening, bothPools: false));
         }
         int reviewed = input.Screening.Sources.Count(s => s.Reviewed);
         text.Append(reviewed > 0 ? string.Create(inv, $"A human reviewer checked {reviewed} screening decisions within the tool. ") : "Screening decisions were not checked by a human reviewer within the tool. ");
@@ -177,7 +177,7 @@ public static class MultivocalPaper
         string main = paper.Model.Trim();
         if (main.Length == 0) return new();
         string screening = input.Screening.Model.Trim();
-        if (screening.Length > 0 && screening != main) steps.Add((screening, "both screenings of every source"));
+        if (screening.Length > 0 && screening != main) steps.Add((screening, input.Screening.AuditSeed == null || MultivocalSecondScreening.Count(input.Screening, null).AllTwice ? "both screenings of every source" : "every screening, first and second"));
         string check = paper.CheckModel?.Trim() ?? "";
         if (check.Length > 0 && check != main) steps.Add((check, "the citation checks"));
         return steps.GroupBy(s => s.Model, StringComparer.Ordinal).Select(g => (g.Key, g.Select(s => s.Task).ToList())).ToList();

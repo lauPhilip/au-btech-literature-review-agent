@@ -133,7 +133,7 @@ else
                                 var flow = AuBtechReviewAgent.MultivocalPaperParts.Flow(input);
                                 <ol class="grid grid-cols-2 gap-2 text-sm sm:grid-cols-3" aria-label="Flow of sources">
                                     @FlowStep("Found", flow.Found, $"from {flow.Searches} searches")
-                                    @FlowStep("Screened twice", flow.Screened, $"{flow.Duplicates} duplicates set aside")
+                                    @FlowStep(AuBtechReviewAgent.MultivocalScreeningText.StepLabel(input.Screening), flow.Screened, input.Screening.AuditSeed == null ? $"{flow.Duplicates} duplicates set aside" : $"{flow.ScreenedTwice} of them twice; {flow.Duplicates} duplicates set aside")
                                     @FlowStep("Included", flow.Included, $"{flow.Excluded} excluded")
                                     @FlowStep("Passed the quality threshold", flow.Passed, $"{flow.BelowThreshold} below it, {flow.NotAssessed} not assessed")
                                     @FlowStep("Extracted", flow.Extracted, flow.NotExtracted > 0 ? $"{flow.NotExtracted} could not be" : "against the fixed map")

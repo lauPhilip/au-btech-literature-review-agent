@@ -127,7 +127,7 @@
 }
 <fieldset class="space-y-2">
     <legend class="ui-label">What to include (G9)</legend>
-    <p class="text-xs text-muted">Every source found is screened against these, twice, with the same care for every source (G10), so write them about the subject, not about where a source was published.</p>
+    <p class="text-xs text-muted">Every source found is screened against these, with the same care for every source (G10), so write them about the subject, not about where a source was published.</p>
     <div>
         <label for="p-include" class="text-sm text-ink">A source is included when it is about</label>
         <textarea id="p-include" rows="3" class="ui-input resize-y mt-1" maxlength="@AuBtechReviewAgent.MultivocalPlan.MaxText" @bind="Page.plan.InclusionCriteria" @bind:event="oninput"></textarea>
@@ -156,7 +156,7 @@
         @if (Page.plan.StoppingRule == "effort")
         {
             <div class="flex items-center justify-between gap-3">
-                <label for="p-top" class="text-sm text-ink">Top hits per search string<span class="block text-xs text-muted">The paper looks at the first 100. A plan starts at 20, since each hit is screened twice; raise it for a fuller search.</span></label>
+                <label for="p-top" class="text-sm text-ink">Top hits per search string<span class="block text-xs text-muted">The paper looks at the first 100. A plan starts at 20, since each hit is screened, many of them twice; raise it for a fuller search.</span></label>
                 <input id="p-top" type="number" min="10" max="500" class="ui-input w-20 text-center" @bind="Page.plan.TopHits" />
             </div>
         }
