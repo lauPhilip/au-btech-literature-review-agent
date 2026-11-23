@@ -188,12 +188,17 @@ public sealed partial class MultivocalScreener
         var chat = _chat();
         var firsts = await InParallelAsync(toScreen, item => ScreenFirstAsync(chat, plan, item.Record), (i, n) => progress?.Report($"{i} of {n} sources screened"));
 
+        // The pilot check: more than half of a pool's first 30 sources included is a warning on file, never a stop.
+        var decided = toScreen.Select((item, i) => (item, first: firsts[i])).Where(x => x.first.Answer != null).ToList();
+        foreach (bool formal in new[] { false, true })
+            if (MultivocalPilotCheck.Warning(decided.Where(x => file.Sources[x.item.Index].Formal == formal).Select(x => x.first.Answer!.IsIncluded), formal) is { } warning)
+                (file.Warnings ??= new()).Add(warning);
+
         // Second pass: only the sources the rule picks (MultivocalSecondScreening), each pool's audit sample drawn from
         // every source the first pass decided, whatever it decided.
         file.AuditSeed = MultivocalSecondScreening.SeedOf(runId);
         file.AuditShare = MultivocalSecondScreening.AuditShare;
         file.AuditMinimum = MultivocalSecondScreening.AuditMinimum;
-        var decided = toScreen.Select((item, i) => (item, first: firsts[i])).Where(x => x.first.Answer != null).ToList();
         var audit = new HashSet<string>(StringComparer.Ordinal);
         foreach (bool formal in new[] { false, true })
             audit.UnionWith(MultivocalSecondScreening.AuditSample(file.AuditSeed,
