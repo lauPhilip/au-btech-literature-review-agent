@@ -71,7 +71,9 @@ public static partial class MultivocalFormalText
     {
         var formal = input.Extraction.Sources.Where(s => s.Formal && s.Error == null).ToList();
         int onAbstract = formal.Count(s => s.TextBasis == MultivocalPages.AbstractBasis);
-        return $" Grey and academic sources were mapped and extracted together; for the {Count(formal.Count, "academic source")} extracted, each quote was found in its full text, or for {Num(onAbstract)} of them in its abstract.";
+        int selected = formal.Count(s => s.Passages != null);
+        return $" Grey and academic sources were mapped and extracted together; for the {Count(formal.Count, "academic source")} extracted, each quote was found in its full text, or for {Num(onAbstract)} of them in its abstract." +
+               (selected == 0 ? "" : $" For {Num(selected)} long full {(selected == 1 ? "text" : "texts")}, the model was given the first passages and the passages that share the most words with the map and the questions, not the whole text; each quote was found in those passages.");
     }
 
     /// <summary>What the synthesis says about the two pools (G13): what the themes rest on, and where the state of the art and of the practice disagree.</summary>

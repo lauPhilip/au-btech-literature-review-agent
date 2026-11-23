@@ -116,7 +116,7 @@ public static class FormalKit
         MultivocalWriter Writer, MultivocalReporter Reporter, FakeChatService Model, Database Academic, MultivocalPages Pages, MultivocalQualityAssessor Quality);
 
     /// <summary>Plans a multivocal review with one grey search and one academic database, and runs it as far as it goes.</summary>
-    public static async Task<Run> RunAsync(string root, Func<string, string?>? respond = null)
+    public static async Task<Run> RunAsync(string root, Func<string, string?>? respond = null, Func<AcademicPaper, string, Task<FullTextResult>>? fullText = null)
     {
         var store = new RunStore(root);
         var model = new FakeChatService().RespondsWith(p => respond?.Invoke(p) ?? Appraisal(p) ?? Extraction(p) ?? Placement(p) ?? ModuleKit.RespondMultivocal(p));
@@ -131,7 +131,7 @@ public static class FormalKit
 
         var academic = new Database();
         var searcher = new MultivocalSearcher(store, planner, _ => new ModuleKit.KitGreySource(), k => k == "openalex" ? academic : null);
-        var pages = new MultivocalPages(store, searcher, new PageFetcher(new ModuleKit.KitWeb(), _ => Task.CompletedTask), FullText);
+        var pages = new MultivocalPages(store, searcher, new PageFetcher(new ModuleKit.KitWeb(), _ => Task.CompletedTask), fullText ?? FullText);
         var screener = new MultivocalScreener(store, planner, searcher, Chat, parallelism: 1);
         var assessor = new MultivocalQualityAssessor(store, planner, searcher, screener, pages, Chat, parallelism: 1);
         var mapper = new MultivocalMapper(store, planner, searcher, assessor, Chat);
