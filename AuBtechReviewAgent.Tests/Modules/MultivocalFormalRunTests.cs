@@ -92,12 +92,12 @@ public class MultivocalFormalRunTests : IDisposable
     }
 
     [Fact]
-    public async Task TheRunStopsWithItsReasonAtTheFirstStepNotBuilt()
+    public async Task TheRunGoesFromThePlanToTheCheckedPaper()
     {
         var run = await FormalKit.RunAsync(_root);
 
-        Assert.Equal("Writing the paper stopped: " + MultivocalRunner.FormalPaperNotBuiltMessage, run.Runner.StatusOf(run.RunId)!.Error);
-        Assert.Equal(MultivocalSynthesiser.StageSynthesised, run.Store.LoadHeader(run.RunId)!.Stage);
+        Assert.Null(run.Runner.StatusOf(run.RunId)!.Error);
+        Assert.Equal(MultivocalWriter.StageChecked, run.Store.LoadHeader(run.RunId)!.Stage);
     }
 
     [Fact]

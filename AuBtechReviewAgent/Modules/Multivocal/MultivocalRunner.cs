@@ -68,16 +68,6 @@ public sealed partial class MultivocalRunner
 
     public bool IsRunning(Guid runId) => StatusOf(runId)?.Running == true;
 
-    /// <summary>
-    /// Whether the paper of a run with both pools is built (block I-6 of docs/roadmap/mlr-todo.md). Until it is, such a
-    /// run stops after its synthesis and says why, rather than writing a paper whose method and references cover grey
-    /// sources only.
-    /// </summary>
-    public const bool FormalPaperBuilt = false;
-
-    public const string FormalPaperNotBuiltMessage =
-        "The paper of a review with academic sources cannot be written yet; that comes in step I-6 of the roadmap. The synthesis is on file. Plan a new review with no academic database ticked, or from the Grey Literature Review card.";
-
     /// <summary>Whether a run at this stage has steps left for the runner.</summary>
     public static bool HasStepsLeft(string? stage) => stage is not (null or "" or MultivocalWriter.StageChecked);
 
@@ -230,7 +220,6 @@ public sealed partial class MultivocalRunner
                 break;
             case MultivocalSynthesiser.StageSynthesised:
             case MultivocalWriter.StageWriting:
-                if (!FormalPaperBuilt && _searcher.LoadLedger(runId)?.HasFormalPool == true) throw new InvalidOperationException(FormalPaperNotBuiltMessage);
                 // The references are written in code first; the paper cites them by their numbers.
                 await SaveReferencesAsync(runId);
                 if (_writer == null) { Set(runId, new MultivocalRunStatus(false, "Done", null, null)); return true; }
