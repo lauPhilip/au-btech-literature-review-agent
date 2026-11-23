@@ -31,9 +31,10 @@ public sealed partial class MultivocalWriter
         }
         void Step(int number, string what) => progress?.Report($"{number} of {WritingSteps} writing steps · {what}");
 
-        // 1. The grounded outline: the claims each source supports, before any prose.
+        // 1. The grounded outline: the claims each source supports, before any prose. Each source comes with its verified
+        // findings and one excerpt, not two, so the one prompt with every source stays small (lean evidence).
         Step(1, "the grounded outline");
-        string excerpts = string.Join("\n", evidence.Sources.Select(s => evidence.SourceBlock(s.Reference, null, excerpts: 2)));
+        string excerpts = string.Join("\n", evidence.Sources.Select(s => evidence.SourceBlock(s.Reference, null, OutlineExcerpts, profile.LeanEvidence)));
         string outline;
         using (LlmStage.Begin("outline"))
             outline = await ReviewWriter.WriteOutlineAsync(chat, profile, plan.Topic, goal, excerpts, referenceLines, Warn);
@@ -141,6 +142,9 @@ public sealed partial class MultivocalWriter
         if (front == null) file.Objectives = $"The review set out to {LowerFirst(goal.TrimEnd('.'))}.";
         return (file, outline);
     }
+
+    /// <summary>How many excerpts of each source's text the outline prompt gets; the theme prompts choose their own.</summary>
+    public const int OutlineExcerpts = 1;
 
     private static string LowerFirst(string text) => text.Length == 0 ? text : char.ToLowerInvariant(text[0]) + text[1..];
 }
