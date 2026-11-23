@@ -21,4 +21,11 @@ public interface ICitationGraph
 {
     string SourceName { get; }
     Task<CitationNeighbours> GetCitationNeighboursAsync(string doi, int perDirection);
+
+    /// <summary>
+    /// A wider pool of neighbours for one seed study, with citation counts, so the caller can rank them in code: up to
+    /// <paramref name="poolPerDirection"/> works it cites and that cite it. A graph without a wider look-up gives its
+    /// ordinary neighbours.
+    /// </summary>
+    Task<CitationNeighbours> GetCitationPoolAsync(string doi, int poolPerDirection) => GetCitationNeighboursAsync(doi, poolPerDirection);
 }

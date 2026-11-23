@@ -12,16 +12,19 @@ public partial class PrismaReviewEngine
     /// Citation chaining (one round of backward and forward snowballing): for every included record with a
     /// DOI, the works it cites and the works citing it are looked up in OpenAlex, run through the same
     /// duplicate and year checks, and screened like any other record. They are reported as "identified via
-    /// other methods" in the PRISMA flow.
+    /// other methods" in the PRISMA flow. The most-cited included studies are built out first and wider
+    /// (<see cref="ChainFromSeedsAsync"/>); every other included record with a DOI is chained as before.
     /// </summary>
     private async Task ChainCitationsAsync(RunContext ctx, int yearFrom, int yearTo)
     {
+        var graph = CitationGraphFactory?.Invoke() ?? new OpenAlexSource(OpenSources.ContactEmail, OpenSources.OpenAlexApiKey);
+        var builtOut = await ChainFromSeedsAsync(ctx, graph, yearFrom, yearTo);
+
         var seeds = ctx.State.Phases.Screening
-            .Where(l => l.Decision == "Included" && l.Origin == OriginDatabase && NormalizeDoi(l.Doi) != null)
+            .Where(l => l.Decision == "Included" && l.Origin == OriginDatabase && NormalizeDoi(l.Doi) != null && !builtOut.Contains(l.PaperId))
             .ToList();
         if (seeds.Count == 0) return;
 
-        var graph = CitationGraphFactory?.Invoke() ?? new OpenAlexSource(OpenSources.ContactEmail, OpenSources.OpenAlexApiKey);
         int perDirection = Math.Clamp(OpenSources.ChainingPerPaper, 1, 25);
         string sourceName = $"{graph.SourceName} (citation chaining)";
 
