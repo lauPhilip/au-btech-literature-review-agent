@@ -53,6 +53,8 @@ public static class AiUseStatement
             text.Append(other > 0 ? string.Create(inv, $", and {other} could not be checked") : "");
             text.Append("; a supporting verdict counted only when its quote was found verbatim in the paper. ");
         }
+        int flagged = state.FullTextFlags?.Select(f => f.PaperId).Distinct().Count() ?? 0;
+        text.Append(FlaggedSources(flagged, s.FullTextRetrieved, "full text", "included study", "included studies"));
         text.Append("The complete record of the run (protocol, search responses, every screening decision and model call, and the citation audit) is available as a fingerprinted archive. ");
         text.Append("The authors reviewed the output and take full responsibility for the content.");
         return text.ToString();
@@ -65,6 +67,19 @@ public static class AiUseStatement
         if (!string.IsNullOrWhiteSpace(state.RunSettings?.FastModel)) model += $" and {state.RunSettings!.FastModel}";
         return $"The literature search, screening, data extraction and a first draft of the synthesis were carried out with TraceableAI using {model}; " +
                "every citation was automatically checked against the cited paper, and the authors reviewed and edited all output and take full responsibility for it.";
+    }
+
+    /// <summary>
+    /// The sentence on source texts that read like instructions to a model (#363), from the number of distinct sources
+    /// flagged and the number whose text was kept, ending with a space. Empty when none was flagged, so the statement
+    /// of a run without flags stays word for word as it was. A flag changes no decision; this says so.
+    /// </summary>
+    public static string FlaggedSources(int flagged, int kept, string text, string one, string many)
+    {
+        if (flagged <= 0) return "";
+        kept = Math.Max(kept, flagged);
+        return string.Create(CultureInfo.InvariantCulture,
+            $"The {text} of {flagged} of {kept} {(kept == 1 ? one : many)} contained phrases that look like instructions to a model; {(flagged == 1 ? "it was" : "they were")} flagged for the reviewer and changed no decision. ");
     }
 
     private static string JoinList(IReadOnlyList<string> items) => items.Count switch
