@@ -26,7 +26,7 @@ public sealed partial class MultivocalQualityAssessor
     public const string StageAssessed = "Assessed";
 
     /// <summary>Part of the cache key: raise it whenever the quality prompt changes.</summary>
-    public const string PromptVersion = "grey-quality-v2";
+    public const string PromptVersion = "grey-quality-v3";
 
     /// <summary>At most this much of a page is sent to the model; a quote must come from this part.</summary>
     public const int MaxTextForModel = 40_000;
