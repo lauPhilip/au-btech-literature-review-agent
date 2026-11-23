@@ -29,6 +29,7 @@ public class ModuleKitTests
     [Theory]
     [InlineData("systematic")]
     [InlineData("multivocal")]
+    [InlineData("multivocal-formal")]
     public async Task EveryAcceptedCitationRestsOnAQuoteFoundInTheSource(string module)
     {
         var run = await ModuleKit.RunAsync(module);
@@ -44,6 +45,7 @@ public class ModuleKitTests
     [Theory]
     [InlineData("systematic")]
     [InlineData("multivocal")]
+    [InlineData("multivocal-formal")]
     public async Task TheMethodIsWrittenByCodeFromTheLedger(string module)
     {
         var run = await ModuleKit.RunAsync(module);
@@ -56,6 +58,7 @@ public class ModuleKitTests
     [Theory]
     [InlineData("systematic")]
     [InlineData("multivocal")]
+    [InlineData("multivocal-formal")]
     public async Task TheRunIsOnFileAndEveryFileOfItsFolderIsInTheArchive(string module)
     {
         var run = await ModuleKit.RunAsync(module);
@@ -79,6 +82,7 @@ public class ModuleKitTests
     [Theory]
     [InlineData("systematic")]
     [InlineData("multivocal")]
+    [InlineData("multivocal-formal")]
     public async Task TextFromASourceReachesTheModelOnlyAsMarkedData(string module)
     {
         var run = await ModuleKit.RunAsync(module);
@@ -101,6 +105,7 @@ public class ModuleKitTests
     [Theory]
     [InlineData("systematic")]
     [InlineData("multivocal")]
+    [InlineData("multivocal-formal")]
     public async Task TheArchiveHoldsNoKey(string module)
     {
         var run = await ModuleKit.RunAsync(module);
@@ -112,6 +117,7 @@ public class ModuleKitTests
     [Theory]
     [InlineData("systematic")]
     [InlineData("multivocal")]
+    [InlineData("multivocal-formal")]
     public async Task TheReportLinksNoAddressThatIsNotAWebAddress(string module)
     {
         var run = await ModuleKit.RunAsync(module);

@@ -51,6 +51,7 @@ public static class ModuleKit
     {
         ["systematic"] = RunSystematicAsync,
         ["multivocal"] = RunMultivocalAsync, // the grey literature review: its card is on
+        ["multivocal-formal"] = FormalKit.KitAsync, // a multivocal review with both pools (block I), checked before its card is on
     };
 
     private static readonly ConcurrentDictionary<string, Lazy<Task<KitRun>>> Runs = new();
@@ -195,7 +196,7 @@ public static class ModuleKit
             written, MultivocalWriter.StageChecked);
     }
 
-    private static Dictionary<string, byte[]> Unzip(byte[] zip)
+    internal static Dictionary<string, byte[]> Unzip(byte[] zip)
     {
         using var archive = new ZipArchive(new MemoryStream(zip));
         return archive.Entries.ToDictionary(e => e.FullName, e =>
