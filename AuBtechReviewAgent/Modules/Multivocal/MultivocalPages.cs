@@ -35,6 +35,14 @@ public sealed class PageSnapshot
     /// <summary>The Wayback Machine's capture nearest to the access date (a lookup, not a capture this app made).</summary>
     public string WaybackUrl { get; set; } = "";
 
+    /// <summary>
+    /// Instruction-like phrases in the kept text (#366), shown to the reviewer beside the source; null, and left out of
+    /// the file, when there are none. The text goes on to extraction, quality, synthesis and the citation check, so a
+    /// hit asks the reviewer to look at what those steps took from it. It changes no decision.
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public List<SourceFlag>? InjectionFlags { get; set; }
+
     /// <summary>Why the page was not kept, in words for the reviewer; null when it was.</summary>
     public string? NotKept { get; set; }
 
@@ -168,6 +176,7 @@ public sealed partial class MultivocalPages
                 snapshot.TextFile = name;
                 snapshot.TextSha256 = Sha256(bytes);
                 snapshot.Characters = text.Length;
+                snapshot.InjectionFlags = PromptSafety.Find(text);
             }
 
             var file = Load(runId);
