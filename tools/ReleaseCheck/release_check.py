@@ -5,7 +5,8 @@ Run from the repository root after the tag is fetched as an annotated tag:
     python3 tools/ReleaseCheck/release_check.py v0.1.0 --notes-out release-notes.md
 
 The release is titled "v0.1.0 - <title>", where the title is the first line of the annotated tag's message
-(git tag -a v0.1.0 -m "Research questions"). The notes are the version's section of CHANGELOG.md. The script stops
+(git tag -a v0.1.0 -m "Research questions"). The notes are the version's section of CHANGELOG.md; with --body-out it
+also writes the release body that release_body.py composes around them. The script stops
 with every reason it found, and publishes nothing, when:
 
   * the tag is not "v" followed by a Semantic Versioning 2.0.0 version,
@@ -31,6 +32,7 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
+from release_body import compose_body
 from release_notes import MIN_READING_EASE, find_emoji, reading_ease
 
 # Semantic Versioning 2.0.0, from semver.org, with the "v" prefix MinVer reads (MinVerTagPrefix).
@@ -218,7 +220,11 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Check a version tag and write its release title and notes.")
     parser.add_argument("tag", help="the tag, such as v0.1.0")
     parser.add_argument("--repo", default=".", help="the repository root (default: the current folder)")
-    parser.add_argument("--notes-out", help="write the release notes to this file")
+    parser.add_argument("--notes-out", help="write the version's CHANGELOG.md section to this file")
+    parser.add_argument("--body-out", help="write the composed release body to this file (see release_body.py)")
+    parser.add_argument("--generated-notes", help="GitHub's generated notes, folded into the body's last part")
+    parser.add_argument("--previous-tag", default="", help="the version before, for the comparison link")
+    parser.add_argument("--repository", default="lauPhilip/au-btech-literature-review-agent", help="owner/name")
     args = parser.parse_args(argv)
 
     repo = Path(args.repo)
@@ -235,6 +241,11 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.notes_out:
         Path(args.notes_out).write_text(release.notes + "\n", encoding="utf-8")
+    if args.body_out:
+        generated = _read(Path(args.generated_notes)) if args.generated_notes else None
+        body = compose_body(args.tag, release.version, release.notes, _read(repo / "CITATION.cff") or "",
+                            args.repository, args.previous_tag or None, generated)
+        Path(args.body_out).write_text(body, encoding="utf-8")
     output = os.environ.get("GITHUB_OUTPUT")
     if output:
         with open(output, "a", encoding="utf-8") as handle:
