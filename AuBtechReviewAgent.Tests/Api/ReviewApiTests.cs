@@ -35,7 +35,7 @@ public class ReviewApiTests
         return await client.SendAsync(message);
     }
 
-    private static async Task<JsonElement> ProblemOf(HttpResponseMessage response)
+    internal static async Task<JsonElement> ProblemOf(HttpResponseMessage response)
     {
         Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
         return await response.Content.ReadFromJsonAsync<JsonElement>();
