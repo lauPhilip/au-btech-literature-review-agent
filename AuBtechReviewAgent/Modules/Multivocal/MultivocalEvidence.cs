@@ -56,6 +56,7 @@ public static class MultivocalEvidence
         }
 
         var types = input.Planned.Plan.Numbered().ToDictionary(q => q.Number, q => q.Question.Type);
+        var texts = input.Planned.Plan.Numbered().ToDictionary(q => q.Number, q => q.Question.Text);
         var byId = input.Synthesis.Findings.ToDictionary(f => f.Id);
         var themes = new List<EvidenceTheme>();
         var questionOf = new Dictionary<string, string>();
@@ -73,6 +74,7 @@ public static class MultivocalEvidence
                 Codes = findings.GroupBy(f => numbers[f.Address])
                     .ToDictionary(g => g.Key, g => (IReadOnlyList<string>)g.Select(f => $"{f.Attribute}: {f.Value}").Distinct().ToList()),
                 FindingIds = findings.GroupBy(f => numbers[f.Address]).ToDictionary(g => g.Key, g => (IReadOnlyList<string>)g.Select(f => f.Id).ToList()),
+                Question = texts.TryGetValue(theme.Question, out var text) ? $"{theme.Question}: {text.Trim()}" : "",
             });
             questionOf[id] = theme.Question;
         }
