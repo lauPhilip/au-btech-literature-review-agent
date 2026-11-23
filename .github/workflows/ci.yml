@@ -11,9 +11,46 @@ on:
 permissions:
   contents: read
 
+# A newer push to a pull request cancels the older run. A push to master never does: each one has its own group.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
+  # What a pull request changes, by tools/test-scope.sh. One that changes docs alone skips Build & Test, the CSS check
+  # and accessibility: a job skipped by "if:" reports as skipped, which counts as passing for a required check, where a
+  # workflow-level paths-ignore would leave the required checks waiting. A push to master always runs everything.
+  changes:
+    name: What changed
+    runs-on: ubuntu-latest
+    outputs:
+      code: ${{ steps.scope.outputs.code }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0   # the pull request's base commit, to compare with
+
+      # FileLengthTests does not run for docs alone, so its 300-line rule is checked here for the changed files.
+      - name: Is it docs only?
+        id: scope
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+        run: |
+          if [ "${{ github.event_name }}" != pull_request ]; then echo "code=true" >> "$GITHUB_OUTPUT"; exit 0; fi
+          scope=$(bash tools/test-scope.sh "$BASE...HEAD")
+          if [ "$scope" != NONE ]; then echo "code=true" >> "$GITHUB_OUTPUT"; exit 0; fi
+          echo "code=false" >> "$GITHUB_OUTPUT"
+          fail=0
+          for f in $(git diff --name-only --diff-filter=d "$BASE...HEAD" | grep -viE '\.(png|jpg|gif|ico|woff2|pdf)$'); do
+            n=$(awk 'END { print NR }' "$f")
+            if [ "$n" -gt 300 ]; then echo "::error file=$f::$f has $n lines; split it under 300 (FileLengthTests)"; fail=1; fi
+          done
+          exit $fail
+
   build-and-test:
     name: Build & Test
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -25,17 +62,50 @@ jobs:
         with:
           dotnet-version: '10.0.x'
 
+      # No packages.lock.json, so setup-dotnet's own cache cannot be used; the key is the project files instead.
+      - name: Cache NuGet packages
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.nuget/packages
+          key: nuget-build-${{ runner.os }}-${{ hashFiles('**/*.csproj') }}
+          restore-keys: nuget-build-${{ runner.os }}-
+
       - name: Restore
         run: dotnet restore AuBtechReviewAgent.sln
 
       - name: Build
         run: dotnet build AuBtechReviewAgent.sln --configuration Release --no-restore
 
+      # A pull request runs the tests its change can affect (tools/test-scope.sh, against the pull request's base);
+      # the log and the run's summary say which and why. A push to master runs the whole suite, as release.yml does.
+      - name: Choose the tests
+        id: tests
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+        run: |
+          if [ "${{ github.event_name }}" = pull_request ]; then
+            scope=$(bash tools/test-scope.sh "$BASE...HEAD" 2> scope.txt)
+          else
+            scope=ALL; echo "A push to master runs the whole suite." > scope.txt
+          fi
+          cat scope.txt
+          { echo '### Tests run'; echo '```'; cat scope.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          echo "filter=$scope" >> "$GITHUB_OUTPUT"
+
       - name: Test
-        run: dotnet test AuBtechReviewAgent.sln --configuration Release --no-build --verbosity normal
+        env:
+          FILTER: ${{ steps.tests.outputs.filter }}
+        run: |
+          if [ "$FILTER" = ALL ]; then
+            dotnet test AuBtechReviewAgent.sln --configuration Release --no-build --verbosity normal
+          else
+            dotnet test AuBtechReviewAgent.sln --configuration Release --no-build --verbosity normal --filter "$FILTER"
+          fi
 
   css-up-to-date:
     name: Compiled CSS matches components
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -48,6 +118,8 @@ jobs:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: '22'
+          cache: npm
+          cache-dependency-path: AuBtechReviewAgent/package-lock.json
 
       # wwwroot/css/tailwind.css is committed. If a component uses a class that is not in it, this fails:
       # run "npm ci && npm run build:css" in AuBtechReviewAgent and commit the result.
@@ -71,6 +143,8 @@ jobs:
 
   accessibility:
     name: Accessibility (axe-core, WCAG 2.2 AA)
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -82,9 +156,31 @@ jobs:
         with:
           dotnet-version: '10.0.x'
 
+      # No packages.lock.json, so setup-dotnet's own cache cannot be used; the key is the project files instead.
+      - name: Cache NuGet packages
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.nuget/packages
+          key: nuget-app-${{ runner.os }}-${{ hashFiles('**/*.csproj') }}
+          restore-keys: nuget-app-${{ runner.os }}-
+
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: '22'
+          cache: npm
+          cache-dependency-path: tools/a11y/package-lock.json
+
+      # The browsers are cached by Playwright version. "playwright install" below skips a browser that is already
+      # there but still installs the system libraries Chromium needs, which live outside the cache.
+      - name: Read the Playwright version
+        id: playwright
+        run: echo "version=$(jq -r '.packages["node_modules/playwright"].version' tools/a11y/package-lock.json)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache the Playwright browsers
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}
 
       # The app runs without real keys: the checked pages never call the model or the sources.
       - name: Start the app
