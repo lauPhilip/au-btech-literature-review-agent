@@ -93,6 +93,7 @@ public static partial class MultivocalPaperParts
     /// <summary>The opening text of the data section, in code.</summary>
     public static string DataText(MultivocalReportInput input)
     {
+        if (input.Ledger.HasFormalPool) return MultivocalFormalText.DataText(input);
         var f = Flow(input);
         return $"The searches found {f.Found} grey sources. After {f.Duplicates} duplicates were set aside, {f.Screened} were screened and {f.Included} included; " +
                $"{f.Passed} of them passed the quality threshold of {input.Quality.Threshold} points and {f.Extracted} were extracted against the systematic map. " +
@@ -105,7 +106,7 @@ public static partial class MultivocalPaperParts
         var sb = new StringBuilder();
         sb.AppendLine(@"\begin{figure}[H]");
         sb.AppendLine(@"\centering");
-        sb.Append(FlowTikz(Flow(input)));
+        sb.Append(input.Ledger.HasFormalPool ? MultivocalFormalText.FlowTikz(input) : FlowTikz(Flow(input)));
         sb.AppendLine(@"\caption{Flow of sources from the searches to the synthesis}");
         sb.AppendLine(@"\end{figure}");
         sb.AppendLine(@"\vspace{6pt}");

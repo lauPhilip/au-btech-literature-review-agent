@@ -16,8 +16,10 @@ public static partial class MultivocalPaperParts
         var records = input.Ledger.Sources.GroupBy(s => MultivocalSearcher.AddressKey(s.Record.Url)).ToDictionary(g => g.Key, g => g.First().Record);
         return input.Extraction.Sources.Where(s => s.Error == null)
             .GroupBy(s => records.GetValueOrDefault(s.Address)?.Kind ?? "")
-            .Select(g => (Kind: g.Key, Label: MultivocalGuidelines.GreyTypes.FirstOrDefault(t => t.Key == g.Key).Label ?? (g.Key.Length > 0 ? g.Key : "Other"),
-                          Tier: MultivocalSynthesiser.TierOf(g.Key), Sources: g.Count()))
+            // An academic source has no outlet tier (0): it is formal literature, drawn in its own colour.
+            .Select(g => (Kind: g.Key, Label: g.Key == MultivocalSearcher.FormalKind ? "Academic literature"
+                              : MultivocalGuidelines.GreyTypes.FirstOrDefault(t => t.Key == g.Key).Label ?? (g.Key.Length > 0 ? g.Key : "Other"),
+                          Tier: g.Key == MultivocalSearcher.FormalKind ? 0 : MultivocalSynthesiser.TierOf(g.Key), Sources: g.Count()))
             .OrderByDescending(x => x.Sources).ThenBy(x => x.Tier).ThenBy(x => x.Label, StringComparer.Ordinal)
             .ToList();
     }
@@ -33,12 +35,13 @@ public static partial class MultivocalPaperParts
         string labels = string.Join(",", kinds.Select(k => "{" + PaperLatex.Escape(Short(k.Label)) + "}"));
         sb.AppendLine(@"\begin{tikzpicture}[scale=0.8]");
         sb.AppendLine($"\\begin{{axis}}[xbar stacked, ytick={{{ticks}}}, yticklabels={{{labels}}}, y dir=reverse, xmin=0, xmax={max}, ymin=0.5, ymax={kinds.Count + 0.5}, xlabel={{Sources}}, width=0.8\\textwidth, height={Math.Max(4, 1 + kinds.Count * 0.8).ToString("0.#", CultureInfo.InvariantCulture)}cm, bar width=8pt, yticklabel style={{font=\\footnotesize}}, legend style={{font=\\footnotesize, at={{(0.5,-0.45)}}, anchor=north, legend columns=3, draw=none}}]");
-        foreach (var (tier, colour) in new[] { (1, "blue!60"), (2, "teal!50"), (3, "orange!50") })
+        bool academic = kinds.Any(k => k.Tier == 0);
+        foreach (var (tier, colour) in new[] { (1, "blue!60"), (2, "teal!50"), (3, "orange!50"), (0, "gray!50") }.Where(t => academic || t.Item1 != 0))
         {
             string points = string.Join(" ", kinds.Select((k, i) => $"({(k.Tier == tier ? k.Sources : 0)},{i + 1})"));
             sb.AppendLine($"\\addplot[fill={colour}] coordinates {{{points}}};");
         }
-        sb.AppendLine(@"\legend{1st tier, 2nd tier, 3rd tier}");
+        sb.AppendLine(academic ? @"\legend{1st tier, 2nd tier, 3rd tier, academic}" : @"\legend{1st tier, 2nd tier, 3rd tier}");
         sb.AppendLine(@"\end{axis}");
         sb.AppendLine(@"\end{tikzpicture}");
         return sb.ToString();
@@ -47,7 +50,8 @@ public static partial class MultivocalPaperParts
     /// <summary>The number of assessed sources per band of two quality points (0–1.5, 2–3.5, …, 20).</summary>
     public static IReadOnlyList<(int From, int Sources)> QualityBands(MultivocalQualityFile quality)
     {
-        var scored = quality.Sources.Where(q => q.Outcome != "Not assessed").Select(q => q.Points).ToList();
+        // Table 7 points are the grey sources'; an academic source is appraised with MMAT instead.
+        var scored = quality.Sources.Where(q => q.Outcome != "Not assessed" && !q.Formal).Select(q => q.Points).ToList();
         int top = quality.MaxPoints;
         return Enumerable.Range(0, top / 2 + 1).Select(i => i * 2)
             .Select(from => (From: from, Sources: scored.Count(p => p >= from && (from == top ? p <= top : p < from + 2))))
