@@ -12,6 +12,7 @@ public class PrismaFlowCounts
     public List<(string Source, int Count)> IdentifiedBySource { get; set; } = new();
     public int Identified { get; set; }
     public int IdentifiedViaCitations { get; set; }  // PRISMA "other methods": citation chaining
+    public int IdentifiedViaSeedChaining { get; set; }  // ...of which by building out from the most-cited included studies
     public int DuplicatesRemoved { get; set; }
     public int OutsideDateRange { get; set; }
     public int CappedBeyondMax { get; set; }
@@ -38,12 +39,13 @@ public class PrismaFlowCounts
         return new PrismaFlowCounts
         {
             IdentifiedBySource = state.SearchLogs
-                .Where(l => !l.SourceName.EndsWith("(citation chaining)", StringComparison.Ordinal))
+                .Where(l => !l.SourceName.EndsWith("(citation chaining)", StringComparison.Ordinal) && !l.SourceName.EndsWith("(seed chaining)", StringComparison.Ordinal))
                 .GroupBy(l => l.SourceName)
                 .Select(g => (g.Key, g.Sum(l => l.PapersFound)))
                 .ToList(),
             Identified = s.TotalIdentified,
             IdentifiedViaCitations = s.IdentifiedViaCitations,
+            IdentifiedViaSeedChaining = s.IdentifiedViaSeedChaining,
             DuplicatesRemoved = s.DuplicatesRemoved,
             OutsideDateRange = s.OutsideDateRange,
             CappedBeyondMax = s.CappedBeyondMaxResults,
@@ -74,8 +76,7 @@ public static class PrismaFlowDiagram
         string sources = c.IdentifiedBySource.Count == 0
             ? ""
             : "\\\\ " + string.Join("\\\\ ", c.IdentifiedBySource.Select(x => $"{Escape(x.Source)} (n = {x.Count})"));
-        if (c.IdentifiedViaCitations > 0)
-            sources += $"\\\\ Other methods: citation chaining (n = {c.IdentifiedViaCitations})";
+        sources += OtherMethods(c.IdentifiedViaCitations, c.IdentifiedViaSeedChaining);
 
         var removed = new List<string> { $"Duplicates (n = {c.DuplicatesRemoved})" };
         if (c.OutsideDateRange > 0) removed.Add($"Outside year range (n = {c.OutsideDateRange})");
@@ -105,6 +106,19 @@ public static class PrismaFlowDiagram
         sb.AppendLine(@"\draw[arrow] (screened) -- (excluded);");
         sb.AppendLine(@"\end{tikzpicture}");
         return sb.ToString();
+    }
+
+    /// <summary>
+    /// The "other methods" lines of the identification box: citation chaining, split into the most-cited seeds and the
+    /// other included studies when the seed step found records. Shared with the multivocal flow diagram.
+    /// </summary>
+    public static string OtherMethods(int viaCitations, int viaSeeds)
+    {
+        if (viaCitations <= 0) return "";
+        if (viaSeeds <= 0) return $"\\\\ Other methods: citation chaining (n = {viaCitations})";
+        string lines = $"\\\\ Other methods: citation chaining from the most-cited included studies (n = {viaSeeds})";
+        int other = viaCitations - viaSeeds;
+        return other > 0 ? lines + $"\\\\ Other methods: citation chaining from the other included studies (n = {other})" : lines;
     }
 
     private static string Escape(string s) => s.Replace("&", @"\&").Replace("_", @"\_").Replace("%", @"\%").Replace("#", @"\#");
