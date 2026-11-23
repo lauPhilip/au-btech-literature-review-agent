@@ -118,7 +118,9 @@
 /*
  * The shared building blocks of every page. Use these instead of repeating long class lists, so the pages
  * look like one product and a change of style is made in one place. Colours come from tailwind.config.js.
- * Buttons and fields have a 10 px radius (rounded-btn, rounded-field) and cards 16 px (rounded-card).
+ * No rounded corners except on buttons: buttons have a 10 px radius (rounded-btn); fields, cards and panels are
+ * square (rounded-field, rounded-card and rounded-panel are 0). Only round shapes, such as status dots and
+ * spinners, use rounded-full.
  */
 @layer components {
     .ui-container { @apply max-w-6xl mx-auto px-4 sm:px-6; }

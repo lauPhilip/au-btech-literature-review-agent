@@ -2,7 +2,7 @@
 
 The redesign gives TraceableAI the simplicity of its sibling Coursebot: one calm landing screen, a fixed app frame with a header and footer that never move, and one task per page. It also brings a new mark, the "reader bot", and a light and a dark theme. The full brief, with every page described at every width, is Lau's redesign handover of 20 November 2026; the brand files and their rules are in `AuBtechReviewAgent/wwwroot/brand/` (`BRAND.md`).
 
-Lau settled two questions before the build started. Cards have a 16 px radius and buttons and fields a 10 px radius, which replaces the old rule that only buttons are rounded. Claude pushes the branches and merges the pull requests once all checks pass, as for every other feature.
+Lau settled two questions before the build started. Cards have a 16 px radius and buttons and fields a 10 px radius, which replaces the old rule that only buttons are rounded. Lau later went back to the old rule: since issue #390, only buttons are rounded and everything else is square. Claude pushes the branches and merges the pull requests once all checks pass, as for every other feature.
 
 ## The order of the work
 
