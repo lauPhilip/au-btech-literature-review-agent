@@ -46,6 +46,13 @@ public sealed record WritingProfile
     /// </summary>
     public string DiscussionParts { get; init; } =
         "(a) what the themes together say about the objective, (b) where the themes connect, reinforce or contradict each other, (c) how strong the evidence behind the main findings is. Do not write the limitations, the implications, the directions for future research or a conclusion: they are separate sections written after this one.";
+
+    /// <summary>
+    /// Whether the theme prompts get lean source blocks (<see cref="ReviewEvidence.SourceBlock"/>): only the findings
+    /// placed in the theme, without a codes line that repeats them. Off by default, so the systematic review's prompts
+    /// stay exactly as they were; the multivocal review turns it on to cut the tokens it sends.
+    /// </summary>
+    public bool LeanEvidence { get; init; }
 }
 
 /// <summary>

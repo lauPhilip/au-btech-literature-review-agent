@@ -43,6 +43,12 @@ public sealed class EvidenceTheme
     public IReadOnlyDictionary<int, IReadOnlyList<string>> Codes { get; init; } = new Dictionary<int, IReadOnlyList<string>>();
 
     /// <summary>
+    /// The ids of the findings that put each source in this theme, for a lean source block (<see cref="WritingProfile.LeanEvidence"/>).
+    /// Empty when the module gives none; then a source's block lists all its findings, as before.
+    /// </summary>
+    public IReadOnlyDictionary<int, IReadOnlyList<string>> FindingIds { get; init; } = new Dictionary<int, IReadOnlyList<string>>();
+
+    /// <summary>
     /// Facts about the theme's sources, counted in code, for the writer of its subsection (issue #146): what they were
     /// read from and how they were designed. Empty when the module gives none; then the prompt has no such line.
     /// </summary>
@@ -89,8 +95,11 @@ public sealed class ReviewEvidence
     /// <summary>
     /// What the writer gets for one source of a theme: its profile, its codes in the theme, its verified findings
     /// (or its abstract when it has none) and a few excerpts of its text chosen by the theme's words.
+    /// A <paramref name="lean"/> block (<see cref="WritingProfile.LeanEvidence"/>) lists, in a theme, only the findings
+    /// that put the source in it (<see cref="EvidenceTheme.FindingIds"/>), and leaves out the codes line when every
+    /// code is already the value of a listed finding. Every finding listed still carries its verified quote.
     /// </summary>
-    public string SourceBlock(int reference, EvidenceTheme? theme, int excerpts)
+    public string SourceBlock(int reference, EvidenceTheme? theme, int excerpts, bool lean = false)
     {
         var sb = new StringBuilder();
         var source = Source(reference);
@@ -98,8 +107,11 @@ public sealed class ReviewEvidence
         sb.AppendLine($"{SourceLabel} [{reference}] {text?.Title}");
         if (!string.IsNullOrEmpty(source?.Profile)) sb.AppendLine(source.Profile);
         var codes = (theme == null ? source?.Codes : theme.Codes.GetValueOrDefault(reference)) ?? Array.Empty<string>();
-        if (codes.Count > 0) sb.AppendLine($"Codes{(theme == null ? "" : " in this theme")}: {string.Join("; ", codes)}");
         var findings = source?.Findings ?? Array.Empty<EvidenceFinding>();
+        if (lean && theme != null && theme.FindingIds.TryGetValue(reference, out var inTheme))
+            findings = findings.Where(f => inTheme.Contains(f.Id)).ToList();
+        bool codesRepeatFindings = lean && findings.Count > 0 && codes.All(c => findings.Any(f => f.Value == c));
+        if (codes.Count > 0 && !codesRepeatFindings) sb.AppendLine($"Codes{(theme == null ? "" : " in this theme")}: {string.Join("; ", codes)}");
         foreach (var f in findings) sb.AppendLine($"Finding {f.Id}: {f.Value} (verbatim: \"{f.Quote}\")");
         if (findings.Count == 0 && text != null && !string.IsNullOrWhiteSpace(text.Abstract))
             sb.AppendLine($"Abstract: {text.Abstract.Trim()}");

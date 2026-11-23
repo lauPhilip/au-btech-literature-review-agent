@@ -122,7 +122,7 @@ public static partial class ReviewWriter
         string field = $"synthesis-{number}";
         var coverage = new ThemeCoverage { ThemeId = theme.Id, Field = field, Studies = theme.Sources.ToList() };
         int excerpts = theme.Sources.Count <= 12 ? 2 : 1;
-        string themeEvidence = string.Join("\n", theme.Sources.Select(r => evidence.SourceBlock(r, theme, excerpts)));
+        string themeEvidence = string.Join("\n", theme.Sources.Select(r => evidence.SourceBlock(r, theme, excerpts, profile.LeanEvidence)));
         string otherThemes = string.Join("; ", evidence.Themes.Where(t => t.Id != theme.Id).Select(t => t.Name));
         int paragraphs = ThematicSynthesis.ParagraphsFor(theme.Sources.Count);
         string sourceList = string.Join(", ", theme.Sources.Select(r => $"[{r}]"));
@@ -190,7 +190,7 @@ public static partial class ReviewWriter
         var missing = theme.Sources.Except(coverage.CitedAfterWriting).ToList();
         if (missing.Count > 0)
         {
-            string missingEvidence = string.Join("\n", missing.Select(r => evidence.SourceBlock(r, theme, 2)));
+            string missingEvidence = string.Join("\n", missing.Select(r => evidence.SourceBlock(r, theme, 2, profile.LeanEvidence)));
             string fillPrompt = $$"""
                 You are revising one theme subsection of {{profile.ReviewShort}} so that it covers every {{s}} of the theme. The {{ss}} below belong to this theme but are not yet cited in it.
 
