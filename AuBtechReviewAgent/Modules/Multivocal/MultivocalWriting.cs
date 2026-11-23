@@ -42,13 +42,15 @@ public sealed partial class MultivocalWriter
     private readonly MultivocalPages _pages;
     private readonly Func<IChatCompletionService> _chat;
     private readonly string _model;
+    private readonly string _checkModel;
     private readonly int _parallelism;
 
     private readonly ReviewCache _cache;
     private readonly RunMetricsStore _metrics;
 
+    /// <param name="checkModel">The model that answers the citation checks when a fast model takes them (Llm:FastModel); empty: <paramref name="model"/>.</param>
     public MultivocalWriter(RunStore runs, MultivocalReporter reporter, MultivocalPages pages, Func<IChatCompletionService> chat, string model = "", int parallelism = 4,
-        ReviewCache? cache = null, RunMetricsStore? metrics = null)
+        ReviewCache? cache = null, RunMetricsStore? metrics = null, string? checkModel = null)
     {
         _cache = cache ?? ReviewCache.Disabled;
         _metrics = metrics ?? RunMetricsStore.Disabled;
@@ -57,6 +59,7 @@ public sealed partial class MultivocalWriter
         _pages = pages;
         _chat = chat;
         _model = model;
+        _checkModel = string.IsNullOrWhiteSpace(checkModel) ? model : checkModel.Trim();
         _parallelism = Math.Max(1, parallelism);
     }
 
