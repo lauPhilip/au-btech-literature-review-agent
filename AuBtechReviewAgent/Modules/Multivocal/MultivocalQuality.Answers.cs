@@ -42,7 +42,7 @@ public sealed partial class MultivocalQualityAssessor
             double given = a == null ? 0 : Snap(a.Score);
             string reason = a?.Reason.Trim() ?? "The model gave no answer for this item.";
             string? quote = string.IsNullOrWhiteSpace(a?.Quote) ? null : a!.Quote!.Trim();
-            bool found = quote != null && CitationSupportChecker.QuoteOccursIn(quote, text);
+            bool found = quote != null && PassageSelection.QuoteFound(quote, text);
             bool needsQuote = item.QuoteForLow ? given < 1 : given > 0;
             var answer = new QualityAnswer { Id = item.Id, Score = given, Reason = reason, Quote = quote, Basis = "model" };
             if (needsQuote && !found)
@@ -73,7 +73,7 @@ public sealed partial class MultivocalQualityAssessor
         var argument = new GreyArgument
         {
             Claim = opinion.Claim?.Trim() ?? "",
-            ClaimFound = CitationSupportChecker.QuoteOccursIn(opinion.Claim, text),
+            ClaimFound = PassageSelection.QuoteFound(opinion.Claim, text),
         };
         foreach (var (id, question) in GreyArgument.CriticalQuestions)
         {
@@ -93,7 +93,7 @@ public sealed partial class MultivocalQualityAssessor
                 var given = id switch { "expertise" => opinion.Expertise, "field" => opinion.Field, "opinion" => opinion.Assertion, _ => opinion.Evidence };
                 answer.Answer = given?.Answer?.Trim() ?? "No answer.";
                 answer.Quote = string.IsNullOrWhiteSpace(given?.Quote) ? null : given!.Quote!.Trim();
-                bool found = answer.Quote != null && CitationSupportChecker.QuoteOccursIn(answer.Quote, text);
+                bool found = answer.Quote != null && PassageSelection.QuoteFound(answer.Quote, text);
                 answer.Basis = found ? "model" : "unsupported";
                 if (!found) answer.Answer = "(No quote from the page backs this.) " + answer.Answer;
             }
@@ -103,13 +103,13 @@ public sealed partial class MultivocalQualityAssessor
     }
 
     private async Task<(ModelQualityAnswers Answers, bool FromCache)> AnswerCachedAsync(
-        IChatCompletionService chat, MultivocalPlan plan, GreyRecord record, string text, string textSha)
+        IChatCompletionService chat, MultivocalPlan plan, GreyRecord record, string text, string textSha, bool selected)
     {
         string topic = TopicLine(plan);
-        string key = ReviewCache.Key(PromptVersion, _model, topic, record.Title, record.Producer, record.Site, record.Kind, textSha);
+        string key = ReviewCache.Key(PromptVersion, _model, topic, record.Title, record.Producer, record.Site, record.Kind, textSha, selected ? text : null);
         if (_cache.TryGet<ModelQualityAnswers>("grey-quality", key, out var cached) && cached != null && ModelQualityAnswers.Validate(cached) == null)
             return (cached, true);
-        var answer = await AskAsync(chat, topic, record, text);
+        var answer = await AskAsync(chat, topic, record, text, selected);
         _cache.Set("grey-quality", key, answer);
         return (answer, false);
     }
@@ -117,15 +117,19 @@ public sealed partial class MultivocalQualityAssessor
     private static string TopicLine(MultivocalPlan plan) =>
         $"{plan.Topic}. Research questions: {string.Join(" ", plan.Numbered().Select(q => $"{q.Number}: {q.Question.Text}"))}";
 
+    private const string SelectedHeading =
+        "PAGE TEXT (selected passages of a long page: its start, its end, and the passages most relevant to each item and to the topic; [passage break] marks text left out; the only evidence you may use)";
+
     private const string AnswerShape = """
         {"answers":[{"id":"1.1","score":1,"reason":"One sentence.","quote":"Word for word from the page."}],"opinion":{"isOpinion":true,"claim":"Word for word from the page.","expertise":{"answer":"One sentence.","quote":"Word for word."},"field":{"answer":"...","quote":"..."},"assertion":{"answer":"...","quote":"..."},"evidence":{"answer":"...","quote":"..."}}}
         """;
 
     /// <summary>
     /// The quality prompt: the 17 items read from the page, each scored 1, 0.5 or 0 with a verbatim quote, and for an
-    /// opinion piece its main claim and four of the critical questions for an expert opinion (G13).
+    /// opinion piece its main claim and four of the critical questions for an expert opinion (G13). With
+    /// <paramref name="selected"/>, the text is selected passages of a long page (<see cref="GreyPageText.ForQuality"/>).
     /// </summary>
-    public static async Task<ModelQualityAnswers> AskAsync(IChatCompletionService chat, string topic, GreyRecord record, string text)
+    public static async Task<ModelQualityAnswers> AskAsync(IChatCompletionService chat, string topic, GreyRecord record, string text, bool selected = false)
     {
         string items = string.Join("\n", GreyQualityChecklist.ModelItems.Select(i => $"{i.Id} ({i.Group}) {i.Question}"));
         string about = $"""
@@ -144,7 +148,7 @@ public sealed partial class MultivocalQualityAssessor
             SOURCE:
             {{PromptSafety.Wrap(about, "source metadata")}}
 
-            PAGE TEXT (the only evidence you may use):
+            {{(selected ? SelectedHeading : "PAGE TEXT (the only evidence you may use)")}}:
             {{PromptSafety.Wrap(text, "page text")}}
 
             Answer each item below about this source. Score 1 (yes), 0.5 (partly) or 0 (no, or the page does not show it).

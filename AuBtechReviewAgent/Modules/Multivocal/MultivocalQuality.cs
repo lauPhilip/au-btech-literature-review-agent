@@ -26,10 +26,7 @@ public sealed partial class MultivocalQualityAssessor
     public const string StageAssessed = "Assessed";
 
     /// <summary>Part of the cache key: raise it whenever the quality prompt changes.</summary>
-    public const string PromptVersion = "grey-quality-v3";
-
-    /// <summary>At most this much of a page is sent to the model; a quote must come from this part.</summary>
-    public const int MaxTextForModel = 40_000;
+    public const string PromptVersion = "grey-quality-v4";
 
     private static readonly JsonSerializerOptions Json = new() { WriteIndented = true };
     private static readonly ConcurrentDictionary<Guid, bool> Running = new();
@@ -185,10 +182,13 @@ public sealed partial class MultivocalQualityAssessor
         }
         result.TextSha256 = snapshot.TextSha256;
 
-        string forModel = text.Length <= MaxTextForModel ? text : text[..MaxTextForModel];
+        // A long page is sent as its start, its end and the passages that show the items (GreyPageText); every quote is checked against what was sent.
+        var sent = GreyPageText.ForQuality(text, TopicLine(plan));
+        result.Passages = sent.Passages;
+        string forModel = sent.Text;
         try
         {
-            var (answers, fromCache) = await AnswerCachedAsync(chat, plan, record, forModel, snapshot.TextSha256);
+            var (answers, fromCache) = await AnswerCachedAsync(chat, plan, record, forModel, snapshot.TextSha256, sent.Passages != null);
             result.FromCache = fromCache;
             result.Answers = Score(record, answers.Answers, forModel);
             result.Argument = Argument(answers.Opinion, forModel);
