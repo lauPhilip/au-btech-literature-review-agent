@@ -25,7 +25,7 @@ public sealed class MultivocalExtractor
     public const string PromptVersion = "grey-extraction-v2";
 
     /// <summary>Part of the cache key of a formal source's extraction, whose prompt names it as academic (block I-5).</summary>
-    public const string FormalPromptVersion = "formal-extraction-v2";
+    public const string FormalPromptVersion = "formal-extraction-v3";
 
     private static readonly JsonSerializerOptions Json = new() { WriteIndented = true };
     private static readonly ConcurrentDictionary<Guid, bool> Running = new();
@@ -140,7 +140,10 @@ public sealed class MultivocalExtractor
         }
         result.TextSha256 = snapshot!.TextSha256;
         if (result.Formal) result.TextBasis = snapshot.TextBasis;
-        string forModel = text.Length <= MultivocalQualityAssessor.MaxTextForModel ? text : text[..MultivocalQualityAssessor.MaxTextForModel];
+        // A formal source's long full text is sent as selected passages; every quote is checked against what was sent.
+        var formalText = result.Formal ? FormalExtractionText.Select(text, snapshot.TextBasis, plan, map) : null;
+        result.Passages = formalText?.Passages;
+        string forModel = formalText?.Text ?? (text.Length <= MultivocalQualityAssessor.MaxTextForModel ? text : text[..MultivocalQualityAssessor.MaxTextForModel]);
 
         try
         {
@@ -214,7 +217,7 @@ public sealed class MultivocalExtractor
         // A formal source (block I-5) is named as academic, and its text is its open full text or its abstract.
         bool formal = record.Kind == MultivocalSearcher.FormalKind;
         string kind = formal ? "academic source (a paper from a bibliographic database)" : "grey literature source";
-        string textHeading = formal ? "SOURCE TEXT (its open full text, or its abstract when no full text is open; the only evidence you may use)" : "PAGE TEXT (the only evidence you may use)";
+        string textHeading = formal ? "SOURCE TEXT (its open full text or selected passages of it, or its abstract when no full text is open; the only evidence you may use)" : "PAGE TEXT (the only evidence you may use)";
         var prompt = $$"""
             You extract data from one {{kind}} for a multivocal literature review (Garousi et al. 2019, G12), against the review's systematic map.
             The review is about: {{PromptSafety.Wrap(plan.Topic, "review topic")}}
