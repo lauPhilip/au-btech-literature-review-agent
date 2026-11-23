@@ -99,7 +99,8 @@ public partial class PrismaReviewEngine
                 if (IsWebAddress(fullText.Url)) state.FullTextUrls[record.PaperId] = fullText.Url!;
             }
 
-            var referenced = new ReferencedPaper(reference, record.PaperId, record.Title, paper.Abstract, fullText.Chunks);
+            // The same cleaned text the run read (#369), so a quote found then is found now.
+            var referenced = new ReferencedPaper(reference, record.PaperId, record.Title, paper.Abstract, HiddenText.CleanChunks(fullText.Chunks).Chunks);
             var extraction = state.Extractions?.FirstOrDefault(e => e.ReferenceNumber == reference);
             var findings = new Dictionary<int, IReadOnlyList<string>>();
             if (extraction != null) findings[reference] = ThematicSynthesis.VerifiedFindings(extraction).Select(f => f.Finding.Quote).ToList();
