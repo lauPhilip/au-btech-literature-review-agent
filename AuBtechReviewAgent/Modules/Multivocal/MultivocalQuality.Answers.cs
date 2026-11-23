@@ -138,6 +138,7 @@ public sealed partial class MultivocalQualityAssessor
             You assess the quality of one grey literature source for a multivocal literature review, with the quality checklist of Garousi et al. (2019, Table 7).
             The review is about: {{PromptSafety.Wrap(topic, "review topic")}}
 
+            {{PromptSafety.ReviewerInputNotice}}
             {{PromptSafety.DataOnlyNotice}}
 
             SOURCE:
