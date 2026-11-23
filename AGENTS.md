@@ -7,11 +7,12 @@ This file tells AI coding assistants (and people in a hurry) how to work in this
 ```bash
 dotnet build
 dotnet test                                   # all tests are offline and use a scripted fake model
+tools/test-scope.sh --run -- --no-build       # only the tests your change can affect (tools/test-scope.ps1 on Windows)
 cd AuBtechReviewAgent && npm ci && npm run build:css   # after changing Tailwind classes in .razor files
 cd AuBtechReviewAgent && dotnet run           # needs MISTRAL_API_KEY in user-secrets, or a local model (Llm section)
 ```
 
-CI fails when `wwwroot/css/tailwind.css` is out of date, so rebuild and commit it with any change to classes. Never build a class name from a variable; Tailwind only finds class names written out in full.
+`tools/test-scope.sh` maps the files changed since `origin/master` (and your uncommitted ones) to their test folders and always adds the module kit, `FileLengthTests` and the attack set; shared code, the test helpers, the project files or any file it does not know run the whole suite, and docs alone run none. Pull requests run the same scope in CI and master runs everything; the map is in `docs/wiki/07-extending-and-testing.md`. CI fails when `wwwroot/css/tailwind.css` is out of date, so rebuild and commit it with any change to classes. Never build a class name from a variable; Tailwind only finds class names written out in full.
 
 ## Where to make a change
 
