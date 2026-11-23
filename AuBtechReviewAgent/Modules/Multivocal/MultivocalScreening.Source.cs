@@ -15,8 +15,29 @@ namespace AuBtechReviewAgent;
 // Screening one source once or twice, with the systematic review's steps and answer format, and applying the answers.
 public sealed partial class MultivocalScreener
 {
-    /// <summary>Part of the cache key of an academic record (block I-3): raise it whenever its prompt changes. v2: targeted second screenings.</summary>
-    public const string FormalPromptVersion = "formal-screening-v2";
+    /// <summary>
+    /// Part of the cache key of an academic record (block I-3): raise it whenever its prompt changes. v2: targeted second
+    /// screenings. v3: the first screening looks for positive evidence (<see cref="FirstProcedure"/>).
+    /// </summary>
+    public const string FormalPromptVersion = "formal-screening-v3";
+
+    /// <summary>
+    /// The first screening's steps in the multivocal review: the systematic review's steps
+    /// (<see cref="PrismaReviewEngine.ScreeningProcedure"/>) with a step for positive evidence, as its second screener
+    /// has, and a rule for a record with no summary. A live run with broad criteria included 65% of its sources, and a
+    /// source with no summary was decided on its title alone. The systematic review's steps are not changed. A source
+    /// excluded here for too little information has low confidence, so it is screened a second time and marked uncertain
+    /// (<see cref="MultivocalSecondScreening.TargetReason"/>).
+    /// </summary>
+    public const string FirstProcedure = """
+        TASK:
+        1. Look for positive evidence: what in the record shows that the source's main subject meets the inclusion thresholds. A passing mention of the topic, or a source that only might be relevant, is not positive evidence.
+        2. Decide Included only when there is positive evidence and no exclusion threshold applies. Otherwise decide Excluded.
+        3. If the record has no summary and the title alone gives no positive evidence, decide Excluded with the reason "too-little-information" and confidence "low".
+        4. Create a brief 1-2 sentence executive summary of the source.
+        5. Say how confident you are: "high", "medium" or "low" (low when the record is too thin to judge).
+        6. If Excluded, name the main reason: "off-topic" (not about the review's subject), "inclusion-not-met" (on topic but misses an inclusion threshold), "exclusion-matched" (an exclusion threshold applies) or "too-little-information" (the record is too thin to show it qualifies).
+        """;
 
     /// <summary>
     /// The stages that label the two screenings' calls, as in the systematic review, so a chat service routed by stage
@@ -68,8 +89,8 @@ public sealed partial class MultivocalScreener
     }
 
     /// <summary>
-    /// The screening prompt for one source: the systematic review's steps and answer format, with the record described
-    /// as what it is. It is judged on its subject against the criteria, not on being grey literature; an academic
+    /// The screening prompt for one source: the systematic review's answer format and second screener's steps, the
+    /// multivocal review's own first steps (<see cref="FirstProcedure"/>), with the record described as what it is. It is judged on its subject against the criteria, not on being grey literature; an academic
     /// record of the formal pool (block I-3) gets the same criteria, steps and answer format, introduced as academic.
     /// </summary>
     public static async Task<ScreeningAnswer> ScreenGreyAsync(IChatCompletionService chat, GreyRecord r, string inclusion, string exclusion, bool secondScreener)
@@ -109,7 +130,7 @@ public sealed partial class MultivocalScreener
             SOURCE TARGET DATA:
             {{PromptSafety.Wrap(record, formal ? "academic record metadata and abstract" : "grey source metadata and summary")}}
 
-            {{PrismaReviewEngine.ScreeningProcedure(secondScreener)}}
+            {{(secondScreener ? PrismaReviewEngine.ScreeningProcedure(true) : FirstProcedure)}}
 
             {{PrismaReviewEngine.ScreeningAnswerFormat}}
             """;

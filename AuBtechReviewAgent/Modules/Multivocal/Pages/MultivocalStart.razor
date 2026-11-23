@@ -147,6 +147,19 @@
                             {
                                 <p class="bg-supported-fill border border-supported-border text-supported p-2 text-xs">Everything is filled in. Check the protocol, then write it.</p>
                             }
+                            @if (CriteriaWarnings.Count > 0)
+                            {
+                                <div class="bg-partly-fill border border-partly-border text-partly p-2 text-xs space-y-1" role="status">
+                                    <p class="font-semibold">Your criteria may let in many sources:</p>
+                                    <ul class="list-disc pl-4 space-y-0.5">
+                                        @foreach (var warning in CriteriaWarnings)
+                                        {
+                                            <li>@warning</li>
+                                        }
+                                    </ul>
+                                    <p>Every included source is read, scored and extracted, so broad criteria make the run slow. You can still start the review. <button type="button" @onclick="() => GoTo(3)" class="underline decoration-dotted underline-offset-2">Change the criteria</button></p>
+                                </div>
+                            }
                         }
                     </div>
 
