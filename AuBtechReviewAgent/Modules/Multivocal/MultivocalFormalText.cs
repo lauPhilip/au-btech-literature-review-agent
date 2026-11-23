@@ -86,6 +86,21 @@ public static partial class MultivocalFormalText
                "A theme's mean quality counts its grey sources only, since academic sources have no Table 7 points.";
     }
 
+    /// <summary>
+    /// The statement on the use of AI, the part that says what the model did, for a review with both pools (#362): both
+    /// pools screened, two appraisals, and citations checked against a grey source's page or an academic source's text.
+    /// </summary>
+    public static string AiUseTasks(MultivocalReportInput input) =>
+        "The model was used for screening the grey and the academic sources twice against the same criteria, scoring the grey sources' quality on the guidelines' checklist, " +
+        "appraising the academic sources with the Mixed Methods Appraisal Tool, proposing the systematic map, extracting each source's values, checking that each value's quote supports it, " +
+        "grouping the findings into themes, writing the theme sections, the discussion, the summary for practitioners and the title, abstract and introduction, " +
+        "and checking each citation against the kept text of the source it cites: the kept page of a grey source, and the open-access full text or else the abstract of an academic one. " +
+        "Every value, quality point, appraisal answer and citation verdict counts only with a quote found verbatim in that kept text; the method, the counts, the figures, the answers to questions about frequency or existence and the references were written in code. ";
+
+    /// <summary>The screenings' agreement for the statement on the use of AI: each pool and both, as the method gives it.</summary>
+    public static string AiUseKappa(MultivocalReportInput input) =>
+        $"The two screenings agreed with Cohen's kappa = {Kappa(input.Screening.KappaGrey)} for the grey sources, {Kappa(input.Screening.KappaFormal)} for the academic sources and {Kappa(input.Screening.Kappa)} for both. ";
+
     private static string Was(int n) => n == 1 ? "was" : "were";
 
     private static string Kappa(double? k) => k is double v ? v.ToString("0.00", CultureInfo.InvariantCulture) : "not computed";

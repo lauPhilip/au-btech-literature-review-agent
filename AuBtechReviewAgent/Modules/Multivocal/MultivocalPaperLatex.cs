@@ -141,9 +141,17 @@ public static class MultivocalPaper
         var text = new StringBuilder();
         text.Append(inv, $"This review was conducted with TraceableAI (version {RecordingChatCompletionService.AppVersion.Split('+')[0]}), an open-source tool, following the multivocal literature review guidelines of Garousi et al. (2019), with {model}, in {paper.WrittenUtc.ToString("MMMM yyyy", inv)} (run {input.Planned.RunId}). ");
         text.Append("The protocol was written by the authors and fingerprinted before the search. ");
-        text.Append("The model was used for screening the grey sources twice against the criteria, scoring their quality on the guidelines' checklist, proposing the systematic map, extracting each source's values, checking that each value's quote supports it, grouping the findings into themes, writing the theme sections, the discussion, the summary for practitioners and the title, abstract and introduction, and checking each citation against the kept page of the source it cites. ");
-        text.Append("Every value, quality point and citation verdict counts only with a quote found verbatim in the kept page text; the method, the counts, the figures, the answers to questions about frequency or existence and the references were written in code. ");
-        if (input.Screening.Kappa is double k) text.Append(inv, $"The two screenings agreed with Cohen's kappa = {k:0.00}. ");
+        if (input.Ledger.HasFormalPool)
+        {
+            text.Append(MultivocalFormalText.AiUseTasks(input));
+            text.Append(MultivocalFormalText.AiUseKappa(input));
+        }
+        else
+        {
+            text.Append("The model was used for screening the grey sources twice against the criteria, scoring their quality on the guidelines' checklist, proposing the systematic map, extracting each source's values, checking that each value's quote supports it, grouping the findings into themes, writing the theme sections, the discussion, the summary for practitioners and the title, abstract and introduction, and checking each citation against the kept page of the source it cites. ");
+            text.Append("Every value, quality point and citation verdict counts only with a quote found verbatim in the kept page text; the method, the counts, the figures, the answers to questions about frequency or existence and the references were written in code. ");
+            if (input.Screening.Kappa is double k) text.Append(inv, $"The two screenings agreed with Cohen's kappa = {k:0.00}. ");
+        }
         int reviewed = input.Screening.Sources.Count(s => s.Reviewed);
         text.Append(reviewed > 0 ? string.Create(inv, $"A human reviewer checked {reviewed} screening decisions within the tool. ") : "Screening decisions were not checked by a human reviewer within the tool. ");
         text.Append("The authors reviewed the output and take full responsibility for the content.");
