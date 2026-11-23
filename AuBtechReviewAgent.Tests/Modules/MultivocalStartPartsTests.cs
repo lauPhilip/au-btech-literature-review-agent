@@ -89,8 +89,8 @@ public class MultivocalStartPartsTests
         Assert.Contains("Grey and academic sources are screened twice", html);
         Assert.Contains("Each academic source is appraised with MMAT, as in the systematic review, on its open full text or else its abstract.", html);
         Assert.Contains("a tension between academic and grey sources is named as one between the state of the art and the state of the practice", html);
-        Assert.Equal(6, Count(html, ">built</span>")); // up to the synthesis (I-2 to I-5); writing and checking follow in I-6
-        Assert.Equal(2, Count(html, ">not built yet</span>"));
+        Assert.Equal(8, Count(html, ">built</span>")); // every step covers both pools once block I-6 is in
+        Assert.Equal(0, Count(html, ">not built yet</span>"));
     }
 
     [Fact]

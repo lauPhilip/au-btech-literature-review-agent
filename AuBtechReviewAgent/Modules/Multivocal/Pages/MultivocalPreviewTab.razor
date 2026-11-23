@@ -64,8 +64,10 @@
                     ? "Grey and academic sources are classified in one systematic map proposed from your research questions; every extracted value rests on a quote from the source's kept text: its page, or a paper's full text or abstract."
                     : "The sources are classified in a systematic map proposed from your research questions; every extracted value rests on a quote from the source's page.", true),
                 ("Synthesis", $"The findings are grouped into themes to answer {questions} research question{(questions == 1 ? "" : "s")}, each theme labelled with the kind and quality of the sources it rests on{(p.UsesFormalPool ? ", grey, academic or both; a tension between academic and grey sources is named as one between the state of the art and the state of the practice" : "")}.", true),
-                ("Writing", "The paper is written from the findings: an outline, one section per theme, the discussion, a summary for practitioners and an automated peer review; the title and abstract last.", !p.UsesFormalPool), // built for grey literature in block G; both pools in block I-6
-                ("Checking", "Every citation is compared with the kept text of the page it cites; weak ones get a second check and are repaired.", !p.UsesFormalPool),
+                ("Writing", "The paper is written from the findings: an outline, one section per theme, the discussion, a summary for practitioners and an automated peer review; the title and abstract last.", true),
+                ("Checking", p.UsesFormalPool
+                    ? "Every citation is compared with the kept text of the source it cites: a page, or a paper's full text or abstract; weak ones get a second check and are repaired."
+                    : "Every citation is compared with the kept text of the page it cites; weak ones get a second check and are repaired.", true),
             };
         }
     }
