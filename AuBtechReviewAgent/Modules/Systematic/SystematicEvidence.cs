@@ -11,8 +11,9 @@ namespace AuBtechReviewAgent;
 public static class SystematicEvidence
 {
     public static ReviewEvidence Build(ThematicCodebook book, IReadOnlyList<IncludedPaperMetricRow> records,
-        IReadOnlyList<ReferencedPaper> papers, IReadOnlyList<StudyExtraction> extractions)
+        IReadOnlyList<ReferencedPaper> papers, IReadOnlyList<StudyExtraction> extractions, IReadOnlyList<string>? questions = null)
     {
+        questions ??= System.Array.Empty<string>();
         var byPaper = papers.ToDictionary(p => p.ReferenceNumber);
         var byExtraction = extractions.ToDictionary(e => e.ReferenceNumber);
         var sources = records.Select(r =>
@@ -51,6 +52,9 @@ public static class SystematicEvidence
             Sources = t.Studies.ToList(),
             Codes = t.Studies.ToDictionary(r => r, r => (IReadOnlyList<string>)book.Codes.Where(c => c.Reference == r && t.CodeIds.Contains(c.Id)).Select(c => c.Label).ToList()),
             Facts = ThemeFacts(t.Studies, byExtraction),
+            // The questions the codebook says the theme answers, with their text (issue #124).
+            Question = string.Join("; ", questions.Select((q, i) => (Id: ReviewWriter.QuestionId(i), Text: q.Trim()))
+                .Where(q => t.Questions?.Contains(q.Id) == true).Select(q => $"{q.Id}: {q.Text}")),
         }).ToList();
         return new ReviewEvidence { Sources = sources, Themes = themes, BaseFacts = BaseFacts(extractions), LeftOut = book.Uncoded.OrderBy(u => u.Reference).ToList() };
     }
