@@ -34,6 +34,8 @@ public static class AiUseStatement
         automated.Add(state.ThematicSynthesis is { Themes.Count: > 0 } ? "coding findings into themes and drafting the synthesis" : "drafting the synthesis");
         automated.Add("checking each citation against the cited paper");
         text.Append("The model was used for ").Append(JoinList(automated)).Append(". ");
+        if (state.SeedChaining is { Seeds.Count: > 0 })
+            text.Append("The seed studies for citation chaining were chosen in code from the citation counts in the databases' metadata, not by the model. ");
 
         if (state.DualScreeningRequested && s.DualScreened > 0)
         {
