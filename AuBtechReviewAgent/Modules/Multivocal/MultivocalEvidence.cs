@@ -46,7 +46,9 @@ public static class MultivocalEvidence
                 Reference = number,
                 Title = extracted.Title,
                 ReferenceLine = references.TryGetValue(number, out var reference) ? GreyReferences.Line(reference) : null,
-                Profile = Profile(record, points.GetValueOrDefault(extracted.Address), input.Quality.MaxPoints),
+                Profile = record?.Kind == MultivocalSearcher.FormalKind
+                    ? MultivocalFormalText.Profile(record, input.Quality.Sources.FirstOrDefault(q => q.Address == extracted.Address), page)
+                    : Profile(record, points.GetValueOrDefault(extracted.Address), input.Quality.MaxPoints),
                 Findings = findings.Select(f => new EvidenceFinding(f.Id, $"{f.Attribute}: {f.Value}", f.Quote)).ToList(),
                 Codes = findings.Select(f => $"{f.Attribute}: {f.Value}").Distinct().ToList(),
                 Text = new ReferencedPaper(number, extracted.Address, extracted.Title, record?.Summary ?? "", Chunks(extracted.Address, text)),
@@ -128,7 +130,9 @@ public static class MultivocalEvidence
     public static string BaseFacts(MultivocalReportInput input, IReadOnlyDictionary<string, GreyRecord> records, IReadOnlyDictionary<string, double> points)
     {
         var numbers = MultivocalReporter.SourceNumbers(input.Extraction);
-        var addresses = numbers.Keys.ToList();
+        // With a formal pool, these facts are the grey pool's, and the formal pool's follow (block I-6).
+        bool pools = input.Ledger.HasFormalPool;
+        var addresses = numbers.Keys.Where(a => !pools || records.GetValueOrDefault(a)?.Kind != MultivocalSearcher.FormalKind).ToList();
         int Tier(int t) => addresses.Count(a => MultivocalSynthesiser.TierOf(records.GetValueOrDefault(a)?.Kind ?? "") == t);
         var years = addresses.Select(a => records.GetValueOrDefault(a)?.Published?.Year).OfType<int>().ToList();
         int undated = addresses.Count - years.Count;
@@ -148,6 +152,7 @@ public static class MultivocalEvidence
             "The searches used free search interfaces only; no general web search engine was used and no one was contacted.",
             "A language model screened, scored, mapped, extracted and grouped the sources; every value rests on a quote found in the kept page text.",
         };
+        if (pools) lines.InsertRange(1, MultivocalFormalText.BaseFacts(input));
         return string.Join("\n", lines);
     }
 

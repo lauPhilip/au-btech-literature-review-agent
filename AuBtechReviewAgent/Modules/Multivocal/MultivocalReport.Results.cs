@@ -116,7 +116,7 @@ public sealed partial class MultivocalReporter
             new[] { "G8", "When to stop", Upper(Sentence(input.Ledger.StoppingApplied)) },
             new[] { "G9", "Inclusion and exclusion criteria", "Set in the protocol and applied to every source." },
             new[] { "G10", "Selection with the same care for every source", $"Every source screened twice; κ = {(input.Screening.Kappa is double k ? k.ToString("0.00", CultureInfo.InvariantCulture) : "not computed")}; {Count(input.Screening.Sources.Count(x => x.Uncertain), "decision")} flagged as uncertain; {Num(input.Screening.Sources.Count(x => x.Reviewed))} looked at by the reviewer." },
-            new[] { "G11", "Quality of the sources", $"Table 7 checklist, threshold {input.Quality.Threshold} of {input.Quality.MaxPoints} points; every point backed by a quote." },
+            new[] { "G11", "Quality of the sources", $"Table 7 checklist, threshold {input.Quality.Threshold} of {input.Quality.MaxPoints} points; every point backed by a quote.{(input.Ledger.HasFormalPool ? " Academic sources appraised with MMAT, as in the systematic review, on their full text or abstract; the threshold is for grey sources only." : "")}" },
             new[] { "G12", "Data extraction and systematic map", $"Map version {fixedMap.Number} with {Count(fixedMap.Attributes.Count, "attribute")}, fixed before extraction; every value backed by a quote." },
             new[] { "G13", "Synthesis", $"Qualitative coding into {Count(input.Synthesis.Themes.Count, "theme")}; evidence counted in code; opinion pieces with the critical questions." },
             new[] { "G14", "Reporting for the audience", "This report, written in code from the run's files, with its source repository; the paper and its summary for practitioners are written from the same files." },
@@ -134,6 +134,8 @@ public sealed partial class MultivocalReporter
             "Grey literature is not peer reviewed. Each theme says which outlet tiers it rests on, and a theme resting on 3rd-tier sources only (such as blog posts and code repositories) is labelled as such.",
             "Only robots.txt was checked before a page was fetched; other terms of a site cannot be read by code.",
         };
+        if (input.Ledger.HasFormalPool)
+            limits.Add($"An academic source without an open full text was read on its abstract alone ({MultivocalPools.For(true, input.Ledger, input.Screening, input.Quality, input.Extraction).AbstractOnly} of the extracted academic sources); its findings and citations rest on that abstract, and it is marked \"abstract only\" wherever it is listed or cited.");
         section.Blocks.Add(ReportBlock.List(limits));
         return section;
     }
@@ -152,10 +154,14 @@ public sealed partial class MultivocalReporter
                 string kind = records.TryGetValue(s.Address, out var r) ? r.Kind : "";
                 var page = pages.GetValueOrDefault(s.Address);
                 string url = PrismaReviewEngine.IsWebAddress(s.Url) ? s.Url : "";
+                // An academic source: its MMAT appraisal and its text basis in place of a tier and points (block I-6).
+                var cells = kind == MultivocalSearcher.FormalKind
+                    ? MultivocalFormalText.RepositoryCells(input.Quality.Sources.FirstOrDefault(q => q.Address == s.Address), page)
+                    : (MultivocalGuidelines.GreyTypes.FirstOrDefault(t => t.Key == kind).Label ?? kind, Ordinal(MultivocalSynthesiser.TierOf(kind)),
+                        $"{points.GetValueOrDefault(s.Address).ToString("0.#", CultureInfo.InvariantCulture)} of {input.Quality.MaxPoints}");
                 return new[]
                 {
-                    $"S{numbers[s.Address]}", s.Title, MultivocalGuidelines.GreyTypes.FirstOrDefault(t => t.Key == kind).Label ?? kind,
-                    Ordinal(MultivocalSynthesiser.TierOf(kind)), $"{points.GetValueOrDefault(s.Address).ToString("0.#", CultureInfo.InvariantCulture)} of {input.Quality.MaxPoints}",
+                    $"S{numbers[s.Address]}", s.Title, cells.Item1, cells.Item2, cells.Item3,
                     url, page != null ? page.AccessedUtc.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) : "", page != null && PrismaReviewEngine.IsWebAddress(page.WaybackUrl) ? page.WaybackUrl : "",
                 };
             })));
