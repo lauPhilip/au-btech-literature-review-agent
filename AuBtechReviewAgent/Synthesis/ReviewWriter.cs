@@ -170,18 +170,23 @@ public static partial class ReviewWriter
     /// (sources found, included, themes): a number in the abstract that is in neither the facts nor the sections is
     /// rejected, as is a citation outside the reference list. The rationale's citations are checked against their
     /// sources like any other sentence. A module can add its own check on the abstract (<paramref name="abstractRule"/>,
-    /// null when the abstract is fine), such as the systematic review's rule that its record counts add up. Returns
-    /// null when no acceptable answer comes back.
+    /// null when the abstract is fine), such as the systematic review's rule that its record counts add up. With research
+    /// questions the prompt lists them, and the objectives are written in code from them (<see cref="ObjectivesFromQuestions"/>)
+    /// instead of by the model. Returns null when no acceptable answer comes back.
     /// </summary>
     public static async Task<FrontMatter?> WriteFrontMatterAsync(IChatCompletionService chat, WritingProfile profile, string topic, string goal,
         string facts, IReadOnlyList<SynthesisSection> sections, string discussion, string referenceLines, int referenceCount, Action<string>? warn = null,
-        Func<string, string?>? abstractRule = null)
+        Func<string, string?>? abstractRule = null, IReadOnlyList<string>? questions = null)
     {
         string results = string.Join("\n\n", sections.Select(x => $"### {x.Heading}\n{x.Text}")) + $"\n\n### Discussion\n{discussion}";
+        string? codeObjectives = ObjectivesFromQuestions(questions);
+        string objectivesRule = codeObjectives == null ? "\"objectives\": the objective and what the review set out to answer, in two or three sentences, without citations."
+            : "\"objectives\" are written in code from the research questions above; do not write them.";
+        string objectivesField = codeObjectives == null ? ",\"objectives\":\"...\"" : "";
         string prompt = $$"""
             You are writing the title, abstract, rationale and objectives of {{profile.Review}}. Its results and discussion are finished and checked; write only what they and the facts below say.
 
-            REVIEW OBJECTIVE: "{{goal}}"
+            {{AimBlock(goal, questions)}}
             PRIMARY TOPIC: "{{topic}}"
             {{PromptSafety.ReviewerInputNotice}}
 
@@ -198,22 +203,22 @@ public static partial class ReviewWriter
             1. "title": one line, at most 25 words, no full stop, naming the topic and the kind of review.
             2. "abstract": one paragraph of 150 to 250 words: background, method, main results by theme, and what they mean. No citations. Use no number that is not in the facts or the results above.
             3. "rationale": one or two paragraphs on why the review is needed, from what the {{profile.Sources}} report; every sentence ends with an inline [n] marker, using the {{profile.Sources}} the results cite for it. Add no background from general knowledge: leave out a sentence you cannot cite, since code removes every rationale sentence without a citation.
-            4. "objectives": the objective and what the review set out to answer, in two or three sentences, without citations.
+            4. {{objectivesRule}}
             {{ProseCleaner.PlainProseRule}}
             Respond ONLY with a valid minified JSON object:
-            {"title":"...","abstract":"...","rationale":"... [n] ...","objectives":"..."}
+            {"title":"...","abstract":"...","rationale":"... [n] ..."{{objectivesField}}}
             """;
         string allowedNumbers = facts + "\n" + results;
         try
         {
             using (LlmStage.Begin("front-matter"))
             {
-                var answer = await LlmJson.GetAsync<FrontMatterAnswer>(chat, prompt, LlmJson.JsonMode(0.3), a => FrontMatterProblem(a, allowedNumbers, referenceCount) ?? abstractRule?.Invoke(a.Abstract!), repairAttempts: 2);
+                var answer = await LlmJson.GetAsync<FrontMatterAnswer>(chat, prompt, LlmJson.JsonMode(0.3), a => FrontMatterProblem(a, allowedNumbers, referenceCount, codeObjectives == null) ?? abstractRule?.Invoke(a.Abstract!), repairAttempts: 2);
                 return new FrontMatter(
                     answer.Title!.Trim().TrimEnd('.'),
                     MethodsSectionWriter.StripMarkdownEmphasis(answer.Abstract!.Trim()),
                     MethodsSectionWriter.StripMarkdownEmphasis(answer.Rationale!.Trim()),
-                    MethodsSectionWriter.StripMarkdownEmphasis(answer.Objectives!.Trim()));
+                    codeObjectives ?? MethodsSectionWriter.StripMarkdownEmphasis(answer.Objectives!.Trim()));
             }
         }
         catch (Exception ex)
@@ -223,10 +228,11 @@ public static partial class ReviewWriter
         }
     }
 
-    private static string? FrontMatterProblem(FrontMatterAnswer a, string allowedNumbers, int referenceCount)
+    private static string? FrontMatterProblem(FrontMatterAnswer a, string allowedNumbers, int referenceCount, bool objectives = true)
     {
-        if (string.IsNullOrWhiteSpace(a.Title) || string.IsNullOrWhiteSpace(a.Abstract) || string.IsNullOrWhiteSpace(a.Rationale) || string.IsNullOrWhiteSpace(a.Objectives))
-            return "title, abstract, rationale and objectives must all be given.";
+        if (string.IsNullOrWhiteSpace(a.Title) || string.IsNullOrWhiteSpace(a.Abstract) || string.IsNullOrWhiteSpace(a.Rationale))
+            return objectives ? "title, abstract, rationale and objectives must all be given." : "title, abstract and rationale must all be given.";
+        if (objectives && string.IsNullOrWhiteSpace(a.Objectives)) return "title, abstract, rationale and objectives must all be given.";
         if (a.Title.Split(' ', StringSplitOptions.RemoveEmptyEntries).Length > 25) return "the title must be at most 25 words.";
         if (ThematicSynthesis.CitedIn(a.Abstract).Count > 0 || ThematicSynthesis.CitedIn(a.Objectives).Count > 0) return "the abstract and objectives take no citations.";
         if (ThematicSynthesis.CitedIn(a.Rationale).Count == 0) return "the rationale has no citation; every sentence of it ends with the [n] of the sources the results cite for it.";

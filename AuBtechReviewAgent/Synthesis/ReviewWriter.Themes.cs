@@ -130,13 +130,15 @@ public static partial class ReviewWriter
         // The theme's own counts (issue #146), when the module gives them; without them the prompt is as before.
         string themeFacts = theme.Facts.Length == 0 ? ""
             : $"\nFACTS ABOUT THE {ss.ToUpperInvariant()} IN THIS THEME ({profile.BaseFactsFrom}; use them whenever you say how these {ss} were designed, and do not change them): {theme.Facts}";
+        // The research questions the theme answers (issue #124); without them the prompt is as before.
+        string themeQuestion = theme.Question.Length == 0 ? "" : $"\nTHIS THEME ANSWERS: {theme.Question}";
 
         string prompt = $$"""
             You are writing one subsection of {{profile.ResultsSection}} of {{profile.Review}}. The review used thematic synthesis; this subsection reports one theme.
 
             REVIEW OBJECTIVE: "{{goal}}"
             {{PromptSafety.ReviewerInputNotice}}
-            THEME: {{theme.Name}}. {{theme.Description}}
+            THEME: {{theme.Name}}. {{theme.Description}}{{themeQuestion}}
             OTHER THEMES (reported in their own subsections; do not cover them here): {{(otherThemes.Length == 0 ? "none" : otherThemes)}}{{themeFacts}}
 
             REFERENCE LIST FOR THIS THEME (cite ONLY these numbers):
