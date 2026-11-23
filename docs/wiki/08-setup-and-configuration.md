@@ -77,6 +77,8 @@ All of these can be set in `appsettings.json` (non-secret values only), user sec
 | `OpenSources:SemanticScholarApiKey` | empty | Optional Semantic Scholar key (secret) |
 | `OpenSources:OpenAlexApiKey` | empty | OpenAlex key (secret); without it most OpenAlex queries are refused once the small keyless budget is used up |
 | `OpenSources:ChainingPerPaper` | 5 | References and citing papers taken per included paper in citation chaining |
+| `OpenSources:SeedStudies` | 10 | With citation chaining on, how many included studies, those with the most citations per year, are built out further as seeds (0 switches the seed step off; at most 50) |
+| `OpenSources:SeedChainingPerDirection` | 20 | References and citing works kept per seed, those with the most citations per year first (at most 100) |
 | `Cache:Enabled` | true | Reuse search responses and screening decisions; every reuse is marked in the ledger |
 | `Cache:SearchResponseHours` | 24 | How long a search response is reused |
 | `Cache:ScreeningDecisionDays` | 90 | How long a screening decision is reused |
