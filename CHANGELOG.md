@@ -18,6 +18,8 @@ The API and the MCP server have their own page, at `/docs/api`. It shows how to 
 
 You can now stop a review you started. The run stops at the next safe point, before its next model call or step. A review that waits in line just leaves the line. The run is marked as cancelled, and the time and your reason are kept on file. Your free review for the day comes back, once a day. Only the browser or tool that started the review can cancel it. Click "Cancel review" beside the run, and the page asks once before it acts. You can say why, if you like. Then the page shows the run as cancelled, with your reason and a button to start a new review. The button works on a phone too.
 
+The multivocal review can now search academic databases as well as the web. It screens papers with the same rules as web sources. It reads a paper's open full text, or its abstract when there is none, and rates it with MMAT, as the systematic review does. Papers and web sources share one map, one set of themes and one paper. Each theme says whether it rests on papers, web sources or both. The paper cites papers as the systematic review does, and it marks a paper read on its abstract alone. The run view shows the two kinds of source side by side. The Multivocal card stays off until a real review has been checked by hand.
+
 ### Changed
 
 The theme sections are now written so more citations hold up. Each claim gets its own citation, and sources share one only when each says the whole thing. The writer adds no counts, comparisons or words like "always" that a source does not state.

@@ -22,7 +22,7 @@
             }
             @Row("Screened twice", Grey.Screened, Formal.Screened, true)
             <tr class="border-t border-line text-muted">
-                <th scope="row" class="py-1 pr-2 font-normal pl-3">Agreement (κ)@(Kappa is double both ? $"; both {both:0.00}" : "")</th>
+                <th scope="row" class="py-1 pr-2 font-normal pl-3 text-left">Agreement (κ)@(Kappa is double both ? $"; both {both:0.00}" : "")</th>
                 <td class="py-1 pr-2 text-right font-mono">@KappaText(Grey.Kappa)</td>
                 <td class="py-1 text-right font-mono">@KappaText(Formal.Kappa)</td>
             </tr>
@@ -55,7 +55,7 @@
 
     private static RenderFragment Row(string step, int? grey, int? formal, bool main) =>
         @<tr class="@(main ? "border-t border-line text-ink font-medium" : "border-t border-line text-muted")">
-            <th scope="row" class="@(main ? "py-1 pr-2 font-medium" : "py-1 pr-2 font-normal pl-3")">@step</th>
+            <th scope="row" class="@(main ? "py-1 pr-2 font-medium text-left" : "py-1 pr-2 font-normal pl-3 text-left")">@step</th>
             <td class="py-1 pr-2 text-right font-mono">@(grey?.ToString() ?? "–")</td>
             <td class="py-1 text-right font-mono">@(formal?.ToString() ?? "–")</td>
         </tr>;

@@ -121,16 +121,26 @@ else
                         <section id="@AuBtechReviewAgent.ReportOutline.StudiesId" data-report-section class="scroll-mt-20 space-y-5">
                             <h2 class="font-display text-xl font-semibold tracking-tight text-heading">3. Data and the flow of sources</h2>
                             <p>@AuBtechReviewAgent.MultivocalPaperParts.DataText(input)</p>
-                            @{ var flow = AuBtechReviewAgent.MultivocalPaperParts.Flow(input); }
-                            <ol class="grid grid-cols-2 gap-2 text-sm sm:grid-cols-3" aria-label="Flow of sources">
-                                @FlowStep("Found", flow.Found, $"from {flow.Searches} searches")
-                                @FlowStep("Screened twice", flow.Screened, $"{flow.Duplicates} duplicates set aside")
-                                @FlowStep("Included", flow.Included, $"{flow.Excluded} excluded")
-                                @FlowStep("Passed the quality threshold", flow.Passed, $"{flow.BelowThreshold} below it, {flow.NotAssessed} not assessed")
-                                @FlowStep("Extracted", flow.Extracted, flow.NotExtracted > 0 ? $"{flow.NotExtracted} could not be" : "against the fixed map")
-                                @FlowStep("Synthesised", flow.Themes, $"themes from {flow.Findings} findings")
-                            </ol>
-                            @Table(new AuBtechReviewAgent.PaperTable("Extracted sources by kind of grey literature", new[] { "Kind", "Outlet tier", "Sources" },
+                            @if (input.Ledger.HasFormalPool)
+                            {
+                                @* Both pools side by side, the same table as the run view's funnel (block I-6). *@
+                                <MultivocalPoolFunnel Grey="AuBtechReviewAgent.MultivocalPools.For(false, input.Ledger, input.Screening, input.Quality, input.Extraction)"
+                                                      Formal="AuBtechReviewAgent.MultivocalPools.For(true, input.Ledger, input.Screening, input.Quality, input.Extraction)"
+                                                      Kappa="input.Screening.Kappa" Screened="true" Assessed="true" Extracted="true" />
+                            }
+                            else
+                            {
+                                var flow = AuBtechReviewAgent.MultivocalPaperParts.Flow(input);
+                                <ol class="grid grid-cols-2 gap-2 text-sm sm:grid-cols-3" aria-label="Flow of sources">
+                                    @FlowStep("Found", flow.Found, $"from {flow.Searches} searches")
+                                    @FlowStep("Screened twice", flow.Screened, $"{flow.Duplicates} duplicates set aside")
+                                    @FlowStep("Included", flow.Included, $"{flow.Excluded} excluded")
+                                    @FlowStep("Passed the quality threshold", flow.Passed, $"{flow.BelowThreshold} below it, {flow.NotAssessed} not assessed")
+                                    @FlowStep("Extracted", flow.Extracted, flow.NotExtracted > 0 ? $"{flow.NotExtracted} could not be" : "against the fixed map")
+                                    @FlowStep("Synthesised", flow.Themes, $"themes from {flow.Findings} findings")
+                                </ol>
+                            }
+                            @Table(new AuBtechReviewAgent.PaperTable(input.Ledger.HasFormalPool ? "Extracted sources by kind" : "Extracted sources by kind of grey literature", new[] { "Kind", "Outlet tier", "Sources" },
                                 AuBtechReviewAgent.MultivocalPaperParts.Kinds(input).Select(k => (IReadOnlyList<string>)new[] { k.Label, Ordinal(k.Tier), k.Sources.ToString() }).ToList()))
                             @Table(AuBtechReviewAgent.MultivocalPaperParts.MapCounts(input))
                         </section>
@@ -235,7 +245,7 @@ else
     private RenderFragment Cited(string field, string text) =>
         @<CitedProse Field="@field" Text="@text" Checks="checks" Open="openCitation" SourceNoun="page"
                      OnToggle="@(c => ToggleCitation(c.Field, c.Sentence, c.Reference))" OnClose="CloseCitation"
-                     SourceTitle="@(reference => references.FirstOrDefault(r => r.Number == reference)?.Title)" />;
+                     SourceTitle="@(reference => references.FirstOrDefault(r => r.Number == reference) is { } r ? r.Title + (AuBtechReviewAgent.GreyReferences.AbstractOnly(r) ? " (abstract only)" : "") : null)" />;
 
     private static RenderFragment FlowStep(string label, int count, string note) =>
         @<li class="border border-line bg-soft p-3"><span class="block text-xs font-semibold uppercase tracking-wider text-muted">@label</span><span class="block font-mono text-lg font-semibold text-heading">@count</span><span class="block text-xs text-muted">@note</span></li>;

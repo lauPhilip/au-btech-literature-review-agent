@@ -71,6 +71,47 @@ public static class FormalKit
         return "{\"placements\":[" + string.Join(",", ids.Select(id => $$"""{"group":"{{id}}","themes":["Summaries keep the context short"],"reason":""}""")) + "]}";
     }
 
+    private static readonly string KitRoot = Path.Join(Path.GetTempPath(), "formalkit-" + Guid.NewGuid().ToString("N"));
+
+    static FormalKit() => AppDomain.CurrentDomain.ProcessExit += (_, _) => TestFolders.TryDelete(KitRoot);
+
+    /// <summary>
+    /// The whole run with both pools as the module kit sees it, so the rules of AGENTS.md are checked on it too: the
+    /// kit's poisoned grey sources, the two academic papers, and the method and data in main.tex written in code.
+    /// </summary>
+    public static async Task<KitRun> KitAsync()
+    {
+        var run = await RunAsync(KitRoot);
+        if (run.Runner.StatusOf(run.RunId)?.Error is string error) throw new InvalidOperationException("The kit's formal run stopped: " + error);
+        Dictionary<string, byte[]> archive;
+        using (var zip = new System.IO.Compression.ZipArchive(new MemoryStream(run.Writer.Archive(run.RunId))))
+            archive = zip.Entries.ToDictionary(e => e.FullName, e =>
+            {
+                using var stream = e.Open();
+                using var copy = new MemoryStream();
+                stream.CopyTo(copy);
+                return copy.ToArray();
+            });
+        var input = run.Reporter.LoadInput(run.RunId)!;
+        string tex = ModuleKit.Text(archive[MultivocalPaper.MainTexFile]);
+        (string, string, string) InTex(string what, string fromFiles) => (what, tex.Contains(fromFiles, StringComparison.Ordinal) ? fromFiles : "(not in main.tex)", fromFiles);
+        var culture = System.Globalization.CultureInfo.CurrentCulture;
+        System.Globalization.CultureInfo.CurrentCulture = System.Globalization.CultureInfo.InvariantCulture;
+        List<(string, string, string)> written;
+        try
+        {
+            written = MultivocalPaperParts.Methods(input).Select(m => InTex("method: " + m.Heading, m.Latex ?? PaperLatex.Escape(m.Text))).ToList();
+            written.Add(InTex("data", PaperLatex.Escape(MultivocalPaperParts.DataText(input))));
+            written.Add(InTex("flow with two arms", MultivocalFormalText.FlowTikz(input)));
+        }
+        finally { System.Globalization.CultureInfo.CurrentCulture = culture; }
+        List<string> prompts;
+        lock (run.Model.Prompts) prompts = run.Model.Prompts.ToList();
+        return new KitRun(run.Store.FolderOf(run.RunId), ReviewModules.Find("multivocal")!, archive, prompts,
+            new[] { MultivocalPaper.MainTexFile, GreyReferences.BibFile, GreyReferences.RisFile, GreyReferences.ScreenedFile },
+            written, MultivocalWriter.StageChecked);
+    }
+
     public sealed record Run(RunStore Store, Guid RunId, string Key, MultivocalRunner Runner, MultivocalSearcher Searcher, MultivocalScreener Screener,
         MultivocalWriter Writer, MultivocalReporter Reporter, FakeChatService Model, Database Academic, MultivocalPages Pages, MultivocalQualityAssessor Quality);
 
