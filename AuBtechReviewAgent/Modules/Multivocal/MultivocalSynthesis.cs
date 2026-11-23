@@ -91,7 +91,8 @@ public sealed partial class MultivocalSynthesiser
             // Every quote is checked again against the kept page text before it is used; one that is no longer there
             // (the kept text was changed or removed) is left out, and the note says how many.
             var extracted = Findings(extraction, fixedMap, records, points);
-            var checkedFindings = extracted.Where(f => _pages.CheckQuote(runId, f.Address, f.Quote) == "found").ToList();
+            var checkQuote = _pages.QuoteChecker(runId);
+            var checkedFindings = extracted.Where(f => checkQuote(f.Address, f.Quote) == "found").ToList();
             if (checkedFindings.Count < extracted.Count)
                 file.Notes.Add($"{extracted.Count - checkedFindings.Count} extracted value(s) were left out because their quote is no longer in the kept page text.");
             // A value that only says the source does not state it ("Not addressed") is not a finding.
