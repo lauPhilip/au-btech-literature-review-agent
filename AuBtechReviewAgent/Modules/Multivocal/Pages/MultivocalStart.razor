@@ -186,6 +186,7 @@
                             }
                             else
                             {
+                                <Honeypot Id="mlr-website" @bind-Value="honeypot" />
                                 <button type="button" class="ui-btn-primary" disabled="@(Problems.Count > 0 || !FlagsConfirmed || saving)" @onclick="WriteProtocolAsync">Start the review</button>
                             }
                         </div>

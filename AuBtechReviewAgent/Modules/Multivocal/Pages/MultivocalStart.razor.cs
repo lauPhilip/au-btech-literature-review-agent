@@ -47,6 +47,9 @@ public partial class MultivocalStart
     private bool tabChosen; // once the reviewer picks a tab, the panel stops following the run
     private string? shownStep;
     internal bool saving;
+    internal string honeypot = ""; // the hidden field (Honeypot); a bot that fills it cannot start a run
+
+    [Inject] private AuBtechReviewAgent.ActionLimiter Actions { get; set; } = default!;
     internal string? error;
 
     // Grey literature only while the formal pool is not built (decision 6), whichever card planned the review.
@@ -190,6 +193,11 @@ public partial class MultivocalStart
     {
         if (planned == null) return;
         tabChosen = false;
+        if (!Actions.TryTake(AuBtechReviewAgent.ActionLimiter.StartReview, PrerenderClientAddress ?? "unknown", out string limited))
+        {
+            error = limited;
+            return;
+        }
         Runner.Start(planned.RunId, editKey, PrerenderClientAddress);
     }
 
