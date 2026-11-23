@@ -20,12 +20,14 @@ public static class LongGreyRun
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
             string path = request.RequestUri!.AbsolutePath;
-            bool page = path.StartsWith("/p", StringComparison.Ordinal) && int.TryParse(path[2..], out int n);
-            var response = page
-                ? new HttpResponseMessage(System.Net.HttpStatusCode.OK) { Content = new StringContent(LongGreyPages.Html(int.Parse(path[2..]), LengthOf(int.Parse(path[2..]))), Encoding.UTF8, "text/html") }
-                : new HttpResponseMessage(System.Net.HttpStatusCode.NotFound) { Content = new StringContent("") };
-            return Task.FromResult(response);
+            return Task.FromResult(path.StartsWith("/p", StringComparison.Ordinal) && int.TryParse(path[2..], out int number)
+                ? Respond(System.Net.HttpStatusCode.OK, LongGreyPages.Html(number, LengthOf(number)))
+                : Respond(System.Net.HttpStatusCode.NotFound, ""));
         }
+
+        // The HttpClient that called the handler owns and disposes the response.
+        private static HttpResponseMessage Respond(System.Net.HttpStatusCode status, string body) =>
+            new(status) { Content = new StringContent(body, Encoding.UTF8, "text/html") };
     }
 
     private sealed class Source : IGreySource
