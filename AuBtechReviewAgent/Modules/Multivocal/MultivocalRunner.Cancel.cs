@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Concurrent;
+using System.Linq;
 using System.Threading.Tasks;
 
 namespace AuBtechReviewAgent;
@@ -15,6 +16,9 @@ public sealed partial class MultivocalRunner
     private sealed record StopRequest(DateTime? StartedUtc, DateTime RequestedUtc, string Reason);
 
     private readonly ConcurrentDictionary<Guid, StopRequest> _stops = new();
+
+    /// <summary>How many runs are running on this server now, for /health: the deploy waits until no run is going.</summary>
+    public int ActiveRunCount => _status.Values.Count(s => s.Running);
 
     /// <summary>
     /// Asks a running run to stop before its next step (only with the run's edit key). False when the key does not

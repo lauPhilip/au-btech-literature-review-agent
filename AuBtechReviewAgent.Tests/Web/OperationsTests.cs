@@ -121,4 +121,19 @@ public class OperationsTests
         Assert.Contains("Run failed during Screening (3f2b6c1e)", decoded);
         Assert.DoesNotContain(" ", url); // fully escaped
     }
+
+    [Fact]
+    public void HealthCountsTheRunsOfEveryKindAndNamesTheCommit()
+    {
+        var checks = new[] { new SiteHealth.Check("storage", "ok", "fine") };
+        var report = SiteHealth.Create(checks, "0.3.1-alpha.0.2+40B00A0C59F6B49E121C30D1D6D98AC8F3D3C961", DateTime.UtcNow, systematicRuns: 1, multivocalRuns: 2);
+
+        Assert.Equal(3, report.ActiveRuns); // the deploy waits for grey literature runs too, not only systematic ones
+        Assert.Equal(new SiteHealth.RunCounts(1, 2), report.Runs);
+        Assert.Equal("0.3.1-alpha.0.2", report.Version);
+        Assert.Equal("40b00a0c59f6b49e121c30d1d6d98ac8f3d3c961", report.Commit); // the deploy compares it with the commit it built
+        Assert.Equal("ok", report.Status);
+        Assert.Null(SiteHealth.Create(checks, "1.0.0", DateTime.UtcNow, 0, 0).Commit);
+        Assert.Equal("degraded", SiteHealth.Create(new[] { new SiteHealth.Check("model", "degraded", "slow") }, "1.0.0", DateTime.UtcNow, 0, 0).Status);
+    }
 }

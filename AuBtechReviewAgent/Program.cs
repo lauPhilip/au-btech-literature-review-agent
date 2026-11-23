@@ -219,7 +219,7 @@ app.MapGet("/sitemap.xml", (HttpRequest request) =>
 bool serverModelKey = !string.IsNullOrWhiteSpace(mistralApiKey) && !mistralApiKey.Contains("PLACEHOLDER", StringComparison.OrdinalIgnoreCase);
 app.MapGet("/health", () =>
 {
-    var report = AuBtechReviewAgent.SiteHealth.Build(reviewEngine, serverModelKey, DateTime.UtcNow);
+    var report = AuBtechReviewAgent.SiteHealth.Build(reviewEngine, serverModelKey, DateTime.UtcNow, multivocalRunner.ActiveRunCount);
     return Results.Json(report, statusCode: report.Status == "unhealthy" ? StatusCodes.Status503ServiceUnavailable : StatusCodes.Status200OK);
 });
 
