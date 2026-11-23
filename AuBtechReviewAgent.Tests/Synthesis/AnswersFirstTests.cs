@@ -76,4 +76,47 @@ public class AnswersFirstTests
             ReviewWriter.AnswersProblem(new[] { "Studies show that supervisors help." }, 1, Evidence(), results, 3, WritingProfile.Systematic));
         Assert.Contains("citation numbers 9 are not in the reference list", ReviewWriter.AnswersProblem(new[] { "Supervisors help [9]." }, 1, Evidence(), results, 3, WritingProfile.Systematic));
     }
+
+    private static string Closing(string conclusion) => System.Text.Json.JsonSerializer.Serialize(new
+    {
+        limitations = "The evidence rests on two studies.",
+        implications = "Teams should add supervisors.",
+        futureResearch = "Certification needs its own trials.",
+        conclusion,
+    });
+
+    [Fact]
+    public async Task TheClosingGetsTheAnswersAsGivenTextAndItsConclusionMayNotRestateThem()
+    {
+        var given = new[] { Answer, ReviewWriter.UnansweredText(WritingProfile.Systematic) };
+        var model = new FakeChatService()
+            .Returns(Closing("Agent loops recover through supervisors that restart failed steps."))   // restates the answer to RQ1: sent back
+            .Returns(Closing("Safe agent loops need recovery first, and certification is still open."));
+
+        var closing = await ReviewWriter.WriteClosingAsync(model, WritingProfile.Systematic, "agent loops", "Map agent loops", "Included: 3.", Sections, Discussion,
+            Evidence(), 3, null, Questions, new[] { "RQ2" }, given);
+
+        string prompt = model.Prompts[0];
+        Assert.Contains("RESEARCH QUESTIONS AND THEIR ANSWERS", prompt);
+        Assert.Contains($"RQ1: How do agent loops recover?\nAnswer: {Answer}\nRQ2: How are agent loops certified?\nAnswer: {given[1]}", prompt.Replace("\r\n", "\n"));
+        Assert.DoesNotContain("\"answers\"", prompt);
+        Assert.Contains("Do not restate the answers above", prompt);
+        Assert.Contains("restates the answer to RQ1", model.Prompts[1]);
+        Assert.Equal(given, closing!.Answers);
+        Assert.Equal("Safe agent loops need recovery first, and certification is still open.", closing.Conclusion);
+    }
+
+    [Fact]
+    public async Task TheFrontMatterGetsTheAnswersAndTheConclusion()
+    {
+        var model = new FakeChatService().Returns("""{"title":"Agent loops: a systematic review","abstract":"We included 3 studies. Supervisors restart failed steps.","rationale":"Agent loops fail in production [1]."}""");
+
+        var front = await ReviewWriter.WriteFrontMatterAsync(model, WritingProfile.Systematic, "agent loops", "Map agent loops", "Included: 3.", Sections, Discussion,
+            Evidence().ReferenceLines(), 3, questions: Questions, answers: new[] { Answer, "None." }, conclusion: "Recovery comes first.");
+
+        string prompt = model.Prompts.Single().Replace("\r\n", "\n");
+        Assert.Contains($"ANSWERS TO THE RESEARCH QUESTIONS (written and checked before this step; the abstract's results and what they mean agree with them):\nRQ1: {Answer}\nRQ2: None.", prompt);
+        Assert.Contains("CONCLUSION (written and checked before this step; the abstract ends on the same reading, in its own words):\nRecovery comes first.", prompt);
+        Assert.NotNull(front);
+    }
 }
