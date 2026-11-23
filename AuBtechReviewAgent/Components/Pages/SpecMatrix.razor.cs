@@ -200,6 +200,7 @@ public partial class SpecMatrix
         string folder = Runs.FolderOf(State.CurrentSessionId);
         string reportPath = Path.Join(folder, "prisma-report.json");
         hasProtocol = File.Exists(Path.Join(folder, "protocol.md"));
+        ResetEdits(folder);
 
         if (File.Exists(reportPath))
         {
@@ -207,7 +208,7 @@ public partial class SpecMatrix
             {
                 string content = await File.ReadAllTextAsync(reportPath);
                 report = JsonSerializer.Deserialize<PrismaReport>(content, new JsonSerializerOptions { PropertyNameCaseInsensitive = true }) ?? new PrismaReport();
-                report = AuBtechReviewAgent.ReportEdits.Apply(report, AuBtechReviewAgent.ReportEditLog.Load(folder));
+                report = AuBtechReviewAgent.ReportEdits.Apply(report, editLog);
             }
             catch { report = new PrismaReport(); }
         }
@@ -222,7 +223,7 @@ public partial class SpecMatrix
         flow = AuBtechReviewAgent.PrismaFlowCounts.From(state);
         runLine = RunLine(state);
         dateLine = state.CompletedUtc is DateTime done ? done.ToString("d MMMM yyyy", System.Globalization.CultureInfo.InvariantCulture) : "";
-        aiStatement = AuBtechReviewAgent.AiUseStatement.Methods(state, State.CurrentSessionId, AuBtechReviewAgent.ReportEditLog.Load(folder));
+        aiStatement = AuBtechReviewAgent.AiUseStatement.Methods(state, State.CurrentSessionId, editLog);
         aiShort = AuBtechReviewAgent.AiUseStatement.Short(state);
         researchQuestions = state.ResearchQuestions?.ToList() ?? new List<string>();
         passedPeerReviewCheck = state.Stats.PassedPeerReviewCheck;
