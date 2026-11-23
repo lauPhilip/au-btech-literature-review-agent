@@ -202,6 +202,14 @@ public partial class MultivocalStart
         StateHasChanged();
     }
 
+    /// <summary>The browser tab's title: the progress while the run goes ("42% · Your review"), as on the systematic review's page.</summary>
+    internal string TabTitle()
+    {
+        if (planned != null && Runner.StatusOf(planned.RunId) is { Running: true } status)
+            return $"{MultivocalProgress.Percent(stage, status.Progress)}% · Your review";
+        return (GreyOnly ? "Grey literature review" : "Multivocal literature review") + (CardOn ? "" : " (preview)");
+    }
+
     internal string StageLine()
     {
         if (stage == MultivocalWriter.StageChecked) return "Finished: the paper is written and every citation is checked";
