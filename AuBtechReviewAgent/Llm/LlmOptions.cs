@@ -22,10 +22,28 @@ public class LlmOptions
     public string ApiKey { get; set; } = "";
 
     /// <summary>
-    /// How many model calls one run makes at the same time (screening, extraction, coding, checks). Reasoning models
-    /// take 30 to 110 seconds a call, so the calls are bound by waiting, not by the server's throughput.
+    /// The earlier name of <see cref="QualityParallelism"/>, still read when that is not set.
     /// </summary>
     public int ScreeningParallelism { get; set; } = 8;
+
+    private int? _qualityParallelism;
+
+    /// <summary>
+    /// How many items one run sends to the main model at the same time (extraction, coding, writing, and every stage
+    /// when there is no <see cref="FastModel"/>). Reasoning models take 30 to 110 seconds a call, so the calls are bound
+    /// by waiting, not by the server's throughput. Not set: <see cref="ScreeningParallelism"/>.
+    /// </summary>
+    public int QualityParallelism
+    {
+        get => _qualityParallelism ?? ScreeningParallelism;
+        set => _qualityParallelism = value;
+    }
+
+    /// <summary>How many items one run sends to <see cref="FastModel"/> at the same time (the <see cref="FastStages"/>).</summary>
+    public int FastParallelism { get; set; } = 16;
+
+    /// <summary>The width of a stage in one run: <see cref="FastParallelism"/> when it goes to the fast model, else <see cref="QualityParallelism"/>.</summary>
+    public int ParallelismFor(string stage) => Math.Max(1, HasFastModel && FastStages.Contains(stage) ? FastParallelism : QualityParallelism);
 
     /// <summary>
     /// Mistral only: the reasoning_effort sent with every call ("low", "medium" or "high"). Reasoning models such as
@@ -69,7 +87,7 @@ public class LlmOptions
     public LlmOptions ForFastModel() => new()
     {
         Provider = Provider, Model = FastModel.Trim(), BaseUrl = BaseUrl, ApiKey = ApiKey,
-        ScreeningParallelism = ScreeningParallelism, ReasoningEffort = FastReasoningEffort,
+        ScreeningParallelism = FastParallelism, FastParallelism = FastParallelism, ReasoningEffort = FastReasoningEffort,
     };
 
     private string NameOf(string model) => IsOpenAICompatible

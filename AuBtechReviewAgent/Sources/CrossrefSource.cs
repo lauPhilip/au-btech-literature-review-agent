@@ -28,7 +28,7 @@ public class CrossrefSource : IAcademicSource
         // Only research outputs: journal and proceedings articles and posted preprints.
         string url = OpenSourceHttp.WithMailto(
             $"https://api.crossref.org/works?query.bibliographic={Uri.EscapeDataString(query)}&rows={Math.Clamp(maxResults, 1, 100)}" +
-            "&filter=type:journal-article,type:proceedings-article,type:posted-content&select=DOI,title,author,container-title,issued,type,abstract,URL,link",
+            "&filter=type:journal-article,type:proceedings-article,type:posted-content&select=DOI,title,author,container-title,issued,type,abstract,URL,link,is-referenced-by-count",
             _contactEmail);
         string json = await OpenSourceHttp.GetStringAsync(url);
         _raw.Add(json);
@@ -60,6 +60,7 @@ public class CrossrefSource : IAcademicSource
             }
 
             string type = Str(it, "type");
+            int? citedBy = it.TryGetProperty("is-referenced-by-count", out var c) && c.ValueKind == JsonValueKind.Number && c.TryGetInt32(out int cites) && cites >= 0 ? cites : null;
             string venue = type == "posted-content" ? "" : First(it, "container-title");
 
             string? pdf = null;
@@ -77,7 +78,8 @@ public class CrossrefSource : IAcademicSource
                 JournalSource: venue,
                 Doi: doi,
                 Url: Str(it, "URL") is { Length: > 0 } u ? u : $"https://doi.org/{doi}",
-                PdfUrl: pdf));
+                PdfUrl: pdf,
+                CitedByCount: citedBy));
         }
         return papers;
     }

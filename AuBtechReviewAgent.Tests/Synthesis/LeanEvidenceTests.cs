@@ -107,4 +107,43 @@ public class LeanEvidenceTests
         Assert.DoesNotContain("Finding F2.4:", lean);
         Assert.True(lean.Length < systematic.Length);
     }
+
+    [Fact]
+    public void ALeanThemeBlockCarriesOneShortExcerptOfWholeSentencesMostAboutTheTheme()
+    {
+        // Chunks of about 1,200 characters, as the multivocal review cuts its kept pages; the second has the theme's words late in it.
+        string Sentence(int i) => $"Sentence {i} is ordinary text about agents and their tools in a long page.";
+        string other = string.Join(" ", Enumerable.Range(1, 16).Select(Sentence));
+        string relevant = string.Join(" ", Enumerable.Range(1, 10).Select(Sentence)) + " Running summaries keep the context short. Summaries replace old turns. " + string.Join(" ", Enumerable.Range(11, 4).Select(Sentence));
+        var text = new ReferencedPaper(1, "s1", "Source 1", "", new[] { new DocumentChunk("s1", 1, other), new DocumentChunk("s1", 2, relevant) });
+        var source = new EvidenceSource { Reference = 1, Title = "Source 1", Findings = new[] { new EvidenceFinding("F1.1", "Summaries", "Quote.") }, Text = text };
+        var theme = new EvidenceTheme { Id = "T1", Name = "Summaries", Description = "Running summaries.", Sources = new[] { 1 }, FindingIds = new Dictionary<int, IReadOnlyList<string>> { [1] = new[] { "F1.1" } } };
+        var evidence = new ReviewEvidence { Sources = new[] { source }, Themes = new[] { theme } };
+
+        string lean = evidence.SourceBlock(1, theme, 2, lean: true);
+        var excerpts = lean.Split('\n').Where(l => l.StartsWith("[1, page ", StringComparison.Ordinal)).ToList();
+        string excerpt = Assert.Single(excerpts)["[1, page 2]: ".Length..];
+        Assert.StartsWith("[1, page 2]: ", excerpts[0]);
+        Assert.Contains("Running summaries keep the context short.", excerpt);
+        Assert.InRange(excerpt.Length, 1, ReviewEvidence.LeanExcerptCharacters);
+        Assert.EndsWith(".", excerpt);
+        Assert.Contains(excerpt, relevant);
+
+        // The default block still carries both chunks whole.
+        string full = evidence.SourceBlock(1, theme, 2);
+        Assert.Contains($"[1, page 1]: {other}", full);
+        Assert.Contains($"[1, page 2]: {relevant}", full);
+    }
+
+    [Fact]
+    public void ASentenceLongerThanTheExcerptIsCutAtASpaceAndEveryPieceIsCopiedFromTheChunk()
+    {
+        string words = string.Join(" ", Enumerable.Range(1, 300).Select(i => $"word{i}")) + ".";
+        var pieces = ReviewEvidence.Excerpts(new DocumentChunk("s", 3, words), 700).ToList();
+        Assert.True(pieces.Count > 1);
+        Assert.All(pieces, p => Assert.InRange(p.Text.Length, 1, 700));
+        Assert.All(pieces, p => Assert.Contains(p.Text, words));
+        Assert.All(pieces, p => Assert.Equal(3, p.PageNumber));
+        Assert.Equal(words, string.Join(" ", pieces.Select(p => p.Text)));
+    }
 }

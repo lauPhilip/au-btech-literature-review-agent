@@ -18,17 +18,30 @@ public static class SiteHealth
     public const long CriticalDiskBytes = 100L * 1024 * 1024;
 
     public sealed record Check(string Name, string Status, string Detail);
-    public sealed record Report(string Status, string Version, DateTime CheckedUtc, int ActiveRuns, IReadOnlyList<Check> Checks);
+    /// <summary>The runs going on this server, by kind of review.</summary>
+    public sealed record RunCounts(int Systematic, int Multivocal);
 
-    public static Report Build(PrismaReviewEngine engine, bool modelKeyConfigured, DateTime utcNow)
+    /// <summary>
+    /// Commit is the full hash the build was made from, so the deploy can check that the new version started.
+    /// ActiveRuns counts every running review of every kind; the deploy waits until it is 0 (deploy/site_health.py).
+    /// </summary>
+    public sealed record Report(string Status, string Version, string? Commit, DateTime CheckedUtc, int ActiveRuns,
+        RunCounts Runs, IReadOnlyList<Check> Checks);
+
+    public static Report Build(PrismaReviewEngine engine, bool modelKeyConfigured, DateTime utcNow, int multivocalRuns)
     {
         var checks = new List<Check> { Disk(engine.WorkspaceRoot), Model(engine.Llm, modelKeyConfigured) };
         checks.AddRange(Sources());
+        return Create(checks, ToolVersion.Current, utcNow, engine.Coordinator.ActiveRunIds.Count, multivocalRuns);
+    }
 
+    /// <summary>The report from its checks, the app's version and the runs going on.</summary>
+    public static Report Create(IReadOnlyList<Check> checks, string appVersion, DateTime utcNow, int systematicRuns, int multivocalRuns)
+    {
         string status = checks.Any(c => c.Status == "unhealthy") ? "unhealthy"
             : checks.Any(c => c.Status == "degraded") ? "degraded" : "ok";
-        return new Report(status, RecordingChatCompletionService.AppVersion.Split('+')[0], utcNow,
-            engine.Coordinator.ActiveRunIds.Count, checks);
+        return new Report(status, ToolVersion.Number(appVersion), ToolVersion.Commit(appVersion), utcNow,
+            systematicRuns + multivocalRuns, new RunCounts(systematicRuns, multivocalRuns), checks);
     }
 
     /// <summary>The run folder can be written to, and the drive has room for more runs.</summary>

@@ -4,11 +4,6 @@ using System.Linq;
 
 namespace AuBtechReviewAgent;
 
-/// <summary>What the model is given of a formal source's kept text for its extraction, and what that was, for the file.</summary>
-/// <param name="Text">The text sent: the whole kept text, or selected passages of it joined by <see cref="FormalExtractionText.Break"/>.</param>
-/// <param name="Passages">What was sent, e.g. "14 of 83 passages of the full text (8,104 of 41,230 characters)"; null when the whole kept text was sent.</param>
-public sealed record FormalTextForModel(string Text, string? Passages);
-
 /// <summary>
 /// The text a formal (academic) source is extracted from (block I-5). A long open full text is not sent whole: the
 /// model gets its first passages, where a paper's title and abstract are, and the passages most relevant to the map's
@@ -27,37 +22,23 @@ public static class FormalExtractionText
     /// <summary>The passages chosen by relevance on top of the lead passages.</summary>
     public const int RelevantPassages = 12;
 
-    /// <summary>What separates two passages that are not next to each other, so no quote can join them.</summary>
-    public const string Break = "\n\n[passage break]\n\n";
-
     // Words for the source's purpose (G12), which the extraction also asks for.
     private const string PurposeWords = "aim purpose objective goal propose present paper article contribution";
 
     /// <summary>The text to send for a source whose kept text is <paramref name="text"/>, read as its <paramref name="basis"/>.</summary>
-    public static FormalTextForModel Select(string text, string? basis, MultivocalPlan plan, MapVersion map)
+    public static TextForModel Select(string text, string? basis, MultivocalPlan plan, MapVersion map)
     {
-        if (basis != MultivocalPages.FullTextBasis || text.Length <= WholeUpTo) return new FormalTextForModel(text, null);
+        if (basis != MultivocalPages.FullTextBasis || text.Length <= WholeUpTo) return new TextForModel(text, null);
         // The kept full text is its passages joined by a blank line (MultivocalPages.AsPaper reads it the same way).
-        var passages = text.Split("\n\n", StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-            .Select((t, i) => new DocumentChunk("", i + 1, t)).ToList();
-        if (passages.Count <= LeadPassages + RelevantPassages) return new FormalTextForModel(text, null);
-
-        var terms = TextRelevance.Terms(string.Join(" ", new[] { plan.Topic, PurposeWords }
-            .Concat(plan.Numbered().Select(q => q.Question.Text))
-            .Concat(map.Attributes.SelectMany(a => new[] { a.Name, a.Description }.Concat(a.Values)))));
-        var lead = passages.Take(LeadPassages).ToList();
-        var chosen = lead.Concat(GroundingContextBuilder.SelectChunks(passages.Skip(LeadPassages).ToList(), terms, RelevantPassages))
-            .OrderBy(p => p.PageNumber).ToList();
-
-        var parts = new List<string>();
-        for (int i = 0; i < chosen.Count; i++)
-        {
-            if (i > 0) parts.Add(chosen[i].PageNumber == chosen[i - 1].PageNumber + 1 ? "\n\n" : Break);
-            parts.Add(chosen[i].Text);
-        }
-        string sent = string.Concat(parts);
-        int sentCharacters = chosen.Sum(p => p.Text.Length);
-        return new FormalTextForModel(sent,
-            $"{chosen.Count} of {passages.Count} passages of the full text ({sentCharacters.ToString("N0", System.Globalization.CultureInfo.InvariantCulture)} of {text.Length.ToString("N0", System.Globalization.CultureInfo.InvariantCulture)} characters)");
+        var passages = PassageSelection.Paragraphs(text);
+        if (passages.Count <= LeadPassages + RelevantPassages) return new TextForModel(text, null);
+        var chosen = passages.Take(LeadPassages)
+            .Concat(PassageSelection.MostRelevant(text, passages.Skip(LeadPassages).ToList(), Terms(plan, map), RelevantPassages));
+        return PassageSelection.Join(text, chosen, passages.Count, "the full text");
     }
+
+    /// <summary>The words an extraction looks for: the topic, a source's purpose, the questions and the map's attributes.</summary>
+    public static HashSet<string> Terms(MultivocalPlan plan, MapVersion map) => TextRelevance.Terms(string.Join(" ", new[] { plan.Topic, PurposeWords }
+        .Concat(plan.Numbered().Select(q => q.Question.Text))
+        .Concat(map.Attributes.SelectMany(a => new[] { a.Name, a.Description }.Concat(a.Values)))));
 }
