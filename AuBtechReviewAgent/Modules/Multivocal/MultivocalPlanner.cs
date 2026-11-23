@@ -40,10 +40,12 @@ public sealed class MultivocalPlanner
     /// </summary>
     public async Task<(Guid RunId, string EditKey)> CreateAsync(MultivocalPlan plan, IReadOnlyList<string>? confirmedFlags = null)
     {
+        // The flags first, from the plan as typed, as the form worked them out: cleaning takes out tag characters,
+        // and with them the hidden text the flags must still name.
+        var flags = MultivocalPlanGuard.Lines(plan);
         plan.Normalized();
         var problems = plan.Problems();
         if (problems.Count > 0) throw new ArgumentException(string.Join(" ", problems));
-        var flags = MultivocalPlanGuard.Lines(plan);
         if (flags.Count > 0 && (confirmedFlags == null || !flags.SequenceEqual(confirmedFlags)))
             throw new ArgumentException("Some of your text reads like instructions to the language model. Confirm it on the last step, or change it.");
         plan.InputFlags = flags;

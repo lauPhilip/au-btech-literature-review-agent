@@ -25,7 +25,7 @@ public sealed record InputCheck(ReviewRequest Request, IReadOnlyList<string> Err
 /// deployment they are a way to steer the model (or to use the server's key for something else). The
 /// guard works in four steps, and none of them rewrites the reviewer's words silently:
 ///  1. normalise: Unicode NFKC, remove invisible and control characters (zero-width, bidirectional
-///     overrides) that can hide text from a reader but not from the model, defuse the markers the prompts
+///     overrides, tag characters; <see cref="HiddenText"/>) that can hide text from a reader but not from the model, defuse the markers the prompts
 ///     use for third-party text, and tidy whitespace;
 ///  2. limit the length of every field (an error, not a silent cut);
 ///  3. scan for instruction-like phrases with the same patterns used for paper text, minus the ones that
@@ -58,27 +58,36 @@ public static class ReviewInputGuard
     private static readonly HashSet<string> NotFlaggedForReviewers = new() { "demands-inclusion", "claims-criteria-met" };
 
     /// <summary>Normalises one field: NFKC, no invisible or control characters, no prompt markers, tidy whitespace.</summary>
-    public static string Normalize(string? text, bool singleLine)
+    public static string Normalize(string? text, bool singleLine) => Clean(text, singleLine).Text;
+
+    /// <summary>
+    /// Normalises one field as <see cref="Normalize"/> does, and also returns what the removed tag characters spelled
+    /// (<see cref="CleanedText.Hidden"/>), for the scan. Invisible characters are removed by <see cref="HiddenText"/>, the
+    /// same way as in source text, so tag characters (U+E0000 to U+E007F) go too, while a joiner between two characters
+    /// outside ASCII (Persian, emoji sequences) stays.
+    /// </summary>
+    public static CleanedText Clean(string? text, bool singleLine)
     {
-        if (string.IsNullOrEmpty(text)) return "";
-        string s = text.Normalize(NormalizationForm.FormKC);
-        var sb = new StringBuilder(s.Length);
-        foreach (char c in s)
+        if (string.IsNullOrEmpty(text)) return new CleanedText("", 0, 0, "");
+        var visible = HiddenText.RemoveInvisible(text.Normalize(NormalizationForm.FormKC));
+        var sb = new StringBuilder(visible.Text.Length);
+        foreach (char c in visible.Text)
         {
             if (c is '\n' or '\t') { sb.Append(singleLine ? ' ' : c); continue; }
             if (c == '\r') continue;
+            // HiddenText kept a joiner only between two characters outside ASCII, where the script needs it.
+            if (c is '\u200C' or '\u200D') { sb.Append(c); continue; }
             var category = CharUnicodeInfo.GetUnicodeCategory(c);
-            // Control characters and format characters (zero-width space and joiners, bidirectional
-            // overrides, BOM) are invisible on screen but visible to the model.
+            // Any other control or format character is invisible on screen but visible to the model.
             if (category is UnicodeCategory.Control or UnicodeCategory.Format) continue;
             sb.Append(c);
         }
-        s = sb.ToString()
+        string s = sb.ToString()
             .Replace("<<<", "‹‹‹", StringComparison.Ordinal)
             .Replace(">>>", "›››", StringComparison.Ordinal);
         s = Regex.Replace(s, @"[ \t]{2,}", " ");
         s = Regex.Replace(s, @"\n{3,}", "\n\n");
-        return s.Trim();
+        return visible with { Text = s.Trim() };
     }
 
     /// <summary>Cleans the request's text fields and reports length errors and instruction-like phrases.</summary>
@@ -89,11 +98,11 @@ public static class ReviewInputGuard
 
         string Field(string name, string? value, int max, bool singleLine, bool required)
         {
-            string clean = Normalize(value, singleLine);
-            if (required && clean.Length == 0) errors.Add($"{name} is empty.");
-            if (clean.Length > max) errors.Add($"{name} is {clean.Length} characters long; the limit is {max}.");
-            flags.AddRange(FlagsIn(name, clean));
-            return clean;
+            var clean = Clean(value, singleLine);
+            if (required && clean.Text.Length == 0) errors.Add($"{name} is empty.");
+            if (clean.Text.Length > max) errors.Add($"{name} is {clean.Text.Length} characters long; the limit is {max}.");
+            flags.AddRange(FlagsIn(name, clean.Text, clean.Hidden));
+            return clean.Text;
         }
 
         var cleaned = request with
@@ -137,11 +146,21 @@ public static class ReviewInputGuard
 
     /// <summary>
     /// The instruction-like phrases in one cleaned field, with the same exceptions as the review form, so every form
-    /// that sends a reviewer's text to the model flags the same things.
+    /// that sends a reviewer's text to the model flags the same things. <paramref name="hidden"/> is what the field's
+    /// tag characters spelled (<see cref="Clean"/>); when it reads like instructions, one <see cref="HiddenText.FlagPattern"/>
+    /// flag is added last, with what it spells marked as hidden, since the reviewer cannot see it in the field.
     /// </summary>
-    public static IReadOnlyList<InputFlag> FlagsIn(string field, string clean) =>
-        PromptSafety.Scan(clean).Where(p => !NotFlaggedForReviewers.Contains(p))
+    public static IReadOnlyList<InputFlag> FlagsIn(string field, string clean, string hidden = "")
+    {
+        var flags = PromptSafety.Scan(clean).Where(p => !NotFlaggedForReviewers.Contains(p) && p != HiddenText.FlagPattern)
             .Select(pattern => new InputFlag(field, pattern, ExcerptFor(pattern, clean))).ToList();
+        if (PromptSafety.Find(hidden) is { Count: > 0 } found)
+            flags.Add(new InputFlag(field, HiddenText.FlagPattern, HiddenMark + found[0].Excerpt));
+        return flags;
+    }
+
+    /// <summary>Starts the excerpt of a <see cref="HiddenText.FlagPattern"/> flag: the words after it were invisible in the field.</summary>
+    public const string HiddenMark = "hidden, not shown in the field: ";
 
     /// <summary>The matched phrase with a little context, for the warning and the protocol.</summary>
     private static string ExcerptFor(string pattern, string text)
