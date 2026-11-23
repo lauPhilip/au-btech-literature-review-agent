@@ -120,7 +120,7 @@ public static partial class StudyExtractor
     /// A cached extraction, checked again against the text it is reused for: every quote is looked up, and an MMAT
     /// "yes" or "no" whose quote is not found becomes "cant_tell", as for a fresh answer.
     /// </summary>
-    private static StudyExtraction Reuse(StudyExtraction cached, string evidenceText)
+    private static StudyExtraction Reuse(StudyExtraction cached, CanonicalText evidenceText)
     {
         foreach (var v in new[] { cached.Method, cached.Sample, cached.Limitations }.Concat(cached.KeyFindings)) Verify(v, evidenceText);
         foreach (var a in cached.Appraisal)

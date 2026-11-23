@@ -160,7 +160,7 @@ public static partial class ThematicSynthesis
                     uncoded.Add(new UncodedStudy(p.ReferenceNumber, string.IsNullOrWhiteSpace(s.Reason) ? "No code bearing on the objective." : s.Reason.Trim()));
                     continue;
                 }
-                string evidence = EvidenceText(p, e);
+                var evidence = CanonicalText.Of(EvidenceText(p, e));
                 foreach (var c in valid)
                 {
                     var ids = (c.Findings ?? new()).Select(f => f.Trim().ToUpperInvariant()).Distinct().ToList();

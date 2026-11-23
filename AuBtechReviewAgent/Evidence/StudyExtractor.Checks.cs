@@ -36,7 +36,7 @@ public static partial class StudyExtractor
     /// are not the quote and keep their % signs (issue #130), and all five MMAT answers, each yes or no backed by a
     /// quote that is in the text, not all "can't tell" when the full text was read (issue #149).
     /// </summary>
-    internal static string? StrictProblem(ExtractionAnswer a, string evidenceText, bool fullText)
+    internal static string? StrictProblem(ExtractionAnswer a, CanonicalText evidenceText, bool fullText)
     {
         var fields = new List<(string Name, EvidencedValue? Value, int MaxWords)>
         {
@@ -75,7 +75,7 @@ public static partial class StudyExtractor
     private static int Words(string text) => text.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries).Length;
     private static string Canonical(string text) => Regex.Replace(text.ToLowerInvariant(), @"[^\p{L}\p{N}]+", " ").Trim();
 
-    private static EvidencedValue Verify(EvidencedValue? v, string evidenceText)
+    private static EvidencedValue Verify(EvidencedValue? v, CanonicalText evidenceText)
     {
         var value = v ?? new EvidencedValue { Value = "not reported" };
         value.Value = (value.Value ?? "").Trim();
