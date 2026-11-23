@@ -20,6 +20,13 @@ public partial class MultivocalStart
     };
 
     internal IReadOnlyList<string> Problems => plan.Problems();
+
+    // Instruction-like text in the plan (#365): shown on the last step, and the review starts only once the reviewer
+    // confirms exactly these flags; editing the plan so the flags change asks again.
+    internal IReadOnlyList<string> FlagLines => MultivocalPlanGuard.Lines(plan);
+    private string? confirmedFlags;
+    internal bool FlagsConfirmed => FlagLines.Count == 0 || confirmedFlags == string.Join("\n", FlagLines);
+    internal void ConfirmFlags(ChangeEventArgs e) => confirmedFlags = e.Value is true ? string.Join("\n", FlagLines) : null;
     internal string ProtocolPreview =>
         MultivocalProtocol.Write(plan, Guid.Empty, DateTime.UtcNow).Replace(Guid.Empty.ToString(), "assigned when the protocol is written");
 
@@ -120,7 +127,8 @@ public partial class MultivocalStart
                 if (plan.StoppingRule == "effort" && plan.TopHits is < 10 or > 500) return "Look at between 10 and 500 top hits per search string (step 4).";
                 return null;
             default:
-                return Problems.Count > 0 ? Problems[0] : null;
+                if (Problems.Count > 0) return Problems[0];
+                return FlagsConfirmed ? null : "Confirm the text that reads like instructions (step 5).";
         }
     }
 
@@ -191,7 +199,7 @@ public partial class MultivocalStart
         error = null;
         try
         {
-            var (newRunId, newEditKey) = await Planner.CreateAsync(plan);
+            var (newRunId, newEditKey) = await Planner.CreateAsync(plan, FlagsConfirmed ? FlagLines : null);
             // The protocol is written; the rest runs on the server, one step after another, without a click.
             Runner.Start(newRunId, newEditKey);
             // Only this browser keeps the run's edit key, as for a systematic review.

@@ -98,7 +98,7 @@ public class MultivocalStartPageTests
         Assert.Contains("Runner.Changed += OnRunChanged", source);
         Assert.Contains("Runner.Changed -= OnRunChanged", source);
         Assert.Contains("Runner.Start(", source);
-        Assert.Contains("Planner.CreateAsync(plan)", source);
+        Assert.Contains("Planner.CreateAsync(plan, ", source);
         Assert.Contains("ReviewEngine.PreviewSearchStringsAsync(", source);
     }
 
@@ -111,5 +111,17 @@ public class MultivocalStartPageTests
         Assert.DoesNotContain("border-gray-", source);
         Assert.DoesNotContain("ui-h2", source);
         Assert.DoesNotContain("rounded-lg", source);
+    }
+
+    [Fact]
+    public void FlaggedTextMustBeConfirmedBeforeTheReviewStarts()
+    {
+        string? source = StartSource();
+        if (source == null) return;
+        Assert.Contains("MultivocalPlanGuard.Lines(plan)", source);
+        Assert.Contains("Some of your text reads like instructions to the language model:", source);
+        Assert.Contains("@onchange=\"ConfirmFlags\"", source);
+        Assert.Contains("disabled=\"@(Problems.Count > 0 || !FlagsConfirmed || saving)\"", source);
+        Assert.Contains("Planner.CreateAsync(plan, FlagsConfirmed ? FlagLines : null)", source);
     }
 }

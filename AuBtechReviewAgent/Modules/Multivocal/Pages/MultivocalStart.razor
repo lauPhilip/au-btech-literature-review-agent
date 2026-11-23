@@ -126,6 +126,23 @@
                                     </ul>
                                 </div>
                             }
+                            else if (FlagLines.Count > 0)
+                            {
+                                <div class="bg-partly-fill border border-partly-border text-partly p-2 text-xs space-y-1" role="alert">
+                                    <p class="font-semibold">Some of your text reads like instructions to the language model:</p>
+                                    <ul class="list-disc pl-4 space-y-0.5">
+                                        @foreach (var flag in FlagLines)
+                                        {
+                                            <li>@flag</li>
+                                        }
+                                    </ul>
+                                    <p>The model is told to treat your answers only as the topic, questions and criteria, so this usually changes nothing. If it is what you meant, confirm it. The warning is written to the protocol.</p>
+                                    <label class="flex items-center gap-2 font-semibold">
+                                        <input type="checkbox" checked="@FlagsConfirmed" @onchange="ConfirmFlags" />
+                                        This is what I meant
+                                    </label>
+                                </div>
+                            }
                             else
                             {
                                 <p class="bg-supported-fill border border-supported-border text-supported p-2 text-xs">Everything is filled in. Check the protocol, then write it.</p>
@@ -156,7 +173,7 @@
                             }
                             else
                             {
-                                <button type="button" class="ui-btn-primary" disabled="@(Problems.Count > 0 || saving)" @onclick="WriteProtocolAsync">Start the review</button>
+                                <button type="button" class="ui-btn-primary" disabled="@(Problems.Count > 0 || !FlagsConfirmed || saving)" @onclick="WriteProtocolAsync">Start the review</button>
                             }
                         </div>
                     </div>
