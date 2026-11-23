@@ -90,7 +90,7 @@ public partial class PrismaReviewEngine
         // citation) and checked again; a second pass removes what is still not supported (issue #135). Before and after go into citation-audit.json. The check
         // and the repair are shared by every kind of review (Verification/Grounding.cs).
         var grounding = await Grounding.CheckAndRepairAsync(chat, fields, papersForCheck, verifiedFindings, referenceCount,
-            new GroundingOptions(Llm.ScreeningParallelism, Synthesis.SecondCitationCheck, Synthesis.RepairCitations),
+            new GroundingOptions(Llm.ParallelismFor("citation-check"), Synthesis.SecondCitationCheck, Synthesis.RepairCitations),
             checking: count => ReportProgress(sessionId, finalState, RunProgress.Checking, 0, $"Checking {count} citations"),
             checkProgress: (second, done, total) => ReportProgress(sessionId, finalState, RunProgress.Checking,
                 RunProgress.Phase(RunProgress.CheckingPhases, second ? 1 : 0, (double)done / total),

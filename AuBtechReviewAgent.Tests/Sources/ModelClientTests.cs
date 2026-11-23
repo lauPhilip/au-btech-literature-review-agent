@@ -215,7 +215,7 @@ public class ModelClientTests
         var options = new LlmOptions();
         Assert.False(options.HasFastModel);
         Assert.Equal("mistral-large-latest", options.ModelFor("screening"));
-        Assert.IsType<OpenAICompatibleChatService>(LlmFactory.CreateForReview(options, "key"));
+        Assert.IsType<LimitedChatService>(LlmFactory.CreateForReview(options, "key")); // the client, behind the shared gate
         Assert.False(new LlmOptions { FastModel = "mistral-large-latest" }.HasFastModel); // the same model is not a second one
 
         var split = new LlmOptions { FastModel = "mistral-small-latest" };
