@@ -78,6 +78,8 @@ The **module test kit** (`Modules/ModuleKit.cs` and `Modules/ModuleKitTests.cs`)
 
 When you fix a bug found in a real run, add a case to `RealRunRegressionTests.cs` with the input that caused it.
 
+Most tests take a few milliseconds. The API and MCP tests (`Api/`, `Mcp/` and `ApiDocsPageTests.cs`) start the whole app, so they share one collection that runs on its own after the rest; they wait for a run with `ApiTestHost.WaitForFinishedStatusAsync`, which looks at the run every 20 ms, so do not add waits of your own. The durations `dotnet test` reports are wall-clock times: on a busy machine a quick test can show tens of seconds while it waits for a free thread, so time a class on its own (`--filter "FullyQualifiedName~.TheClass"`) before you look for a cause in it.
+
 ## Measuring screening accuracy
 
 `tools/ScreeningEval` runs the app's own screening prompt over a dataset where human reviewers made the inclusion decisions (any ASReview-format CSV, for example from the SYNERGY collection) and reports recall, precision, specificity, F1 and Cohen's kappa, plus every paper the model missed. The usage is in the comment at the top of `tools/ScreeningEval/Program.cs`. It uses the first screening prompt only, needs a real API key and costs one model call per paper, so run it deliberately rather than in CI.
