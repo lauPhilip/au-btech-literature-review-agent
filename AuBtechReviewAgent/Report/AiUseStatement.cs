@@ -13,8 +13,11 @@ namespace AuBtechReviewAgent;
 /// </summary>
 public static class AiUseStatement
 {
-    /// <summary>The statement for the methods section (several sentences).</summary>
-    public static string Methods(ReviewState state, Guid runId)
+    /// <summary>
+    /// The statement for the methods section (several sentences). With the reviewer's edits of the report, it says how
+    /// many sentences were edited and how their citations were checked again; without, it reads as before.
+    /// </summary>
+    public static string Methods(ReviewState state, Guid runId, ReportEditLog? edits = null)
     {
         var s = state.Stats;
         var inv = CultureInfo.InvariantCulture;
@@ -56,6 +59,7 @@ public static class AiUseStatement
         // A paper that only lost invisible characters is on file too (#369), but it held nothing that reads like instructions.
         int flagged = state.FullTextFlags?.Where(f => f.Flags.Count > 0).Select(f => f.PaperId).Distinct().Count() ?? 0;
         text.Append(FlaggedSources(flagged, s.FullTextRetrieved, "full text", "included study", "included studies"));
+        if (edits?.Sentence() is { Length: > 0 } edited) text.Append(edited).Append(' ');
         text.Append("The complete record of the run (protocol, search responses, every screening decision and model call, and the citation audit) is available as a fingerprinted archive. ");
         text.Append("The authors reviewed the output and take full responsibility for the content.");
         return text.ToString();

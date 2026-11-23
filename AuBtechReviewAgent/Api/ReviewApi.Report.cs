@@ -25,10 +25,13 @@ public sealed partial class ReviewApi
         string folder = _engine.Store.FolderOf(runId);
         var report = Read<PrismaReport>(Path.Join(folder, "prisma-report.json"));
         if (report == null) return ApiProblems.NotReady(stage);
+        // The reviewer's checked edits, as the page shows them.
+        var edits = ReportEditLog.Load(folder);
+        report = ReportEdits.Apply(report, edits);
 
         var references = ReferencesOf(state);
         var links = references.GroupBy(r => r.Number).ToDictionary(g => g.Key, g => g.First().Link);
-        var citations = ChecksOf(folder)
+        var citations = ReportEdits.Checks(ChecksOf(folder), edits)
             .Select(c => new ApiReportCitation(c.Reference, c.Field, c.SentenceIndex, c.Sentence, c.Verdict,
                 c.QuoteVerified && !string.IsNullOrWhiteSpace(c.Quote) ? c.Quote : null, c.QuoteVerified,
                 c.EvidenceBasis, c.Reason, links.GetValueOrDefault(c.Reference)))
