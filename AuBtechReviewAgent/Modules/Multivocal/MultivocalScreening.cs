@@ -15,8 +15,9 @@ namespace AuBtechReviewAgent;
 /// <summary>
 /// Screens the sources of a searched multivocal run (MLR block E, G9–G10): every source once, and a second time,
 /// independently, when <see cref="MultivocalSecondScreening"/> picks it (included, unsure or flagged, or in the random
-/// audit sample), with the plan's criteria and the same steps and answer format as the systematic review's screening
-/// (<see cref="PrismaReviewEngine.ScreeningProcedure"/>), so formal and grey sources get the same care. A source the two
+/// audit sample), with the plan's criteria and the systematic review's answer format and second screener's steps
+/// (<see cref="PrismaReviewEngine.ScreeningProcedure"/>), and first steps that ask for positive evidence
+/// (<see cref="FirstProcedure"/>), so formal and grey sources get the same care. A source the two
 /// screenings disagree on is kept and flagged, as in the systematic review. Sources with the same title under another
 /// address (an OpenAlex work with several DOIs, seen in a live run) are screened once. The run goes from "Searched"
 /// through "Screening" to "Screened".
@@ -30,8 +31,9 @@ public sealed partial class MultivocalScreener
     /// <summary>
     /// Part of the cache key: raise it whenever the grey screening prompt changes. v2: second screenings are targeted
     /// (<see cref="MultivocalSecondScreening"/>), so no answer cached under the rule of two screenings each is reused.
+    /// v3: the first screening looks for positive evidence (<see cref="FirstProcedure"/>).
     /// </summary>
-    public const string PromptVersion = "grey-screening-v2";
+    public const string PromptVersion = "grey-screening-v3";
 
     private static readonly JsonSerializerOptions Json = new() { WriteIndented = true };
     private static readonly ConcurrentDictionary<Guid, bool> Running = new();
