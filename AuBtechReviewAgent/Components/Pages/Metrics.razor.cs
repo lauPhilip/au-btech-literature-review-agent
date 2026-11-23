@@ -6,12 +6,12 @@ public partial class Metrics
 {
     private static readonly System.Globalization.CultureInfo Culture = System.Globalization.CultureInfo.InvariantCulture;
     private static readonly (string Key, string Label)[] Kinds = { ("systematic", "Systematic reviews"), ("grey", "Grey literature reviews") };
-    private static readonly (string Id, string Label)[] Sections = { ("chart", "Chart"), ("shares", "Shares per run"), ("run-data", "Run data"), ("by-version", "By version") };
+    private static readonly (string Id, string Label)[] Sections = { ("chart", "Chart"), ("shares", "Shares per run"), ("run-data", "Run data"), ("effort", "Effort"), ("by-version", "By version") };
 
     // Table cells: square, with a header row that stays at the top of its box while the rows scroll.
-    private const string Td = "whitespace-nowrap border-t border-line px-3 py-2 text-ink";
-    private const string TdNum = "whitespace-nowrap border-t border-line px-3 py-2 text-right tabular-nums text-ink";
-    private const string ThClass = "sticky top-0 z-10 whitespace-nowrap border-b border-line bg-soft px-3 py-2 font-semibold text-muted";
+    internal const string Td = "whitespace-nowrap border-t border-line px-3 py-2 text-ink";
+    internal const string TdNum = "whitespace-nowrap border-t border-line px-3 py-2 text-right tabular-nums text-ink";
+    internal const string ThClass = "sticky top-0 z-10 whitespace-nowrap border-b border-line bg-soft px-3 py-2 font-semibold text-muted";
 
     [SupplyParameterFromQuery(Name = "kind")] public string? KindParameter { get; set; }
 

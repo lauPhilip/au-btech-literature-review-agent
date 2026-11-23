@@ -27,6 +27,15 @@ public class OpenSourcesOptions
 
     /// <summary>How many referenced and citing papers to fetch per included paper when citation chaining is on.</summary>
     public int ChainingPerPaper { get; set; } = 5;
+
+    /// <summary>
+    /// How many included studies, those with the most citations per year since publication, are taken as seeds and built
+    /// out further when citation chaining is on (0 switches the seed step off).
+    /// </summary>
+    public int SeedStudies { get; set; } = 10;
+
+    /// <summary>How many referenced and how many citing works are kept per seed study, those with the most citations per year first.</summary>
+    public int SeedChainingPerDirection { get; set; } = 20;
 }
 
 /// <summary>Shared HTTP plumbing for the open scholarly APIs: one HttpClient, polite retries on 429/5xx.</summary>

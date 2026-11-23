@@ -148,7 +148,11 @@ public static class RunManifest
 /// </summary>
 public static class ProtocolWriter
 {
-    public static string Write(Guid runId, ReviewRequest request, IReadOnlyList<string> sourceNames, string model, RunsOptions runs, DateTime createdUtc, IReadOnlyList<string>? inputFlags = null)
+    /// <summary>The protocol of one systematic run, from its request and the server's settings, before anything is searched.</summary>
+    /// <param name="seedStudies">How many of the most-cited included studies citation chaining builds out further (0: none).</param>
+    /// <param name="seedPerDirection">How many references and citing works are kept per seed study.</param>
+    public static string Write(Guid runId, ReviewRequest request, IReadOnlyList<string> sourceNames, string model, RunsOptions runs, DateTime createdUtc,
+        IReadOnlyList<string>? inputFlags = null, int seedStudies = 0, int seedPerDirection = 0)
     {
         var sb = new StringBuilder();
         sb.AppendLine("# Review protocol");
@@ -177,6 +181,8 @@ public static class ProtocolWriter
         sb.AppendLine($"- Sources: {string.Join(", ", sourceNames)}");
         sb.AppendLine($"- At most {request.MaxResultsPerSource} record{(request.MaxResultsPerSource == 1 ? "" : "s")} per source; the language model adds up to three extra search strings (recorded below as an amendment).");
         sb.AppendLine($"- Citation chaining (references and citing papers of included studies via OpenAlex): {(request.CitationChaining ? "yes" : "no")}");
+        if (request.CitationChaining && seedStudies > 0)
+            sb.AppendLine($"- Seed studies: the {seedStudies} included studies with the most citations per year since publication, chosen in code from the databases' citation counts, are built out further, keeping the {seedPerDirection} references and the {seedPerDirection} citing works with the most citations per year for each.");
         sb.AppendLine();
         sb.AppendLine("## Selection, extraction and appraisal");
         sb.AppendLine();
