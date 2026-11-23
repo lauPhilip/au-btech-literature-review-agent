@@ -4,10 +4,17 @@
 #     and its papers name the release (v0.2.1) and not a pre-release (0.2.1-alpha.0.1). See #144.
 # The caller decides whether to deploy (DEPLOY_ENABLED and, for a release, whether the tag is still master's newest
 # commit). Every deploy waits for the one before it, across both workflows (concurrency group deploy-simply).
+# Taking the site offline stops every running review, so the "wait" job first waits until none is running
+# (deploy/site_health.py, tested in tools/ReleaseCheck/test_site_health.py). See docs/wiki/06, "Deployment".
 name: Deploy
 
 on:
   workflow_call:
+    inputs:
+      wait-minutes:
+        description: How long to wait for running reviews before deploying anyway (the repository variable DEPLOY_WAIT_MINUTES wins)
+        type: number
+        default: 150
     secrets:
       SIMPLY_FTP_USER:
         required: true
@@ -17,10 +24,47 @@ on:
 permissions:
   contents: read
 
+env:
+  HEALTH_URL: ${{ vars.SITE_HEALTH_URL || 'https://au-btech-literature-review-agent.dk/health' }}
+
 jobs:
+  # Decides whether to deploy, then waits until no review is running. Nothing has changed on the server yet, so a
+  # newer deploy may cancel this one while it waits (cancel-in-progress): only the newest commit is deployed.
+  # A run longer than the limit is stopped by the deploy rather than holding back a merged fix.
+  wait:
+    name: Wait for running reviews
+    runs-on: ubuntu-latest
+    timeout-minutes: 200   # the wait limit (150 min) and some room; GitHub's own limit is 6 h
+    concurrency:
+      group: deploy-simply-wait
+      cancel-in-progress: true
+    outputs:
+      deploy: ${{ steps.changes.outputs.deploy || 'true' }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0   # to compare the site's commit with this one
+
+      # Only for a push to master: a merge that changed nothing but documentation is not deployed. A release is
+      # always deployed, because the build then names the release (#144). Compared with the commit the site runs,
+      # not the push before, so a docs-only push never drops a code change that a cancelled deploy did not ship.
+      - name: Did anything but documentation change?
+        id: changes
+        if: github.event_name == 'push'
+        run: python3 deploy/site_health.py needs-deploy "$HEALTH_URL" "$GITHUB_SHA"
+
+      - name: Wait until no review is running
+        if: steps.changes.outputs.deploy != 'false'
+        env:
+          WAIT_MINUTES: ${{ vars.DEPLOY_WAIT_MINUTES || inputs.wait-minutes }}
+        run: python3 deploy/site_health.py wait-idle "$HEALTH_URL" --minutes "$WAIT_MINUTES"
+
   deploy:
     name: Deploy to Simply
+    needs: wait
+    if: needs.wait.outputs.deploy == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 90
     # Never run two deploys at the same time; a newer push waits for the running one.
     concurrency:
       group: deploy-simply
@@ -53,6 +97,11 @@ jobs:
 
       - name: Install lftp
         run: sudo apt-get update -qq && sudo apt-get install -y -qq lftp
+
+      # This job may have queued behind another deploy, or reviews may have started since the wait job; look once
+      # more, right before the site goes offline. A review started in the seconds after this check is still stopped.
+      - name: Check again that no review is running
+        run: python3 deploy/site_health.py wait-idle "$HEALTH_URL" --minutes 30
 
       # Add these repository secrets (Settings -> Secrets and variables -> Actions -> Secrets):
       #   SIMPLY_FTP_USER      - the FTP username from the Simply.com control panel
@@ -113,3 +162,8 @@ jobs:
             cd \"$REMOTE_DIR\";
             rm app_offline.htm
           "
+
+      # IIS starts the app on the first request. Until /health answers 200 with this commit, the deploy is not done:
+      # a version that does not start (HTTP 502.5) fails the job here, so it is seen at once.
+      - name: Check that the new version started
+        run: python3 deploy/site_health.py wait-started "$HEALTH_URL" "$GITHUB_SHA" --minutes 5

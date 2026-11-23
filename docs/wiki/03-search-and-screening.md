@@ -66,7 +66,7 @@ flowchart TD
     U --> LED["ScreeningLog in the ledger"]
 ```
 
-`ScreenCandidatesAsync` screens several records at a time (`Llm:ScreeningParallelism`), but applies the outcomes to the ledger strictly in candidate order, saving the ledger after each one. That is why the dashboard counts move one record at a time even though the calls overlap.
+`ScreenCandidatesAsync` screens several records at a time (`Llm:FastParallelism` when a fast model is set, else `Llm:QualityParallelism`), but applies the outcomes to the ledger strictly in candidate order, saving the ledger after each one. That is why the dashboard counts move one record at a time even though the calls overlap.
 
 `ScreenPaperAsync` is the single place where the screening prompt is built; the command-line evaluation tool uses the same method, so it measures exactly what a run does. The paper's title, authors, date, venue and abstract are passed inside `PromptSafety.Wrap` markers, with an instruction that text inside them is data, never instructions. The **second** screener is a different prompt, not a repeat: it works through the exclusion criterion first and then looks for positive evidence for inclusion. Both run at temperature 0 and return JSON that `ScreeningAnswer.Validate` checks (decision exactly "Included" or "Excluded", non-empty reasoning, confidence high, medium or low, and for an exclusion an optional `exclusionReason`).
 

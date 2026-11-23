@@ -77,7 +77,7 @@ public partial class PrismaReviewEngine
     /// </summary>
     private async Task ExtractStudiesAsync(RunContext ctx, IReadOnlyList<ReferencedPaper> papers)
     {
-        using var throttle = new SemaphoreSlim(Math.Max(1, Llm.ScreeningParallelism));
+        using var throttle = new SemaphoreSlim(Math.Max(1, Llm.QualityParallelism));
         int extracted = 0;
         ReportProgress(ctx.RunId, ctx.State, RunProgress.Extraction, 0, $"Extracting and appraising {papers.Count} studies");
         var work = papers.Select(async p =>

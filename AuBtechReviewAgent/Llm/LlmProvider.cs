@@ -50,11 +50,20 @@ public static class LlmFactory
 {
     /// <summary>
     /// The chat service of a systematic review: <see cref="Create"/> for the main model, routed to a second client for
-    /// the checks when <see cref="LlmOptions.FastModel"/> is set.
+    /// the checks when <see cref="LlmOptions.FastModel"/> is set. Each model's calls pass a gate shared by every run on
+    /// the server (<see cref="ModelCallLimiter"/>), sized from its stage width and <paramref name="concurrentRuns"/>.
     /// </summary>
-    public static IChatCompletionService CreateForReview(LlmOptions options, string mistralApiKey) => options.HasFastModel
-        ? new StageRoutedChatService(Create(options, mistralApiKey), Create(options.ForFastModel(), mistralApiKey), options)
-        : Create(options, mistralApiKey);
+    public static IChatCompletionService CreateForReview(LlmOptions options, string mistralApiKey, int concurrentRuns = 3) => options.HasFastModel
+        ? new StageRoutedChatService(Limited(options, mistralApiKey, concurrentRuns), Limited(options.ForFastModel(), mistralApiKey, concurrentRuns), options)
+        : Limited(options, mistralApiKey, concurrentRuns);
+
+    private static IChatCompletionService Limited(LlmOptions options, string mistralApiKey, int concurrentRuns)
+    {
+        string endpoint = options.IsOpenAICompatible ? options.BaseUrl : MistralBaseUrl;
+        string key = options.IsOpenAICompatible ? options.ApiKey : mistralApiKey;
+        var gate = ModelCallLimiter.GateFor(endpoint, options.Model, key, ModelCallLimiter.CapacityFor(options.QualityParallelism, concurrentRuns));
+        return new LimitedChatService(Create(options, mistralApiKey), gate);
+    }
 
     /// <summary>The Mistral chat completions API, which follows the OpenAI format.</summary>
     public const string MistralBaseUrl = "https://api.mistral.ai/v1";
