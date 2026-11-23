@@ -138,7 +138,7 @@ public sealed partial class MultivocalWriter
         int themed = input.Synthesis.Themes.Count(t => !inCode.Contains(t.Question));
         int written = Math.Min(sectionsWritten ?? themed, themed);
         return $"Kind of review: {plan.ReviewKind} following the Garousi et al. (2019) guidelines. " +
-               $"Grey sources found by the searches: {f.Found}, from {f.Searches} searches. Screened twice against the criteria: {f.Screened}. " +
+               $"Grey sources found by the searches: {f.Found}, from {f.Searches} searches. " + MultivocalScreeningText.Facts(input.Screening, f.Screened) +
                $"Included at screening, before the quality check: {f.Included}; excluded at screening: {f.Excluded}. " +
                $"Passed the quality check ({input.Quality.Threshold} of {input.Quality.MaxPoints} points or more) and kept for the synthesis: {f.Passed}; below the threshold: {f.BelowThreshold}; not assessed (page not readable): {f.NotAssessed}. " +
                $"Extracted against the systematic map: {f.Extracted}. Findings: {f.Findings}. Themes written up as result sections: {written}" +
