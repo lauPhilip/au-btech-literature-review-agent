@@ -10,16 +10,17 @@ namespace AuBtechReviewAgent;
 /// <summary>The discussion, written from the finished theme subsections.</summary>
 public static partial class ReviewWriter
 {
-    /// <summary>The discussion, written from the theme subsections; empty when it cannot be written.</summary>
+    /// <summary>The discussion, written from the theme subsections, with the research questions when there are any; empty when it cannot be written.</summary>
     public static async Task<string> WriteDiscussionAsync(IChatCompletionService chat, WritingProfile profile, string topic, string goal,
-        IReadOnlyList<SynthesisSection> sections, ReviewEvidence evidence, int referenceCount, Action<string>? warn = null)
+        IReadOnlyList<SynthesisSection> sections, ReviewEvidence evidence, int referenceCount, Action<string>? warn = null,
+        IReadOnlyList<string>? questions = null)
     {
         int paragraphs = Math.Clamp(2 + sections.Count / 2, 3, 6);
         string synthesis = string.Join("\n\n", sections.Select(x => $"### {x.Heading}\n{x.Text}"));
         string prompt = $$"""
             You are writing {{profile.DiscussionSection}} of {{profile.Review}} whose results are reported theme by theme below.
 
-            REVIEW OBJECTIVE: "{{goal}}"
+            {{AimBlock(goal, questions)}}
             PRIMARY TOPIC: "{{topic}}"
             {{PromptSafety.ReviewerInputNotice}}
 

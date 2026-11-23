@@ -104,7 +104,8 @@ public static class LlmRecording
 
 /// <summary>
 /// Wraps the Mistral chat service for one run. It (1) retries rate-limit (429) and temporary server errors
-/// with exponential backoff, so a busy moment does not break a run halfway, and (2) records every call:
+/// (<see cref="LlmRetryPolicy"/>: the server's Retry-After when it sends one, exponential backoff otherwise), so a
+/// busy moment does not break a run halfway, and (2) records every call:
 /// stage, model, temperature, duration, token usage and SHA-256 hashes of the prompt and the response.
 /// Prompts themselves are not stored (they contain whole paper excerpts), only their fingerprints.
 /// </summary>
@@ -112,21 +113,21 @@ public class RecordingChatCompletionService : IChatCompletionService
 {
     private readonly IChatCompletionService _inner;
     private readonly string _model;
-    private readonly int _maxAttempts;
-    private readonly Func<int, TimeSpan> _backoff;
+    private readonly LlmRetryPolicy _retry;
     private readonly List<LlmCallRecord> _calls = new();
     private readonly object _lock = new();
     private readonly CancellationToken _stop;
 
     /// <summary>Wraps one run's chat service, retrying temporary errors and recording every call.</summary>
     /// <param name="stop">Cancelled when the run's owner cancels the run: from then on no new call is made or recorded.</param>
-    public RecordingChatCompletionService(IChatCompletionService inner, string model, int maxAttempts = 4, Func<int, TimeSpan>? backoff = null, CancellationToken stop = default)
+    /// <param name="retry">When to try a failed call again; when given, <paramref name="maxAttempts"/> and <paramref name="backoff"/> are not used.</param>
+    public RecordingChatCompletionService(IChatCompletionService inner, string model, int maxAttempts = 4, Func<int, TimeSpan>? backoff = null,
+        CancellationToken stop = default, LlmRetryPolicy? retry = null)
     {
         _stop = stop;
         _inner = inner;
         _model = model;
-        _maxAttempts = Math.Max(1, maxAttempts);
-        _backoff = backoff ?? (attempt => TimeSpan.FromSeconds(Math.Pow(2, attempt)) + TimeSpan.FromMilliseconds(Random.Shared.Next(0, 500)));
+        _retry = retry ?? new LlmRetryPolicy { MaxAttempts = Math.Max(1, maxAttempts), Backoff = backoff ?? LlmRetryPolicy.DefaultBackoff };
     }
 
     public IReadOnlyDictionary<string, object?> Attributes => _inner.Attributes;
@@ -169,9 +170,9 @@ public class RecordingChatCompletionService : IChatCompletionService
                 Finish(record, stopwatch);
                 return result;
             }
-            catch (Exception ex) when (IsTransient(ex) && attempt < _maxAttempts && !cancellationToken.IsCancellationRequested)
+            catch (Exception ex) when (!cancellationToken.IsCancellationRequested && _retry.NextWait(ex, attempt) is { } wait)
             {
-                await Task.Delay(_backoff(attempt), cancellationToken).ConfigureAwait(false);
+                await _retry.Delay(wait, cancellationToken).ConfigureAwait(false);
             }
             catch (Exception ex)
             {

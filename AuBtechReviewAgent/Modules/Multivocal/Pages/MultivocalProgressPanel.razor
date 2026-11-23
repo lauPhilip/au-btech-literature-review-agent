@@ -19,8 +19,8 @@
         <span class="text-[11px] font-mono text-muted">@(failed ? "stopped" : $"{percent}%")@(Elapsed is { } e ? $" · {e}" : "")</span>
     </div>
 
-    <div class="w-full h-2 bg-active rounded-full overflow-hidden" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="@percent" aria-label="Run progress">
-        <div class="h-full @barColor rounded-full transition-all duration-500 @(running && percent == 0 ? "animate-pulse w-1/12" : "")" style="@(percent > 0 ? $"width:{percent}%" : "")"></div>
+    <div class="w-full h-2 bg-active overflow-hidden" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="@percent" aria-label="Run progress">
+        <div class="h-full @barColor transition-all duration-500 @(running && percent == 0 ? "animate-pulse w-1/12" : "")" style="@(percent > 0 ? $"width:{percent}%" : "")"></div>
     </div>
 
     <p class="text-[11px] text-ink leading-snug" role="status" aria-live="polite">
@@ -100,7 +100,7 @@
                 </div>
             }
 
-            @FunnelRow("Screened", Screening == null ? "–" : (included + excluded).ToString(), Screening?.Kappa is double k ? $"twice; agreement κ = {k:0.00}" : null, false)
+            @FunnelRow("Screened", Screening == null ? "–" : (included + excluded).ToString(), Screening == null ? null : AuBtechReviewAgent.MultivocalScreeningText.FunnelNote(Screening), false)
             @if (Screening != null)
             {
                 <div class="grid grid-cols-2 gap-1.5">

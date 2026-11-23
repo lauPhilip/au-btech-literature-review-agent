@@ -12,11 +12,11 @@ using Microsoft.SemanticKernel.ChatCompletion;
 
 namespace AuBtechReviewAgent;
 
-// Screening one source twice, with the systematic review's steps and answer format, and applying the two answers.
+// Screening one source once or twice, with the systematic review's steps and answer format, and applying the answers.
 public sealed partial class MultivocalScreener
 {
-    /// <summary>Part of the cache key of an academic record (block I-3): raise it whenever its prompt changes.</summary>
-    public const string FormalPromptVersion = "formal-screening-v1";
+    /// <summary>Part of the cache key of an academic record (block I-3): raise it whenever its prompt changes. v2: targeted second screenings.</summary>
+    public const string FormalPromptVersion = "formal-screening-v2";
 
     /// <summary>
     /// The stages that label the two screenings' calls, as in the systematic review, so a chat service routed by stage
@@ -25,23 +25,29 @@ public sealed partial class MultivocalScreener
     public const string FirstStage = "screening";
     public const string SecondStage = "screening-second";
 
-    private sealed record Screened(ScreeningAnswer? First, ScreeningAnswer? Second, int CacheHits, IReadOnlyList<string> Flags, string? Error);
+    /// <summary>One screening of one source: its answer, or the error that stopped it, and the flags of its text.</summary>
+    private sealed record Screened(ScreeningAnswer? Answer, bool FromCache, IReadOnlyList<string> Flags, string? Error);
 
-    private async Task<Screened> ScreenOneAsync(IChatCompletionService chat, MultivocalPlan plan, GreyRecord record)
+    private Task<Screened> ScreenFirstAsync(IChatCompletionService chat, MultivocalPlan plan, GreyRecord record) =>
+        ScreenOnceAsync(chat, plan, record, secondScreener: false);
+
+    private Task<Screened> ScreenSecondAsync(IChatCompletionService chat, MultivocalPlan plan, GreyRecord record) =>
+        ScreenOnceAsync(chat, plan, record, secondScreener: true);
+
+    private async Task<Screened> ScreenOnceAsync(IChatCompletionService chat, MultivocalPlan plan, GreyRecord record, bool secondScreener)
     {
         var flags = PromptSafety.Scan(record.Title, record.Summary, record.Producer);
         try
         {
-            var (first, hit1) = await ScreenCachedAsync(chat, plan, record, secondScreener: false);
-            var (second, hit2) = await ScreenCachedAsync(chat, plan, record, secondScreener: true);
-            return new Screened(first, second, (hit1 ? 1 : 0) + (hit2 ? 1 : 0), flags, null);
+            var (answer, hit) = await ScreenCachedAsync(chat, plan, record, secondScreener);
+            return new Screened(answer, hit, flags, null);
         }
         catch (Exception ex) when (ex is not OutOfMemoryException)
         {
             // One failed source does not stop the screening; it is logged as not screened.
             string message = ex.Message.Replace('\r', ' ').Replace('\n', ' ');
             _log.LogWarning("Grey screening failed for '{Title}': {Message}", record.Title.Replace('\r', ' ').Replace('\n', ' '), message);
-            return new Screened(null, null, 0, flags, message);
+            return new Screened(null, false, flags, message);
         }
     }
 
@@ -112,37 +118,40 @@ public sealed partial class MultivocalScreener
         return answer.Normalized();
     }
 
-    /// <summary>The same rules as the systematic review: a disagreement keeps the source and flags it.</summary>
-    private static void Apply(GreyScreening entry, Screened s, GreyRecord record)
+    /// <summary>
+    /// The same rules as the systematic review: a disagreement keeps the source and flags it. A source screened once
+    /// takes its one decision; a failed call, first or second, leaves it not screened.
+    /// </summary>
+    private static void Apply(GreyScreening entry, Screened s, Screened? again, GreyRecord record)
     {
         entry.InjectionFlags = s.Flags.Count > 0 ? s.Flags.ToList() : null;
-        if (s.Error != null || s.First == null || s.Second == null)
+        string? error = s.Error ?? again?.Error;
+        if (error != null || s.Answer == null || (again != null && again.Answer == null))
         {
             entry.Decision = "Error";
-            entry.Reasoning = $"Not screened: the model call failed ({s.Error}).";
+            entry.Reasoning = $"Not screened: the model call failed ({error}).";
             entry.Uncertain = true;
             return;
         }
-        var (first, second) = (s.First, s.Second);
-        bool agree = first.IsIncluded == second.IsIncluded;
+        var (first, second) = (s.Answer, again?.Answer);
+        bool agree = second == null || first.IsIncluded == second.IsIncluded;
         entry.First = first;
         entry.Second = second;
-        entry.FromCache = s.CacheHits == 2;
+        entry.FromCache = s.FromCache && (again == null || again.FromCache);
         entry.Decision = agree ? first.Decision : "Included";
         entry.Reasoning = agree
             ? first.Reasoning
-            : $"The two independent screenings disagreed (first: {first.Decision}, second: {second.Decision}), so the source was kept and flagged for the reviewer. First screening: {first.Reasoning}";
+            : $"The two independent screenings disagreed (first: {first.Decision}, second: {second!.Decision}), so the source was kept and flagged for the reviewer. First screening: {first.Reasoning}";
         entry.Summary = first.BriefSummary;
-        entry.Confidence = new[] { first.Confidence, second.Confidence }.Contains("low") ? "low"
-            : new[] { first.Confidence, second.Confidence }.Contains("medium") ? "medium"
-            : first.Confidence ?? second.Confidence;
+        var confidences = new[] { first.Confidence, second?.Confidence };
+        entry.Confidence = confidences.Contains("low") ? "low" : confidences.Contains("medium") ? "medium" : first.Confidence ?? second?.Confidence;
         if (record.Summary.Length == 0)
         {
             entry.Confidence = "low";
             entry.Reasoning = "(No summary was available, so this decision rests on the title and site only.) " + entry.Reasoning;
         }
         entry.Uncertain = !agree || entry.Confidence == "low" || entry.InjectionFlags != null;
-        entry.ExclusionReason = entry.Decision == "Excluded" ? first.ExclusionReason ?? second.ExclusionReason ?? ExclusionReasons.Unspecified : null;
+        entry.ExclusionReason = entry.Decision == "Excluded" ? first.ExclusionReason ?? second?.ExclusionReason ?? ExclusionReasons.Unspecified : null;
     }
 
     /// <summary>How many words a title needs to identify a source on its own, whoever is named as its producer.</summary>

@@ -15,10 +15,12 @@ public static partial class ReviewWriter
     /// One critique of all subsections and the discussion, then a revision of each section that received medium or
     /// high comments. A revision that drops a citation the section had (and so lowers coverage) or cites outside the
     /// reference list is rejected, and the original is kept. The sections are revised in place; the revised
-    /// discussion is returned with the log.
+    /// discussion is returned with the log. With research questions, the critique also sees the objective and the
+    /// questions, and judges whether the sections answer them; without, its prompt is as before.
     /// </summary>
     public static async Task<(PeerReviewLog Log, string Discussion)> PeerReviewAsync(IChatCompletionService chat, WritingProfile profile,
-        List<SynthesisSection> sections, string discussion, ReviewEvidence evidence, int referenceCount, int parallelism, Action<string>? warn = null)
+        List<SynthesisSection> sections, string discussion, ReviewEvidence evidence, int referenceCount, int parallelism, Action<string>? warn = null,
+        string goal = "", IReadOnlyList<string>? questions = null)
     {
         string AllSynthesis() => string.Join("\n\n", sections.Select(x => $"### {x.Heading}\n{x.Text}"));
         var log = new PeerReviewLog
@@ -34,9 +36,11 @@ public static partial class ReviewWriter
         string Named(string text) => NameSections(text, headings);
         string sectionsText = string.Join("\n\n", sections.Select(x => $"[{x.Field}] {x.Heading}\n{x.Text}"))
                               + $"\n\n[discussion] Discussion\n{discussion}";
+        string critiqueAim = questions is not { Count: > 0 } ? "" : "\n\n" + AimBlock(goal, questions) +
+            "\nAlso review (f) whether each theme subsection answers the research questions it is for, and whether the discussion speaks to every research question.";
 
         string critiquePrompt = $$"""
-            You are a strict but constructive peer reviewer for {{profile.Review}}. Review each section below (theme subsections of the results, and the discussion) for: (a) depth: does it synthesise and compare rather than list, (b) whether each specific claim carries an inline [n] citation, (c) over-claiming beyond what a {{profile.Source}} could show, (d) coherence and overlap between sections, (e) whether the discussion interprets rather than repeats.
+            You are a strict but constructive peer reviewer for {{profile.Review}}. Review each section below (theme subsections of the results, and the discussion) for: (a) depth: does it synthesise and compare rather than list, (b) whether each specific claim carries an inline [n] citation, (c) over-claiming beyond what a {{profile.Source}} could show, (d) coherence and overlap between sections, (e) whether the discussion interprets rather than repeats.{{critiqueAim}}
 
             REFERENCE LIST (valid citation numbers):
             {{evidence.ReferenceLines()}}

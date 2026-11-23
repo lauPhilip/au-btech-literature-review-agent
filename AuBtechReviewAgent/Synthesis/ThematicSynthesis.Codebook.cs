@@ -13,17 +13,23 @@ namespace AuBtechReviewAgent;
 /// <summary>The codebook of the thematic synthesis: themes built from the codes, and the second, independent coding.</summary>
 public static partial class ThematicSynthesis
 {
-    private sealed class CodebookAnswer { public List<ThemeAnswer>? Themes { get; set; } public List<UnassignedAnswer>? Unassigned { get; set; } }
-    private sealed class ThemeAnswer { public string Name { get; set; } = ""; public string Description { get; set; } = ""; public List<string>? Codes { get; set; } }
+    private sealed class CodebookAnswer { public List<ThemeAnswer>? Themes { get; set; } public List<UnassignedAnswer>? Unassigned { get; set; } public List<UnansweredAnswer>? Unanswered { get; set; } }
+    private sealed class ThemeAnswer { public string Name { get; set; } = ""; public string Description { get; set; } = ""; public List<string>? Codes { get; set; } public List<string>? Questions { get; set; } }
     private sealed class UnassignedAnswer { public string Code { get; set; } = ""; public string Reason { get; set; } = ""; }
+    private sealed class UnansweredAnswer { public string Question { get; set; } = ""; public string Reason { get; set; } = ""; }
 
     /// <summary>
     /// Groups the codes into descriptive themes. The model must place every coded study in at least one theme
-    /// (through one of its codes) or say why its codes fit none; the answer is rejected otherwise.
+    /// (through one of its codes) or say why its codes fit none; the answer is rejected otherwise. With research
+    /// questions, every theme names the questions it answers and every question is answered by a theme or listed as
+    /// unanswered with a reason (filled into <paramref name="unanswered"/>); the themes are put in question order.
     /// </summary>
     public static async Task<(List<Theme> Themes, List<UncodedStudy> Unplaced)> BuildCodebookAsync(
-        IChatCompletionService chat, string objective, IReadOnlyList<ThematicCode> codes, int maxThemes, string criteria = "")
+        IChatCompletionService chat, string objective, IReadOnlyList<ThematicCode> codes, int maxThemes, string criteria = "",
+        IReadOnlyList<string>? questions = null, List<UnansweredQuestion>? unanswered = null)
     {
+        questions ??= Array.Empty<string>();
+        var questionIds = questions.Select((_, i) => ReviewWriter.QuestionId(i)).ToList();
         var studies = codes.Select(c => c.Reference).Distinct().ToList();
         var (min, max) = ThemeRange(studies.Count, maxThemes);
         var ids = codes.Select(c => c.Id).ToHashSet(StringComparer.OrdinalIgnoreCase);
@@ -32,10 +38,17 @@ public static partial class ThematicSynthesis
         // Every study here was included, so a reason to leave it out may not contradict the criteria it met (issue #166).
         string criteriaBlock = string.IsNullOrWhiteSpace(criteria) ? "" : $"\nELIGIBILITY CRITERIA (every study below met them and was included):\n{criteria.Trim()}\n";
         string criteriaRule = string.IsNullOrWhiteSpace(criteria) ? "" : " Never leave a code out because its study is outside the topic, population, setting or intervention: every study met the eligibility criteria above, and a reason must not contradict them.";
+        // With research questions the themes are organised by question (the real runs grouped them by outcome numbers).
+        string questionRule = questions.Count == 0 ? "" : $"""
+
+            - Organise the themes by research question: every theme answers one or more of the research questions above, named in "questions" (e.g. ["RQ1"]). Every research question is answered by at least one theme, or, when no code bears on it, listed under "unanswered" with a one-sentence reason; never stretch a theme to cover a question its codes do not answer.
+            """;
+        string questionField = questions.Count == 0 ? "" : ",\"questions\":[\"RQ1\"]";
+        string unansweredField = questions.Count == 0 ? "" : ",\"unanswered\":[{\"question\":\"RQ2\",\"reason\":\"...\"}]";
         string prompt = $$"""
             You are building the codebook for the thematic synthesis of a systematic literature review: group the codes below into descriptive themes.
 
-            REVIEW OBJECTIVE: "{{objective}}"{{criteriaBlock}}
+            {{ReviewWriter.AimBlock(objective, questions)}}{{criteriaBlock}}
             {{PromptSafety.ReviewerInputNotice}}
 
             {{PromptSafety.DataOnlyNotice}}
@@ -45,9 +58,9 @@ public static partial class ThematicSynthesis
             TASK: Group the codes into {{min}} to {{max}} themes. A theme names a pattern that several studies share and that answers part of the objective; it is not a single study. Give each theme a short name (at most 8 words) and a one- or two-sentence description of what unites its codes.
             - Put every code in the theme it fits best; a code may also go into a second theme if it clearly belongs to both.
             - Every study should end up in at least one theme. Only leave a code out if it does not bear on the objective; list it under "unassigned" with a reason.{{criteriaRule}}
-            - Use only the code ids listed above.
+            - Use only the code ids listed above.{{questionRule}}
             Respond ONLY with a minified JSON object:
-            {"themes":[{"name":"...","description":"...","codes":["C1","C4"]}],"unassigned":[{"code":"C9","reason":"..."}]}
+            {"themes":[{"name":"...","description":"...","codes":["C1","C4"]{{questionField}}}],"unassigned":[{"code":"C9","reason":"..."}]{{unansweredField}}}
             """;
 
         var answer = await LlmJson.GetAsync<CodebookAnswer>(chat, prompt, PrismaReviewEngine.JsonMode(0.1), a =>
@@ -60,22 +73,34 @@ public static partial class ThematicSynthesis
             var unplaced = StudiesWithoutTheme(codes, a.Themes.Select(t => t.Codes!), (a.Unassigned ?? new()).Select(u => u.Code));
             if (unplaced.Count > 0)
                 return $"studies {string.Join(", ", unplaced)} are in no theme and none of their codes is listed as unassigned. Place one of their codes in the best fitting theme, or list the codes under unassigned with a reason.";
-            return null;
+            return questions.Count == 0 ? null : QuestionProblem(questionIds, a.Themes.Select(t => (IEnumerable<string>)(t.Questions ?? new())), (a.Unanswered ?? new()).Select(u => u.Question));
         });
 
         var byId = codes.ToDictionary(c => c.Id, StringComparer.OrdinalIgnoreCase);
-        var themes = answer.Themes!.Select((t, i) =>
+        var themes = answer.Themes!.Select(t =>
         {
             var codeIds = t.Codes!.Select(c => c.Trim().ToUpperInvariant()).Where(byId.ContainsKey).Distinct().ToList();
             return new Theme
             {
-                Id = $"T{i + 1}",
                 Name = t.Name.Trim().TrimEnd('.'),
                 Description = t.Description.Trim(),
                 CodeIds = codeIds,
                 Studies = codeIds.Select(c => byId[c].Reference).Distinct().OrderBy(r => r).ToList(),
+                Questions = questions.Count == 0 ? null
+                    : questionIds.Where(q => (t.Questions ?? new()).Any(x => x.Trim().Equals(q, StringComparison.OrdinalIgnoreCase))).ToList(),
             };
-        }).Where(t => t.Studies.Count > 0).ToList();
+        }).Where(t => t.Studies.Count > 0)
+            // In question order (a stable sort), so the results read question by question; without questions the order is the model's.
+            .OrderBy(t => t.Questions is { Count: > 0 } q ? questionIds.IndexOf(q[0]) : 0).ToList();
+        for (int i = 0; i < themes.Count; i++) themes[i].Id = $"T{i + 1}";
+        if (questions.Count > 0 && unanswered != null)
+        {
+            var answered = themes.SelectMany(t => t.Questions!).ToHashSet();
+            var why = (answer.Unanswered ?? new()).GroupBy(u => u.Question.Trim().ToUpperInvariant()).ToDictionary(g => g.Key, g => g.First().Reason.Trim());
+            // A question whose only theme had no studies left is unanswered too, said in code.
+            unanswered.AddRange(questionIds.Where(q => !answered.Contains(q)).Select(q =>
+                new UnansweredQuestion(q, why.TryGetValue(q, out var w) && w.Length > 0 ? w : "No theme of the codebook answers it.")));
+        }
 
         var placed = themes.SelectMany(t => t.Studies).ToHashSet();
         var reasons = (answer.Unassigned ?? new()).Where(u => byId.ContainsKey(u.Code.Trim()))
@@ -84,6 +109,26 @@ public static partial class ThematicSynthesis
             .Select(s => new UncodedStudy(s, reasons.TryGetValue(s, out var r) && !string.IsNullOrWhiteSpace(r) ? $"Codes left out of the themes: {r.Trim()}" : "Codes left out of the themes."))
             .ToList();
         return (themes, unplacedStudies);
+    }
+
+    /// <summary>
+    /// Why the questions of a codebook answer cannot be used, or null: a theme without a question or with an unknown one,
+    /// and a question that is in neither a theme nor the unanswered list (or in both). Public for unit tests.
+    /// </summary>
+    public static string? QuestionProblem(IReadOnlyList<string> questionIds, IEnumerable<IEnumerable<string>> themeQuestions, IEnumerable<string> unanswered)
+    {
+        var perTheme = themeQuestions.Select(q => q.Select(x => x.Trim().ToUpperInvariant()).ToList()).ToList();
+        var left = unanswered.Select(x => x.Trim().ToUpperInvariant()).ToList();
+        var known = questionIds.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var unknown = perTheme.SelectMany(q => q).Concat(left).Where(q => !known.Contains(q)).Distinct().ToList();
+        if (unknown.Count > 0) return $"unknown research questions: {string.Join(", ", unknown)}; use only {string.Join(", ", questionIds)}.";
+        if (perTheme.Any(q => q.Count == 0)) return "every theme names the research questions it answers in \"questions\".";
+        var answered = perTheme.SelectMany(q => q).ToHashSet();
+        var both = left.Where(answered.Contains).Distinct().ToList();
+        if (both.Count > 0) return $"{string.Join(", ", both)} is answered by a theme and also listed as unanswered; keep it in one place.";
+        var missing = questionIds.Where(q => !answered.Contains(q) && !left.Contains(q)).ToList();
+        return missing.Count == 0 ? null
+            : $"{string.Join(", ", missing)} is in no theme and not listed as unanswered. Name it in the \"questions\" of the themes that answer it, or list it under \"unanswered\" with a reason.";
     }
 
     /// <summary>Coded studies that are in no theme and have none of their codes listed as unassigned.</summary>

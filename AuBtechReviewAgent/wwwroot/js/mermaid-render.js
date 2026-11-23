@@ -29,7 +29,7 @@ window.traceableMermaid = (function () {
         note.className = 'text-[11px] text-gray-500 mb-2';
         note.textContent = reason;
         const pre = document.createElement('pre');
-        pre.className = 'text-[10px] text-left whitespace-pre-wrap text-gray-600 bg-white border border-gray-200 rounded p-2 w-full';
+        pre.className = 'text-[10px] text-left whitespace-pre-wrap text-gray-600 bg-white border border-gray-200 p-2 w-full';
         pre.textContent = code;
         element.replaceChildren(note, pre);
     }

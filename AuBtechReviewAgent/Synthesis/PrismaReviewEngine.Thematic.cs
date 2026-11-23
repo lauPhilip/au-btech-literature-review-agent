@@ -47,6 +47,8 @@ public partial class PrismaReviewEngine
         var result = new ThematicResult { Codebook = book };
         var extractions = state.Extractions ?? new List<StudyExtraction>();
         string goal = string.IsNullOrWhiteSpace(objective) ? query : objective;
+        // The research questions go to every step from the codebook on (issue #124); without them the prompts are as before.
+        var questions = state.ResearchQuestions ?? new List<string>();
 
         // 1. Coding
         List<ThematicCode> codes;
@@ -54,7 +56,7 @@ public partial class PrismaReviewEngine
         {
             ReportProgress(runId, state, RunProgress.Synthesis, RunProgress.Phase(RunProgress.SynthesisPhases, 1, 0), $"Coding {papers.Count} studies");
             var (c, uncoded) = await ThematicSynthesis.CodeStudiesAsync(chat, goal, papers, extractions,
-                Synthesis.CodingBatchSize, Llm.ScreeningParallelism,
+                Synthesis.CodingBatchSize, Llm.QualityParallelism,
                 (done, total) => ReportProgress(runId, state, RunProgress.Synthesis, RunProgress.Phase(RunProgress.SynthesisPhases, 1, (double)done / total), $"Coding studies: {Of(done, total, "batches")}"));
             codes = c;
             book.Codes = codes;
@@ -72,7 +74,9 @@ public partial class PrismaReviewEngine
             ReportProgress(runId, state, RunProgress.Synthesis, RunProgress.Phase(RunProgress.SynthesisPhases, 2, 0), $"Grouping {codes.Count} codes into themes");
             using (LlmStage.Begin("thematic-codebook"))
             {
-                var (themes, unplaced) = await ThematicSynthesis.BuildCodebookAsync(chat, goal, codes, Math.Max(2, Synthesis.MaxThemes), CriteriaForCodebook(state));
+                var unanswered = questions.Count == 0 ? null : new List<UnansweredQuestion>();
+                var (themes, unplaced) = await ThematicSynthesis.BuildCodebookAsync(chat, goal, codes, Math.Max(2, Synthesis.MaxThemes), CriteriaForCodebook(state), questions, unanswered);
+                book.Unanswered = unanswered;
                 book.Themes = themes;
                 book.Uncoded.AddRange(unplaced);
                 book.Uncoded = book.Uncoded.OrderBy(u => u.Reference).ToList();
@@ -102,12 +106,12 @@ public partial class PrismaReviewEngine
 
         // 4. One subsection per theme, each with its own coverage fill pass (shared by every kind of review:
         //    Synthesis/ReviewWriter.cs). Written in parallel, assembled in theme order.
-        var evidence = SystematicEvidence.Build(book, state.SynthesizedRecords, papers, extractions);
+        var evidence = SystematicEvidence.Build(book, state.SynthesizedRecords, papers, extractions, questions);
         result.Evidence = evidence;
         var profile = WritingProfile.Systematic;
         void Warn(string message) => _log.LogWarning("{Message}", SanitizeLogMessage(message));
         ReportProgress(runId, state, RunProgress.Synthesis, RunProgress.Phase(RunProgress.SynthesisPhases, 3, 0), $"Writing {book.Themes.Count} theme subsections");
-        var (sections, coverage) = await ReviewWriter.WriteThemesAsync(chat, profile, goal, evidence, referenceCount, Llm.ScreeningParallelism,
+        var (sections, coverage) = await ReviewWriter.WriteThemesAsync(chat, profile, goal, evidence, referenceCount, Llm.QualityParallelism,
             (n, total) => ReportProgress(runId, state, RunProgress.Synthesis, RunProgress.Phase(RunProgress.SynthesisPhases, 3, (double)n / total), $"Theme subsections: {Of(n, total, "written")}"),
             Warn);
         if (secondCoding != null) book.SecondCoding = await secondCoding;
@@ -126,12 +130,12 @@ public partial class PrismaReviewEngine
             {
                 Warn(message);
                 (book.WritingNotes ??= new()).Add(message);
-            });
+            }, questions);
 
         // 6. Peer review, per section, with the same coverage guard as the fill pass
         ReportProgress(runId, state, RunProgress.Synthesis, RunProgress.Phase(RunProgress.SynthesisPhases, 5, 0), "Automated peer review");
         using (LlmStage.Begin("automated-peer-review"))
-            (result.PeerReview, result.Discussion) = await ReviewWriter.PeerReviewAsync(chat, profile, result.Sections, result.Discussion, evidence, referenceCount, Llm.ScreeningParallelism, Warn);
+            (result.PeerReview, result.Discussion) = await ReviewWriter.PeerReviewAsync(chat, profile, result.Sections, result.Discussion, evidence, referenceCount, Llm.QualityParallelism, Warn, goal, questions);
 
         return result;
     }

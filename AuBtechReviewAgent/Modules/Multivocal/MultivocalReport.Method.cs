@@ -71,9 +71,8 @@ public sealed partial class MultivocalReporter
         var section = new ReportSection { Heading = "3. Selection (G9, G10)" };
         int reviewed = s.Sources.Count(x => x.Reviewed);
         int changed = s.Sources.Count(x => x.Reviewed && x.ModelDecision != null && x.ModelDecision != x.Decision);
-        string kappa = s.Kappa is double k ? $" The two screenings agreed with Cohen's κ = {k.ToString("0.00", CultureInfo.InvariantCulture)}." : "";
         section.Blocks.Add(ReportBlock.Paragraph(
-            $"Each of the {Count(s.Sources.Count, "source")} found was screened twice by the language model against the protocol's criteria, independently and with the steps in a different order (G9, G10).{kappa} " +
+            MultivocalScreeningText.Method(s) +
             $"{Num(s.Count("Included"))} were included, {Num(s.Count("Excluded"))} excluded and {Num(s.Count("Duplicate"))} set aside as duplicates of a source with the same title" +
             $"{(s.Count("Error") > 0 ? $"; {Num(s.Count("Error"))} could not be screened" : "")}. " +
             $"The reviewer looked at {Count(reviewed, "decision")} and changed {Num(changed)}; the model's decision stays on file next to the reviewer's."));
@@ -100,6 +99,7 @@ public sealed partial class MultivocalReporter
             $"Every included {(input.Ledger.HasFormalPool ? "grey " : "")}source was scored on the {q.MaxPoints} items of the quality checklist in the guidelines' Table 7, each 1, 0.5 or 0 points, with a threshold of {q.Threshold} points. " +
             $"The language model answered the items that need reading the source, and every point it gave rests on a quote found in the kept text of the source's page; the date, the impact and the outlet type were decided in code (impact: {Lower(q.ImpactRule.TrimEnd('.'))}). " +
             $"{Num(passed.Count)} sources passed, {Num(below)} scored below the threshold and {Num(notAssessed)} could not be assessed{(notAssessed > 0 ? ", most often because their page could not be read" : "")}." +
+            GreyPageText.QualityMethod(grey) +
             (opinions > 0 ? $" {Count(opinions, "source")} {(opinions == 1 ? "was" : "were")} recorded as an opinion piece, with the critical questions for an expert opinion (G13)." : "")));
         if (passed.Count > 0)
             section.Blocks.Add(ReportBlock.Paragraph(
@@ -126,8 +126,9 @@ public sealed partial class MultivocalReporter
         section.Blocks.Add(ReportBlock.Paragraph(
             $"The language model proposed the attributes of the systematic map from the research questions, with values generalised over {Count(map.SourcesSeen, "source")} that passed the quality check. " +
             $"The reviewer {(edited > 0 ? $"edited it {Count(edited, "time")}" : "kept it as proposed")}, and version {fixedMap.Number} was fixed before any source was extracted. " +
-            $"{Num(extracted)} sources were extracted against it{(failed > 0 ? $" and {Num(failed)} could not be" : "")}; every value rests on a quote found in the kept text of the source's page, and what a page does not state was recorded as not stated. " +
-            "The kind of each source, whether it is grey or formal literature, its site, date and quality points were recorded in code." +
+            $"{Num(extracted)} sources were extracted against it{(failed > 0 ? $" and {Num(failed)} could not be" : "")}; every value rests on a quote found in the kept text of the source's page, and what a page does not state was recorded as not stated." +
+            GreyPageText.ExtractionMethod(input.Extraction) +
+            " The kind of each source, whether it is grey or formal literature, its site, date and quality points were recorded in code." +
             (input.Extraction.NameMerges.Count + input.Extraction.OwnSourceValues.Count > 0
                 ? $" For the open attributes, names were merged in code only where they match when case, punctuation, spaces and hyphens are ignored, or where one is given in brackets after the other ({Count(input.Extraction.NameMerges.Count, "merge")}), and {Count(input.Extraction.OwnSourceValues.Count, "value")} naming one of the review's own sources {(input.Extraction.OwnSourceValues.Count == 1 ? "was" : "were")} not counted; the data appendix lists both."
                 : "") +

@@ -34,9 +34,9 @@ public class FormalExtractionTextTests : IDisposable
     public void AnAbstractOrAShortFullTextIsSentWhole()
     {
         var plan = MultivocalPlan.Example();
-        Assert.Equal(new FormalTextForModel("An abstract.", null), FormalExtractionText.Select("An abstract.", MultivocalPages.AbstractBasis, plan, Map()));
+        Assert.Equal(new TextForModel("An abstract.", null), FormalExtractionText.Select("An abstract.", MultivocalPages.AbstractBasis, plan, Map()));
         string shortText = "First passage.\n\nSecond passage.";
-        Assert.Equal(new FormalTextForModel(shortText, null), FormalExtractionText.Select(shortText, MultivocalPages.FullTextBasis, plan, Map()));
+        Assert.Equal(new TextForModel(shortText, null), FormalExtractionText.Select(shortText, MultivocalPages.FullTextBasis, plan, Map()));
     }
 
     [Fact]
@@ -49,9 +49,9 @@ public class FormalExtractionTextTests : IDisposable
         Assert.True(sent.Text.Length < 12_000, $"{sent.Text.Length} characters sent");
         Assert.StartsWith("We keep a running summary of the conversation.\n\nPassage 2. ", sent.Text);
         Assert.Contains(Relevant, sent.Text);
-        Assert.Contains(FormalExtractionText.Break, sent.Text);
+        Assert.Contains(PassageSelection.Break, sent.Text);
         // Every passage sent is in the kept text, so a quote found in what was sent is found in the kept text too.
-        Assert.All(sent.Text.Split(FormalExtractionText.Break).SelectMany(p => p.Split("\n\n")), p => Assert.Contains(p, kept));
+        Assert.All(sent.Text.Split(PassageSelection.Break).SelectMany(p => p.Split("\n\n")), p => Assert.Contains(p, kept));
         Assert.Matches(@"^14 of 62 passages of the full text \([\d,]+ of [\d,]+ characters\)$", sent.Passages);
     }
 

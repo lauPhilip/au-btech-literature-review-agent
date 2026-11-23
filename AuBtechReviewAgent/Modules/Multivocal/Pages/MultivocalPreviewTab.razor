@@ -11,7 +11,7 @@
         {
             var s = PlanSteps[i];
             <li class="flex gap-3">
-                <span class="flex-none w-6 h-6 rounded-full bg-primary/10 text-heading text-[11px] font-semibold flex items-center justify-center">@(i + 1)</span>
+                <span class="flex-none w-6 h-6 bg-primary/10 text-heading text-[11px] font-semibold flex items-center justify-center">@(i + 1)</span>
                 <span class="text-xs leading-snug flex-1">
                     <span class="font-semibold text-heading">@s.Title</span>
                     <span class="text-muted"> · @s.Text</span>
@@ -56,7 +56,7 @@
                 ("Search", p.UsesFormalPool
                     ? $"{searches} grey literature search{(searches == 1 ? "" : "es")} and {p.FormalDatabases.Count} academic database{(p.FormalDatabases.Count == 1 ? "" : "s")}, each with its own search strings, {stop}."
                     : $"{searches} grey literature search{(searches == 1 ? "" : "es")}, {stop}.", true),
-                ("Selection", p.UsesFormalPool ? "Grey and academic sources are screened twice, with the same criteria and the same care." : "Every source is screened twice against your criteria; a source the two screenings disagree on is kept and marked for you to look at.", true),
+                ("Selection", p.UsesFormalPool ? "Grey and academic sources are screened with the same criteria and the same care: once each, and again when included, unsure or flagged, and for a random sample." : "Every source is screened against your criteria once, and again when it is included, unsure or flagged, and for a random sample; a source the two screenings disagree on is kept and marked for you to look at.", true),
                 ("Quality", p.UsesFormalPool
                     ? $"Each grey source is scored on Table 7; below {p.QualityThreshold} of {MultivocalGuidelines.QualityPointsMax} points it is left out. Each academic source is appraised with MMAT, as in the systematic review, on its open full text or else its abstract. Every answer rests on a quote."
                     : $"Each source is scored on Table 7; below {p.QualityThreshold} of {MultivocalGuidelines.QualityPointsMax} points it is left out. Every score rests on a quote.", true),
