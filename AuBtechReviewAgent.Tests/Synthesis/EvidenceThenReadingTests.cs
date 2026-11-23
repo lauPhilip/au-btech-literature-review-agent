@@ -58,4 +58,68 @@ public class EvidenceThenReadingTests
             Assert.Contains(word, rule);
         Assert.Contains("Never cite a sentence for the review's own reasoning", rule);
     }
+
+    private static ReviewEvidence Evidence() => new()
+    {
+        Sources = Enumerable.Range(1, 2).Select(r => new EvidenceSource { Reference = r, ReferenceLine = $"Author {r} (2025). Study {r}." }).ToList(),
+        BaseFacts = "2 studies.",
+    };
+
+    private static List<SynthesisSection> Sections() => new()
+    {
+        new SynthesisSection { Field = "synthesis-1", Heading = "Recovery", Text = "Supervisors restart failed workers [1]. Audits log agent actions [2]." },
+    };
+
+    private static string Json(string text) => System.Text.Json.JsonSerializer.Serialize(new { text });
+
+    private const string Reading = "Supervisors restart failed workers [1]. Recovery and auditing answer different parts of the same problem.";
+
+    [Fact]
+    public async Task TheDiscussionPromptCarriesTheRuleAndAnUncitedFindingIsSentBack()
+    {
+        var model = new FakeChatService().Returns(Json("Several studies report that supervision works.")).Returns(Json(Reading));
+
+        string discussion = await ReviewWriter.WriteDiscussionAsync(model, WritingProfile.Systematic, "agent loops", "Map agent loops", Sections(), Evidence(), 2);
+
+        Assert.Equal(Reading, discussion);
+        Assert.Contains(ReviewWriter.EvidenceThenReadingRule(WritingProfile.Systematic), model.Prompts[0]);
+        Assert.Contains(ReviewWriter.ClaimPerCitationRule(WritingProfile.Systematic), model.Prompts[0]);
+        Assert.Contains("YOUR PREVIOUS ANSWER WAS REJECTED: \"Several studies report that supervision works.\" has no citation", model.Prompts[1]);
+    }
+
+    [Fact]
+    public async Task APeerReviewRevisionOfTheDiscussionThatReportsAnUncitedFindingIsRejected()
+    {
+        var model = new FakeChatService().RespondsWith(p => p.Contains("strict but constructive peer reviewer")
+            ? """{"comments":[{"section":"discussion","severity":"medium","issue":"Thin.","suggestion":"Expand."}]}"""
+            : Json(Reading + " The literature agrees that oversight works."));
+
+        var (log, discussion) = await ReviewWriter.PeerReviewAsync(model, WritingProfile.Systematic, Sections(), Reading, Evidence(), 2, 1);
+
+        Assert.Equal(Reading, discussion);
+        var revision = Assert.Single(log.SectionRevisions);
+        Assert.False(revision.Applied);
+        Assert.Contains("\"The literature agrees that oversight works.\" has no citation", revision.Note);
+    }
+
+    [Fact]
+    public async Task TheClosingPromptCarriesTheRuleAndLetsProposalsGoUncited()
+    {
+        var model = new FakeChatService().Returns(System.Text.Json.JsonSerializer.Serialize(new Dictionary<string, string>
+        {
+            ["limitations"] = "The evidence rests on 2 case studies.",
+            ["implications"] = "Supervisors restart failed workers [1]. Teams should plan for supervision from the start.",
+            ["futureResearch"] = "Field studies of supervised loops in production are missing.",
+            ["conclusion"] = "Safe agent loops need both recovery and oversight.",
+        }));
+
+        var closing = await ReviewWriter.WriteClosingAsync(model, WritingProfile.Systematic, "agent loops", "Map agent loops", "Included: 2.",
+            Sections(), Reading, Evidence(), 2);
+
+        Assert.NotNull(closing);
+        Assert.Equal("Field studies of supervised loops in production are missing.", closing!.FutureResearch);
+        Assert.Contains(ReviewWriter.EvidenceThenReadingRule(WritingProfile.Systematic), model.Prompts[0]);
+        Assert.Contains("A proposal is the review's own reading and takes no citation", model.Prompts[0]);
+        Assert.Single(model.Prompts);
+    }
 }
