@@ -53,8 +53,12 @@ public class MultivocalSourceTextFlagTests : IDisposable
 
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) =>
             Task.FromResult(request.RequestUri!.AbsolutePath == "/post"
-                ? new HttpResponseMessage(System.Net.HttpStatusCode.OK) { Content = new StringContent(Page, System.Text.Encoding.UTF8, "text/html") }
-                : new HttpResponseMessage(System.Net.HttpStatusCode.NotFound) { Content = new StringContent("") });
+                ? Respond(System.Net.HttpStatusCode.OK, Page)
+                : Respond(System.Net.HttpStatusCode.NotFound, ""));
+
+        // The HttpClient that called the handler owns and disposes the response.
+        private static HttpResponseMessage Respond(System.Net.HttpStatusCode status, string body) =>
+            new(status) { Content = new StringContent(body, System.Text.Encoding.UTF8, "text/html") };
     }
 
     [Fact]
