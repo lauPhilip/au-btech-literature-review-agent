@@ -135,7 +135,10 @@ public partial class PrismaReviewEngine
         int referenceCount = run.ReferenceCount;
 
         var textOf = fields.ToDictionary(f => f.Field, f => f.Text);
-        var citedStudies = new SortedSet<int>(fields.SelectMany(f => ThematicSynthesis.CitedIn(f.Text)).Where(r => r >= 1 && r <= referenceCount));
+        // The coverage sentence says what "the synthesis and discussion" cite, so it counts only the results and the
+        // discussion; a study cited only in the rationale or the closing sections is not synthesised (issue #447).
+        var resultFields = run.Sections.Select(x => x.Field).Append("synthesisResultsItem").Append("discussionItem").ToHashSet(StringComparer.Ordinal);
+        var citedStudies = new SortedSet<int>(fields.Where(f => resultFields.Contains(f.Field)).SelectMany(f => ThematicSynthesis.CitedIn(f.Text)).Where(r => r >= 1 && r <= referenceCount));
         var notCited = new List<UncodedStudy>();
         for (int refNo = 1; refNo <= referenceCount; refNo++)
         {
