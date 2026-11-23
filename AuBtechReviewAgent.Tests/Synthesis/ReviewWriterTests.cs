@@ -49,7 +49,12 @@ public class ReviewWriterTests : IDisposable
             return $$"""{"studies":[{{string.Join(",", studies)}}]}""";
         }
         if (prompt.Contains("You are building the codebook"))
-            return """{"themes":[{"name":"Recovery and oversight","description":"How agent loops recover and are overseen.","codes":["C1","C2"]}],"unassigned":[]}""";
+        {
+            // With research questions, the one theme answers all of them; without, the answer is as before.
+            var ids = Regex.Matches(prompt, @"^RQ(\d+): ", RegexOptions.Multiline).Select(m => $"\"RQ{m.Groups[1].Value}\"").Distinct().ToList();
+            string questions = ids.Count == 0 ? "" : $",\"questions\":[{string.Join(",", ids)}]";
+            return $$"""{"themes":[{"name":"Recovery and oversight","description":"How agent loops recover and are overseen.","codes":["C1","C2"]{{questions}}}],"unassigned":[]}""";
+        }
         if (prompt.Contains("second, independent coder")) return """{"studies":[{"ref":1,"themes":["T1"]},{"ref":2,"themes":["T1"]}]}""";
         if (prompt.Contains("You are writing one subsection of the Results"))
             return """{"heading":"Recovery and oversight","text":"Agent loops recover from faults through supervisor checks [1]."}""";
