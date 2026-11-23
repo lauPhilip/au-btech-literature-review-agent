@@ -97,7 +97,9 @@ public sealed class ReviewEvidence
     /// (or its abstract when it has none) and a few excerpts of its text chosen by the theme's words.
     /// A <paramref name="lean"/> block (<see cref="WritingProfile.LeanEvidence"/>) lists, in a theme, only the findings
     /// that put the source in it (<see cref="EvidenceTheme.FindingIds"/>), and leaves out the codes line when every
-    /// code is already the value of a listed finding. Every finding listed still carries its verified quote.
+    /// code is already the value of a listed finding, and carries one excerpt of at most <see cref="LeanExcerptCharacters"/>
+    /// characters, cut on sentence ends, instead of <paramref name="excerpts"/> whole chunks. Every finding listed still
+    /// carries its verified quote; the citation check still reads the whole text.
     /// </summary>
     public string SourceBlock(int reference, EvidenceTheme? theme, int excerpts, bool lean = false)
     {
@@ -118,10 +120,46 @@ public sealed class ReviewEvidence
         if (text != null && excerpts > 0)
         {
             var terms = TextRelevance.Terms($"{theme?.Name} {theme?.Description} {string.Join(" ", codes)}");
-            foreach (var chunk in GroundingContextBuilder.SelectChunks(text.Chunks, terms, excerpts))
+            // A lean theme block carries one short excerpt, the stretch of whole sentences most relevant to the theme.
+            var chosen = lean && theme != null
+                ? GroundingContextBuilder.SelectChunks(text.Chunks.SelectMany(c => Excerpts(c, LeanExcerptCharacters)).ToList(), terms, 1)
+                : GroundingContextBuilder.SelectChunks(text.Chunks, terms, excerpts);
+            foreach (var chunk in chosen)
                 sb.AppendLine($"[{reference}, page {chunk.PageNumber}]: {chunk.Text}");
         }
         return sb.ToString();
+    }
+
+    /// <summary>The most characters of the one excerpt in a lean theme block (<see cref="WritingProfile.LeanEvidence"/>).</summary>
+    public const int LeanExcerptCharacters = 700;
+
+    /// <summary>
+    /// A chunk cut into excerpts of whole sentences of at most <paramref name="most"/> characters, each copied from the
+    /// chunk; a single sentence longer than that is cut at the last space before the limit.
+    /// </summary>
+    public static IEnumerable<DocumentChunk> Excerpts(DocumentChunk chunk, int most)
+    {
+        var sentences = System.Text.RegularExpressions.Regex.Split(chunk.Text.Trim(), @"(?<=[.!?])\s+").Where(x => x.Length > 0);
+        var current = new StringBuilder();
+        foreach (var sentence in sentences)
+        {
+            if (current.Length > 0 && current.Length + 1 + sentence.Length > most)
+            {
+                yield return chunk with { Text = current.ToString() };
+                current.Clear();
+            }
+            string rest = sentence;
+            while (current.Length == 0 && rest.Length > most)
+            {
+                int cut = rest.LastIndexOf(' ', most);
+                if (cut <= 0) cut = most;
+                yield return chunk with { Text = rest[..cut].TrimEnd() };
+                rest = rest[cut..].TrimStart();
+            }
+            if (current.Length > 0) current.Append(' ');
+            current.Append(rest);
+        }
+        if (current.Length > 0) yield return chunk with { Text = current.ToString() };
     }
 
     /// <summary>The quotes of each source's verified findings, by reference number, for the citation check.</summary>
