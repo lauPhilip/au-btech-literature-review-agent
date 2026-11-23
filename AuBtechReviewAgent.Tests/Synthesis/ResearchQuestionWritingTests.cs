@@ -69,6 +69,10 @@ public class ResearchQuestionWritingTests : IDisposable
         Assert.Contains("\"answers\": exactly 1 answer(s), one for each of RQ1 in that order", discussion);
         Assert.Contains("No evidence bears on RQ2, so it is answered in code; give no answer for it.", discussion);
 
+        // The critique sees the answers as context and judges whether each section serves its question (issue #447).
+        string critique = Prompt("strict but constructive peer reviewer");
+        Assert.Contains($"ANSWERS TO THE RESEARCH QUESTIONS (written with the discussion and checked; not under review here):\nRQ1: {Answer}\n", critique);
+        Assert.Contains("(f) whether each section serves the research question it is for", critique);
         // The closing step gets both answers as given text and asks for none; RQ2's stays in the codebook.
         string closing = Prompt("You are writing the sections that follow the discussion of");
         Assert.Contains($"RQ1: How do agent loops recover from faults?\nAnswer: {Answer}\nRQ2: How are agent loops certified?\nAnswer: {ReviewWriter.UnansweredText(WritingProfile.Systematic)}\n", closing);
