@@ -139,7 +139,7 @@ public partial class PrismaReviewEngine
         var (activeMistral, activeElsevier, activeIeee, activeScholar) = ResolveKeys(request.UserKeys);
 
         // With Llm:FastModel set, the screenings and citation checks go to it (StageRoutedChatService).
-        IChatCompletionService innerChat = ChatFactory != null ? ChatFactory(activeMistral) : LlmFactory.CreateForReview(Llm, activeMistral);
+        IChatCompletionService innerChat = ChatFactory != null ? ChatFactory(activeMistral) : LlmFactory.CreateForReview(Llm, activeMistral, _runsOptions.MaxConcurrentRuns);
         var chat = new RecordingChatCompletionService(innerChat, Llm.Model, stop: stop);
 
         int yearFrom = request.YearFrom, yearTo = request.YearTo;
