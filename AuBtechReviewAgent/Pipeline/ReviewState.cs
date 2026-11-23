@@ -58,6 +58,11 @@ public class ReviewState
     // The address of each included paper's open-access full text, when one was downloaded (linked from the report).
     public Dictionary<string, string> FullTextUrls { get; set; } = new();
 
+    // Instruction-like phrases in an included paper's full text (#366); null, and left out of the ledger, when none
+    // was found. The text goes on to extraction and the citation check, so the run view asks the reviewer to look.
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public List<SourceTextFlags>? FullTextFlags { get; set; }
+
     // Data extraction and MMAT appraisal per included study (also written to extraction.json).
     public List<StudyExtraction> Extractions { get; set; } = new();
 
@@ -152,3 +157,6 @@ public class ReviewPhases
 { 
     public List<ScreeningLog> Screening { get; set; } = new(); 
 }
+
+/// <summary>The instruction-like phrases found in one included paper's full text (#366).</summary>
+public sealed record SourceTextFlags(string PaperId, string Title, List<SourceFlag> Flags);

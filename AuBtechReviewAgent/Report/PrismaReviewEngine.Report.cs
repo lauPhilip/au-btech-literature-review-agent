@@ -61,6 +61,9 @@ public partial class PrismaReviewEngine
             ctx.State.FullTextSources[included[i].Id] = result.Source;
             if (IsWebAddress(result.Url)) ctx.State.FullTextUrls[included[i].Id] = result.Url!;
             if (result.Chunks.Count > 0) ctx.State.Stats.FullTextRetrieved++;
+            ctx.State.FullTextFlags?.RemoveAll(f => f.PaperId == included[i].Id);
+            if (PromptSafety.Find(string.Join("\n", result.Chunks.Select(c => c.Text))) is { } flags)
+                (ctx.State.FullTextFlags ??= new()).Add(new SourceTextFlags(included[i].Id, included[i].Title, flags));
         }
         await PublishAsync(ctx);
     }
