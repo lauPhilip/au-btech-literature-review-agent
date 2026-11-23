@@ -45,6 +45,13 @@ public sealed class GreyQuality
     public string? NotAssessed { get; set; }
     public bool FromCache { get; set; }
 
+    /// <summary>
+    /// What of a long page the model was given, when not the whole kept text (<see cref="GreyPageText.ForQuality"/>),
+    /// e.g. "21 of 96 passages of the page (9,870 of 48,210 characters)"; null, and left out, when it was given the whole page.
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Passages { get; set; }
+
     /// <summary>For an opinion piece: its main claim and the critical questions for an expert opinion (G13); null otherwise.</summary>
     public GreyArgument? Argument { get; set; }
 
