@@ -141,8 +141,14 @@ class BodyTests(unittest.TestCase):
 
 
 class RepositoryBodyTests(unittest.TestCase):
-    def test_unreleased_section_and_citation_compose_a_body(self):
-        notes = rc.changelog_section((ROOT / "CHANGELOG.md").read_text(encoding="utf-8"), "Unreleased")
+    def test_newest_section_and_citation_compose_a_body(self):
+        """[Unreleased], or the newest version just after a release, when [Unreleased] is empty."""
+        changelog = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+        versions = [m.group("version") for line in changelog.splitlines() if (m := rc._SECTION.match(line))]
+        try:
+            notes = rc.changelog_section(changelog, "Unreleased")
+        except rc.ReleaseError:
+            notes = rc.changelog_section(changelog, versions[1])
         citation = (ROOT / "CITATION.cff").read_text(encoding="utf-8")
         body = rb.compose_body("v9.9.9", "9.9.9", notes, citation, REPO, "v0.0.1", None)
         self.assertIn("## Cite this version", body)
