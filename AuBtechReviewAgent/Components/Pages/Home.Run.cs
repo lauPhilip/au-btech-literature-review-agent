@@ -52,8 +52,12 @@ public partial class Home
         if (stage == AuBtechReviewAgent.PrismaReviewEngine.StageCancelled) return failureMessage ?? "The run was cancelled.";
         if (awaitingReview) return "The run is waiting for you to check the screening decisions.";
         if (stage == AuBtechReviewAgent.PrismaReviewEngine.StageQueued) return "The run is waiting for a free slot.";
-        return AuBtechReviewAgent.RunProgress.Steps.TryGetValue(State.Stats.ProgressStep, out var step) ? $"Now: {step.Label}." : "The run has started.";
+        // The kind of work the live line names, without its numbers, held for a few seconds when it flips (LiveAnnouncer).
+        var line = AuBtechReviewAgent.LiveActivity.ForSystematic(State.Stats, stage, queuePosition);
+        return liveAnnouncer.Next(line?.Announce ?? "The run has started.", DateTime.UtcNow);
     }
+
+    private readonly AuBtechReviewAgent.LiveAnnouncer liveAnnouncer = new();
 
 
     internal void ToggleLog() => showLog = !showLog;
