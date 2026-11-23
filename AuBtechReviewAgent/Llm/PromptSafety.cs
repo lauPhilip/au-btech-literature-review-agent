@@ -94,17 +94,24 @@ public static class PromptSafety
         return (start > 0 ? "…" : "") + excerpt + (end < text.Length ? "…" : "");
     }
 
-    /// <summary>Names of the instruction-like patterns found in the text (empty when none).</summary>
+    /// <summary>
+    /// Names of the instruction-like patterns found in the text (empty when none). Text spelled in Unicode tag
+    /// characters shows nothing on screen, so when it reads like instructions it adds <see cref="HiddenText.FlagPattern"/>
+    /// last, as the scan of a kept text does (#373).
+    /// </summary>
     public static IReadOnlyList<string> Scan(params string?[] texts)
     {
         var hits = new List<string>();
+        bool hidden = false;
         foreach (var text in texts)
         {
             if (string.IsNullOrWhiteSpace(text)) continue;
-            string visible = HiddenText.RemoveInvisible(text).Text;
+            var clean = HiddenText.RemoveInvisible(text);
             foreach (var (name, pattern) in Patterns)
-                if (!hits.Contains(name) && pattern.IsMatch(visible)) hits.Add(name);
+                if (!hits.Contains(name) && pattern.IsMatch(clean.Text)) hits.Add(name);
+            hidden |= clean.Hidden.Length > 0 && Patterns.Any(p => p.Pattern.IsMatch(clean.Hidden));
         }
+        if (hidden) hits.Add(HiddenText.FlagPattern);
         return hits;
     }
 }
