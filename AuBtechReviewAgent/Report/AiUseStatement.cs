@@ -53,7 +53,8 @@ public static class AiUseStatement
             text.Append(other > 0 ? string.Create(inv, $", and {other} could not be checked") : "");
             text.Append("; a supporting verdict counted only when its quote was found verbatim in the paper. ");
         }
-        int flagged = state.FullTextFlags?.Select(f => f.PaperId).Distinct().Count() ?? 0;
+        // A paper that only lost invisible characters is on file too (#369), but it held nothing that reads like instructions.
+        int flagged = state.FullTextFlags?.Where(f => f.Flags.Count > 0).Select(f => f.PaperId).Distinct().Count() ?? 0;
         text.Append(FlaggedSources(flagged, s.FullTextRetrieved, "full text", "included study", "included studies"));
         text.Append("The complete record of the run (protocol, search responses, every screening decision and model call, and the citation audit) is available as a fingerprinted archive. ");
         text.Append("The authors reviewed the output and take full responsibility for the content.");

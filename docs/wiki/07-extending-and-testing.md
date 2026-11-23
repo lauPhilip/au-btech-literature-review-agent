@@ -61,6 +61,7 @@ The **module test kit** (`Modules/ModuleKit.cs` and `Modules/ModuleKitTests.cs`)
 | `PipelineFeatureTests.cs` | Dual screening and disagreements, injection flags, citation chaining, cache reuse, deleting a run, parallel screening order |
 | `RealRunRegressionTests.cs` | Cases taken from real runs that once went wrong |
 | `OpenSourceAdapterTests.cs`, `ArxivSourceTests.cs` | Source parsers on saved real responses (OpenAlex, Semantic Scholar, Crossref, Unpaywall, arXiv), rate-limit handling and retries, the PDF size limit |
+| `Security/InjectionAttackSet*.cs` | The attack set of poisoned sources (`Security/AttackSet/`), case by case and through a whole systematic and grey literature review |
 | `SafetyAndRecordsTests.cs` | Prompt-injection markers, structured model output, the cache, the manifest, the security headers, and methods text from the run's own counts |
 | `DocPathsTests.cs` | Every file or folder the docs name in backticks exists in the repository |
 | `ArtifactAndProseTests.cs` | Markdown turned into prose, artifact validation and drawing (Mermaid, TikZ), custom requests, compacting after repair, progress that never moves back, a full run with an artifact and with none |
