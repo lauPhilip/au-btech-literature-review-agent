@@ -22,7 +22,7 @@ public sealed class MultivocalExtractor
     public const string ExtractionFile = "multivocal-extraction.json";
     public const string StageExtracting = "Extracting";
     public const string StageExtracted = "Extracted";
-    public const string PromptVersion = "grey-extraction-v2";
+    public const string PromptVersion = "grey-extraction-v3";
 
     /// <summary>Part of the cache key of a formal source's extraction, whose prompt names it as academic (block I-5).</summary>
     public const string FormalPromptVersion = "formal-extraction-v3";
@@ -140,14 +140,18 @@ public sealed class MultivocalExtractor
         }
         result.TextSha256 = snapshot!.TextSha256;
         if (result.Formal) result.TextBasis = snapshot.TextBasis;
-        // A formal source's long full text is sent as selected passages; every quote is checked against what was sent.
-        var formalText = result.Formal ? FormalExtractionText.Select(text, snapshot.TextBasis, plan, map) : null;
-        result.Passages = formalText?.Passages;
-        string forModel = formalText?.Text ?? (text.Length <= MultivocalQualityAssessor.MaxTextForModel ? text : text[..MultivocalQualityAssessor.MaxTextForModel]);
+        // A long full text or page is sent as selected passages; every quote is checked against what was sent.
+        var sent = result.Formal ? FormalExtractionText.Select(text, snapshot.TextBasis, plan, map) : GreyPageText.ForExtraction(text, plan, map);
+        result.Passages = sent.Passages;
+        string forModel = sent.Text;
 
         try
         {
-            string key = ReviewCache.Key(result.Formal ? FormalPromptVersion : PromptVersion, _model, JsonSerializer.Serialize(map.Attributes), plan.Topic, record.Title, snapshot.TextSha256);
+            // A grey page's key also holds the passages sent, which depend on the questions too.
+            string attributes = JsonSerializer.Serialize(map.Attributes);
+            string key = result.Formal
+                ? ReviewCache.Key(FormalPromptVersion, _model, attributes, plan.Topic, record.Title, snapshot.TextSha256)
+                : ReviewCache.Key(PromptVersion, _model, attributes, plan.Topic, record.Title, snapshot.TextSha256, sent.Passages == null ? null : forModel);
             ModelExtraction answer;
             if (_cache.TryGet<ModelExtraction>("grey-extraction", key, out var cached) && cached != null && ModelExtraction.Problem(cached, map) == null)
             {
@@ -156,7 +160,7 @@ public sealed class MultivocalExtractor
             }
             else
             {
-                answer = await AskAsync(chat, plan, map, record, forModel);
+                answer = await AskAsync(chat, plan, map, record, forModel, sent.Passages != null);
                 _cache.Set("grey-extraction", key, answer);
             }
             Verify(result, answer, map, plan, forModel);
@@ -176,7 +180,7 @@ public sealed class MultivocalExtractor
     /// </summary>
     public static void Verify(GreyExtraction result, ModelExtraction answer, MapVersion map, MultivocalPlan plan, string text)
     {
-        if (answer.Purpose is { } purpose && !string.IsNullOrWhiteSpace(purpose.Value) && CitationSupportChecker.QuoteOccursIn(purpose.Quote, text))
+        if (answer.Purpose is { } purpose && !string.IsNullOrWhiteSpace(purpose.Value) && PassageSelection.QuoteFound(purpose.Quote, text))
             result.Purpose = new ExtractedValue { Value = purpose.Value.Trim(), Quote = purpose.Quote.Trim() };
 
         result.Attributes = map.Attributes.Select(attribute =>
@@ -186,7 +190,7 @@ public sealed class MultivocalExtractor
             foreach (var v in given?.Values ?? new())
             {
                 var value = new ExtractedValue { Value = Canonical(attribute, v.Value), Quote = (v.Quote ?? "").Trim() };
-                if (CitationSupportChecker.QuoteOccursIn(value.Quote, text)) extracted.Values.Add(value);
+                if (PassageSelection.QuoteFound(value.Quote, text)) extracted.Values.Add(value);
                 else extracted.Unsupported.Add(value);
             }
             return extracted;
@@ -204,8 +208,11 @@ public sealed class MultivocalExtractor
     private static string Canonical(MapAttribute attribute, string value) =>
         attribute.Open ? value.Trim() : attribute.Values.FirstOrDefault(v => v.Equals(value.Trim(), StringComparison.OrdinalIgnoreCase)) ?? value.Trim();
 
-    /// <summary>The extraction prompt: every attribute of the fixed map, each value with a word-for-word quote.</summary>
-    public static async Task<ModelExtraction> AskAsync(IChatCompletionService chat, MultivocalPlan plan, MapVersion map, GreyRecord record, string text)
+    /// <summary>
+    /// The extraction prompt: every attribute of the fixed map, each value with a word-for-word quote. With
+    /// <paramref name="selected"/>, the text is selected passages of a long page or full text.
+    /// </summary>
+    public static async Task<ModelExtraction> AskAsync(IChatCompletionService chat, MultivocalPlan plan, MapVersion map, GreyRecord record, string text, bool selected = false)
     {
         string attributes = string.Join("\n", map.Attributes.Select(a =>
             $"- {a.Name} ({a.Question}; {(a.Open ? "open text" : a.Multiple ? "one or more of: " + string.Join(" | ", a.Values) : "exactly one of: " + string.Join(" | ", a.Values))}): {a.Description}"));
@@ -217,7 +224,9 @@ public sealed class MultivocalExtractor
         // A formal source (block I-5) is named as academic, and its text is its open full text or its abstract.
         bool formal = record.Kind == MultivocalSearcher.FormalKind;
         string kind = formal ? "academic source (a paper from a bibliographic database)" : "grey literature source";
-        string textHeading = formal ? "SOURCE TEXT (its open full text or selected passages of it, or its abstract when no full text is open; the only evidence you may use)" : "PAGE TEXT (the only evidence you may use)";
+        string textHeading = formal ? "SOURCE TEXT (its open full text or selected passages of it, or its abstract when no full text is open; the only evidence you may use)"
+            : selected ? "PAGE TEXT (selected passages of a long page: its start and the passages most relevant to the map; [passage break] marks text left out; the only evidence you may use)"
+            : "PAGE TEXT (the only evidence you may use)";
         var prompt = $$"""
             You extract data from one {{kind}} for a multivocal literature review (Garousi et al. 2019, G12), against the review's systematic map.
             The review is about: {{PromptSafety.Wrap(plan.Topic, "review topic")}}

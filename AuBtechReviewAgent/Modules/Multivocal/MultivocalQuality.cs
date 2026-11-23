@@ -28,9 +28,6 @@ public sealed partial class MultivocalQualityAssessor
     /// <summary>Part of the cache key: raise it whenever the quality prompt changes.</summary>
     public const string PromptVersion = "grey-quality-v4";
 
-    /// <summary>At most this much of a page is sent to the extraction; a quote must come from this part.</summary>
-    public const int MaxTextForModel = 40_000;
-
     private static readonly JsonSerializerOptions Json = new() { WriteIndented = true };
     private static readonly ConcurrentDictionary<Guid, bool> Running = new();
     private static ILogger _log => AppLog.For("AuBtechReviewAgent.MultivocalQualityAssessor");
