@@ -124,4 +124,13 @@ public class MultivocalStartPageTests
         Assert.Contains("disabled=\"@(Problems.Count > 0 || !FlagsConfirmed || saving)\"", source);
         Assert.Contains("Planner.CreateAsync(plan, FlagsConfirmed ? FlagLines : null)", source);
     }
+
+    [Fact]
+    public void ASourceWithInstructionLikeTextIsMarkedOnTheSourcesTab()
+    {
+        string? source = StartSource();
+        if (source == null) return;
+        Assert.Contains("snapshot?.InjectionFlags is { Count: > 0 } textFlags", source);
+        Assert.Contains(">possible prompt injection</span>", source);
+    }
 }

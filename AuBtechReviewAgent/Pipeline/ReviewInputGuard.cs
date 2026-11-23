@@ -162,6 +162,8 @@ public static class ReviewInputGuard
         "output-format-command" => "tells the model how to answer",
         "reveal-instructions" => "asks the model to reveal its instructions",
         "role-change" => "tries to give the model new instructions",
+        "demands-inclusion" => "demands that it be included",
+        "claims-criteria-met" => "claims to meet the inclusion criteria",
         _ => pattern,
     };
 }

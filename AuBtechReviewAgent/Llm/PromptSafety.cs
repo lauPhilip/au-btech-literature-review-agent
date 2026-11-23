@@ -68,6 +68,28 @@ public static class PromptSafety
         return null;
     }
 
+    /// <summary>
+    /// Every instruction-like pattern in a source's kept text, each with its first match and a little context (#366).
+    /// Null when there is none, so a file without hits looks as before. A hit is for the reviewer to look at: a paper
+    /// about prompt injection quotes such phrases honestly, so it never changes a decision.
+    /// </summary>
+    public static List<SourceFlag>? Find(string? text)
+    {
+        if (string.IsNullOrWhiteSpace(text)) return null;
+        var flags = new List<SourceFlag>();
+        foreach (var (name, pattern) in Patterns)
+            if (pattern.Match(text) is { Success: true } match) flags.Add(new SourceFlag(name, Excerpt(text, match)));
+        return flags.Count > 0 ? flags : null;
+    }
+
+    /// <summary>The matched phrase with up to 40 characters on each side, on one line.</summary>
+    public static string Excerpt(string text, Match match)
+    {
+        int start = Math.Max(0, match.Index - 40), end = Math.Min(text.Length, match.Index + match.Length + 40);
+        string excerpt = Regex.Replace(text[start..end], @"\s+", " ").Trim();
+        return (start > 0 ? "…" : "") + excerpt + (end < text.Length ? "…" : "");
+    }
+
     /// <summary>Names of the instruction-like patterns found in the text (empty when none).</summary>
     public static IReadOnlyList<string> Scan(params string?[] texts)
     {
@@ -80,4 +102,10 @@ public static class PromptSafety
         }
         return hits;
     }
+}
+
+/// <summary>An instruction-like phrase in a source's kept text: the pattern's name and the phrase in its context.</summary>
+public sealed record SourceFlag(string Pattern, string Excerpt)
+{
+    public override string ToString() => $"{ReviewInputGuard.Describe(Pattern)} (\"{Excerpt}\")";
 }

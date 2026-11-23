@@ -1,0 +1,26 @@
+@* Under the finished run's card: the included papers whose full text has phrases that read like instructions to the
+   model (#366). The text is treated as data and no decision changed, but extraction and the citation check read it,
+   so the reviewer is asked to look at what was taken from those papers. Nothing shows when no paper was flagged. *@
+
+@if (Flags is { Count: > 0 } flags)
+{
+    <details class="ui-card mt-4 p-4 text-sm sm:p-5">
+        <summary class="cursor-pointer font-semibold text-not-supported">
+            @flags.Count included @(flags.Count == 1 ? "paper has" : "papers have") text that reads like instructions to the model
+        </summary>
+        <p class="mt-2 text-muted">The text was treated as data and changed no decision. Papers about language models can quote such phrases honestly. Check what extraction and the citations took from these papers.</p>
+        <ul class="mt-2 space-y-1.5">
+            @foreach (var entry in flags)
+            {
+                <li>
+                    <span class="font-semibold text-heading">@entry.Title</span>
+                    <span class="block text-xs text-muted">@string.Join("; ", entry.Flags)</span>
+                </li>
+            }
+        </ul>
+    </details>
+}
+
+@code {
+    [Parameter] public List<AuBtechReviewAgent.SourceTextFlags>? Flags { get; set; }
+}
