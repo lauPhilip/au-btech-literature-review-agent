@@ -112,4 +112,21 @@ public static class Grounding
                 excerptsPerReference: 8, verifiedFindings: verifiedQuotes, parallelism: 1, secondCheck: true, review: review);
         return result.FirstOrDefault();
     }
+
+    /// <summary>
+    /// Checks a sentence the reviewer edited after the run: one call per cited source on the fast stage of the first
+    /// check, with no second check and no repair, since the reviewer's text is kept as written and only marked. The
+    /// sentence is wrapped as data in the prompt. Returns one verdict per citation.
+    /// </summary>
+    public static async Task<List<CitationSupportResult>> CheckEditAsync(
+        IChatCompletionService chat,
+        CitedSentence sentence,
+        IReadOnlyList<ReferencedPaper> sources,
+        IReadOnlyDictionary<int, IReadOnlyList<string>> verifiedQuotes,
+        string review = CitationRepairer.DefaultReview)
+    {
+        using (LlmStage.Begin("citation-check"))
+            return await CitationSupportChecker.CheckAsync(chat, new[] { sentence }, sources, verifiedFindings: verifiedQuotes,
+                parallelism: 1, secondCheck: false, review: review, reviewerText: true);
+    }
 }

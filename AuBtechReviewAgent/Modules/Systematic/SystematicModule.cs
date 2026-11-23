@@ -16,7 +16,7 @@ public sealed class SystematicModule : IReviewModule
     public IReadOnlyList<string> ArchiveFiles { get; } = new[]
     {
         RunHeader.FileName, RunStore.ProtocolFile, "transparent-process.json", "prisma-report.json", "llm-calls.json", "extraction.json",
-        "citation-audit.json", RunStore.NotesFile, "thematic-codebook.json", "run-metrics.json", "peer-review-feedback.json",
+        "citation-audit.json", RunStore.NotesFile, ReportEditLog.FileName, "thematic-codebook.json", "run-metrics.json", "peer-review-feedback.json",
         "stylistic-transformation-ledger.json", "grounded-outline.txt",
     };
 
