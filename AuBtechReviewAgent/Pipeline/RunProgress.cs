@@ -71,6 +71,8 @@ public static class RunProgress
             incoming.ProgressFraction = shown.ProgressFraction;
             incoming.ProgressDetail = shown.ProgressDetail;
         }
+        // The ledger never holds the subject (it is live only), so a re-read of the same step keeps the one on screen.
+        if (incoming.ProgressSubject.Length == 0 && incoming.ProgressStep == shown.ProgressStep) incoming.ProgressSubject = shown.ProgressSubject;
         return incoming;
     }
 
@@ -110,11 +112,11 @@ public partial class PrismaReviewEngine
     private static readonly long ProgressInterval = TimeSpan.FromMilliseconds(400).Ticks;
 
     /// <summary>
-    /// Sets the run's current step, how far it is and a short detail, and tells the dashboard. Only the
+    /// Sets the run's current step, how far it is, a short detail and what it works on now (the subject, live only), and tells the dashboard. Only the
     /// in-memory counters change here; the ledger is saved at the usual points, so this is cheap to call
     /// from inside loops. A step change is always sent; updates within a step at most every 400 ms.
     /// </summary>
-    private void ReportProgress(Guid runId, ReviewState state, string step, double fraction, string detail = "")
+    private void ReportProgress(Guid runId, ReviewState state, string step, double fraction, string detail = "", string subject = "")
     {
         var stats = state.Stats;
         _liveStats[runId] = stats;
@@ -127,6 +129,7 @@ public partial class PrismaReviewEngine
             stats.ProgressFraction = stepChanged ? value : Math.Max(stats.ProgressFraction, value);
             stats.ProgressStep = step;
             stats.ProgressDetail = detail;
+            stats.ProgressSubject = subject;
         }
         long now = DateTime.UtcNow.Ticks;
         long last = _lastProgressTicks.GetOrAdd(runId, 0);
