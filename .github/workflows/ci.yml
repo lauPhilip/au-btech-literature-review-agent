@@ -25,6 +25,14 @@ jobs:
         with:
           dotnet-version: '10.0.x'
 
+      # No packages.lock.json, so setup-dotnet's own cache cannot be used; the key is the project files instead.
+      - name: Cache NuGet packages
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.nuget/packages
+          key: nuget-build-${{ runner.os }}-${{ hashFiles('**/*.csproj') }}
+          restore-keys: nuget-build-${{ runner.os }}-
+
       - name: Restore
         run: dotnet restore AuBtechReviewAgent.sln
 
@@ -48,6 +56,8 @@ jobs:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: '22'
+          cache: npm
+          cache-dependency-path: AuBtechReviewAgent/package-lock.json
 
       # wwwroot/css/tailwind.css is committed. If a component uses a class that is not in it, this fails:
       # run "npm ci && npm run build:css" in AuBtechReviewAgent and commit the result.
@@ -82,9 +92,31 @@ jobs:
         with:
           dotnet-version: '10.0.x'
 
+      # No packages.lock.json, so setup-dotnet's own cache cannot be used; the key is the project files instead.
+      - name: Cache NuGet packages
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.nuget/packages
+          key: nuget-app-${{ runner.os }}-${{ hashFiles('**/*.csproj') }}
+          restore-keys: nuget-app-${{ runner.os }}-
+
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: '22'
+          cache: npm
+          cache-dependency-path: tools/a11y/package-lock.json
+
+      # The browsers are cached by Playwright version. "playwright install" below skips a browser that is already
+      # there but still installs the system libraries Chromium needs, which live outside the cache.
+      - name: Read the Playwright version
+        id: playwright
+        run: echo "version=$(jq -r '.packages["node_modules/playwright"].version' tools/a11y/package-lock.json)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache the Playwright browsers
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}
 
       # The app runs without real keys: the checked pages never call the model or the sources.
       - name: Start the app
