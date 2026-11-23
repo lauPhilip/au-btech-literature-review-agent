@@ -46,7 +46,25 @@ public class OpenAlexSource : IAcademicSource, ICitationGraph
     /// Citation chaining (snowballing) for one paper: up to <paramref name="perDirection"/> works it cites
     /// (backward) and that cite it (forward). The paper is looked up by DOI.
     /// </summary>
-    public async Task<CitationNeighbours> GetCitationNeighboursAsync(string doi, int perDirection)
+    public Task<CitationNeighbours> GetCitationNeighboursAsync(string doi, int perDirection) => NeighboursAsync(doi, perDirection, perDirection);
+
+    /// <summary>
+    /// The most OpenAlex returns in one answer and the most ids one filter may list, so a seed's pool costs one request
+    /// per direction (OpenAlex: per-page at most 200, an OR filter at most 100 values).
+    /// </summary>
+    public const int MaxPoolPerDirection = 100;
+
+    /// <summary>
+    /// A seed study's wider pool, each work with its citation count: up to <paramref name="poolPerDirection"/> of the works
+    /// it cites (in the order OpenAlex lists them) and of the works citing it, most cited first. The caller ranks them.
+    /// </summary>
+    public Task<CitationNeighbours> GetCitationPoolAsync(string doi, int poolPerDirection)
+    {
+        int pool = Math.Clamp(poolPerDirection, 1, MaxPoolPerDirection);
+        return NeighboursAsync(doi, pool, pool);
+    }
+
+    private async Task<CitationNeighbours> NeighboursAsync(string doi, int backwardCount, int forwardCount)
     {
         // Local list (not _raw): chaining calls for several papers can run at the same time.
         var raw = new List<string>();
@@ -57,7 +75,7 @@ public class OpenAlexSource : IAcademicSource, ICitationGraph
         var root = doc.RootElement;
         string id = ShortId(Str(root, "id"));
         var referenced = root.TryGetProperty("referenced_works", out var refs) && refs.ValueKind == JsonValueKind.Array
-            ? refs.EnumerateArray().Select(r => ShortId(r.GetString())).Where(r => r.Length > 0).Take(perDirection).ToList()
+            ? refs.EnumerateArray().Select(r => ShortId(r.GetString())).Where(r => r.Length > 0).Take(backwardCount).ToList()
             : new List<string>();
 
         var backward = new List<AcademicPaper>();
@@ -69,9 +87,9 @@ public class OpenAlexSource : IAcademicSource, ICitationGraph
         }
 
         var forward = new List<AcademicPaper>();
-        if (id.Length > 0 && perDirection > 0)
+        if (id.Length > 0 && forwardCount > 0)
         {
-            string fwdJson = await GetAsync($"{Api}/works?filter=cites:{id}&sort=cited_by_count:desc&per-page={perDirection}");
+            string fwdJson = await GetAsync($"{Api}/works?filter=cites:{id}&sort=cited_by_count:desc&per-page={forwardCount}");
             raw.Add(fwdJson);
             forward = ParseWorks(fwdJson);
         }
@@ -93,6 +111,7 @@ public class OpenAlexSource : IAcademicSource, ICitationGraph
             if (title.Length == 0) title = Str(w, "title");
 
             int year = w.TryGetProperty("publication_year", out var y) && y.ValueKind == JsonValueKind.Number ? y.GetInt32() : 0;
+            int? citedBy = w.TryGetProperty("cited_by_count", out var c) && c.ValueKind == JsonValueKind.Number && c.TryGetInt32(out int cites) && cites >= 0 ? cites : null;
 
             var authors = new List<string>();
             if (w.TryGetProperty("authorships", out var auths) && auths.ValueKind == JsonValueKind.Array)
@@ -123,7 +142,8 @@ public class OpenAlexSource : IAcademicSource, ICitationGraph
                 JournalSource: venue,
                 Doi: doi,
                 Url: $"https://openalex.org/{id}",
-                PdfUrl: pdf));
+                PdfUrl: pdf,
+                CitedByCount: citedBy));
         }
         return papers;
     }
