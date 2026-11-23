@@ -49,8 +49,8 @@ public static partial class ThematicSynthesis
     /// <summary>Codes every study, a batch at a time. Studies that could not be coded are returned with the reason.</summary>
     public static async Task<(List<ThematicCode> Codes, List<UncodedStudy> Uncoded)> CodeStudiesAsync(
         IChatCompletionService chat, string objective, IReadOnlyList<ReferencedPaper> papers,
-        IReadOnlyList<StudyExtraction> extractions, int batchSize, int parallelism, Action<int, int>? progress = null,
-        IReadOnlyList<string>? questions = null, string criteria = "")
+        IReadOnlyList<StudyExtraction> extractions, int batchSize, int parallelism, Action<int, int>? progress = null, IReadOnlyList<string>? questions = null,
+        string criteria = "")
     {
         questions ??= Array.Empty<string>();
         var byRef = extractions.ToDictionary(e => e.ReferenceNumber);
@@ -113,6 +113,7 @@ public static partial class ThematicSynthesis
             data.AppendLine();
         }
 
+        // With research questions a finding that bears only on one of them is still coded (the real runs dropped such codes).
         var (aim, bearsOn, questionRules, questionField) = CodingQuestionPrompt(objective, questions, criteria);
         string prompt = $$"""
             You are coding studies for the thematic synthesis of a systematic literature review (Thomas & Harden, 2008: line-by-line coding of findings, then descriptive themes).
@@ -127,7 +128,7 @@ public static partial class ThematicSynthesis
             TASK: For each study, give 1 to 4 codes. A code is a short descriptive label (3 to 8 words) for one thing the study found, proposed or showed that bears on the review objective{{bearsOn}}. Codes should be specific enough that two studies with the same code report the same kind of finding.
             - Base every code on the study's listed findings and name them in "findings" (e.g. ["F3.1"]). Use only finding ids listed for that study.
             - For a study with "No verified findings", base the code on its abstract and copy a verbatim quote (one sentence, max 40 words, unbroken) from the abstract into "quote"; leave "findings" empty.
-            - If a study has nothing that bears on the objective, give "codes": [] and a one-sentence "reason".{{questionRules}}
+            - If a study has nothing that bears on the objective{{bearsOn}}, give "codes": [] and a one-sentence "reason".{{questionRules}}
             Respond ONLY with a minified JSON object:
             {"studies":[{"ref":3,"codes":[{"label":"...","findings":["F3.1"],"quote":""{{questionField}}}],"reason":""}]}
             """;

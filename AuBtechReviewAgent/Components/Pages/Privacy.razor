@@ -150,7 +150,8 @@
             $"reuses its model decisions the same way, also for {CacheOptions.ScreeningDecisionDays} days: the screening, the quality points, the " +
             "extracted values and the checks of values and citations, each with the short quotes it rests on but not the page's text." : ""),
             "For the public Metrics page, every finished run leaves a line of quality figures: how many citations were supported, coverage, " +
-            "time and cost. It contains no research question, criteria or paper text, and no network address.",
+            "time and cost. It contains no research question, criteria or paper text, and no network address. Anyone can download these lines " +
+            "from the Metrics page as CSV or JSON, with only the first eight characters of each run's ID, so a file cannot be used to open a run.",
         }),
     };
 

@@ -82,6 +82,12 @@ public static class SampleMetrics
     // The first five runs were made before tokens were counted (issue #414), so the page shows their dashes.
     private static RunMetrics WithTokens(this RunMetrics run, int n)
     {
+        if (run.IsMultivocal)
+            run.GreyPool = new PoolMetrics
+            {
+                Identified = run.Identified, Screened = run.Screened, Included = run.Included + 4, Kept = run.Included, Kappa = run.ScreeningKappa,
+                KappaBasis = n % 2 == 0 ? "audit sample" : "all sources", Table7Scored = run.Included + 4, MeanTable7Points = 11.5,
+            };
         if (n < 5) return run;
         run.InputTokens = 180_000 + n * 13_000 % 90_000;
         run.CachedInputTokens = run.InputTokens / 3;

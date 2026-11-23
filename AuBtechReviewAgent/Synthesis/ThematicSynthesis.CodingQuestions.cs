@@ -23,7 +23,7 @@ public static partial class ThematicSynthesis
 
             - Name the research questions each code bears on in "questions" (e.g. ["{ids[0]}"]), or [] when it bears on none. A code that bears on a research question bears on the objective: never leave it out.{(string.IsNullOrWhiteSpace(criteria) ? "" : " Never call a study off-topic: every study met the eligibility criteria above.")}
             """;
-        return (aim, " or one of the research questions", rules, ",\"questions\":[\"RQ1\"]");
+        return (aim, " or on any of the research questions", rules, ",\"questions\":[\"RQ1\"]");
     }
 
     /// <summary>A finding's research question, as shown to the coding model ("" when the run has none or the finding bears on none).</summary>

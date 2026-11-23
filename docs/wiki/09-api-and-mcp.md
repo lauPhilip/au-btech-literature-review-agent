@@ -130,7 +130,7 @@ The key lives in the run's `ReviewRequest` and in the chat service made from it,
 
 ## Limits
 
-Two limits guard the API and the MCP server. Each call counts once per client address and once per key, at most 120 a minute each, on every address under `/api/v1` and `/mcp` (`ApiEndpoints.AddReviewApi`, a chained global limiter that lets every other address through). Starting a review counts again, per key and per address, at most `Quota:OwnKeyRunsPerHour` an hour, the same number the form allows with an own key. Both use ASP.NET Core's rate limiter, and neither holds a key or an address in plain text.
+Two limits guard the API and the MCP server. Each call counts once per client address and once per key, at most 120 a minute each, on every address under `/api/v1` and `/mcp` (`ApiEndpoints.AddReviewApi`, a chained global limiter that lets every other address through). Starting a review counts again, per key and per address, at most `Quota:OwnKeyRunsPerHour` an hour, the same number the form allows with an own key. Both use ASP.NET Core's rate limiter, and neither holds a key or an address in plain text. A start then joins the one line every review shares (`RunCoordinator.TryAdmit`, see the operations page): when the caller's address already has its share of reviews running or waiting, the answer is 429 "Too many reviews waiting"; when the whole line is full, it is 503 "The tool is busy" with `Retry-After` set to the rough wait. Nothing is counted and nothing starts in either case.
 
 ## The documentation page
 

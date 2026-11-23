@@ -4,19 +4,19 @@
    it can render again after each click. *@
 
 <div class="ui-card p-4 sm:p-5">
-    <h2 class="font-display text-base font-semibold text-heading">Stop this review</h2>
+    <h2 class="font-display text-base font-semibold text-heading">@(Queued ? "Leave the line" : "Stop this review")</h2>
     @if (Requested)
     {
         <p class="mt-1 text-sm leading-relaxed text-muted" role="status">Cancelling. The review stops before its next step or model call.</p>
     }
     else if (!Asking)
     {
-        <p class="mt-1 text-sm leading-relaxed text-muted">Started the wrong review? You can cancel it.</p>
+        <p class="mt-1 text-sm leading-relaxed text-muted">@(Queued ? "Your review is waiting for a free slot. It keeps its place if you close this page. You can also leave the line." : "Started the wrong review? You can cancel it.")</p>
         @if (!string.IsNullOrEmpty(Problem))
         {
             <p class="mt-2 text-sm text-not-supported" role="alert">@Problem</p>
         }
-        <button type="button" @onclick="OnAsk" class="ui-btn-secondary mt-3 min-h-[44px] w-full">Cancel review</button>
+        <button type="button" @onclick="OnAsk" class="ui-btn-secondary mt-3 min-h-[44px] w-full">@(Queued ? "Leave the line" : "Cancel review")</button>
     }
     else
     {
@@ -31,6 +31,9 @@
 </div>
 
 @code {
+    /// <summary>True while the run waits in line: the card offers to leave the line, which cancels the run.</summary>
+    [Parameter] public bool Queued { get; set; }
+
     /// <summary>True after the first click: the card asks before it acts.</summary>
     [Parameter] public bool Asking { get; set; }
 
