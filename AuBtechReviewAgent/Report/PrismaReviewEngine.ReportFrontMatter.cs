@@ -111,7 +111,7 @@ public partial class PrismaReviewEngine
             ? await ReviewWriter.WriteClosingAsync(chat, WritingProfile.Systematic, query, explicitObjective,
                 FrontMatterFacts(finalState, thematic.Codebook, includedFacts, screeningFacts), resultSections, discussionText,
                 thematic.Evidence, referenceCount, message => _log.LogWarning("{Message}", SanitizeLogMessage(message)),
-                finalState.ResearchQuestions, thematic.Codebook.Unanswered?.Select(u => u.Question).ToList())
+                finalState.ResearchQuestions, thematic.Codebook.Unanswered?.Select(u => u.Question).ToList(), thematic.Answers)
             : null;
 
         var frontTask = FrontAndStyleAsync();
