@@ -54,7 +54,7 @@ public partial class PrismaReviewEngine
         {
             ReportProgress(runId, state, RunProgress.Synthesis, RunProgress.Phase(RunProgress.SynthesisPhases, 1, 0), $"Coding {papers.Count} studies");
             var (c, uncoded) = await ThematicSynthesis.CodeStudiesAsync(chat, goal, papers, extractions,
-                Synthesis.CodingBatchSize, Llm.ScreeningParallelism,
+                Synthesis.CodingBatchSize, Llm.QualityParallelism,
                 (done, total) => ReportProgress(runId, state, RunProgress.Synthesis, RunProgress.Phase(RunProgress.SynthesisPhases, 1, (double)done / total), $"Coding studies: {Of(done, total, "batches")}"));
             codes = c;
             book.Codes = codes;
@@ -107,7 +107,7 @@ public partial class PrismaReviewEngine
         var profile = WritingProfile.Systematic;
         void Warn(string message) => _log.LogWarning("{Message}", SanitizeLogMessage(message));
         ReportProgress(runId, state, RunProgress.Synthesis, RunProgress.Phase(RunProgress.SynthesisPhases, 3, 0), $"Writing {book.Themes.Count} theme subsections");
-        var (sections, coverage) = await ReviewWriter.WriteThemesAsync(chat, profile, goal, evidence, referenceCount, Llm.ScreeningParallelism,
+        var (sections, coverage) = await ReviewWriter.WriteThemesAsync(chat, profile, goal, evidence, referenceCount, Llm.QualityParallelism,
             (n, total) => ReportProgress(runId, state, RunProgress.Synthesis, RunProgress.Phase(RunProgress.SynthesisPhases, 3, (double)n / total), $"Theme subsections: {Of(n, total, "written")}"),
             Warn);
         if (secondCoding != null) book.SecondCoding = await secondCoding;
@@ -131,7 +131,7 @@ public partial class PrismaReviewEngine
         // 6. Peer review, per section, with the same coverage guard as the fill pass
         ReportProgress(runId, state, RunProgress.Synthesis, RunProgress.Phase(RunProgress.SynthesisPhases, 5, 0), "Automated peer review");
         using (LlmStage.Begin("automated-peer-review"))
-            (result.PeerReview, result.Discussion) = await ReviewWriter.PeerReviewAsync(chat, profile, result.Sections, result.Discussion, evidence, referenceCount, Llm.ScreeningParallelism, Warn);
+            (result.PeerReview, result.Discussion) = await ReviewWriter.PeerReviewAsync(chat, profile, result.Sections, result.Discussion, evidence, referenceCount, Llm.QualityParallelism, Warn);
 
         return result;
     }
