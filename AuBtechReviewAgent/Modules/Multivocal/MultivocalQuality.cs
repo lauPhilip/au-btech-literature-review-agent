@@ -13,7 +13,8 @@ namespace AuBtechReviewAgent;
 
 /// <summary>
 /// Scores the included grey sources of a screened multivocal run on the quality checklist (MLR block E, G11, Table 7).
-/// For each source the page text is kept first (<see cref="MultivocalPages"/>); the model answers the 17 items that
+/// The page texts of all the sources are kept first, with their own slots (MultivocalQuality.Fetch.cs), so a model
+/// slot never waits on a slow site; then the model answers the 17 items that
 /// need reading, each point backed by a quote, and a quote that is not in the kept text gives no points. The date,
 /// the impact and the outlet type are decided in code (<see cref="GreyQualityChecklist"/>). A source at or above the
 /// plan's threshold passes; one below it is excluded for quality with its score; one whose page cannot be read is
@@ -41,10 +42,12 @@ public sealed partial class MultivocalQualityAssessor
     private readonly ReviewCache _cache;
     private readonly string _model;
     private readonly int _parallelism;
+    private readonly int _fetchParallelism;
 
     /// <summary>An assessor that keeps pages through <paramref name="pages"/> and asks <paramref name="chat"/>'s model.</summary>
     public MultivocalQualityAssessor(RunStore runs, MultivocalPlanner planner, MultivocalSearcher searcher, MultivocalScreener screener,
-        MultivocalPages pages, Func<IChatCompletionService> chat, ReviewCache? cache = null, string model = "", int parallelism = 4)
+        MultivocalPages pages, Func<IChatCompletionService> chat, ReviewCache? cache = null, string model = "", int parallelism = 4,
+        int fetchParallelism = DefaultFetchParallelism)
     {
         _runs = runs;
         _planner = planner;
@@ -55,6 +58,7 @@ public sealed partial class MultivocalQualityAssessor
         _cache = cache ?? ReviewCache.Disabled;
         _model = model;
         _parallelism = Math.Max(1, parallelism);
+        _fetchParallelism = Math.Max(1, fetchParallelism);
     }
 
     public MultivocalQualityFile? Load(Guid runId)
@@ -125,12 +129,16 @@ public sealed partial class MultivocalQualityAssessor
                 FormalAppraisalVersion = planned.Plan.UsesFormalPool ? FormalAppraisalVersion : null,
             };
 
+            // Every page first, so a source whose page could not be fetched is on file before any model call.
+            var unfetched = await KeepMissingAsync(runId, editKey, included.Select(s => records[s.Address]).ToList(), progress);
             var chat = _chat();
             using var throttle = new SemaphoreSlim(_parallelism);
             var work = included.Select(async s =>
             {
+                var record = records[s.Address];
+                if (unfetched.TryGetValue(s.Address, out var why)) return Unfetched(record, why);
                 await throttle.WaitAsync();
-                try { return await AssessOneAsync(runId, editKey, chat, planned.Plan, records[s.Address]); }
+                try { return await AssessOneAsync(runId, editKey, chat, planned.Plan, record, fetch: false); }
                 finally { throttle.Release(); }
             }).ToList();
             for (int i = 0; i < work.Count; i++)
@@ -155,15 +163,18 @@ public sealed partial class MultivocalQualityAssessor
         }
     }
 
-    private async Task<GreyQuality> AssessOneAsync(Guid runId, string? editKey, IChatCompletionService chat, MultivocalPlan plan, GreyRecord record)
+    /// <summary>Scores one source on its kept text.</summary>
+    /// <param name="fetch">Whether a page that is not kept is fetched now; false when the pages were kept first.</param>
+    private async Task<GreyQuality> AssessOneAsync(Guid runId, string? editKey, IChatCompletionService chat, MultivocalPlan plan, GreyRecord record, bool fetch = true)
     {
-        if (record.Kind == MultivocalSearcher.FormalKind) return await AppraiseFormalAsync(runId, editKey, chat, record);
+        if (record.Kind == MultivocalSearcher.FormalKind) return await AppraiseFormalAsync(runId, editKey, chat, record, fetch);
         var result = new GreyQuality { Address = MultivocalSearcher.AddressKey(record.Url), Title = record.Title, Url = record.Url };
 
         // The page text first: a kept snapshot, or keep it now.
         string? text = null;
         var snapshot = _pages.Load(runId).Pages.FirstOrDefault(p => MultivocalSearcher.AddressKey(p.Url) == result.Address);
-        if (snapshot is not { NotKept: null })
+        if (snapshot == null && !fetch) return NotAssessed(result, "the page was not kept");
+        if (snapshot is not { NotKept: null } && fetch)
         {
             try { snapshot = await _pages.KeepAsync(runId, editKey, record.Url); }
             catch (Exception ex) when (ex is System.Net.Http.HttpRequestException or TaskCanceledException)
@@ -173,7 +184,7 @@ public sealed partial class MultivocalQualityAssessor
                 return result;
             }
         }
-        if (snapshot.NotKept == null) text = _pages.ReadText(runId, snapshot);
+        if (snapshot!.NotKept == null) text = _pages.ReadText(runId, snapshot);
         if (text == null)
         {
             result.Outcome = "Not assessed";
