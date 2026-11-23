@@ -1,0 +1,79 @@
+using AuBtechReviewAgent;
+using Xunit;
+
+namespace AuBtechReviewAgent.Tests;
+
+/// <summary>
+/// Issue #446: the discussion call writes the answers to the research questions first and builds on them; the closing
+/// sections and the front matter get the answers as given text, so the review states its reading once.
+/// </summary>
+public class AnswersFirstTests
+{
+    private static ReviewEvidence Evidence(params UncodedStudy[] leftOut) => new()
+    {
+        Sources = Enumerable.Range(1, 3).Select(r => new EvidenceSource { Reference = r, ReferenceLine = $"Author {r} (2025). Study {r}." }).ToList(),
+        BaseFacts = "3 studies.",
+        LeftOut = leftOut,
+    };
+
+    private static readonly List<SynthesisSection> Sections = new()
+    {
+        new SynthesisSection { Field = "synthesis-1", ThemeId = "T1", Heading = "Recovery", Text = "Supervisors restart failed agent steps [1, 2]." },
+    };
+
+    private static readonly string[] Questions = { "How do agent loops recover?", "How are agent loops certified?" };
+
+    private const string Discussion = "Recovery and oversight work together [1, 2].";
+    private const string Answer = "Agent loops recover through supervisors that restart failed steps [1, 2].";
+
+    private static string Json(string text, params string[] answers) =>
+        System.Text.Json.JsonSerializer.Serialize(answers.Length == 0 ? (object)new { text } : new { answers, text });
+
+    [Fact]
+    public async Task WithoutQuestionsThePromptIsTheDiscussionsOwnAndThereAreNoAnswers()
+    {
+        var plain = new FakeChatService().Returns(Json(Discussion));
+        await ReviewWriter.WriteDiscussionAsync(plain, WritingProfile.Systematic, "agent loops", "Map agent loops", Sections, Evidence(), 3);
+        var first = new FakeChatService().Returns(Json(Discussion));
+
+        var result = await ReviewWriter.WriteDiscussionAndAnswersAsync(first, WritingProfile.Systematic, "agent loops", "Map agent loops", Sections, Evidence(), 3, null, null, null);
+
+        Assert.Equal(plain.Prompts.Single(), first.Prompts.Single());
+        Assert.Equal(Discussion, result.Text);
+        Assert.Null(result.Answers);
+    }
+
+    [Fact]
+    public async Task TheAnswersComeFirstAreCheckedAndTheUnansweredQuestionIsAnsweredInCode()
+    {
+        var model = new FakeChatService()
+            .Returns(Json(Discussion, Answer, "Certification is open."))   // two answers for one question asked: sent back
+            .Returns(Json(Discussion, "Agent loops recover [3]."))         // cites a study left out of the themes: sent back
+            .Returns(Json(Discussion, Answer));
+        var notes = new List<string>();
+
+        var result = await ReviewWriter.WriteDiscussionAndAnswersAsync(model, WritingProfile.Systematic, "agent loops", "Map agent loops", Sections,
+            Evidence(new UncodedStudy(3, "About vaping.")), 3, notes.Add, Questions, new[] { "RQ2" });
+
+        string prompt = model.Prompts[0];
+        Assert.Contains("5. Write the answers first. \"answers\": exactly 1 answer(s), one for each of RQ1 in that order", prompt);
+        Assert.Contains("No evidence bears on RQ2, so it is answered in code; give no answer for it.", prompt);
+        Assert.Contains("the discussion builds on the answers, says what they mean together and where the themes connect, and does not restate them either.", prompt);
+        Assert.EndsWith("{\"answers\":[\"answer to RQ1\"],\"text\":\"the discussion with inline [n] citations\"}", prompt.TrimEnd());
+        Assert.Contains("answers must hold exactly 1 answer(s), one per research question; you gave 2.", model.Prompts[1]);
+        Assert.Contains("answer 1: it cites [3], which the synthesis left out of the themes", model.Prompts[2]);
+        Assert.Equal(Discussion, result.Text);
+        Assert.Equal(new[] { Answer, ReviewWriter.UnansweredText(WritingProfile.Systematic) }, result.Answers);
+    }
+
+    [Fact]
+    public void AnAnswerWithANumberFromNowhereOrAnUncitedFindingIsSentBack()
+    {
+        string results = "### Recovery\nSupervisors restart 40 % of failed steps [1].";
+        Assert.Null(ReviewWriter.AnswersProblem(new[] { "Supervisors restart 40 % of failed steps [1]." }, 1, Evidence(), results, 3, WritingProfile.Systematic));
+        Assert.Contains("the answers use 70", ReviewWriter.AnswersProblem(new[] { "Supervisors restart 70 % of failed steps [1]." }, 1, Evidence(), results, 3, WritingProfile.Systematic));
+        Assert.StartsWith("answer 1: \"Studies show that supervisors help.\" has no citation",
+            ReviewWriter.AnswersProblem(new[] { "Studies show that supervisors help." }, 1, Evidence(), results, 3, WritingProfile.Systematic));
+        Assert.Contains("citation numbers 9 are not in the reference list", ReviewWriter.AnswersProblem(new[] { "Supervisors help [9]." }, 1, Evidence(), results, 3, WritingProfile.Systematic));
+    }
+}
