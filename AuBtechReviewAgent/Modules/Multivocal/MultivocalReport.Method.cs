@@ -40,22 +40,24 @@ public sealed partial class MultivocalReporter
         var plan = input.Planned.Plan;
         var ledger = input.Ledger;
         var section = new ReportSection { Heading = "2. Search (G6–G8)" };
-        var ran = ledger.Searches.Where(s => s.Error == null).ToList();
+        // The grey pool's searches; a formal pool's follow in their own paragraph (block I-6).
+        var ran = ledger.Searches.Where(s => s.Error == null && !s.Formal).ToList();
         string kinds = Join(plan.GreyTypes.Select(KindLabel).Select(Lower), "; ");
         // The kinds the searches actually found, in the guidelines' order, so the method never claims a kind no search reached.
-        var foundKinds = ledger.Sources.Select(x => x.Record.Kind).Distinct()
+        var foundKinds = ledger.GreyPool.Select(x => x.Record.Kind).Distinct()
             .OrderBy(k => MultivocalGuidelines.GreyTypes.ToList().FindIndex(t => t.Key == k) is var i && i < 0 ? int.MaxValue : i).ToList();
         string covered = foundKinds.Count == 0 || foundKinds.ToHashSet().SetEquals(plan.GreyTypes)
             ? $"The review covered {kinds} (G6)."
             : $"The protocol named {kinds} as the kinds of grey literature to cover (G6); the sources the searches found were {Join(foundKinds.Select(KindLabel).Select(Lower), "; ")}.";
         section.Blocks.Add(ReportBlock.Paragraph(
             $"{covered} On {ledger.SearchedUtc:yyyy-MM-dd} (UTC), {Count(ran.Count, "search", "searches")} ran across {Count(ran.Select(s => s.Source).Distinct().Count(), "source")} " +
-            $"with {Count(plan.EffectiveGreySearchStrings.Count, "search string")} ({Join(plan.EffectiveGreySearchStrings.Select(t => $"\"{t}\""))}) and found {Count(ledger.Sources.Count, "source")} (G7). " +
+            $"with {Count(plan.EffectiveGreySearchStrings.Count, "search string")} ({Join(plan.EffectiveGreySearchStrings.Select(t => $"\"{t}\""))}) and found {Count(ledger.GreyPool.Count(), "source")} (G7). " +
             $"Each raw answer was saved as received, with its SHA-256 fingerprint. Stopping rule (G8): {Sentence(ledger.StoppingApplied)}"));
         section.Blocks.Add(ReportBlock.Table(new[] { "Source", "Search string", "Returned", "New" },
-            ledger.Searches.Select(s => new[] { MultivocalGuidelines.SearchLabel(s.Source), s.SearchString, s.Error == null ? Num(s.Returned) : $"failed: {s.Error}", Num(s.New) })));
+            ledger.Searches.Where(s => !s.Formal).Select(s => new[] { MultivocalGuidelines.SearchLabel(s.Source), s.SearchString, s.Error == null ? Num(s.Returned) : $"failed: {s.Error}", Num(s.New) })));
+        if (ledger.HasFormalPool) section.Blocks.AddRange(MultivocalFormalText.SearchBlocks(input));
         var notDone = new List<string>();
-        notDone.AddRange(ledger.Skipped.Select(s => $"{MultivocalGuidelines.SearchLabel(s.Source)}: not run ({Lower(s.Reason.TrimEnd('.'))})."));
+        notDone.AddRange(ledger.Skipped.Select(s => $"{MultivocalFormalText.SearchName(s.Source)}: not run ({Lower(s.Reason.TrimEnd('.'))})."));
         notDone.Add("No general web search engine was used: none offers a search API that is free and allows its results to be kept, which a traceable review needs.");
         notDone.Add("Practitioners and authors were not contacted for sources; only sources found by the searches were reviewed.");
         section.Blocks.Add(ReportBlock.Paragraph("Not done, and why:"));
@@ -75,6 +77,7 @@ public sealed partial class MultivocalReporter
             $"{Num(s.Count("Included"))} were included, {Num(s.Count("Excluded"))} excluded and {Num(s.Count("Duplicate"))} set aside as duplicates of a source with the same title" +
             $"{(s.Count("Error") > 0 ? $"; {Num(s.Count("Error"))} could not be screened" : "")}. " +
             $"The reviewer looked at {Count(reviewed, "decision")} and changed {Num(changed)}; the model's decision stays on file next to the reviewer's."));
+        if (input.Ledger.HasFormalPool) section.Blocks.Add(ReportBlock.Paragraph(MultivocalFormalText.SelectionText(input)));
         section.Blocks.Add(ReportBlock.Paragraph($"Inclusion criteria: {Sentence(s.InclusionCriteria)} Exclusion criteria: {(s.ExclusionCriteria.Trim().Length > 0 ? Sentence(s.ExclusionCriteria) : "none.")}"));
         var reasons = s.Sources.Where(x => x.Decision == "Excluded")
             .GroupBy(x => ReasonLabel(x.ExclusionReason))
@@ -88,17 +91,21 @@ public sealed partial class MultivocalReporter
     {
         var q = input.Quality;
         var section = new ReportSection { Heading = "4. Quality (G11)" };
-        var passed = q.Sources.Where(x => x.Outcome == "Passed").ToList();
-        int opinions = q.Sources.Count(x => x.Argument != null);
+        // Table 7 scores the grey sources; a formal pool's MMAT appraisal has its own paragraph (block I-6).
+        var grey = q.Sources.Where(x => !x.Formal).ToList();
+        var passed = grey.Where(x => x.Outcome == "Passed").ToList();
+        int below = grey.Count(x => x.Outcome == "Below threshold"), notAssessed = grey.Count(x => x.Outcome == "Not assessed");
+        int opinions = grey.Count(x => x.Argument != null);
         section.Blocks.Add(ReportBlock.Paragraph(
-            $"Every included source was scored on the {q.MaxPoints} items of the quality checklist in the guidelines' Table 7, each 1, 0.5 or 0 points, with a threshold of {q.Threshold} points. " +
+            $"Every included {(input.Ledger.HasFormalPool ? "grey " : "")}source was scored on the {q.MaxPoints} items of the quality checklist in the guidelines' Table 7, each 1, 0.5 or 0 points, with a threshold of {q.Threshold} points. " +
             $"The language model answered the items that need reading the source, and every point it gave rests on a quote found in the kept text of the source's page; the date, the impact and the outlet type were decided in code (impact: {Lower(q.ImpactRule.TrimEnd('.'))}). " +
-            $"{Num(passed.Count)} sources passed, {Num(q.Count("Below threshold"))} scored below the threshold and {Num(q.Count("Not assessed"))} could not be assessed{(q.Count("Not assessed") > 0 ? ", most often because their page could not be read" : "")}." +
+            $"{Num(passed.Count)} sources passed, {Num(below)} scored below the threshold and {Num(notAssessed)} could not be assessed{(notAssessed > 0 ? ", most often because their page could not be read" : "")}." +
             (opinions > 0 ? $" {Count(opinions, "source")} {(opinions == 1 ? "was" : "were")} recorded as an opinion piece, with the critical questions for an expert opinion (G13)." : "")));
         if (passed.Count > 0)
             section.Blocks.Add(ReportBlock.Paragraph(
                 $"Of the sources that passed, {TierCount(passed, input, 1)} came from 1st-tier outlets, {TierCount(passed, input, 2)} from 2nd-tier and {TierCount(passed, input, 3)} from 3rd-tier outlets (checklist item 8.1); " +
                 $"their mean score was {passed.Average(x => x.Points).ToString("0.#", CultureInfo.InvariantCulture)} of {q.MaxPoints} points."));
+        if (input.Ledger.HasFormalPool) section.Blocks.Add(ReportBlock.Paragraph(MultivocalFormalText.QualityText(input)));
         return section;
     }
 
@@ -123,7 +130,8 @@ public sealed partial class MultivocalReporter
             "The kind of each source, whether it is grey or formal literature, its site, date and quality points were recorded in code." +
             (input.Extraction.NameMerges.Count + input.Extraction.OwnSourceValues.Count > 0
                 ? $" For the open attributes, names were merged in code only where they match when case, punctuation, spaces and hyphens are ignored, or where one is given in brackets after the other ({Count(input.Extraction.NameMerges.Count, "merge")}), and {Count(input.Extraction.OwnSourceValues.Count, "value")} naming one of the review's own sources {(input.Extraction.OwnSourceValues.Count == 1 ? "was" : "were")} not counted; the data appendix lists both."
-                : "")));
+                : "") +
+            (input.Ledger.HasFormalPool ? MultivocalFormalText.ExtractionText(input) : "")));
         section.Blocks.Add(ReportBlock.Table(new[] { "Attribute", "Question", "Values" },
             fixedMap.Attributes.Select(a => new[] { a.Name, a.Question, a.Open ? "open (named by each source)" : string.Join(", ", a.Values) })));
         return section;
@@ -143,7 +151,8 @@ public sealed partial class MultivocalReporter
                 : "") +
             $"The review produced {Count(s.Themes.Count, "theme")}. What each theme rests on (how many sources, their outlet tiers and quality points, grey or formal literature) was counted in code, never by the model." +
             (notCoded > 0 ? $" {Count(notCoded, "finding")} had the map's \"Other\" value; they are listed under their question as not coded by the map, not themed." : "") +
-            (s.Unassigned.Count > 0 ? $" {Count(s.Unassigned.Count, "value")} fit no theme; they are listed with the reason." : "")));
+            (s.Unassigned.Count > 0 ? $" {Count(s.Unassigned.Count, "value")} fit no theme; they are listed with the reason." : "") +
+            (input.Ledger.HasFormalPool ? MultivocalFormalText.SynthesisText(input) : "")));
         if (s.Notes.Count > 0)
         {
             section.Blocks.Add(ReportBlock.Paragraph("Notes recorded by the synthesis:"));
