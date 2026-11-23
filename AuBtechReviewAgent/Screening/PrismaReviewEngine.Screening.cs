@@ -43,7 +43,7 @@ public partial class PrismaReviewEngine
             finally { throttle.Release(); }
         }).ToList();
 
-        bool chaining = origin == OriginCitations;
+        bool chaining = origin != OriginDatabase;
         int applied = 0;
         foreach (var task in work)
         {
@@ -124,7 +124,7 @@ public partial class PrismaReviewEngine
         ScreeningLog Log(string decision, string reasoning, string summary) => new(
             paper.Id, paper.Title, decision, reasoning, apa.Citation, summary,
             apa.VenueType, apa.VenueName, apa.Year, paper.Authors, paper.Doi, paper.Url, paper.Abstract,
-            InjectionFlags: flags, Origin: origin);
+            InjectionFlags: flags, Origin: origin, CitedByCount: paper.CitedByCount);
 
         if (o.Error != null)
         {
