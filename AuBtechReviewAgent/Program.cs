@@ -208,6 +208,9 @@ app.UseRateLimiter();
 // The run downloads, with Last-Modified, an ETag and the kept archive of a finished run (Web/WorkspaceDownloads.cs).
 AuBtechReviewAgent.WorkspaceDownloads.MapWorkspaceDownloads(app, reviewEngine, multivocalWriter, multivocalReporter);
 
+// The Metrics page's figures as CSV and JSON, for papers about the tool (Web/MetricsDownloads.cs).
+AuBtechReviewAgent.MetricsDownloads.MapMetricsDownloads(app, metricsStore, app.Services.GetRequiredService<AuBtechReviewAgent.ReviewModulesOptions>(), metricsOptions.Prices);
+
 // For search engines: which pages to crawl, and the list of public pages (see SiteSeo).
 var siteConfiguration = app.Configuration;
 app.MapGet("/robots.txt", (HttpRequest request) =>
