@@ -6,7 +6,7 @@ public partial class Metrics
 {
     private static readonly System.Globalization.CultureInfo Culture = System.Globalization.CultureInfo.InvariantCulture;
     private static readonly (string Key, string Label)[] Kinds = { ("systematic", "Systematic reviews"), ("grey", "Grey literature reviews") };
-    private static readonly (string Id, string Label)[] Sections = { ("chart", "Chart"), ("shares", "Shares per run"), ("run-data", "Run data"), ("effort", "Effort"), ("by-version", "By version") };
+    private static readonly (string Id, string Label)[] Sections = { ("chart", "Chart"), ("shares", "Shares per run"), ("run-data", "Run data"), ("effort", "Effort"), ("by-version", "By version"), ("files", "Download") };
 
     // Table cells: square, with a header row that stays at the top of its box while the rows scroll.
     internal const string Td = "whitespace-nowrap border-t border-line px-3 py-2 text-ink";
