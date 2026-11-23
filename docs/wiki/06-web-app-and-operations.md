@@ -203,7 +203,7 @@ While a run waits, the run page shows its place and a rough wait ("You are 4th i
 
 `ReviewCache` decides **whether work can be reused**. Search responses are kept for `Cache:SearchResponseHours` (24) and screening decisions for `Cache:ScreeningDecisionDays` (90), in `App_Data/cache/`. The keys include everything the result depends on, so a changed prompt, model or criterion never reuses an old answer. Reuse is marked per record in the ledger.
 
-Separately, the download endpoints are rate-limited per client address (20 per minute, policy `ArchiveDownloadPolicy`). Runs themselves start over the SignalR connection, which HTTP rate limiting never sees; that is what the quota service is for.
+Separately, every plain HTTP address is rate-limited per client address, and the actions of the live connection that cost a model call are limited per address and hour; [page 10](10-limits-and-abuse.md) has the numbers, the upload limits, the hidden field on the start forms and the choices left for a CAPTCHA.
 
 ## Clean-up
 
