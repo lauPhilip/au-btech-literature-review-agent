@@ -20,6 +20,8 @@ You can now stop a review you started. The run stops at the next safe point, bef
 
 The multivocal review can now search academic databases as well as the web. It screens papers with the same rules as web sources. It reads a paper's open full text, or its abstract when there is none, and rates it with MMAT, as the systematic review does. Papers and web sources share one map, one set of themes and one paper. Each theme says whether it rests on papers, web sources or both. The paper cites papers as the systematic review does, and it marks a paper read on its abstract alone. The run view shows the two kinds of source side by side. The Multivocal card stays off until a real review has been checked by hand.
 
+The review now looks for text that tries to steer the model. The full text of each included paper, and each kept page of a grey literature review, is checked for phrases that read like instructions to the model, such as "ignore all previous instructions". A finished review lists the papers where it found some, with the phrase, so you can check what was taken from them. Nothing is excluded for it, since papers about language models quote such phrases honestly. The planning form of the grey literature review checks your own answers the same way as the systematic review's form, and asks you to confirm before it starts.
+
 ### Changed
 
 The theme sections are now written so more citations hold up. Each claim gets its own citation, and sources share one only when each says the whole thing. The writer adds no counts, comparisons or words like "always" that a source does not state.
