@@ -45,6 +45,10 @@
                                 <span class="text-[9px] font-bold uppercase tracking-wide bg-not-supported-fill text-not-supported px-1.5 py-0.5 "
                                       title="The paper's text contains phrases that look like instructions to the model (@string.Join(", ", row.Flags)). Check that the decision is based on the content.">Possible prompt injection</span>
                             }
+                            @if (row.CitedByCount is int cites)
+                            {
+                                <span class="text-[9px] uppercase tracking-wide bg-active text-muted px-1.5 py-0.5 " title="The citation count in the database's metadata on the day of the search">Cited @cites @(cites == 1 ? "time" : "times")</span>
+                            }
                             @if (row.Origin != "database search")
                             {
                                 <span class="text-[9px] uppercase tracking-wide bg-abstract-only-fill text-abstract-only px-1.5 py-0.5 ">Found by @row.Origin</span>
@@ -114,6 +118,7 @@
         public string? SecondReasoning;
         public List<string> Flags = new();
         public string Origin = "database search";
+        public int? CitedByCount;
     }
 
     protected override void OnParametersSet()
@@ -141,6 +146,7 @@
                 SecondReasoning = l.SecondReasoning,
                 Flags = l.InjectionFlags ?? new List<string>(),
                 Origin = l.Origin ?? "database search",
+                CitedByCount = l.CitedByCount,
             })
             // Uncertain decisions first, so a reviewer with little time looks at those; otherwise ledger order.
             .Select((r, i) => (r, i))

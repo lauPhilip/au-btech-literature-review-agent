@@ -35,7 +35,8 @@ public static partial class MethodsSectionWriter
         IReadOnlyList<PlatformSearchLog> searchLogs,
         DateTime runDateUtc,
         int identifiedViaCitations = 0,
-        bool citationChaining = false)
+        bool citationChaining = false,
+        SeedChainingRecord? seeds = null)
     {
         var sb = new StringBuilder();
         var queried = searchLogs.Select(l => l.SourceName).Distinct().ToList();
@@ -62,7 +63,16 @@ public static partial class MethodsSectionWriter
             sb.Append($"At least one query to {JoinNatural(faulted)} failed; the failed requests are listed in the run ledger (transparent-process.json). ");
         }
 
-        if (citationChaining)
+        if (citationChaining && seeds != null)
+        {
+            sb.Append("In addition, one round of citation chaining was run through OpenAlex, in both directions: the works a study cites and the works citing it. ");
+            sb.Append(SeedChaining(seeds));
+            int other = Math.Max(0, identifiedViaCitations - seeds.Identified);
+            sb.Append($"For every {(seeds.Seeds.Count > 0 ? "other " : "")}included record with a DOI, up to a fixed number of the works it cites and of the works citing it were retrieved ({other} record{(other == 1 ? "" : "s")} identified this way). ");
+            sb.Append("All records found by citation chaining were screened in the same way. ");
+            sb.Append("No other databases, registers or websites were consulted.");
+        }
+        else if (citationChaining)
         {
             sb.Append($"In addition, one round of citation chaining was run through OpenAlex: for every included record with a DOI, up to a fixed number of the works it cites and of the works citing it were retrieved ({identifiedViaCitations} record{(identifiedViaCitations == 1 ? "" : "s")} identified this way) and screened in the same way. ");
             sb.Append("No other databases, registers or websites were consulted.");
@@ -72,6 +82,35 @@ public static partial class MethodsSectionWriter
             sb.Append("No other databases, registers, websites or reference lists were consulted.");
         }
         return sb.ToString().Trim();
+    }
+
+    /// <summary>
+    /// The sentences on the seed step of citation chaining, shared by every kind of review, from the seed record on file:
+    /// how the seeds were ranked, that code chose them from included records only, and what building out kept. Empty
+    /// without a seed record.
+    /// </summary>
+    public static string SeedChaining(SeedChainingRecord? seeds, string records = "included record")
+    {
+        if (seeds == null) return "";
+        string Plural(int n, string one) => n == 1 ? one : one.EndsWith('y') ? one[..^1] + "ies" : one + "s";
+        if (seeds.Seeds.Count == 0)
+            return seeds.WithoutCount > 0
+                ? $"No seed studies were chosen, because none of the {seeds.WithoutCount} {Plural(seeds.WithoutCount, records)} with a DOI had a citation count and a year in its database's metadata. "
+                : $"No seed studies were chosen, because no {records} had a DOI. ";
+        var sb = new StringBuilder();
+        int n = seeds.Seeds.Count;
+        sb.Append($"First, the {(n == 1 ? "" : n + " ")}{Plural(n, records)} with the most citations per year {(n == 1 ? "was" : "were")} taken as seed {Plural(n, "study")}. ");
+        sb.Append($"Citations per year are the citation count in the database's metadata on the day of the search divided by the years from publication to {seeds.ReferenceYear}, the publication year counting as one, so a recent study could compete with an older one; ties went to more citations, then to the newer study. ");
+        sb.Append("The seeds were chosen in code from these counts, not by a language model, and only from records already included at screening, so a highly cited but irrelevant paper could not become a seed. ");
+        if (seeds.WithoutCount > 0)
+            sb.Append($"Of the {records}s with a DOI, {seeds.WithoutCount} had no citation count or year and could not be ranked. ");
+        string kept = seeds.PerDirection == 1 ? "the one with the most citations per year in each direction was" : $"the {seeds.PerDirection} with the most citations per year in each direction were";
+        sb.Append($"For each seed, up to {seeds.PoolPerDirection} of the works it cites and up to {seeds.PoolPerDirection} of the most cited works citing it were retrieved from OpenAlex and ranked the same way, and {kept} kept ({seeds.Identified} record{(seeds.Identified == 1 ? "" : "s")} identified this way). ");
+        int failed = seeds.Seeds.Count(x => x.Error != null);
+        if (failed > 0)
+            sb.Append($"The look-up failed for {failed} seed{(failed == 1 ? "" : "s")}, which {(failed == 1 ? "was" : "were")} chained like the other included records instead. ");
+        sb.Append("The appendix lists the seeds. ");
+        return sb.ToString();
     }
 
     public static string SearchStrategy(

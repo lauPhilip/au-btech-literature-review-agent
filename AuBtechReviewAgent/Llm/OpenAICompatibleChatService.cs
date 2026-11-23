@@ -67,7 +67,11 @@ public class OpenAICompatibleChatService : IChatCompletionService
                 _reasoningEffort = "";
                 continue;
             }
-            throw new HttpOperationException(response.StatusCode, json, $"The model server answered {(int)response.StatusCode}{ErrorDetail(json)}.", null);
+            var error = new HttpOperationException(response.StatusCode, json, $"The model server answered {(int)response.StatusCode}{ErrorDetail(json)}.", null);
+            // How long the server asks us to wait (429, 503), for the retry in RecordingChatCompletionService.
+            if (LlmRetryPolicy.Parse(response.Headers.RetryAfter, DateTimeOffset.UtcNow) is { } retryAfter)
+                error.Data[LlmRetryPolicy.RetryAfterKey] = retryAfter;
+            throw error;
         }
 
         var (text, model, usage) = ParseResponse(json);

@@ -42,10 +42,17 @@ public partial class PrismaReviewEngine
         ab.AppendLine(@"\end{tabularx}");
         ab.AppendLine(@"\vspace{4pt}\noindent\small ");
         ab.AppendLine(@"Table A.1 lists each included study with a short summary, the reason it was included, the database it came from and its reference.");
+        int nextTable = 2;
         if (state?.Extractions is { Count: > 0 } extractions)
         {
             ab.AppendLine(@"\vspace{10pt}");
             ab.Append(ExtractionTables(extractions));
+            nextTable += extractions.Any(MethodsSectionWriter.ShowInAppraisalTable) ? 2 : 1;
+        }
+        if (state?.SeedChaining is { Seeds.Count: > 0 } seeds)
+        {
+            if (nextTable == 2) ab.AppendLine(@"\vspace{10pt}"); // the extraction tables end with this space already
+            ab.Append(SeedStudiesTable.Latex(seeds, $"A.{nextTable}", EscapeLatexText));
         }
         return ab.ToString();
     }

@@ -27,7 +27,7 @@ public partial class PrismaReviewEngine
         string? Error);
 
     /// <summary>
-    /// Screens the candidates several at a time (Llm:ScreeningParallelism), but applies the results to the
+    /// Screens the candidates several at a time (Llm:FastParallelism with a fast model, else Llm:QualityParallelism), but applies the results to the
     /// ledger strictly in candidate order, so the ledger and counters come out the same on every run.
     /// </summary>
     private async Task ScreenCandidatesAsync(RunContext ctx, List<(AcademicPaper Paper, string SourceName)> candidates, string origin)
@@ -35,7 +35,7 @@ public partial class PrismaReviewEngine
         if (candidates.Count == 0) return;
         foreach (var (paper, _) in candidates) ctx.Papers[paper.Id] = paper;
 
-        using var throttle = new SemaphoreSlim(Math.Max(1, Llm.ScreeningParallelism));
+        using var throttle = new SemaphoreSlim(Llm.ParallelismFor("screening"));
         var work = candidates.Select(async c =>
         {
             await throttle.WaitAsync();
@@ -43,7 +43,7 @@ public partial class PrismaReviewEngine
             finally { throttle.Release(); }
         }).ToList();
 
-        bool chaining = origin == OriginCitations;
+        bool chaining = origin != OriginDatabase;
         int applied = 0;
         foreach (var task in work)
         {
@@ -124,7 +124,7 @@ public partial class PrismaReviewEngine
         ScreeningLog Log(string decision, string reasoning, string summary) => new(
             paper.Id, paper.Title, decision, reasoning, apa.Citation, summary,
             apa.VenueType, apa.VenueName, apa.Year, paper.Authors, paper.Doi, paper.Url, paper.Abstract,
-            InjectionFlags: flags, Origin: origin);
+            InjectionFlags: flags, Origin: origin, CitedByCount: paper.CitedByCount);
 
         if (o.Error != null)
         {
