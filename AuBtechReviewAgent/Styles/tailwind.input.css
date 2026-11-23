@@ -154,7 +154,19 @@
     .ui-chip-ok { @apply ui-chip border-supported-border bg-supported-fill text-supported; }
     .ui-chip-partial { @apply ui-chip border-partly-border bg-partly-fill text-partly; }
     .ui-chip-bad { @apply ui-chip border-not-supported-border bg-not-supported-fill text-not-supported; }
+    /* The live line of a running review (Components/Dashboard/LiveActivityLine.razor). */
+    .ui-live { @apply flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-sm leading-snug text-ink; }
+    .ui-live-dot { @apply inline-block h-2 w-2 shrink-0 self-center rounded-full bg-supported-chart; }
+    .ui-live-dot-wait { @apply bg-partly-chart; }
+    .ui-live-text { @apply min-w-0 break-words; }
+    .ui-live-count { @apply font-mono text-xs text-muted; }
 }
+@media (prefers-reduced-motion: no-preference) {
+    .ui-live-dot:not(.ui-live-dot-wait) { animation: tai-live-pulse 1.8s ease-in-out infinite; }
+    .ui-live-text { animation: tai-live-in 0.3s ease-out; }
+}
+@keyframes tai-live-pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.35; transform: scale(0.75); } }
+@keyframes tai-live-in { from { opacity: 0; transform: translateY(2px); } to { opacity: 1; transform: none; } }
 
 /* Landing page: the looping citation example (Components/Landing/CitationLoop.razor). Three citations take a
    third of the 12.6 s cycle each: 1.1 s "checking" (to 8.7 %), then the verdict until a third. Every moving part

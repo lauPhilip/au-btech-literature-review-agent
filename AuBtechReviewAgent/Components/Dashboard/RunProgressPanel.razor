@@ -2,7 +2,7 @@
 @implements IDisposable
 
 @* New review while a run is going, waiting or stopped (redesign step 7). The main column, at most 760 px, has the
-   eyebrow with the step, the objective as the title, the overall bar and the seven steps (ReviewSteps), each done,
+   eyebrow with the step, the objective as the title, the live line of what happens now (LiveActivityLine), the overall bar and the seven steps (ReviewSteps), each done,
    running or waiting, with one line. The side column says the page can be closed and what is on record so far, with
    the way into the live log. The page adds its own parts through Notice (under the bar), Main (under the steps) and
    Side (under the side cards). The numbers come from ReviewStats, set by the engine through RunProgress; this
@@ -25,6 +25,10 @@
         <section id="run-panel" class="mx-auto w-full max-w-[760px] min-w-0" aria-labelledby="run-title">
             <p class="font-display text-xs font-semibold uppercase tracking-[0.14em] @(failed ? "text-not-supported" : "text-muted")">@Eyebrow(failed, queued, waitingForYou, current)</p>
             <h1 id="run-title" class="mt-1 font-display text-[clamp(22px,2vw,32px)] font-semibold leading-tight tracking-[-0.025em] text-heading line-clamp-3 sm:mt-2">@Title</h1>
+            @if (Running && !failed)
+            {
+                <LiveActivityLine Line="AuBtechReviewAgent.LiveActivity.ForSystematic(Stats, Stage, QueuePosition)" Class="mt-2 sm:mt-3" />
+            }
 
             <div class="ui-card mt-4 p-4 sm:mt-5 sm:p-6">
                 <div class="flex items-center justify-between gap-2 text-sm">
