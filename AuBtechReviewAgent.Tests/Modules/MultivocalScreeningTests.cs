@@ -200,7 +200,7 @@ public class MultivocalScreeningTests : IDisposable
         Assert.Contains("- Kind of source: Academic literature, from a bibliographic database", formal);
         Assert.Contains("Being a preprint or not peer-reviewed is not a reason to exclude it", formal);
         Assert.StartsWith("Evaluate the following grey literature source", blog);
-        foreach (string shared in new[] { "- Inclusion Thresholds: About agents", PrismaReviewEngine.ScreeningProcedure(false).Trim(), PrismaReviewEngine.ScreeningAnswerFormat.Trim() })
+        foreach (string shared in new[] { "- Inclusion Thresholds: About agents", MultivocalScreener.FirstProcedure.Trim(), PrismaReviewEngine.ScreeningAnswerFormat.Trim() })
         {
             Assert.Contains(shared, formal);
             Assert.Contains(shared, blog);

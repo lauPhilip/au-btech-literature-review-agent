@@ -126,6 +126,6 @@ public class MultivocalSecondScreeningTests : IDisposable
         Assert.Equal((30, twice, 7, 6, 10), (counts.Screened, counts.ScreenedTwice, counts.TargetedTotal, counts.TargetedAgreed, counts.Audit));
         Assert.Equal(twice - 7, counts.AuditOnly);
         Assert.Equal(MultivocalScreener.PromptVersion, file.PromptVersion);
-        Assert.Equal("grey-screening-v2", MultivocalScreener.PromptVersion);
+        Assert.Equal("grey-screening-v3", MultivocalScreener.PromptVersion);
     }
 }
