@@ -12,6 +12,7 @@ public class ModelCallLimiterTests
     /// <summary>A model that counts the calls in flight and remembers the most it saw at once.</summary>
     private sealed class CountingChat : IChatCompletionService
     {
+        private readonly object _peakLock = new();
         private int _inFlight;
         public int Peak;
         public int Calls;
@@ -21,7 +22,7 @@ public class ModelCallLimiterTests
             PromptExecutionSettings? executionSettings = null, Kernel? kernel = null, CancellationToken cancellationToken = default)
         {
             int now = Interlocked.Increment(ref _inFlight);
-            lock (this) Peak = Math.Max(Peak, now);
+            lock (_peakLock) Peak = Math.Max(Peak, now);
             await Task.Delay(5, cancellationToken);
             Interlocked.Decrement(ref _inFlight);
             Interlocked.Increment(ref Calls);
