@@ -23,6 +23,7 @@ public sealed partial class MultivocalSynthesiser
             Topic: {{PromptSafety.Wrap(topic, "review topic")}}
             Research question {{question}}: {{PromptSafety.Wrap(questionText, "research question")}}
 
+            {{PromptSafety.ReviewerInputNotice}}
             {{PromptSafety.DataOnlyNotice}}
 
             WHAT THE SOURCES SAY (attribute: value, and how many sources say it):
@@ -47,6 +48,7 @@ public sealed partial class MultivocalSynthesiser
             THEMES:
             {{PromptSafety.Wrap(themeList, "themes")}}
 
+            {{PromptSafety.ReviewerInputNotice}}
             {{PromptSafety.DataOnlyNotice}}
 
             VALUES TO PLACE (id, attribute: value, sources, example quotes):
@@ -77,6 +79,7 @@ public sealed partial class MultivocalSynthesiser
             In a multivocal literature review, research question {{question}}: {{PromptSafety.Wrap(questionText, "research question")}}
             Theme: {{PromptSafety.Wrap(theme, "theme")}}
 
+            {{PromptSafety.ReviewerInputNotice}}
             {{PromptSafety.DataOnlyNotice}}
 
             VALUES IN THIS THEME (id, attribute: value, sources, example quotes):
