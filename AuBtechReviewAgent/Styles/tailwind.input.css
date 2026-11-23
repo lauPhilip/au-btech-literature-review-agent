@@ -159,7 +159,7 @@
     .ui-live-dot { @apply inline-block h-2 w-2 shrink-0 self-center rounded-full bg-supported-chart; }
     .ui-live-dot-wait { @apply bg-partly-chart; }
     .ui-live-text { @apply min-w-0 break-words; }
-    .ui-live-count { @apply font-mono text-xs text-muted; }
+    .ui-live-count { @apply font-mono text-xs text-muted max-sm:hidden; }
 }
 @media (prefers-reduced-motion: no-preference) {
     .ui-live-dot:not(.ui-live-dot-wait) { animation: tai-live-pulse 1.8s ease-in-out infinite; }
