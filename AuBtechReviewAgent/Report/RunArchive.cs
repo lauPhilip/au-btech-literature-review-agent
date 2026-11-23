@@ -21,7 +21,7 @@ public static class RunArchive
     /// <summary>Files every run may hold, whatever its module; always kept at the archive root when present.</summary>
     public static readonly IReadOnlyList<string> CoreFiles = new[]
     {
-        RunHeader.FileName, RunStore.ProtocolFile, "llm-calls.json", RunStore.NotesFile, "run-metrics.json",
+        RunHeader.FileName, RunStore.ProtocolFile, "llm-calls.json", RunStore.NotesFile, "run-metrics.json", ReportEditLog.FileName,
     };
 
     /// <summary>Folder of each source's answers exactly as received.</summary>
