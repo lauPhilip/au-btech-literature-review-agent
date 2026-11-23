@@ -113,6 +113,7 @@ public static partial class StudyExtractor
         evidence.AppendLine($"Abstract: {(string.IsNullOrWhiteSpace(paper.Abstract) ? "(no abstract available)" : paper.Abstract)}");
         foreach (var c in chunks.Concat(appraisalChunks)) evidence.AppendLine($"[page {c.PageNumber}] {c.Text}");
         string evidenceText = evidence.ToString();
+        var canonical = CanonicalText.Of(evidenceText);
 
         string criteriaList = string.Join("\n", MmatCriteria.Select(kv => $"- {kv.Key}: " + string.Join(" | ", kv.Value)));
         string prompt = $$"""
@@ -149,20 +150,20 @@ public static partial class StudyExtractor
             try
             {
                 answer = await LlmJson.GetAsync<ExtractionAnswer>(chat, prompt, settings,
-                    a => BasicProblem(a) ?? StrictProblem(a, evidenceText, paper.HasFullText));
+                    a => BasicProblem(a) ?? StrictProblem(a, canonical, paper.HasFullText));
             }
             catch (LlmOutputException)
             {
                 answer = await LlmJson.GetAsync<ExtractionAnswer>(chat, prompt, settings, BasicProblem);
-                string? left = StrictProblem(answer, evidenceText, paper.HasFullText);
+                string? left = StrictProblem(answer, canonical, paper.HasFullText);
                 if (left != null) result.Note = $"Kept after a second try with a problem the model did not fix: {left}";
             }
 
             result.StudyType = answer.StudyType.Trim();
-            result.Method = Verify(answer.Method, evidenceText);
-            result.Sample = Verify(answer.Sample, evidenceText);
-            result.Limitations = Verify(answer.Limitations, evidenceText);
-            result.KeyFindings = (answer.KeyFindings ?? new()).Take(3).Select(f => Verify(f, evidenceText)).ToList();
+            result.Method = Verify(answer.Method, canonical);
+            result.Sample = Verify(answer.Sample, canonical);
+            result.Limitations = Verify(answer.Limitations, canonical);
+            result.KeyFindings = (answer.KeyFindings ?? new()).Take(3).Select(f => Verify(f, canonical)).ToList();
             result.AppraisalCategory = answer.AppraisalCategory;
 
             if (MmatCriteria.TryGetValue(answer.AppraisalCategory, out var criteria))
@@ -172,7 +173,7 @@ public static partial class StudyExtractor
                     string id = criteria[i].Split(' ')[0];
                     var given = answer.Appraisal?.FirstOrDefault(x => CriterionId(x.Id) == id) ?? answer.Appraisal?.ElementAtOrDefault(i);
                     var a = new AppraisalAnswer { Id = id, Criterion = criteria[i][(id.Length + 1)..], Answer = given == null ? "cant_tell" : NormalAnswer(given.Answer), Quote = given?.Quote ?? "" };
-                    a.QuoteVerified = CitationSupportChecker.QuoteOccursIn(a.Quote, evidenceText);
+                    a.QuoteVerified = CitationSupportChecker.QuoteOccursIn(a.Quote, canonical);
                     // A "yes" or "no" must be backed by text that is really in the paper; otherwise it cannot be told.
                     if (a.Answer != "cant_tell" && !a.QuoteVerified) a.Answer = "cant_tell";
                     result.Appraisal.Add(a);
