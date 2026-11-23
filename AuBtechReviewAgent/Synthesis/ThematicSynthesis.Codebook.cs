@@ -33,7 +33,8 @@ public static partial class ThematicSynthesis
         var studies = codes.Select(c => c.Reference).Distinct().ToList();
         var (min, max) = ThemeRange(studies.Count, maxThemes);
         var ids = codes.Select(c => c.Id).ToHashSet(StringComparer.OrdinalIgnoreCase);
-        string codeList = string.Join("\n", codes.Select(c => $"{c.Id} [study {c.Reference}]: {c.Label}"));
+        // A code's research questions are shown when the coding named them, so the themes can be organised by question.
+        string codeList = string.Join("\n", codes.Select(c => $"{c.Id} [study {c.Reference}]{(c.Questions is { Count: > 0 } q ? $" ({string.Join(", ", q)})" : "")}: {c.Label}"));
 
         // Every study here was included, so a reason to leave it out may not contradict the criteria it met (issue #166).
         string criteriaBlock = string.IsNullOrWhiteSpace(criteria) ? "" : $"\nELIGIBILITY CRITERIA (every study below met them and was included):\n{criteria.Trim()}\n";

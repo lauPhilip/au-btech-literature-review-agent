@@ -47,7 +47,7 @@ public partial class PrismaReviewEngine
         var result = new ThematicResult { Codebook = book };
         var extractions = state.Extractions ?? new List<StudyExtraction>();
         string goal = string.IsNullOrWhiteSpace(objective) ? query : objective;
-        // The research questions go to every step from the codebook on (issue #124); without them the prompts are as before.
+        // The research questions go to every step from the coding on (issues #124, #430); without them the prompts are as before.
         var questions = state.ResearchQuestions ?? new List<string>();
 
         // 1. Coding
@@ -57,7 +57,8 @@ public partial class PrismaReviewEngine
             ReportProgress(runId, state, RunProgress.Synthesis, RunProgress.Phase(RunProgress.SynthesisPhases, 1, 0), $"Coding {papers.Count} studies");
             var (c, uncoded) = await ThematicSynthesis.CodeStudiesAsync(chat, goal, papers, extractions,
                 Synthesis.CodingBatchSize, Llm.QualityParallelism,
-                (done, total) => ReportProgress(runId, state, RunProgress.Synthesis, RunProgress.Phase(RunProgress.SynthesisPhases, 1, (double)done / total), $"Coding studies: {Of(done, total, "batches")}"));
+                (done, total) => ReportProgress(runId, state, RunProgress.Synthesis, RunProgress.Phase(RunProgress.SynthesisPhases, 1, (double)done / total), $"Coding studies: {Of(done, total, "batches")}"),
+                questions, CriteriaForCodebook(state));
             codes = c;
             book.Codes = codes;
             book.Uncoded.AddRange(uncoded);
