@@ -134,6 +134,8 @@ public static partial class CitationRepairer
                     - "drop_citation": the sentence is fine without the flagged paper; the flagged citation will be removed.
                     - "delete": the sentence cannot be supported and should be removed.
 
+                    {{RoleRule(group.Key)}}
+
                     {{PromptSafety.DataOnlyNotice}}
 
                     {{PromptSafety.Wrap(data.ToString(), "the flagged sentences and the cited papers' evidence")}}

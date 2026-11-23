@@ -87,6 +87,7 @@ public static class MultivocalRunLog
             Model = paper.Model,
             QueryHash = RunMetrics.Sha(string.Join("|", plan.Numbered().Select(q => q.Question.Text))),
             Settings = settings,
+            ReviewType = Module,
         };
         m.ConfigFingerprint = RunMetrics.Sha(string.Join("|", new[] { m.Model, m.AppVersion }.Concat(settings.OrderBy(kv => kv.Key, StringComparer.Ordinal).Select(kv => $"{kv.Key}={kv.Value}"))));
 
@@ -151,16 +152,7 @@ public static class MultivocalRunLog
         int words = m.SynthesisWords + m.DiscussionWords;
         m.CitationsPer100Words = words == 0 ? 0 : Math.Round(refsPerSentence.Sum() * 100.0 / words, 2);
 
-        m.LlmCalls = calls.Count;
-        m.LlmRetries = calls.Sum(c => Math.Max(0, c.Attempts - 1));
-        m.LlmFailures = calls.Count(c => c.Outcome != "ok");
-        m.Tokens = calls.Sum(c => RunMetrics.TokensIn(c.Usage));
-        m.CostByStage = calls.GroupBy(c => c.Stage).OrderBy(g => g.Key, StringComparer.Ordinal).ToDictionary(g => g.Key, g => new StageCost
-        {
-            Calls = g.Count(),
-            Seconds = Math.Round(g.Sum(c => c.DurationMs) / 1000.0, 1),
-            Tokens = g.Sum(c => RunMetrics.TokensIn(c.Usage)),
-        });
+        m.AddCost(calls);
         if (paper.CheckedUtc is DateTime done && input.Ledger.SearchedUtc != default)
             m.DurationMinutes = Math.Round((done - input.Ledger.SearchedUtc).TotalMinutes, 1);
         return m;
