@@ -78,10 +78,10 @@ public static partial class ReviewWriter
 
             REQUIREMENTS:
             1. "limitations": one paragraph on the limitations of the evidence base (PRISMA 2020 item 23b): what kinds of {{profile.Sources}} it rests on, what they leave unmeasured, and how far the findings generalise. Use the facts above. Do not describe how this review was done; that is written separately.
-            2. "implications": one paragraph on the implications for practice and policy (item 23d): what someone acting on these findings should do or watch for, and how firm each point is.
-            3. "futureResearch": one paragraph on the directions for future research (item 23d): the open questions and missing kinds of study the results show, each tied to the theme or {{profile.Sources}} it comes from.
+            2. "implications": one paragraph on the implications for practice and policy (item 23d): what someone acting on these findings should do or watch for, and how firm each point is. A recommendation is the review's own reading and takes no citation; the finding behind it may come first, in its own cited sentence.
+            3. "futureResearch": one paragraph on the directions for future research (item 23d): the open questions and missing kinds of study the results show, each tied by name to the theme it comes from. A proposal is the review's own reading and takes no citation: say what study is missing, not again what the {{profile.Sources}} found.
             4. "conclusion": three to five sentences that answer the review objective in plain words, at most {{MaxConclusionWords}} words, with no new claims.{{conclusionRule}}
-            5. Every sentence that attributes something to the literature ends with an inline marker such as [3] or [2, 5], using the same {{profile.Sources}} the results cite for it. {{OwnCountRule}} Do not invent numbers, statistics or {{profile.Sources}}.{{leftOutRule}} {{ReadingBasisRule(profile)}} This holds for the limitations too: how this review was done, including what it read, is written separately.{{answerRule}}
+            5. {{EvidenceThenReadingRule(profile)}} In the limitations and the directions for future research, an uncited sentence may name kinds of {{profile.Sources}} (what the evidence rests on, what study is missing). {{ClaimPerCitationRule(profile)}} {{OwnCountRule}} Do not invent numbers, statistics or {{profile.Sources}}.{{leftOutRule}} {{ReadingBasisRule(profile)}} This holds for the limitations too: how this review was done, including what it read, is written separately.{{answerRule}}
             {{ProseCleaner.PlainProseRule}}
             Respond ONLY with a valid minified JSON object:
             {"limitations":"...","implications":"...","futureResearch":"...","conclusion":"..."{{answerField}}}
@@ -91,7 +91,7 @@ public static partial class ReviewWriter
             ClosingAnswer answer;
             using (LlmStage.Begin("closing"))
                 answer = await LlmJson.GetAsync<ClosingAnswer>(chat, prompt, LlmJson.JsonMode(0.3), a => ClosingProblem(a.Limitations, a.Implications, a.FutureResearch, a.Conclusion, results + "\n" + facts + "\n" + evidence.BaseFacts, referenceCount,
-                    a.Answers, questions.Count, ownFacts: facts + "\n" + evidence.BaseFacts, results: results, evidence: evidence, profile: profile));
+                    a.Answers, questions.Count, ownFacts: facts + "\n" + evidence.BaseFacts, results: results, evidence: evidence, profile: profile), repairAttempts: 2);
             string Clean(string? text) => MethodsSectionWriter.StripMarkdownEmphasis(text!.Trim());
             var modelAnswers = new Queue<string>((answer.Answers ?? new()).Where(a => !string.IsNullOrWhiteSpace(a)).Select(Clean));
             return new ClosingSections(Clean(answer.Limitations), Clean(answer.Implications), Clean(answer.FutureResearch), Clean(answer.Conclusion),
@@ -129,6 +129,11 @@ public static partial class ReviewWriter
         foreach (var (name, text) in parts)
             if (OwnCountCited(text!, ownFacts, results) is { } own)
                 return $"{name}: \"{own}\" states this review's own count and carries a citation; the review's own counts take no citation.";
+        // An uncited sentence is the review's own reading: it may not report a finding (the limitations and the future
+        // research may name kinds of study). Without the review's own facts, the numbers allowed are those of known.
+        foreach (var (name, text) in parts)
+            if (UncitedAttribution(text!, ownFacts.Length > 0 ? ownFacts : known, designsAllowed: name is "limitations" or "futureResearch") is { } reported)
+                return $"{name}: {reported}";
         foreach (var (name, text) in parts)
             if (ReadingBasisSentence(text!) is { } basis) return $"{name}: {ReadingBasisProblem(basis, profile ?? WritingProfile.Systematic)}";
         if (evidence != null)
@@ -149,13 +154,13 @@ public static partial class ReviewWriter
         "A sentence that states this review's own counts (how many sources it rests on, how many were read in full text, how many are not empirical) is the review's statement, not a source's: it takes no citation.";
 
     private static readonly Regex OwnCount = new(
-        @"\b(\d+)\s+(?:(?:included|empirical|non-empirical|primary)\s+)?(?:studies|study|records|papers|sources)\b|\b(\d+)\s+(?:of\s+(?:them|which)\s+)?(?:were|was|are|is)\s+(?:read|assessed|appraised|included|not\s+empirical|non-empirical)\b",
+        @"\b(\d+|" + NumberWordPattern + @")\s+(?:(?:included|empirical|non-empirical|primary)\s+)?(?:studies|study|records|papers|sources)\b|\b(\d+|" + NumberWordPattern + @")\s+(?:of\s+(?:them|which)\s+)?(?:were|was|are|is)\s+(?:read|assessed|appraised|included|not\s+empirical|non-empirical)\b",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     /// <summary>
     /// The first cited sentence of <paramref name="text"/> that states one of the review's own counts, or null (issue
     /// #116). A count is a number from <paramref name="ownFacts"/> (counted in code) that the sentence uses as a count of
-    /// sources ("13 studies", "9 were read in full text"), unless a cited sentence of <paramref name="results"/> already
+    /// sources ("13 studies", "four studies", "9 were read in full text"), unless a cited sentence of <paramref name="results"/> already
     /// uses that number, which makes it a number from the literature. Public for unit tests.
     /// </summary>
     public static string? OwnCountCited(string text, string ownFacts, string results = "")
@@ -169,7 +174,7 @@ public static partial class ReviewWriter
             if (ThematicSynthesis.CitedIn(sentence).Count == 0) continue;
             foreach (Match m in OwnCount.Matches(Regex.Replace(sentence, @"\[[^\]]*\]", "")))
             {
-                string number = m.Groups[1].Success ? m.Groups[1].Value : m.Groups[2].Value;
+                string number = AsDigits(m.Groups[1].Success ? m.Groups[1].Value : m.Groups[2].Value);
                 if (own.Contains(number) && !fromLiterature.Contains(number)) return sentence;
             }
         }

@@ -204,7 +204,7 @@ public partial class MultivocalStart
         {
             var (newRunId, newEditKey) = await Planner.CreateAsync(plan, FlagsConfirmed ? FlagLines : null);
             // The protocol is written; the rest runs on the server, one step after another, without a click.
-            Runner.Start(newRunId, newEditKey);
+            Runner.Start(newRunId, newEditKey, PrerenderClientAddress);
             // Only this browser keeps the run's edit key, as for a systematic review.
             try { await JS.InvokeVoidAsync("traceableReview.saveEditKey", newRunId.ToString(), newEditKey); }
             catch (Exception ex) when (ex is JSException or JSDisconnectedException or InvalidOperationException or TaskCanceledException)

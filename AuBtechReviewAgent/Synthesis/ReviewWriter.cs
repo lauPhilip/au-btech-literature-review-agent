@@ -202,7 +202,7 @@ public static partial class ReviewWriter
             REQUIREMENTS:
             1. "title": one line, at most 25 words, no full stop, naming the topic and the kind of review.
             2. "abstract": one paragraph of 150 to 250 words: background, method, main results by theme, and what they mean. No citations. Use no number that is not in the facts or the results above.
-            3. "rationale": one or two paragraphs on why the review is needed, from what the {{profile.Sources}} report; every sentence ends with an inline [n] marker, using the {{profile.Sources}} the results cite for it. Add no background from general knowledge: leave out a sentence you cannot cite, since code removes every rationale sentence without a citation.
+            3. "rationale": one or two paragraphs on why the review is needed. Every sentence but the last states the problem from what the {{profile.Sources}} say and ends with an inline [n] marker, using the {{profile.Sources}} the results cite for it; these sentences use no result figure (no number, percentage or effect size from the results). The last sentence has no citation and states what is not yet known, the gap this review addresses; it names no {{profile.Source}}, number or {{profile.Source}} design and uses none of these words: report, found, show, demonstrate, observe, "studies", "the literature". Add no background from general knowledge: leave out a sentence you cannot cite, since code removes every other rationale sentence without a citation.
             4. {{objectivesRule}}
             {{ProseCleaner.PlainProseRule}}
             Respond ONLY with a valid minified JSON object:
@@ -213,7 +213,7 @@ public static partial class ReviewWriter
         {
             using (LlmStage.Begin("front-matter"))
             {
-                var answer = await LlmJson.GetAsync<FrontMatterAnswer>(chat, prompt, LlmJson.JsonMode(0.3), a => FrontMatterProblem(a, allowedNumbers, referenceCount, codeObjectives == null) ?? abstractRule?.Invoke(a.Abstract!), repairAttempts: 2);
+                var answer = await LlmJson.GetAsync<FrontMatterAnswer>(chat, prompt, LlmJson.JsonMode(0.3), a => FrontMatterProblem(a, allowedNumbers, referenceCount, codeObjectives == null, facts) ?? abstractRule?.Invoke(a.Abstract!), repairAttempts: 2);
                 return new FrontMatter(
                     answer.Title!.Trim().TrimEnd('.'),
                     MethodsSectionWriter.StripMarkdownEmphasis(answer.Abstract!.Trim()),
@@ -228,7 +228,7 @@ public static partial class ReviewWriter
         }
     }
 
-    private static string? FrontMatterProblem(FrontMatterAnswer a, string allowedNumbers, int referenceCount, bool objectives = true)
+    private static string? FrontMatterProblem(FrontMatterAnswer a, string allowedNumbers, int referenceCount, bool objectives = true, string facts = "")
     {
         if (string.IsNullOrWhiteSpace(a.Title) || string.IsNullOrWhiteSpace(a.Abstract) || string.IsNullOrWhiteSpace(a.Rationale))
             return objectives ? "title, abstract, rationale and objectives must all be given." : "title, abstract and rationale must all be given.";
@@ -238,35 +238,40 @@ public static partial class ReviewWriter
         if (ThematicSynthesis.CitedIn(a.Rationale).Count == 0) return "the rationale has no citation; every sentence of it ends with the [n] of the sources the results cite for it.";
         var outside = ThematicSynthesis.CitedIn(a.Rationale).Where(r => r < 1 || r > referenceCount).ToList();
         if (outside.Count > 0) return $"citation numbers {string.Join(", ", outside)} are not in the reference list.";
+        // The rationale states the problem and the gap; a result figure belongs to the results (the audit of two real runs).
+        var figures = NumbersIn(a.Rationale).Where(n => !NumbersIn(facts).Contains(n)).ToList();
+        if (figures.Count > 0) return $"the rationale uses {string.Join(", ", figures)}; it states the problem and the gap, not the results, so leave out result figures.";
         var known = NumbersIn(allowedNumbers);
         var unknown = NumbersIn(a.Abstract).Where(n => !known.Contains(n)).ToList();
         return unknown.Count > 0 ? $"the abstract uses {string.Join(", ", unknown)}, which is in neither the facts nor the results; use only those numbers." : null;
     }
 
     /// <summary>
-    /// The rationale with only its cited sentences (issue #248): in a live run two uncited sentences came from the
-    /// model's general knowledge, not from the sources. Every sentence without an inline [n] marker is left out, the
-    /// paragraphs are kept, and <paramref name="log"/> records what was left out for the writing ledger, or is null when
-    /// nothing was. The goal, audience and research questions are not in the rationale: they are in the objectives.
+    /// The rationale with only its cited sentences (issue #248), and its gap: in a live run two uncited sentences came
+    /// from the model's general knowledge, not from the sources. The last sentence, when uncited, is the rationale's one
+    /// statement of what is not yet known, and is kept when it reports no finding (<see cref="UncitedAttribution"/>, with
+    /// the review's own counts in <paramref name="facts"/>); every other uncited sentence is left out, and the paragraphs
+    /// are kept. <paramref name="log"/> records what was left out and whether the gap was kept, for the writing ledger,
+    /// or is null when every sentence is cited. The goal, audience and research questions are in the objectives.
     /// </summary>
-    public static string CitedSentencesOnly(string rationale, out StyleDeltaLog? log)
+    public static string CitedSentencesOnly(string rationale, out StyleDeltaLog? log, string facts = "")
     {
         log = null;
         if (string.IsNullOrWhiteSpace(rationale)) return rationale;
-        var dropped = new List<string>();
-        var paragraphs = new List<string>();
-        foreach (var paragraph in Regex.Split(rationale.Trim(), @"\n\s*\n"))
-        {
-            var sentences = CitationSupportChecker.SplitSentences(paragraph);
-            dropped.AddRange(sentences.Where(x => ThematicSynthesis.CitedIn(x).Count == 0));
-            var kept = sentences.Where(x => ThematicSynthesis.CitedIn(x).Count > 0).ToList();
-            if (kept.Count > 0) paragraphs.Add(string.Join(" ", kept));
-        }
-        if (dropped.Count == 0) return rationale;
-        string result = string.Join("\n\n", paragraphs);
-        log = new StyleDeltaLog(RationaleCitedOnlyField, rationale, result, Applied: true,
-            Note: $"Left out in code, because {(dropped.Count == 1 ? "it carries" : "they carry")} no citation: " + string.Join(" ", dropped.Select(d => $"\"{d}\"")));
-        return result;
+        var paragraphs = Regex.Split(rationale.Trim(), @"\n\s*\n").Select(p => CitationSupportChecker.SplitSentences(p).ToList()).Where(p => p.Count > 0).ToList();
+        string? gap = paragraphs.LastOrDefault()?.Last() is { } last && ThematicSynthesis.CitedIn(last).Count == 0 ? last : null;
+        string? gapProblem = gap == null ? null : UncitedAttribution(gap, facts);
+        bool Keep(string s) => ThematicSynthesis.CitedIn(s).Count > 0 || (ReferenceEquals(s, gap) && gapProblem == null);
+        var dropped = paragraphs.SelectMany(p => p).Where(s => !Keep(s)).ToList();
+        if (gap == null && dropped.Count == 0) return rationale;
+        string result = string.Join("\n\n", paragraphs.Select(p => string.Join(" ", p.Where(Keep))).Where(p => p.Length > 0));
+        var notes = new List<string>();
+        if (dropped.Count > 0)
+            notes.Add($"Left out in code, because {(dropped.Count == 1 ? "it carries" : "they carry")} no citation: " + string.Join(" ", dropped.Select(d => $"\"{d}\"")));
+        if (gap != null)
+            notes.Add(gapProblem == null ? $"Kept as the statement of the gap, because it reports no finding: \"{gap}\"" : $"The closing sentence was not kept as the gap: {gapProblem}");
+        log = new StyleDeltaLog(RationaleCitedOnlyField, rationale, result, Applied: dropped.Count > 0, Note: string.Join(" ", notes));
+        return dropped.Count == 0 ? rationale : result;
     }
 
     /// <summary>The writing ledger's name for the step that keeps the rationale's cited sentences only.</summary>

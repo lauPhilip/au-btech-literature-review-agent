@@ -33,10 +33,12 @@ public sealed partial class MultivocalRunner
             if (_stops.TryGetValue(runId, out var earlier))
             {
                 if (earlier.StartedUtc == status.StartedUtc) return false;
-                if (_stops.TryUpdate(runId, request, earlier)) return true;
+                if (_stops.TryUpdate(runId, request, earlier)) break;
             }
-            else if (_stops.TryAdd(runId, request)) return true;
+            else if (_stops.TryAdd(runId, request)) break;
         }
+        StopWaiting(runId);
+        return true;
     }
 
     /// <summary>At the safe point before a step: true when this start of the run was cancelled, after recording it.</summary>

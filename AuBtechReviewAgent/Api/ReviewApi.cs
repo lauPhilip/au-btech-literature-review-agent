@@ -74,9 +74,16 @@ public sealed partial class ReviewApi
         if (problems.Count > 0) return ApiProblems.Invalid("Some fields need a change before the review can start.", problems);
         if (check.Flags.Count > 0 && !body.AcceptFlaggedInput) return ApiProblems.Flagged(check.Flags.Select(f => f.ToString()).ToList());
 
-        if (!TryTakeStart(keys.Mistral, clientAddress, out var wait)) return ApiProblems.TooMany(wait);
-
+        // The same line as the form: a full line, or a client with its share, is refused before a start is counted.
         var runId = Guid.NewGuid();
+        var admission = _engine.Coordinator.TryAdmit(runId, clientAddress);
+        if (!admission.Admitted) return ApiProblems.Busy(admission);
+        if (!TryTakeStart(keys.Mistral, clientAddress, out var wait))
+        {
+            _engine.Coordinator.Withdraw(runId);
+            return ApiProblems.TooMany(wait);
+        }
+
         string editKey = _engine.ClaimRun(runId);
         var engine = _engine;
         // The run must not carry this request's context (its HttpContext, its logging scope) for the minutes it takes.
