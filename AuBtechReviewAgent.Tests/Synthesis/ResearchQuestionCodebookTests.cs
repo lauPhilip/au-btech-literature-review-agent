@@ -35,8 +35,8 @@ public class ResearchQuestionCodebookTests
     public async Task ThemesAnswerTheQuestionsInQuestionOrderAndAQuestionNoCodeBearsOnIsOnFile()
     {
         var chat = new FakeChatService()
-            .Returns("""{"themes":[{"name":"Audits","description":"d","codes":["C2"],"questions":["RQ3"]},{"name":"Recovery","description":"d","codes":["C1"],"questions":["RQ1"]}],"unassigned":[],"unanswered":[]}""")
-            .Returns("""{"themes":[{"name":"Audits","description":"d","codes":["C2"],"questions":["RQ1"]},{"name":"Recovery","description":"d","codes":["C1"],"questions":["RQ1"]}],"unassigned":[],"unanswered":[{"question":"RQ2","reason":"No study certifies agent loops."}]}""");
+            .Returns("""{"themes":[{"name":"Audits","description":"d","codes":["C2"],"questions":["RQ3"],"singleStudyReason":"Only this study covers it."},{"name":"Recovery","description":"d","codes":["C1"],"questions":["RQ1"],"singleStudyReason":"Only this study covers it."}],"unassigned":[],"unanswered":[]}""")
+            .Returns("""{"themes":[{"name":"Audits","description":"d","codes":["C2"],"questions":["RQ1"],"singleStudyReason":"Only this study covers it."},{"name":"Recovery","description":"d","codes":["C1"],"questions":["RQ1"],"singleStudyReason":"Only this study covers it."}],"unassigned":[],"unanswered":[{"question":"RQ2","reason":"No study certifies agent loops."}]}""");
         var unanswered = new List<UnansweredQuestion>();
 
         var (themes, _) = await ThematicSynthesis.BuildCodebookAsync(chat, "objective", Codes(), 8, questions: Questions, unanswered: unanswered);
@@ -69,7 +69,7 @@ public class ResearchQuestionCodebookTests
     public async Task ThemesAreSortedByTheirFirstQuestion()
     {
         var chat = new FakeChatService()
-            .Returns("""{"themes":[{"name":"Audits","description":"d","codes":["C2"],"questions":["RQ2"]},{"name":"Recovery","description":"d","codes":["C1"],"questions":["RQ1"]}],"unassigned":[]}""");
+            .Returns("""{"themes":[{"name":"Audits","description":"d","codes":["C2"],"questions":["RQ2"],"singleStudyReason":"Only this study covers it."},{"name":"Recovery","description":"d","codes":["C1"],"questions":["RQ1"],"singleStudyReason":"Only this study covers it."}],"unassigned":[]}""");
         var unanswered = new List<UnansweredQuestion>();
 
         var (themes, _) = await ThematicSynthesis.BuildCodebookAsync(chat, "objective", Codes(), 8, questions: Questions, unanswered: unanswered);
@@ -82,7 +82,7 @@ public class ResearchQuestionCodebookTests
     public async Task WithoutQuestionsTheCodebookPromptAndFileAreAsBefore()
     {
         var chat = new FakeChatService()
-            .Returns("""{"themes":[{"name":"Audits","description":"d","codes":["C2"]},{"name":"Recovery","description":"d","codes":["C1"]}],"unassigned":[]}""");
+            .Returns("""{"themes":[{"name":"Audits","description":"d","codes":["C2"],"singleStudyReason":"Only this study covers it."},{"name":"Recovery","description":"d","codes":["C1"],"singleStudyReason":"Only this study covers it."}],"unassigned":[]}""");
 
         var (themes, _) = await ThematicSynthesis.BuildCodebookAsync(chat, "objective", Codes(), 8);
 
