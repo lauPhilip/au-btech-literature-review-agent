@@ -47,7 +47,7 @@ Start the app (`dotnet watch` in `AuBtechReviewAgent`), then in `tools/a11y` run
 
 ## Tests
 
-All tests are in `AuBtechReviewAgent.Tests` and run offline: no API keys, no network. Run them from the repository root with `dotnet test`; CI runs the same command. The tests sit in the same folders as the code they test (`Screening/`, `Verification/` and so on), with whole runs in `Pipeline/` and the fakes in `Support/`; the table below lists them by file name.
+All tests are in `AuBtechReviewAgent.Tests` and run offline: no API keys, no network. Run them from the repository root with `dotnet test`, or only the tests your change can affect with `tools/test-scope.sh --run` (see Running only the affected tests below). The tests sit in the same folders as the code they test (`Screening/`, `Verification/` and so on), with whole runs in `Pipeline/` and the fakes in `Support/`; the table below lists them by file name.
 
 The engine has test hooks so a whole review can run against fakes. `ChatFactory` replaces the language model (usually with `FakeChatService`, which answers by matching text in the prompt), `SourceFactory` replaces the sources (`PipelineTests.FakeSource`), `CitationGraphFactory` replaces OpenAlex for chaining, `FullTextFetcher` replaces PDF downloads, `Cache` replaces the cache (`ReviewCache.Disabled` by default in tests), and `WorkspaceRoot` points the run folders at a temporary directory, which `TestFolders.TryDelete` removes afterwards.
 
@@ -85,3 +85,20 @@ When you fix a bug found in a real run, add a case to `RealRunRegressionTests.cs
 ## Short files
 
 No file in the repository is longer than 300 lines (issue #235): code and tests, but also the docs, the workflows, the Python tools and the data files. `Support/FileLengthTests.cs` reads the list of files git tracks, so run folders and build output never count, and fails when one of them grows past the limit. The exceptions are files nobody writes by hand: the downloaded SCImago rankings in `ScimagoData/`, the generated `package-lock.json`, the vendored libraries in `wwwroot/lib/` and the compiled `tailwind.css`. The 37 files that were longer when the rule came in were split on 22 November 2026, so the rule now holds for every other file without a list. Split a long file by responsibility (partial classes, child components, a `.razor.cs` code-behind), and before the split add tests that pin down what the file does wherever its tests are thin, so the same tests pass before and after. Comments say why, a rule or a source; a comment that repeats the code goes.
+
+### Running only the affected tests
+
+The whole suite takes about a minute on CI and longer on a laptop, while most changes touch one folder. `tools/test-scope.sh` (issue #394) reads the files a git range changes, by default `origin/master...HEAD` plus your uncommitted and untracked files, and prints `ALL`, `NONE` or a `dotnet test --filter` that names the test classes to run; on standard error it says, file by file, why. With `--run` it runs them too, and anything after `--` goes to `dotnet test`, so `tools/test-scope.sh --run -- --no-build` tests a build you already made. On Windows, `tools/test-scope.ps1` runs the same script in the bash that comes with Git for Windows. The table shows how a changed file is mapped.
+
+| Changed file | Tests that run |
+|---|---|
+| Docs only: any `.md`, `docs/`, `LICENSE`, `NOTICE`, `CITATION.cff` | None |
+| `Api/`, `Evidence/`, `Mcp/`, `Runs/`, `Screening/`, `Search/`, `Sources/`, `Web/` | The test folder of the same name |
+| `Components/`, `Styles/`, `wwwroot/`, the npm and Tailwind files | `Web/` |
+| `Modules/<Name>/` | Test classes whose name starts with the module's name, and every test file that names a type or component the module declares |
+| A test file | Its own classes, and every test file that names a class it declares |
+| `.github/`, `tools/a11y/`, `tools/ReleaseCheck/`, `tools/ScreeningEval/`, `deploy/`, `Dockerfile` | Only the set that always runs (their own CI jobs check them) |
+| `Llm/`, `Pipeline/`, `Verification/`, `Synthesis/`, `Report/`, `Program.cs`, the project files, `AuBtechReviewAgent.Tests/Support/`, a removed test file, or any file not in the map | The whole suite |
+
+Whenever any test runs, the module kit (`ModuleKitTests` and every test that runs a whole fake review through `ModuleKit` or `FormalKit`), `FileLengthTests` and the attack set in `Security/` run too, and `DocPathsTests` joins them when docs changed alongside code. The script finds the test classes by reading the test files, so there is no list to keep, and `Support/TestScopeTests.cs` checks the map against the folders as they are. When a change reaches every test class, the answer is `ALL`. CI uses the script on pull requests and runs the whole suite on master; see the operations page.
+
