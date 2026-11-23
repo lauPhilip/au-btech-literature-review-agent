@@ -32,17 +32,20 @@ public static partial class MultivocalFormalText
         sb.AppendLine($@"\node[box, below=of gscreened] (gincluded) {{Included: {g.Included}}};");
         sb.AppendLine($@"\node[box, below=of gincluded] (gkept) {{Passed the quality threshold: {g.Kept}}};");
         sb.AppendLine($@"\node[box, below=of gkept] (gextracted) {{Extracted: {g.Extracted}}};");
-        sb.AppendLine($@"\node[side, left=of gscreened] (gout) {{Same title: {g.DuplicatesAtScreening}\\Not screened: {g.NotScreened}\\Excluded: {g.Excluded}\\Below the threshold: {g.BelowThreshold}\\Not assessed: {g.NotAssessed}}};");
+        // Each side box sits beside the step its sources left at (#362): screening beside "Screened twice", quality beside the quality step.
+        sb.AppendLine($@"\node[side, left=of gscreened] (gout) {{Same title: {g.DuplicatesAtScreening}\\Not screened: {g.NotScreened}\\Excluded: {g.Excluded}}};");
+        sb.AppendLine($@"\node[side, left=of gkept] (glow) {{Below the threshold: {g.BelowThreshold}\\Not assessed: {g.NotAssessed}}};");
         sb.AppendLine($@"\node[box, right=1.2cm of gfound] (ffound) {{Academic records found: {f.Identified}}};");
         sb.AppendLine($@"\node[box, below=of ffound] (fscreened) {{Screened twice: {f.Screened}}};");
         sb.AppendLine($@"\node[box, below=of fscreened] (fincluded) {{Included: {f.Included}}};");
         sb.AppendLine($@"\node[box, below=of fincluded] (fkept) {{Appraised with MMAT: {f.Kept}}};");
         sb.AppendLine($@"\node[box, below=of fkept] (fextracted) {{Extracted: {f.Extracted}\\{{\scriptsize of which on the abstract only: {f.AbstractOnly}}}}};");
-        sb.AppendLine($@"\node[side, right=of fscreened] (fout) {{Duplicates by DOI or title: {f.DuplicatesRemoved}\\No web address: {f.NoAddressRemoved}\\Same title: {f.DuplicatesAtScreening}\\Not screened: {f.NotScreened}\\Excluded: {f.Excluded}\\Not appraised: {f.NotAssessed}}};");
+        sb.AppendLine($@"\node[side, right=of fscreened] (fout) {{Duplicates by DOI or title: {f.DuplicatesRemoved}\\No web address: {f.NoAddressRemoved}\\Same title: {f.DuplicatesAtScreening}\\Not screened: {f.NotScreened}\\Excluded: {f.Excluded}}};");
+        sb.AppendLine($@"\node[side, right=of fkept] (fnotappraised) {{Not appraised: {f.NotAssessed}}};");
         sb.AppendLine($@"\node[box, text width=8cm, below=0.8cm of gextracted.south east, anchor=north west, xshift=-1.8cm] (themes) {{Synthesised: {Count(input.Synthesis.Findings.Count, "finding")} in {Count(input.Synthesis.Themes.Count, "theme")}}};");
         foreach (string arm in new[] { "g", "f" })
             sb.AppendLine($@"\draw[->] ({arm}found) -- ({arm}screened); \draw[->] ({arm}screened) -- ({arm}included); \draw[->] ({arm}included) -- ({arm}kept); \draw[->] ({arm}kept) -- ({arm}extracted); \draw[->] ({arm}extracted) -- (themes);");
-        sb.AppendLine(@"\draw[->] (gscreened) -- (gout); \draw[->] (fscreened) -- (fout);");
+        sb.AppendLine(@"\draw[->] (gscreened) -- (gout); \draw[->] (fscreened) -- (fout); \draw[->] (gkept) -- (glow); \draw[->] (fkept) -- (fnotappraised);");
         sb.AppendLine(@"\end{tikzpicture}");
         return sb.ToString();
     }

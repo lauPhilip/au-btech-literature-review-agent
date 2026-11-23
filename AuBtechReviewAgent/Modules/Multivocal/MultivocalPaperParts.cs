@@ -131,7 +131,7 @@ public static partial class MultivocalPaperParts
         return sb.ToString();
     }
 
-    private static string FlowTikz(SourceFlow f)
+    public static string FlowTikz(SourceFlow f)
     {
         var sb = new StringBuilder();
         sb.AppendLine(@"\begin{tikzpicture}[node distance=0.55cm and 1.2cm, box/.style={draw, rectangle, align=center, font=\small, minimum width=5.2cm, minimum height=0.8cm}, side/.style={draw, rectangle, align=left, font=\footnotesize, text width=4.6cm, fill=black!3}, >={Stealth}]");
@@ -140,7 +140,7 @@ public static partial class MultivocalPaperParts
         sb.AppendLine($@"\node[box, below=of screened] (included) {{Included: {f.Included}}};");
         sb.AppendLine($@"\node[box, below=of included] (passed) {{Passed the quality threshold: {f.Passed}}};");
         sb.AppendLine($@"\node[box, below=of passed] (extracted) {{Extracted against the map: {f.Extracted}}};");
-        sb.AppendLine($@"\node[box, below=of extracted] (themes) {{Synthesised: {f.Findings} findings in {f.Themes} themes}};");
+        sb.AppendLine($@"\node[box, below=of extracted] (themes) {{Synthesised: {f.Findings} finding{(f.Findings == 1 ? "" : "s")} in {f.Themes} theme{(f.Themes == 1 ? "" : "s")}}};");
         sb.AppendLine($@"\node[side, right=of found] (dup) {{Duplicates: {f.Duplicates}\\Could not be screened: {f.NotScreened}}};");
         sb.AppendLine($@"\node[side, right=of screened] (exc) {{Excluded: {f.Excluded}}};");
         sb.AppendLine($@"\node[side, right=of included] (low) {{Below the threshold: {f.BelowThreshold}\\Not assessed (no readable page): {f.NotAssessed}}};");
