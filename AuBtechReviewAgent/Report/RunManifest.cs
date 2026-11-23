@@ -148,6 +148,7 @@ public static class RunManifest
 /// </summary>
 public static class ProtocolWriter
 {
+    /// <summary>The protocol of one systematic run, from its request and the server's settings, before anything is searched.</summary>
     /// <param name="seedStudies">How many of the most-cited included studies citation chaining builds out further (0: none).</param>
     /// <param name="seedPerDirection">How many references and citing works are kept per seed study.</param>
     public static string Write(Guid runId, ReviewRequest request, IReadOnlyList<string> sourceNames, string model, RunsOptions runs, DateTime createdUtc,
