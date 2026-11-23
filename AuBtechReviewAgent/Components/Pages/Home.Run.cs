@@ -110,14 +110,8 @@ public partial class Home
         }
         int runMaxResults = Quota.MaxResultsFor(tier, maxResults);
         maxResults = runMaxResults;
-        // The engine runs the same check again; these are the normalised fields.
         showLog = false;
         prefillNotice = null;
-        string cleanQuery = inputCheck.Request.Query;
-        string cleanObjective = inputCheck.Request.Objective;
-        string cleanInclusion = inputCheck.Request.Inclusion;
-        string cleanExclusion = inputCheck.Request.Exclusion;
-        string cleanDirective = inputCheck.Request.SynthesisDirective;
         pendingFlagSignature = null;
 
         State.Stats = new ReviewStats();
@@ -153,12 +147,14 @@ public partial class Home
         await ClearDraftAsync();
         editingNew = false;
         runInfo = null;
+        // The fields as typed: the engine runs the same check again, so it cleans them the same way and records the
+        // flags the reviewer confirmed, including text hidden in tag characters, which cleaning takes out.
         var request = new AuBtechReviewAgent.ReviewRequest(
-            cleanQuery, cleanObjective, cleanInclusion, cleanExclusion, runMaxResults,
-            requirePeerReview, cleanDirective, sessionKeys, runSources, yearFrom, yearTo, State.ReviewScreeningFirst,
+            draft.Query, draft.Objective, draft.Inclusion, draft.Exclusion, runMaxResults,
+            requirePeerReview, draft.SynthesisDirective, sessionKeys, runSources, yearFrom, yearTo, State.ReviewScreeningFirst,
             DualScreening: State.DualScreening, CitationChaining: State.CitationChaining, ArtifactKind: State.ArtifactKind,
-            SearchStrings: inputCheck.Request.SearchStrings, Method: ReviewMethod.Key,
-            ResearchQuestions: inputCheck.Request.ResearchQuestions);
+            SearchStrings: draft.SearchStrings, Method: ReviewMethod.Key,
+            ResearchQuestions: draft.ResearchQuestions);
 
         Subscribe();
 
