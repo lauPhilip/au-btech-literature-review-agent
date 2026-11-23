@@ -125,6 +125,15 @@ public static class MultivocalProtocol
         sb.AppendLine("## 8. Keeping the evidence");
         sb.AppendLine();
         sb.AppendLine("The text of each web source is kept on the server for the run's lifetime, so every citation check can be repeated. The run archive holds each source's address, access date, SHA-256 fingerprint, the quoted passages and a Wayback Machine link, not the pages themselves.");
+        if (plan.InputFlags.Count > 0)
+        {
+            sb.AppendLine();
+            sb.AppendLine("## Input check");
+            sb.AppendLine();
+            sb.AppendLine("Some of the answers above contain phrases that read like instructions to a language model. The person planning the review saw this warning and started the review anyway:");
+            sb.AppendLine();
+            foreach (var flag in plan.InputFlags) sb.AppendLine($"- {flag}");
+        }
         return sb.ToString();
     }
 
