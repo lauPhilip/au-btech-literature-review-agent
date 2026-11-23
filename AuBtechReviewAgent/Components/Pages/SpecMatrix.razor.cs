@@ -105,7 +105,8 @@ public partial class SpecMatrix
             {
                 using var doc = JsonDocument.Parse(await File.ReadAllTextAsync(auditPath));
                 if (doc.RootElement.TryGetProperty("SupportChecks", out var checks))
-                    auditChecks.AddRange(JsonSerializer.Deserialize<List<AuBtechReviewAgent.CitationSupportResult>>(checks.GetRawText()) ?? new());
+                    auditChecks.AddRange(AuBtechReviewAgent.ReportEdits.Checks(JsonSerializer.Deserialize<List<AuBtechReviewAgent.CitationSupportResult>>(checks.GetRawText()) ?? new(),
+                        AuBtechReviewAgent.ReportEditLog.Load(folder)));
                 if (doc.RootElement.TryGetProperty("RemovedCitations", out var removed) && removed.ValueKind == JsonValueKind.Array)
                     auditRemoved = removed.GetArrayLength();
                 if (doc.RootElement.TryGetProperty("Rechecks", out var done))
@@ -121,7 +122,7 @@ public partial class SpecMatrix
             try
             {
                 var updated = JsonSerializer.Deserialize<PrismaReport>(await File.ReadAllTextAsync(reportPath), new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
-                if (updated != null) report.CitationCheckSummary = updated.CitationCheckSummary;
+                if (updated != null) report.CitationCheckSummary = AuBtechReviewAgent.ReportEdits.Apply(updated, AuBtechReviewAgent.ReportEditLog.Load(folder)).CitationCheckSummary;
             }
             catch (Exception ex) when (ex is JsonException or IOException)
             {
@@ -206,6 +207,7 @@ public partial class SpecMatrix
             {
                 string content = await File.ReadAllTextAsync(reportPath);
                 report = JsonSerializer.Deserialize<PrismaReport>(content, new JsonSerializerOptions { PropertyNameCaseInsensitive = true }) ?? new PrismaReport();
+                report = AuBtechReviewAgent.ReportEdits.Apply(report, AuBtechReviewAgent.ReportEditLog.Load(folder));
             }
             catch { report = new PrismaReport(); }
         }
@@ -220,7 +222,7 @@ public partial class SpecMatrix
         flow = AuBtechReviewAgent.PrismaFlowCounts.From(state);
         runLine = RunLine(state);
         dateLine = state.CompletedUtc is DateTime done ? done.ToString("d MMMM yyyy", System.Globalization.CultureInfo.InvariantCulture) : "";
-        aiStatement = AuBtechReviewAgent.AiUseStatement.Methods(state, State.CurrentSessionId);
+        aiStatement = AuBtechReviewAgent.AiUseStatement.Methods(state, State.CurrentSessionId, AuBtechReviewAgent.ReportEditLog.Load(folder));
         aiShort = AuBtechReviewAgent.AiUseStatement.Short(state);
         researchQuestions = state.ResearchQuestions?.ToList() ?? new List<string>();
         passedPeerReviewCheck = state.Stats.PassedPeerReviewCheck;

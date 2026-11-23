@@ -48,6 +48,8 @@ public partial class PrismaReviewEngine
             }
         }
 
+        // The reviewer's checked edits (report-edits.json) go into main.tex; a run without edits is written as before.
+        report = ReportEdits.Apply(report, LoadReportEdits(sessionId));
         return GenerateWorkspaceArchive(sessionId, report, state.SynthesizedRecords, state);
     }
 
