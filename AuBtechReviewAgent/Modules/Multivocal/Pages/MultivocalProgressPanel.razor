@@ -100,7 +100,7 @@
                 </div>
             }
 
-            @FunnelRow("Screened", Screening == null ? "–" : (included + excluded).ToString(), Screening?.Kappa is double k ? $"twice; agreement κ = {k:0.00}" : null, false)
+            @FunnelRow("Screened", Screening == null ? "–" : (included + excluded).ToString(), Screening == null ? null : AuBtechReviewAgent.MultivocalScreeningText.FunnelNote(Screening), false)
             @if (Screening != null)
             {
                 <div class="grid grid-cols-2 gap-1.5">
