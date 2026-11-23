@@ -71,9 +71,8 @@ public sealed partial class MultivocalReporter
         var section = new ReportSection { Heading = "3. Selection (G9, G10)" };
         int reviewed = s.Sources.Count(x => x.Reviewed);
         int changed = s.Sources.Count(x => x.Reviewed && x.ModelDecision != null && x.ModelDecision != x.Decision);
-        string kappa = s.Kappa is double k ? $" The two screenings agreed with Cohen's κ = {k.ToString("0.00", CultureInfo.InvariantCulture)}." : "";
         section.Blocks.Add(ReportBlock.Paragraph(
-            $"Each of the {Count(s.Sources.Count, "source")} found was screened twice by the language model against the protocol's criteria, independently and with the steps in a different order (G9, G10).{kappa} " +
+            MultivocalScreeningText.Method(s) +
             $"{Num(s.Count("Included"))} were included, {Num(s.Count("Excluded"))} excluded and {Num(s.Count("Duplicate"))} set aside as duplicates of a source with the same title" +
             $"{(s.Count("Error") > 0 ? $"; {Num(s.Count("Error"))} could not be screened" : "")}. " +
             $"The reviewer looked at {Count(reviewed, "decision")} and changed {Num(changed)}; the model's decision stays on file next to the reviewer's."));

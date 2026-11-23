@@ -34,7 +34,17 @@ public sealed class GreyScreening
     /// <summary>For a duplicate: the address of the source with the same title and producer that was screened.</summary>
     public string? DuplicateOf { get; set; }
     public ScreeningAnswer? First { get; set; }
+
+    /// <summary>The second, independent screening; null for a source screened once (<see cref="MultivocalSecondScreening"/>).</summary>
     public ScreeningAnswer? Second { get; set; }
+
+    /// <summary>Why the source was screened a second time: "included", "uncertain" or "flagged"; null when only the audit sample (or nothing) asked for it.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? SecondReason { get; set; }
+
+    /// <summary>The source is in its pool's random audit sample, the only sources Cohen's κ is computed over.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public bool AuditSample { get; set; }
     public List<string>? InjectionFlags { get; set; }
     public bool FromCache { get; set; }
 
@@ -64,14 +74,31 @@ public sealed class MultivocalScreeningFile
     public string InclusionCriteria { get; set; } = "";
     public string ExclusionCriteria { get; set; } = "";
 
-    /// <summary>Cohen's kappa between the two screenings, over the sources both screened (both pools together).</summary>
+    /// <summary>
+    /// The seed of the random audit sample (<see cref="MultivocalSecondScreening.SeedOf"/>); null in a run screened
+    /// before 23 Nov 2026, when every source was screened twice.
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? AuditSeed { get; set; }
+
+    /// <summary>The share of each pool drawn for the audit sample, and its smallest size; null in an older run.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public double? AuditShare { get; set; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public int? AuditMinimum { get; set; }
+
+    /// <summary>
+    /// Cohen's kappa between the two screenings, both pools together: over the random audit sample only, never over the
+    /// targeted second screenings (in an older run, over every source).
+    /// </summary>
     public double? Kappa { get; set; }
 
-    /// <summary>With a formal pool: Cohen's kappa of the grey sources alone; null, and left out, otherwise.</summary>
+    /// <summary>With a formal pool: Cohen's kappa of the grey sources' audit sample; null, and left out, otherwise.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public double? KappaGrey { get; set; }
 
-    /// <summary>With a formal pool: Cohen's kappa of the formal sources alone; null, and left out, otherwise.</summary>
+    /// <summary>With a formal pool: Cohen's kappa of the formal sources' audit sample; null, and left out, otherwise.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public double? KappaFormal { get; set; }
 

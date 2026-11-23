@@ -16,10 +16,12 @@ namespace AuBtechReviewAgent;
 /// <param name="Kept">Grey sources that passed the quality threshold, or academic sources appraised with MMAT.</param>
 /// <param name="BelowThreshold">Grey sources below the quality threshold (none for the formal pool).</param>
 /// <param name="AbstractOnly">Of the extracted academic sources, those that rest on their abstract alone (decision 8).</param>
+/// <param name="Second">The pool's second screenings: how many, why, the audit sample and its κ; null before screening.</param>
 public sealed record PoolCounts(
     int Identified, int DuplicatesRemoved, int NoAddressRemoved, int DuplicatesAtScreening, int NotScreened,
     int Included, int Excluded, int ToLookAt, double? Kappa,
-    int Kept, int BelowThreshold, int NotAssessed, int Extracted, int NotExtracted, int AbstractOnly)
+    int Kept, int BelowThreshold, int NotAssessed, int Extracted, int NotExtracted, int AbstractOnly,
+    SecondScreeningCounts? Second = null)
 {
     public int Screened => Included + Excluded;
 }
@@ -50,6 +52,7 @@ public static class MultivocalPools
             NotAssessed: assessed.Count(q => q.Outcome == "Not assessed"),
             Extracted: extracted.Count(x => x.Error == null),
             NotExtracted: extracted.Count(x => x.Error != null),
-            AbstractOnly: extracted.Count(x => x.Error == null && x.TextBasis == MultivocalPages.AbstractBasis));
+            AbstractOnly: extracted.Count(x => x.Error == null && x.TextBasis == MultivocalPages.AbstractBasis),
+            Second: screening == null ? null : MultivocalSecondScreening.Count(screening, formal));
     }
 }

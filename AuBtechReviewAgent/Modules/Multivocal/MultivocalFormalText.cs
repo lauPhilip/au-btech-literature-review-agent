@@ -48,7 +48,7 @@ public static partial class MultivocalFormalText
         var formal = MultivocalPools.For(true, input.Ledger, s, null, null);
         return "Grey and academic sources were screened with the same criteria, steps and answer format; only the opening of the prompt said what kind of source it was (G10). " +
                $"Of the {Count(formal.Screened, "academic source")} screened, {Num(formal.Included)} {Was(formal.Included)} included and {Num(formal.Excluded)} excluded; of the {Count(grey.Screened, "grey source")}, {Num(grey.Included)} {Was(grey.Included)} included and {Num(grey.Excluded)} excluded. " +
-               $"Cohen's κ between the two screenings was {Kappa(s.KappaGrey)} for the grey sources, {Kappa(s.KappaFormal)} for the academic sources and {Kappa(s.Kappa)} for both.";
+               MultivocalScreeningText.PoolAgreement(s);
     }
 
     /// <summary>The formal pool's appraisal (G11 does not cover it): MMAT on the full text or the abstract, and no threshold.</summary>
@@ -93,15 +93,14 @@ public static partial class MultivocalFormalText
     /// pools screened, two appraisals, and citations checked against a grey source's page or an academic source's text.
     /// </summary>
     public static string AiUseTasks(MultivocalReportInput input, string subject = "The model was") =>
-        subject + " used for screening the grey and the academic sources twice against the same criteria, scoring the grey sources' quality on the guidelines' checklist, " +
+        subject + " used for " + MultivocalScreeningText.AiUseTask(input.Screening, "the grey and the academic sources", "the same criteria") + ", scoring the grey sources' quality on the guidelines' checklist, " +
         "appraising the academic sources with the Mixed Methods Appraisal Tool, proposing the systematic map, extracting each source's values, checking that each value's quote supports it, " +
         "grouping the findings into themes, writing the theme sections, the discussion, the summary for practitioners and the title, abstract and introduction, " +
         "and checking each citation against the kept text of the source it cites: the kept page of a grey source, and the open-access full text or else the abstract of an academic one. " +
         "Every value, quality point, appraisal answer and citation verdict counts only with a quote found verbatim in that kept text; the method, the counts, the figures, the answers to questions about frequency or existence and the references were written in code. ";
 
-    /// <summary>The screenings' agreement for the statement on the use of AI: each pool and both, as the method gives it.</summary>
-    public static string AiUseKappa(MultivocalReportInput input) =>
-        $"The two screenings agreed with Cohen's kappa = {Kappa(input.Screening.KappaGrey)} for the grey sources, {Kappa(input.Screening.KappaFormal)} for the academic sources and {Kappa(input.Screening.Kappa)} for both. ";
+    /// <summary>The screenings' agreement for the statement on the use of AI: each pool and both, on the audit sample, as the method gives it.</summary>
+    public static string AiUseKappa(MultivocalReportInput input) => MultivocalScreeningText.AiUseAgreement(input.Screening, bothPools: true);
 
     private static string Was(int n) => n == 1 ? "was" : "were";
 
