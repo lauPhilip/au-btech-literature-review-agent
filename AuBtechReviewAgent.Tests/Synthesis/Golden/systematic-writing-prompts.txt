@@ -189,7 +189,7 @@ Recovery and audits complement each other [1, 2].
 REQUIREMENTS:
 1. "title": one line, at most 25 words, no full stop, naming the topic and the kind of review.
 2. "abstract": one paragraph of 150 to 250 words: background, method, main results by theme, and what they mean. No citations. Use no number that is not in the facts or the results above.
-3. "rationale": one or two paragraphs on why the review is needed, from what the studies report; every sentence ends with an inline [n] marker, using the studies the results cite for it. Add no background from general knowledge: leave out a sentence you cannot cite, since code removes every rationale sentence without a citation.
+3. "rationale": one or two paragraphs on why the review is needed. Every sentence but the last states the problem from what the studies say and ends with an inline [n] marker, using the studies the results cite for it; these sentences use no result figure (no number, percentage or effect size from the results). The last sentence has no citation and states what is not yet known, the gap this review addresses; it names no study, number or study design and uses none of these words: report, found, show, demonstrate, observe, "studies", "the literature". Add no background from general knowledge: leave out a sentence you cannot cite, since code removes every other rationale sentence without a citation.
 4. "objectives": the objective and what the review set out to answer, in two or three sentences, without citations.
 Write plain paragraphs separated by a blank line: no Markdown, no headings, no bullet or numbered lists, no tables and no bold or italics.
 Respond ONLY with a valid minified JSON object:
