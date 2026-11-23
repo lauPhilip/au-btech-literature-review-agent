@@ -12,7 +12,8 @@ public record AcademicPaper(
     string JournalSource,
     string? Doi = null,   // Bare DOI (e.g. "10.1016/j.epsr.2025.109876") when the source API returns one
     string? Url = null,   // Landing-page URL used when no DOI is available
-    string? PdfUrl = null // Direct link to a legal open-access PDF, when the source knows one
+    string? PdfUrl = null, // Direct link to a legal open-access PDF, when the source knows one
+    int? CitedByCount = null // Times cited, as the source counted it on the day of the search; null when the source gives none
 );
 
 public class IncludedPaperMetricRow
@@ -74,7 +75,9 @@ public record ScreeningLog(
     // "database search" or "citation chaining".
     string Origin = "database search",
     // For excluded records: the group of reasons (see ExclusionReasons), for the funnel and PRISMA item 16a.
-    string? ExclusionReason = null
+    string? ExclusionReason = null,
+    // Times cited, from the source's metadata on the day of the search; null when the source gave none.
+    int? CitedByCount = null
 );
 
 public class PlatformSearchLog

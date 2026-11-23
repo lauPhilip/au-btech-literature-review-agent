@@ -77,6 +77,10 @@ public class ReviewState
     public bool DualScreeningRequested { get; set; }
     public bool CitationChainingRequested { get; set; }
 
+    /// <summary>The seed step of citation chaining: the rule, the seeds with their counts and ranks, and what they found.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public SeedChainingRecord? SeedChaining { get; set; }
+
     // True when the user asked to confirm the screening decisions before the write-up.
     public bool HumanScreeningReviewRequested { get; set; }
     public string? HumanScreeningReviewOutcome { get; set; }
@@ -127,6 +131,7 @@ public class ReviewStats
     public int CitationsNotSupported { get; set; }
     public int CitationsUnverifiable { get; set; }
     public int IdentifiedViaCitations { get; set; } // Subset of TotalIdentified found by citation chaining (PRISMA "other methods")
+    public int IdentifiedViaSeedChaining { get; set; } // ...of which found by building out from the most-cited included studies
     public int DualScreened { get; set; }           // Records screened by both independent prompts
     public int ScreeningDisagreements { get; set; } // ...where the two prompts disagreed
     public double? ScreeningKappa { get; set; }     // Cohen's kappa between the two screenings
