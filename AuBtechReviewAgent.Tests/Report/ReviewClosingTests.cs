@@ -22,8 +22,22 @@ public class ReviewClosingTests : IDisposable
         Assert.Contains("futureResearch, conclusion must not be empty", ReviewWriter.ClosingProblem("a", "b", " ", "", known, 2));
         Assert.Contains("conclusion is too long", ReviewWriter.ClosingProblem("a", "b", "c", string.Join(" ", Enumerable.Repeat("word", ReviewWriter.MaxConclusionWords + 1)), known, 2));
         Assert.Contains("citation numbers 7 are not in the reference list", ReviewWriter.ClosingProblem("a [7].", "b", "c", "d", known, 2));
-        Assert.Contains("the text uses 85", ReviewWriter.ClosingProblem("a", "85 percent adopt it.", "c", "d", known, 2));
+        Assert.Contains("the text uses 85", ReviewWriter.ClosingProblem("a", "85 percent adopt it [1].", "c", "d", known, 2));
         Assert.Null(ReviewWriter.ClosingProblem("2 studies were included.", "b", "c", "d", known, 2)); // a number from the facts is fine
+    }
+
+    [Fact]
+    public void AnUncitedSentenceThatReportsAFindingIsSentBack()
+    {
+        // From the audit of two real runs: the review's own readings carried citations, and the check flagged them.
+        const string facts = "13 studies; full text was read for 9.";
+        string? Problem(string limitations, string futureResearch, string conclusion) =>
+            ReviewWriter.ClosingProblem(limitations, "Teams should add supervisor checks.", futureResearch, conclusion, facts, 13, ownFacts: facts);
+
+        Assert.Null(Problem("The evidence rests on 13 case studies.", "Longitudinal field studies of supervised loops are missing.", "Safety needs both recovery and oversight."));
+        Assert.Contains("conclusion: \"Studies report that oversight works.\" has no citation", Problem("a [1].", "c", "Studies report that oversight works."));
+        Assert.Contains("futureResearch: \"Tests reach 40 to 90 percent coverage.\" has no citation", Problem("a [1].", "Tests reach 40 to 90 percent coverage.", "d"));
+        Assert.Contains("names a study design", ReviewWriter.ClosingProblem("a [1].", "Run a randomised comparison first.", "c", "d", facts, 13, ownFacts: facts));
     }
 
     [Fact]
@@ -35,7 +49,7 @@ public class ReviewClosingTests : IDisposable
         Assert.Contains("exactly 2 answer(s)", Problem("Only one [1]."));
         Assert.Contains("exactly 2 answer(s)", Problem("One [1].", " "));
         Assert.Contains("citation numbers 9 are not in the reference list", Problem("One [9].", "Two [1]."));
-        Assert.Contains("the text uses 85", Problem("85 percent adopt it.", "Two [1]."));
+        Assert.Contains("the text uses 85", Problem("85 percent adopt it [1].", "Two [1]."));
         Assert.Null(ReviewWriter.ClosingProblem("a", "b", "c", "d", known, 2)); // without questions nothing changes
     }
 
@@ -90,6 +104,15 @@ public class ReviewClosingTests : IDisposable
     }
 
     [Fact]
+    public void AnOwnCountInWordsThatCarriesACitationIsCaught()
+    {
+        // From the audit: a limitation read "The evidence base rests on four studies [1, 2, 3, 4]."
+        Assert.Equal("The evidence base rests on four studies [1, 2, 3, 4].",
+            ReviewWriter.OwnCountCited("The evidence base rests on four studies [1, 2, 3, 4].", "4 studies; 3 read in full text."));
+        Assert.Null(ReviewWriter.OwnCountCited("The evidence base rests on four studies [1, 2, 3, 4].", "13 studies."));
+    }
+
+    [Fact]
     public void TheAnswersComeBetweenTheClosingSectionsAndTheConclusionInReadingOrder()
     {
         var themes = new[] { "theme1" };
@@ -101,7 +124,7 @@ public class ReviewClosingTests : IDisposable
     }
 
     private static string RespondWithClosing(string prompt) => prompt.Contains("You are writing the sections that follow the discussion")
-        ? """{"limitations":"The evidence rests on two studies read from their abstracts [1, 2].","implications":"Teams should add supervisor checks to agent loops [1].","futureResearch":"Governance layers need evaluation in production [2].","conclusion":"Agent loops recover from faults through supervisor checks, and governance layers audit their actions [1, 2]."}"""
+        ? """{"limitations":"Both studies leave long-term effects unmeasured [1, 2].","implications":"Teams should add supervisor checks to agent loops [1].","futureResearch":"Governance layers need evaluation in production [2].","conclusion":"Agent loops recover from faults through supervisor checks, and governance layers audit their actions [1, 2]."}"""
         : ReviewWriterTests.Respond(prompt);
 
     [Fact]
@@ -119,7 +142,7 @@ public class ReviewClosingTests : IDisposable
 
         string folder = Path.Join(_root, runId.ToString("N"));
         var report = System.Text.Json.JsonSerializer.Deserialize<PrismaReport>(File.ReadAllText(Path.Join(folder, "prisma-report.json")))!;
-        Assert.Equal("The evidence rests on two studies read from their abstracts [1, 2].", report.EvidenceLimitationsItem);
+        Assert.Equal("Both studies leave long-term effects unmeasured [1, 2].", report.EvidenceLimitationsItem);
         Assert.Equal("Teams should add supervisor checks to agent loops [1].", report.ImplicationsItem);
         Assert.Equal("Governance layers need evaluation in production [2].", report.FutureResearchItem);
         Assert.StartsWith("Agent loops recover from faults through supervisor checks", report.ConclusionItem);
@@ -141,7 +164,7 @@ public class ReviewClosingTests : IDisposable
     }
 
     private static string RespondWithAnswers(string prompt) => prompt.Contains("You are writing the sections that follow the discussion")
-        ? """{"limitations":"The evidence rests on two studies read from their abstracts [1, 2].","implications":"Teams should add supervisor checks to agent loops [1].","futureResearch":"Governance layers need evaluation in production [2].","conclusion":"Together, the themes suggest that safe agent loops need both recovery and oversight, and that support for either is still thin.","answers":["Supervisor checks let agent loops recover from faults [1].","Governance layers audit what agents do [2]."]}"""
+        ? """{"limitations":"Both studies leave long-term effects unmeasured [1, 2].","implications":"Teams should add supervisor checks to agent loops [1].","futureResearch":"Governance layers need evaluation in production [2].","conclusion":"Together, the themes suggest that safe agent loops need both recovery and oversight, and that support for either is still thin.","answers":["Supervisor checks let agent loops recover from faults [1].","Governance layers audit what agents do [2]."]}"""
         : ReviewWriterTests.Respond(prompt);
 
     [Fact]

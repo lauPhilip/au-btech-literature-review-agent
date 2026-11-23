@@ -75,6 +75,24 @@ public class ThematicSynthesisTests
     }
 
     [Fact]
+    public async Task TheCodingStepGetsTheResearchQuestionsAndWithoutThemItsPromptIsAsBefore()
+    {
+        // The audit of two real runs: codes were dropped as "not bearing on the objective" though they answered a question.
+        var withQuestions = new FakeChatService().Returns("""{"studies":[{"ref":1,"codes":[],"reason":"About crop yields."}]}""");
+        await ThematicSynthesis.CodeStudiesAsync(withQuestions, "objective", new[] { Paper(1, "Wheat.") }, new[] { Extraction(1) }, 6, 1,
+            questions: new[] { "How do agent loops recover?" });
+        string prompt = withQuestions.Prompts.Single();
+        Assert.Contains(ReviewWriter.AimBlock("objective", new[] { "How do agent loops recover?" }), prompt);
+        Assert.Contains("bears on the review objective or on any of the research questions.", prompt);
+
+        var without = new FakeChatService().Returns("""{"studies":[{"ref":1,"codes":[],"reason":"About crop yields."}]}""");
+        await ThematicSynthesis.CodeStudiesAsync(without, "objective", new[] { Paper(1, "Wheat.") }, new[] { Extraction(1) }, 6, 1);
+        Assert.Contains("REVIEW OBJECTIVE: \"objective\"\n", without.Prompts.Single().Replace("\r\n", "\n"));
+        Assert.DoesNotContain("RESEARCH QUESTIONS", without.Prompts.Single());
+        Assert.Contains("that bears on the review objective. Codes should", without.Prompts.Single());
+    }
+
+    [Fact]
     public async Task CodebookIsRejectedUntilEveryCodedStudyIsPlacedOrExplained()
     {
         var codes = new List<ThematicCode>
