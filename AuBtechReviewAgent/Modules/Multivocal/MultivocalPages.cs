@@ -131,12 +131,27 @@ public sealed partial class MultivocalPages
     /// the live page, which may have changed since the access date; a kept text whose SHA-256 no longer matches counts
     /// as missing. Returns "found", "not found" or "no kept page".
     /// </summary>
-    public string CheckQuote(Guid runId, string address, string quote)
+    public string CheckQuote(Guid runId, string address, string quote) => QuoteChecker(runId)(address, quote);
+
+    /// <summary>
+    /// <see cref="CheckQuote"/> for many quotes of one run: the pages file is read once, and each kept text once,
+    /// checked against its fingerprint and made canonical once, however many quotes are checked in it.
+    /// </summary>
+    public Func<string, string, string> QuoteChecker(Guid runId)
     {
-        var snapshot = Load(runId).Pages.FirstOrDefault(p => MultivocalSearcher.AddressKey(p.Url) == address);
-        string? text = snapshot is { NotKept: null } ? ReadText(runId, snapshot) : null;
-        if (text == null) return "no kept page";
-        return CitationSupportChecker.QuoteOccursIn(quote, text) ? "found" : "not found";
+        var pages = Load(runId).Pages;
+        var texts = new Dictionary<string, CanonicalText?>();
+        return (address, quote) =>
+        {
+            if (!texts.TryGetValue(address, out var text))
+            {
+                var snapshot = pages.FirstOrDefault(p => MultivocalSearcher.AddressKey(p.Url) == address);
+                string? kept = snapshot is { NotKept: null } ? ReadText(runId, snapshot) : null;
+                texts[address] = text = kept == null ? null : CanonicalText.Of(kept);
+            }
+            if (text == null) return "no kept page";
+            return CitationSupportChecker.QuoteOccursIn(quote, text) ? "found" : "not found";
+        };
     }
 
     /// <summary>Fetches one found source's page and keeps its text. Needs the run's edit key.</summary>
