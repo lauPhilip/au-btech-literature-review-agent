@@ -88,6 +88,19 @@ public partial class Home
             return;
         }
 
+        // A bot that filled the hidden field is refused without a reason it could learn from.
+        if (!string.IsNullOrEmpty(State.Honeypot))
+        {
+            AuBtechReviewAgent.SiteRateLimits.LogRefusal("honeypot", clientAddress);
+            quotaNotice = "The tool is busy; try again later.";
+            return;
+        }
+        if (!Actions.TryTake(AuBtechReviewAgent.ActionLimiter.StartReview, clientAddress, out string tooMany))
+        {
+            quotaNotice = tooMany;
+            return;
+        }
+
         // Join the one line for every review first: a full line refuses the run before anything is counted.
         var runId = Guid.NewGuid();
         var admission = ReviewEngine.Coordinator.TryAdmit(runId, clientAddress);

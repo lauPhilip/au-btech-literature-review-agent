@@ -2,9 +2,12 @@
 @layout AppLayout
 @rendermode InteractiveServer
 @inject ILogger<Verify> Logger
+@inject IHttpContextAccessor HttpContextAccessor
+@inject AuBtechReviewAgent.ActionLimiter Actions
 
-@* Checks an uploaded run archive against its manifest.json (RunManifest.CheckArchive). The file is read in
-   memory for the check and not saved. *@
+@* Checks an uploaded run archive against its manifest.json (RunManifest.CheckArchive). The upload goes to a
+   temporary file that is deleted when the check ends, one check at a time across the site (ArchiveUpload), and each
+   address may check a limited number an hour (ActionLimiter). *@
 
 <SeoHead Title="Verify a run archive" Path="/verify" BreadcrumbName="Verify"
          Description="Check that a TraceableAI run archive has not been changed: every file is compared with the SHA-256 fingerprint in its manifest." />
@@ -20,7 +23,7 @@
                 <label for="archive" class="flex min-h-[220px] cursor-pointer flex-col items-center justify-center gap-2 rounded-card border-2 border-dashed border-line-field bg-soft p-6 text-center hover:border-heading focus-within:border-heading focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-heading @(checking ? "opacity-60" : "")">
                     <svg class="h-8 w-8 text-heading" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
                     <span class="font-display text-base font-semibold text-heading">Choose a run archive</span>
-                    <span class="text-sm text-muted">A .zip file of at most @(MaxUploadMb) MB. It is checked in memory and not stored.</span>
+                    <span class="text-sm text-muted">A .zip file of at most @(MaxUploadMb) MB. It is checked on the server and not stored.</span>
                     <InputFile id="archive" OnChange="CheckAsync" accept=".zip,application/zip" disabled="@checking" aria-describedby="archive-help" class="sr-only" />
                 </label>
                 <p id="archive-help" class="mt-3 text-sm text-muted">You can also check it yourself: unzip it and compare <code class="font-mono">sha256sum</code> (or <code class="font-mono">Get-FileHash</code> in PowerShell) with the manifest.</p>
@@ -124,12 +127,19 @@
             : "The manifest itself was edited: its own fingerprint no longer matches, so the list of fingerprints cannot be trusted.";
     }
 
-    private const int MaxUploadMb = 200;
+    private const int MaxUploadMb = AuBtechReviewAgent.ArchiveUpload.MaxMb;
 
     private bool checking;
     private string? fileName;
     private string? error;
     private AuBtechReviewAgent.RunManifest.ArchiveCheck? result;
+
+    // The address the upload limit counts by, read during the prerender as the review form reads it.
+    [PersistentState]
+    public string? PrerenderClientAddress { get; set; }
+
+    protected override void OnInitialized() =>
+        PrerenderClientAddress ??= AuBtechReviewAgent.RunQuotaService.NormalizeClientAddress(HttpContextAccessor.HttpContext?.Connection.RemoteIpAddress);
 
     private async Task CheckAsync(InputFileChangeEventArgs e)
     {
@@ -139,11 +149,11 @@
         fileName = e.File.Name;
         try
         {
-            using var buffer = new MemoryStream();
-            await using (var upload = e.File.OpenReadStream(MaxUploadMb * 1024L * 1024L))
-                await upload.CopyToAsync(buffer);
-            buffer.Position = 0;
-            result = await Task.Run(() => AuBtechReviewAgent.RunManifest.CheckArchive(buffer));
+            if (AuBtechReviewAgent.ArchiveUpload.Refuse(e.File.Name, e.File.Size) is { } refused) { error = refused; return; }
+            if (!Actions.TryTake(AuBtechReviewAgent.ActionLimiter.VerifyUpload, PrerenderClientAddress ?? "unknown", out string limited)) { error = limited; return; }
+            await using var upload = e.File.OpenReadStream(MaxUploadMb * 1024L * 1024L);
+            result = await AuBtechReviewAgent.ArchiveUpload.CheckAsync(upload);
+            if (result == null) error = "Another archive is being checked just now. Try again in a minute.";
         }
         catch (IOException ex) when (ex.Message.Contains("exceeds", StringComparison.OrdinalIgnoreCase))
         {

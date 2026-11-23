@@ -83,6 +83,12 @@ public partial class MultivocalStart
     internal async Task ProposeFormalStrings()
     {
         if (proposingStrings || proposalsLeft <= 0 || string.IsNullOrWhiteSpace(plan.Topic)) return;
+        // The page's five start again with a reload; the limit per address does not.
+        if (!Actions.TryTake(AuBtechReviewAgent.ActionLimiter.ProposeStrings, PrerenderClientAddress ?? "unknown", out string limited))
+        {
+            proposalError = limited;
+            return;
+        }
         proposingStrings = true;
         proposalError = null;
         proposalsLeft--;
@@ -198,8 +204,19 @@ public partial class MultivocalStart
     internal async Task WriteProtocolAsync()
     {
         if (saving) return;
-        saving = true;
         error = null;
+        if (!string.IsNullOrEmpty(honeypot))
+        {
+            AuBtechReviewAgent.SiteRateLimits.LogRefusal("honeypot", PrerenderClientAddress ?? "unknown");
+            error = "The tool is busy; try again later.";
+            return;
+        }
+        if (!Actions.TryTake(AuBtechReviewAgent.ActionLimiter.StartReview, PrerenderClientAddress ?? "unknown", out string tooMany))
+        {
+            error = tooMany;
+            return;
+        }
+        saving = true;
         try
         {
             var (newRunId, newEditKey) = await Planner.CreateAsync(plan, FlagsConfirmed ? FlagLines : null);
