@@ -90,11 +90,14 @@ public partial class MultivocalStart
     {
         if (screening == null) return $"{ledger.StoppingApplied} Not screened yet.";
         static string K(double? k) => k is double v ? v.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture) : "not computed";
+        string sample = screening.AuditSeed == null ? "" : " on the audit sample";
         string agreement = ledger.HasFormalPool
-            ? $"; agreement κ = {K(screening.KappaGrey)} for grey, {K(screening.KappaFormal)} for academic and {K(screening.Kappa)} for both"
-            : screening.Kappa is double k ? $"; agreement κ = {K(k)}" : "";
+            ? $"; agreement κ{sample} = {K(screening.KappaGrey)} for grey, {K(screening.KappaFormal)} for academic and {K(screening.Kappa)} for both"
+            : screening.Kappa is double k ? $"; agreement κ{sample} = {K(k)}" : "";
         string by = screening.Model.Trim().Length > 0 ? $" by {screening.Model.Trim()}" : "";
-        return $"{ledger.StoppingApplied} Screened twice with the plan's criteria{by}{agreement}{(quality == null ? "; the quality check comes next." : ".")}";
+        string how = screening.AuditSeed == null ? "Screened twice"
+            : $"Screened once, and {MultivocalSecondScreening.Count(screening, null).ScreenedTwice} twice,";
+        return $"{ledger.StoppingApplied} {how} with the plan's criteria{by}{agreement}{(quality == null ? "; the quality check comes next." : ".")}";
     }
 
     /// <summary>

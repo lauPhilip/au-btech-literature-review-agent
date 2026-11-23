@@ -20,12 +20,20 @@
             {
                 @Row("− Could not be screened", Grey.NotScreened, Formal.NotScreened, false)
             }
-            @Row("Screened twice", Grey.Screened, Formal.Screened, true)
-            <tr class="border-t border-line text-muted">
-                <th scope="row" class="py-1 pr-2 font-normal pl-3 text-left">Agreement (κ)@(Kappa is double both ? $"; both {both:0.00}" : "")</th>
-                <td class="py-1 pr-2 text-right font-mono">@KappaText(Grey.Kappa)</td>
-                <td class="py-1 text-right font-mono">@KappaText(Formal.Kappa)</td>
-            </tr>
+            @if (Grey.Second is { Targeted: true } g && Formal.Second is { } f)
+            {
+                @* Screened once, and twice where the rule asks (MultivocalSecondScreening); κ on the random audit sample only. *@
+                @Row("Screened", Grey.Screened, Formal.Screened, true)
+                @Row("of which screened twice", g.ScreenedTwice, f.ScreenedTwice, false)
+                @Text("Targeted (included, unsure, flagged): agreed", $"{g.TargetedAgreed} of {g.TargetedTotal}", $"{f.TargetedAgreed} of {f.TargetedTotal}")
+                @Row("Random audit sample", g.Audit, f.Audit, false)
+                @Text($"Agreement on the audit sample (κ){(Kappa is double both ? $"; both {both:0.00}" : "")}", KappaText(Grey.Kappa), KappaText(Formal.Kappa))
+            }
+            else
+            {
+                @Row("Screened twice", Grey.Screened, Formal.Screened, true)
+                @Text($"Agreement (κ){(Kappa is double both ? $"; both {both:0.00}" : "")}", KappaText(Grey.Kappa), KappaText(Formal.Kappa))
+            }
             @Row("− Excluded", Grey.Excluded, Formal.Excluded, false)
             @Row("Included", Grey.Included, Formal.Included, true)
         }
@@ -52,6 +60,13 @@
     [Parameter] public bool Extracted { get; set; }
 
     private static string KappaText(double? kappa) => kappa is double k ? k.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture) : "–";
+
+    private static RenderFragment Text(string step, string grey, string formal) =>
+        @<tr class="border-t border-line text-muted">
+            <th scope="row" class="py-1 pr-2 font-normal pl-3 text-left">@step</th>
+            <td class="py-1 pr-2 text-right font-mono">@grey</td>
+            <td class="py-1 text-right font-mono">@formal</td>
+        </tr>;
 
     private static RenderFragment Row(string step, int? grey, int? formal, bool main) =>
         @<tr class="@(main ? "border-t border-line text-ink font-medium" : "border-t border-line text-muted")">

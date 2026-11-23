@@ -99,6 +99,16 @@ public sealed partial class MultivocalReporter
         return chosen.OrderBy(f => f.Tier).ThenByDescending(f => f.QualityPoints).ThenBy(f => f.Id, StringComparer.Ordinal).ToList();
     }
 
+    /// <summary>The G10 row's screening: every source twice in an older run, else once and twice where the rule asks, κ on the audit sample.</summary>
+    private static string ScreeningRow(MultivocalScreeningFile s)
+    {
+        var c = MultivocalSecondScreening.Count(s, null);
+        string kappa = s.Kappa is double k ? k.ToString("0.00", CultureInfo.InvariantCulture) : "not computed";
+        return !c.Targeted
+            ? $"Every source screened twice; κ = {kappa}"
+            : $"Every source screened once, {Num(c.ScreenedTwice)} twice ({Num(c.TargetedTotal)} included, unsure or flagged, {Num(c.TargetedAgreed)} of them agreeing; {Num(c.Audit)} in a random audit sample); κ = {kappa} on the audit sample";
+    }
+
     private static ReportSection Guidelines(MultivocalReportInput input)
     {
         var plan = input.Planned.Plan;
@@ -115,7 +125,7 @@ public sealed partial class MultivocalReporter
             new[] { "G7", "Where to search", $"{Count(input.Ledger.Searches.Select(x => x.Source).Distinct().Count(), "free search source")}; no general web search engine; no one contacted." },
             new[] { "G8", "When to stop", Upper(Sentence(input.Ledger.StoppingApplied)) },
             new[] { "G9", "Inclusion and exclusion criteria", "Set in the protocol and applied to every source." },
-            new[] { "G10", "Selection with the same care for every source", $"Every source screened twice; κ = {(input.Screening.Kappa is double k ? k.ToString("0.00", CultureInfo.InvariantCulture) : "not computed")}; {Count(input.Screening.Sources.Count(x => x.Uncertain), "decision")} flagged as uncertain; {Num(input.Screening.Sources.Count(x => x.Reviewed))} looked at by the reviewer." },
+            new[] { "G10", "Selection with the same care for every source", $"{ScreeningRow(input.Screening)}; {Count(input.Screening.Sources.Count(x => x.Uncertain), "decision")} flagged as uncertain; {Num(input.Screening.Sources.Count(x => x.Reviewed))} looked at by the reviewer." },
             new[] { "G11", "Quality of the sources", $"Table 7 checklist, threshold {input.Quality.Threshold} of {input.Quality.MaxPoints} points; every point backed by a quote.{(input.Ledger.HasFormalPool ? " Academic sources appraised with MMAT, as in the systematic review, on their full text or abstract; the threshold is for grey sources only." : "")}" },
             new[] { "G12", "Data extraction and systematic map", $"Map version {fixedMap.Number} with {Count(fixedMap.Attributes.Count, "attribute")}, fixed before extraction; every value backed by a quote." },
             new[] { "G13", "Synthesis", $"Qualitative coding into {Count(input.Synthesis.Themes.Count, "theme")}; evidence counted in code; opinion pieces with the critical questions." },
