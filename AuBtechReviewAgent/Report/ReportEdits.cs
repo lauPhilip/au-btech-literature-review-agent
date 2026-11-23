@@ -110,12 +110,14 @@ public static class ReportEdits
 
     private static string Replace(string text, IReadOnlyList<(int Start, int Length)> spans, IReadOnlyDictionary<int, string> sentences)
     {
-        foreach (var (index, sentence) in sentences.OrderByDescending(s => s.Key))
+        var result = new System.Text.StringBuilder(text.Length);
+        int from = 0;
+        foreach (var (index, sentence) in sentences.Where(s => s.Key >= 0 && s.Key < spans.Count).OrderBy(s => s.Key))
         {
-            if (index < 0 || index >= spans.Count) continue;
-            text = text[..spans[index].Start] + sentence + text[(spans[index].Start + spans[index].Length)..];
+            result.Append(text, from, spans[index].Start - from).Append(sentence);
+            from = spans[index].Start + spans[index].Length;
         }
-        return text;
+        return result.Append(text, from, text.Length - from).ToString();
     }
 
     /// <summary>
