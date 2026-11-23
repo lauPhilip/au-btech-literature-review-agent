@@ -65,8 +65,8 @@ public sealed class GreyExtraction
     public string? TextBasis { get; set; }
 
     /// <summary>
-    /// What of a formal source's full text the model was given, when not the whole kept text (<see cref="FormalExtractionText"/>),
-    /// e.g. "14 of 83 passages of the full text (8,104 of 41,230 characters)"; null when it was given the whole text.
+    /// What of a long full text or page the model was given, when not the whole kept text (<see cref="FormalExtractionText"/>,
+    /// <see cref="GreyPageText.ForExtraction"/>), e.g. "14 of 83 passages of the full text (8,104 of 41,230 characters)"; null when it was given the whole text.
     /// </summary>
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
     public string? Passages { get; set; }

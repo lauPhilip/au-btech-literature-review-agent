@@ -9,7 +9,7 @@
 }
 @if (total > 0)
 {
-    <div class="@(Thin ? "h-2" : "h-3") flex w-full overflow-hidden rounded-full bg-active" role="img" aria-label="@c.Sentence(total)">
+    <div class="@(Thin ? "h-2" : "h-3") flex w-full overflow-hidden bg-active" role="img" aria-label="@c.Sentence(total)">
         @Segment(c.Supported, total, "bg-supported-chart")
         @Segment(c.Partly, total, "bg-partly-chart")
         @Segment(c.NotSupported, total, "bg-not-supported-chart")
