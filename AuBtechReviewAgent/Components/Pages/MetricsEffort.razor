@@ -1,0 +1,77 @@
+@* The Metrics page's effort table (issue #414): per run, newest first, the wall-clock minutes, the model calls with
+   their retries and failures, the tokens in and out (with the reasoning part of the output) and the summed call time,
+   all from run-metrics.json, which counts them from llm-calls.json. No prices: they change, so the page counts tokens.
+   Runs made before these were counted show a dash. The table's cells use the page's classes (Metrics.razor.cs). *@
+
+@using System.Globalization
+
+<section id="effort" aria-labelledby="effort-title" class="ui-card scroll-mt-6 p-5 sm:p-6">
+    <h2 id="effort-title" class="font-display text-xl font-semibold tracking-tight text-heading">Effort per run</h2>
+    <p class="mt-1 max-w-[70ch] text-[15px] text-muted">
+        How long each run took and how much it asked of the language model, newest first. Minutes run from the start to the end of the run.
+        Calls are the model calls; a retry is a call sent again after a busy or failed answer. Output tokens include the reasoning tokens.
+        Call time adds up the time of every call, and calls run side by side, so it can be longer than the run. A dash means the run was made before this was counted.
+    </p>
+    <div class="mt-4 max-h-[70vh] overflow-auto border border-line" tabindex="0" role="region" aria-labelledby="effort-title">
+        <table class="w-full border-separate border-spacing-0 text-sm">
+            <thead>
+                <tr>
+                    @Th("Run") @Th("Version") @Th("Minutes", true) @Th("Calls", true) @Th("Retries", true) @Th("Failed", true)
+                    @Th("Input tokens", true) @Th("Output tokens", true) @Th("Of which reasoning", true) @Th("Call time (min)", true)
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var run in Runs.Reverse())
+                {
+                    var r = run;
+                    <tr class="hover:bg-soft">
+                        <th scope="row" class="@Metrics.Td text-left font-mono font-normal">@AuBtechReviewAgent.MetricsOverview.ShortId(r.RunId)</th>
+                        <td class="@Metrics.Td font-mono">@r.ShortVersion</td>
+                        <td class="@Metrics.TdNum">@r.DurationMinutes.ToString("0.0", Culture)</td>
+                        <td class="@Metrics.TdNum">@r.LlmCalls.ToString("N0", Culture)</td>
+                        <td class="@Metrics.TdNum">@r.LlmRetries.ToString("N0", Culture)</td>
+                        <td class="@Metrics.TdNum">@r.LlmFailures.ToString("N0", Culture)</td>
+                        <td class="@Metrics.TdNum">@Count(r.InputTokens)</td>
+                        <td class="@Metrics.TdNum">@Count(r.OutputTokens)</td>
+                        <td class="@Metrics.TdNum">@Count(r.ReasoningTokens)</td>
+                        <td class="@Metrics.TdNum">@(r.LlmMinutes is double m ? m.ToString("0.0", Culture) : "–")</td>
+                    </tr>
+                }
+            </tbody>
+            <tfoot>
+                <tr class="bg-soft font-semibold">
+                    <th scope="row" class="@Metrics.Td text-left" colspan="2">Mean per run</th>
+                    <td class="@Metrics.TdNum">@Mean(Runs.Select(r => (double?)r.DurationMinutes), "0.0")</td>
+                    <td class="@Metrics.TdNum">@Mean(Runs.Select(r => (double?)r.LlmCalls), "N0")</td>
+                    <td class="@Metrics.TdNum">@Mean(Runs.Select(r => (double?)r.LlmRetries), "0.0")</td>
+                    <td class="@Metrics.TdNum">@Mean(Runs.Select(r => (double?)r.LlmFailures), "0.0")</td>
+                    <td class="@Metrics.TdNum">@Mean(Runs.Select(r => (double?)r.InputTokens), "N0")</td>
+                    <td class="@Metrics.TdNum">@Mean(Runs.Select(r => (double?)r.OutputTokens), "N0")</td>
+                    <td class="@Metrics.TdNum">@Mean(Runs.Select(r => (double?)r.ReasoningTokens), "N0")</td>
+                    <td class="@Metrics.TdNum">@Mean(Runs.Select(r => r.LlmMinutes), "0.0")</td>
+                </tr>
+            </tfoot>
+        </table>
+    </div>
+</section>
+
+@code {
+    private static readonly CultureInfo Culture = CultureInfo.InvariantCulture;
+
+    /// <summary>The runs, oldest first, as the page holds them.</summary>
+    [Parameter, EditorRequired] public IReadOnlyList<AuBtechReviewAgent.RunMetrics> Runs { get; set; } = Array.Empty<AuBtechReviewAgent.RunMetrics>();
+
+    private static string Count(long? n) => n is long v ? v.ToString("N0", Culture) : "–";
+
+    // The mean over the runs that counted the figure; a dash when none did.
+    private static string Mean(IEnumerable<double?> values, string format)
+    {
+        var known = values.Where(v => v.HasValue).Select(v => v!.Value).ToList();
+        return known.Count == 0 ? "–" : known.Average().ToString(format, Culture);
+    }
+
+    private static RenderFragment Th(string label, bool numeric = false) => __builder =>
+    {
+        <th scope="col" class="@Metrics.ThClass @(numeric ? "text-right" : "text-left")">@label</th>
+    };
+}
