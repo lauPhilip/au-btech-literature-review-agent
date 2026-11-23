@@ -71,7 +71,9 @@ public class MultivocalPlanTests : IDisposable
         Assert.DoesNotContain("Where formal (academic) literature is searched", protocol);
         Assert.Contains("Inclusion criteria (G9): Sources on context engineering practice for LLM agents.", protocol);
         Assert.Contains("Exclusion criteria (G9): Marketing pages.", protocol);
-        Assert.Contains("screened twice", protocol);
+        Assert.Contains("is screened once by the language model, following the rapid-review practice of single screening with a verified sample", protocol);
+        Assert.Contains("random audit sample of 20% of its pool, at least 10 sources", protocol);
+        Assert.Contains("Cohen's kappa is computed on the audit sample only", protocol);
 
         plan.InclusionCriteria = " ";
         Assert.Contains("Say what a source must be about to be included (the inclusion criteria).", plan.Problems());
@@ -104,7 +106,7 @@ public class MultivocalPlanTests : IDisposable
         Assert.All(plan.IncludeGrey, a => Assert.NotNull(a));
         Assert.Equal(new[] { "RQ1", "RQ1.1", "RQ1.2", "RQ2", "RQ3" }, plan.Numbered().Select(q => q.Number));
         Assert.Contains("Context engineering for LLM agents", MultivocalProtocol.Write(plan, Guid.NewGuid(), DateTime.UtcNow));
-        Assert.Equal((20, 20, 2, 4), (new MultivocalPlan().TopHits, plan.TopHits, plan.GreySearchStrings.Count, plan.GreySearches.Count)); // kept small: every hit is screened twice
+        Assert.Equal((20, 20, 2, 4), (new MultivocalPlan().TopHits, plan.TopHits, plan.GreySearchStrings.Count, plan.GreySearches.Count)); // kept small: every hit is screened, many twice
         Assert.All(MultivocalPlan.ExampleFormalDatabases, k => Assert.Equal(SourceKeyKind.None, SourceCatalog.All.First(s => s.Key == k).KeyKind));
     }
 

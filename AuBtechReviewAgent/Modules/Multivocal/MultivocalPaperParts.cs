@@ -66,7 +66,8 @@ public static partial class MultivocalPaperParts
 
     /// <summary>The counts behind the data section, from the run's files.</summary>
     public sealed record SourceFlow(int Found, int Searches, int Duplicates, int NotScreened, int Screened, int Excluded, int Included,
-        int BelowThreshold, int NotAssessed, int Passed, int NotExtracted, int Extracted, int Findings, int Themes);
+        int BelowThreshold, int NotAssessed, int Passed, int NotExtracted, int Extracted, int Findings, int Themes,
+        int ScreenedTwice = 0, string ScreenedBox = "");
 
     public static SourceFlow Flow(MultivocalReportInput input)
     {
@@ -87,7 +88,9 @@ public static partial class MultivocalPaperParts
             NotExtracted: input.Extraction.Sources.Count - extracted,
             Extracted: extracted,
             Findings: input.Synthesis.Findings.Count,
-            Themes: input.Synthesis.Themes.Count);
+            Themes: input.Synthesis.Themes.Count,
+            ScreenedTwice: MultivocalSecondScreening.Count(s, null).ScreenedTwice,
+            ScreenedBox: MultivocalScreeningText.FlowBox(s, s.Count("Included") + s.Count("Excluded"), MultivocalSecondScreening.Count(s, null).ScreenedTwice));
     }
 
     /// <summary>The opening text of the data section, in code.</summary>
@@ -136,7 +139,7 @@ public static partial class MultivocalPaperParts
         var sb = new StringBuilder();
         sb.AppendLine(@"\begin{tikzpicture}[node distance=0.55cm and 1.2cm, box/.style={draw, rectangle, align=center, font=\small, minimum width=5.2cm, minimum height=0.8cm}, side/.style={draw, rectangle, align=left, font=\footnotesize, text width=4.6cm, fill=black!3}, >={Stealth}]");
         sb.AppendLine($@"\node[box] (found) {{Found: {f.Found} sources\\{{\footnotesize from {f.Searches} searches}}}};");
-        sb.AppendLine($@"\node[box, below=of found] (screened) {{Screened twice: {f.Screened}}};");
+        sb.AppendLine($@"\node[box, below=of found] (screened) {{{(f.ScreenedBox.Length > 0 ? f.ScreenedBox : $"Screened twice: {f.Screened}")}}};");
         sb.AppendLine($@"\node[box, below=of screened] (included) {{Included: {f.Included}}};");
         sb.AppendLine($@"\node[box, below=of included] (passed) {{Passed the quality threshold: {f.Passed}}};");
         sb.AppendLine($@"\node[box, below=of passed] (extracted) {{Extracted against the map: {f.Extracted}}};");

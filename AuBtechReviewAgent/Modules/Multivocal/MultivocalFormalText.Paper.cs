@@ -28,15 +28,15 @@ public static partial class MultivocalFormalText
         var sb = new StringBuilder();
         sb.AppendLine(@"\begin{tikzpicture}[node distance=0.5cm and 0.6cm, box/.style={draw, rectangle, align=center, font=\footnotesize, text width=3.6cm, minimum height=0.75cm}, side/.style={draw, rectangle, align=left, font=\scriptsize, text width=3.3cm, fill=black!3}, >={Stealth}]");
         sb.AppendLine($@"\node[box] (gfound) {{Grey literature found: {g.Identified}}};");
-        sb.AppendLine($@"\node[box, below=of gfound] (gscreened) {{Screened twice: {g.Screened}}};");
+        sb.AppendLine($@"\node[box, below=of gfound] (gscreened) {{{MultivocalScreeningText.FlowBox(input.Screening, g.Screened, g.Second?.ScreenedTwice ?? 0)}}};");
         sb.AppendLine($@"\node[box, below=of gscreened] (gincluded) {{Included: {g.Included}}};");
         sb.AppendLine($@"\node[box, below=of gincluded] (gkept) {{Passed the quality threshold: {g.Kept}}};");
         sb.AppendLine($@"\node[box, below=of gkept] (gextracted) {{Extracted: {g.Extracted}}};");
-        // Each side box sits beside the step its sources left at (#362): screening beside "Screened twice", quality beside the quality step.
+        // Each side box sits beside the step its sources left at (#362): screening beside the screening box, quality beside the quality step.
         sb.AppendLine($@"\node[side, left=of gscreened] (gout) {{Same title: {g.DuplicatesAtScreening}\\Not screened: {g.NotScreened}\\Excluded: {g.Excluded}}};");
         sb.AppendLine($@"\node[side, left=of gkept] (glow) {{Below the threshold: {g.BelowThreshold}\\Not assessed: {g.NotAssessed}}};");
         sb.AppendLine($@"\node[box, right=1.2cm of gfound] (ffound) {{Academic records found: {f.Identified}}};");
-        sb.AppendLine($@"\node[box, below=of ffound] (fscreened) {{Screened twice: {f.Screened}}};");
+        sb.AppendLine($@"\node[box, below=of ffound] (fscreened) {{{MultivocalScreeningText.FlowBox(input.Screening, f.Screened, f.Second?.ScreenedTwice ?? 0)}}};");
         sb.AppendLine($@"\node[box, below=of fscreened] (fincluded) {{Included: {f.Included}}};");
         sb.AppendLine($@"\node[box, below=of fincluded] (fkept) {{Appraised with MMAT: {f.Kept}}};");
         sb.AppendLine($@"\node[box, below=of fkept] (fextracted) {{Extracted: {f.Extracted}\\{{\scriptsize of which on the abstract only: {f.AbstractOnly}}}}};");
