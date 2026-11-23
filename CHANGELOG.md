@@ -98,6 +98,8 @@ A question about how often something happens now gets the same answer in the pap
 
 The planning form now says which kinds of grey literature each chosen search can find. It warns you when a kind you named has no search that reaches it, and the protocol says the same. Before, a plan could name five kinds and search only GitHub.
 
+The paper of a multivocal review with academic sources now says in its statement on AI use that both pools were screened and appraised, and how each source's citations were checked. Its flow diagram puts each excluded group beside the step where it left. A grey literature review's flow no longer says "1 themes".
+
 
 ## [0.4.0] - 2026-11-20
 
