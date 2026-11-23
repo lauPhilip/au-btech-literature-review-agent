@@ -43,6 +43,13 @@ public sealed class PageSnapshot
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public List<SourceFlag>? InjectionFlags { get; set; }
 
+    /// <summary>
+    /// What was taken out of the text before it was kept, because a reader never sees it (#369): invisible characters
+    /// and hidden parts of the page. Null, and left out of the file, when nothing was.
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public HiddenTextRemoved? HiddenText { get; set; }
+
     /// <summary>Why the page was not kept, in words for the reviewer; null when it was.</summary>
     public string? NotKept { get; set; }
 
@@ -156,12 +163,25 @@ public sealed partial class MultivocalPages
             NotKept = page.NotFetched,
         };
 
-        return await SaveAsync(runId, address, snapshot, page.NotFetched == null ? page.Text : null);
+        return await SaveAsync(runId, address, snapshot, page.NotFetched == null ? page.Text : null, page.Removed, page.HiddenText);
     }
 
-    /// <summary>Writes the text (when there is one) to the run folder and the snapshot to the pages file, replacing an earlier one.</summary>
-    private async Task<PageSnapshot> SaveAsync(Guid runId, string address, PageSnapshot snapshot, string? text)
+    /// <summary>
+    /// Writes the text (when there is one) to the run folder and the snapshot to the pages file, replacing an earlier
+    /// one. Invisible characters are taken out of the text first, and what was removed while reading the page
+    /// (<paramref name="removed"/>, <paramref name="hidden"/>) is added to the count and the scan (#369).
+    /// </summary>
+    private async Task<PageSnapshot> SaveAsync(Guid runId, string address, PageSnapshot snapshot, string? text,
+        HiddenTextRemoved? removed = null, string hidden = "")
     {
+        if (text != null)
+        {
+            var clean = AuBtechReviewAgent.HiddenText.RemoveInvisible(text);
+            text = clean.Text;
+            snapshot.HiddenText = HiddenTextRemoved.Of((removed?.InvisibleCharacters ?? 0) + clean.InvisibleCharacters, removed?.HiddenElements ?? 0);
+            snapshot.InjectionFlags = AuBtechReviewAgent.HiddenText.Flags(text, hidden + "\n" + clean.Hidden);
+        }
+
         string folder = _runs.FolderOf(runId);
         await Gate.WaitAsync();
         try
@@ -176,7 +196,6 @@ public sealed partial class MultivocalPages
                 snapshot.TextFile = name;
                 snapshot.TextSha256 = Sha256(bytes);
                 snapshot.Characters = text.Length;
-                snapshot.InjectionFlags = PromptSafety.Find(text);
             }
 
             var file = Load(runId);
