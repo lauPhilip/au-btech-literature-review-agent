@@ -66,6 +66,9 @@ public sealed class MultivocalPlan
     /// </summary>
     public List<string> FormalStringsProposed { get; set; } = new();
 
+    /// <summary>Phrases in the plan that read like instructions to the model, confirmed by the reviewer before the protocol was written (#365).</summary>
+    public List<string> InputFlags { get; set; } = new();
+
     /// <summary>The databases a multivocal plan starts with: the ones that need no key.</summary>
     public static IReadOnlyList<string> DefaultFormalDatabases =>
         SourceCatalog.All.Where(s => s.KeyKind == SourceKeyKind.None).Select(s => s.Key).ToList();

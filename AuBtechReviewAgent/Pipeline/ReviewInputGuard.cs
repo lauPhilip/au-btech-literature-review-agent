@@ -92,8 +92,7 @@ public static class ReviewInputGuard
             string clean = Normalize(value, singleLine);
             if (required && clean.Length == 0) errors.Add($"{name} is empty.");
             if (clean.Length > max) errors.Add($"{name} is {clean.Length} characters long; the limit is {max}.");
-            foreach (var pattern in PromptSafety.Scan(clean).Where(p => !NotFlaggedForReviewers.Contains(p)))
-                flags.Add(new InputFlag(name, pattern, ExcerptFor(pattern, clean)));
+            flags.AddRange(FlagsIn(name, clean));
             return clean;
         }
 
@@ -135,6 +134,14 @@ public static class ReviewInputGuard
         }
         return new InputCheck(cleaned, errors, flags);
     }
+
+    /// <summary>
+    /// The instruction-like phrases in one cleaned field, with the same exceptions as the review form, so every form
+    /// that sends a reviewer's text to the model flags the same things.
+    /// </summary>
+    public static IReadOnlyList<InputFlag> FlagsIn(string field, string clean) =>
+        PromptSafety.Scan(clean).Where(p => !NotFlaggedForReviewers.Contains(p))
+            .Select(pattern => new InputFlag(field, pattern, ExcerptFor(pattern, clean))).ToList();
 
     /// <summary>The matched phrase with a little context, for the warning and the protocol.</summary>
     private static string ExcerptFor(string pattern, string text)
