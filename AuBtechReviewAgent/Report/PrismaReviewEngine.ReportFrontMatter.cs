@@ -40,7 +40,7 @@ public partial class PrismaReviewEngine
         var unavailableNames = finalState.UnavailableSources.Select(SourceCatalog.DisplayNameFor).ToList();
         string methodsEligibility = MethodsSectionWriter.Eligibility(inc, exc, finalState.PeerReviewOnlyToggle);
         string methodsSources = MethodsSectionWriter.InformationSources(selectedNames, unavailableNames, finalState.SearchLogs, finalState.Timestamp,
-            finalState.Stats.IdentifiedViaCitations, finalState.CitationChainingRequested);
+            finalState.Stats.IdentifiedViaCitations, finalState.CitationChainingRequested, finalState.SeedChaining);
         string methodsSearch = MethodsSectionWriter.SearchStrategy(query, effectivePerspectives, finalState.MaxResultsPerSource,
             finalState.Stats.DuplicatesRemoved, finalState.Stats.CappedBeyondMaxResults, finalState.YearFrom, finalState.YearTo, finalState.Stats.OutsideDateRange,
             finalState.SearchStringsReviewed, finalState.SearchStringYields);

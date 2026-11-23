@@ -15,15 +15,26 @@ The readability score is 206.835 − 1.015 × (words per sentence) − 84.6 × (
 
 The emoji and readability checks live in `release_notes.py`; `release_check.py` reads the tag and the two files and applies them.
 
+`release_body.py` composes the body of the GitHub release, which `release.yml` asks for with `--body-out`. It adds nothing of its own about the version, so the same files give the same body every time.
+
+| Part of the body | Where it comes from |
+|---|---|
+| The bold summary at the top | The first sentence of the section's lead, the text above its first `###` heading |
+| "What this means for your review" | The rest of the lead, then a table counting the paragraphs under each kind, with a fixed line on what each kind means |
+| Added, Changed and Fixed | The section, as written |
+| "Cite this version" | The concept DOI, title, authors and date in `CITATION.cff`; the version DOI follows once Zenodo has archived the release |
+| The folded list of pull requests | GitHub's generated notes since the previous version tag (`--generated-notes`) |
+| The comparison link | The previous version tag (`--previous-tag`) and this one |
+
 A version with a pre-release part, such as `v0.2.0-rc.1`, is published as a pre-release. The script uses only Python's standard library.
 
 Try it on your own tag before pushing it:
 
 ```bash
-python3 tools/ReleaseCheck/release_check.py v0.1.0 --notes-out release-notes.md
+python3 tools/ReleaseCheck/release_check.py v0.1.0 --notes-out release-notes.md --body-out release-body.md --previous-tag v0.0.9
 ```
 
-The tests are in three files. `test_release_feature.py` builds small git repositories with good and bad tags, `test_release_notes.py` checks the readability score and the emoji count on texts whose answer is known, and `test_release_check.py` checks each rule on its own and also checks the repository's own `CHANGELOG.md` and `CITATION.cff`, including that the `[Unreleased]` section would pass as release notes. They run in CI on every pull request:
+The tests sit beside the scripts. `test_release_feature.py` builds small git repositories with good and bad tags. `test_release_notes.py` checks the readability score and the emoji count on texts whose answer is known. `test_release_body.py` checks where each part of the release body comes from. `test_release_check.py` checks each rule on its own and also checks the repository's own `CHANGELOG.md` and `CITATION.cff`, including that the `[Unreleased]` section would pass as release notes. `test_workflows.py` checks how the workflows wire the release and the deploy, and `test_site_health.py` checks the deploy's health script. They run in CI on every pull request:
 
 ```bash
 python3 -m unittest discover -s tools/ReleaseCheck -v

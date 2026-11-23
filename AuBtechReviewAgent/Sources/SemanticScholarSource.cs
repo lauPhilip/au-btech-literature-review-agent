@@ -13,7 +13,7 @@ namespace AuBtechReviewAgent;
 /// </summary>
 public class SemanticScholarSource : IAcademicSource
 {
-    private const string Fields = "title,abstract,year,authors,venue,externalIds,openAccessPdf,url,publicationTypes";
+    private const string Fields = "title,abstract,year,authors,venue,externalIds,openAccessPdf,url,publicationTypes,citationCount";
     private readonly string _apiKey;
     private readonly List<string> _raw = new();
 
@@ -64,6 +64,7 @@ public class SemanticScholarSource : IAcademicSource
             string id = Str(p, "paperId");
             if (id.Length == 0) continue;
             int year = p.TryGetProperty("year", out var y) && y.ValueKind == JsonValueKind.Number ? y.GetInt32() : 0;
+            int? citedBy = p.TryGetProperty("citationCount", out var c) && c.ValueKind == JsonValueKind.Number && c.TryGetInt32(out int cites) && cites >= 0 ? cites : null;
 
             var authors = p.TryGetProperty("authors", out var a) && a.ValueKind == JsonValueKind.Array
                 ? a.EnumerateArray().Select(x => Str(x, "name")).Where(n => n.Length > 0).ToList()
@@ -92,7 +93,8 @@ public class SemanticScholarSource : IAcademicSource
                 JournalSource: venue,
                 Doi: doi,
                 Url: Str(p, "url") is { Length: > 0 } link ? link : $"https://www.semanticscholar.org/paper/{id}",
-                PdfUrl: pdf));
+                PdfUrl: pdf,
+                CitedByCount: citedBy));
         }
         return papers;
     }
