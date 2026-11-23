@@ -55,6 +55,9 @@ public partial class PrismaReviewEngine
         ReportProgress(ctx.RunId, ctx.State, RunProgress.FullText, 0, $"Fetching open-access full texts of {included.Count} studies");
         for (int i = 0; i < included.Count; i++)
         {
+            // The live line names the paper waited for now ("Reading the full text of Doe et al., 2025"), built in code.
+            ReportProgress(ctx.RunId, ctx.State, RunProgress.FullText, (double)i / included.Count, Of(i, included.Count, "papers"),
+                LiveActivity.ShortCite(included[i].Authors, included[i].PublishedDate, included[i].Title));
             var result = await downloads[i];
             ReportProgress(ctx.RunId, ctx.State, RunProgress.FullText, (double)(i + 1) / included.Count, Of(i + 1, included.Count, "papers"));
             // Text a reader never sees is taken out before anything reads it (#369); what was removed is on file below.

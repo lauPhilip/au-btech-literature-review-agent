@@ -47,6 +47,9 @@ public partial class MultivocalStart
     private bool tabChosen; // once the reviewer picks a tab, the panel stops following the run
     private string? shownStep;
     internal bool saving;
+    internal string honeypot = ""; // the hidden field (Honeypot); a bot that fills it cannot start a run
+
+    [Inject] private AuBtechReviewAgent.ActionLimiter Actions { get; set; } = default!;
     internal string? error;
 
     // Grey literature only while the formal pool is not built (decision 6), whichever card planned the review.
@@ -190,6 +193,11 @@ public partial class MultivocalStart
     {
         if (planned == null) return;
         tabChosen = false;
+        if (!Actions.TryTake(AuBtechReviewAgent.ActionLimiter.StartReview, PrerenderClientAddress ?? "unknown", out string limited))
+        {
+            error = limited;
+            return;
+        }
         Runner.Start(planned.RunId, editKey, PrerenderClientAddress);
     }
 
@@ -210,6 +218,14 @@ public partial class MultivocalStart
             Logger.LogDebug("Could not read the notification permission: {Message}", ex.Message);
         }
         StateHasChanged();
+    }
+
+    /// <summary>The browser tab's title: the progress while the run goes ("42% · Your review"), as on the systematic review's page.</summary>
+    internal string TabTitle()
+    {
+        if (planned != null && Runner.StatusOf(planned.RunId) is { Running: true } status)
+            return $"{MultivocalProgress.Percent(stage, status.Progress)}% · Your review";
+        return (GreyOnly ? "Grey literature review" : "Multivocal literature review") + (CardOn ? "" : " (preview)");
     }
 
     internal string StageLine()

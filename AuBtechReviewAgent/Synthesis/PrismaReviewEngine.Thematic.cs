@@ -28,6 +28,9 @@ public partial class PrismaReviewEngine
         public ThematicCodebook Codebook { get; init; } = new();
         public List<SynthesisSection> Sections { get; } = new();
         public string Discussion { get; set; } = "";
+
+        /// <summary>The answers to the research questions, written with the discussion (issue #446); null without questions or when it failed.</summary>
+        public IReadOnlyList<string>? Answers { get; set; }
         public PeerReviewLog? PeerReview { get; set; }
 
         /// <summary>The evidence the sections were written from, for the closing sections written after them.</summary>
@@ -124,14 +127,17 @@ public partial class PrismaReviewEngine
             return result;
         }
 
-        // 5. Discussion from the subsections
+        // 5. The answers to the research questions, then the discussion that builds on them, from the subsections (issue #446)
         ReportProgress(runId, state, RunProgress.Synthesis, RunProgress.Phase(RunProgress.SynthesisPhases, 4, 0), "Writing the discussion");
         using (LlmStage.Begin("discussion"))
-            result.Discussion = await ReviewWriter.WriteDiscussionAsync(chat, profile, query, goal, result.Sections, evidence, referenceCount, message =>
+        {
+            var written = await ReviewWriter.WriteDiscussionAndAnswersAsync(chat, profile, query, goal, result.Sections, evidence, referenceCount, message =>
             {
                 Warn(message);
                 (book.WritingNotes ??= new()).Add(message);
-            }, questions);
+            }, questions, book.Unanswered?.Select(u => u.Question).ToList());
+            (result.Discussion, result.Answers) = (written.Text, written.Answers);
+        }
 
         // 6. Peer review, per section, with the same coverage guard as the fill pass
         ReportProgress(runId, state, RunProgress.Synthesis, RunProgress.Phase(RunProgress.SynthesisPhases, 5, 0), "Automated peer review");

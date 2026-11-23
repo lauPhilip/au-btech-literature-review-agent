@@ -155,6 +155,9 @@ public class ReviewStats
     public string ProgressStep { get; set; } = "";
     public double ProgressFraction { get; set; }
     public string ProgressDetail { get; set; } = "";
+    /// <summary>What the step is working on right now, for the live line under a running review's title (LiveActivity):
+    /// a database and its search string, or the paper whose full text is read. Shown live only; never written to the ledger.</summary>
+    [JsonIgnore] public string ProgressSubject { get; set; } = "";
     public DateTime? RunStartedUtc { get; set; }
 }
 

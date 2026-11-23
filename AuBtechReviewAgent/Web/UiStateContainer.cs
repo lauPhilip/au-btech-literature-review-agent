@@ -40,7 +40,10 @@ public class UiStateContainer
 
     public bool IsSearching { get; set; } = false;
 
+    // The hidden field of the form (Honeypot): a person leaves it empty, a bot that fills every field does not.
+    public string Honeypot { get; set; } = "";
+
     // Source gateways ticked in the dashboard (keys from SourceCatalog). All are ticked by default;
     // ones without an API key are shown greyed out and skipped.
     public HashSet<string> SelectedSources { get; set; } = new(SourceCatalog.AllKeys, StringComparer.OrdinalIgnoreCase);
-}
+}

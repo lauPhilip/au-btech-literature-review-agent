@@ -165,7 +165,9 @@ public class ReviewClosingTests : IDisposable
 
     private static string RespondWithAnswers(string prompt) => prompt.Contains("You are writing the sections that follow the discussion")
         ? """{"limitations":"Both studies leave long-term effects unmeasured [1, 2].","implications":"Teams should add supervisor checks to agent loops [1].","futureResearch":"Governance layers need evaluation in production [2].","conclusion":"Together, the themes suggest that safe agent loops need both recovery and oversight, and that support for either is still thin.","answers":["Supervisor checks let agent loops recover from faults [1].","Governance layers audit what agents do [2]."]}"""
-        : ReviewWriterTests.Respond(prompt);
+        : prompt.Contains("You are writing the Discussion section") // the discussion call writes the answers first (issue #446)
+            ? """{"answers":["Supervisor checks let agent loops recover from faults [1].","Governance layers audit what agents do [2]."],"text":"Recovery and audits complement each other [1, 2]."}"""
+            : ReviewWriterTests.Respond(prompt);
 
     [Fact]
     public async Task EachResearchQuestionIsInTheProtocolAndAnsweredInTheConclusion()

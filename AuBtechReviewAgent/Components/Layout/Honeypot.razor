@@ -1,0 +1,16 @@
+@* A field no person sees or hears, on the forms that start a review (issue #433). It is hidden on screen (sr-only),
+   from screen readers (aria-hidden) and from the keyboard (tabindex -1), with no script, so the strict
+   Content-Security-Policy is untouched. A bot that fills every field fills it too, and the page then refuses the
+   start without saying why (SiteRateLimits.LogRefusal records it). *@
+<div class="sr-only" aria-hidden="true">
+    <label for="@Id">Leave this field empty</label>
+    <input id="@Id" name="website" type="text" tabindex="-1" autocomplete="off" value="@Value" @onchange="Changed" />
+</div>
+
+@code {
+    [Parameter] public string Id { get; set; } = "website";
+    [Parameter] public string? Value { get; set; }
+    [Parameter] public EventCallback<string> ValueChanged { get; set; }
+
+    private Task Changed(ChangeEventArgs e) => ValueChanged.InvokeAsync(e.Value?.ToString() ?? "");
+}
