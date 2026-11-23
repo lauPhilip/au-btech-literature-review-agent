@@ -70,7 +70,9 @@ public class MultivocalSecondScreeningTests : IDisposable
     {
         bool second = prompt.Contains("SECOND, INDEPENDENT");
         string title = prompt.Split("- Title: ")[1].Split('\n')[0];
-        bool include = (title.Contains("agent") && !(second && title.Contains("tricky"))) || (second && title.Contains("Wobbly"));
+        bool firstWouldInclude = title.Contains("agent");
+        bool secondChangesIt = second && (title.Contains("tricky") || title.Contains("Wobbly"));
+        bool include = firstWouldInclude != secondChangesIt;
         string confidence = title.Contains("Maybe") ? "medium" : "high";
         return include
             ? $$"""{"decision":"Included","reasoning":"On agents.","briefSummary":"A post.","confidence":"{{confidence}}"}"""

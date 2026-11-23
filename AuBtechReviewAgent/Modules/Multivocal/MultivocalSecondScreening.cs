@@ -75,12 +75,7 @@ public static class MultivocalSecondScreening
         var twice = screened.Where(s => s.Second != null && s.First != null).ToList();
         var targeted = twice.Where(s => s.SecondReason != null).ToList();
         var audit = twice.Where(s => s.AuditSample).ToList();
-        double? kappa = formal switch
-        {
-            null => file.Kappa,
-            true => file.KappaFormal,
-            false => file.KappaGrey ?? file.Kappa,
-        };
+        double? kappa = formal == null ? file.Kappa : formal.Value ? file.KappaFormal : file.KappaGrey ?? file.Kappa;
         return new SecondScreeningCounts(
             Targeted: file.AuditSeed != null,
             Screened: screened.Count,
