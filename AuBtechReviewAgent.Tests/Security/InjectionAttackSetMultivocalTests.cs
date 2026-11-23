@@ -24,10 +24,12 @@ public class InjectionAttackSetMultivocalTests : IDisposable
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
             var page = AttackSet.Pages.FirstOrDefault(c => request.RequestUri!.AbsolutePath == "/" + c.Id);
-            // The HttpClient that called the handler owns and disposes the response.
-            return Task.FromResult(new HttpResponseMessage(page == null ? System.Net.HttpStatusCode.NotFound : System.Net.HttpStatusCode.OK)
-                { Content = new StringContent(page?.Text ?? "", Encoding.UTF8, "text/html") });
+            return Task.FromResult(page == null ? Respond(System.Net.HttpStatusCode.NotFound, "") : Respond(System.Net.HttpStatusCode.OK, page.Text));
         }
+
+        // The HttpClient that called the handler owns and disposes the response.
+        private static HttpResponseMessage Respond(System.Net.HttpStatusCode status, string body) =>
+            new(status) { Content = new StringContent(body, Encoding.UTF8, "text/html") };
     }
 
     private sealed class AttackSource : IGreySource
