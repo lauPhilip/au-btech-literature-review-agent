@@ -33,6 +33,10 @@ public sealed class MultivocalPlanner
 
     public MultivocalPlanner(RunStore runs) => _runs = runs;
 
+    /// <summary>The seed step's settings (OpenSources:SeedStudies and SeedChainingPerDirection), for the protocol; 0 when the step is off.</summary>
+    public int SeedStudies { get; init; }
+    public int SeedChainingPerDirection { get; init; }
+
     /// <summary>
     /// Writes the run; returns its id and edit key. Throws <see cref="ArgumentException"/> when the plan is incomplete,
     /// or when its text has instruction-like phrases (<see cref="MultivocalPlanGuard"/>) the reviewer has not confirmed
@@ -56,7 +60,7 @@ public sealed class MultivocalPlanner
         var now = DateTime.UtcNow;
 
         await RunHeader.WriteAsync(folder, new RunHeader(runId, "multivocal", plan.Card, now, StagePlanned));
-        string protocol = MultivocalProtocol.Write(plan, runId, now);
+        string protocol = MultivocalProtocol.Write(plan, runId, now, SeedStudies, SeedChainingPerDirection);
         await SafeFile.WriteAllTextAsync(Path.Join(folder, RunStore.ProtocolFile), protocol);
         string sha = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(protocol))).ToLowerInvariant();
         await SafeFile.WriteAllTextAsync(Path.Join(folder, PlanFile), JsonSerializer.Serialize(new PlannedRun(runId, plan, sha, now), Json));
