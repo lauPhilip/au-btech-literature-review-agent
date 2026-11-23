@@ -78,13 +78,15 @@ public partial class PrismaReviewEngine
             var written = await ReviewWriter.WriteFrontMatterAsync(chat, WritingProfile.Systematic, query, explicitObjective,
                 FrontMatterFacts(finalState, useThematic ? thematic!.Codebook : null, includedFacts, screeningFacts) + EvidenceBaseFacts(useThematic ? thematic!.Evidence : null),
                 resultSections, discussionText, referenceListMapping, referenceCount, message => _log.LogWarning("{Message}", SanitizeLogMessage(message)),
-                abstractRule: text => AbstractCountsProblem(text, finalState.Stats));
+                abstractRule: text => AbstractCountsProblem(text, finalState.Stats), questions: finalState.ResearchQuestions);
             using (LlmStage.Begin("style"))
             {
-                // Three separate copy-edits, sent together.
+                // Three separate copy-edits, sent together. Objectives written in code from the research questions are not copy-edited.
                 var abstractTask = StylisticRefinerUtility.RefineAcademicProseAsync(chat, "Abstract", written?.Abstract ?? run.Draft.Abstract);
                 var rationaleTask = StylisticRefinerUtility.RefineAcademicProseAsync(chat, "Rationale", written?.Rationale ?? run.Draft.Rationale);
-                var objectivesTask = StylisticRefinerUtility.RefineAcademicProseAsync(chat, "Objectives", written?.Objectives ?? run.Draft.Objectives);
+                var objectivesTask = ReviewWriter.ObjectivesFromQuestions(finalState.ResearchQuestions) is { } codeObjectives
+                    ? Task.FromResult((codeObjectives, new StyleDeltaLog("Objectives", codeObjectives, codeObjectives, Applied: false, Note: "Written in code from the research questions in the protocol; not sent through the stylistic pass.")))
+                    : StylisticRefinerUtility.RefineAcademicProseAsync(chat, "Objectives", written?.Objectives ?? run.Draft.Objectives);
                 await Task.WhenAll(abstractTask, rationaleTask, objectivesTask);
                 return (written, await abstractTask, await rationaleTask, await objectivesTask);
             }
@@ -109,7 +111,7 @@ public partial class PrismaReviewEngine
             ? await ReviewWriter.WriteClosingAsync(chat, WritingProfile.Systematic, query, explicitObjective,
                 FrontMatterFacts(finalState, thematic.Codebook, includedFacts, screeningFacts), resultSections, discussionText,
                 thematic.Evidence, referenceCount, message => _log.LogWarning("{Message}", SanitizeLogMessage(message)),
-                finalState.ResearchQuestions)
+                finalState.ResearchQuestions, thematic.Codebook.Unanswered?.Select(u => u.Question).ToList())
             : null;
 
         var frontTask = FrontAndStyleAsync();

@@ -59,7 +59,12 @@ If you change the Tailwind classes in a component, rebuild the CSS in the `AuBte
    dotnet build
    dotnet test
    ```
-   If you're changing or adding behaviour, please add or update a test for it where it makes sense. The same tests run automatically on your pull request.
+   While you work, you can run only the tests your change can affect, which is much faster:
+   ```bash
+   tools/test-scope.sh --run            # on Windows: .\tools\test-scope.ps1 --run
+   ```
+   It compares your branch and your uncommitted files with `origin/master`, prints which tests it picked and why, and runs them; without `--run` it only prints the filter. Run the whole `dotnet test` once before you submit.
+   If you're changing or adding behaviour, please add or update a test for it where it makes sense. Your pull request runs the tests its change can affect, and master runs them all.
 4. Commit with a short, clear message that says what the change does and why.
 
 ## Submitting a pull request
