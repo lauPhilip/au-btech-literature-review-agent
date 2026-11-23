@@ -79,7 +79,17 @@ public partial class MultivocalStart
         StartFormalPool();
     }
 
-    protected override void OnInitialized() => Runner.Changed += OnRunChanged;
+    [Inject] private Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor { get; set; } = default!;
+
+    // The address the line counts this browser's runs by, read during the prerender as the systematic form reads it.
+    [PersistentState]
+    public string? PrerenderClientAddress { get; set; }
+
+    protected override void OnInitialized()
+    {
+        PrerenderClientAddress ??= AuBtechReviewAgent.RunQuotaService.NormalizeClientAddress(HttpContextAccessor.HttpContext?.Connection.RemoteIpAddress);
+        Runner.Changed += OnRunChanged;
+    }
 
     public void Dispose() => Runner.Changed -= OnRunChanged;
 
@@ -180,7 +190,7 @@ public partial class MultivocalStart
     {
         if (planned == null) return;
         tabChosen = false;
-        Runner.Start(planned.RunId, editKey);
+        Runner.Start(planned.RunId, editKey, PrerenderClientAddress);
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)

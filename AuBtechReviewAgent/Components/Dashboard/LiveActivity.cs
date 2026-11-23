@@ -29,11 +29,12 @@ public static class LiveActivity
     private static readonly Regex SearchSubject = new("^(?<name>[^:\"]{1,60}): \"(?<text>.*)\"$", RegexOptions.CultureInvariant | RegexOptions.Singleline);
 
     /// <summary>The line for a systematic run; null when the run is finished or stopped.</summary>
-    public static LiveLine? ForSystematic(ReviewStats stats, string stage, int queuePosition)
+    /// <param name="queueText">The place in line with a rough wait ("You are 4th in line, about 25 minutes."), while the run waits.</param>
+    public static LiveLine? ForSystematic(ReviewStats stats, string stage, int queuePosition, string? queueText = null)
     {
         if (PrismaReviewEngine.IsFinishedStage(stage) || stats.ProgressStep == RunProgress.Done) return null;
         if (stage == PrismaReviewEngine.StageQueued)
-            return Line("queue", queuePosition > 0 ? $"Waiting in line for a free run slot, number {queuePosition}" : "Waiting in line for a free run slot", null);
+            return Waiting(queueText, queuePosition);
         if (stage == PrismaReviewEngine.StageAwaitingReview || stats.ProgressStep == RunProgress.Review)
             return Line("your-check", "Waiting for you to check the screening decisions", Counts(stats));
 
@@ -88,6 +89,11 @@ public static class LiveActivity
         if (detail.Contains("artifact", StringComparison.Ordinal)) return Line("artifact", "Building the artifact", themes);
         return Line("draft", "Drafting the outline of the report", themes);
     }
+
+    /// <summary>A run waiting in the shared line: the place and the rough wait as the line words them, else the number.</summary>
+    internal static LiveLine Waiting(string? queueText, int queuePosition) =>
+        Line("queue", "Waiting in line for a free run slot",
+            !string.IsNullOrWhiteSpace(queueText) ? queueText.Trim() : queuePosition > 0 ? $"number {queuePosition} in line" : null);
 
     /// <summary>"Searching OpenAlex for “agentic AI”" from a subject such as <c>OpenAlex: "agentic AI"</c>; null for anything else.</summary>
     internal static string? SearchFor(string subject)

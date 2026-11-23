@@ -69,9 +69,13 @@ public class LiveActivityTests
     {
         Assert.Equal("your-check", Line(Stats(RunProgress.Review, "Waiting for your screening decisions"), PrismaReviewEngine.StageAwaitingReview).Kind);
         var queued = Line(Stats(""), PrismaReviewEngine.StageQueued, 3);
-        Assert.Equal("Waiting in line for a free run slot, number 3", queued.Text);
+        Assert.Equal("Waiting in line for a free run slot", queued.Text);
+        Assert.Equal("number 3 in line", queued.Count);
         Assert.Equal("queue", queued.Kind);
-        Assert.Equal("Waiting in line for a free run slot", Line(Stats(""), PrismaReviewEngine.StageQueued).Text);
+        Assert.Null(Line(Stats(""), PrismaReviewEngine.StageQueued).Count);
+        // The shared line's own words, with the rough wait, win over the bare number.
+        var worded = LiveActivity.ForSystematic(Stats(""), PrismaReviewEngine.StageQueued, 4, "You are 4th in line, about 25 minutes.")!;
+        Assert.Equal("You are 4th in line, about 25 minutes.", worded.Count);
     }
 
     [Fact]

@@ -16,19 +16,34 @@ public class CitedRationaleTests : IDisposable
 
     private const string General = "High-stakes applications make context failures risk serious harm.";
     private const string Urgent = "There is an urgent need for systematic reviews.";
+    private const string Gap = "How long such summaries stay faithful over many turns is not yet known.";
 
     [Fact]
-    public void OnlyTheCitedSentencesAreKeptInTheirParagraphs()
+    public void OnlyTheCitedSentencesAndTheClosingGapAreKeptInTheirParagraphs()
     {
-        string rationale = $"{General} Agents keep a running summary [1].\n\nRetrieval brings in only what is needed [2]. {Urgent}";
+        string rationale = $"{General} Agents keep a running summary [1].\n\n{Urgent} Retrieval brings in only what is needed [2]. {Gap}";
 
         string kept = ReviewWriter.CitedSentencesOnly(rationale, out var log);
 
-        Assert.Equal("Agents keep a running summary [1].\n\nRetrieval brings in only what is needed [2].", kept);
+        Assert.Equal($"Agents keep a running summary [1].\n\nRetrieval brings in only what is needed [2]. {Gap}", kept);
         Assert.NotNull(log);
         Assert.Equal(ReviewWriter.RationaleCitedOnlyField, log!.FieldName);
         Assert.Equal((rationale, kept, true), (log.OriginalText, log.RefinedText, log.Applied));
-        Assert.Equal($"Left out in code, because they carry no citation: \"{General}\" \"{Urgent}\"", log.Note);
+        Assert.Equal($"Left out in code, because they carry no citation: \"{General}\" \"{Urgent}\" Kept as the statement of the gap, because it reports no finding: \"{Gap}\"", log.Note);
+    }
+
+    [Fact]
+    public void AGapThatReportsAFindingIsLeftOutAndAKeptGapIsStillLogged()
+    {
+        const string cited = "Agents keep a running summary [1].";
+        const string reported = "Studies report that summaries lose 30 percent of the detail.";
+        Assert.Equal(cited, ReviewWriter.CitedSentencesOnly($"{cited} {reported}", out var log));
+        Assert.Contains($"The closing sentence was not kept as the gap: \"{reported}\" has no citation", log!.Note);
+
+        string withGap = $"{cited} {Gap}";
+        Assert.Same(withGap, ReviewWriter.CitedSentencesOnly(withGap, out var kept));
+        Assert.False(kept!.Applied);
+        Assert.Contains("Kept as the statement of the gap", kept.Note);
     }
 
     [Fact]
@@ -51,7 +66,7 @@ public class CitedRationaleTests : IDisposable
 
         Assert.Equal("Agents keep a running summary [1].", front!.Rationale);
         Assert.Contains("YOUR PREVIOUS ANSWER WAS REJECTED: the rationale has no citation", model.Prompts[1]);
-        Assert.Contains("leave out a sentence you cannot cite, since code removes every rationale sentence without a citation", model.Prompts[0]);
+        Assert.Contains("leave out a sentence you cannot cite, since code removes every other rationale sentence without a citation", model.Prompts[0]);
     }
 
     [Fact]

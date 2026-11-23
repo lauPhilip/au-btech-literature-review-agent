@@ -1,0 +1,59 @@
+@* The grey literature tab's pool table (issue #415): per multivocal run, newest first, each pool's sources found,
+   included and kept (grey: passed the quality check; academic: appraised with MMAT), and Cohen's κ of its two
+   screenings with what it is computed over. Runs recorded before the pools were counted are left out. *@
+
+@using System.Globalization
+
+@if (Pooled.Count > 0)
+{
+    <section id="pools" aria-labelledby="pools-title" class="ui-card scroll-mt-6 p-5 sm:p-6">
+        <h2 id="pools-title" class="font-display text-xl font-semibold tracking-tight text-heading">Grey and academic sources</h2>
+        <p class="mt-1 max-w-[70ch] text-[15px] text-muted">
+            Each pool on its own, newest run first. Kept grey sources passed the quality checklist; academic sources are appraised with MMAT and all kept.
+            κ is the agreement of two independent screenings: on a random audit sample of each pool, or on every source in runs screened before 23 November 2026.
+            A run with grey sources only shows dashes for the academic pool.
+        </p>
+        <div class="mt-4 max-h-[70vh] overflow-auto border border-line" tabindex="0" role="region" aria-labelledby="pools-title">
+            <table class="w-full border-separate border-spacing-0 text-sm">
+                <thead>
+                    <tr>
+                        @Th("Run") @Th("Grey found", true) @Th("Included", true) @Th("Kept", true) @Th("κ", true)
+                        @Th("Academic found", true) @Th("Included", true) @Th("Appraised", true) @Th("κ", true) @Th("κ over")
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var run in Pooled)
+                    {
+                        var r = run;
+                        <tr class="hover:bg-soft">
+                            <th scope="row" class="@Metrics.Td text-left font-mono font-normal">@AuBtechReviewAgent.MetricsOverview.ShortId(r.RunId)</th>
+                            @Cells(r.GreyPool)
+                            @Cells(r.FormalPool)
+                            <td class="@Metrics.Td">@(r.GreyPool?.KappaBasis ?? "–")</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </section>
+}
+
+@code {
+    /// <summary>The runs, oldest first, as the page holds them.</summary>
+    [Parameter, EditorRequired] public IReadOnlyList<AuBtechReviewAgent.RunMetrics> Runs { get; set; } = Array.Empty<AuBtechReviewAgent.RunMetrics>();
+
+    private List<AuBtechReviewAgent.RunMetrics> Pooled => Runs.Where(r => r.GreyPool != null).Reverse().ToList();
+
+    private static RenderFragment Cells(AuBtechReviewAgent.PoolMetrics? p) => __builder =>
+    {
+        <td class="@Metrics.TdNum">@(p?.Identified.ToString(CultureInfo.InvariantCulture) ?? "–")</td>
+        <td class="@Metrics.TdNum">@(p?.Included.ToString(CultureInfo.InvariantCulture) ?? "–")</td>
+        <td class="@Metrics.TdNum">@(p?.Kept.ToString(CultureInfo.InvariantCulture) ?? "–")</td>
+        <td class="@Metrics.TdNum">@(p == null ? "–" : AuBtechReviewAgent.MetricsOverview.Kappa(p.Kappa))</td>
+    };
+
+    private static RenderFragment Th(string label, bool numeric = false) => __builder =>
+    {
+        <th scope="col" class="@Metrics.ThClass @(numeric ? "text-right" : "text-left")">@label</th>
+    };
+}

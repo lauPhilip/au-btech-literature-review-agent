@@ -33,6 +33,7 @@
         int current = AuBtechReviewAgent.MultivocalProgress.CurrentIndex(stage);
         if (current >= count) return "Review complete";
         string of = $"step {Math.Clamp(current + 1, 1, count)} of {count}";
+        if (status is { Running: true, Step: AuBtechReviewAgent.MultivocalRunner.StepWaiting }) return "Review waiting for a free slot";
         if (status is { Running: true }) return $"Review running · {of}";
         if (status?.Step == AuBtechReviewAgent.PrismaReviewEngine.StageCancelled) return $"Review cancelled · {of}";
         if (status is { Error: not null }) return $"Review stopped · {of}";

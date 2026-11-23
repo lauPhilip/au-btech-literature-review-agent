@@ -61,6 +61,16 @@ public class MultivocalLiveActivityTests
     }
 
     [Fact]
+    public void ARunWaitingInTheSharedLineSaysSo()
+    {
+        var line = Line(MultivocalRunner.StepWaiting, "You are 2nd in line, about 10 minutes.");
+        Assert.Equal("Waiting in line for a free run slot", line.Text);
+        Assert.Equal("You are 2nd in line, about 10 minutes.", line.Count);
+        Assert.Equal("queue", line.Kind);
+        Assert.Equal("Review waiting for a free slot", MultivocalRunHeader.EyebrowFor(MultivocalPlanner.StagePlanned, new MultivocalRunStatus(true, MultivocalRunner.StepWaiting, null, null)));
+    }
+
+    [Fact]
     public void ARunThatIsNotRunningHasNoLine()
     {
         Assert.Null(MultivocalLiveActivity.For(null));

@@ -24,6 +24,8 @@ public static class MultivocalLiveActivity
         var of = LiveActivity.Of(progress);
         switch (status.Step)
         {
+            case MultivocalRunner.StepWaiting:
+                return LiveActivity.Waiting(status.Progress, 0);
             case "Searching":
                 if (SearchLine.Match(progress) is { Success: true } s && LiveActivity.SearchFor(s.Groups["subject"].Value) is { } searching)
                     return LiveActivity.Line("search", searching, of is { } n ? $"search {n.Done} of {n.Total}" : found);

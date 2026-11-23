@@ -27,7 +27,7 @@
             <h1 id="run-title" class="mt-1 font-display text-[clamp(22px,2vw,32px)] font-semibold leading-tight tracking-[-0.025em] text-heading line-clamp-3 sm:mt-2">@Title</h1>
             @if (Running && !failed)
             {
-                <LiveActivityLine Line="AuBtechReviewAgent.LiveActivity.ForSystematic(Stats, Stage, QueuePosition)" Class="mt-2 sm:mt-3" />
+                <LiveActivityLine Line="AuBtechReviewAgent.LiveActivity.ForSystematic(Stats, Stage, QueuePosition, QueueText)" Class="mt-2 sm:mt-3" />
             }
 
             <div class="ui-card mt-4 p-4 sm:mt-5 sm:p-6">
@@ -122,6 +122,9 @@
     [Parameter] public string Stage { get; set; } = "";
     [Parameter] public bool Running { get; set; }
     [Parameter] public int QueuePosition { get; set; }
+
+    /// <summary>The place in line with a rough wait ("You are 4th in line, about 25 minutes."), while the run waits.</summary>
+    [Parameter] public string? QueueText { get; set; }
     [Parameter] public DateTime? CompletedUtc { get; set; }
 
     /// <summary>The run's objective, shown as the title (the query when the run has no objective).</summary>
@@ -197,7 +200,8 @@
     private string CurrentLabel()
     {
         if (Stage == AuBtechReviewAgent.PrismaReviewEngine.StageQueued)
-            return QueuePosition > 0 ? $"Waiting for a free run slot (number {QueuePosition} in line)" : "Waiting for a free run slot";
+            return !string.IsNullOrEmpty(QueueText) ? $"Waiting for a free run slot. {QueueText}"
+                : QueuePosition > 0 ? $"Waiting for a free run slot (number {QueuePosition} in line)" : "Waiting for a free run slot";
         if (Stage == AuBtechReviewAgent.PrismaReviewEngine.StageAwaitingReview) return "Waiting for your screening decisions";
         if (Stage == AuBtechReviewAgent.PrismaReviewEngine.StageFailed) return "The run stopped with an error";
         if (Stage == AuBtechReviewAgent.PrismaReviewEngine.StageInterrupted) return "The run was interrupted";

@@ -18,7 +18,7 @@
 }
 else
 {
-    <RunProgressPanel Stats="Page.State.Stats" Stage="@Page.stage" Running="Page.isSearching" QueuePosition="Page.queuePosition" CompletedUtc="Page.completedUtc"
+    <RunProgressPanel Stats="Page.State.Stats" Stage="@Page.stage" Running="Page.isSearching" QueuePosition="Page.queuePosition" QueueText="@Page.QueueText()" CompletedUtc="Page.completedUtc"
                       Objective="@Page.ObjectiveShown()" SourceCount="Page.SourcesShown().Count" LogShown="Page.showLog" OnShowLog="EventCallback.Factory.Create(Page, Page.ToggleLog)">
         <Notice>
             @if (!string.IsNullOrEmpty(Page.failureMessage))
@@ -83,7 +83,8 @@ else
             {
                 <CancelRunCard Asking="Page.ConfirmingCancel" Requested="Page.CancelRequested" Problem="@Page.CancelProblem" Reason="@Page.cancelReason"
                                OnAsk="EventCallback.Factory.Create(Page, Page.AskToCancel)" OnKeep="EventCallback.Factory.Create(Page, Page.KeepRunning)"
-                               OnConfirm="EventCallback.Factory.Create(Page, Page.CancelReview)" OnReason="@(EventCallback.Factory.Create<string>(Page, Page.SetCancelReason))" />
+                               OnConfirm="EventCallback.Factory.Create(Page, Page.CancelReview)" OnReason="@(EventCallback.Factory.Create<string>(Page, Page.SetCancelReason))"
+                               Queued="@(Page.stage == AuBtechReviewAgent.PrismaReviewEngine.StageQueued)" />
             }
             @Page.RunCard()
         </Side>
