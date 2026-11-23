@@ -13,8 +13,9 @@ using Microsoft.SemanticKernel.ChatCompletion;
 namespace AuBtechReviewAgent;
 
 /// <summary>
-/// Screens the grey sources of a searched multivocal run (MLR block E, G9–G10): every source twice, independently, with
-/// the plan's criteria and the same steps and answer format as the systematic review's screening
+/// Screens the sources of a searched multivocal run (MLR block E, G9–G10): every source once, and a second time,
+/// independently, when <see cref="MultivocalSecondScreening"/> picks it (included, unsure or flagged, or in the random
+/// audit sample), with the plan's criteria and the same steps and answer format as the systematic review's screening
 /// (<see cref="PrismaReviewEngine.ScreeningProcedure"/>), so formal and grey sources get the same care. A source the two
 /// screenings disagree on is kept and flagged, as in the systematic review. Sources with the same title under another
 /// address (an OpenAlex work with several DOIs, seen in a live run) are screened once. The run goes from "Searched"
@@ -26,8 +27,11 @@ public sealed partial class MultivocalScreener
     public const string StageScreening = "Screening";
     public const string StageScreened = "Screened";
 
-    /// <summary>Part of the cache key: raise it whenever the grey screening prompt changes.</summary>
-    public const string PromptVersion = "grey-screening-v1";
+    /// <summary>
+    /// Part of the cache key: raise it whenever the grey screening prompt changes. v2: second screenings are targeted
+    /// (<see cref="MultivocalSecondScreening"/>), so no answer cached under the rule of two screenings each is reused.
+    /// </summary>
+    public const string PromptVersion = "grey-screening-v2";
 
     private static readonly JsonSerializerOptions Json = new() { WriteIndented = true };
     private static readonly ConcurrentDictionary<Guid, bool> Running = new();
@@ -178,37 +182,64 @@ public sealed partial class MultivocalScreener
             file.Sources.Add(entry);
         }
 
+        // First pass: every source once.
         var chat = _chat();
-        using var throttle = new SemaphoreSlim(_parallelism);
-        var work = toScreen.Select(async item =>
-        {
-            await throttle.WaitAsync();
-            try { return await ScreenOneAsync(chat, plan, item.Record); }
-            finally { throttle.Release(); }
-        }).ToList();
+        var firsts = await InParallelAsync(toScreen, item => ScreenFirstAsync(chat, plan, item.Record), (i, n) => progress?.Report($"{i} of {n} sources screened"));
 
-        var pairs = new List<(bool Formal, bool First, bool Second)>();
-        for (int i = 0; i < work.Count; i++)
+        // Second pass: only the sources the rule picks (MultivocalSecondScreening), each pool's audit sample drawn from
+        // every source the first pass decided, whatever it decided.
+        file.AuditSeed = MultivocalSecondScreening.SeedOf(runId);
+        file.AuditShare = MultivocalSecondScreening.AuditShare;
+        file.AuditMinimum = MultivocalSecondScreening.AuditMinimum;
+        var decided = toScreen.Select((item, i) => (item, first: firsts[i])).Where(x => x.first.Answer != null).ToList();
+        var audit = new HashSet<string>(StringComparer.Ordinal);
+        foreach (bool formal in new[] { false, true })
+            audit.UnionWith(MultivocalSecondScreening.AuditSample(file.AuditSeed,
+                decided.Where(x => file.Sources[x.item.Index].Formal == formal).Select(x => file.Sources[x.item.Index].Address)));
+        var again = new List<(int Index, GreyRecord Record)>();
+        foreach (var (item, first) in decided)
         {
-            var screened = await work[i];
-            var entry = file.Sources[toScreen[i].Index];
-            Apply(entry, screened, toScreen[i].Record);
-            if (screened.First != null && screened.Second != null) pairs.Add((entry.Formal, screened.First.IsIncluded, screened.Second.IsIncluded));
-            progress?.Report($"{i + 1} of {work.Count} sources screened");
+            var entry = file.Sources[item.Index];
+            entry.SecondReason = MultivocalSecondScreening.TargetReason(first.Answer!, item.Record.Summary.Length > 0, first.Flags.Count > 0);
+            entry.AuditSample = audit.Contains(entry.Address);
+            if (entry.SecondReason != null || entry.AuditSample) again.Add(item);
         }
-        file.Kappa = Kappa(pairs);
+        var seconds = await InParallelAsync(again, item => ScreenSecondAsync(chat, plan, item.Record), (i, n) => progress?.Report($"{i} of {n} second screenings"));
+        var secondOf = again.Select((item, i) => (item.Index, seconds[i])).ToDictionary(x => x.Index, x => x.Item2);
+
+        for (int i = 0; i < toScreen.Count; i++)
+        {
+            var (index, record) = toScreen[i];
+            Apply(file.Sources[index], firsts[i], secondOf.TryGetValue(index, out var second) ? second : null, record);
+        }
+
+        // κ over the audit sample only: the targeted second screenings are reported apart, as counts.
+        var sample = file.Sources.Where(s => s.AuditSample && s.Decision != "Error").ToList();
+        file.Kappa = MultivocalSecondScreening.Kappa(sample);
         if (plan.UsesFormalPool)
         {
             // Each pool's agreement apart as well, since the two pools are screened from different kinds of record (G10).
-            file.KappaGrey = Kappa(pairs.Where(p => !p.Formal));
-            file.KappaFormal = Kappa(pairs.Where(p => p.Formal));
+            file.KappaGrey = MultivocalSecondScreening.Kappa(sample.Where(s => !s.Formal));
+            file.KappaFormal = MultivocalSecondScreening.Kappa(sample.Where(s => s.Formal));
         }
         return file;
     }
 
-    private static double? Kappa(IEnumerable<(bool Formal, bool First, bool Second)> pairs)
+    private async Task<List<T>> InParallelAsync<T>(List<(int Index, GreyRecord Record)> items, Func<(int Index, GreyRecord Record), Task<T>> screen, Action<int, int> report)
     {
-        var list = pairs.Select(p => (p.First, p.Second)).ToList();
-        return list.Count == 0 ? null : Math.Round(ScreeningConfusion.From(list).CohensKappa, 3);
+        using var throttle = new SemaphoreSlim(_parallelism);
+        var work = items.Select(async item =>
+        {
+            await throttle.WaitAsync();
+            try { return await screen(item); }
+            finally { throttle.Release(); }
+        }).ToList();
+        var results = new List<T>();
+        for (int i = 0; i < work.Count; i++)
+        {
+            results.Add(await work[i]);
+            report(i + 1, work.Count);
+        }
+        return results;
     }
 }
