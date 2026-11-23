@@ -14,7 +14,7 @@ namespace AuBtechReviewAgent;
 public static partial class ThematicSynthesis
 {
     private sealed class CodebookAnswer { public List<ThemeAnswer>? Themes { get; set; } public List<UnassignedAnswer>? Unassigned { get; set; } public List<UnansweredAnswer>? Unanswered { get; set; } }
-    private sealed class ThemeAnswer { public string Name { get; set; } = ""; public string Description { get; set; } = ""; public List<string>? Codes { get; set; } public List<string>? Questions { get; set; } }
+    private sealed class ThemeAnswer { public string Name { get; set; } = ""; public string Description { get; set; } = ""; public List<string>? Codes { get; set; } public List<string>? Questions { get; set; } public string? SingleStudyReason { get; set; } }
     private sealed class UnassignedAnswer { public string Code { get; set; } = ""; public string Reason { get; set; } = ""; }
     private sealed class UnansweredAnswer { public string Question { get; set; } = ""; public string Reason { get; set; } = ""; }
 
@@ -55,7 +55,7 @@ public static partial class ThematicSynthesis
 
             {{PromptSafety.Wrap(codeList, "codes, each with the study it came from")}}
 
-            TASK: Group the codes into {{min}} to {{max}} themes. A theme names a pattern that several studies share and that answers part of the objective; it is not a single study. Give each theme a short name (at most 8 words) and a one- or two-sentence description of what unites its codes.
+            TASK: Group the codes into {{min}} to {{max}} themes. A theme names a pattern that several studies share and that answers part of the objective; it is not a single study. A theme needs codes from at least two studies; a theme whose codes all come from one study is allowed only when that study answers a part of the objective no other study touches, and then it gives that reason in one sentence in the theme's "singleStudyReason" field. Give each theme a short name (at most 8 words) and a one- or two-sentence description of what unites its codes.
             - Put every code in the theme it fits best; a code may also go into a second theme if it clearly belongs to both.
             - Every study should end up in at least one theme. Only leave a code out if it does not bear on the objective; list it under "unassigned" with a reason.{{criteriaRule}}
             - Use only the code ids listed above.{{questionRule}}
@@ -73,6 +73,7 @@ public static partial class ThematicSynthesis
             var unplaced = StudiesWithoutTheme(codes, a.Themes.Select(t => t.Codes!), (a.Unassigned ?? new()).Select(u => u.Code));
             if (unplaced.Count > 0)
                 return $"studies {string.Join(", ", unplaced)} are in no theme and none of their codes is listed as unassigned. Place one of their codes in the best fitting theme, or list the codes under unassigned with a reason.";
+            if (SingleStudyThemeProblem(a.Themes.Select(t => (t.Name, (IEnumerable<string>)t.Codes!, t.SingleStudyReason)), codes, studies.Count) is { } single) return single;
             return questions.Count == 0 ? null : QuestionProblem(questionIds, a.Themes.Select(t => (IEnumerable<string>)(t.Questions ?? new())), (a.Unanswered ?? new()).Select(u => u.Question));
         });
 
@@ -86,6 +87,7 @@ public static partial class ThematicSynthesis
                 Description = t.Description.Trim(),
                 CodeIds = codeIds,
                 Studies = codeIds.Select(c => byId[c].Reference).Distinct().OrderBy(r => r).ToList(),
+                SingleStudyReason = codeIds.Select(c => byId[c].Reference).Distinct().Count() == 1 && !string.IsNullOrWhiteSpace(t.SingleStudyReason) ? t.SingleStudyReason.Trim() : null,
                 Questions = questions.Count == 0 ? null
                     : questionIds.Where(q => (t.Questions ?? new()).Any(x => x.Trim().Equals(q, StringComparison.OrdinalIgnoreCase))).ToList(),
             };
@@ -139,6 +141,24 @@ public static partial class ThematicSynthesis
         return codes.GroupBy(c => c.Reference)
             .Where(g => !g.Any(c => assigned.Contains(c.Id)) && !g.Any(c => left.Contains(c.Id)))
             .Select(g => g.Key).OrderBy(r => r).ToList();
+    }
+
+    /// <summary>
+    /// Why a theme rests on one study without a reason, or null (issue #447): a theme is a pattern several studies share,
+    /// and a one-study theme asked the peer review for comparisons it could not make. With fewer than two coded studies
+    /// every theme rests on one, and no reason is asked for. Public for unit tests.
+    /// </summary>
+    public static string? SingleStudyThemeProblem(IEnumerable<(string Name, IEnumerable<string> Codes, string? Reason)> themes, IReadOnlyList<ThematicCode> codes, int codedStudies)
+    {
+        if (codedStudies < 2) return null;
+        var studyOf = codes.ToDictionary(c => c.Id, c => c.Reference, StringComparer.OrdinalIgnoreCase);
+        foreach (var (name, themeCodes, reason) in themes)
+        {
+            var studies = themeCodes.Select(c => c.Trim()).Where(studyOf.ContainsKey).Select(c => studyOf[c]).Distinct().ToList();
+            if (studies.Count == 1 && string.IsNullOrWhiteSpace(reason))
+                return $"the theme \"{name}\" rests on one study ([{studies[0]}]). Merge its codes into a theme with another study, or give \"singleStudyReason\": why that study alone answers a part of the objective no other study touches.";
+        }
+        return null;
     }
 
     // ─── 3. Second, independent coding ──────────────────────────────────────────────────────────────────
