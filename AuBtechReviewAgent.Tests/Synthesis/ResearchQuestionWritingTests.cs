@@ -62,6 +62,11 @@ public class ResearchQuestionWritingTests : IDisposable
         var report = System.Text.Json.JsonSerializer.Deserialize<PrismaReport>(File.ReadAllText(Path.Join(_root, runId.ToString("N"), "prisma-report.json")))!;
         Assert.Equal("The review set out to answer two research questions: (RQ1) How do agent loops recover from faults?; (RQ2) How are agent loops certified?", report.ObjectivesItem);
 
+        // The discussion call answers RQ1 first (issue #446); RQ2, which no code bears on, is answered in code.
+        string discussion = Prompt("You are writing the Discussion section");
+        Assert.Contains("\"answers\": exactly 1 answer(s), one for each of RQ1 in that order", discussion);
+        Assert.Contains("No evidence bears on RQ2, so it is answered in code; give no answer for it.", discussion);
+
         // The model answers RQ1 only; RQ2, which no code bears on, is answered in code and kept in the codebook.
         string closing = Prompt("You are writing the sections that follow the discussion of");
         Assert.Contains("RQ1: How do agent loops recover from faults?\nNo evidence bears on these, so they are answered in code; give no answer for them: RQ2: How are agent loops certified?\n", closing);
