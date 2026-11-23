@@ -6,6 +6,10 @@ Each version's section becomes the notes of its GitHub release, so write it for 
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-11-23
+
+TraceableAI has a new look, an API for other tools and a guard against text that tries to steer the model. Many prompts changed, so a run can differ from 0.4.0. A multivocal review, still in preview, now costs far less.
+
 ### Added
 
 Other tools can now start a review through an API. Send the form's fields to `/api/v1/reviews` with your own Mistral key, and follow the run by its id. To stop it, send a DELETE with its edit key. Your key is used for that run only and is never stored. The API gives no free reviews, and it stays off on the live site until it is switched on.
@@ -28,6 +32,10 @@ The statement on the use of AI now says how many sources were flagged. It counts
 
 The defences now have their own attack test set. It is a small set of poisoned papers and web pages, each with a trick to steer the model, plus a few honest sources as a check. The tests run them through whole reviews with a fake model. They check that every trick is flagged, that no hidden text reaches the model, and that no decision changes. The set found two faults, now fixed. Instructions hidden in invisible tag characters in an abstract were missed at screening. And a paper that only lost a few stray invisible characters was counted as flagged in the statement on AI use.
 
+Citation chaining now looks further out from the studies that matter most. When it is on, code picks the ten included studies with the most citations per year, so a recent study can beat an old classic. For each, it takes the twenty most cited works it cites and the twenty most cited works that cite it, and screens them like any other record. Only studies you already included can be picks, and no model takes part in choosing them. The flow diagram, the methods and a new table in main.tex show what came from them.
+
+The owner of a finished review can now rewrite a sentence of its report, and every citation in that sentence is checked again against its source. A citation that does not hold stays marked, just as in the text the review wrote. Each edit is kept on file with the text before and after, and you can take it back. The parts written in code, such as the method, the counts and the references, cannot be edited. This version adds the engine behind it; the editor on the report page comes next.
+
 ### Changed
 
 The theme sections are now written so more citations hold up. Each claim gets its own citation, and sources share one only when each says the whole thing. The writer adds no counts, comparisons or words like "always" that a source does not state.
@@ -38,7 +46,7 @@ A repaired sentence in a grey literature review is now checked again as a grey l
 
 The rationale in the introduction now keeps only sentences that cite a source. A sentence from the model's general knowledge is left out, and the writing log says which.
 
-The site starts its new look. It now uses a deeper navy, the same one as Coursebot, and two new typefaces: Inter for text and Poppins for headings and buttons. Cards and fields have round corners. The browser tab shows the new mark, a small robot reading a book. 🤖
+The site starts its new look. It now uses a deeper navy, the same one as Coursebot, and two new typefaces: Inter for text and Poppins for headings and buttons. The browser tab shows the new mark, a small robot reading a book. 🤖
 
 The icons that phones and older browsers use now show the same mark on a navy tile. So does the small logo in the header, and an Android phone gets a large icon when you add the site to the home screen.
 
@@ -84,6 +92,18 @@ The Metrics page opens faster. The stored figures of past runs are read once and
 
 A running review costs the server less. The page that follows a run checked its progress file every second and read it in full each time. Now it reads the file only when it changed.
 
+The research questions now guide every writing step. Each theme says which questions it answers, and a question that no study bears on is named as unanswered, with the reason. The objectives in the paper are now written in code from your plan. Before, only the last step saw the questions, so a theme could drift away from them. A run without research questions is written as before.
+
+The multivocal review now costs far less to run. Screening and the citation checks go to the fast model, as in the systematic review, and the statement on AI use names both models. Each source is screened once. It is screened a second time when the first look kept it, was unsure or found text that looks like instructions, and so is a random sample of at least one in five. Kappa is worked out on that sample, and anyone can draw the sample again from the run's id. A new plan starts with the top 20 hits of each search, not 100. Long pages and papers are sent as their most useful passages, and every quote is still checked against the kept text.
+
+A busy model server no longer ends a run. When the server asks the review to wait, it now waits as long as asked, up to a minute at a time, and tries a few more times. The quick checks also run sixteen at a time instead of eight, so a review is done sooner.
+
+Updating the site no longer stops a review that is running. An update now waits until no review is running, for up to two and a half hours. A change to the docs alone does not update the site at all.
+
+Cards, fields and bars are now square. Only buttons get to keep their round corners.
+
+This release page is new too. It opens with a summary, tells you how to cite the version and folds the long list of pull requests away.
+
 ### Fixed
 
 The discussion no longer says the limitations twice. The prompt asks for each part once. If the answer still has two paragraphs on the limitations, the code merges them into one and drops the sentences that only repeat. A note on file says what was dropped.
@@ -107,6 +127,8 @@ A question about how often something happens now gets the same answer in the pap
 The planning form now says which kinds of grey literature each chosen search can find. It warns you when a kind you named has no search that reaches it, and the protocol says the same. Before, a plan could name five kinds and search only GitHub.
 
 The paper of a multivocal review with academic sources now says in its statement on AI use that both pools were screened and appraised, and how each source's citations were checked. Its flow diagram puts each excluded group beside the step where it left. A grey literature review's flow no longer says "1 themes".
+
+Hidden text in your own answers on the planning form is now taken out too. Invisible tag characters could slip into the prompts. Now they are removed, and if they spelled out an instruction, the warning shows you the hidden words.
 
 
 ## [0.4.0] - 2026-11-20
@@ -209,7 +231,8 @@ The version now comes from the release tag. You can see it on the Metrics page, 
 
 Screening and citation checks now use a smaller, faster model. The writing still uses the large one, where it counts.
 
-[Unreleased]: https://github.com/lauPhilip/au-btech-literature-review-agent/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/lauPhilip/au-btech-literature-review-agent/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/lauPhilip/au-btech-literature-review-agent/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/lauPhilip/au-btech-literature-review-agent/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/lauPhilip/au-btech-literature-review-agent/compare/v0.2.3...v0.3.0
 [0.2.3]: https://github.com/lauPhilip/au-btech-literature-review-agent/compare/v0.2.2...v0.2.3
