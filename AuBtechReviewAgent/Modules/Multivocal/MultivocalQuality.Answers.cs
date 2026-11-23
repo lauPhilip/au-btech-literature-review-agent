@@ -23,6 +23,7 @@ public sealed partial class MultivocalQualityAssessor
     public static List<QualityAnswer> Score(GreyRecord record, IReadOnlyList<ModelQualityAnswer> model, string text)
     {
         var byId = model.GroupBy(a => a.Id.Trim()).ToDictionary(g => g.Key, g => g.First());
+        var spans = PassageSelection.Spans(text);
         var answers = new List<QualityAnswer>();
         foreach (var item in GreyQualityChecklist.Items)
         {
@@ -42,7 +43,7 @@ public sealed partial class MultivocalQualityAssessor
             double given = a == null ? 0 : Snap(a.Score);
             string reason = a?.Reason.Trim() ?? "The model gave no answer for this item.";
             string? quote = string.IsNullOrWhiteSpace(a?.Quote) ? null : a!.Quote!.Trim();
-            bool found = quote != null && PassageSelection.QuoteFound(quote, text);
+            bool found = quote != null && PassageSelection.QuoteFound(quote, spans);
             bool needsQuote = item.QuoteForLow ? given < 1 : given > 0;
             var answer = new QualityAnswer { Id = item.Id, Score = given, Reason = reason, Quote = quote, Basis = "model" };
             if (needsQuote && !found)
@@ -70,10 +71,11 @@ public sealed partial class MultivocalQualityAssessor
     public static GreyArgument? Argument(ModelOpinion? opinion, string text)
     {
         if (opinion is not { IsOpinion: true }) return null;
+        var spans = PassageSelection.Spans(text);
         var argument = new GreyArgument
         {
             Claim = opinion.Claim?.Trim() ?? "",
-            ClaimFound = PassageSelection.QuoteFound(opinion.Claim, text),
+            ClaimFound = PassageSelection.QuoteFound(opinion.Claim, spans),
         };
         foreach (var (id, question) in GreyArgument.CriticalQuestions)
         {
@@ -93,7 +95,7 @@ public sealed partial class MultivocalQualityAssessor
                 var given = id switch { "expertise" => opinion.Expertise, "field" => opinion.Field, "opinion" => opinion.Assertion, _ => opinion.Evidence };
                 answer.Answer = given?.Answer?.Trim() ?? "No answer.";
                 answer.Quote = string.IsNullOrWhiteSpace(given?.Quote) ? null : given!.Quote!.Trim();
-                bool found = answer.Quote != null && PassageSelection.QuoteFound(answer.Quote, text);
+                bool found = answer.Quote != null && PassageSelection.QuoteFound(answer.Quote, spans);
                 answer.Basis = found ? "model" : "unsupported";
                 if (!found) answer.Answer = "(No quote from the page backs this.) " + answer.Answer;
             }
