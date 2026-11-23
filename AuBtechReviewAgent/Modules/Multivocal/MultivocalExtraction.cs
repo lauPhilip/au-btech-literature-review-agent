@@ -180,7 +180,8 @@ public sealed class MultivocalExtractor
     /// </summary>
     public static void Verify(GreyExtraction result, ModelExtraction answer, MapVersion map, MultivocalPlan plan, string text)
     {
-        if (answer.Purpose is { } purpose && !string.IsNullOrWhiteSpace(purpose.Value) && PassageSelection.QuoteFound(purpose.Quote, text))
+        var spans = PassageSelection.Spans(text);
+        if (answer.Purpose is { } purpose && !string.IsNullOrWhiteSpace(purpose.Value) && PassageSelection.QuoteFound(purpose.Quote, spans))
             result.Purpose = new ExtractedValue { Value = purpose.Value.Trim(), Quote = purpose.Quote.Trim() };
 
         result.Attributes = map.Attributes.Select(attribute =>
@@ -190,7 +191,7 @@ public sealed class MultivocalExtractor
             foreach (var v in given?.Values ?? new())
             {
                 var value = new ExtractedValue { Value = Canonical(attribute, v.Value), Quote = (v.Quote ?? "").Trim() };
-                if (PassageSelection.QuoteFound(value.Quote, text)) extracted.Values.Add(value);
+                if (PassageSelection.QuoteFound(value.Quote, spans)) extracted.Values.Add(value);
                 else extracted.Unsupported.Add(value);
             }
             return extracted;

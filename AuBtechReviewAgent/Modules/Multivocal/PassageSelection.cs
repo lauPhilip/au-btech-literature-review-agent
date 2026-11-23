@@ -113,10 +113,17 @@ public static class PassageSelection
     /// True when the quote is found (<see cref="CitationSupportChecker.QuoteOccursIn"/>) within one stretch of the
     /// text sent between two breaks, each a span of the kept text; for a text sent whole, anywhere in it.
     /// </summary>
-    public static bool QuoteFound(string? quote, string sent) =>
+    public static bool QuoteFound(string? quote, string sent) => QuoteFound(quote, Spans(sent));
+
+    /// <summary>The same check against the sent text's stretches made canonical once (<see cref="Spans"/>).</summary>
+    public static bool QuoteFound(string? quote, IReadOnlyList<CanonicalText> spans) =>
+        spans.Any(span => CitationSupportChecker.QuoteOccursIn(quote, span));
+
+    /// <summary>The stretches of a sent text between two breaks, each made canonical once for every quote checked in it.</summary>
+    public static IReadOnlyList<CanonicalText> Spans(string sent) =>
         sent.Contains(Break, StringComparison.Ordinal)
-            ? sent.Split(Break).Any(span => CitationSupportChecker.QuoteOccursIn(quote, span))
-            : CitationSupportChecker.QuoteOccursIn(quote, sent);
+            ? sent.Split(Break).Select(CanonicalText.Of).ToList()
+            : new[] { CanonicalText.Of(sent) };
 
     private static void Add(List<Passage> passages, string text, int from, int to)
     {
