@@ -31,8 +31,8 @@
                     <span class="font-semibold text-ink">@CurrentLabel()</span>
                     <span class="shrink-0 font-mono text-xs text-muted">@(failed ? "stopped" : $"{percent}%")@(Elapsed is { } e ? $" · {e}" : "")</span>
                 </div>
-                <div class="mt-2 h-2 w-full overflow-hidden rounded-full bg-active" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="@percent" aria-label="Run progress">
-                    <div class="h-full rounded-full @barColor transition-all duration-500 @(Running && !failed && percent == 0 ? "w-1/12 animate-pulse" : "")" style="@(percent > 0 ? $"width:{percent}%" : "")"></div>
+                <div class="mt-2 h-2 w-full overflow-hidden bg-active" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="@percent" aria-label="Run progress">
+                    <div class="h-full @barColor transition-all duration-500 @(Running && !failed && percent == 0 ? "w-1/12 animate-pulse" : "")" style="@(percent > 0 ? $"width:{percent}%" : "")"></div>
                 </div>
 
                 @Notice
