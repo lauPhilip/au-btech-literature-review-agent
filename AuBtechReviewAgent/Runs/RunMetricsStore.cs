@@ -14,6 +14,9 @@ public class MetricsOptions
 
     /// <summary>Folder of the metrics store (relative paths are resolved against the content root).</summary>
     public string Folder { get; set; } = Path.Join("App_Data", "metrics");
+
+    /// <summary>An optional price table for the downloads' estimated cost; empty, so off, unless a deployment sets it (issue #414).</summary>
+    public MetricsPrices Prices { get; set; } = new();
 }
 
 /// <summary>
