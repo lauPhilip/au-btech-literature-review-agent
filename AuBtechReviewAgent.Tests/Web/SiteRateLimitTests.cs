@@ -104,7 +104,7 @@ public class SiteRateLimitTests
         using var host = new Host();
         var client = host.CreateClient();
         using var content = new ByteArrayContent(new byte[2 * 1024 * 1024]);
-        var request = new HttpRequestMessage(HttpMethod.Post, "/") { Content = content };
+        using var request = new HttpRequestMessage(HttpMethod.Post, "/") { Content = content };
         request.Headers.Add(AddressHeader, "203.0.113.60");
         Assert.Equal(HttpStatusCode.RequestEntityTooLarge, (await client.SendAsync(request)).StatusCode);
     }

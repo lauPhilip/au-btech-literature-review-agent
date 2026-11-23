@@ -49,9 +49,10 @@ public class ActionLimiterTests
             writer.Write("# Protocol");
         }
         zip.Position = 0;
-        // A zip without a manifest is still read, and the check says what is missing instead of failing.
-        try { await ArchiveUpload.CheckAsync(zip); }
-        catch (Exception ex) when (ex is InvalidDataException or KeyNotFoundException or InvalidOperationException) { }
+        // A zip without a manifest is still read, and the check says the manifest is missing instead of failing.
+        var check = await ArchiveUpload.CheckAsync(zip);
+        Assert.NotNull(check);
+        Assert.False(check!.HasManifest);
         Assert.Empty(Directory.GetFiles(Path.GetTempPath(), "verify-*.zip.tmp"));
     }
 }
