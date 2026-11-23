@@ -80,3 +80,4 @@ public static class SearchSaturation
             : head + " The search has not settled yet: another phrasing or citation chaining may find further studies." + skipped;
     }
 }
+
