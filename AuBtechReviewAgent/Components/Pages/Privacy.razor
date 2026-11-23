@@ -86,7 +86,7 @@
     private (string Title, string Text)[] Summary => new[]
     {
         ("No account, no tracking", "No sign-up, no analytics, no advertising cookies."),
-        ("Your network address", $"Only used to count free runs, stored as a keyed fingerprint, and forgotten after two days."),
+        ("Your network address", $"Only used to count free runs and to slow down automated traffic. Written to disk only as a keyed fingerprint, and forgotten after two days."),
         ("Your review", $"Kept on this server for {RunsOptions.RetentionDays} days, then deleted. You can delete it sooner."),
         ("Your API keys", "Kept encrypted in this browser tab only, and gone when you close it."),
     };
@@ -103,6 +103,11 @@
             $"Free runs are limited to {QuotaOptions.FreeRunsPerDay} per day per network address. To count them, your address is replaced " +
             "by a keyed fingerprint (HMAC-SHA-256 with a secret that exists only on this server) before anything is stored, so the stored value " +
             "cannot be turned back into an address. Counts older than two days are deleted.",
+            "To keep the tool fair and to slow down automated traffic, the server also counts in its memory how many pages, downloads and " +
+            "costly actions (starting a review, proposing search strings, checking a citation again, checking an archive) come from one " +
+            "address, and how many reviews it has running or waiting. These counts are never written to disk. They are gone after an hour " +
+            "at most, or when the server restarts. When a request is refused because too many came from one address, the server's log notes " +
+            "a short fingerprint that changes with every restart, never the address itself.",
             "Like any web server, the hosting provider may keep standard access logs (address, time, page) for operating and securing the server.",
         }),
         ("review", "Your review", new[]

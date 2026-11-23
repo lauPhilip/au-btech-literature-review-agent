@@ -36,36 +36,39 @@ public sealed partial class MultivocalRunner
             await RunStepsAsync(runId, editKey);
             return;
         }
-        IDisposable? slot = null;
-        var wait = new CancellationTokenSource();
-        _waits[runId] = wait;
         try
         {
-            try
-            {
-                slot = await Coordinator.AcquireSlotAsync(runId, wait.Token, place =>
-                {
-                    Set(runId, new MultivocalRunStatus(true, StepWaiting, place.Text, null));
-                    return Task.CompletedTask;
-                });
-            }
-            catch (OperationCanceledException)
-            {
-                // The owner left the line: the run ends as cancelled, as it would between two steps.
-                if (!await StoppedAsync(runId)) Set(runId, new MultivocalRunStatus(false, StepWaiting, null, "The run left the line before it started."));
-                return;
-            }
-            finally
-            {
-                _waits.TryRemove(runId, out _);
-                wait.Dispose();
-            }
-            await RunStepsAsync(runId, editKey);
+            using var slot = await WaitForSlotAsync(Coordinator, runId);
+            if (slot != null) await RunStepsAsync(runId, editKey);
         }
         finally
         {
-            slot?.Dispose();
             Coordinator.Withdraw(runId);
+        }
+    }
+
+    /// <summary>Waits in line, showing the place; null when the owner left the line, after the run is marked cancelled.</summary>
+    private async Task<IDisposable?> WaitForSlotAsync(RunCoordinator coordinator, Guid runId)
+    {
+        using var wait = new CancellationTokenSource();
+        _waits[runId] = wait;
+        try
+        {
+            return await coordinator.AcquireSlotAsync(runId, wait.Token, place =>
+            {
+                Set(runId, new MultivocalRunStatus(true, StepWaiting, place.Text, null));
+                return Task.CompletedTask;
+            });
+        }
+        catch (OperationCanceledException)
+        {
+            // The owner left the line: the run ends as cancelled, as it would between two steps.
+            if (!await StoppedAsync(runId)) Set(runId, new MultivocalRunStatus(false, StepWaiting, null, "The run left the line before it started."));
+            return null;
+        }
+        finally
+        {
+            _waits.TryRemove(runId, out _);
         }
     }
 
