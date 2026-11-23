@@ -83,6 +83,7 @@ public static partial class StudyExtractor
     /// <summary>The evidence basis of such a study.</summary>
     public const string NoText = "no text";
 
+    /// <summary>Extracts and appraises one study; every value comes with a quote checked against the text sent.</summary>
     /// <param name="focus">The run's research questions, objective and cache; null keeps the extraction as it was (MMAT for the multivocal review).</param>
     public static async Task<StudyExtraction> ExtractAsync(IChatCompletionService chat, ReferencedPaper paper, int excerpts = 8, ExtractionFocus? focus = null)
     {
