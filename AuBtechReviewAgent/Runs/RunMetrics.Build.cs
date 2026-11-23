@@ -30,6 +30,7 @@ public partial class RunMetrics
         m.Screened = s.Screened;
         m.Included = s.Included;
         m.ScreeningKappa = s.ScreeningKappa;
+        m.ScreeningKappaBasis = s.ScreeningKappa == null ? null : "all records";
         m.UncertainDecisions = s.UncertainDecisions;
         m.FullTextRetrieved = s.FullTextRetrieved;
         m.FullTextShare = s.Included == 0 ? 0 : Math.Round((double)s.FullTextRetrieved / s.Included, 4);
