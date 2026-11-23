@@ -130,6 +130,24 @@ class CallersTests(unittest.TestCase):
             self.assertIn("SIMPLY_FTP_PASSWORD: ${{ secrets.SIMPLY_FTP_PASSWORD }}", job, name)
 
 
+class ReleaseBodyWiringTests(unittest.TestCase):
+    """The release body comes from release_body.py, with GitHub's list fed in, not appended by gh itself."""
+
+    def setUp(self):
+        self.job = jobs(read("release.yml"))["github-release"]
+
+    def test_fetches_githubs_list_since_the_version_before(self):
+        self.assertIn("git describe --tags --abbrev=0 --match 'v[0-9]*' \"${TAG}^\"", self.job)
+        self.assertIn('releases/generate-notes', self.job)
+        self.assertIn('previous_tag_name="$prev"', self.job)
+
+    def test_composes_the_body_and_publishes_only_that(self):
+        self.assertIn("--body-out release-body.md", self.job)
+        self.assertIn("--generated-notes generated-notes.md --previous-tag \"$PREVIOUS\"", self.job)
+        self.assertIn("--notes-file release-body.md", self.job)
+        self.assertNotIn("--generate-notes", self.job)
+
+
 class IsMasterHeadFeatureTests(unittest.TestCase):
     """Runs the comparison step with a stand-in gh that answers for the tag and for master."""
 
