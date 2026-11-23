@@ -22,10 +22,10 @@ public sealed class MultivocalExtractor
     public const string ExtractionFile = "multivocal-extraction.json";
     public const string StageExtracting = "Extracting";
     public const string StageExtracted = "Extracted";
-    public const string PromptVersion = "grey-extraction-v1";
+    public const string PromptVersion = "grey-extraction-v2";
 
     /// <summary>Part of the cache key of a formal source's extraction, whose prompt names it as academic (block I-5).</summary>
-    public const string FormalPromptVersion = "formal-extraction-v1";
+    public const string FormalPromptVersion = "formal-extraction-v2";
 
     private static readonly JsonSerializerOptions Json = new() { WriteIndented = true };
     private static readonly ConcurrentDictionary<Guid, bool> Running = new();
@@ -219,6 +219,7 @@ public sealed class MultivocalExtractor
             You extract data from one {{kind}} for a multivocal literature review (Garousi et al. 2019, G12), against the review's systematic map.
             The review is about: {{PromptSafety.Wrap(plan.Topic, "review topic")}}
 
+            {{PromptSafety.ReviewerInputNotice}}
             {{PromptSafety.DataOnlyNotice}}
 
             SOURCE:

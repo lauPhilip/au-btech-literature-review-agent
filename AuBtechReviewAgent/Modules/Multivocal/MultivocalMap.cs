@@ -21,7 +21,7 @@ public sealed partial class MultivocalMapper
     public const string MapFile = "multivocal-map.json";
     public const string StageMapping = "Mapping";
     public const string StageMapped = "Mapped";
-    public const string PromptVersion = "grey-map-v3";
+    public const string PromptVersion = "grey-map-v4";
 
     public const int MaxAttributes = 20;
 
@@ -164,6 +164,7 @@ public sealed partial class MultivocalMapper
             RESEARCH QUESTIONS (from the reviewer):
             {{PromptSafety.Wrap(questions, "research questions")}}
 
+            {{PromptSafety.ReviewerInputNotice}}
             {{PromptSafety.DataOnlyNotice}}
 
             SOURCES THAT PASSED THE QUALITY CHECK (title, site, summary):
