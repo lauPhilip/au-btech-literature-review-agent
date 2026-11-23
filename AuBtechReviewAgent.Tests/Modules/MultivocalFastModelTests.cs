@@ -104,4 +104,40 @@ public class MultivocalFastModelTests : IDisposable
         Assert.Equal(new[] { "screening", "screening", "screening-second", "screening-second" }, stages.Order(StringComparer.Ordinal));
         Assert.True(LlmOptions.FastStages.Contains(MultivocalScreener.FirstStage) && LlmOptions.FastStages.Contains(MultivocalScreener.SecondStage));
     }
+
+    [Fact]
+    public void TheStatementOnAiUseNamesBothModelsAndWhatEachDid()
+    {
+        var input = MultivocalPaperTests.Input();
+        input.Screening.Model = "small-model";
+        var paper = new MultivocalPaperFile { Model = "large-model", CheckModel = "small-model", WrittenUtc = new DateTime(2026, 11, 23) };
+
+        string text = MultivocalPaper.AiUse(input, paper);
+
+        Assert.Contains("with the large language models large-model and small-model, in November 2026", text);
+        Assert.Contains("Of these, small-model answered both screenings of every source and the citation checks, and large-model did every other step that used a model. ", text);
+        Assert.Contains("The models were used for screening the grey sources twice", text);
+    }
+
+    [Fact]
+    public void WithOneModelTheStatementStaysAsItWas()
+    {
+        var input = MultivocalPaperTests.Input();
+        input.Screening.Model = "large-model";
+        string text = MultivocalPaper.AiUse(input, new MultivocalPaperFile { Model = "large-model", WrittenUtc = new DateTime(2026, 11, 23) });
+
+        Assert.Contains("with the large language model large-model, in November 2026", text);
+        Assert.Contains("The model was used for screening the grey sources twice", text);
+        Assert.DoesNotContain("Of these", text);
+    }
+
+    [Fact]
+    public void AnEarlierRunWhoseChecksAloneWentToTheFastModelSaysSo()
+    {
+        var input = MultivocalPaperTests.Input();
+        input.Screening.Model = "";
+        string text = MultivocalPaper.AiUse(input, new MultivocalPaperFile { Model = "large-model", CheckModel = "small-model", WrittenUtc = new DateTime(2026, 11, 23) });
+
+        Assert.Contains("Of these, small-model answered the citation checks, and large-model did every other step that used a model. ", text);
+    }
 }
