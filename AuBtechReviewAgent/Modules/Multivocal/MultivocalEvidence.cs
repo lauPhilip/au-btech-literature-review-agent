@@ -72,6 +72,7 @@ public static class MultivocalEvidence
                 Sources = findings.Select(f => numbers[f.Address]).Distinct().OrderBy(n => n).ToList(),
                 Codes = findings.GroupBy(f => numbers[f.Address])
                     .ToDictionary(g => g.Key, g => (IReadOnlyList<string>)g.Select(f => $"{f.Attribute}: {f.Value}").Distinct().ToList()),
+                FindingIds = findings.GroupBy(f => numbers[f.Address]).ToDictionary(g => g.Key, g => (IReadOnlyList<string>)g.Select(f => f.Id).ToList()),
             });
             questionOf[id] = theme.Question;
         }
