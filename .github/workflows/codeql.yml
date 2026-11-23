@@ -11,9 +11,36 @@ on:
 permissions:
   contents: read
 
+# A newer push to a pull request cancels the older run; pushes to master and the weekly run each have their own group.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
+  # A pull request that changes docs alone is not analysed (tools/test-scope.sh prints NONE); the skipped job still
+  # reports. Pushes to master and the weekly run are always analysed.
+  changes:
+    name: What changed
+    runs-on: ubuntu-latest
+    outputs:
+      code: ${{ steps.scope.outputs.code }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0   # the pull request's base commit, to compare with
+      - name: Is it docs only?
+        id: scope
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+        run: |
+          code=true
+          if [ "${{ github.event_name }}" = pull_request ] && [ "$(bash tools/test-scope.sh "$BASE...HEAD")" = NONE ]; then code=false; fi
+          echo "code=$code" >> "$GITHUB_OUTPUT"
+
   analyze:
     name: Analyze (${{ matrix.language }})
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read

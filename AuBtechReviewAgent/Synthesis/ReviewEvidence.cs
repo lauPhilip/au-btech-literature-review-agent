@@ -53,6 +53,9 @@ public sealed class EvidenceTheme
     /// read from and how they were designed. Empty when the module gives none; then the prompt has no such line.
     /// </summary>
     public string Facts { get; init; } = "";
+
+    /// <summary>The research questions the theme answers, with their text ("RQ1: ..."); empty when it answers none named.</summary>
+    public string Question { get; init; } = "";
 }
 
 /// <summary>

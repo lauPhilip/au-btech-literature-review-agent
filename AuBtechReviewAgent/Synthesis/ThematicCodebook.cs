@@ -58,9 +58,16 @@ public class Theme
 
     /// <summary>Reference numbers of the studies with at least one code in this theme (derived in code).</summary>
     public List<int> Studies { get; set; } = new();
+
+    /// <summary>The research questions the theme answers ("RQ1"); null when the run has none.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public List<string>? Questions { get; set; }
 }
 
 public record UncodedStudy(int Reference, string Reason);
+
+/// <summary>A research question no code bears on ("RQ2"), with the codebook's reason; it is answered in code.</summary>
+public record UnansweredQuestion(string Question, string Reason);
 
 /// <summary>Coverage of one theme subsection: which of its studies are cited, before and after the fill pass.</summary>
 public class ThemeCoverage
@@ -91,6 +98,10 @@ public class ThematicCodebook
     public List<ThematicCode> Codes { get; set; } = new();
     public List<Theme> Themes { get; set; } = new();
     public List<UncodedStudy> Uncoded { get; set; } = new();
+
+    /// <summary>The research questions no theme answers, with the reason; null when the run has no research questions.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public List<UnansweredQuestion>? Unanswered { get; set; }
     public List<ThemeCoverage> Coverage { get; set; } = new();
     public SecondCoding? SecondCoding { get; set; }
 
