@@ -162,6 +162,19 @@ public class MultivocalRunnerTests : IDisposable
     }
 
     [Fact]
+    public async Task ARunningRunIsCountedForHealthUntilItEnds()
+    {
+        var (_, runId, key, runner) = await AssessedRun(Model(() => false));
+        var counted = new List<int>();
+        runner.Changed += id => { if (runner.StatusOf(id)?.Running == true) counted.Add(runner.ActiveRunCount); };
+        Assert.Equal(0, runner.ActiveRunCount);
+        await runner.RunAsync(runId, key);
+        Assert.NotEmpty(counted);
+        Assert.All(counted, c => Assert.Equal(1, c)); // the deploy waits while this is above 0
+        Assert.Equal(0, runner.ActiveRunCount);
+    }
+
+    [Fact]
     public async Task WithTheWriterTheRunGoesOnToWriteAndCheckThePaper()
     {
         var (store, runId, key, runner) = await AssessedRun(Model(() => false), withWriter: true);
