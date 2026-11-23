@@ -24,6 +24,9 @@ public partial class MultivocalStart
     // Instruction-like text in the plan (#365): shown on the last step, and the review starts only once the reviewer
     // confirms exactly these flags; editing the plan so the flags change asks again.
     internal IReadOnlyList<string> FlagLines => MultivocalPlanGuard.Lines(plan);
+
+    // Signs of broad criteria, checked in code (MultivocalCriteriaCheck); a warning only, never a problem.
+    internal IReadOnlyList<string> CriteriaWarnings => MultivocalCriteriaCheck.Warnings(plan);
     private string? confirmedFlags;
     internal bool FlagsConfirmed => FlagLines.Count == 0 || confirmedFlags == string.Join("\n", FlagLines);
     internal void ConfirmFlags(ChangeEventArgs e) => confirmedFlags = e.Value is true ? string.Join("\n", FlagLines) : null;

@@ -105,6 +105,11 @@ public sealed class MultivocalScreeningFile
     /// <summary>With a formal pool: the version of the prompt for academic records; null, and left out, otherwise.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? FormalPromptVersion { get; set; }
+
+    /// <summary>Warnings of the pilot check (<see cref="MultivocalPilotCheck"/>), one per pool; null, and left out, when none.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public List<string>? Warnings { get; set; }
+
     public List<GreyScreening> Sources { get; set; } = new();
 
     public int Count(string decision) => Sources.Count(s => s.Decision == decision);
