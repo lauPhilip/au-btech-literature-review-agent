@@ -133,5 +133,6 @@ public partial class MultivocalPaperPage
 
     private static string ReferenceLine(GreyReference r) => GreyReferences.Line(r).Replace("*", "");
 
-    private static string Ordinal(int n) => n switch { 1 => "1st", 2 => "2nd", 3 => "3rd", _ => $"{n}th" };
+    // Tier 0 is an academic source, which has no outlet tier.
+    private static string Ordinal(int n) => n switch { 0 => "none (academic)", 1 => "1st", 2 => "2nd", 3 => "3rd", _ => $"{n}th" };
 }
