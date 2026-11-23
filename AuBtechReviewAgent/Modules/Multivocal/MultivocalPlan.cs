@@ -145,7 +145,9 @@ public sealed class MultivocalPlan
     /// A complete example plan, to try the form and the protocol without typing (the "Fill in an example" button on
     /// the preview). It plans a review of context engineering for LLM agents, a topic where much of the knowledge is
     /// in grey literature. It is kept small (two grey strings, four grey searches, 20 top hits), so trying it is cheap;
-    /// the form adds <see cref="ExampleFormalDatabases"/> to a multivocal plan.
+    /// the form adds <see cref="ExampleFormalDatabases"/> to a multivocal plan. Its criteria are narrow on purpose: with
+    /// broader ones a live run included 282 of 431 sources, and every included source costs a page, a quality call and
+    /// an extraction.
     /// </summary>
     public static MultivocalPlan Example(string card = "multivocal") => new()
     {
@@ -166,8 +168,8 @@ public sealed class MultivocalPlan
         GreyTypes = new List<string> { "white-papers", "documentation", "blogs", "qa", "code" },
         GreySearches = new List<string> { "stackexchange", "github", "openalex-grey", "backlinks" },
         GreySearchStrings = new List<string> { "context engineering", "LLM agent context window" },
-        InclusionCriteria = "Sources about engineering the context given to LLM agents (what goes into the context window, memory, retrieval, tool descriptions, compression or summarisation), with practical experience, guidance, an evaluation or a tool.",
-        ExclusionCriteria = "Sources only about the wording of prompts for single chat requests; marketing pages without technical content; sources not in English.",
+        InclusionCriteria = "Sources whose main subject is how the context of an LLM agent is built, selected or managed, meaning what goes into its context window and why. A source must explain at least one such practice, or evaluate one, in enough detail that a developer could apply it.",
+        ExclusionCriteria = "Sources that mention an agent's context only in passing; generic tutorials on retrieval-augmented generation or vector databases; release notes and changelogs; code repositories whose README does not explain a practice; marketing pages without technical content; sources only about the wording of prompts for single chat requests; sources not in English.",
         StoppingRule = "effort",
         TopHits = DefaultTopHits,
         QualityThreshold = 10,
