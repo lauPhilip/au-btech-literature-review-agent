@@ -18,7 +18,10 @@ namespace AuBtechReviewAgent;
 /// <summary>What fetching one web page gave: its text, or why it was not fetched.</summary>
 /// <param name="FinalUrl">The address the text came from, after redirects.</param>
 /// <param name="NotFetched">Why there is no text (robots.txt, a sign-in, the size, the type); null when there is.</param>
-public sealed record FetchedPage(string Url, string FinalUrl, int? Status, string ContentType, string Title, string Text, string? NotFetched);
+/// <param name="Removed">What was taken out of the text because a reader never sees it (#369); null when nothing was.</param>
+/// <param name="HiddenText">The readable text that was hidden, for the scan for instruction-like phrases.</param>
+public sealed record FetchedPage(string Url, string FinalUrl, int? Status, string ContentType, string Title, string Text, string? NotFetched,
+    HiddenTextRemoved? Removed = null, string HiddenText = "");
 
 /// <summary>
 /// Fetches web pages for their snapshots, politely and safely: robots.txt is read first and obeyed for our product
@@ -111,7 +114,8 @@ public sealed partial class PageFetcher
 
         try
         {
-            string title, text;
+            string title;
+            CleanedText text;
             if (pdf)
             {
                 if (!Encoding.ASCII.GetString(bytes, 0, Math.Min(bytes.Length, 1024)).Contains("%PDF-"))
@@ -122,11 +126,12 @@ public sealed partial class PageFetcher
             {
                 string decoded = Decode(bytes, response.Content.Headers.ContentType);
                 title = html ? PageText.TitleOf(decoded) : "";
-                text = html ? PageText.FromHtml(decoded) : PageText.FromPlainText(decoded);
+                text = html ? PageText.Read(decoded) : PageText.ReadPlain(decoded);
             }
-            if (text.Length == 0)
+            if (text.Text.Length == 0)
                 return NotFetched(url, finalUrl, status, "no readable text (the page may need JavaScript, or the PDF is scanned)");
-            return new FetchedPage(url, finalUrl, status, type, title, text, null);
+            return new FetchedPage(url, finalUrl, status, type, title, text.Text, null,
+                HiddenTextRemoved.Of(text.InvisibleCharacters, text.HiddenElements), text.Hidden);
         }
         catch (RegexMatchTimeoutException)
         {
@@ -139,13 +144,13 @@ public sealed partial class PageFetcher
         }
     }
 
-    private static (string Title, string Text) PdfText(byte[] bytes)
+    private static (string Title, CleanedText Text) PdfText(byte[] bytes)
     {
         using var document = PdfDocument.Open(bytes);
         string title = document.Information?.Title?.Trim() ?? "";
         var text = new StringBuilder();
         foreach (var page in document.GetPages()) text.Append(page.Text).Append('\n');
-        return (title, PageText.FromPlainText(text.ToString()));
+        return (title, PageText.ReadPlain(text.ToString()));
     }
 
     /// <summary>The charset the server names, else the one the page declares, else UTF-8.</summary>

@@ -57,13 +57,16 @@ public partial class PrismaReviewEngine
         {
             var result = await downloads[i];
             ReportProgress(ctx.RunId, ctx.State, RunProgress.FullText, (double)(i + 1) / included.Count, Of(i + 1, included.Count, "papers"));
-            ctx.Chunks[included[i].Id] = result.Chunks.ToList();
+            // Text a reader never sees is taken out before anything reads it (#369); what was removed is on file below.
+            var (chunks, removed, hidden) = HiddenText.CleanChunks(result.Chunks);
+            ctx.Chunks[included[i].Id] = chunks;
             ctx.State.FullTextSources[included[i].Id] = result.Source;
             if (IsWebAddress(result.Url)) ctx.State.FullTextUrls[included[i].Id] = result.Url!;
             if (result.Chunks.Count > 0) ctx.State.Stats.FullTextRetrieved++;
             ctx.State.FullTextFlags?.RemoveAll(f => f.PaperId == included[i].Id);
-            if (PromptSafety.Find(string.Join("\n", result.Chunks.Select(c => c.Text))) is { } flags)
-                (ctx.State.FullTextFlags ??= new()).Add(new SourceTextFlags(included[i].Id, included[i].Title, flags));
+            var flags = HiddenText.Flags(string.Join("\n", chunks.Select(c => c.Text)), hidden);
+            if (flags != null || removed != null)
+                (ctx.State.FullTextFlags ??= new()).Add(new SourceTextFlags(included[i].Id, included[i].Title, flags ?? new(), removed));
         }
         await PublishAsync(ctx);
     }

@@ -176,6 +176,10 @@
                         The kept text has phrases that read like instructions to the model: @string.Join("; ", textFlags). It is treated as data, but check what was taken from it.
                     </p>
                 }
+                @if (snapshot?.HiddenText is { } removed)
+                {
+                    <p class="text-[11px] text-muted mt-1">Hidden text taken out before the model read it: @removed. A reader does not see it.</p>
+                }
                 @if (canEdit && (snapshot == null || snapshot.NotKept != null))
                 {
                     bool busy = keeping.Contains(r.Url);

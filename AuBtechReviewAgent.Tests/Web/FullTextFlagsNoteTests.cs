@@ -27,6 +27,21 @@ public class FullTextFlagsNoteTests
     }
 
     [Fact]
+    public async Task PapersWithHiddenTextTakenOutAreListedApart()
+    {
+        var flags = new List<SourceTextFlags>
+        {
+            new("p1", "Agents that loop", new List<SourceFlag>(), new HiddenTextRemoved(3, 0)),
+        };
+
+        string html = await RenderAsync(flags);
+
+        Assert.DoesNotContain("reads like instructions", html);
+        Assert.Contains("Hidden text was taken out of 1 included paper", html);
+        Assert.Contains("3 invisible characters removed", html);
+    }
+
+    [Fact]
     public async Task NothingShowsWithoutFlags()
     {
         Assert.Equal("", (await RenderAsync(null)).Trim());

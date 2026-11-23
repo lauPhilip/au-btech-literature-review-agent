@@ -164,6 +164,7 @@ public static class ReviewInputGuard
         "role-change" => "tries to give the model new instructions",
         "demands-inclusion" => "demands that it be included",
         "claims-criteria-met" => "claims to meet the inclusion criteria",
+        HiddenText.FlagPattern => "hides text from the reader that reads like instructions",
         _ => pattern,
     };
 }

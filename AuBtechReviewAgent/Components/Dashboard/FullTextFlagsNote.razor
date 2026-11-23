@@ -1,8 +1,9 @@
 @* Under the finished run's card: the included papers whose full text has phrases that read like instructions to the
    model (#366). The text is treated as data and no decision changed, but extraction and the citation check read it,
-   so the reviewer is asked to look at what was taken from those papers. Nothing shows when no paper was flagged. *@
+   so the reviewer is asked to look at what was taken from those papers. Below them, the papers whose full text had
+   hidden text taken out before the model read it (#369). Nothing shows when no paper has either. *@
 
-@if (Flags is { Count: > 0 } flags)
+@if (Flags?.Where(f => f.Flags.Count > 0).ToList() is { Count: > 0 } flags)
 {
     <details class="ui-card mt-4 p-4 text-sm sm:p-5">
         <summary class="cursor-pointer font-semibold text-not-supported">
@@ -15,6 +16,24 @@
                 <li>
                     <span class="font-semibold text-heading">@entry.Title</span>
                     <span class="block text-xs text-muted">@string.Join("; ", entry.Flags)</span>
+                </li>
+            }
+        </ul>
+    </details>
+}
+@if (Flags?.Where(f => f.Removed != null).ToList() is { Count: > 0 } removed)
+{
+    <details class="ui-card mt-4 p-4 text-sm sm:p-5">
+        <summary class="cursor-pointer font-semibold text-heading">
+            Hidden text was taken out of @removed.Count included @(removed.Count == 1 ? "paper" : "papers")
+        </summary>
+        <p class="mt-2 text-muted">A reader cannot see these characters, but a language model can. They were removed before anything read the text. Quotes are checked against the text without them.</p>
+        <ul class="mt-2 space-y-1.5">
+            @foreach (var entry in removed)
+            {
+                <li>
+                    <span class="font-semibold text-heading">@entry.Title</span>
+                    <span class="block text-xs text-muted">@entry.Removed removed</span>
                 </li>
             }
         </ul>

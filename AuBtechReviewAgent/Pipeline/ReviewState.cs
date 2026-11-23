@@ -158,5 +158,10 @@ public class ReviewPhases
     public List<ScreeningLog> Screening { get; set; } = new(); 
 }
 
-/// <summary>The instruction-like phrases found in one included paper's full text (#366).</summary>
-public sealed record SourceTextFlags(string PaperId, string Title, List<SourceFlag> Flags);
+/// <summary>
+/// The instruction-like phrases found in one included paper's full text (#366), and what was taken out of that text
+/// because a reader never sees it (#369). <see cref="Flags"/> is empty when only hidden text was removed.
+/// </summary>
+public sealed record SourceTextFlags(string PaperId, string Title, List<SourceFlag> Flags,
+    [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    HiddenTextRemoved? Removed = null);
