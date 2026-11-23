@@ -61,6 +61,9 @@ public sealed class MultivocalPaperFile
     /// <summary>When the citation check finished, and its counts after the repair; null before the check.</summary>
     public DateTime? CheckedUtc { get; set; }
     public CitationSupportSummary? Checks { get; set; }
+
+    /// <summary>The model that answered the citation checks when it was not <see cref="Model"/> (Llm:FastModel); null otherwise.</summary>
+    public string? CheckModel { get; set; }
 }
 
 /// <summary>A source the paper does not cite, and why.</summary>

@@ -27,7 +27,11 @@ public sealed partial class MultivocalWriter
             var file = Load(runId) ?? throw new InvalidOperationException("Write the paper first.");
             await RunHeader.WriteAsync(folder, header with { Stage = StageChecking });
 
-            var audit = await CheckPaperAsync(_chat(), input, file, page => _pages.ReadText(runId, page), _parallelism, progress, new CheckCache(_cache, _model));
+            // Keyed on the model that answers the checks, so a verdict of the main model is not reused as the fast model's.
+            bool fast = _checkModel != _model;
+            var cache = new CheckCache(_cache, _checkModel, fast ? _model : null);
+            var audit = await CheckPaperAsync(_chat(), input, file, page => _pages.ReadText(runId, page), _parallelism, progress, cache);
+            file.CheckModel = fast ? _checkModel : null;
             await SafeFile.WriteAllTextAsync(Path.Join(folder, AuditFile), JsonSerializer.Serialize(audit, Json));
             await SafeFile.WriteAllTextAsync(Path.Join(folder, PaperFile), JsonSerializer.Serialize(file, Json));
             await RunHeader.WriteAsync(folder, header with { Stage = StageChecked });

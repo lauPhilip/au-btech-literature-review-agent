@@ -61,7 +61,7 @@ public class MultivocalFormalSearchTests : IDisposable
         for (int i = 0; i < 2; i++)
             Assert.Equal(RunManifest.Sha256(File.ReadAllBytes(Path.Join(store.FolderOf(runId), files[i]))), hashes[i]);
         Assert.Equal("<feed>one</feed>", File.ReadAllText(Path.Join(store.FolderOf(runId), files[0])));
-        Assert.All(xml.Asked, n => Assert.Equal(100, n)); // effort bounded: the plan's top 100
+        Assert.All(xml.Asked, n => Assert.Equal(MultivocalPlan.DefaultTopHits, n)); // effort bounded: the plan's top hits
     }
 
     [Fact]

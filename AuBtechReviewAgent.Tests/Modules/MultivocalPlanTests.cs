@@ -104,6 +104,8 @@ public class MultivocalPlanTests : IDisposable
         Assert.All(plan.IncludeGrey, a => Assert.NotNull(a));
         Assert.Equal(new[] { "RQ1", "RQ1.1", "RQ1.2", "RQ2", "RQ3" }, plan.Numbered().Select(q => q.Number));
         Assert.Contains("Context engineering for LLM agents", MultivocalProtocol.Write(plan, Guid.NewGuid(), DateTime.UtcNow));
+        Assert.Equal((20, 20, 2, 4), (new MultivocalPlan().TopHits, plan.TopHits, plan.GreySearchStrings.Count, plan.GreySearches.Count)); // kept small: every hit is screened twice
+        Assert.All(MultivocalPlan.ExampleFormalDatabases, k => Assert.Equal(SourceKeyKind.None, SourceCatalog.All.First(s => s.Key == k).KeyKind));
     }
 
     [Fact]

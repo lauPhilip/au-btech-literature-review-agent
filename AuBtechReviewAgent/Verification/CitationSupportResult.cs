@@ -100,5 +100,9 @@ public class CitationSupportSummary
 }
 
 
-/// <summary>A cache for the citation check's answers, and the model they came from (part of the key).</summary>
-public sealed record CheckCache(ReviewCache Cache, string Model);
+/// <summary>
+/// A cache for the citation check's answers, and the model they came from (part of the key). When the check goes to a
+/// fast model (Llm:FastModel), <paramref name="SenseModel"/> names the model of the repair's sense check, which stays
+/// on the main model; null when one model answers both.
+/// </summary>
+public sealed record CheckCache(ReviewCache Cache, string Model, string? SenseModel = null);

@@ -94,8 +94,14 @@ public sealed class MultivocalPlan
     /// <summary>True when the plan has the criteria screening needs.</summary>
     public bool HasCriteria => InclusionCriteria.Trim().Length > 0;
 
-    /// <summary>For the effort-bounded rule: how many top hits of each search string are looked at (the paper uses 100).</summary>
-    public int TopHits { get; set; } = 100;
+    /// <summary>
+    /// For the effort-bounded rule: how many top hits of each search string are looked at. The paper uses 100; a plan
+    /// starts at 20, since every hit is screened twice by a model, and the reviewer can raise it on the form.
+    /// </summary>
+    public int TopHits { get; set; } = DefaultTopHits;
+
+    /// <summary>The top hits a new plan starts with.</summary>
+    public const int DefaultTopHits = 20;
 
     /// <summary>Grey sources scoring below this many of the 20 quality points are excluded (decision 4; the paper's example uses 10).</summary>
     public int QualityThreshold { get; set; } = 10;
@@ -138,7 +144,8 @@ public sealed class MultivocalPlan
     /// <summary>
     /// A complete example plan, to try the form and the protocol without typing (the "Fill in an example" button on
     /// the preview). It plans a review of context engineering for LLM agents, a topic where much of the knowledge is
-    /// in grey literature.
+    /// in grey literature. It is kept small (two grey strings, four grey searches, 20 top hits), so trying it is cheap;
+    /// the form adds <see cref="ExampleFormalDatabases"/> to a multivocal plan.
     /// </summary>
     public static MultivocalPlan Example(string card = "multivocal") => new()
     {
@@ -157,14 +164,17 @@ public sealed class MultivocalPlan
             new() { Text = "Is the use of retrieval for context related to fewer reported agent failures?", Type = "relationship" },
         },
         GreyTypes = new List<string> { "white-papers", "documentation", "blogs", "qa", "code" },
-        GreySearches = new List<string> { "stackexchange", "github", "hackernews", "openalex-grey", "zenodo", "backlinks" },
-        GreySearchStrings = new List<string> { "context engineering", "LLM agent context window", "agent memory management" },
+        GreySearches = new List<string> { "stackexchange", "github", "openalex-grey", "backlinks" },
+        GreySearchStrings = new List<string> { "context engineering", "LLM agent context window" },
         InclusionCriteria = "Sources about engineering the context given to LLM agents (what goes into the context window, memory, retrieval, tool descriptions, compression or summarisation), with practical experience, guidance, an evaluation or a tool.",
         ExclusionCriteria = "Sources only about the wording of prompts for single chat requests; marketing pages without technical content; sources not in English.",
         StoppingRule = "effort",
-        TopHits = 100,
+        TopHits = DefaultTopHits,
         QualityThreshold = 10,
     };
+
+    /// <summary>The academic databases the example searches: only ones that need no key, so it runs on any server.</summary>
+    public static readonly IReadOnlyList<string> ExampleFormalDatabases = new[] { "openalex", "semanticscholar", "arxiv" };
 
     /// <summary>Adds a main question at the end, or a sub-question right after its main question's other sub-questions.</summary>
     public void AddQuestion(int? parent)

@@ -115,10 +115,11 @@ var multivocalSearcher = new AuBtechReviewAgent.MultivocalSearcher(reviewEngine.
     reviewEngine.CreateServerSource); // the formal pool: the systematic review's databases, with the server's keys
 builder.Services.AddSingleton(multivocalSearcher); // multivocal grey searches (preview)
 // Inside a run started by the runner, the steps use the run's recording service, so their calls land in llm-calls.json.
+// As in the systematic review, the screenings and citation checks go to Llm:FastModel when one is set.
 var multivocalChat = () => (Microsoft.SemanticKernel.ChatCompletion.IChatCompletionService?)AuBtechReviewAgent.LlmRecording.Current
-    ?? AuBtechReviewAgent.LlmFactory.Create(llmOptions, mistralApiKey);
+    ?? AuBtechReviewAgent.LlmFactory.CreateForReview(llmOptions, mistralApiKey);
 var multivocalScreener = new AuBtechReviewAgent.MultivocalScreener(reviewEngine.Store, multivocalPlanner, multivocalSearcher,
-    multivocalChat, reviewEngine.Cache, llmOptions.Model, llmOptions.ScreeningParallelism);
+    multivocalChat, reviewEngine.Cache, llmOptions.ModelFor("screening"), llmOptions.ScreeningParallelism, llmOptions.ModelFor);
 builder.Services.AddSingleton(multivocalScreener); // grey screening (preview)
 var multivocalPages = new AuBtechReviewAgent.MultivocalPages(reviewEngine.Store, multivocalSearcher, new AuBtechReviewAgent.PageFetcher(),
     (paper, folder) => AuBtechReviewAgent.DocumentRAGUtility.IngestAndChunkPaperAsync(paper, folder, openSources.ContactEmail)); // a formal source's open full text
@@ -139,11 +140,11 @@ var multivocalReporter = new AuBtechReviewAgent.MultivocalReporter(reviewEngine.
     multivocalQuality, multivocalMapper, multivocalExtractor, multivocalSynthesiser);
 builder.Services.AddSingleton(multivocalReporter); // report, written in code (preview)
 var multivocalWriter = new AuBtechReviewAgent.MultivocalWriter(reviewEngine.Store, multivocalReporter, multivocalPages, multivocalChat,
-    llmOptions.Model, llmOptions.ScreeningParallelism, reviewEngine.Cache, metricsStore);
+    llmOptions.Model, llmOptions.ScreeningParallelism, reviewEngine.Cache, metricsStore, llmOptions.ModelFor("citation-check"));
 builder.Services.AddSingleton(multivocalWriter); // writing and checking the paper (preview)
 var multivocalRunner = new AuBtechReviewAgent.MultivocalRunner(reviewEngine.Store, multivocalSearcher, multivocalScreener, multivocalQuality,
     multivocalMapper, multivocalExtractor, multivocalSynthesiser, multivocalPages, multivocalWriter,
-    () => AuBtechReviewAgent.LlmFactory.Create(llmOptions, mistralApiKey), llmOptions.Model);
+    () => AuBtechReviewAgent.LlmFactory.CreateForReview(llmOptions, mistralApiKey), llmOptions.Model);
 builder.Services.AddSingleton(multivocalRunner); // runs the steps one after another (preview)
 reviewEngine.AddCanceller(multivocalRunner.Cancel); // so CancelRun reaches grey literature runs too
 // Modules shown as a preview while they are being built (Development only; see ReviewModulesOptions).
