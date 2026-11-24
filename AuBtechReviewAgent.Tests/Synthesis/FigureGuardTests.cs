@@ -43,4 +43,28 @@ public class FigureGuardTests
             ReviewWriter.FigurePlacementProblem(Results, "", new[] { ("the implications", "Teams can expect 34 % more [1].") }, new[] { "Agents find 34 % more [1]." }));
         Assert.Null(ReviewWriter.FigurePlacementProblem(Results, "", new[] { ("the conclusion", "Teams in 2026 should test agents.") }, null, new[] { "the conclusion" }));
     }
+
+    private static string Json(string text, params string[] answers) => System.Text.Json.JsonSerializer.Serialize(new { answers, text });
+
+    [Fact]
+    public async Task TheDiscussionIsSentBackTwiceThenKeptAndBothAreOnFile()
+    {
+        const string repeating = "Agents find 34 % more rare scenarios than manual testing [1].";
+        var model = new FakeChatService()
+            .Returns(Json(repeating, "Agents find 34 % more rare scenarios [1]."))
+            .Returns(Json(repeating, "Agents find 34 % more rare scenarios [1]."))
+            .Returns(Json(repeating, "Agents find 34 % more rare scenarios [1]."));
+        var notes = new List<string>();
+
+        var result = await ReviewWriter.WriteDiscussionAndAnswersAsync(model, WritingProfile.Systematic, "agent testing", "Map agent testing", Sections, Evidence(), 2,
+            notes.Add, new[] { "What do testing agents find?" }, null);
+
+        Assert.Contains("A figure from the results (a number, percentage or effect size) is given in at most one answer", model.Prompts[0]);
+        Assert.Equal(3, model.Prompts.Count);
+        Assert.Contains("the discussion uses 34, a result figure answer 1 already gives", model.Prompts[1]);
+        Assert.Equal(repeating, result.Text);
+        Assert.Equal(3, notes.Count);
+        Assert.StartsWith("The discussion call was sent back for a repeated result figure (1 of 2)", notes[0]);
+        Assert.StartsWith("The discussion call was kept after 2 send-backs with a repeated result figure", notes[2]);
+    }
 }
