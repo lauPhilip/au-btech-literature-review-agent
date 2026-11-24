@@ -65,7 +65,7 @@ public static class LatexText
         foreach (var r in text.EnumerateRunes())
         {
             if (Mapped.TryGetValue(r.Value, out var latex)) sb.Append(latex);
-            else if (IsSafe(r)) sb.Append(r.ToString());
+            else if (IsSafe(r)) sb.Append(r);
             else sb.Append(Fallback(r));
         }
         return sb.ToString();
