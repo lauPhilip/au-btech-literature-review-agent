@@ -65,11 +65,11 @@ public class GreyReferencesTests
 
         Assert.Equal(new[] { 1, 2 }, references.Select(r => r.Number)); // the source that could not be extracted is not cited
         var guide = references[0];
-        Assert.Equal("docs.acme.dev", guide.Producer); // no producer: credited to the site
+        Assert.Equal("", guide.Producer); // no producer: never the web address (#471)
         Assert.Null(guide.Year);
         Assert.Null(guide.AccessedUtc); // its page was not kept
         Assert.Null(guide.WaybackUrl); // and an address that is not http(s) is never linked
-        Assert.Equal("docs.acme.dev (n.d.). Effective context & memory_management. https://docs.acme.dev/guide", GreyReferences.Line(guide));
+        Assert.Equal("Effective context & memory_management. (n.d.). *docs.acme.dev*. https://docs.acme.dev/guide", GreyReferences.Line(guide));
         Assert.Equal("Ana Berg (2025). Managing agent context. *blog.example.org*. https://blog.example.org/post (accessed 2026-10-07; archived at https://web.archive.org/web/2026/https://blog.example.org/post)",
             GreyReferences.Line(references[1]));
         Assert.Equal(MultivocalReporter.SourceNumbers(extraction)["blog.example.org/post"], references[1].Number); // the number the findings carry
@@ -113,5 +113,37 @@ public class GreyReferencesTests
         Assert.Contains("N1  - Screening: About cooking.", records[2]); // on one line
         Assert.Contains("KW  - duplicate", records[3]);
         Assert.DoesNotContain("Source [", records[3]);
+    }
+
+    [Theory]
+    [InlineData("", "https://www.anthropic.com/engineering/effective-context-engineering-for-ai-agents", "Anthropic")]
+    [InlineData("", "https://claude.com/blog/the-new-rules", "Anthropic")]
+    [InlineData("", "https://developers.googleblog.com/en/gemini-embedding/", "Google")]
+    [InlineData("", "https://github.com/outcomeops/context-engineering", "outcomeops")]
+    [InlineData("", "https://github.com/topics/agents", "")]
+    [InlineData("", "https://rlancemartin.github.io/2025/06/23/context_engineering/", "rlancemartin")]
+    [InlineData("", "https://arxiv.org/abs/1909.09454", "")]
+    [InlineData("", "https://www.dbreunig.com/2026/10/24/state.html", "")]
+    [InlineData("github.com", "https://github.com/jrswab/axe", "jrswab")]
+    [InlineData("www.example.org", "https://www.example.org/post", "")]
+    [InlineData("Ana Berg", "https://www.anthropic.com/x", "Ana Berg")]
+    [InlineData("", "javascript:alert(1)", "")]
+    public void AProducerIsAPersonOrOrganisationNeverAWebAddress(string given, string url, string expected) =>
+        Assert.Equal(expected, GreyProducer.Of(given, url));
+
+    [Fact]
+    public void AShowHnPostIsCreditedToItsPosterAndOtherLinkPostsAreNot()
+    {
+        const string json = """
+        {"hits":[
+          {"objectID":"1","title":"Show HN: N0x - agents in the browser","url":"https://n0xth.vercel.app/","author":"ixchio","created_at":"2026-03-18T05:44:47Z","points":9,"num_comments":0},
+          {"objectID":"2","title":"Effective context engineering for AI agents","url":"https://www.anthropic.com/engineering/x","author":"someone","created_at":"2025-09-29T20:18:34Z","points":148,"num_comments":32}
+        ]}
+        """;
+        var records = HackerNewsSource.Parse(json);
+
+        Assert.Equal("ixchio", records[0].Producer);
+        Assert.Equal("", records[1].Producer);
+        Assert.Equal("Anthropic", GreyProducer.Of(records[1].Producer, records[1].Url));
     }
 }

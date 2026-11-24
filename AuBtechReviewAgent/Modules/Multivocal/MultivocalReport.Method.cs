@@ -52,7 +52,7 @@ public sealed partial class MultivocalReporter
         section.Blocks.Add(ReportBlock.Paragraph(
             $"{covered} On {ledger.SearchedUtc:yyyy-MM-dd} (UTC), {Count(ran.Count, "search", "searches")} ran across {Count(ran.Select(s => s.Source).Distinct().Count(), "source")} " +
             $"with {Count(plan.EffectiveGreySearchStrings.Count, "search string")} ({Join(plan.EffectiveGreySearchStrings.Select(t => $"\"{t}\""))}) and found {Count(ledger.GreyPool.Count(), "source")} (G7). " +
-            $"Each raw answer was saved as received, with its SHA-256 fingerprint. Stopping rule (G8): {Sentence(ledger.StoppingApplied)}"));
+            $"{MultivocalFormalText.RawAnswersSentence(ledger.Searches.Where(s => !s.Formal))} Stopping rule (G8): {Sentence(ledger.StoppingApplied)}"));
         section.Blocks.Add(ReportBlock.Table(new[] { "Source", "Search string", "Returned", "New" },
             ledger.Searches.Where(s => !s.Formal).Select(s => new[] { MultivocalGuidelines.SearchLabel(s.Source), s.SearchString, s.Error == null ? Num(s.Returned) : $"failed: {s.Error}", Num(s.New) })));
         if (ledger.HasFormalPool) section.Blocks.AddRange(MultivocalFormalText.SearchBlocks(input));
