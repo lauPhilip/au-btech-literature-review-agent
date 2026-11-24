@@ -165,7 +165,7 @@ public static partial class MultivocalFormalText
         "appraising the academic sources with the Mixed Methods Appraisal Tool, proposing the systematic map, extracting each source's values, checking that each value's quote supports it, " +
         $"grouping the findings into themes, writing {written}, " +
         "and checking each citation against the kept text of the source it cites: the kept page of a grey source, and the open-access full text or else the abstract of an academic one. " +
-        "Every value, quality point, appraisal answer and citation verdict counts only with a quote found verbatim in that kept text; the method, the counts, the figures, the answers to questions about frequency or existence and the references were written in code. ";
+        "Every value, quality point, appraisal answer and citation verdict counts only with a quote found verbatim in that kept text; the method, the counts, the figures, the answers to questions about frequency, existence or a relationship and the references were written in code. ";
 
     /// <summary>The sentence on the seed step for the statement on the use of AI; empty when no seed was chosen.</summary>
     public static string AiUseSeeds(MultivocalReportInput input) => input.Ledger.SeedChaining is { Seeds.Count: > 0 }

@@ -23,7 +23,7 @@ public static class MultivocalFrontMatter
         int written = Math.Min(sectionsWritten ?? themed, themed);
         string themes = $"Themes written up as result sections: {written}" +
             (written < themed ? $"; {themed - written} more {(themed - written == 1 ? "theme" : "themes")} could not be written up and {(themed - written == 1 ? "is" : "are")} listed with {(themed - written == 1 ? "its" : "their")} sources only" : "") +
-            ". Questions about frequency or existence are answered by counting, in tables, not by themes. " +
+            ". Questions about frequency, existence or a relationship are answered by counting, in tables, not by themes. " + MultivocalRelationship.FactsLine(input) +
             $"Research questions: {plan.Numbered().Count}. ";
         string head = $"Kind of review: {plan.ReviewKind} following the Garousi et al. (2019) guidelines. ";
         if (!input.Ledger.HasFormalPool)
