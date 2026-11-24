@@ -23,7 +23,7 @@ public sealed partial class MultivocalWriter
         int referenceCount = evidence.Sources.Count;
         string goal = string.IsNullOrWhiteSpace(plan.Goal) ? plan.Topic : plan.Goal;
         string referenceLines = evidence.ReferenceLines();
-        var file = new MultivocalPaperFile { RunId = input.Planned.RunId, WrittenUtc = DateTime.UtcNow, Model = model };
+        var file = new MultivocalPaperFile { RunId = input.Planned.RunId, WrittenUtc = DateTime.UtcNow, Model = model, AppVersion = RecordingChatCompletionService.AppVersion };
         void Warn(string message)
         {
             file.Notes.Add(message);

@@ -69,7 +69,23 @@ public sealed partial class MultivocalWriter
 
     public static bool IsRunning(Guid runId) => Running.ContainsKey(runId);
 
-    public MultivocalPaperFile? Load(Guid runId) => Read<MultivocalPaperFile>(Path.Join(_runs.FolderOf(runId), PaperFile));
+    /// <summary>The run's paper, with the version that wrote it taken from the run's own files when the paper predates the field.</summary>
+    public MultivocalPaperFile? Load(Guid runId)
+    {
+        string folder = _runs.FolderOf(runId);
+        var paper = Read<MultivocalPaperFile>(Path.Join(folder, PaperFile));
+        if (paper != null && string.IsNullOrWhiteSpace(paper.AppVersion)) paper.AppVersion = RecordedVersion(folder);
+        return paper;
+    }
+
+    /// <summary>The version recorded in a run's files: run-metrics.json, else llm-calls.json; null when neither records one.</summary>
+    public static string? RecordedVersion(string folder)
+    {
+        string? fromMetrics = Read<RunMetrics>(Path.Join(folder, MultivocalRunLog.MetricsFile))?.AppVersion;
+        if (!string.IsNullOrWhiteSpace(fromMetrics)) return fromMetrics;
+        string? fromCalls = MultivocalRunLog.LoadCalls(folder)?.RunSettings?.AppVersion;
+        return string.IsNullOrWhiteSpace(fromCalls) ? null : fromCalls;
+    }
 
     public MultivocalCitationAudit? LoadAudit(Guid runId) => Read<MultivocalCitationAudit>(Path.Join(_runs.FolderOf(runId), AuditFile));
 
