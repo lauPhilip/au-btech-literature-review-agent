@@ -91,6 +91,43 @@ public static class MultivocalScreeningText
 
     private static string Kappa(double? k) => k is double v ? K(v) : "not computed";
     private static string K(double k) => k.ToString("0.00", CultureInfo.InvariantCulture);
+    /// <summary>
+    /// The method's sentences on the decisions flagged for the reviewer (#473): how many and why, each counted once by
+    /// its first reason (disagreement, text like instructions, an unsure model, a failed call), how many the reviewer
+    /// looked at and changed, and how many flagged decisions were left unseen, exclusions apart, since an unseen flagged
+    /// exclusion stands as the model made it.
+    /// </summary>
+    public static string Flagged(MultivocalScreeningFile s)
+    {
+        var flagged = s.Sources.Where(x => x.Uncertain).ToList();
+        int reviewed = s.Sources.Count(x => x.Reviewed);
+        int changed = s.Sources.Count(x => x.Reviewed && x.ModelDecision != null && x.ModelDecision != x.Decision);
+        string looked = $"The reviewer looked at {Count(reviewed, "decision")} and changed {Num(changed)}";
+        const string onFile = "the model's decision stays on file next to the reviewer's. ";
+        if (flagged.Count == 0) return $"No decision was flagged for the reviewer. {looked}; {onFile}";
+        var reasons = flagged.GroupBy(FlagReason).OrderBy(g => g.Key).Select(g => $"{Num(g.Count())} {ReasonText(g.Key)}");
+        var unseen = flagged.Where(x => !x.Reviewed).ToList();
+        int unseenExcluded = unseen.Count(x => x.Decision == "Excluded");
+        string left = unseen.Count == 0 ? "every flagged decision was looked at"
+            : $"{Num(unseen.Count)} of the flagged decisions {Were(unseen.Count)} not looked at, {Num(unseenExcluded)} of them {(unseenExcluded == 1 ? "an exclusion that stands" : "exclusions that stand")} as the model made {(unseenExcluded == 1 ? "it" : "them")}";
+        return $"{Num(flagged.Count)} {(flagged.Count == 1 ? "decision was" : "decisions were")} flagged for the reviewer: {string.Join("; ", reasons)}. {looked}; {left}; {onFile}";
+    }
+
+    /// <summary>The first reason a decision was flagged, in the order <see cref="Flagged"/> names them.</summary>
+    public static int FlagReason(GreyScreening x) =>
+        x.Decision == "Error" ? 3
+        : x.First != null && x.Second != null && x.First.IsIncluded != x.Second.IsIncluded ? 0
+        : PromptSafety.AnyStrong(x.InjectionFlags) ? 1
+        : 2;
+
+    private static string ReasonText(int reason) => reason switch
+    {
+        0 => "because the two screenings disagreed, so the source was kept",
+        1 => "because the source's text looked like instructions to the model",
+        2 => "because the model was unsure (low confidence, or no summary to judge by)",
+        _ => "because the model call failed, so the source was not screened",
+    };
+
     private static string Num(int n) => n.ToString(CultureInfo.InvariantCulture);
     private static string Were(int n) => n == 1 ? "was" : "were";
     private static string Count(int n, string noun) => $"{Num(n)} {(n == 1 ? noun : noun + "s")}";
