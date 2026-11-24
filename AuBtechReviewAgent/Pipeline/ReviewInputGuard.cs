@@ -69,7 +69,7 @@ public static class ReviewInputGuard
     public static CleanedText Clean(string? text, bool singleLine)
     {
         if (string.IsNullOrEmpty(text)) return new CleanedText("", 0, 0, "");
-        var visible = HiddenText.RemoveInvisible(text.Normalize(NormalizationForm.FormKC));
+        var visible = HiddenText.RemoveInvisible(WithoutLoneSurrogates(text).Normalize(NormalizationForm.FormKC));
         var sb = new StringBuilder(visible.Text.Length);
         foreach (char c in visible.Text)
         {
@@ -88,6 +88,23 @@ public static class ReviewInputGuard
         s = Regex.Replace(s, @"[ \t]{2,}", " ");
         s = Regex.Replace(s, @"\n{3,}", "\n\n");
         return visible with { Text = s.Trim() };
+    }
+
+    /// <summary>
+    /// The text without lone surrogates (half of a surrogate pair, from a broken paste or a crafted request), which
+    /// carry no character and make <see cref="string.Normalize(NormalizationForm)"/> throw (#485); whole pairs stay.
+    /// </summary>
+    public static string WithoutLoneSurrogates(string text)
+    {
+        if (!text.Any(char.IsSurrogate)) return text;
+        var sb = new StringBuilder(text.Length);
+        for (int i = 0; i < text.Length; i++)
+        {
+            char c = text[i];
+            if (char.IsHighSurrogate(c) && i + 1 < text.Length && char.IsLowSurrogate(text[i + 1])) { sb.Append(c).Append(text[++i]); continue; }
+            if (!char.IsSurrogate(c)) sb.Append(c);
+        }
+        return sb.ToString();
     }
 
     /// <summary>Cleans the request's text fields and reports length errors and instruction-like phrases.</summary>
