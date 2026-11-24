@@ -45,7 +45,7 @@ public static partial class MultivocalPaperParts
         string borrowed = attributes.All(a => a.Question != number)
             ? $" It counts the values of {string.Join(" and ", attributes.Select(a => $"\"{a.Name}\" ({a.Question})"))}, which the map records for {(attributes.Count == 1 ? "that question" : "those questions")}."
             : "";
-        return $"This question asks {kind}, so it is answered by counting, in code, rather than in written text: the {(attributes.Count == 1 ? "table counts" : "tables count")} how many of the {extracted} extracted sources state each value of the systematic map, each value backed by a quote found in the source's kept page.{borrowed} A count says how many sources state a value, not how common it is in practice.";
+        return $"This question asks {kind}, so it is answered by counting, in code, rather than in written text: the {(attributes.Count == 1 ? "table counts" : "tables count")} how many of the {extracted} extracted sources state each value of the systematic map, each value backed by a quote found in the source's kept page.{borrowed}{(input.Ledger.HasFormalPool ? " The grey and the academic sources are counted apart, each with its share of its own pool." : "")} A count says how many sources state a value, not how common it is in practice.";
     }
 
     /// <summary>
@@ -58,17 +58,19 @@ public static partial class MultivocalPaperParts
         var attributes = FixedMap(input).Attributes.Where(a => a.Serves(number)).ToList();
         if (attributes.Count == 0) return "The systematic map has no attribute for this question, so the review does not answer it.";
         int extracted = input.Extraction.Sources.Count(x => x.Error == null);
+        var split = Split(input);
         var parts = attributes.Select(attribute =>
         {
             var counts = ValueCounts(input, attribute);
             var stated = counts.Where(c => c.Value != "not stated").ToList();
             int none = counts.FirstOrDefault(c => c.Value == "not stated").Sources;
             if (stated.Count == 0) return $"None of the {extracted} extracted sources states a value of \"{attribute.Name}\".";
-            var top = stated.Take(TopValues).Select(c => $"{c.Value} ({Sources(c.Sources)}, {Percent(c.Sources, extracted)})").ToList();
+            var top = stated.Take(TopValues).Select(c => $"{c.Value} ({CountPhrase(c.Sources, c.References, extracted, split)})").ToList();
             string list = top.Count == 1 ? top[0] : string.Join(", ", top.Take(top.Count - 1)) + " and " + top[^1];
             return $"Of the {extracted} extracted sources, {Stating(extracted - none)} a value of \"{attribute.Name}\" ({stated.Count} different {(stated.Count == 1 ? "value" : "values")}); the most often stated {(top.Count == 1 ? "is" : "are")} {list}.";
         });
-        return string.Join(" ", parts) + " Counted in code; the table in the results gives every value with its sources.";
+        string pools = split == null ? "" : $" The shares are of each pool's own {split.Grey} grey and {split.Academic} academic sources.";
+        return string.Join(" ", parts) + pools + " Counted in code; the table in the results gives every value with its sources.";
 
         static string Stating(int n) => n == 1 ? "1 states" : $"{n} state";
     }
@@ -98,23 +100,29 @@ public static partial class MultivocalPaperParts
     {
         if (IsRelationship(input, number)) return MultivocalRelationship.Tables(input, number);
         int extracted = input.Extraction.Sources.Count(x => x.Error == null);
-        string Share(int sources) => extracted == 0 ? "–" : $"{Math.Round(100.0 * sources / extracted).ToString(CultureInfo.InvariantCulture)}%";
+        var split = Split(input);
         string Cite(IEnumerable<int> refs) => refs.Any() ? $"[{string.Join(", ", refs.Distinct().OrderBy(n => n))}]" : "";
         return FixedMap(input).Attributes.Where(a => a.Serves(number)).Select(attribute =>
         {
-            var (shown, namedOnce) = Compact(ValueCounts(input, attribute), attribute.Open);
-            var rows = shown.Select(c => (IReadOnlyList<string>)new[] { c.Value, c.Sources.ToString(CultureInfo.InvariantCulture), Share(c.Sources), Cite(c.References) }).ToList();
+            var counts = ValueCounts(input, attribute);
+            var stating = counts.SelectMany(c => c.References).Distinct().ToList();
+            var (shown, namedOnce) = Compact(counts, attribute.Open);
+            // With a formal pool each value is counted in each pool, with its share of that pool (issue #459).
+            var rows = shown.Select(c => split != null && c.Value == "not stated" && c.References.Count == 0
+                ? NotStatedRow(c.Sources, stating, extracted, split)
+                : CountRow(c.Value, c.Sources, c.References, extracted, split, Cite(c.References))).ToList();
             var notes = new List<string>();
             if (namedOnce.Count > 0)
             {
                 var refs = namedOnce.SelectMany(c => c.References).Distinct().ToList();
                 // Before "not stated", which stays the last row.
                 int at = rows.FindIndex(r => r[0] == "not stated");
-                rows.Insert(at < 0 ? rows.Count : at, new[] { $"{namedOnce.Count} more, each named by one source", refs.Count.ToString(CultureInfo.InvariantCulture), Share(refs.Count), Cite(refs) });
+                rows.Insert(at < 0 ? rows.Count : at, CountRow($"{namedOnce.Count} more, each named by one source", refs.Count, refs, extracted, split, Cite(refs)));
                 notes.Add($"Named by one source each: {string.Join("; ", namedOnce.Select(c => $"{c.Value} [{c.References[0]}]"))}.");
             }
             if (attribute.Multiple) notes.Add("A source can state several values, so the shares can add up to more than 100%.");
-            return new PaperTable(attribute.Name, new[] { "Value", "Sources", "Share", "Cited" }, rows, notes.Count == 0 ? null : string.Join(" ", notes));
+            if (split != null) notes.Add(SplitNote(split));
+            return new PaperTable(attribute.Name, CountHeaders(split), rows, notes.Count == 0 ? null : string.Join(" ", notes));
         }).ToList();
     }
 
