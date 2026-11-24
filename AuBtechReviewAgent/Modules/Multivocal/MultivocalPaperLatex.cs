@@ -36,7 +36,8 @@ public static partial class MultivocalPaper
     {
         var plan = input.Planned.Plan;
         var themes = new List<PaperSection>();
-        foreach (var result in paper.Results)
+        var shown = ShownResults(input, paper);
+        foreach (var result in shown)
         {
             if (result.Kind == "theme")
             {
@@ -77,7 +78,7 @@ public static partial class MultivocalPaper
             DataText = MultivocalPaperParts.DataText(input),
             DataLatex = MultivocalPaperParts.DataLatex(input),
             ResultsHeading = "Results",
-            ResultsText = ResultsText(paper),
+            ResultsText = ResultsText(new MultivocalPaperFile { Results = shown }),
             Themes = themes,
             // The discussion is in its parts, so the answers come first (issue #461).
             Discussion = "",
@@ -95,7 +96,7 @@ public static partial class MultivocalPaper
         int themes = paper.Results.Count(r => r.Kind == "theme");
         int unwritten = paper.Results.Count(r => r.Kind == MultivocalWriter.UnwrittenKind);
         return $"The results answer each research question in turn. The {themes} theme section{(themes == 1 ? " was" : "s were")} written by the language model from the findings of {(themes == 1 ? "its theme" : "each theme")} only, and every citation in {(themes == 1 ? "it" : "them")} was checked against the kept page of the source it cites; " +
-               "the note under each theme, on what it rests on, and the answers to questions about frequency or existence are counted in code." +
+               "the note under each theme, on what it rests on, and the answers to questions about frequency, existence or a relationship are counted in code." +
                (unwritten == 0 ? "" : $" The section{(unwritten == 1 ? "" : "s")} on {unwritten} more theme{(unwritten == 1 ? "" : "s")} could not be written; {(unwritten == 1 ? "it is" : "they are")} kept in {(unwritten == 1 ? "its" : "their")} place with what {(unwritten == 1 ? "it rests" : "they rest")} on.");
     }
 
@@ -167,7 +168,7 @@ public static partial class MultivocalPaper
         else
         {
             text.Append(subject).Append(" used for ").Append(MultivocalScreeningText.AiUseTask(input.Screening, "the grey sources", "the criteria")).Append(", scoring their quality on the guidelines' checklist, proposing the systematic map, extracting each source's values, checking that each value's quote supports it, grouping the findings into themes, writing ").Append(WrittenParts(paper)).Append(", and checking each citation against the kept page of the source it cites. ");
-            text.Append("Every value, quality point and citation verdict counts only with a quote found verbatim in the kept page text; the method, the counts, the figures, the answers to questions about frequency or existence and the references were written in code. ");
+            text.Append("Every value, quality point and citation verdict counts only with a quote found verbatim in the kept page text; the method, the counts, the figures, the answers to questions about frequency, existence or a relationship and the references were written in code. ");
             text.Append(MultivocalScreeningText.AiUseAgreement(input.Screening, bothPools: false));
         }
         int reviewed = input.Screening.Sources.Count(s => s.Reviewed);

@@ -43,6 +43,28 @@ public static partial class MultivocalPaper
         return new PaperSection(AnswersHeading, text.ToString().Trim(), latex.ToString());
     }
 
+    /// <summary>
+    /// The results as the paper shows them: a question answered in code is shown once, by its answer in code, even when
+    /// the paper file holds theme sections for it. A paper written before issue #458 answered a relationship question
+    /// with themes that grouped every outcome; its answer is now the pairing in code.
+    /// </summary>
+    public static List<PaperResult> ShownResults(MultivocalReportInput input, MultivocalPaperFile paper)
+    {
+        var questions = input.Planned.Plan.Numbered().ToDictionary(q => q.Number, q => q.Question);
+        var shown = new List<PaperResult>();
+        foreach (var r in paper.Results)
+        {
+            if (!questions.TryGetValue(r.Question, out var q) || !MultivocalPaperParts.AnsweredInCode(q.Type)) { shown.Add(r); continue; }
+            if (shown.Any(s => s.Question == r.Question)) continue;
+            shown.Add(r.Kind == "code" ? r : new PaperResult
+            {
+                Question = r.Question, QuestionText = q.Text, Kind = "code", Field = $"answer-{r.Question}", Heading = $"{r.Question}: {q.Text}",
+                Text = MultivocalPaperParts.CodeAnswerLead(input, r.Question, q),
+            });
+        }
+        return shown;
+    }
+
     /// <summary>The conclusion, when it was written; null otherwise (the discussion's text in code says why).</summary>
     public static PaperSection? ConclusionSection(MultivocalPaperFile paper) =>
         string.IsNullOrWhiteSpace(paper.Conclusion) ? null : new PaperSection("Conclusion", paper.Conclusion);

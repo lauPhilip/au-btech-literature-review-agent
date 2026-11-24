@@ -29,6 +29,8 @@ public partial class MultivocalPaperPage
         }
         input = Reporter.LoadInput(RunId);
         paper = Writer.Load(RunId);
+        // Only for display: a question answered in code is shown by its answer in code (issue #458).
+        if (paper != null && input != null) paper.Results = MultivocalPaper.ShownResults(input, paper);
         audit = Writer.LoadAudit(RunId);
         checks = audit?.SupportChecks ?? new List<CitationSupportResult>();
         references = input == null ? Array.Empty<GreyReference>() : GreyReferences.Build(input.Ledger, input.Pages, input.Extraction);
