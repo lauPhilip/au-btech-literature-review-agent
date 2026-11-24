@@ -68,4 +68,21 @@ public class MultivocalFormalPaperTests
         Assert.Contains("KW  - formal literature", ModuleKit.Text(run.Archive[GreyReferences.ScreenedFile]));
         Assert.Contains(@"AI-GENERATED MULTIVOCAL LITERATURE REVIEW", tex);
     }
+
+    [Fact]
+    public void TheMethodNamesADatabaseWhoseRawAnswerWasNotKept()
+    {
+        var kept = new GreySearchLog { Source = "openalex", Formal = true, Returned = 20, RawFile = "SourceResponses/formal-openalex-1.json" };
+        var failed = new GreySearchLog { Source = "crossref", Formal = true, Error = "timed out" };
+        var notKept = new[]
+        {
+            new GreySearchLog { Source = "scopus", Formal = true, Returned = 20 },
+            new GreySearchLog { Source = "ieee", Formal = true, Returned = 20 },
+        };
+
+        Assert.Equal("Each raw answer was saved as received, with its SHA-256 fingerprint.", MultivocalFormalText.RawAnswersSentence(new[] { kept, failed }));
+        string sentence = MultivocalFormalText.RawAnswersSentence(notKept.Append(kept));
+        Assert.StartsWith("Each raw answer was saved as received, with its SHA-256 fingerprint, except those of ", sentence);
+        Assert.Contains(SourceCatalog.DisplayNameFor("scopus") + " and " + SourceCatalog.DisplayNameFor("ieee") + ", which were not kept.", sentence);
+    }
 }

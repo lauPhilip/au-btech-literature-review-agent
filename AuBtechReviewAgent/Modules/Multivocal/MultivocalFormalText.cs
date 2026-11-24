@@ -17,6 +17,19 @@ public static partial class MultivocalFormalText
     public static string SearchName(string key) =>
         SourceCatalog.Find(key) is { } database ? database.DisplayName : MultivocalGuidelines.SearchLabel(key);
 
+    /// <summary>
+    /// What the method may say about the raw answers of these searches: that each was saved, or, when a search that
+    /// answered left no raw file (Scopus and IEEE Xplore before #469), which databases' answers were not kept.
+    /// </summary>
+    public static string RawAnswersSentence(IEnumerable<GreySearchLog> searches)
+    {
+        var notKept = searches.Where(s => s.Error == null && s.Returned > 0 && string.IsNullOrEmpty(s.RawFile))
+            .Select(s => SearchName(s.Source)).Distinct().ToList();
+        if (notKept.Count == 0) return "Each raw answer was saved as received, with its SHA-256 fingerprint.";
+        string names = notKept.Count == 1 ? notKept[0] : string.Join(", ", notKept.Take(notKept.Count - 1)) + " and " + notKept[^1];
+        return $"Each raw answer was saved as received, with its SHA-256 fingerprint, except those of {names}, which were not kept.";
+    }
+
     /// <summary>The formal pool's search (G7, G8): the databases, the strings, what they returned, and what was set aside.</summary>
     public static IReadOnlyList<ReportBlock> SearchBlocks(MultivocalReportInput input)
     {
@@ -33,7 +46,7 @@ public static partial class MultivocalFormalText
                 $"with its own {Count(plan.EffectiveFormalSearchStrings.Count, "search string")} ({strings}) under the same stopping rule (G7, G8). " +
                 $"The databases returned {Count(counts.Identified, "record")}; {Num(counts.DuplicatesRemoved)} {Was(counts.DuplicatesRemoved)} set aside as duplicates by identifier, DOI or title, as in the systematic review, " +
                 $"and {Num(counts.NoAddressRemoved)} because {(counts.NoAddressRemoved == 1 ? "it" : "they")} had no web address to cite, leaving {Count(ledger.FormalPool.Count(), "academic source")}. " +
-                "Each raw answer was saved as received, with its SHA-256 fingerprint, and the two pools were kept and counted apart."),
+                RawAnswersSentence(searches) + " The two pools were kept and counted apart."),
             ReportBlock.Table(new[] { "Database", "Search string", "Returned", "New" },
                 searches.Select(s => new[] { SearchName(s.Source), s.SearchString, s.Error == null ? Num(s.Returned) : $"failed: {s.Error}", Num(s.New) })),
         };
