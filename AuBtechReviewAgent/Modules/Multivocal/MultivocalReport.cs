@@ -50,7 +50,16 @@ public sealed partial class MultivocalReporter
     public MultivocalReport? Build(Guid runId)
     {
         var input = LoadInput(runId);
-        return input == null ? null : Write(input);
+        return input == null ? null : Write(input, LoadPaper(runId));
+    }
+
+    /// <summary>The run's written paper (mlr-paper.json), for the models it names; null before it is written or when it cannot be read.</summary>
+    private MultivocalPaperFile? LoadPaper(Guid runId)
+    {
+        string path = Path.Join(_runs.FolderOf(runId), MultivocalWriter.PaperFile);
+        if (!File.Exists(path)) return null;
+        try { return System.Text.Json.JsonSerializer.Deserialize<MultivocalPaperFile>(File.ReadAllText(path)); }
+        catch (System.Text.Json.JsonException) { return null; }
     }
 
     /// <summary>Writes the report to the run folder (multivocal-report.md). Needs the run's edit key.</summary>
@@ -100,8 +109,8 @@ public sealed partial class MultivocalReporter
         return new MultivocalReportInput(planned, ledger, screening, _pages.Load(runId), quality, map, extraction, synthesis);
     }
 
-    /// <summary>The report, written in code from the run's files.</summary>
-    public static MultivocalReport Write(MultivocalReportInput input)
+    /// <summary>The report, written in code from the run's files; <paramref name="paper"/>, once written, names the citation checks' model.</summary>
+    public static MultivocalReport Write(MultivocalReportInput input, MultivocalPaperFile? paper = null)
     {
         var plan = input.Planned.Plan;
         string kind = plan.ReviewKind;
@@ -109,7 +118,7 @@ public sealed partial class MultivocalReporter
         report.Meta.Add($"Run {input.Planned.RunId}, planned {input.Planned.CreatedUtc:yyyy-MM-dd}, synthesised {input.Synthesis.SynthesisedUtc:yyyy-MM-dd} (UTC)");
         report.Meta.Add($"Method: {MultivocalGuidelines.Reference}");
         report.Meta.Add($"Protocol fingerprint (SHA-256): {input.Planned.ProtocolSha256}");
-        if (input.Synthesis.Model.Length > 0) report.Meta.Add($"Language model: {input.Synthesis.Model}");
+        if (MultivocalPaper.ModelsLine(input, paper) is { } models) report.Meta.Add(models);
 
         var sources = SourceNumbers(input.Extraction);
         report.Sections.AddRange(MethodSections(input));

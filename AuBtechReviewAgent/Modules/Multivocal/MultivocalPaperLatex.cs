@@ -181,16 +181,34 @@ public static class MultivocalPaper
     /// The models other than the paper's that answered a step (Llm:FastModel), each with what it did, from the run's
     /// files: the screening file names the screenings' model and the paper file the citation checks' model.
     /// </summary>
-    private static List<(string Model, List<string> Tasks)> OtherModels(MultivocalReportInput input, MultivocalPaperFile paper)
+    private static List<(string Model, List<string> Tasks)> OtherModels(MultivocalReportInput input, MultivocalPaperFile paper) =>
+        OtherModels(input, paper.Model, paper.CheckModel);
+
+    private static List<(string Model, List<string> Tasks)> OtherModels(MultivocalReportInput input, string mainModel, string? checkModel)
     {
         var steps = new List<(string Model, string Task)>();
-        string main = paper.Model.Trim();
+        string main = mainModel.Trim();
         if (main.Length == 0) return new();
         string screening = input.Screening.Model.Trim();
         if (screening.Length > 0 && screening != main) steps.Add((screening, input.Screening.AuditSeed == null || MultivocalSecondScreening.Count(input.Screening, null).AllTwice ? "both screenings of every source" : "every screening, first and second"));
-        string check = paper.CheckModel?.Trim() ?? "";
+        string check = checkModel?.Trim() ?? "";
         if (check.Length > 0 && check != main) steps.Add((check, "the citation checks"));
         return steps.GroupBy(s => s.Model, StringComparer.Ordinal).Select(g => (g.Key, g.Select(s => s.Task).ToList())).ToList();
+    }
+
+    /// <summary>
+    /// The data appendix's line on the models (#484), in the words of the statement on AI use: one model, or each model
+    /// other than the main one with what it answered. The main model is the paper's, or the synthesis's before the paper
+    /// is written; the citation checks' model is known only from the paper's file. Null when no model is on file.
+    /// </summary>
+    public static string? ModelsLine(MultivocalReportInput input, MultivocalPaperFile? paper)
+    {
+        string main = (paper?.Model is { Length: > 0 } written ? written : input.Synthesis.Model).Trim();
+        if (main.Length == 0) return null;
+        var others = OtherModels(input, main, paper?.CheckModel);
+        return others.Count == 0
+            ? $"Language model: {main}"
+            : $"Language models: {string.Join("; ", others.Select(o => $"{o.Model} answered {JoinList(o.Tasks)}"))}, and {main} did every other step that used a model";
     }
 
     private static string JoinList(IReadOnlyList<string> items) => items.Count switch
