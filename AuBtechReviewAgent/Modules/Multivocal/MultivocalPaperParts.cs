@@ -26,6 +26,16 @@ public static partial class MultivocalPaperParts
     /// </summary>
     public static bool AnsweredInCode(string? questionType) => questionType is "existence" or "frequency";
 
+    /// <summary>
+    /// The themes the paper shows: those of the questions not answered in code. A run synthesised before such questions
+    /// were left out of the synthesis has themes for them too; the paper does not show them, so no count includes them (#462).
+    /// </summary>
+    public static List<SynthesisTheme> ShownThemes(MultivocalReportInput input)
+    {
+        var inCode = input.Planned.Plan.Numbered().Where(q => AnsweredInCode(q.Question.Type)).Select(q => q.Number).ToHashSet();
+        return input.Synthesis.Themes.Where(t => !inCode.Contains(t.Question)).ToList();
+    }
+
     // ---------- Method ----------
 
     /// <summary>The method, one subsection per phase, from the same code as the report's method.</summary>
@@ -88,7 +98,7 @@ public static partial class MultivocalPaperParts
             NotExtracted: input.Extraction.Sources.Count - extracted,
             Extracted: extracted,
             Findings: input.Synthesis.Findings.Count,
-            Themes: input.Synthesis.Themes.Count,
+            Themes: ShownThemes(input).Count,
             ScreenedTwice: MultivocalSecondScreening.Count(s, null).ScreenedTwice,
             ScreenedBox: MultivocalScreeningText.FlowBox(s, s.Count("Included") + s.Count("Excluded"), MultivocalSecondScreening.Count(s, null).ScreenedTwice));
     }
