@@ -95,13 +95,21 @@ public sealed class MultivocalPlan
     public bool HasCriteria => InclusionCriteria.Trim().Length > 0;
 
     /// <summary>
-    /// For the effort-bounded rule: how many top hits of each search string are looked at. The paper uses 100; a plan
-    /// starts at 20, since every hit is screened twice by a model, and the reviewer can raise it on the form.
+    /// For the effort-bounded rule and saturation (<see cref="UsesTopHits"/>): how many top hits of each search string are
+    /// looked at. The paper uses 100; a plan starts at 20, since every hit is screened by a model, many twice, and the
+    /// reviewer can raise it on the form.
     /// </summary>
     public int TopHits { get; set; } = DefaultTopHits;
 
     /// <summary>The top hits a new plan starts with.</summary>
     public const int DefaultTopHits = 20;
+
+    /// <summary>
+    /// Whether <see cref="TopHits"/> bounds the search: under the effort-bounded rule and under saturation, which takes
+    /// each string's hits up to it (#486); evidence exhaustion takes every hit the search returns.
+    /// </summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public bool UsesTopHits => StoppingRule is "effort" or "saturation";
 
     /// <summary>Grey sources scoring below this many of the 20 quality points are excluded (decision 4; the paper's example uses 10).</summary>
     public int QualityThreshold { get; set; } = 10;
@@ -280,7 +288,7 @@ public sealed class MultivocalPlan
         if (FormalDatabases.Any(k => SourceCatalog.Find(k) == null)) problems.Add("Choose the academic databases from the list.");
         if (FormalSearchStrings.Count > MaxSearchStrings) problems.Add($"Use at most {MaxSearchStrings} search strings for academic databases.");
         if (FormalSearchStrings.Any(t => t.Length > MaxSearchStringLength)) problems.Add($"Keep every search string for academic databases under {MaxSearchStringLength} characters.");
-        if (StoppingRule == "effort" && TopHits is < 10 or > 500) problems.Add("Look at between 10 and 500 top hits per search string.");
+        if (UsesTopHits && TopHits is < 10 or > 500) problems.Add("Look at between 10 and 500 top hits per search string.");
         if (QualityThreshold is < 1 or > MultivocalGuidelines.QualityPointsMax)
             problems.Add($"Set the quality threshold between 1 and {MultivocalGuidelines.QualityPointsMax} points.");
         return problems;
