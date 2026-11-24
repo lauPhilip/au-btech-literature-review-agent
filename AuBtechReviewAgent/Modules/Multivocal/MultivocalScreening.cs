@@ -225,7 +225,7 @@ public sealed partial class MultivocalScreener
         // every source the first pass decided, whatever it decided.
         var audit = new HashSet<string>(StringComparer.Ordinal);
         foreach (bool formal in new[] { false, true })
-            audit.UnionWith(MultivocalSecondScreening.AuditSample(file.AuditSeed,
+            audit.UnionWith(MultivocalSecondScreening.AuditSample(file.AuditSeed ?? MultivocalSecondScreening.SeedOf(file.RunId),
                 decided.Where(x => file.Sources[x.item.Index].Formal == formal).Select(x => file.Sources[x.item.Index].Address)));
         var again = new List<(int Index, GreyRecord Record)>();
         foreach (var (item, first) in decided)
