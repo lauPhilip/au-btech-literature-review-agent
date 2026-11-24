@@ -122,6 +122,23 @@ public class PipelineScreeningTests : PipelineFeatureRun
     }
 
     [Fact]
+    public async Task AnAbstractThatOnlyNamesTheSystemPromptIsLoggedButNotUncertain()
+    {
+        var topical = new AcademicPaper("SCHOLAR_t", "Agent orchestration and system prompts",
+            "We study how the system prompt of an agent shapes its tool use, and how a tool can act as an assistant.",
+            "Published: 2025", new() { "Tia" }, "Journal of Agents");
+        var engine = Engine(source: new PipelineTests.FakeSource(topical));
+        var runId = Guid.NewGuid();
+        await engine.RunReviewAsync(runId, Request() with { MaxResultsPerSource = 4 });
+
+        var state = engine.LoadState(runId)!;
+        var log = state.Phases.Screening.Single(l => l.PaperId == "SCHOLAR_t");
+        Assert.Equal(new[] { "mentions-ai-role", "mentions-system-prompt" }, log.InjectionFlags);
+        Assert.False(log.Uncertain);
+        Assert.Equal(0, state.Stats.InjectionSuspected);
+    }
+
+    [Fact]
     public async Task ARecordWithoutAnAbstractIsMarkedLowConfidence()
     {
         var noAbstract = new AcademicPaper("SCHOLAR_n", "Agent supervision without an abstract", "", "Published: 2025", new() { "Ann" }, "Journal of Agents");
