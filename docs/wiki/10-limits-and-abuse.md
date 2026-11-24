@@ -36,7 +36,7 @@ Starting a review, proposing search strings, re-checking a citation, the editor'
 | `start-review` | Start review on the form, Start the review and Continue on the multivocal pages | 20 |
 | `propose-strings` | Propose search strings, on both forms | 30 |
 | `recheck` | Check again on Review output (on top of five per run) | 30 |
-| `editor-check` | The editor's check of a changed sentence, when its page calls it | 60 |
+| `editor-check` | "Check and save" in the report's checked editor, for a sentence that cites a study (`SpecMatrix.Edits.cs`); the refusal shows in the edit box | 60 |
 | `verify-upload` | Checking an archive on `/verify` | 20 |
 
 `Site:ActionsPerHour` overrides any of them, for example `"Site": { "ActionsPerHour": { "propose-strings": 10 } }`; 0 means no limit. A refusal says when to try again, in the words of the quota ("Try again in 42 min."). Starting a review is also bound by the free quota and the one fair line; this limit only stops an address that keeps trying.
