@@ -35,6 +35,11 @@ else
         <div class="mb-4 flex flex-wrap items-center justify-between gap-2 print:hidden">
             <a href="@runHref" class="ui-btn-ghost min-h-[44px] px-2"><span aria-hidden="true">←</span> Back to the run</a>
             <div class="flex flex-wrap items-center gap-2">
+                @if (CanEditText)
+                {
+                    <span class="text-xs text-muted max-sm:hidden">@AuBtechReviewAgent.EditView.UsedLine(editLog)</span>
+                    <button type="button" @onclick="ToggleEditMode" aria-pressed="@(editMode ? "true" : "false")" class="@(editMode ? "ui-btn-primary" : "ui-btn-secondary") min-h-[44px]" title="Rewrite a sentence; its citations are checked again before it is saved">@(editMode ? "Stop editing" : "Edit the text")</button>
+                }
                 <button type="button" @onclick="PrintReport" class="ui-btn-secondary min-h-[44px] max-sm:hidden" title="Print the report, or choose Save as PDF in the print window">Print or save as PDF</button>
                 <a href="@($"{api}/archive")" class="ui-btn-primary min-h-[44px]" title="Every file of the run, fingerprinted, with the LaTeX manuscript">
                     <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
@@ -166,6 +171,13 @@ else
             </p>
 
         </article>
+        @if (editLog.Edits.Count > 0 || CanEditText)
+        {
+            <div class="mx-auto mt-6 w-full max-w-[880px]">
+                <EditHistory Log="editLog" CanEdit="CanEditText" Undoing="undoing" Message="@undoMessage" Failed="undoFailed" OnUndo="UndoAsync"
+                             FieldLabel="@(f => AuBtechReviewAgent.EditView.FieldLabel(report, f))" SourceTitle="SourceTitleOf" />
+            </div>
+        }
             </div>
 
             <div class="hidden min-[1500px]:block print:hidden">
@@ -185,9 +197,11 @@ else
     {
         <CitedProse Field="@field" Text="@text" Checks="auditChecks" Open="openCitation"
                     OnToggle="@(c => ToggleCitation(c.Field, c.Sentence, c.Reference))" OnClose="CloseCitation"
-                    SourceTitle="@(reference => tableRecords.FirstOrDefault(t => t.ReferenceNumber == reference)?.Title)"
-                    SourceLink="SourceLink"
-                    PanelExtras="CitationExtras" />
+                    SourceTitle="SourceTitleOf"
+                    SourceLink="SourceLink" PanelExtras="CitationExtras"
+                    Editable="AuBtechReviewAgent.EditView.CanEdit(CanEditText, editMode, field)" Editing="@(editing is { } e && e.Field == field ? e.Sentence : null)"
+                    OnEdit="@(s => StartEdit(field, s))" Editor="EditorFor(field)" EditName="@AuBtechReviewAgent.EditView.FieldLabel(report, field)"
+                    Edited="AuBtechReviewAgent.EditView.EditedIn(editLog, field)" HistoryHref="@PageHref" />
     };
 
     /// <summary>What this page adds to an open citation's panel: the reviewer's note, a past re-check and the "Check again" button.</summary>
