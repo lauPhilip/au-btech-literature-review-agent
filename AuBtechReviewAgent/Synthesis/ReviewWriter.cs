@@ -134,7 +134,7 @@ public static partial class ReviewWriter
         Func<string, string?>? abstractRule = null, IReadOnlyList<string>? questions = null, IReadOnlyList<string>? answers = null, string? conclusion = null)
     {
         string results = string.Join("\n\n", sections.Select(x => $"### {x.Heading}\n{x.Text}")) + $"\n\n### Discussion\n{discussion}";
-        string readingBlock = (answers is { Count: > 0 } ? $"\n\nANSWERS TO THE RESEARCH QUESTIONS (written and checked before this step; the abstract's results and what they mean agree with them):\n{AnswerLines(answers)}" : "")
+        string readingBlock = (answers is { Count: > 0 } ? $"\n\nANSWERS TO THE RESEARCH QUESTIONS (written and checked before this step; the abstract's results and what they mean agree with them):\n{AnswerLines(answers, profile)}" : "")
             + (string.IsNullOrWhiteSpace(conclusion) ? "" : $"\n\nCONCLUSION (written and checked before this step; the abstract ends on the same reading, in its own words):\n{conclusion.Trim()}");
         string? codeObjectives = ObjectivesFromQuestions(questions, profile);
         string objectivesRule = codeObjectives == null ? "\"objectives\": the objective and what the review set out to answer, in two or three sentences, without citations."

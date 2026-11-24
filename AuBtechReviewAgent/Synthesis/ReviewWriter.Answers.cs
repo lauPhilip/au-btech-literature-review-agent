@@ -24,14 +24,14 @@ public static partial class ReviewWriter
     }
 
     /// <summary>The questions the model answers: every one but those no evidence bears on (<paramref name="unanswered"/>, e.g. "RQ2").</summary>
-    private static List<(string Id, string Text)> AnsweredByModel(IReadOnlyList<string>? questions, IReadOnlyCollection<string>? unanswered) =>
-        (questions ?? Array.Empty<string>()).Select((q, i) => (Id: QuestionId(i), Text: q)).Where(q => unanswered?.Contains(q.Id) != true).ToList();
+    private static List<(string Id, string Text)> AnsweredByModel(IReadOnlyList<string>? questions, IReadOnlyCollection<string>? unanswered, WritingProfile profile) =>
+        (questions ?? Array.Empty<string>()).Select((q, i) => (Id: QuestionId(i, profile), Text: q)).Where(q => unanswered?.Contains(q.Id) != true).ToList();
 
     /// <summary>The discussion prompt's rule for the answers; empty when the model answers no question.</summary>
-    private static string AnswersRule(IReadOnlyList<string> questions, List<(string Id, string Text)> asked)
+    private static string AnswersRule(IReadOnlyList<string> questions, List<(string Id, string Text)> asked, WritingProfile profile)
     {
         if (asked.Count == 0) return "";
-        var inCode = questions.Select((_, i) => QuestionId(i)).Except(asked.Select(q => q.Id)).ToList();
+        var inCode = questions.Select((_, i) => QuestionId(i, profile)).Except(asked.Select(q => q.Id)).ToList();
         string inCodeLine = inCode.Count == 0 ? "" : $" No evidence bears on {string.Join(", ", inCode)}, so {(inCode.Count == 1 ? "it is" : "they are")} answered in code; give no answer for {(inCode.Count == 1 ? "it" : "them")}.";
         return $"""
 
@@ -68,10 +68,10 @@ public static partial class ReviewWriter
     private static List<string> AllAnswers(IReadOnlyList<string> questions, List<(string Id, string Text)> asked, IEnumerable<string> modelAnswers, WritingProfile profile)
     {
         var fromModel = new Queue<string>(modelAnswers.Where(a => !string.IsNullOrWhiteSpace(a)).Select(a => MethodsSectionWriter.StripMarkdownEmphasis(a.Trim())));
-        return questions.Select((_, i) => asked.Any(q => q.Id == QuestionId(i)) ? fromModel.Dequeue() : UnansweredText(profile)).ToList();
+        return questions.Select((_, i) => asked.Any(q => q.Id == QuestionId(i, profile)) ? fromModel.Dequeue() : UnansweredText(profile)).ToList();
     }
 
     /// <summary>The given answers for a prompt, one "RQn: answer" line each; empty without answers.</summary>
-    public static string AnswerLines(IReadOnlyList<string>? answers) =>
-        answers is not { Count: > 0 } ? "" : string.Join("\n", answers.Select((a, i) => $"{QuestionId(i)}: {a}"));
+    public static string AnswerLines(IReadOnlyList<string>? answers, WritingProfile? profile = null) =>
+        answers is not { Count: > 0 } ? "" : string.Join("\n", answers.Select((a, i) => $"{QuestionId(i, profile)}: {a}"));
 }
