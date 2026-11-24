@@ -29,7 +29,8 @@ public static class MultivocalSecondScreening
 
     /// <summary>
     /// The reason a source gets a targeted second screening, or null when one screening is enough: it was included,
-    /// the decision was unsure (low or medium confidence, none given, or no summary to judge by), or its text was flagged.
+    /// the decision was unsure (low or medium confidence, none given, or no summary to judge by), or its text holds a
+    /// strong flag, a phrase aimed at the model (<see cref="PromptSafety.AnyStrong(IEnumerable{string})"/>; a weak mention is not enough, #472).
     /// </summary>
     public static string? TargetReason(ScreeningAnswer first, bool hasSummary, bool flagged) =>
         first.IsIncluded ? Included
