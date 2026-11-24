@@ -33,7 +33,7 @@ public sealed partial class MultivocalReporter
                 string cited = Cite(findings.Select(f => f.Address), numbers);
                 section.Blocks.Add(ReportBlock.Paragraph(
                     $"**{theme.Name}.** {Sentence(theme.Description)} This theme rests on {Count(theme.Sources, "source")} {cited}: " +
-                    $"{Num(theme.FirstTier)} from 1st-tier, {Num(theme.SecondTier)} from 2nd-tier and {Num(theme.ThirdTier)} from 3rd-tier outlets, with a mean quality of {theme.MeanQuality.ToString("0.#", CultureInfo.InvariantCulture)} of {input.Quality.MaxPoints} points ({theme.EvidenceLabel})."));
+                    $"{MultivocalFormalText.ThemeBasis(theme, input.Quality.MaxPoints)}."));
                 foreach (var f in Representative(findings))
                     section.Blocks.Add(ReportBlock.Quote($"\"{f.Quote}\" ({f.Attribute}: {f.Value}) {Cite(new[] { f.Address }, numbers)}"));
                 if (theme.Tensions.Count > 0)

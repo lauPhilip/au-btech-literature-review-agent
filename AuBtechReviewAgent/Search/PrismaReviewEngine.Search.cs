@@ -177,7 +177,8 @@ public partial class PrismaReviewEngine
             string cacheKey = ReviewCache.Key("search-v1", source.SourceName, query, perPerspectiveCap.ToString());
             try
             {
-                if (Cache.TryGet<SearchCacheEntry>("search", cacheKey, out var cached) && cached != null)
+                // An entry with papers but no raw answer predates the Scopus and IEEE Xplore fix (#469): search again, so the answer is kept.
+                if (Cache.TryGet<SearchCacheEntry>("search", cacheKey, out var cached) && cached != null && (cached.Raw.Count > 0 || cached.Papers.Count == 0))
                 {
                     papers = cached.Papers;
                     raw = cached.Raw;

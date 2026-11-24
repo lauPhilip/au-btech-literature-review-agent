@@ -27,12 +27,19 @@
                     <p class="text-ink">@theme.Description</p>
                     <p class="flex flex-wrap gap-1.5">
                         <span class="ui-chip border-line bg-soft text-ink text-[10px]">@theme.Sources source@(theme.Sources == 1 ? "" : "s")</span>
-                        <span class="ui-chip border-line bg-soft text-ink text-[10px]">tiers 1st @theme.FirstTier · 2nd @theme.SecondTier · 3rd @theme.ThirdTier</span>
+                        @* A theme on academic sources only has no outlet tiers and no Table 7 points to average (#467). *@
+                        @if (theme.GreySources > 0 || theme.FormalSources == 0)
+                        {
+                            <span class="ui-chip border-line bg-soft text-ink text-[10px]">tiers 1st @theme.FirstTier · 2nd @theme.SecondTier · 3rd @theme.ThirdTier</span>
+                        }
                         @if (theme.FormalSources > 0)
                         {
                             <span class="ui-chip border-line bg-soft text-ink text-[10px]">@theme.GreySources grey · @theme.FormalSources academic</span>
                         }
-                        <span class="ui-chip border-line bg-soft text-ink text-[10px]">mean quality@(theme.FormalSources > 0 ? " of the grey sources" : "") @theme.MeanQuality.ToString("0.#") of @AuBtechReviewAgent.GreyQualityChecklist.MaxPoints</span>
+                        @if (theme.GreySources > 0 || theme.FormalSources == 0)
+                        {
+                            <span class="ui-chip border-line bg-soft text-ink text-[10px]">mean quality@(theme.FormalSources > 0 ? " of the grey sources" : "") @theme.MeanQuality.ToString("0.#") of @AuBtechReviewAgent.GreyQualityChecklist.MaxPoints</span>
+                        }
                         <span class="@(theme.EvidenceLabel.StartsWith("3rd") ? "ui-chip border-partly-border bg-partly-fill text-partly" : "ui-chip border-line bg-soft text-ink") text-[10px]">@theme.EvidenceLabel</span>
                     </p>
                     @if (theme.Tensions.Count > 0)

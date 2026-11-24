@@ -71,8 +71,8 @@ public static partial class GreyReferences
         return new GreyReference(
             number,
             address,
-            // A page without a named producer is credited to its site, as a reference to a web page is.
-            Producer: OneLine(record?.Producer is { Length: > 0 } producer ? producer : site),
+            // Never a bare web address: with no producer known the reference starts with the title (GreyProducer, #471).
+            Producer: GreyProducer.Of(record?.Producer, PrismaReviewEngine.IsWebAddress(url) ? url : record?.Url),
             Year: record?.Published?.Year,
             Title: OneLine(record?.Title is { Length: > 0 } t ? t : title),
             Site: site,
@@ -91,9 +91,10 @@ public static partial class GreyReferences
     {
         if (r.Paper != null) return FormalLine(r);
         var sb = new StringBuilder();
-        sb.Append(r.Producer.Length > 0 ? r.Producer : "Unknown producer");
-        sb.Append($" ({(r.Year is int y ? y.ToString(CultureInfo.InvariantCulture) : "n.d.")}). ");
-        sb.Append(EndWithStop(r.Title.Length > 0 ? r.Title : "Untitled")).Append(' ');
+        string year = r.Year is int y ? y.ToString(CultureInfo.InvariantCulture) : "n.d.";
+        string title = EndWithStop(r.Title.Length > 0 ? r.Title : "Untitled");
+        // APA: a work with no author starts with its title, then the year.
+        sb.Append(r.Producer.Length > 0 ? $"{r.Producer} ({year}). {title} " : $"{title} ({year}). ");
         if (r.Site.Length > 0 && !string.Equals(r.Site, r.Producer, StringComparison.OrdinalIgnoreCase)) sb.Append($"*{r.Site}*. ");
         if (r.Url.Length > 0) sb.Append(r.Url);
         var notes = new List<string>();
@@ -116,12 +117,10 @@ public static partial class GreyReferences
                 sb.Append(FormalBibTeX(r, used));
                 continue;
             }
-            var fields = new List<(string, string)>
-            {
-                // Double braces: a producer is often an organisation, and BibTeX would split "Acme Labs" into a first and last name.
-                ("author", "{" + Bib(r.Producer.Length > 0 ? r.Producer : "Unknown producer") + "}"),
-                ("title", "{" + Bib(r.Title) + "}"),
-            };
+            var fields = new List<(string, string)>();
+            // Double braces: a producer is often an organisation, and BibTeX would split "Acme Labs" into a first and last name.
+            if (r.Producer.Length > 0) fields.Add(("author", "{" + Bib(r.Producer) + "}"));
+            fields.Add(("title", "{" + Bib(r.Title) + "}"));
             if (r.Site.Length > 0) fields.Add(("howpublished", Bib(r.Site)));
             if (r.Year is int year) fields.Add(("year", year.ToString(CultureInfo.InvariantCulture)));
             if (r.Url.Length > 0) fields.Add(("url", r.Url));
@@ -185,8 +184,8 @@ public static partial class GreyReferences
             }
             var record = records.GetValueOrDefault(s.Address);
             string site = OneLine(record?.Site ?? "");
-            string producer = record?.Producer is { Length: > 0 } p ? p : site;
             string url = PrismaReviewEngine.IsWebAddress(s.Url) ? s.Url : "";
+            string producer = GreyProducer.Of(record?.Producer, url.Length > 0 ? url : record?.Url);
             AppendRis(sb, OneLine(producer), OneLine(s.Title), site, record?.Published?.Year, url);
             sb.AppendLine("KW  - TraceableAI");
             sb.AppendLine("KW  - grey literature");
@@ -231,10 +230,11 @@ public static partial class GreyReferences
         await SafeFile.WriteAllTextAsync(Path.Join(folder, ScreenedFile), ToScreenedRis(ledger, screening, numbers));
     }
 
-    /// <summary>producer + year + first title word, e.g. "anthropic2025effective".</summary>
+    /// <summary>producer (else the site) + year + first title word, e.g. "anthropic2025effective".</summary>
     public static string CitationKey(GreyReference r)
     {
-        string producer = Regex.Matches(RemoveDiacritics(r.Producer), @"[\p{L}\p{N}]+").Select(m => m.Value).FirstOrDefault() ?? "anon";
+        string who = r.Producer.Length > 0 ? r.Producer : Regex.Replace(r.Site, @"^www\.", "", RegexOptions.IgnoreCase);
+        string producer = Regex.Matches(RemoveDiacritics(who), @"[\p{L}\p{N}]+").Select(m => m.Value).FirstOrDefault() ?? "anon";
         string firstWord = Regex.Matches(RemoveDiacritics(r.Title), @"[\p{L}\p{N}]+")
             .Select(m => m.Value)
             .FirstOrDefault(w => w.Length > 3 && !new[] { "with", "from", "towards", "toward", "into", "what", "your" }.Contains(w.ToLowerInvariant()))

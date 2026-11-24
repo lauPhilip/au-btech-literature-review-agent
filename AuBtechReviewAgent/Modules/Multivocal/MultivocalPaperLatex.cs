@@ -130,8 +130,15 @@ public static class MultivocalPaper
         new PaperSection("Registration and protocol",
             $"The review was not registered. Its protocol (need and audience, the decision to include grey literature, research questions, kinds of grey literature, searches and search strings, stopping rule, criteria and quality threshold) was written on {input.Planned.CreatedUtc:yyyy-MM-dd} (UTC), before any search; its SHA-256 fingerprint begins {Short(input.Planned.ProtocolSha256)}. The file is part of the run archive."),
         new PaperSection("Availability",
-            ($"The code of the tool is openly available at {ToolVersion.RepositoryUrl}. {ToolVersion.PaperSentence(ToolVersion.Current)} The run archive contains the protocol, the raw search answers, every screening decision and quality score with its quotes, the systematic map, the extraction, the synthesis, the written paper, the citation audit and a manifest.json with the SHA-256 fingerprint of every file. The kept page texts are fingerprinted but not redistributed.")),
+            ($"The code of the tool is openly available at {ToolVersion.RepositoryUrl}. {VersionSentence(paper.AppVersion)} The run archive contains the protocol, the raw search answers, every screening decision and quality score with its quotes, the systematic map, the extraction, the synthesis, the written paper, the citation audit and a manifest.json with the SHA-256 fingerprint of every file. The kept page texts are fingerprinted but not redistributed.")),
     };
+
+    /// <summary>The run's own version without the commit (#468), or "unknown" when its files record none.</summary>
+    public static string VersionNumber(string? version) => ToolVersion.Number(version) is { Length: > 0 } number ? number : "unknown";
+
+    /// <summary>The availability sentence on the run's own version; a run whose files record none says so.</summary>
+    public static string VersionSentence(string? version) =>
+        ToolVersion.Number(version).Length > 0 ? ToolVersion.PaperSentence(version) : "The run's files do not record which version of the tool made it.";
 
     /// <summary>The statement on the use of AI, written in code from what the run did.</summary>
     public static string AiUse(MultivocalReportInput input, MultivocalPaperFile paper)
@@ -143,7 +150,7 @@ public static class MultivocalPaper
             : $"the large language models {paper.Model} and {JoinList(others.Select(o => o.Model).ToList())}";
         string subject = others.Count == 0 ? "The model was" : "The models were";
         var text = new StringBuilder();
-        text.Append(inv, $"This review was conducted with TraceableAI (version {RecordingChatCompletionService.AppVersion.Split('+')[0]}), an open-source tool, following the multivocal literature review guidelines of Garousi et al. (2019), with {model}, in {paper.WrittenUtc.ToString("MMMM yyyy", inv)} (run {input.Planned.RunId}). ");
+        text.Append(inv, $"This review was conducted with TraceableAI (version {VersionNumber(paper.AppVersion)}), an open-source tool, following the multivocal literature review guidelines of Garousi et al. (2019), with {model}, in {paper.WrittenUtc.ToString("MMMM yyyy", inv)} (run {input.Planned.RunId}). ");
         if (others.Count > 0)
             text.Append($"Of these, {string.Join("; ", others.Select(o => $"{o.Model} answered {JoinList(o.Tasks)}"))}, and {paper.Model} did every other step that used a model. ");
         text.Append("The protocol was written by the authors and fingerprinted before the search. ");

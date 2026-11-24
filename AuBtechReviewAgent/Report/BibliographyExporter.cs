@@ -29,7 +29,8 @@ public static class BibliographyExporter
             string key = UniqueKey(CitationKey(r), usedKeys);
 
             var fields = new List<(string, string)>();
-            if (r.Authors.Count > 0) fields.Add(("author", string.Join(" and ", r.Authors.Select(BibAuthor))));
+            // A list a source gave only in part ends in BibTeX's own "and others" (issue #470).
+            if (r.Authors.Count > 0) fields.Add(("author", string.Join(" and ", r.Authors.Select(a => IsEtAl(a) ? "others" : BibAuthor(a)))));
             fields.Add(("title", "{" + Bib(r.Title) + "}")); // double braces keep capitalisation
             if (!string.IsNullOrWhiteSpace(r.VenueName))
                 fields.Add((type == "article" ? "journal" : type == "inproceedings" ? "booktitle" : "howpublished", Bib(r.VenueName)));
@@ -60,7 +61,7 @@ public static class BibliographyExporter
                 _ => r.Category == "Arxiv" ? "UNPB" : "GEN",
             };
             sb.AppendLine($"TY  - {type}");
-            foreach (var a in r.Authors) sb.AppendLine($"AU  - {RisAuthor(a)}");
+            foreach (var a in r.Authors.Where(a => !IsEtAl(a))) sb.AppendLine($"AU  - {RisAuthor(a)}");
             sb.AppendLine($"TI  - {OneLine(r.Title)}");
             if (!string.IsNullOrWhiteSpace(r.VenueName)) sb.AppendLine($"T2  - {OneLine(r.VenueName)}");
             if (r.Year > 0) sb.AppendLine($"PY  - {r.Year}");
@@ -93,7 +94,7 @@ public static class BibliographyExporter
                 _ => "GEN",
             };
             sb.AppendLine($"TY  - {type}");
-            foreach (var a in l.Authors ?? new List<string>()) sb.AppendLine($"AU  - {RisAuthor(a)}");
+            foreach (var a in (l.Authors ?? new List<string>()).Where(a => !IsEtAl(a))) sb.AppendLine($"AU  - {RisAuthor(a)}");
             sb.AppendLine($"TI  - {OneLine(l.Title)}");
             if (!string.IsNullOrWhiteSpace(l.VenueName)) sb.AppendLine($"T2  - {OneLine(l.VenueName)}");
             if (l.Year > 0) sb.AppendLine($"PY  - {l.Year}");
@@ -141,8 +142,12 @@ public static class BibliographyExporter
         string a = author.Trim();
         if (a.Contains(',')) return a.Split(',')[0].Trim();
         var parts = a.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-        return parts.Length > 0 ? parts[^1] : "anon";
+        if (parts.Length == 0) return "anon";
+        int initials = ApaCitationBuilder.TrailingInitials(parts);
+        return initials < parts.Length ? string.Join(" ", parts[..initials]) : parts[^1];
     }
+
+    private static bool IsEtAl(string author) => author.Trim().Equals(ApaCitationBuilder.EtAl, StringComparison.OrdinalIgnoreCase);
 
     // BibTeX and RIS both prefer "Surname, Given".
     private static string BibAuthor(string author) => Bib(RisAuthor(author));
@@ -151,6 +156,10 @@ public static class BibliographyExporter
     {
         string a = Regex.Replace(author.Trim(), @"\s+", " ");
         if (a.Contains(',') || !a.Contains(' ')) return a;
+        // "Liu J." is already surname first: "Liu, J.", not "J., Liu".
+        var parts = a.Split(' ');
+        int initials = ApaCitationBuilder.TrailingInitials(parts);
+        if (initials < parts.Length) return $"{string.Join(" ", parts[..initials])}, {string.Join(" ", parts[initials..])}";
         int last = a.LastIndexOf(' ');
         return $"{a[(last + 1)..]}, {a[..last]}";
     }
