@@ -144,7 +144,7 @@
                     ? (l.SecondDecision == "Included" ? "Excluded" : "Included") : l.Decision,
                 SecondDecision = l.SecondDecision,
                 SecondReasoning = l.SecondReasoning,
-                Flags = l.InjectionFlags ?? new List<string>(),
+                Flags = l.InjectionFlags?.Where(PromptSafety.IsStrong).ToList() ?? new List<string>(), // weak mentions are not flags (#472)
                 Origin = l.Origin ?? "database search",
                 CitedByCount = l.CitedByCount,
             })
