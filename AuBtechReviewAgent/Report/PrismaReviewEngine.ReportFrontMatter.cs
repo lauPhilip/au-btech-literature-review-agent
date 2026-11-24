@@ -115,7 +115,12 @@ public partial class PrismaReviewEngine
         async Task<ClosingSections?> ClosingAsync() => useThematic && thematic!.Evidence != null
             ? await ReviewWriter.WriteClosingAsync(chat, WritingProfile.Systematic, query, explicitObjective,
                 FrontMatterFacts(finalState, thematic.Codebook, includedFacts, screeningFacts), resultSections, discussionText,
-                thematic.Evidence, referenceCount, message => _log.LogWarning("{Message}", SanitizeLogMessage(message)),
+                thematic.Evidence, referenceCount, message =>
+                {
+                    // On file with the discussion's notes, so a figure sent back or kept is in thematic-codebook.json (issue #452).
+                    _log.LogWarning("{Message}", SanitizeLogMessage(message));
+                    lock (thematic.Codebook) (thematic.Codebook.WritingNotes ??= new()).Add(message);
+                },
                 finalState.ResearchQuestions, thematic.Codebook.Unanswered?.Select(u => u.Question).ToList(), thematic.Answers)
             : null;
 

@@ -67,7 +67,7 @@ public static partial class ReviewWriter
             """;
         try
         {
-            var reply = await LlmJson.GetAsync<DiscussionAnswer>(chat, prompt, LlmJson.JsonMode(0.3), a =>
+            var reply = await LlmJson.GetAsync<DiscussionAnswer>(chat, prompt, LlmJson.JsonMode(0.3), WithFigureGuard<DiscussionAnswer>(a =>
             {
                 if (string.IsNullOrWhiteSpace(a.Text)) return "text must not be empty.";
                 var outside = ThematicSynthesis.CitedIn(a.Text).Where(r => r < 1 || r > referenceCount).ToList();
@@ -78,7 +78,8 @@ public static partial class ReviewWriter
                 if (OwnCountCited(a.Text, evidence.BaseFacts, synthesis) is { } own)
                     return $"\"{own}\" states this review's own count and carries a citation; the review's own counts take no citation.";
                 return asked.Count == 0 ? null : AnswersProblem(a.Answers, asked.Count, evidence, synthesis, referenceCount, profile);
-            }, repairAttempts: 2);
+            }, a => FigurePlacementProblem(synthesis, evidence.BaseFacts,
+                (a.Answers ?? new()).Select((t, i) => ($"answer {i + 1}", t ?? "")).Append(("the discussion", a.Text!)).ToList()), "discussion call", warn), repairAttempts: 2);
             string text = OneLimitationsParagraph(MethodsSectionWriter.StripMarkdownEmphasis(reply.Text!.Trim()), out string? merged);
             if (merged != null) warn?.Invoke(merged);
             return new DiscussionWithAnswers(text, answer && all.Count > 0 ? AllAnswers(all, asked, reply.Answers ?? new(), profile) : null);
