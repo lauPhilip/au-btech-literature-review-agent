@@ -96,6 +96,9 @@ public static class MultivocalRunLog
         m.Screened = f.Screened;
         m.Included = f.Passed;
         m.ScreeningKappa = input.Screening.Kappa;
+        // Flagged for the reviewer, as in the systematic review, and how many of them nobody looked at (#473).
+        m.UncertainDecisions = input.Screening.Sources.Count(x => x.Uncertain);
+        m.FlaggedNotLookedAt = input.Screening.Sources.Count(x => x.NeedsLook);
         m.FullTextRetrieved = f.Extracted;
         m.FullTextShare = f.Passed == 0 ? 0 : Math.Round((double)f.Extracted / f.Passed, 4);
 

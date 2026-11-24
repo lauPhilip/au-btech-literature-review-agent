@@ -69,13 +69,11 @@ public sealed partial class MultivocalReporter
     {
         var s = input.Screening;
         var section = new ReportSection { Heading = "3. Selection (G9, G10)" };
-        int reviewed = s.Sources.Count(x => x.Reviewed);
-        int changed = s.Sources.Count(x => x.Reviewed && x.ModelDecision != null && x.ModelDecision != x.Decision);
         section.Blocks.Add(ReportBlock.Paragraph(
             MultivocalScreeningText.Method(s) +
             $"{Num(s.Count("Included"))} were included, {Num(s.Count("Excluded"))} excluded and {Num(s.Count("Duplicate"))} set aside as duplicates of a source with the same title" +
             $"{(s.Count("Error") > 0 ? $"; {Num(s.Count("Error"))} could not be screened" : "")}. " +
-            $"The reviewer looked at {Count(reviewed, "decision")} and changed {Num(changed)}; the model's decision stays on file next to the reviewer's."));
+            MultivocalScreeningText.Flagged(s).TrimEnd()));
         if (input.Ledger.HasFormalPool) section.Blocks.Add(ReportBlock.Paragraph(MultivocalFormalText.SelectionText(input)));
         section.Blocks.Add(ReportBlock.Paragraph($"Inclusion criteria: {Sentence(s.InclusionCriteria)} Exclusion criteria: {(s.ExclusionCriteria.Trim().Length > 0 ? Sentence(s.ExclusionCriteria) : "none.")}"));
         var reasons = s.Sources.Where(x => x.Decision == "Excluded")
