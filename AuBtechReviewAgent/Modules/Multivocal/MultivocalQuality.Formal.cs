@@ -17,14 +17,15 @@ public sealed partial class MultivocalQualityAssessor
     /// <summary>Part of the cache key of a formal source's appraisal: raise it whenever that appraisal changes.</summary>
     public const string FormalAppraisalVersion = "formal-mmat-v1";
 
-    private async Task<GreyQuality> AppraiseFormalAsync(Guid runId, string? editKey, IChatCompletionService chat, GreyRecord record)
+    private async Task<GreyQuality> AppraiseFormalAsync(Guid runId, string? editKey, IChatCompletionService chat, GreyRecord record, bool fetch = true)
     {
         var result = new GreyQuality { Address = MultivocalSearcher.AddressKey(record.Url), Title = record.Title, Url = record.Url, Formal = true };
         var paper = _searcher.LoadLedger(runId)?.FormalPool.FirstOrDefault(s => MultivocalSearcher.AddressKey(s.Record.Url) == result.Address)?.Paper;
         if (paper == null) return NotAssessed(result, "the database's record of this source is not in the ledger");
 
         var snapshot = _pages.Load(runId).Pages.FirstOrDefault(p => MultivocalSearcher.AddressKey(p.Url) == result.Address);
-        if (snapshot is not { NotKept: null }) snapshot = await _pages.KeepAsync(runId, editKey, record.Url);
+        if (snapshot is not { NotKept: null } && fetch) snapshot = await _pages.KeepAsync(runId, editKey, record.Url);
+        if (snapshot == null) return NotAssessed(result, "the text was not kept");
         string? text = snapshot.NotKept == null ? _pages.ReadText(runId, snapshot) : null;
         if (text == null) return NotAssessed(result, snapshot.NotKept ?? "the kept text no longer matches its fingerprint");
         result.TextSha256 = snapshot.TextSha256;

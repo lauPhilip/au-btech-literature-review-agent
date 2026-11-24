@@ -83,6 +83,8 @@ public partial class PrismaReviewEngine
         using var throttle = new SemaphoreSlim(Math.Max(1, Llm.QualityParallelism));
         int extracted = 0;
         ReportProgress(ctx.RunId, ctx.State, RunProgress.Extraction, 0, $"Extracting and appraising {papers.Count} studies");
+        // With research questions the extraction looks for what answers them (issue #430); every run reuses an identical earlier extraction.
+        var focus = new ExtractionFocus(ctx.State.ResearchQuestions, ctx.Request.Objective, Cache, Llm.ModelFor("extraction"));
         var work = papers.Select(async p =>
         {
             await throttle.WaitAsync();
@@ -90,7 +92,7 @@ public partial class PrismaReviewEngine
             {
                 StudyExtraction result;
                 using (LlmStage.Begin("extraction"))
-                    result = await StudyExtractor.ExtractAsync(ctx.Chat, p);
+                    result = await StudyExtractor.ExtractAsync(ctx.Chat, p, focus: focus);
                 int n = Interlocked.Increment(ref extracted);
                 ReportProgress(ctx.RunId, ctx.State, RunProgress.Extraction, (double)n / papers.Count, Of(n, papers.Count, "studies"));
                 return result;

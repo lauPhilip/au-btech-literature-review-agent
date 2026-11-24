@@ -11,6 +11,13 @@ public class EvidencedValue
     public string Quote { get; set; } = "";
     /// <summary>True when the quote was found word for word in the paper text the model was shown.</summary>
     public bool QuoteVerified { get; set; }
+
+    /// <summary>
+    /// For a key finding of a run with research questions: the question it bears on ("RQ1") or "none", checked in code
+    /// against the run's question ids. Null (and not written) when the run had no research questions.
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Question { get; set; }
 }
 
 /// <summary>One MMAT 2018 criterion and the model's answer to it.</summary>
@@ -46,6 +53,10 @@ public class StudyExtraction
     /// fix when it was sent back. Null when there is nothing to say.
     /// </summary>
     public string? Note { get; set; }
+
+    /// <summary>True when this extraction was reused from an earlier identical one (same prompt, prompt version and model).</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public bool? FromCache { get; set; }
 
     [JsonIgnore] public int AppraisalYes => Appraisal.Count(a => a.Answer == "yes");
 }

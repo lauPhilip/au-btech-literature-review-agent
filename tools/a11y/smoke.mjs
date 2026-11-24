@@ -39,6 +39,21 @@ const flows = [
     },
   },
   {
+    // The sample run has no edit key, so this browser may edit it (issue #413). Cancel makes no change.
+    name: 'Report: "Edit the text" opens a sentence\'s edit box and Cancel closes it',
+    path: '/design/report',
+    async run(page) {
+      await page.getByRole('button', { name: 'Edit the text', exact: true }).click(wait);
+      const edit = page.locator('button[id^="edit-discussionItem-"]').first();
+      await edit.scrollIntoViewIfNeeded();
+      await edit.click(wait);
+      const box = page.locator('#sentence-editor');
+      await box.waitFor({ state: 'visible', ...wait });
+      await box.getByRole('button', { name: 'Cancel', exact: true }).click(wait);
+      await box.waitFor({ state: 'hidden', ...wait });
+    },
+  },
+  {
     name: 'Glossary: the search narrows the list',
     path: '/glossary',
     async run(page) {

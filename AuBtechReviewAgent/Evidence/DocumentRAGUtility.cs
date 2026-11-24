@@ -6,6 +6,7 @@ using System.Net.Http;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Linq;
 using Microsoft.Extensions.Logging;
@@ -222,16 +223,20 @@ public static class DocumentRAGUtility
         }
     }
 
-    public static async Task<bool> CopyWithLimitAsync(Stream input, Stream output, long maxBytes)
+    /// <summary>
+    /// Copies at most <paramref name="maxBytes"/>; false when the input is longer. <paramref name="cancel"/> stops a
+    /// slow body (the web page fetcher's deadline); by default nothing stops it, as the PDF download has always worked.
+    /// </summary>
+    public static async Task<bool> CopyWithLimitAsync(Stream input, Stream output, long maxBytes, CancellationToken cancel = default)
     {
         var buffer = new byte[81920];
         long total = 0;
         int read;
-        while ((read = await input.ReadAsync(buffer)) > 0)
+        while ((read = await input.ReadAsync(buffer, cancel)) > 0)
         {
             total += read;
             if (total > maxBytes) return false;
-            await output.WriteAsync(buffer.AsMemory(0, read));
+            await output.WriteAsync(buffer.AsMemory(0, read), cancel);
         }
         return true;
     }

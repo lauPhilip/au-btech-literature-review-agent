@@ -1,0 +1,92 @@
+@* The history of the checked editor: every edit and undo of the report, newest first, as report-edits.json keeps
+   them, with the text before and after, when, and what the check found. Every reader sees it, because the edits are
+   part of the report's record; only the browser with the run's edit key sees "Undo", on the newest edit of each
+   sentence that is still in force. An undo is one more entry, so nothing is ever taken out. *@
+
+<section id="@Id" aria-labelledby="@($"{Id}-title")" class="border border-line bg-page p-5 font-sans text-[15px] leading-relaxed text-ink print:hidden">
+    <div class="flex flex-wrap items-baseline justify-between gap-2">
+        <h2 id="@($"{Id}-title")" class="font-display text-lg font-semibold text-heading">Edits after the run</h2>
+        @if (CanEdit)
+        {
+            <p class="text-sm text-muted">@AuBtechReviewAgent.EditView.UsedLine(Log)</p>
+        }
+    </div>
+    <p class="mt-1 text-sm text-muted">
+        Each edited sentence was checked against the @(SourceNoun)s before it was saved. An undo is kept as one more entry, so this list is the full record.
+    </p>
+    @if (Message != null)
+    {
+        <p role="@(Failed ? "alert" : "status")" class="mt-2 text-sm @(Failed ? "text-not-supported" : "text-ink")">@Message</p>
+    }
+    @if (Log.Edits.Count == 0)
+    {
+        <p class="mt-3 text-sm text-ink">No edits yet. Choose "Edit the text" at the top, then a sentence.</p>
+    }
+    else
+    {
+        var undoable = AuBtechReviewAgent.EditView.Undoable(Log);
+        var undone = Log.Edits.Where(e => e.Undoes != null).ToDictionary(e => e.Undoes!.Value, e => e.Number);
+        <ol class="mt-4 space-y-4">
+            @foreach (var item in Enumerable.Reverse(Log.Edits))
+            {
+                var edit = item;
+                bool isUndo = edit.Action == AuBtechReviewAgent.ReportEdit.Undone;
+                <li id="@CitedProse.EditHistoryId(edit.Number)" tabindex="-1" class="scroll-mt-20 border-l-2 @(isUndo ? "border-line" : "border-heading") pl-4 focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand">
+                    <div class="flex flex-wrap items-baseline justify-between gap-2">
+                        <h3 class="text-sm font-semibold text-heading">
+                            @(isUndo ? $"Undo of edit {edit.Undoes}" : $"Edit {edit.Number}") · sentence @(edit.SentenceIndex + 1) of @FieldLabel(edit.Field)
+                        </h3>
+                        <p class="text-xs text-muted">@edit.EditedUtc.ToString("d MMM yyyy, HH:mm", System.Globalization.CultureInfo.InvariantCulture) UTC</p>
+                    </div>
+                    <dl class="mt-1.5 grid gap-x-3 gap-y-1 text-sm sm:grid-cols-[4rem_minmax(0,1fr)]">
+                        <dt class="font-semibold text-muted">Before</dt>
+                        <dd class="text-muted">@edit.Before</dd>
+                        <dt class="font-semibold text-muted">After</dt>
+                        <dd class="text-ink">@edit.After</dd>
+                    </dl>
+                    @if (!isUndo || edit.Checks.Count > 0)
+                    {
+                        <details class="mt-1.5">
+                            <summary class="cursor-pointer text-sm text-heading">What the check found: @AuBtechReviewAgent.EditView.Summary(edit.Checks)</summary>
+                            <div class="mt-2"><EditVerdicts Checks="edit.Checks" SourceTitle="SourceTitle" SourceNoun="@SourceNoun" /></div>
+                        </details>
+                    }
+                    else
+                    {
+                        <p class="mt-1.5 text-sm text-muted">The sentence reads as the run wrote it again, with its first verdicts.</p>
+                    }
+                    @if (undone.TryGetValue(edit.Number, out int undoneBy))
+                    {
+                        <p class="mt-1.5 text-sm text-muted">Undone later (entry @undoneBy).</p>
+                    }
+                    @if (CanEdit && !isUndo && undoable.Contains(edit.Number))
+                    {
+                        <button type="button" class="ui-btn-secondary ui-btn-sm mt-2 min-h-[44px]" disabled="@Undoing"
+                                aria-label="@($"Undo edit {edit.Number}")" @onclick="() => OnUndo.InvokeAsync(edit)">@(Undoing ? "Undoing…" : "Undo")</button>
+                    }
+                </li>
+            }
+        </ol>
+    }
+</section>
+
+@code {
+    public const string Id = "report-edits";
+
+    /// <summary>Every edit of the run's report, in order.</summary>
+    [Parameter] public AuBtechReviewAgent.ReportEditLog Log { get; set; } = new();
+
+    /// <summary>True for the browser with the run's edit key: it sees the edits used and "Undo".</summary>
+    [Parameter] public bool CanEdit { get; set; }
+    [Parameter] public bool Undoing { get; set; }
+
+    /// <summary>What the last undo did, or why it failed.</summary>
+    [Parameter] public string? Message { get; set; }
+    [Parameter] public bool Failed { get; set; }
+
+    /// <summary>The name of a part of the report in plain words.</summary>
+    [Parameter] public Func<string, string> FieldLabel { get; set; } = f => f;
+    [Parameter] public Func<int, string?> SourceTitle { get; set; } = _ => null;
+    [Parameter] public string SourceNoun { get; set; } = "paper";
+    [Parameter] public EventCallback<AuBtechReviewAgent.ReportEdit> OnUndo { get; set; }
+}
