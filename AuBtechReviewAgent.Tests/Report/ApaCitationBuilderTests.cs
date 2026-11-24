@@ -130,6 +130,14 @@ public class ApaCitationBuilderTests
     [InlineData("Doe, J.", "Doe, J.")]
     [InlineData("Jean-Paul Sartre", "Sartre, J. P.")]
     [InlineData("…", "")]
+    [InlineData("Liu J.", "Liu, J.")]
+    [InlineData("Wang J.P.", "Wang, J. P.")]
+    [InlineData("Gangadharan G R", "Gangadharan, G. R.")]
+    [InlineData("Arunkumar .V", "Arunkumar, V.")]
+    [InlineData("Van der Berg A.", "Van der Berg, A.")]
+    [InlineData("Jian LI", "LI, J.")]
+    [InlineData(" PSBC LLM Team", "PSBC LLM Team")]
+    [InlineData("et al.", "et al.")]
     public void FormatsSingleAuthor(string raw, string expected)
     {
         Assert.Equal(expected, ApaCitationBuilder.FormatAuthor(raw));
@@ -206,5 +214,28 @@ public class ApaCitationBuilderTests
     {
         Assert.Empty(ApaCitationBuilder.ItalicSpans(null));
         Assert.Empty(ApaCitationBuilder.ItalicSpans(""));
+    }
+
+    [Fact]
+    public void AListGivenOnlyInPartEndsWithEtAl()
+    {
+        var authors = new List<string> { "Liu J.", ApaCitationBuilder.EtAl };
+
+        Assert.Equal("Liu, J., et al.", ApaCitationBuilder.FormatAuthorList(authors));
+        Assert.StartsWith("Liu, J., et al. (2026).", ApaCitationBuilder.Build(Paper(authors: authors, date: "Published: 2026")).Citation);
+    }
+
+    [Fact]
+    public void ExportsWriteASurnameFirstNameTheRightWayRoundAndEtAlAsOthers()
+    {
+        var row = new IncludedPaperMetricRow { Title = "SMARF: semantic memory", Year = 2026, Authors = new() { "Liu J.", ApaCitationBuilder.EtAl }, ReferenceNumber = 1 };
+
+        string bib = BibliographyExporter.ToBibTeX(new[] { row });
+        string ris = BibliographyExporter.ToRis(new[] { row });
+
+        Assert.Contains("author = {Liu, J. and others}", bib);
+        Assert.Contains("@article{liu2026smarf", bib.Replace("@misc", "@article"));
+        Assert.Contains("AU  - Liu, J.", ris);
+        Assert.DoesNotContain("et al", ris);
     }
 }
