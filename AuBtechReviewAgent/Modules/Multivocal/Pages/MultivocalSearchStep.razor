@@ -161,10 +161,10 @@
                 }
             </div>
         </fieldset>
-        @if (Page.plan.StoppingRule == "effort")
+        @if (Page.plan.UsesTopHits)
         {
             <div class="flex items-center justify-between gap-3">
-                <label for="p-top" class="text-sm text-ink">Top hits per search string<span class="block text-xs text-muted">The paper looks at the first 100. A plan starts at 20, since each hit is screened, many of them twice; raise it for a fuller search.</span></label>
+                <label for="p-top" class="text-sm text-ink">Top hits per search string<span class="block text-xs text-muted">@(Page.plan.StoppingRule == "saturation" ? "Each string is searched up to this many hits, in order, until one adds no new source. " : "The paper looks at the first 100. ")A plan starts at 20, since each hit is screened, many of them twice; raise it for a fuller search.</span></label>
                 <input id="p-top" type="number" min="10" max="500" class="ui-input w-20 text-center" @bind="Page.plan.TopHits" />
             </div>
         }
