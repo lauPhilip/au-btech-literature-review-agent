@@ -46,11 +46,14 @@ public static class MultivocalRelationship
         var both = xs.Keys.Where(ys.ContainsKey).ToList();
         var pairs = both.SelectMany(address => xs[address].SelectMany(x => ys[address].Select(y => (X: x, Y: y, Reference: numbers[address]))))
             .GroupBy(p => (X: p.X.ToLowerInvariant(), Y: p.Y.ToLowerInvariant()))
-            .Select(g => (g.First().X, g.First().Y, (IReadOnlyList<int>)g.Select(p => p.Reference).Distinct().OrderBy(n => n).ToList()))
-            .OrderByDescending(p => p.Item3.Count).ThenBy(p => p.Item1, StringComparer.OrdinalIgnoreCase).ThenBy(p => p.Item2, StringComparer.OrdinalIgnoreCase)
+            .Select(PairOf)
+            .OrderByDescending(p => p.References.Count).ThenBy(p => p.X, StringComparer.OrdinalIgnoreCase).ThenBy(p => p.Y, StringComparer.OrdinalIgnoreCase)
             .ToList();
         return new Pairing(sides[0], sides[1], extracted, both.Select(a => numbers[a]).OrderBy(n => n).ToList(), pairs);
     }
+
+    private static (string X, string Y, IReadOnlyList<int> References) PairOf(IGrouping<(string X, string Y), (string X, string Y, int Reference)> g) =>
+        (g.First().X, g.First().Y, g.Select(p => p.Reference).Distinct().OrderBy(n => n).ToList());
 
     /// <summary>Why the sources do not allow the question to be answered, in code; null when they do.</summary>
     public static string? NotAnswerableText(Pairing p) =>
