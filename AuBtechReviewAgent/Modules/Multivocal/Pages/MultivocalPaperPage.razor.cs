@@ -51,7 +51,17 @@ public partial class MultivocalPaperPage
         if (field == MultivocalWriter.RationaleField) return -1;
         int result = paper?.Results.FindIndex(r => r.Field == field) ?? -1;
         if (result >= 0) return 1 + result;
-        return field == MultivocalWriter.DiscussionField ? 2000 : 3000;
+        int answer = paper?.Answers.FindIndex(a => a.Field == field) ?? -1;
+        if (answer >= 0) return 1000 + answer;
+        return field switch
+        {
+            MultivocalWriter.DiscussionField => 2000,
+            MultivocalWriter.LimitationsField => 2001,
+            MultivocalWriter.ImplicationsField => 2002,
+            MultivocalWriter.FutureResearchField => 2003,
+            MultivocalWriter.SummaryField => 3000,
+            _ => 4000,
+        };
     }
 
     private List<CitationSupportResult> Attention => CitationView.Attention(checks, FieldRank);

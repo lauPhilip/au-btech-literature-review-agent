@@ -133,8 +133,15 @@ public sealed partial class MultivocalWriter
         BaseFactsFrom = "counted in code from the run's files",
         SourceTexts = "excerpts from the kept page texts of the included sources",
         LeanEvidence = true,
+        QuestionIds = plan.Numbered().Select(q => q.Number).ToList(),
+        // The limitations, implications and conclusion are written after the discussion (issue #461), as Garousi et al.
+        // (2019) give them: threats to validity, and implications for practitioners and for researchers.
         DiscussionParts =
-            "(a) what the themes together say about the goal, (b) the state of the practice: where the 1st-tier sources (such as white papers and documentation) and the 3rd-tier sources (such as blog posts) agree or differ, (c) gaps the sources leave open and directions for research and practice, (d) implications for practitioners, (e) in one paragraph, the limitations of the evidence (grey literature, not peer reviewed, pages read as kept on the access date) and of this review (automated screening, extraction and synthesis by a language model).",
+            "(a) what the answers and the themes together say about the goal, (b) the state of the practice: where the 1st-tier sources (such as white papers and documentation) and the 3rd-tier sources (such as blog posts)" +
+            (plan.UsesFormalPool ? ", and the grey and the academic sources," : "") + " agree or differ, (c) how strong the evidence behind the main findings is. Do not write the limitations, the implications, the directions for research or a conclusion: they are separate sections written after this one.",
+        LimitationsPart = "the limitations of the evidence (the threats to validity of Garousi et al. 2019)",
+        ImplicationsPart = "the implications for practitioners (Garousi et al. 2019)",
+        FutureResearchPart = "the implications for researchers: the directions for future research",
     };
 
     /// <summary>The kind of a result whose theme section the model could not write.</summary>

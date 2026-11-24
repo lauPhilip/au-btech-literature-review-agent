@@ -13,16 +13,20 @@ namespace AuBtechReviewAgent;
 /// declarations, the statement on the use of AI and the references. <see cref="PaperLatex.Build"/> writes it as
 /// main.tex; the paper page shows the same parts.
 /// </summary>
-public static class MultivocalPaper
+public static partial class MultivocalPaper
 {
     public const string MainTexFile = "main.tex";
 
     public static string KindLabel(MultivocalPlan plan) =>
         plan.UsesFormalPool ? "AI-GENERATED MULTIVOCAL LITERATURE REVIEW" : "AI-GENERATED GREY LITERATURE REVIEW";
 
-    /// <summary>The objectives as written, followed by the research questions from the plan, in code.</summary>
+    /// <summary>
+    /// The objectives: written in code from the research questions since issue #461, and so given as they are; in a paper
+    /// written before, the model's objectives followed by the research questions from the plan, in code.
+    /// </summary>
     public static string Objectives(MultivocalPlan plan, string written)
     {
+        if (written.TrimStart().StartsWith("The review set out to answer", System.StringComparison.Ordinal)) return written.Trim();
         var questions = plan.Numbered().Select(q => $"{q.Number}: {q.Question.Text.Trim().TrimEnd('?')}?");
         return $"{written.Trim()} The research questions were {string.Join("; ", questions)}".Trim();
     }
@@ -47,8 +51,6 @@ public static class MultivocalPaper
                 : new PaperSection(result.Heading, result.Text, MultivocalPaperParts.Prose(result.Text)));
         }
 
-        var notes = new List<PaperSection>();
-        if (audit?.SupportSummary != null) notes.Add(new PaperSection("Automated citation check", CheckNote(audit)));
 
         PaperSection? summary = null;
         if (paper.SummaryItems.Count > 0)
@@ -77,9 +79,11 @@ public static class MultivocalPaper
             ResultsHeading = "Results",
             ResultsText = ResultsText(paper),
             Themes = themes,
-            Discussion = paper.Discussion,
-            DiscussionNotes = notes,
+            // The discussion is in its parts, so the answers come first (issue #461).
+            Discussion = "",
+            DiscussionNotes = DiscussionParts(input, paper, audit),
             Summary = summary,
+            Conclusion = ConclusionSection(paper),
             Declarations = Declarations(input, paper),
             References = GreyReferences.Build(input.Ledger, input.Pages, input.Extraction).Select(GreyReferences.Line).ToList(),
         };
@@ -156,23 +160,21 @@ public static class MultivocalPaper
         text.Append("The protocol was written by the authors and fingerprinted before the search. ");
         if (input.Ledger.HasFormalPool)
         {
-            text.Append(MultivocalFormalText.AiUseTasks(input, subject));
+            text.Append(MultivocalFormalText.AiUseTasks(input, subject, WrittenParts(paper)));
             text.Append(MultivocalFormalText.AiUseKappa(input));
             text.Append(MultivocalFormalText.AiUseSeeds(input));
         }
         else
         {
-            text.Append(subject).Append(" used for ").Append(MultivocalScreeningText.AiUseTask(input.Screening, "the grey sources", "the criteria")).Append(", scoring their quality on the guidelines' checklist, proposing the systematic map, extracting each source's values, checking that each value's quote supports it, grouping the findings into themes, writing the theme sections, the discussion, the summary for practitioners and the title, abstract and introduction, and checking each citation against the kept page of the source it cites. ");
+            text.Append(subject).Append(" used for ").Append(MultivocalScreeningText.AiUseTask(input.Screening, "the grey sources", "the criteria")).Append(", scoring their quality on the guidelines' checklist, proposing the systematic map, extracting each source's values, checking that each value's quote supports it, grouping the findings into themes, writing ").Append(WrittenParts(paper)).Append(", and checking each citation against the kept page of the source it cites. ");
             text.Append("Every value, quality point and citation verdict counts only with a quote found verbatim in the kept page text; the method, the counts, the figures, the answers to questions about frequency or existence and the references were written in code. ");
             text.Append(MultivocalScreeningText.AiUseAgreement(input.Screening, bothPools: false));
         }
         int reviewed = input.Screening.Sources.Count(s => s.Reviewed);
         text.Append(reviewed > 0 ? string.Create(inv, $"A human reviewer checked {reviewed} screening decisions within the tool. ") : "Screening decisions were not checked by a human reviewer within the tool. ");
         var kept = input.Pages.Pages.Where(p => !string.IsNullOrEmpty(p.TextFile)).ToList();
-        var withHits = kept.Where(p => p.InjectionFlags is { Count: > 0 }).ToList();
-        int flagged = withHits.Where(p => PromptSafety.AnyStrong(p.InjectionFlags)).Select(p => MultivocalSearcher.AddressKey(p.Url)).Distinct().Count();
-        int mentioned = withHits.Select(p => MultivocalSearcher.AddressKey(p.Url)).Distinct().Count() - flagged;
-        text.Append(AiUseStatement.FlaggedSources(flagged, kept.Select(p => MultivocalSearcher.AddressKey(p.Url)).Distinct().Count(), "kept text", "source", "sources", mentioned));
+        int flagged = kept.Where(p => p.InjectionFlags is { Count: > 0 }).Select(p => MultivocalSearcher.AddressKey(p.Url)).Distinct().Count();
+        text.Append(AiUseStatement.FlaggedSources(flagged, kept.Select(p => MultivocalSearcher.AddressKey(p.Url)).Distinct().Count(), "kept text", "source", "sources"));
         text.Append("The authors reviewed the output and take full responsibility for the content.");
         return text.ToString();
     }

@@ -63,8 +63,15 @@ public static class ReportOutline
     /// <summary>The summary for practitioners is section 6 of a multivocal paper when it has one.</summary>
     public const string SummaryId = "s6";
 
-    /// <summary>The number of a multivocal paper's declarations: 7 after a summary for practitioners, 6 without one.</summary>
-    public static int DeclarationsNumber(MultivocalPaperFile paper) => paper.SummaryItems.Count > 0 ? 7 : 6;
+    /// <summary>The conclusion of a multivocal paper, after its summary for practitioners (issue #461).</summary>
+    public const string MultivocalConclusionId = "s7";
+
+    /// <summary>The number of a multivocal paper's conclusion: 7 after a summary for practitioners, 6 without one.</summary>
+    public static int ConclusionNumber(MultivocalPaperFile paper) => paper.SummaryItems.Count > 0 ? 7 : 6;
+
+    /// <summary>The number of a multivocal paper's declarations: after the discussion, the summary and the conclusion it has.</summary>
+    public static int DeclarationsNumber(MultivocalPaperFile paper) =>
+        ConclusionNumber(paper) + (string.IsNullOrWhiteSpace(paper.Conclusion) ? 0 : 1);
 
     /// <summary>The heading of a multivocal result: "RQ1: heading" for a written theme, the heading alone otherwise.</summary>
     public static string ResultHeading(PaperResult result) =>
@@ -88,6 +95,7 @@ public static class ReportOutline
         }
         list.Add(new(DiscussionId, "5 Discussion", 1));
         if (paper.SummaryItems.Count > 0) list.Add(new(SummaryId, "6 Summary for practitioners", 1));
+        if (!string.IsNullOrWhiteSpace(paper.Conclusion)) list.Add(new(MultivocalConclusionId, $"{ConclusionNumber(paper)} Conclusion", 1));
         list.Add(new(DeclarationsId, $"{DeclarationsNumber(paper)} Declarations", 1));
         list.Add(new(ReferencesId, "References", 1));
         return list;

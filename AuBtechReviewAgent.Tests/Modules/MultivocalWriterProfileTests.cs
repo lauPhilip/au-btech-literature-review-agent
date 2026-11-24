@@ -36,8 +36,15 @@ public class MultivocalWriterProfileTests
         Assert.Equal("sources", grey.Sources);
         Assert.Equal("counted in code from the run's files", grey.BaseFactsFrom);
         Assert.Equal("excerpts from the kept page texts of the included sources", grey.SourceTexts);
-        Assert.StartsWith("(a) what the themes together say about the goal, (b) the state of the practice", grey.DiscussionParts);
-        Assert.EndsWith("synthesis by a language model).", grey.DiscussionParts);
+        Assert.StartsWith("(a) what the answers and the themes together say about the goal, (b) the state of the practice", grey.DiscussionParts);
+        Assert.EndsWith("they are separate sections written after this one.", grey.DiscussionParts);
+        Assert.DoesNotContain("academic", grey.DiscussionParts);
+        Assert.Contains("the grey and the academic sources", MultivocalWriter.Profile(multivocal).DiscussionParts);
+        // The questions keep the plan's numbers in every prompt, and the closing parts are named as Garousi et al. (2019) name them (issue #461).
+        Assert.Equal(new[] { "RQ1", "RQ1.1", "RQ1.2", "RQ2", "RQ3" }, grey.QuestionIds);
+        Assert.Contains("threats to validity", grey.LimitationsPart);
+        Assert.Contains("practitioners", grey.ImplicationsPart);
+        Assert.Contains("researchers", grey.FutureResearchPart);
     }
 
     [Fact]

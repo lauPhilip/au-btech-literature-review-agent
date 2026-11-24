@@ -47,6 +47,36 @@ public static partial class MultivocalPaperParts
         return $"This question asks {kind}, so it is answered by counting, in code, rather than in written text: the {(attributes.Count == 1 ? "table counts" : "tables count")} how many of the {extracted} extracted sources state each value of the systematic map, each value backed by a quote found in the source's kept page.{borrowed} A count says how many sources state a value, not how common it is in practice.";
     }
 
+    /// <summary>
+    /// The answer to a question about frequency or existence in a few sentences, in code, for the answers to the research
+    /// questions (issue #461): per attribute of the question, the values most sources state, with their counts and shares.
+    /// </summary>
+    public static string CodeAnswerSummary(MultivocalReportInput input, string number)
+    {
+        var attributes = FixedMap(input).Attributes.Where(a => a.Serves(number)).ToList();
+        if (attributes.Count == 0) return "The systematic map has no attribute for this question, so the review does not answer it.";
+        int extracted = input.Extraction.Sources.Count(x => x.Error == null);
+        var parts = attributes.Select(attribute =>
+        {
+            var counts = ValueCounts(input, attribute);
+            var stated = counts.Where(c => c.Value != "not stated").ToList();
+            int none = counts.FirstOrDefault(c => c.Value == "not stated").Sources;
+            if (stated.Count == 0) return $"None of the {extracted} extracted sources states a value of \"{attribute.Name}\".";
+            var top = stated.Take(TopValues).Select(c => $"{c.Value} ({Sources(c.Sources)}, {Percent(c.Sources, extracted)})").ToList();
+            string list = top.Count == 1 ? top[0] : string.Join(", ", top.Take(top.Count - 1)) + " and " + top[^1];
+            return $"Of the {extracted} extracted sources, {Stating(extracted - none)} a value of \"{attribute.Name}\" ({stated.Count} different {(stated.Count == 1 ? "value" : "values")}); the most often stated {(top.Count == 1 ? "is" : "are")} {list}.";
+        });
+        return string.Join(" ", parts) + " Counted in code; the table in the results gives every value with its sources.";
+
+        static string Stating(int n) => n == 1 ? "1 states" : $"{n} state";
+    }
+
+    /// <summary>How many values the answer in code names per attribute.</summary>
+    public const int TopValues = 3;
+
+    private static string Percent(int part, int whole) =>
+        whole == 0 ? "–" : $"{Math.Round(100.0 * part / whole).ToString(CultureInfo.InvariantCulture)}%";
+
     /// <summary>At most this many values named by one source each are listed as rows of an open attribute; the rest share one row.</summary>
     public const int SingleSourceRows = 8;
 
