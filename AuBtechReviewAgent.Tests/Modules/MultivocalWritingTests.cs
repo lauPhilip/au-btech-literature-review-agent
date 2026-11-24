@@ -140,6 +140,9 @@ public class MultivocalWritingTests
         // Source 3's page was not kept: its citations are unverifiable, never judged on its search summary or old quotes.
         Assert.All(checks.Where(c => c.Reference == 3), c => Assert.Equal(CitationSupportChecker.Unverifiable, c.Verdict));
         Assert.Equal(2, checks.Count(c => c.Reference == 3)); // the discussion and the third summary item
+        // The answer the model wrote and the parts after the discussion are checked too (issue #461).
+        Assert.Contains(checks, c => c.Field == "rq-answer-RQ1");
+        Assert.Contains(checks, c => c.Field == MultivocalWriter.ImplicationsField);
         Assert.All(checks.Where(c => c.Reference != 3), c => Assert.Equal("supported", c.Verdict));
         Assert.Equal(audit.SupportSummary, paper.Checks);
         Assert.NotNull(paper.CheckedUtc);
@@ -198,12 +201,17 @@ public class MultivocalWritingTests
 
         Assert.Equal("AI-GENERATED GREY LITERATURE REVIEW", built.KindLabel);
         Assert.Equal(paper.Title, built.Title);
-        Assert.EndsWith("The research questions were RQ1: Which context engineering practices do practitioners and researchers describe?; RQ1.1: Which tools and frameworks support these practices?; RQ1.2: How are the practices usually applied when an agent is built?; RQ2: How often is each practice mentioned in grey and in academic sources?; RQ3: Is the use of retrieval for context related to fewer reported agent failures?", built.Objectives);
+        Assert.Equal("The review set out to answer five research questions: (RQ1) Which context engineering practices do practitioners and researchers describe?; (RQ1.1) Which tools and frameworks support these practices?; (RQ1.2) How are the practices usually applied when an agent is built?; (RQ2) How often is each practice mentioned in grey and in academic sources?; (RQ3) Is the use of retrieval for context related to fewer reported agent failures?", built.Objectives);
         Assert.Equal(new[] { "RQ1: Short contexts", "RQ1.1: Which tools and frameworks support these practices?" }, built.Themes.Take(2).Select(t => t.Heading));
         Assert.Contains(@"\begin{tabular}", built.Themes[1].Latex); // RQ1.1 answered in code, as a table
         Assert.Contains("What this theme rests on", built.Themes[0].Latex);
-        Assert.Equal("Automated citation check", Assert.Single(built.DiscussionNotes).Heading);
-        Assert.Contains("could not be verified", built.DiscussionNotes[0].Text);
+        // The discussion opens on the answers, then its parts, the review's limitations in code, and the citation check (issue #461).
+        Assert.Equal("", built.Discussion);
+        Assert.Equal(new[] { "Answers to the research questions", "Interpretation", "Limitations of the evidence", "Limitations of the review", "Implications for practitioners", "Implications for researchers", "Automated citation check" },
+            built.DiscussionNotes.Select(n => n.Heading));
+        Assert.Contains(@"\textbf{RQ1.1. Which tools", built.DiscussionNotes[0].Latex);
+        Assert.Contains("could not be verified", built.DiscussionNotes[^1].Text);
+        Assert.Equal("Conclusion", built.Conclusion!.Heading);
         Assert.Equal("Summary for practitioners", built.Summary!.Heading);
         Assert.Equal(new[] { "Use of artificial intelligence", "Registration and protocol", "Availability" }, built.Declarations.Select(d => d.Heading));
         Assert.Contains("This run used version ", built.Declarations.Last().Text);
@@ -212,6 +220,9 @@ public class MultivocalWritingTests
 
         string tex = PaperLatex.Build(built);
         Assert.Contains(@"\section{Summary for practitioners}", tex);
+        Assert.True(tex.IndexOf(@"\section{Conclusion}") > tex.IndexOf(@"\section{Summary for practitioners}"));
+        Assert.True(tex.IndexOf(@"\subsection{Answers to the research questions}") < tex.IndexOf(@"\subsection{Interpretation}"));
+        Assert.Contains("the answers to the research questions and the discussion", built.Declarations[0].Text);
         Assert.Contains(@"\item Keep a running summary of the conversation [1, 2].", tex);
         Assert.Contains(@"\bibitem{ref3}", tex);
         Assert.Equal(CountOf(tex, @"\begin{"), CountOf(tex, @"\end{"));
