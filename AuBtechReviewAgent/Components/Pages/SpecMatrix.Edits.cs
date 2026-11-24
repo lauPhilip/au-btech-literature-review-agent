@@ -64,6 +64,13 @@ public partial class SpecMatrix
     internal async Task SaveEditAsync(string text)
     {
         if (editing is not { } e || editChecking) return;
+        // Only a sentence that cites a study costs model calls; those count against the per-address limit (#449).
+        if (AuBtechReviewAgent.CitationSupportChecker.ReferencesIn(text ?? "").Count > 0
+            && !Actions.TryTake(AuBtechReviewAgent.ActionLimiter.EditorCheck, PrerenderClientAddress ?? "unknown", out string limited))
+        {
+            editError = "Your sentence was not checked or saved. " + limited;
+            return;
+        }
         editChecking = true;
         editError = null;
         try
