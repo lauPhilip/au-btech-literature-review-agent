@@ -108,14 +108,15 @@ public static partial class HiddenText
 
     /// <summary>
     /// The flags for a source's kept text: every instruction-like phrase in the cleaned text, plus one
-    /// <see cref="FlagPattern"/> flag, with its phrase, when the hidden text that was taken out reads like instructions.
-    /// Null when there is neither. Like the other flags, it changes no decision.
+    /// <see cref="FlagPattern"/> flag, with its phrase, when the hidden text that was taken out holds a strong phrase,
+    /// one aimed at the model (<see cref="PromptSafety.IsStrong"/>). Null when there is neither. Like the other flags,
+    /// it changes no decision.
     /// </summary>
     public static List<SourceFlag>? Flags(string? keptText, string? hiddenText)
     {
         var flags = PromptSafety.Find(keptText);
-        if (PromptSafety.Find(hiddenText) is { Count: > 0 } hidden)
-            (flags ??= new()).Add(new SourceFlag(FlagPattern, hidden[0].Excerpt));
+        if (PromptSafety.Find(hiddenText)?.FirstOrDefault(f => PromptSafety.IsStrong(f.Pattern)) is { } hidden)
+            (flags ??= new()).Add(new SourceFlag(FlagPattern, hidden.Excerpt));
         return flags;
     }
 }
