@@ -122,7 +122,7 @@ public sealed partial class MultivocalWriter
         // 6. Last, the title, abstract, rationale and objectives, with the numbers counted in code; then the style pass.
         Step(6, "the title, abstract and introduction");
         var front = await ReviewWriter.WriteFrontMatterAsync(chat, profile, plan.Topic, goal, FrontMatterFacts(input, sections.Count), forDiscussion, discussion,
-            referenceLines, referenceCount, Warn);
+            referenceLines, referenceCount, Warn, abstractRule: text => MultivocalFrontMatter.AbstractProblem(text, input));
         file.Title = front?.Title ?? $"{plan.Topic}: a {plan.ReviewKind}";
         file.Style.Add(new StyleDeltaLog("Title", file.Title, file.Title, Applied: false, Note: "The title is not sent through the style pass." + (front == null ? " The front-matter step failed; the title is the topic and the kind of review." : "")));
         using (LlmStage.Begin("style"))

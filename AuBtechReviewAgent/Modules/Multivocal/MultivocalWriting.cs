@@ -145,24 +145,8 @@ public sealed partial class MultivocalWriter
         "The section on this theme could not be written: the language model's answer failed the checks in code twice. " +
         "The theme's quotations are listed in the data appendix.";
 
-    /// <summary>The facts about the review the abstract may use, counted in code.</summary>
-    public static string FrontMatterFacts(MultivocalReportInput input, int? sectionsWritten = null)
-    {
-        var f = MultivocalPaperParts.Flow(input);
-        var plan = input.Planned.Plan;
-        var inCode = plan.Numbered().Where(q => MultivocalPaperParts.AnsweredInCode(q.Question.Type)).Select(q => q.Number).ToHashSet();
-        int themed = input.Synthesis.Themes.Count(t => !inCode.Contains(t.Question));
-        int written = Math.Min(sectionsWritten ?? themed, themed);
-        return $"Kind of review: {plan.ReviewKind} following the Garousi et al. (2019) guidelines. " +
-               $"Grey sources found by the searches: {f.Found}, from {f.Searches} searches. " + MultivocalScreeningText.Facts(input.Screening, f.Screened) +
-               $"Included at screening, before the quality check: {f.Included}; excluded at screening: {f.Excluded}. " +
-               $"Passed the quality check ({input.Quality.Threshold} of {input.Quality.MaxPoints} points or more) and kept for the synthesis: {f.Passed}; below the threshold: {f.BelowThreshold}; not assessed (page not readable): {f.NotAssessed}. " +
-               $"Extracted against the systematic map: {f.Extracted}. Findings: {f.Findings}. Themes written up as result sections: {written}" +
-               (written < themed ? $"; {themed - written} more {(themed - written == 1 ? "theme" : "themes")} could not be written up and {(themed - written == 1 ? "is" : "are")} listed with {(themed - written == 1 ? "its" : "their")} sources only" : "") +
-               (themed == f.Themes ? ". " : $" (of {f.Themes} themes formed in the synthesis; the others belong to questions answered by counting, shown as tables). ") +
-               $"Research questions: {plan.Numbered().Count}. " +
-               "Use each number only with the meaning given here: the sources the results rest on are the ones kept for the synthesis, not the ones included at screening.";
-    }
+    /// <summary>The facts about the review the abstract may use, counted in code (<see cref="MultivocalFrontMatter.Facts"/>).</summary>
+    public static string FrontMatterFacts(MultivocalReportInput input, int? sectionsWritten = null) => MultivocalFrontMatter.Facts(input, sectionsWritten);
 
     // ---------- The paper as main.tex, and the archive ----------
 

@@ -46,7 +46,7 @@ public static partial class MultivocalFormalText
         // The sources kept but not extracted get a box in each arm, so each column adds up from step to step (#467).
         sb.AppendLine($@"\node[side, left=of gextracted] (gnotextracted) {{Could not be extracted: {g.NotExtracted}}};");
         sb.AppendLine($@"\node[side, right=of fextracted] (fnotextracted) {{Could not be extracted: {f.NotExtracted}}};");
-        sb.AppendLine($@"\node[box, text width=8cm, below=0.8cm of gextracted.south east, anchor=north west, xshift=-1.8cm] (themes) {{Synthesised: {Count(input.Synthesis.Findings.Count, "finding")} in {Count(input.Synthesis.Themes.Count, "theme")}}};");
+        sb.AppendLine($@"\node[box, text width=8cm, below=0.8cm of gextracted.south east, anchor=north west, xshift=-1.8cm] (themes) {{Synthesised: {Count(input.Synthesis.Findings.Count, "finding")} in {Count(MultivocalPaperParts.ShownThemes(input).Count, "theme")}}};");
         foreach (string arm in new[] { "g", "f" })
             sb.AppendLine($@"\draw[->] ({arm}found) -- ({arm}screened); \draw[->] ({arm}screened) -- ({arm}included); \draw[->] ({arm}included) -- ({arm}kept); \draw[->] ({arm}kept) -- ({arm}extracted); \draw[->] ({arm}extracted) -- (themes);");
         sb.AppendLine(@"\draw[->] (gscreened) -- (gout); \draw[->] (fscreened) -- (fout); \draw[->] (gkept) -- (glow); \draw[->] (fkept) -- (fnotappraised);");

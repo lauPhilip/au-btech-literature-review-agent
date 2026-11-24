@@ -135,7 +135,7 @@ public static partial class MultivocalFormalText
     /// <summary>What the synthesis says about the two pools (G13): what the themes rest on, and where the state of the art and of the practice disagree.</summary>
     public static string SynthesisText(MultivocalReportInput input)
     {
-        var themes = input.Synthesis.Themes;
+        var themes = MultivocalPaperParts.ShownThemes(input);
         int both = themes.Count(t => t.GreySources > 0 && t.FormalSources > 0);
         int formalOnly = themes.Count(t => t.GreySources == 0 && t.FormalSources > 0);
         int across = themes.Sum(t => t.Tensions.Count(x => x.Between == SynthesisTension.ArtAgainstPractice));
