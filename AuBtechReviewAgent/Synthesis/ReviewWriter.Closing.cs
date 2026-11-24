@@ -20,6 +20,10 @@ public static partial class ReviewWriter
         public List<string>? Answers { get; set; }
     }
 
+    /// <summary>The closing prompt's rule on result figures (issue #452).</summary>
+    public const string FigureRule =
+        "A figure from the results (a number, percentage or effect size) is given in its theme and at most once after it: the future research and the conclusion use none, and no part repeats a figure the answers, the discussion or another part already gives.";
+
     /// <summary>At most this many words in the conclusion, so it stays a conclusion.</summary>
     public const int MaxConclusionWords = 180;
 
@@ -91,6 +95,7 @@ public static partial class ReviewWriter
             2. "implications": one paragraph on the implications for practice and policy (item 23d): what someone acting on these findings should do or watch for, and how firm each point is. A recommendation is the review's own reading and takes no citation; the finding behind it may come first, in its own cited sentence.
             3. "futureResearch": one paragraph on the directions for future research (item 23d): the open questions and missing kinds of study the results show, each tied by name to the theme it comes from. A proposal is the review's own reading and takes no citation: say what study is missing, not again what the {{profile.Sources}} found.
             4. "conclusion": three to five sentences that answer the review objective in plain words, at most {{MaxConclusionWords}} words, with no new claims.{{conclusionRule}}
+            {{FigureRule}}
             5. {{EvidenceThenReadingRule(profile)}} In the limitations and the directions for future research, an uncited sentence may name kinds of {{profile.Sources}} (what the evidence rests on, what study is missing). {{ClaimPerCitationRule(profile)}} {{OwnCountRule}} Do not invent numbers, statistics or {{profile.Sources}}.{{leftOutRule}} {{ReadingBasisRule(profile)}} This holds for the limitations too: how this review was done, including what it read, is written separately.{{answerRule}}
             {{ProseCleaner.PlainProseRule}}
             Respond ONLY with a valid minified JSON object:
@@ -100,8 +105,9 @@ public static partial class ReviewWriter
         {
             ClosingAnswer answer;
             using (LlmStage.Begin("closing"))
-                answer = await LlmJson.GetAsync<ClosingAnswer>(chat, prompt, LlmJson.JsonMode(0.3), a => ClosingProblem(a.Limitations, a.Implications, a.FutureResearch, a.Conclusion, checkedText + "\n" + facts + "\n" + evidence.BaseFacts, referenceCount,
-                    a.Answers, questions.Count, ownFacts: facts + "\n" + evidence.BaseFacts, results: checkedText, evidence: evidence, profile: profile, givenAnswers: given), repairAttempts: 2);
+                answer = await LlmJson.GetAsync<ClosingAnswer>(chat, prompt, LlmJson.JsonMode(0.3), WithFigureGuard<ClosingAnswer>(a => ClosingProblem(a.Limitations, a.Implications, a.FutureResearch, a.Conclusion, checkedText + "\n" + facts + "\n" + evidence.BaseFacts, referenceCount,
+                    a.Answers, questions.Count, ownFacts: facts + "\n" + evidence.BaseFacts, results: checkedText, evidence: evidence, profile: profile, givenAnswers: given),
+                    a => ClosingFigureProblem(a, sections, discussion, given, facts + "\n" + evidence.BaseFacts), "closing call", warn), repairAttempts: 2);
             string Clean(string? text) => MethodsSectionWriter.StripMarkdownEmphasis(text!.Trim());
             var modelAnswers = new Queue<string>((answer.Answers ?? new()).Where(a => !string.IsNullOrWhiteSpace(a)).Select(Clean));
             return new ClosingSections(Clean(answer.Limitations), Clean(answer.Implications), Clean(answer.FutureResearch), Clean(answer.Conclusion),
@@ -112,6 +118,18 @@ public static partial class ReviewWriter
             warn?.Invoke($"The limitations, implications, future research and conclusion could not be written: {ex.Message}");
             return null;
         }
+    }
+
+    /// <summary>
+    /// Where the closing parts repeat a result figure (issue #452): the future research and the conclusion use none, and the
+    /// others none that the answers, the discussion or an earlier part already gives.
+    /// </summary>
+    private static string? ClosingFigureProblem(ClosingAnswer a, IReadOnlyList<SynthesisSection> sections, string discussion, IReadOnlyList<string>? given, string facts)
+    {
+        var parts = (a.Answers ?? new()).Select((t, i) => ($"answer {i + 1}", t ?? "")).ToList();
+        parts.AddRange(new[] { ("the limitations", a.Limitations ?? ""), ("the implications", a.Implications ?? ""), ("the future research", a.FutureResearch ?? ""), ("the conclusion", a.Conclusion ?? "") });
+        return FigurePlacementProblem(string.Join("\n\n", sections.Select(x => x.Text)), facts, parts,
+            (given ?? Array.Empty<string>()).Append(discussion), new[] { "the future research", "the conclusion" });
     }
 
     /// <summary>Why a closing answer cannot be used, or null. Public for unit tests.</summary>
