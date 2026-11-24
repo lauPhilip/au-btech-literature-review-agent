@@ -63,6 +63,9 @@ public sealed class ReviewPaper
     /// </summary>
     public PaperSection? Summary { get; init; }
 
+    /// <summary>A conclusion after <see cref="Summary"/>, when the module writes one apart (the multivocal review); the systematic review's is its <see cref="Summary"/>.</summary>
+    public PaperSection? Conclusion { get; init; }
+
     /// <summary>Support, registration and protocol, availability.</summary>
     public List<PaperSection> Declarations { get; init; } = new();
 
@@ -235,6 +238,11 @@ public static class PaperLatex
         {
             sb.AppendLine($"\\section{{{Escape(paper.Summary.Heading)}}}");
             sb.AppendLine(Body(paper.Summary));
+        }
+        if (paper.Conclusion != null)
+        {
+            sb.AppendLine($"\\section{{{Escape(paper.Conclusion.Heading)}}}");
+            sb.AppendLine(Body(paper.Conclusion));
         }
 
         sb.AppendLine(@"\section{Declarations}");

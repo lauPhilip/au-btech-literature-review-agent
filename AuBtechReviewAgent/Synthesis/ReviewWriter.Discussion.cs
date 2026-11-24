@@ -36,14 +36,14 @@ public static partial class ReviewWriter
         IReadOnlyList<string>? questions, bool answer, IReadOnlyCollection<string>? unanswered)
     {
         var all = questions ?? Array.Empty<string>();
-        var asked = answer ? AnsweredByModel(all, unanswered) : new List<(string Id, string Text)>();
+        var asked = answer ? AnsweredByModel(all, unanswered, profile) : new List<(string Id, string Text)>();
         string answersField = asked.Count == 0 ? "" : $"\"answers\":[\"answer to {asked[0].Id}\"],";
         int paragraphs = Math.Clamp(2 + sections.Count / 2, 3, 6);
         string synthesis = string.Join("\n\n", sections.Select(x => $"### {x.Heading}\n{x.Text}"));
         string prompt = $$"""
             You are writing {{profile.DiscussionSection}} of {{profile.Review}} whose results are reported theme by theme below.
 
-            {{AimBlock(goal, questions)}}
+            {{AimBlock(goal, questions, profile)}}
             PRIMARY TOPIC: "{{topic}}"
             {{PromptSafety.ReviewerInputNotice}}
 
@@ -60,7 +60,7 @@ public static partial class ReviewWriter
             1. Write about {{paragraphs}} paragraphs, separated by a blank line: {{profile.DiscussionParts}} {{EachPartOnceRule}}
             2. Interpret, do not repeat the results. Ground every claim in the results above. {{EvidenceThenReadingRule(profile)}} {{ClaimPerCitationRule(profile)}} {{OwnCountRule}}
             3. Do not invent numbers, statistics or {{profile.Sources}}.
-            4. {{ReadingBasisRule(profile)}}{{AnswersRule(all, asked)}}
+            4. {{ReadingBasisRule(profile)}}{{AnswersRule(all, asked, profile)}}
             {{ProseCleaner.PlainProseRule}}
             Respond ONLY with a valid minified JSON object:
             {{{answersField}}"text":"the discussion with inline [n] citations"}
