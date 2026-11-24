@@ -67,4 +67,29 @@ public class FigureGuardTests
         Assert.StartsWith("The discussion call was sent back for a repeated result figure (1 of 2)", notes[0]);
         Assert.StartsWith("The discussion call was kept after 2 send-backs with a repeated result figure", notes[2]);
     }
+
+    private static string Closing(string conclusion) => System.Text.Json.JsonSerializer.Serialize(new
+    {
+        limitations = "The evidence rests on two studies.",
+        implications = "Teams should test agents before release.",
+        futureResearch = "Field trials of testing agents are missing.",
+        conclusion,
+    });
+
+    [Fact]
+    public async Task AConclusionWithAResultFigureIsSentBack()
+    {
+        var model = new FakeChatService()
+            .Returns(Closing("Coverage grew by up to 90 % with testing agents [2]."))
+            .Returns(Closing("Testing agents are worth adopting, with care."));
+        var notes = new List<string>();
+
+        var closing = await ReviewWriter.WriteClosingAsync(model, WritingProfile.Systematic, "agent testing", "Map agent testing", "Included: 2.", Sections,
+            "Agents add coverage [2].", Evidence(), 2, notes.Add);
+
+        Assert.Contains(ReviewWriter.FigureRule, model.Prompts[0]);
+        Assert.Contains("the conclusion uses 90, a result figure", model.Prompts[1]);
+        Assert.Equal("Testing agents are worth adopting, with care.", closing!.Conclusion);
+        Assert.StartsWith("The closing call was sent back for a repeated result figure (1 of 2): the conclusion uses 90", Assert.Single(notes));
+    }
 }
