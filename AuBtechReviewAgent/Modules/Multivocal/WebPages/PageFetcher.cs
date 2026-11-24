@@ -26,7 +26,9 @@ public sealed record FetchedPage(string Url, string FinalUrl, int? Status, strin
 /// <summary>
 /// Fetches web pages for their snapshots, politely and safely: robots.txt is read first and obeyed for our product
 /// token (<see cref="RobotsRules"/>), one request per second per site at most (longer if the site's Crawl-delay
-/// asks), nothing behind a sign-in, at most 10 MB, and only web pages, plain text and PDFs. Redirects are
+/// asks), nothing behind a sign-in, at most 10 MB, and only web pages, plain text and PDFs. A page must arrive
+/// within <see cref="DefaultDeadline"/> of the request, so a server that sends it a byte at a time cannot hold a run
+/// up; the time spent waiting for the site's turn does not count. Redirects are
 /// followed one at a time, so every hop is checked the same way. Only public addresses are connected to: an
 /// address that resolves to the server itself or its private network is refused, whatever the link says.
 /// </summary>
@@ -39,12 +41,15 @@ public sealed partial class PageFetcher
     /// <summary>A site asking for more than this between requests is not fetched at all, rather than holding the run up.</summary>
     public static readonly TimeSpan MaxCrawlDelay = TimeSpan.FromSeconds(30);
 
-    private static readonly TimeSpan RobotsLifetime = TimeSpan.FromHours(24);
+    /// <summary>How long a page may take from its request to its last byte, redirects included.</summary>
+    public static readonly TimeSpan DefaultDeadline = TimeSpan.FromSeconds(90);
+
     private static readonly Regex SignInPath = new(@"(^|/)(login|log-in|signin|sign-in|sign_in|sso|auth|oauth2?|account/login)(/|$|\?)", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1));
 
     private readonly HttpClient _client;
     private readonly Func<TimeSpan, Task> _delay;
-    private readonly ConcurrentDictionary<string, (RobotsRules Rules, DateTime Read)> _robots = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Func<DateTime> _clock;
+    private readonly TimeSpan _deadline;
     private readonly ConcurrentDictionary<string, SemaphoreSlim> _hostGates = new(StringComparer.OrdinalIgnoreCase);
     private readonly ConcurrentDictionary<string, DateTime> _nextRequest = new(StringComparer.OrdinalIgnoreCase);
 
@@ -53,14 +58,33 @@ public sealed partial class PageFetcher
     /// <summary>A fetcher with its own robots.txt cache and pacing; the app keeps one for all runs.</summary>
     /// <param name="handler">For tests; by default a handler that connects to public addresses only.</param>
     /// <param name="delay">For tests; by default <see cref="Task.Delay(TimeSpan)"/>.</param>
-    public PageFetcher(HttpMessageHandler? handler = null, Func<TimeSpan, Task>? delay = null)
+    /// <param name="deadline">For tests; by default <see cref="DefaultDeadline"/>.</param>
+    /// <param name="clock">For tests; by default <see cref="DateTime.UtcNow"/>. It dates the robots.txt cache.</param>
+    public PageFetcher(HttpMessageHandler? handler = null, Func<TimeSpan, Task>? delay = null, TimeSpan? deadline = null, Func<DateTime>? clock = null)
     {
         _client = new HttpClient(handler ?? PublicOnlyHandler()) { Timeout = TimeSpan.FromSeconds(60) };
         _client.DefaultRequestHeaders.UserAgent.ParseAdd(OpenSourceHttp.UserAgent);
         _delay = delay ?? (wait => Task.Delay(wait));
+        _deadline = deadline ?? DefaultDeadline;
+        _clock = clock ?? (() => DateTime.UtcNow);
     }
 
     public async Task<FetchedPage> FetchAsync(string url)
+    {
+        string current = url;
+        using var deadline = new FetchDeadline(_deadline);
+        try
+        {
+            return await FetchWithinAsync(url, deadline, hop => current = hop);
+        }
+        catch (OperationCanceledException) when (deadline.Passed)
+        {
+            return NotFetched(url, current, null, $"the site took more than {_deadline.TotalSeconds:0} seconds to send the page");
+        }
+    }
+
+    /// <summary>Follows the redirects one at a time; <paramref name="atHop"/> hears each new address.</summary>
+    private async Task<FetchedPage> FetchWithinAsync(string url, FetchDeadline deadline, Action<string> atHop)
     {
         string current = url;
         for (int hop = 0; hop <= MaxRedirects; hop++)
@@ -78,23 +102,24 @@ public sealed partial class PageFetcher
             if (rules.CrawlDelay > MaxCrawlDelay)
                 return NotFetched(url, current, null, $"the site asks for {rules.CrawlDelay.Value.TotalSeconds:0} seconds between requests");
 
-            using var response = await PacedGetAsync(uri, rules.CrawlDelay, "text/html,application/xhtml+xml,text/plain;q=0.9,application/pdf;q=0.8");
+            using var response = await PacedGetAsync(uri, rules.CrawlDelay, "text/html,application/xhtml+xml,text/plain;q=0.9,application/pdf;q=0.8", deadline);
             int status = (int)response.StatusCode;
             if (status is >= 300 and < 400 && response.Headers.Location is Uri location)
             {
                 current = Resolve(uri, location).ToString();
+                atHop(current);
                 continue;
             }
             if (status is 401 or 403 or 407)
                 return NotFetched(url, current, status, $"the site needs a sign-in or refused access ({status})");
             if (!response.IsSuccessStatusCode)
                 return NotFetched(url, current, status, $"the site answered {status} {response.ReasonPhrase}".TrimEnd());
-            return await ReadAsync(url, current, status, response);
+            return await ReadAsync(url, current, status, response, deadline.Token);
         }
         return NotFetched(url, current, null, $"more than {MaxRedirects} redirects");
     }
 
-    private async Task<FetchedPage> ReadAsync(string url, string finalUrl, int status, HttpResponseMessage response)
+    private static async Task<FetchedPage> ReadAsync(string url, string finalUrl, int status, HttpResponseMessage response, CancellationToken cancel)
     {
         string type = response.Content.Headers.ContentType?.MediaType?.ToLowerInvariant() ?? "";
         bool html = type is "text/html" or "application/xhtml+xml";
@@ -105,9 +130,9 @@ public sealed partial class PageFetcher
             return NotFetched(url, finalUrl, status, "larger than 10 MB");
 
         using var buffer = new MemoryStream();
-        await using (var input = await response.Content.ReadAsStreamAsync())
+        await using (var input = await response.Content.ReadAsStreamAsync(cancel))
         {
-            if (!await DocumentRAGUtility.CopyWithLimitAsync(input, buffer, MaxBytes))
+            if (!await DocumentRAGUtility.CopyWithLimitAsync(input, buffer, MaxBytes, cancel))
                 return NotFetched(url, finalUrl, status, "larger than 10 MB");
         }
         byte[] bytes = buffer.ToArray();
@@ -170,47 +195,11 @@ public sealed partial class PageFetcher
         return text.Length > 0 && text[0] == '﻿' ? text[1..] : text;
     }
 
-    private async Task<RobotsRules> RobotsFor(Uri page)
-    {
-        string origin = page.GetLeftPart(UriPartial.Authority);
-        if (_robots.TryGetValue(origin, out var cached) && DateTime.UtcNow - cached.Read < RobotsLifetime) return cached.Rules;
-
-        RobotsRules rules;
-        try
-        {
-            var robotsUri = new Uri(origin + "/robots.txt");
-            rules = RobotsRules.DisallowAll;
-            for (int hop = 0; hop <= MaxRedirects; hop++)
-            {
-                using var response = await PacedGetAsync(robotsUri, null, "text/plain");
-                int status = (int)response.StatusCode;
-                if (status is >= 300 and < 400 && response.Headers.Location is Uri location)
-                {
-                    robotsUri = Resolve(robotsUri, location);
-                    if (!PrismaReviewEngine.IsWebAddress(robotsUri.ToString())) break;
-                    continue;
-                }
-                if (response.IsSuccessStatusCode)
-                {
-                    using var buffer = new MemoryStream();
-                    await using (var input = await response.Content.ReadAsStreamAsync())
-                        await DocumentRAGUtility.CopyWithLimitAsync(input, buffer, RobotsRules.MaxLength);
-                    rules = RobotsRules.Parse(Encoding.UTF8.GetString(buffer.ToArray()));
-                }
-                else if (status is >= 400 and < 500) rules = RobotsRules.AllowAll; // no robots.txt (RFC 9309, 2.3.1.3)
-                break; // 5xx: assume nothing may be fetched (2.3.1.4)
-            }
-        }
-        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or UriFormatException)
-        {
-            rules = RobotsRules.DisallowAll;
-        }
-        _robots[origin] = (rules, DateTime.UtcNow);
-        return rules;
-    }
-
-    /// <summary>One GET, waiting first so the site gets at most one request per <see cref="MinInterval"/> (or its Crawl-delay).</summary>
-    private async Task<HttpResponseMessage> PacedGetAsync(Uri uri, TimeSpan? crawlDelay, string accept)
+    /// <summary>
+    /// One GET, waiting first so the site gets at most one request per <see cref="MinInterval"/> (or its Crawl-delay).
+    /// The deadline starts when the request is sent, not while it waits for the site's turn.
+    /// </summary>
+    private async Task<HttpResponseMessage> PacedGetAsync(Uri uri, TimeSpan? crawlDelay, string accept, FetchDeadline deadline)
     {
         string host = uri.Host;
         var gate = _hostGates.GetOrAdd(host, _ => new SemaphoreSlim(1, 1));
@@ -224,7 +213,8 @@ public sealed partial class PageFetcher
 
             using var request = new HttpRequestMessage(HttpMethod.Get, uri);
             request.Headers.Accept.ParseAdd(accept);
-            return await _client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead);
+            deadline.Start();
+            return await _client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, deadline.Token);
         }
         finally
         {
