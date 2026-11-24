@@ -171,7 +171,7 @@ public sealed partial class MultivocalScreener
             entry.Confidence = "low";
             entry.Reasoning = "(No summary was available, so this decision rests on the title and site only.) " + entry.Reasoning;
         }
-        entry.Uncertain = !agree || entry.Confidence == "low" || entry.InjectionFlags != null;
+        entry.Uncertain = !agree || entry.Confidence == "low" || PromptSafety.AnyStrong(entry.InjectionFlags);
         entry.ExclusionReason = entry.Decision == "Excluded" ? first.ExclusionReason ?? second?.ExclusionReason ?? ExclusionReasons.Unspecified : null;
     }
 
