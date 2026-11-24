@@ -1,0 +1,82 @@
+@* The paper's sections after the results (issues #460, #461): the discussion, opening with the answer to each research
+   question, then its parts; the summary for practitioners; and the conclusion. The parts come from
+   MultivocalPaper.DiscussionParts, as in main.tex, so the page and the paper cannot drift apart. The parts the model
+   wrote are shown with their checked citations; the parts written in code are plain text. *@
+
+<section id="@AuBtechReviewAgent.ReportOutline.DiscussionId" data-report-section class="scroll-mt-20 space-y-5">
+    <h2 class="font-display text-xl font-semibold tracking-tight text-heading">5. Discussion</h2>
+    @{ int number = 0; }
+    @foreach (var part in AuBtechReviewAgent.MultivocalPaper.DiscussionParts(Input, Paper, Audit))
+    {
+        number++;
+        var current = part;
+        <div class="space-y-2">
+            <h3 class="font-display text-base font-semibold text-heading">5.@number @current.Heading</h3>
+            @if (current.Heading == AuBtechReviewAgent.MultivocalPaper.AnswersHeading)
+            {
+                @foreach (var answer in Paper.Answers)
+                {
+                    var a = answer;
+                    <div>
+                        <p class="font-semibold text-heading">@a.Question. @a.QuestionText</p>
+                        @if (a.Kind == "written")
+                        {
+                            @Cited(a.Field, a.Text)
+                        }
+                        else
+                        {
+                            <p>@a.Text</p>
+                        }
+                    </div>
+                }
+            }
+            else if (FieldOf(current.Heading) is { } field)
+            {
+                @Cited(field, current.Text)
+            }
+            else
+            {
+                <p>@current.Text</p>
+            }
+        </div>
+    }
+</section>
+
+@if (Paper.SummaryItems.Count > 0)
+{
+    <section id="@AuBtechReviewAgent.ReportOutline.SummaryId" data-report-section class="scroll-mt-20 space-y-5">
+        <h2 class="font-display text-xl font-semibold tracking-tight text-heading">6. Summary for practitioners</h2>
+        @if (!string.IsNullOrWhiteSpace(Paper.SummaryLead))
+        {
+            <p>@Paper.SummaryLead</p>
+        }
+        @Cited(AuBtechReviewAgent.MultivocalWriter.SummaryField, string.Join("\n\n", Paper.SummaryItems))
+    </section>
+}
+
+@if (!string.IsNullOrWhiteSpace(Paper.Conclusion))
+{
+    <section id="@AuBtechReviewAgent.ReportOutline.MultivocalConclusionId" data-report-section class="scroll-mt-20 space-y-5">
+        <h2 class="font-display text-xl font-semibold tracking-tight text-heading">@AuBtechReviewAgent.ReportOutline.ConclusionNumber(Paper). Conclusion</h2>
+        @Cited(AuBtechReviewAgent.MultivocalWriter.ConclusionField, Paper.Conclusion)
+    </section>
+}
+
+@code {
+    [Parameter, EditorRequired] public AuBtechReviewAgent.MultivocalReportInput Input { get; set; } = default!;
+    [Parameter, EditorRequired] public AuBtechReviewAgent.MultivocalPaperFile Paper { get; set; } = default!;
+    [Parameter] public AuBtechReviewAgent.MultivocalCitationAudit? Audit { get; set; }
+
+    /// <summary>The parent's cited prose: a field and its text, with every citation a button that opens its check.</summary>
+    [Parameter, EditorRequired] public Func<string, string, RenderFragment> Cited { get; set; } = default!;
+
+    // The parts the model wrote, by heading, and their check fields; a part written in code has none.
+    private string? FieldOf(string heading) => heading switch
+    {
+        "Interpretation" when !string.IsNullOrWhiteSpace(Paper.Discussion) => AuBtechReviewAgent.MultivocalWriter.DiscussionField,
+        AuBtechReviewAgent.MultivocalPaper.LimitationsHeading => AuBtechReviewAgent.MultivocalWriter.LimitationsField,
+        AuBtechReviewAgent.MultivocalPaper.ImplicationsHeading => AuBtechReviewAgent.MultivocalWriter.ImplicationsField,
+        AuBtechReviewAgent.MultivocalPaper.FutureResearchHeading => AuBtechReviewAgent.MultivocalWriter.FutureResearchField,
+        _ => null,
+    };
+}

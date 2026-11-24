@@ -51,7 +51,8 @@ public class DiscussionPartsTests : IDisposable
         foreach (var part in new[] { "(a)", "(b)", "(c)", "(d)", "(e)" }.Where(profile.DiscussionParts.Contains))
             Assert.Single(System.Text.RegularExpressions.Regex.Matches(rule, System.Text.RegularExpressions.Regex.Escape(part)));
         Assert.EndsWith(ReviewWriter.EachPartOnceRule, rule.TrimEnd());
-        if (kind == "grey") Assert.Contains("(e) in one paragraph, the limitations of the evidence", rule);
+        // The grey literature review's limitations and implications are written after the discussion, as the systematic review's are (issue #461).
+        if (kind == "grey") Assert.Contains("Do not write the limitations, the implications", rule);
     }
 
     [Theory]

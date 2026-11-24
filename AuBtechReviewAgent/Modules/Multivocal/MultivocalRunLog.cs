@@ -202,7 +202,7 @@ public static class MultivocalRunLog
     private static LlmCallRecord Copy(LlmCallRecord c) => new()
     {
         Sequence = c.Sequence, Stage = c.Stage, StartedUtc = c.StartedUtc, DurationMs = c.DurationMs, ModelRequested = c.ModelRequested,
-        ModelReported = c.ModelReported, Temperature = c.Temperature, Attempts = c.Attempts, Outcome = c.Outcome,
+        ModelReported = c.ModelReported, Temperature = c.Temperature, ReasoningEffort = c.ReasoningEffort, Attempts = c.Attempts, Outcome = c.Outcome,
         PromptSha256 = c.PromptSha256, PromptChars = c.PromptChars, ResponseSha256 = c.ResponseSha256, ResponseChars = c.ResponseChars, Usage = c.Usage,
     };
 }
