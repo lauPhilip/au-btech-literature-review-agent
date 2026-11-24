@@ -35,7 +35,7 @@ public static partial class ReviewWriter
         string inCodeLine = inCode.Count == 0 ? "" : $" No evidence bears on {string.Join(", ", inCode)}, so {(inCode.Count == 1 ? "it is" : "they are")} answered in code; give no answer for {(inCode.Count == 1 ? "it" : "them")}.";
         return $"""
 
-            5. Write the answers first. "answers": exactly {asked.Count} answer(s), one for each of {string.Join(", ", asked.Select(q => q.Id))} in that order, each one to three sentences that answer the question from the results, with inline [n] markers. Do not repeat the question. Where the results do not answer a question, say so plainly.{inCodeLine} The answers are printed before the discussion, and the abstract and the conclusion are written from them, so the conclusion must not restate them; the discussion builds on the answers, says what they mean together and where the themes connect, and does not restate them either.
+            5. Write the answers first. "answers": exactly {asked.Count} answer(s), one for each of {string.Join(", ", asked.Select(q => q.Id))} in that order, each one to three sentences that answer the question from the results, with inline [n] markers. Do not repeat the question. Where the results do not answer a question, say so plainly.{inCodeLine} The answers are printed before the discussion, and the abstract and the conclusion are written from them, so the conclusion must not restate them; the discussion builds on the answers, says what they mean together and where the themes connect, and does not restate them either. A figure from the results (a number, percentage or effect size) is given in at most one answer, and the discussion repeats none that an answer gives.
             """;
     }
 
