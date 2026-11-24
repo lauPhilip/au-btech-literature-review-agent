@@ -169,12 +169,16 @@
                 {
                     <p class="text-[11px] text-partly mt-1">@(found.IsFormal ? "Text" : "Page text") not kept: @snapshot.NotKept.</p>
                 }
-                @if (snapshot?.InjectionFlags is { Count: > 0 } textFlags)
+                @if (snapshot?.InjectionFlags is { Count: > 0 } textFlags && PromptSafety.AnyStrong(textFlags))
                 {
                     <p class="text-[11px] text-not-supported mt-1">
                         <span class="ui-chip border-not-supported-border bg-not-supported-fill text-not-supported text-[10px] mr-1">possible prompt injection</span>
-                        The kept text has phrases that read like instructions to the model: @string.Join("; ", textFlags). It is treated as data, but check what was taken from it.
+                        The kept text has phrases aimed at the model: @string.Join("; ", textFlags.Where(f => PromptSafety.IsStrong(f.Pattern))). It is treated as data, but check what was taken from it.
                     </p>
+                }
+                else if (snapshot?.InjectionFlags is { Count: > 0 } mentions)
+                {
+                    <p class="text-[11px] text-muted mt-1">The kept text names prompts or instructions as a subject, which is not a flag: @string.Join("; ", mentions).</p>
                 }
                 @if (snapshot?.HiddenText is { } removed)
                 {
