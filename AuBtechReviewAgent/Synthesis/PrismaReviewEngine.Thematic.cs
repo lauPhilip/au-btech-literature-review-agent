@@ -142,7 +142,7 @@ public partial class PrismaReviewEngine
         // 6. Peer review, per section, with the same coverage guard as the fill pass
         ReportProgress(runId, state, RunProgress.Synthesis, RunProgress.Phase(RunProgress.SynthesisPhases, 5, 0), "Automated peer review");
         using (LlmStage.Begin("automated-peer-review"))
-            (result.PeerReview, result.Discussion) = await ReviewWriter.PeerReviewAsync(chat, profile, result.Sections, result.Discussion, evidence, referenceCount, Llm.QualityParallelism, Warn, goal, questions);
+            (result.PeerReview, result.Discussion) = await ReviewWriter.PeerReviewAsync(chat, profile, result.Sections, result.Discussion, evidence, referenceCount, Llm.QualityParallelism, Warn, goal, questions, result.Answers);
 
         return result;
     }

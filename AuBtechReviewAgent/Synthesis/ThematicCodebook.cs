@@ -66,6 +66,10 @@ public class Theme
     /// <summary>The research questions the theme answers ("RQ1"); null when the run has none.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public List<string>? Questions { get; set; }
+
+    /// <summary>Why the theme rests on one study, as the codebook gave it (issue #447); null for a theme of two or more studies.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? SingleStudyReason { get; set; }
 }
 
 public record UncodedStudy(int Reference, string Reason);

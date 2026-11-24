@@ -52,7 +52,7 @@ public class QuestionDirectedCodingTests
             new() { Id = "C1", Reference = 1, Label = "fault coverage", Questions = new() { "RQ1" } },
             new() { Id = "C2", Reference = 2, Label = "audit logging", Questions = new() },
         };
-        var chat = new FakeChatService().Returns("""{"themes":[{"name":"Coverage","description":"d","codes":["C1"],"questions":["RQ1"]},{"name":"Controls","description":"d","codes":["C2"],"questions":["RQ2"]}],"unassigned":[],"unanswered":[]}""");
+        var chat = new FakeChatService().Returns("""{"themes":[{"name":"Coverage","description":"d","codes":["C1"],"questions":["RQ1"],"singleStudyReason":"Only this study covers it."},{"name":"Controls","description":"d","codes":["C2"],"questions":["RQ2"],"singleStudyReason":"Only this study covers it."}],"unassigned":[],"unanswered":[]}""");
         await ThematicSynthesis.BuildCodebookAsync(chat, "Safe agents", codes, 4, "", Questions, new());
 
         Assert.Contains("C1 [study 1] (RQ1): fault coverage", chat.Prompts[0]);

@@ -36,6 +36,14 @@ public static partial class ReviewWriter
         return word < 0 ? count : (word + 1).ToString(System.Globalization.CultureInfo.InvariantCulture);
     }
 
+    /// <summary>The counts in a text, in digits or as words from one to twenty, all as digits ("four" is "4").</summary>
+    public static HashSet<string> CountsIn(string text)
+    {
+        var counts = NumbersIn(text);
+        foreach (Match m in Regex.Matches(text, @"\b(?:" + NumberWordPattern + @")\b", RegexOptions.IgnoreCase)) counts.Add(AsDigits(m.Value));
+        return counts;
+    }
+
     private static readonly Regex AttributionCue = new(
         @"\b(?:report(?:s|ed|ing)?|found|show(?:s|ed|n|ing)?|demonstrat(?:e|es|ed|ing)|observ(?:e|es|ed|ing)|studies|the\s+literature|according\s+to)\b",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
