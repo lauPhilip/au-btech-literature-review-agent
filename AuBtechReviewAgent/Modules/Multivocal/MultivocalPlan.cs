@@ -28,7 +28,7 @@ public sealed class MultivocalPlan
     public List<PlannedQuestion> Questions { get; set; } = new() { new PlannedQuestion() };
 
     public List<string> GreyTypes { get; set; } = new() { "white-papers", "documentation", "blogs", "qa" };
-    public List<string> GreySearches { get; set; } = new() { "stackexchange", "github", "openalex-grey", "zenodo", "backlinks" };
+    public List<string> GreySearches { get; set; } = new() { "stackexchange", "github", "openalex-grey", "zenodo" };
 
     /// <summary>
     /// The search strings sent to the grey literature searches, in this order. Grey literature uses its own words
@@ -226,6 +226,8 @@ public sealed class MultivocalPlan
         InclusionCriteria = Clean(InclusionCriteria);
         ExclusionCriteria = Clean(ExclusionCriteria);
         foreach (var q in Questions) q.Text = Clean(q.Text);
+        // A search that is not built yet (backlink snowballing, #474) is not planned, so the protocol never promises it.
+        GreySearches = GreySearches.Where(GreySourceCatalog.IsBuilt).ToList();
         GreySearchStrings = GreySearchStrings.Select(t => ReviewInputGuard.Normalize(t ?? "", singleLine: true)).Where(t => t.Length > 0).ToList();
         FormalSearchStrings = Distinct(FormalSearchStrings.Select(t => ReviewInputGuard.Normalize(t ?? "", singleLine: true)));
         FormalStringsProposed = Distinct(FormalStringsProposed.Select(t => ReviewInputGuard.Normalize(t ?? "", singleLine: true)));
