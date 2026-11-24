@@ -37,6 +37,7 @@ public static partial class MultivocalPaperParts
     /// <summary>The sentence before the tables of a question answered in code.</summary>
     public static string CodeAnswerLead(MultivocalReportInput input, string number, PlannedQuestion question)
     {
+        if (question.Type == MultivocalRelationship.Type) return MultivocalRelationship.Lead(input, number);
         var attributes = FixedMap(input).Attributes.Where(a => a.Serves(number)).ToList();
         int extracted = input.Extraction.Sources.Count(x => x.Error == null);
         string kind = question.Type == "existence" ? "whether something exists" : "how often something occurs";
@@ -53,6 +54,7 @@ public static partial class MultivocalPaperParts
     /// </summary>
     public static string CodeAnswerSummary(MultivocalReportInput input, string number)
     {
+        if (IsRelationship(input, number)) return MultivocalRelationship.Summary(input, number);
         var attributes = FixedMap(input).Attributes.Where(a => a.Serves(number)).ToList();
         if (attributes.Count == 0) return "The systematic map has no attribute for this question, so the review does not answer it.";
         int extracted = input.Extraction.Sources.Count(x => x.Error == null);
@@ -94,6 +96,7 @@ public static partial class MultivocalPaperParts
 
     public static IReadOnlyList<PaperTable> CodeAnswerTables(MultivocalReportInput input, string number)
     {
+        if (IsRelationship(input, number)) return MultivocalRelationship.Tables(input, number);
         int extracted = input.Extraction.Sources.Count(x => x.Error == null);
         string Share(int sources) => extracted == 0 ? "–" : $"{Math.Round(100.0 * sources / extracted).ToString(CultureInfo.InvariantCulture)}%";
         string Cite(IEnumerable<int> refs) => refs.Any() ? $"[{string.Join(", ", refs.Distinct().OrderBy(n => n))}]" : "";

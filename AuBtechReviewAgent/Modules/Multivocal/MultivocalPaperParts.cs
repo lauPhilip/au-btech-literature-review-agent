@@ -22,9 +22,13 @@ public static partial class MultivocalPaperParts
 {
     /// <summary>
     /// Whether a question of this type is answered in code from the map's counts rather than written by the model:
-    /// "how often" (frequency) and "does it exist" (existence) are counts, and counting is code's job.
+    /// "how often" (frequency) and "does it exist" (existence) are counts, and counting is code's job; so is pairing the
+    /// two sides of a relationship per source (issue #458, <see cref="MultivocalRelationship"/>).
     /// </summary>
-    public static bool AnsweredInCode(string? questionType) => questionType is "existence" or "frequency";
+    public static bool AnsweredInCode(string? questionType) => questionType is "existence" or "frequency" or MultivocalRelationship.Type;
+
+    private static bool IsRelationship(MultivocalReportInput input, string number) =>
+        input.Planned.Plan.Numbered().Any(q => q.Number == number && q.Question.Type == MultivocalRelationship.Type);
 
     /// <summary>
     /// The themes the paper shows: those of the questions not answered in code. A run synthesised before such questions
