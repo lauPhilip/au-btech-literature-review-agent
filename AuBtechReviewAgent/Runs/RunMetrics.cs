@@ -67,6 +67,10 @@ public partial class RunMetrics
     public int Included { get; set; }
     public double? ScreeningKappa { get; set; }
     public int UncertainDecisions { get; set; }
+
+    /// <summary>Of <see cref="UncertainDecisions"/>, those the reviewer never looked at (multivocal runs, #473); null, and left out, otherwise.</summary>
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public int? FlaggedNotLookedAt { get; set; }
     public int FullTextRetrieved { get; set; }
     public double FullTextShare { get; set; }
 
