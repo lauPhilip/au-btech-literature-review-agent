@@ -30,6 +30,9 @@ public sealed class HackerNewsSource : IGreySource
         return Parse(json);
     }
 
+    /// <summary>Whether a story is a "Show HN" post, which by Hacker News's rules presents the poster's own work.</summary>
+    public static bool IsShowHn(string title) => title.StartsWith("Show HN:", StringComparison.OrdinalIgnoreCase);
+
     public static List<GreyRecord> Parse(string json)
     {
         var records = new List<GreyRecord>();
@@ -49,8 +52,9 @@ public sealed class HackerNewsSource : IGreySource
                 GreySourceHttp.PlainText(GreyJson.Str(hit, "story_text")),
                 url,
                 // The author of a story is the person who posted it; for a link that is not the author of the page it
-                // links to, so the producer is left out and the reference names the page's site instead.
-                url == discussion ? GreyJson.Str(hit, "author") : "",
+                // links to, so the producer is left out (GreyProducer works one out from the address). A "Show HN" post
+                // is the exception: by the site's rules it shows something the poster made (#471).
+                url == discussion || IsShowHn(title) ? GreyJson.Str(hit, "author") : "",
                 GreySourceHttp.HostOf(url),
                 url == discussion ? "qa" : "blogs",
                 DateTime.TryParse(GreyJson.Str(hit, "created_at"), null, System.Globalization.DateTimeStyles.AdjustToUniversal | System.Globalization.DateTimeStyles.AssumeUniversal, out var t) ? t : null,
