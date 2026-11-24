@@ -20,8 +20,9 @@ public sealed partial class MultivocalReporter
         foreach (var (number, question) in input.Planned.Plan.Numbered())
         {
             var section = new ReportSection { Heading = $"{number}: {question.Text}", Level = 3 };
-            var themes = s.Themes.Where(t => t.Question == number).ToList();
             bool inCode = MultivocalPaperParts.AnsweredInCode(question.Type);
+            // A question answered by counting shows its counts, not themes, as the paper does (#462).
+            var themes = inCode ? new List<SynthesisTheme>() : s.Themes.Where(t => t.Question == number).ToList();
             if (inCode) section.Blocks.AddRange(CodeAnswerBlocks(input, number, question));
             else if (themes.Count == 0 && !s.NotCoded.Any(n => n.Question == number))
                 section.Blocks.Add(ReportBlock.Paragraph(s.Unanswered.Contains(number)
@@ -128,7 +129,7 @@ public sealed partial class MultivocalReporter
             new[] { "G10", "Selection with the same care for every source", $"{ScreeningRow(input.Screening)}; {Count(input.Screening.Sources.Count(x => x.Uncertain), "decision")} flagged as uncertain; {Num(input.Screening.Sources.Count(x => x.Reviewed))} looked at by the reviewer." },
             new[] { "G11", "Quality of the sources", $"Table 7 checklist, threshold {input.Quality.Threshold} of {input.Quality.MaxPoints} points; every point backed by a quote.{(input.Ledger.HasFormalPool ? " Academic sources appraised with MMAT, as in the systematic review, on their full text or abstract; the threshold is for grey sources only." : "")}" },
             new[] { "G12", "Data extraction and systematic map", $"Map version {fixedMap.Number} with {Count(fixedMap.Attributes.Count, "attribute")}, fixed before extraction; every value backed by a quote." },
-            new[] { "G13", "Synthesis", $"Qualitative coding into {Count(input.Synthesis.Themes.Count, "theme")}; evidence counted in code; opinion pieces with the critical questions." },
+            new[] { "G13", "Synthesis", $"Qualitative coding into {Count(MultivocalPaperParts.ShownThemes(input).Count, "theme")}; evidence counted in code; opinion pieces with the critical questions." },
             new[] { "G14", "Reporting for the audience", "This report, written in code from the run's files, with its source repository; the paper and its summary for practitioners are written from the same files." },
         };
         section.Blocks.Add(ReportBlock.Table(new[] { "Guideline", "What it asks", "In this review" }, rows));
