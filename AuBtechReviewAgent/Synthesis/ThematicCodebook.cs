@@ -47,6 +47,10 @@ public class ThematicCode
 
     /// <summary>"verified finding", "verified quote" or "unanchored" (the evidence could not be confirmed in code).</summary>
     public string Anchor { get; set; } = "";
+
+    /// <summary>The research questions the code bears on ("RQ1"), checked in code; null (and not written) for a run without research questions.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public List<string>? Questions { get; set; }
 }
 
 public class Theme

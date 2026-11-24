@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -86,7 +87,8 @@ public sealed partial class MultivocalPages
     public const string TextFolder = "PageText";
 
     private static readonly JsonSerializerOptions Json = new() { WriteIndented = true };
-    private static readonly SemaphoreSlim Gate = new(1, 1);
+    /// <summary>One lock per run for its pages file, so keeping pages in one run never waits on another run.</summary>
+    private static readonly ConcurrentDictionary<Guid, SemaphoreSlim> Gates = new();
 
     private readonly RunStore _runs;
     private readonly MultivocalSearcher _searcher;
@@ -198,7 +200,8 @@ public sealed partial class MultivocalPages
         }
 
         string folder = _runs.FolderOf(runId);
-        await Gate.WaitAsync();
+        var gate = Gates.GetOrAdd(runId, _ => new SemaphoreSlim(1, 1));
+        await gate.WaitAsync();
         try
         {
             if (text != null)
@@ -221,7 +224,7 @@ public sealed partial class MultivocalPages
         }
         finally
         {
-            Gate.Release();
+            gate.Release();
         }
     }
 
