@@ -60,13 +60,16 @@ public class GreyReferencesPinTests
         var (ledger, pages, extraction, screening) = Run();
         var references = GreyReferences.Build(ledger, pages, extraction);
 
-        // The fingerprints of the files as written before block I-6; a change here changes every grey review's references.
-        Assert.Equal("67cda2635bb7164948f7fce9e239dee00c06e6cad25006022ea3d125816fc761", Sha(GreyReferences.ToBibTeX(references)));
-        Assert.Equal("d1a703facc24ed052ae615a3b0446e9956de2e1a589e886bb55ca530ba71e5d1", Sha(GreyReferences.ToRis(references)));
-        Assert.Equal("5061e3b6a5296bc5a124467c2e7bbcffbaa38770073cbc236344ceca0b8521c9",
+        // The fingerprints of the files as written since #471, which stopped crediting a source with no producer to its
+        // web address; a change here changes every grey review's references.
+        Assert.Equal("5090f9121f39b6093d5d4ffc260e769da93572af588e2400e33aeb4737ad8b1e", Sha(GreyReferences.ToBibTeX(references)));
+        Assert.Equal("eba3f6a009a684f2cdc56cd0689d68c833324a337d58c0d81a3ae52bb162af76", Sha(GreyReferences.ToRis(references)));
+        Assert.Equal("814281a6183193613b566a4acf74ac9ec53b6dcec7c656e2ac41ffc9aa6d9bd3",
             Sha(GreyReferences.ToScreenedRis(ledger, screening, MultivocalReporter.SourceNumbers(extraction))));
-        Assert.Equal("b25b79219b479476335dc5ad62fc941821071cdd34bead282a6ece5438c36a7c", Sha(string.Join("\n", references.Select(GreyReferences.Line))));
+        Assert.Equal("a0ef80a5eade5817b8a0ba2f140c4cf3da7684c8cbc1997754fbd5749ab11b4e", Sha(string.Join("\n", references.Select(GreyReferences.Line))));
         Assert.Equal("acme (2023). agent-memory: a toolkit. *github.com*. https://github.com/acme/agent-memory (last updated 2026-09-30; accessed 2026-10-08; archived at https://web.archive.org/web/20261008090000/https://github.com/acme/agent-memory)",
             GreyReferences.Line(references[1]));
+        // No producer: APA's rule for a work with no author, the title first (#471).
+        Assert.Equal("Effective context & memory_management. (n.d.). *docs.acme.dev*. https://docs.acme.dev/guide", GreyReferences.Line(references[2]));
     }
 }
