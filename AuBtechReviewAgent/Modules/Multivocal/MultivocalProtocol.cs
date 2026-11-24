@@ -13,7 +13,10 @@ namespace AuBtechReviewAgent;
 /// </summary>
 public static class MultivocalProtocol
 {
-    public static string Write(MultivocalPlan plan, Guid runId, DateTime createdUtc)
+    /// <summary>The protocol of a planned run, written before anything is searched.</summary>
+    /// <param name="seedStudies">How many of the most-cited included academic sources are built out after screening (0: none).</param>
+    /// <param name="seedPerDirection">How many references and citing works are kept per seed.</param>
+    public static string Write(MultivocalPlan plan, Guid runId, DateTime createdUtc, int seedStudies = 0, int seedPerDirection = 0)
     {
         var sb = new StringBuilder();
         string kind = plan.UsesFormalPool ? "Multivocal Literature Review" : "Grey Literature Review";
@@ -76,6 +79,8 @@ public static class MultivocalProtocol
             sb.AppendLine("Where formal (academic) literature is searched (G7):");
             foreach (var key in plan.FormalDatabases)
                 sb.AppendLine($"- {SourceCatalog.DisplayNameFor(key)}");
+            if (seedStudies > 0)
+                sb.AppendLine($"- Citation chaining from seed studies (OpenAlex): after screening, the {seedStudies} included academic sources with the most citations per year since publication, chosen in code from the databases' citation counts, are built out one round in both directions, keeping the {seedPerDirection} references and the {seedPerDirection} citing works with the most citations per year for each; what they find is screened like any academic source.");
             sb.AppendLine();
         }
         sb.AppendLine("Not done, by design:");

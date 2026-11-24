@@ -99,7 +99,12 @@ var reviewEngine = new AuBtechReviewAgent.PrismaReviewEngine(mistralApiKey, else
 };
 builder.Services.AddSingleton(reviewEngine);
 builder.Services.AddSingleton(reviewEngine.Store); // the run folders, shared by every kind of review
-var multivocalPlanner = new AuBtechReviewAgent.MultivocalPlanner(reviewEngine.Store);
+// The seed step of the formal pool is named in the protocol with the server's settings, as in the systematic review.
+var multivocalPlanner = new AuBtechReviewAgent.MultivocalPlanner(reviewEngine.Store)
+{
+    SeedStudies = Math.Clamp(openSources.SeedStudies, 0, 50),
+    SeedChainingPerDirection = Math.Clamp(openSources.SeedChainingPerDirection, 1, AuBtechReviewAgent.CitationSeeds.PoolPerDirection),
+};
 builder.Services.AddSingleton(multivocalPlanner); // multivocal planning (preview)
 var multivocalSearcher = new AuBtechReviewAgent.MultivocalSearcher(reviewEngine.Store, multivocalPlanner, key => AuBtechReviewAgent.GreySourceCatalog.Create(key, openSources.ContactEmail),
     reviewEngine.CreateServerSource); // the formal pool: the systematic review's databases, with the server's keys
@@ -109,7 +114,13 @@ builder.Services.AddSingleton(multivocalSearcher); // multivocal grey searches (
 var multivocalChat = () => (Microsoft.SemanticKernel.ChatCompletion.IChatCompletionService?)AuBtechReviewAgent.LlmRecording.Current
     ?? AuBtechReviewAgent.LlmFactory.CreateForReview(llmOptions, mistralApiKey, runsOptions.MaxConcurrentRuns);
 var multivocalScreener = new AuBtechReviewAgent.MultivocalScreener(reviewEngine.Store, multivocalPlanner, multivocalSearcher,
-    multivocalChat, reviewEngine.Cache, llmOptions.ModelFor("screening"), llmOptions.ParallelismFor("screening"), llmOptions.ModelFor);
+    multivocalChat, reviewEngine.Cache, llmOptions.ModelFor("screening"), llmOptions.ParallelismFor("screening"), llmOptions.ModelFor)
+{
+    // The formal pool's seed step: the most-cited included academic sources built out through OpenAlex, as in the systematic review.
+    CitationGraph = () => new AuBtechReviewAgent.OpenAlexSource(openSources.ContactEmail, openSources.OpenAlexApiKey),
+    SeedStudies = multivocalPlanner.SeedStudies,
+    SeedChainingPerDirection = multivocalPlanner.SeedChainingPerDirection,
+};
 builder.Services.AddSingleton(multivocalScreener); // grey screening (preview)
 var multivocalPages = new AuBtechReviewAgent.MultivocalPages(reviewEngine.Store, multivocalSearcher, new AuBtechReviewAgent.PageFetcher(),
     (paper, folder) => AuBtechReviewAgent.DocumentRAGUtility.IngestAndChunkPaperAsync(paper, folder, openSources.ContactEmail)); // a formal source's open full text

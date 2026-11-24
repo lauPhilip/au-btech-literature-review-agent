@@ -81,6 +81,17 @@ public sealed class MultivocalLedger
     [JsonIgnore]
     public bool HasFormalPool => FormalRemoved != null;
 
+    /// <summary>
+    /// The seed step of the formal pool, after screening: the most-cited included academic sources per year, chosen in
+    /// code, and what building out from them found; null, and left out of the file, when it did not run.
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public SeedChainingRecord? SeedChaining { get; set; }
+
+    /// <summary>One look-up per seed in the citation index, with its raw answers' files and fingerprints; null when the seed step did not run.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public List<GreySearchLog>? SeedSearches { get; set; }
+
     [JsonIgnore]
     public IEnumerable<FoundGreySource> GreyPool => Sources.Where(s => !s.IsFormal);
 
@@ -127,6 +138,10 @@ public sealed partial class MultivocalSearcher
         _sources = sources ?? (key => GreySourceCatalog.Create(key));
         _academic = academic;
     }
+
+    /// <summary>Writes the ledger of a run again, after a later step (the seed step of the formal pool) added to it.</summary>
+    internal async Task SaveLedgerAsync(Guid runId, MultivocalLedger ledger) =>
+        await SafeFile.WriteAllTextAsync(Path.Join(_runs.FolderOf(runId), LedgerFile), JsonSerializer.Serialize(ledger, Json));
 
     /// <summary>The ledger of a searched run, or null.</summary>
     public MultivocalLedger? LoadLedger(Guid runId)

@@ -8,6 +8,10 @@
     </thead>
     <tbody>
         @Row("Found", Grey.Identified, Formal.Identified, true)
+        @if (Formal.ViaSeeds > 0)
+        {
+            @Row("of which by citation chaining from the most-cited", null, Formal.ViaSeeds, false)
+        }
         @if (Formal.DuplicatesRemoved + Formal.NoAddressRemoved > 0)
         {
             @Row("− Duplicates by DOI or title", null, Formal.DuplicatesRemoved, false)

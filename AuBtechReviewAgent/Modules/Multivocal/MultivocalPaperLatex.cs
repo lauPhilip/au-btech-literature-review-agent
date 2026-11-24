@@ -151,6 +151,7 @@ public static class MultivocalPaper
         {
             text.Append(MultivocalFormalText.AiUseTasks(input, subject));
             text.Append(MultivocalFormalText.AiUseKappa(input));
+            text.Append(MultivocalFormalText.AiUseSeeds(input));
         }
         else
         {
