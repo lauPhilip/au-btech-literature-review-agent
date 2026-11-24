@@ -43,10 +43,14 @@ public static partial class MultivocalFormalText
         sb.AppendLine($@"\node[box, below=of fkept] (fextracted) {{Extracted: {f.Extracted}\\{{\scriptsize of which on the abstract only: {f.AbstractOnly}}}}};");
         sb.AppendLine($@"\node[side, right=of fscreened] (fout) {{Duplicates by DOI or title: {f.DuplicatesRemoved}\\No web address: {f.NoAddressRemoved}\\Same title: {f.DuplicatesAtScreening}\\Not screened: {f.NotScreened}\\Excluded: {f.Excluded}}};");
         sb.AppendLine($@"\node[side, right=of fkept] (fnotappraised) {{Not appraised: {f.NotAssessed}}};");
+        // The sources kept but not extracted get a box in each arm, so each column adds up from step to step (#467).
+        sb.AppendLine($@"\node[side, left=of gextracted] (gnotextracted) {{Could not be extracted: {g.NotExtracted}}};");
+        sb.AppendLine($@"\node[side, right=of fextracted] (fnotextracted) {{Could not be extracted: {f.NotExtracted}}};");
         sb.AppendLine($@"\node[box, text width=8cm, below=0.8cm of gextracted.south east, anchor=north west, xshift=-1.8cm] (themes) {{Synthesised: {Count(input.Synthesis.Findings.Count, "finding")} in {Count(input.Synthesis.Themes.Count, "theme")}}};");
         foreach (string arm in new[] { "g", "f" })
             sb.AppendLine($@"\draw[->] ({arm}found) -- ({arm}screened); \draw[->] ({arm}screened) -- ({arm}included); \draw[->] ({arm}included) -- ({arm}kept); \draw[->] ({arm}kept) -- ({arm}extracted); \draw[->] ({arm}extracted) -- (themes);");
         sb.AppendLine(@"\draw[->] (gscreened) -- (gout); \draw[->] (fscreened) -- (fout); \draw[->] (gkept) -- (glow); \draw[->] (fkept) -- (fnotappraised);");
+        sb.AppendLine(@"\draw[->] (gextracted) -- (gnotextracted); \draw[->] (fextracted) -- (fnotextracted);");
         sb.AppendLine(@"\end{tikzpicture}");
         return sb.ToString();
     }

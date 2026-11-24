@@ -68,6 +68,17 @@ public partial class MultivocalPaperPage
         }
     }
 
+    /// <summary>
+    /// The heading of the citation-check card: the citations checked, the same number as the line under the title and the
+    /// check note, and the removed ones on their own (#467: the card said 1419 where the rest of the page said 1283).
+    /// </summary>
+    public static string CheckedHeading(VerdictTally counts)
+    {
+        int checkedCount = counts.Total - counts.Removed;
+        string text = $"{checkedCount} {(checkedCount == 1 ? "citation" : "citations")} checked against the sources";
+        return counts.Removed == 0 ? text : $"{text}, and {counts.Removed} removed";
+    }
+
     // The citation-check panel (from 1500 px): which citations it steps through, and where it is.
     private string checkFilter = ReportOutline.Flagged;
     private int checkIndex = -1;

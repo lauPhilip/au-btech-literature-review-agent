@@ -64,6 +64,13 @@ public sealed class MultivocalPaperFile
 
     /// <summary>The model that answered the citation checks when it was not <see cref="Model"/> (Llm:FastModel); null otherwise.</summary>
     public string? CheckModel { get; set; }
+
+    /// <summary>
+    /// The version of TraceableAI that wrote the paper, as <see cref="ToolVersion"/> reads it; the declarations name it, not
+    /// the version of the server that shows the paper (#468). A run written before it was recorded takes the version in its
+    /// run-metrics.json or llm-calls.json when it is loaded; null when the run's files record none.
+    /// </summary>
+    public string? AppVersion { get; set; }
 }
 
 /// <summary>A source the paper does not cite, and why.</summary>
