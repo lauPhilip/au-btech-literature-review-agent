@@ -1,9 +1,10 @@
 @* Under the finished run's card: the included papers whose full text has phrases that read like instructions to the
    model (#366). The text is treated as data and no decision changed, but extraction and the citation check read it,
    so the reviewer is asked to look at what was taken from those papers. Below them, the papers whose full text had
-   hidden text taken out before the model read it (#369). Nothing shows when no paper has either. *@
+   hidden text taken out before the model read it (#369). Nothing shows when no paper has either. Only strong flags,
+   phrases aimed at the model, count; a paper that only names prompts is on file but not listed (#472). *@
 
-@if (Flags?.Where(f => f.Flags.Count > 0).ToList() is { Count: > 0 } flags)
+@if (Flags?.Where(f => PromptSafety.AnyStrong(f.Flags)).ToList() is { Count: > 0 } flags)
 {
     <details class="ui-card mt-4 p-4 text-sm sm:p-5">
         <summary class="cursor-pointer font-semibold text-not-supported">
@@ -15,7 +16,7 @@
             {
                 <li>
                     <span class="font-semibold text-heading">@entry.Title</span>
-                    <span class="block text-xs text-muted">@string.Join("; ", entry.Flags)</span>
+                    <span class="block text-xs text-muted">@string.Join("; ", entry.Flags.Where(f => PromptSafety.IsStrong(f.Pattern)))</span>
                 </li>
             }
         </ul>

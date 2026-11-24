@@ -59,8 +59,10 @@ public static class AiUseStatement
             text.Append("; a supporting verdict counted only when its quote was found verbatim in the paper. ");
         }
         // A paper that only lost invisible characters is on file too (#369), but it held nothing that reads like instructions.
-        int flagged = state.FullTextFlags?.Where(f => f.Flags.Count > 0).Select(f => f.PaperId).Distinct().Count() ?? 0;
-        text.Append(FlaggedSources(flagged, s.FullTextRetrieved, "full text", "included study", "included studies"));
+        var withHits = state.FullTextFlags?.Where(f => f.Flags.Count > 0).ToList() ?? new();
+        int flagged = withHits.Where(f => PromptSafety.AnyStrong(f.Flags)).Select(f => f.PaperId).Distinct().Count();
+        int mentioned = withHits.Select(f => f.PaperId).Distinct().Count() - flagged;
+        text.Append(FlaggedSources(flagged, s.FullTextRetrieved, "full text", "included study", "included studies", mentioned));
         if (edits?.Sentence() is { Length: > 0 } edited) text.Append(edited).Append(' ');
         text.Append("The complete record of the run (protocol, search responses, every screening decision and model call, and the citation audit) is available as a fingerprinted archive. ");
         text.Append("The authors reviewed the output and take full responsibility for the content.");
@@ -77,16 +79,25 @@ public static class AiUseStatement
     }
 
     /// <summary>
-    /// The sentence on source texts that read like instructions to a model (#363), from the number of distinct sources
-    /// flagged and the number whose text was kept, ending with a space. Empty when none was flagged, so the statement
-    /// of a run without flags stays word for word as it was. A flag changes no decision; this says so.
+    /// The sentences on source texts that hold phrases aimed at a model (#363, #472), ending with a space: from the number
+    /// of distinct sources with a strong flag, the number whose text was kept, and the number that only had weak ones
+    /// (they name prompts or instructions as a subject, which a review about language models does all the time). Empty when
+    /// neither, so the statement of a run without flags stays word for word as it was. A flag changes no decision; this says so.
     /// </summary>
-    public static string FlaggedSources(int flagged, int kept, string text, string one, string many)
+    public static string FlaggedSources(int flagged, int kept, string text, string one, string many, int mentioned = 0)
     {
-        if (flagged <= 0) return "";
-        kept = Math.Max(kept, flagged);
-        return string.Create(CultureInfo.InvariantCulture,
-            $"The {text} of {flagged} of {kept} {(kept == 1 ? one : many)} contained phrases that look like instructions to a model; {(flagged == 1 ? "it was" : "they were")} flagged for the reviewer and changed no decision. ");
+        flagged = Math.Max(flagged, 0);
+        mentioned = Math.Max(mentioned, 0);
+        if (flagged + mentioned == 0) return "";
+        kept = Math.Max(kept, flagged + mentioned);
+        string sources = kept == 1 ? one : many;
+        if (flagged == 0)
+            return string.Create(CultureInfo.InvariantCulture,
+                $"The {text} of {mentioned} of {kept} {sources} named prompts or model instructions as a subject, but none held a phrase addressed to a model as an instruction; these mentions are kept in the run's record and changed no decision. ");
+        string sentence = string.Create(CultureInfo.InvariantCulture,
+            $"The {text} of {flagged} of {kept} {sources} contained phrases addressed to a model as instructions; {(flagged == 1 ? "it was" : "they were")} flagged for the reviewer and changed no decision. ");
+        return mentioned == 0 ? sentence : sentence + string.Create(CultureInfo.InvariantCulture,
+            $"The {text} of {mentioned} more only named prompts or model instructions as a subject; these mentions are kept in the run's record but were not flagged. ");
     }
 
     private static string JoinList(IReadOnlyList<string> items) => items.Count switch

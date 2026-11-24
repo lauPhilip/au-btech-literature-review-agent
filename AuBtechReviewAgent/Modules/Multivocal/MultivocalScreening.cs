@@ -231,7 +231,7 @@ public sealed partial class MultivocalScreener
         foreach (var (item, first) in decided)
         {
             var entry = file.Sources[item.Index];
-            entry.SecondReason = MultivocalSecondScreening.TargetReason(first.Answer!, item.Record.Summary.Length > 0, first.Flags.Count > 0);
+            entry.SecondReason = MultivocalSecondScreening.TargetReason(first.Answer!, item.Record.Summary.Length > 0, PromptSafety.AnyStrong(first.Flags));
             entry.AuditSample = audit.Contains(entry.Address);
             if (entry.SecondReason != null || entry.AuditSample) again.Add(item);
         }

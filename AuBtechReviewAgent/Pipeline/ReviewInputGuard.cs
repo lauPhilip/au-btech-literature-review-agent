@@ -146,16 +146,17 @@ public static class ReviewInputGuard
 
     /// <summary>
     /// The instruction-like phrases in one cleaned field, with the same exceptions as the review form, so every form
-    /// that sends a reviewer's text to the model flags the same things. <paramref name="hidden"/> is what the field's
+    /// that sends a reviewer's text to the model flags the same things. Only strong phrases count (#472): a topic such as
+    /// "system prompts in agents" names prompts and is not a request to the model. <paramref name="hidden"/> is what the field's
     /// tag characters spelled (<see cref="Clean"/>); when it reads like instructions, one <see cref="HiddenText.FlagPattern"/>
     /// flag is added last, with what it spells marked as hidden, since the reviewer cannot see it in the field.
     /// </summary>
     public static IReadOnlyList<InputFlag> FlagsIn(string field, string clean, string hidden = "")
     {
-        var flags = PromptSafety.Scan(clean).Where(p => !NotFlaggedForReviewers.Contains(p) && p != HiddenText.FlagPattern)
+        var flags = PromptSafety.Scan(clean).Where(p => PromptSafety.IsStrong(p) && !NotFlaggedForReviewers.Contains(p) && p != HiddenText.FlagPattern)
             .Select(pattern => new InputFlag(field, pattern, ExcerptFor(pattern, clean))).ToList();
-        if (PromptSafety.Find(hidden) is { Count: > 0 } found)
-            flags.Add(new InputFlag(field, HiddenText.FlagPattern, HiddenMark + found[0].Excerpt));
+        if (PromptSafety.Find(hidden)?.FirstOrDefault(f => PromptSafety.IsStrong(f.Pattern)) is { } found)
+            flags.Add(new InputFlag(field, HiddenText.FlagPattern, HiddenMark + found.Excerpt));
         return flags;
     }
 
@@ -177,7 +178,10 @@ public static class ReviewInputGuard
         "ignore-instructions" => "asks to ignore instructions or rules",
         "addresses-the-model" => "addresses the model or gives it a role",
         "mentions-system-prompt" => "mentions the system or developer prompt",
-        "chat-markup" => "contains chat-template markup",
+        "mentions-ignoring" => "mentions ignoring rules or instructions",
+        "mentions-ai-role" => "mentions an AI or assistant role",
+        "chat-markup" => "contains chat markup that opens a system turn",
+        "chat-template" => "contains chat-template markup",
         "output-format-command" => "tells the model how to answer",
         "reveal-instructions" => "asks the model to reveal its instructions",
         "role-change" => "tries to give the model new instructions",
