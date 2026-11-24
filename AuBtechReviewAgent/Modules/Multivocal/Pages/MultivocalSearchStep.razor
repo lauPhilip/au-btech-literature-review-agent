@@ -20,7 +20,15 @@
         @foreach (var search in AuBtechReviewAgent.MultivocalGuidelines.GreySearches)
         {
             var s = search;
-            <label class="flex items-start gap-2 text-sm text-ink cursor-pointer select-none"><input type="checkbox" class="w-4 h-4 mt-0.5 accent-brand" checked="@Page.plan.GreySearches.Contains(s.Key)" @onchange="e => Page.plan.GreySearches = MultivocalStart.Toggle(Page.plan.GreySearches, s.Key, e, AuBtechReviewAgent.MultivocalGuidelines.GreySearches.Select(t => t.Key))" /> <span>@s.Label</span></label>
+            @if (AuBtechReviewAgent.GreySourceCatalog.IsBuilt(s.Key))
+            {
+                <label class="flex items-start gap-2 text-sm text-ink cursor-pointer select-none"><input type="checkbox" class="w-4 h-4 mt-0.5 accent-brand" checked="@Page.plan.GreySearches.Contains(s.Key)" @onchange="e => Page.plan.GreySearches = MultivocalStart.Toggle(Page.plan.GreySearches, s.Key, e, AuBtechReviewAgent.MultivocalGuidelines.GreySearches.Select(t => t.Key).Where(AuBtechReviewAgent.GreySourceCatalog.IsBuilt))" /> <span>@s.Label</span></label>
+            }
+            else
+            {
+                @* Shown so the reviewer knows the guidelines name it, but it cannot be chosen until it is built (#474). *@
+                <label class="flex items-start gap-2 text-sm text-muted select-none"><input type="checkbox" class="w-4 h-4 mt-0.5 accent-brand" disabled aria-describedby="@($"not-built-{s.Key}")" /> <span>@s.Label <span id="@($"not-built-{s.Key}")" class="text-xs">(not available yet)</span></span></label>
+            }
         }
     </div>
     <p class="text-xs text-muted mt-1.5">No general web search engine is used: none is free and allows its results to be kept. Practitioners and authors are not contacted.</p>
