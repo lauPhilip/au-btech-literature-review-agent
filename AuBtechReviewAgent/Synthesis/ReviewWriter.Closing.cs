@@ -43,7 +43,7 @@ public static partial class ReviewWriter
         IReadOnlyList<string>? researchQuestions = null, IReadOnlyCollection<string>? unanswered = null, IReadOnlyList<string>? givenAnswers = null)
     {
         string results = string.Join("\n\n", sections.Select(x => $"### {x.Heading}\n{x.Text}")) + $"\n\n### Discussion\n{discussion}";
-        var all = (researchQuestions ?? Array.Empty<string>()).Select((q, i) => (Id: QuestionId(i), Text: q)).ToList();
+        var all = (researchQuestions ?? Array.Empty<string>()).Select((q, i) => (Id: QuestionId(i, profile), Text: q)).ToList();
         var given = all.Count > 0 && givenAnswers?.Count == all.Count ? givenAnswers : null;
         bool InCode((string Id, string Text) q) => given != null || unanswered?.Contains(q.Id) == true;
         // The model answers only the questions some evidence bears on (issue #124); the others are answered in code.
@@ -68,7 +68,7 @@ public static partial class ReviewWriter
         string conclusionRule = questions.Count == 0 && given == null ? "" : " It takes no citations: the answers carry them, and the conclusion is the review's own reading of the answers together."
             + (given == null ? "" : " Do not restate the answers above: say what they mean together for the review objective.");
         // The given answers are checked text: their numbers may be used, as the results' may.
-        string checkedText = given == null ? results : results + "\n\n### Answers to the research questions\n" + AnswerLines(given);
+        string checkedText = given == null ? results : results + "\n\n### Answers to the research questions\n" + AnswerLines(given, profile);
         // Studies left out of the themes may be named in the limitations, never used as evidence (issue #166).
         string leftOutRule = evidence.LeftOut.Count == 0 ? "" : $" The {profile.Sources} left out of the themes may be named only in the limitations, to say they were left out; no other part cites them.";
         string prompt = $$"""
@@ -91,9 +91,9 @@ public static partial class ReviewWriter
             {{results}}
 
             REQUIREMENTS:
-            1. "limitations": one paragraph on the limitations of the evidence base (PRISMA 2020 item 23b): what kinds of {{profile.Sources}} it rests on, what they leave unmeasured, and how far the findings generalise. Use the facts above. Do not describe how this review was done; that is written separately.
-            2. "implications": one paragraph on the implications for practice and policy (item 23d): what someone acting on these findings should do or watch for, and how firm each point is. A recommendation is the review's own reading and takes no citation; the finding behind it may come first, in its own cited sentence.
-            3. "futureResearch": one paragraph on the directions for future research (item 23d): the open questions and missing kinds of study the results show, each tied by name to the theme it comes from. A proposal is the review's own reading and takes no citation: say what study is missing, not again what the {{profile.Sources}} found.
+            1. "limitations": one paragraph on {{profile.LimitationsPart}}: what kinds of {{profile.Sources}} it rests on, what they leave unmeasured, and how far the findings generalise. Use the facts above. Do not describe how this review was done; that is written separately.
+            2. "implications": one paragraph on {{profile.ImplicationsPart}}: what someone acting on these findings should do or watch for, and how firm each point is. A recommendation is the review's own reading and takes no citation; the finding behind it may come first, in its own cited sentence.
+            3. "futureResearch": one paragraph on {{profile.FutureResearchPart}}: the open questions and missing kinds of study the results show, each tied by name to the theme it comes from. A proposal is the review's own reading and takes no citation: say what study is missing, not again what the {{profile.Sources}} found.
             4. "conclusion": three to five sentences that answer the review objective in plain words, at most {{MaxConclusionWords}} words, with no new claims.{{conclusionRule}}
             {{FigureRule}}
             5. {{EvidenceThenReadingRule(profile)}} In the limitations and the directions for future research, an uncited sentence may name kinds of {{profile.Sources}} (what the evidence rests on, what study is missing). {{ClaimPerCitationRule(profile)}} {{OwnCountRule}} Do not invent numbers, statistics or {{profile.Sources}}.{{leftOutRule}} {{ReadingBasisRule(profile)}} This holds for the limitations too: how this review was done, including what it read, is written separately.{{answerRule}}

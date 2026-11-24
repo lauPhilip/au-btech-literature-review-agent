@@ -39,8 +39,8 @@ public static partial class ReviewWriter
         string Named(string text) => NameSections(text, headings);
         string sectionsText = string.Join("\n\n", sections.Select(x => $"[{x.Field}] {x.Heading}{ThemeSourcesLine(x, evidence, profile)}\n{x.Text}"))
                               + $"\n\n[discussion] Discussion\n{discussion}";
-        string critiqueAim = questions is not { Count: > 0 } ? "" : "\n\n" + AimBlock(goal, questions) +
-            (answers is { Count: > 0 } ? $"\nANSWERS TO THE RESEARCH QUESTIONS (written with the discussion and checked; not under review here):\n{AnswerLines(answers)}" : "") +
+        string critiqueAim = questions is not { Count: > 0 } ? "" : "\n\n" + AimBlock(goal, questions, profile) +
+            (answers is { Count: > 0 } ? $"\nANSWERS TO THE RESEARCH QUESTIONS (written with the discussion and checked; not under review here):\n{AnswerLines(answers, profile)}" : "") +
             "\nAlso review (f) whether each section serves the research question it is for: a theme subsection answers its questions, and the discussion builds on the answers rather than restating them.";
 
         string critiquePrompt = $$"""
