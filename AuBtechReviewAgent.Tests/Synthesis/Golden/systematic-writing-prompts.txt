@@ -123,14 +123,19 @@ Write plain paragraphs separated by a blank line: no Markdown, no headings, no b
 Respond ONLY with a valid minified JSON object:
 {"text":"the discussion with inline [n] citations"}
 === strict but constructive peer reviewer
-You are a strict but constructive peer reviewer for a systematic literature review. Review each section below (theme subsections of the results, and the discussion) for: (a) depth: does it synthesise and compare rather than list, (b) whether each specific claim carries an inline [n] citation, (c) over-claiming beyond what a study could show, (d) coherence and overlap between sections, (e) whether the discussion interprets rather than repeats.
+You are a strict but constructive peer reviewer for a systematic literature review. Review each section below (theme subsections of the results, and the discussion) for: (a) depth: does it synthesise and compare rather than list (for a theme that rests on one study, judge only whether it reports that study faithfully and says what one study can show; do not ask it to compare or to add depth from other studies), (b) whether each specific claim carries an inline [n] citation, (c) over-claiming beyond what a study could show, (d) coherence and overlap between sections, (e) whether the discussion interprets rather than repeats.
+
+Judge what a section says about the studies (how many there are, their designs, what they were read from) only against the facts about the evidence base below, and never state a fact about them that the facts do not give. A theme subsection may cite only the studies of its theme, named after its heading: do not ask it to add others, and do not ask any section to use a study left out of the themes.
 
 REFERENCE LIST (valid citation numbers):
 [1] - Doe, J. (2025). Agent loops for safe orchestration. *Future Internet*. https://doi.org/10.3390/fi1234567
 [2] - Lee, K. (2026). Agent governance layers. In *Proceedings of the Conference on Agents*.
 
+FACTS ABOUT THE EVIDENCE BASE (from the data extraction; the only facts about the studies and their designs; do not contradict them):
+2 studies; full text was read for 0 and only the abstract for 2; 0 are not empirical (position papers, system descriptions or reviews). Study designs by MMAT category, the complete list from the data extraction (describe the designs only by these categories and counts): quantitative descriptive (2). Each study's design as its authors name it, its MMAT category and what it was read from (name the design of a cited study, or count the studies read from the abstract only, only as given here): [1] design science artefact with evaluation, quantitative descriptive, abstract only; [2] design science artefact with evaluation, quantitative descriptive, abstract only.
+
 SECTIONS (the id in brackets is the section id):
-[synthesis-1] Recovery and oversight
+[synthesis-1] Recovery and oversight (studies of this theme: [1], [2])
 Agent loops recover from faults through supervisor checks [1]. Governance layers audit agent actions [2].
 
 [discussion] Discussion
@@ -154,6 +159,8 @@ PEER-REVIEW FEEDBACK:
 
 CURRENT SECTION (Recovery and oversight):
 Agent loops recover from faults through supervisor checks [1]. Governance layers audit agent actions [2].
+
+This section reports one theme: cite only its studies, [1], [2], even where the feedback asks for others.
 
 Write plain paragraphs separated by a blank line: no Markdown, no headings, no bullet or numbered lists, no tables and no bold or italics.
 Refer to another section only by its heading in words, never by an id.

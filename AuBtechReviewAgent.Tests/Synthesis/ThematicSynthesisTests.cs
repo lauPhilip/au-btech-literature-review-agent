@@ -102,8 +102,8 @@ public class ThematicSynthesisTests
             new() { Id = "C3", Reference = 3, Label = "unrelated" },
         };
         var chat = new FakeChatService()
-            .Returns("""{"themes":[{"name":"Recovery","description":"d","codes":["C1"]}],"unassigned":[]}""")
-            .Returns("""{"themes":[{"name":"Recovery","description":"d","codes":["C1"]},{"name":"Oversight","description":"d","codes":["C2","C1"]}],"unassigned":[{"code":"C3","reason":"Not about agents."}]}""");
+            .Returns("""{"themes":[{"name":"Recovery","description":"d","codes":["C1"],"singleStudyReason":"Only this study covers it."}],"unassigned":[]}""")
+            .Returns("""{"themes":[{"name":"Recovery","description":"d","codes":["C1"],"singleStudyReason":"Only this study covers it."},{"name":"Oversight","description":"d","codes":["C2","C1"]}],"unassigned":[{"code":"C3","reason":"Not about agents."}]}""");
 
         var (themes, unplaced) = await ThematicSynthesis.BuildCodebookAsync(chat, "objective", codes, 8);
 
