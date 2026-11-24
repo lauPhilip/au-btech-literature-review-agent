@@ -166,7 +166,7 @@ public sealed class MultivocalPlan
             new() { Text = "Is the use of retrieval for context related to fewer reported agent failures?", Type = "relationship" },
         },
         GreyTypes = new List<string> { "white-papers", "documentation", "blogs", "qa", "code" },
-        GreySearches = new List<string> { "stackexchange", "github", "openalex-grey", "backlinks" },
+        GreySearches = new List<string> { "stackexchange", "github", "openalex-grey" },
         GreySearchStrings = new List<string> { "context engineering", "LLM agent context window" },
         InclusionCriteria = "Sources whose main subject is how the context of an LLM agent is built, selected or managed, meaning what goes into its context window and why. A source must explain at least one such practice, or evaluate one, in enough detail that a developer could apply it.",
         ExclusionCriteria = "Sources that mention an agent's context only in passing; generic tutorials on retrieval-augmented generation or vector databases; release notes and changelogs; code repositories whose README does not explain a practice; marketing pages without technical content; sources only about the wording of prompts for single chat requests; sources not in English.",
@@ -271,6 +271,8 @@ public sealed class MultivocalPlan
             problems.Add("Choose at least one kind of grey literature.");
         if (GreySearches.Count == 0 || GreySearches.Any(s => MultivocalGuidelines.GreySearches.All(g => g.Key != s)))
             problems.Add("Choose at least one place to search.");
+        foreach (var key in GreySearches.Where(k => MultivocalGuidelines.GreySearches.Any(g => g.Key == k) && !GreySourceCatalog.IsBuilt(k)))
+            problems.Add($"{MultivocalGuidelines.SearchLabel(key)} is not available yet; leave it out.");
         if (MultivocalGuidelines.StoppingRules.All(r => r.Key != StoppingRule)) problems.Add("Choose a stopping rule.");
         if (!HasCriteria) problems.Add("Say what a source must be about to be included (the inclusion criteria).");
         if (GreySearchStrings.Count > MaxSearchStrings) problems.Add($"Use at most {MaxSearchStrings} search strings.");

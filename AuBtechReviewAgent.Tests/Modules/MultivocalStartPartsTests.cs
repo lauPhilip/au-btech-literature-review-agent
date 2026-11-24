@@ -67,7 +67,7 @@ public class MultivocalStartPartsTests
         Assert.Contains("The steps marked as built work in this preview", html);
         foreach (string step in new[] { "Protocol", "Search", "Selection", "Quality", "Map and extraction", "Synthesis", "Writing", "Checking" })
             Assert.Contains($"<span class=\"font-semibold text-heading\">{step}</span>", html);
-        Assert.Contains("4 grey literature searches, the top 20 hits of each search string.", html);
+        Assert.Contains("3 grey literature searches, the top 20 hits of each search string.", html);
         Assert.Contains("to answer 5 research questions", html);
         Assert.Contains("below 10 of 20 points it is left out", html);
         Assert.Equal(8, Count(html, ">built</span>")); // every step of a grey literature review, writing and checking included (block G)
@@ -85,7 +85,7 @@ public class MultivocalStartPartsTests
         string html = await RenderAsync<MultivocalPreviewTab>(new() { ["Plan"] = plan, ["CardOn"] = true });
 
         Assert.DoesNotContain("The steps marked as built work in this preview", html);
-        Assert.Contains("4 grey literature searches and 2 academic databases, each with its own search strings, until new sources add nothing new.", html);
+        Assert.Contains("3 grey literature searches and 2 academic databases, each with its own search strings, until new sources add nothing new.", html);
         Assert.Contains("Grey and academic sources are screened with the same criteria and the same care: once each, and again when included, unsure or flagged, and for a random sample.", html);
         Assert.Contains("Each academic source is appraised with MMAT, as in the systematic review, on its open full text or else its abstract.", html);
         Assert.Contains("a tension between academic and grey sources is named as one between the state of the art and the state of the practice", html);
