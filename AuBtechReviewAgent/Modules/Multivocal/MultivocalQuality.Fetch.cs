@@ -12,7 +12,7 @@ namespace AuBtechReviewAgent;
 /// The first half of the quality step: keeping every page that is not kept yet, with its own slots, before any model
 /// call. The model slots then never wait on the network, and a page that could not be fetched is on file as the reason
 /// its source was not assessed. Each site is still paced by <see cref="PageFetcher"/>, so more slots only mean more
-/// sites at once, never more requests to one site.
+/// sites at once, never more requests to one site. Stack Exchange questions are kept from the API first, in batches.
 /// </summary>
 public sealed partial class MultivocalQualityAssessor
 {
@@ -26,8 +26,17 @@ public sealed partial class MultivocalQualityAssessor
         var missing = records.Where(r => !kept.Contains(MultivocalSearcher.AddressKey(r.Url))).ToList();
         var failed = new ConcurrentDictionary<string, string>();
         int done = 0;
+
+        // Stack Exchange questions come from the API, many to a request, never from the site's pages (#453).
+        var questions = missing.Where(r => MultivocalPages.StackExchangeQuestion(r) != null).ToList();
+        if (questions.Count > 0)
+        {
+            await _pages.KeepStackExchangeAsync(runId, editKey, questions);
+            done = questions.Count;
+            progress?.Report($"{done} of {missing.Count} pages kept");
+        }
         using var slots = new SemaphoreSlim(_fetchParallelism);
-        await Task.WhenAll(missing.Select(async record =>
+        await Task.WhenAll(missing.Except(questions).Select(async record =>
         {
             await slots.WaitAsync();
             try

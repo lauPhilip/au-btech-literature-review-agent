@@ -37,6 +37,35 @@ public static partial class MultivocalFormalText
             ReportBlock.Table(new[] { "Database", "Search string", "Returned", "New" },
                 searches.Select(s => new[] { SearchName(s.Source), s.SearchString, s.Error == null ? Num(s.Returned) : $"failed: {s.Error}", Num(s.New) })),
         };
+        blocks.AddRange(SeedBlocks(ledger));
+        return blocks;
+    }
+
+    /// <summary>
+    /// The formal pool's seed step, when it ran: one round of citation chaining from the most-cited included academic
+    /// sources, in the words the systematic review uses (<see cref="MethodsSectionWriter.SeedChaining"/>), and the seeds.
+    /// </summary>
+    public static IReadOnlyList<ReportBlock> SeedBlocks(MultivocalLedger ledger)
+    {
+        var record = ledger.SeedChaining;
+        if (record == null) return Array.Empty<ReportBlock>();
+        int kept = ledger.Sources.Count(s => s.FoundBy.Any(f => f.StartsWith("seed chaining:", StringComparison.Ordinal)) && s.FoundBy.All(f => f.StartsWith("seed chaining:", StringComparison.Ordinal)));
+        var blocks = new List<ReportBlock>
+        {
+            ReportBlock.Paragraph(
+                "After screening, one round of citation chaining was run through OpenAlex from the most-cited included academic sources, in both directions: the works a source cites and the works citing it. " +
+                MethodsSectionWriter.SeedChaining(record, "included academic source", record.Seeds.Count > 0 ? "The table below lists the seeds. " : "", failedChainedOrdinarily: false) +
+                (record.Seeds.Count > 0
+                    ? $"Of the records found, {Count(kept, "new academic source")} joined the formal pool after the same duplicate checks as the formal search, and {(kept == 1 ? "it was" : "they were")} screened in the same way, with an audit sample of their own. Each raw answer was saved as received, with its SHA-256 fingerprint."
+                    : "")),
+        };
+        if (record.Seeds.Count > 0)
+            blocks.Add(ReportBlock.Table(new[] { "Rank", "Seed", "Year", "Citations", "Per year", "Kept (cites / cited by)" },
+                record.Seeds.OrderBy(x => x.Rank).Select(x => new[]
+                {
+                    Num(x.Rank), x.Title, Num(x.Year), Num(x.CitedByCount), x.CitationsPerYear.ToString("0.0", CultureInfo.InvariantCulture),
+                    x.Error == null ? $"{Num(x.Backward)} / {Num(x.Forward)}" : "look-up failed",
+                })));
         return blocks;
     }
 
@@ -98,6 +127,11 @@ public static partial class MultivocalFormalText
         "grouping the findings into themes, writing the theme sections, the discussion, the summary for practitioners and the title, abstract and introduction, " +
         "and checking each citation against the kept text of the source it cites: the kept page of a grey source, and the open-access full text or else the abstract of an academic one. " +
         "Every value, quality point, appraisal answer and citation verdict counts only with a quote found verbatim in that kept text; the method, the counts, the figures, the answers to questions about frequency or existence and the references were written in code. ";
+
+    /// <summary>The sentence on the seed step for the statement on the use of AI; empty when no seed was chosen.</summary>
+    public static string AiUseSeeds(MultivocalReportInput input) => input.Ledger.SeedChaining is { Seeds.Count: > 0 }
+        ? "The seed studies for citation chaining in the formal pool were chosen in code from the citation counts in the databases' metadata, not by the model. "
+        : "";
 
     /// <summary>The screenings' agreement for the statement on the use of AI: each pool and both, on the audit sample, as the method gives it.</summary>
     public static string AiUseKappa(MultivocalReportInput input) => MultivocalScreeningText.AiUseAgreement(input.Screening, bothPools: true);

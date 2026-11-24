@@ -98,7 +98,7 @@
                 }
                 <a href="@r.Url" target="_blank" rel="noopener noreferrer" class="text-sm font-medium text-heading hover:underline">@r.Title</a>
                 <p class="text-[11px] text-muted mt-0.5">
-                    @r.Site · @MultivocalStart.KindLabel(r.Kind)@(r.Producer.Length > 0 ? $" · {r.Producer}" : "")@(r.Published is DateTime d ? $" · {d:yyyy-MM-dd}" : "")@(r.Signals.Count > 0 ? " · " + string.Join(", ", r.Signals.Select(x => $"{x.Key} {x.Value}")) : "")
+                    @r.Site · @MultivocalStart.KindLabel(r.Kind)@(r.Producer.Length > 0 ? $" · {r.Producer}" : "")@(r.Published is DateTime d ? $" · {d:yyyy-MM-dd}" : "")@(r.Signals.Count > 0 ? " · " + string.Join(", ", r.Signals.Select(x => $"{x.Key} {x.Value}")) : "")@(found.Paper?.CitedByCount is int cites ? $" · cited {cites} {(cites == 1 ? "time" : "times")}" : "")@(found.FoundBy.Any(f => f.StartsWith("seed chaining:", StringComparison.Ordinal)) ? " · found by citation chaining from a seed" : "")
                 </p>
                 @if (r.Summary.Length > 0)
                 {
