@@ -98,8 +98,7 @@ public static partial class MultivocalPaperParts
         var cited = theme.Findings.Where(byId.ContainsKey).Select(id => byId[id].Address).Where(numbers.ContainsKey).Select(a => numbers[a]).Distinct().OrderBy(n => n).ToList();
         string Cite(IEnumerable<int> refs) => refs.Any() ? $" [{string.Join(", ", refs.Distinct().OrderBy(n => n))}]" : "";
         var sb = new StringBuilder();
-        sb.Append($"What this theme rests on: {Sources(theme.Sources)}{Cite(cited)}{MultivocalFormalText.ThemePools(theme)}, {theme.FirstTier} from 1st-tier, {theme.SecondTier} from 2nd-tier and {theme.ThirdTier} from 3rd-tier outlets, ");
-        sb.Append($"with a mean quality {(theme.FormalSources > 0 ? "of the grey sources " : "")}of {theme.MeanQuality.ToString("0.#", CultureInfo.InvariantCulture)} of {input.Quality.MaxPoints} points ({theme.EvidenceLabel}).");
+        sb.Append($"What this theme rests on: {Sources(theme.Sources)}{Cite(cited)}{MultivocalFormalText.ThemePools(theme)}, {MultivocalFormalText.ThemeBasis(theme, input.Quality.MaxPoints)}.");
         foreach (var tension in theme.Tensions)
         {
             var refs = new[] { byId.GetValueOrDefault(tension.FindingA)?.Address, byId.GetValueOrDefault(tension.FindingB)?.Address }

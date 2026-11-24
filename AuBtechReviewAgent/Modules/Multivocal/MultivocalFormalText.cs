@@ -92,7 +92,21 @@ public static partial class MultivocalFormalText
                $"That text was its open-access full text where one was found and otherwise its abstract: {Num(withMmat.Count - onAbstract)} {(withMmat.Count - onAbstract == 1 ? "rests" : "rest")} on a full text and {Num(onAbstract)} on the abstract alone. " +
                $"{Num(empirical)} {Was(empirical)} appraised as {(empirical == 1 ? "an empirical study" : "empirical studies")} and {Num(withMmat.Count - empirical)} {Was(withMmat.Count - empirical)} not empirical, so MMAT does not apply to {(withMmat.Count - empirical == 1 ? "it" : "them")}. " +
                "The quality threshold applies to grey sources only, so every appraised academic source was kept" +
-               (appraised.Count > withMmat.Count ? $"; {Num(appraised.Count - withMmat.Count)} could not be appraised ({string.Join("; ", appraised.Where(q => q.Mmat == null).Select(q => q.NotAssessed ?? "no reason recorded"))})." : ".");
+               (appraised.Count > withMmat.Count ? $"; {Num(appraised.Count - withMmat.Count)} could not be appraised{NotAppraisedReasons(appraised.Where(q => q.Mmat == null))}." : ".");
+    }
+
+    /// <summary>
+    /// Why sources could not be appraised, each reason once with how many it holds for (#467): a real run repeated one
+    /// reason eight times. One reason for all reads ", all because ..."; several read " (5: ...; 3: ...)".
+    /// </summary>
+    public static string NotAppraisedReasons(IEnumerable<GreyQuality> notAppraised)
+    {
+        var reasons = notAppraised
+            .Select(q => string.IsNullOrWhiteSpace(q.NotAssessed) ? "no reason recorded" : q.NotAssessed.Trim().TrimEnd('.'))
+            .GroupBy(r => r, StringComparer.Ordinal).OrderByDescending(g => g.Count()).ThenBy(g => g.Key, StringComparer.Ordinal).ToList();
+        if (reasons.Count == 0) return "";
+        if (reasons.Count == 1) return reasons[0].Count() == 1 ? $" ({reasons[0].Key})" : $", all for the same reason ({reasons[0].Key})";
+        return $" ({string.Join("; ", reasons.Select(g => $"{Num(g.Count())}: {g.Key}"))})";
     }
 
     /// <summary>How the formal pool was extracted (G12).</summary>
@@ -115,6 +129,18 @@ public static partial class MultivocalFormalText
         return $" Each finding was labelled in code as grey or formal literature, so each theme says what it rests on: {Num(both)} of the {Count(themes.Count, "theme")} rest on both pools, {Num(formalOnly)} on formal literature only and {Num(themes.Count - both - formalOnly)} on grey literature only. " +
                $"A tension between an academic and a grey source was recorded as one between the state of the art and the state of the practice; there {(across == 1 ? "was" : "were")} {Num(across)}. " +
                "A theme's mean quality counts its grey sources only, since academic sources have no Table 7 points.";
+    }
+
+    /// <summary>
+    /// What a theme rests on after its sources: their outlet tiers and the mean quality of the grey ones, and its label.
+    /// A theme on formal literature only has neither (#467: a real run said "a mean quality of the grey sources of 0").
+    /// </summary>
+    public static string ThemeBasis(SynthesisTheme theme, int maxPoints)
+    {
+        if (theme.GreySources == 0 && theme.FormalSources > 0)
+            return $"all academic, so without outlet tiers or quality points ({theme.EvidenceLabel})";
+        return $"{Num(theme.FirstTier)} from 1st-tier, {Num(theme.SecondTier)} from 2nd-tier and {Num(theme.ThirdTier)} from 3rd-tier outlets, " +
+               $"with a mean quality {(theme.FormalSources > 0 ? "of the grey sources " : "")}of {theme.MeanQuality.ToString("0.#", CultureInfo.InvariantCulture)} of {Num(maxPoints)} points ({theme.EvidenceLabel})";
     }
 
     /// <summary>
