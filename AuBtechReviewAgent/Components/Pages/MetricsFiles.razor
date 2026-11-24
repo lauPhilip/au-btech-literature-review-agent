@@ -1,0 +1,31 @@
+@* The Metrics page's downloads (issue #416): the figures of every finished run as files, for a researcher's own
+   tables, and the data dictionary that says what each column is (Web/MetricsDownloads.cs, docs/metrics-dictionary.md). *@
+
+<section id="files" aria-labelledby="files-title" class="ui-card scroll-mt-6 p-5 sm:p-6">
+    <h2 id="files-title" class="font-display text-xl font-semibold tracking-tight text-heading">Download the figures</h2>
+    <p class="mt-1 max-w-[70ch] text-[15px] text-muted">
+        Every figure of every completed review, one row per run, with the tool version and its commit, for your own tables and plots.
+        The files hold no research question, no paper text and only the short run ID shown here. Each kind of review is marked, so you can keep them apart.
+    </p>
+    <ul class="mt-4 flex flex-wrap gap-3">
+        @foreach (var (href, label) in Files)
+        {
+            var link = href;
+            <li><a class="ui-btn-secondary" href="@link" download data-enhance-nav="false">@label</a></li>
+        }
+    </ul>
+    <p class="mt-3 text-sm text-muted">
+        <a class="text-heading underline underline-offset-2" href="@Dictionary">The data dictionary</a> names every column, its unit and how it is worked out.
+    </p>
+</section>
+
+@code {
+    private static readonly (string Href, string Label)[] Files =
+    {
+        (AuBtechReviewAgent.MetricsDownloads.RunsCsv, "Runs (CSV)"),
+        (AuBtechReviewAgent.MetricsDownloads.RunsJson, "Runs (JSON)"),
+        (AuBtechReviewAgent.MetricsDownloads.StagesCsv, "Effort by stage and model (CSV)"),
+    };
+
+    private static readonly string Dictionary = AuBtechReviewAgent.ToolVersion.RepositoryUrl + "/blob/master/docs/metrics-dictionary.md";
+}

@@ -20,6 +20,7 @@ public partial class RunMetrics
             Model = state.RunSettings?.Model ?? "",
             QueryHash = Sha(state.SearchQuery ?? ""),
             Settings = settings.ToDictionary(kv => kv.Key, kv => kv.Value),
+            ReviewType = "systematic",
         };
         m.ConfigFingerprint = Sha(string.Join("|", new[] { m.Model, m.AppVersion }.Concat(settings.OrderBy(kv => kv.Key, StringComparer.Ordinal).Select(kv => $"{kv.Key}={kv.Value}"))));
 
@@ -29,6 +30,7 @@ public partial class RunMetrics
         m.Screened = s.Screened;
         m.Included = s.Included;
         m.ScreeningKappa = s.ScreeningKappa;
+        m.ScreeningKappaBasis = s.ScreeningKappa == null ? null : "all records";
         m.UncertainDecisions = s.UncertainDecisions;
         m.FullTextRetrieved = s.FullTextRetrieved;
         m.FullTextShare = s.Included == 0 ? 0 : Math.Round((double)s.FullTextRetrieved / s.Included, 4);
@@ -97,16 +99,7 @@ public partial class RunMetrics
             m.CitationsPer100Words = words == 0 ? 0 : Math.Round(refsPerSentence.Sum() * 100.0 / words, 2);
         }
 
-        m.LlmCalls = calls.Count;
-        m.LlmRetries = calls.Sum(c => Math.Max(0, c.Attempts - 1));
-        m.LlmFailures = calls.Count(c => c.Outcome != "ok");
-        m.Tokens = calls.Sum(c => TokensIn(c.Usage));
-        m.CostByStage = calls.GroupBy(c => c.Stage).OrderBy(g => g.Key, StringComparer.Ordinal).ToDictionary(g => g.Key, g => new StageCost
-        {
-            Calls = g.Count(),
-            Seconds = Math.Round(g.Sum(c => c.DurationMs) / 1000.0, 1),
-            Tokens = g.Sum(c => TokensIn(c.Usage)),
-        });
+        m.AddCost(calls);
         if (state.CompletedUtc is DateTime done)
             m.DurationMinutes = Math.Round((done - state.Timestamp).TotalMinutes, 1);
         return m;

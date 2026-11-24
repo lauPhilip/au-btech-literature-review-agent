@@ -33,6 +33,7 @@
                    placeholder="e.g. agentic AI software frameworks" class="ui-input text-base" />
             <FieldHelp Id="h-query" Text="The words sent to the databases. Short and specific works best." Value="@State.SearchQuery" Max="AuBtechReviewAgent.ReviewInputGuard.MaxQuery" />
         </div>
+        <Honeypot Id="f-website" @bind-Value="State.Honeypot" />
 
         @if (QuestionsShown)
         {

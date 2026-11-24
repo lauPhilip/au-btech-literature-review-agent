@@ -24,6 +24,9 @@ public partial class MultivocalStart
     // Instruction-like text in the plan (#365): shown on the last step, and the review starts only once the reviewer
     // confirms exactly these flags; editing the plan so the flags change asks again.
     internal IReadOnlyList<string> FlagLines => MultivocalPlanGuard.Lines(plan);
+
+    // Signs of broad criteria, checked in code (MultivocalCriteriaCheck); a warning only, never a problem.
+    internal IReadOnlyList<string> CriteriaWarnings => MultivocalCriteriaCheck.Warnings(plan);
     private string? confirmedFlags;
     internal bool FlagsConfirmed => FlagLines.Count == 0 || confirmedFlags == string.Join("\n", FlagLines);
     internal void ConfirmFlags(ChangeEventArgs e) => confirmedFlags = e.Value is true ? string.Join("\n", FlagLines) : null;
@@ -80,6 +83,12 @@ public partial class MultivocalStart
     internal async Task ProposeFormalStrings()
     {
         if (proposingStrings || proposalsLeft <= 0 || string.IsNullOrWhiteSpace(plan.Topic)) return;
+        // The page's five start again with a reload; the limit per address does not.
+        if (!Actions.TryTake(AuBtechReviewAgent.ActionLimiter.ProposeStrings, PrerenderClientAddress ?? "unknown", out string limited))
+        {
+            proposalError = limited;
+            return;
+        }
         proposingStrings = true;
         proposalError = null;
         proposalsLeft--;
@@ -195,13 +204,24 @@ public partial class MultivocalStart
     internal async Task WriteProtocolAsync()
     {
         if (saving) return;
-        saving = true;
         error = null;
+        if (!string.IsNullOrEmpty(honeypot))
+        {
+            AuBtechReviewAgent.SiteRateLimits.LogRefusal("honeypot", PrerenderClientAddress ?? "unknown");
+            error = "The tool is busy; try again later.";
+            return;
+        }
+        if (!Actions.TryTake(AuBtechReviewAgent.ActionLimiter.StartReview, PrerenderClientAddress ?? "unknown", out string tooMany))
+        {
+            error = tooMany;
+            return;
+        }
+        saving = true;
         try
         {
             var (newRunId, newEditKey) = await Planner.CreateAsync(plan, FlagsConfirmed ? FlagLines : null);
             // The protocol is written; the rest runs on the server, one step after another, without a click.
-            Runner.Start(newRunId, newEditKey);
+            Runner.Start(newRunId, newEditKey, PrerenderClientAddress);
             // Only this browser keeps the run's edit key, as for a systematic review.
             try { await JS.InvokeVoidAsync("traceableReview.saveEditKey", newRunId.ToString(), newEditKey); }
             catch (Exception ex) when (ex is JSException or JSDisconnectedException or InvalidOperationException or TaskCanceledException)

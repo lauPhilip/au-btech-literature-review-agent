@@ -61,6 +61,10 @@ All of these can be set in `appsettings.json` (non-secret values only), user sec
 | `ReverseProxy:KnownProxies` | empty | Only needed when a separate proxy sends `X-Forwarded-For` |
 | `Report:SupportStatement` | empty | Funding and support text printed in every report |
 | `Runs:MaxConcurrentRuns` | 3 | Runs allowed to call the model at the same time; the rest wait in line |
+| `Runs:MaxRunningPerClient` | 2 | Slots one network address may hold at once; its next run lets others pass |
+| `Runs:MaxQueuedPerClient` | 3 | Runs one address may have waiting on top of those running; more are refused |
+| `Runs:MaxQueuedRuns` | 100 | The longest the line may be; a run beyond it is refused with "The tool is busy" |
+| `Runs:TypicalRunMinutes` | 12 | Minutes per slot for the wait shown in line, until three runs have been timed |
 | `Runs:RetentionDays` | 7 | How long a run's results and link are kept |
 | `ReviewModules:Preview` | (empty) | Modules shown as a preview while they are being built, e.g. `["multivocal"]`: their pages open, their cards get a "Preview" chip, and the model card and privacy page describe them (`ReviewModulesOptions.Shows`). Read only in Development; ignored everywhere else. In production a review is opened and described only once its card is switched on (`Available: true` in its module), which is the one switch that makes it public |
 | `Runs:DemoRunId` | (empty) | A finished run shown on the landing page as "See an example report"; kept and read-only |
@@ -90,10 +94,11 @@ All of these can be set in `appsettings.json` (non-secret values only), user sec
 | `Synthesis:MaxThemes` | 8 | Upper limit on themes |
 | `Synthesis:CodingBatchSize` | 6 | Studies per coding call |
 | `Metrics:Enabled` / `Metrics:Folder` | true / `App_Data/metrics` | The run metrics store behind the Metrics page |
+| `Metrics:Prices:Currency`, `Metrics:Prices:Models:<model>:InputPerMillion`, `CachedInputPerMillion`, `OutputPerMillion` | empty (off) | Optional prices per million tokens for the `estimated_cost` column of the metrics downloads, worked out at download time; the code holds no prices, because they change |
 
 ## Several users at once
 
-Each run gets its own id, folder under `WorkspaceStore/` and link, so users never see or overwrite each other's runs. At most `Runs:MaxConcurrentRuns` runs call the model at the same time; further runs wait in line and their dashboards show the position. The widths above count the items of one run. On top of them, all runs on the server share one limit per model and key on the calls in flight (`ModelCallLimiter`): the model's width times `Runs:MaxConcurrentRuns`, and never less than two widths, so with the defaults at most 24 calls to the main model and 48 to the fast model, however the runs overlap. A run that brings its own key has its own limit. A call that waits for a place in the limit counts that wait in its duration in `llm-calls.json`.
+Each run gets its own id, folder under `WorkspaceStore/` and link, so users never see or overwrite each other's runs. At most `Runs:MaxConcurrentRuns` runs call the model at the same time, whatever kind of review they are; further runs wait in one fair line and their pages show the place and a rough wait (see the line on the [operations page](06-web-app-and-operations.md#limits-quota-slots-cache)). The widths above count the items of one run. On top of them, all runs on the server share one limit per model and key on the calls in flight (`ModelCallLimiter`): the model's width times `Runs:MaxConcurrentRuns`, and never less than two widths, so with the defaults at most 24 calls to the main model and 48 to the fast model, however the runs overlap. A run that brings its own key has its own limit. A call that waits for a place in the limit counts that wait in its duration in `llm-calls.json`.
 
 A rate limit (429) is tried up to six times and other temporary server errors (408, 5xx, network) up to four. On 429 and 503 the run waits as long as the server's `Retry-After` header asks, in seconds or as a date; without the header the wait doubles (2, 4, 8 s and on, plus up to half a second). No single wait is longer than 60 seconds (`LlmRetryPolicy`), and a call waiting to try again holds no place in the shared limit. Every attempt is counted in `llm-calls.json`. A retry sends the same prompt with the same settings, so decisions and cache keys do not change. A public deployment runs on the server's own Mistral key, so each visitor gets a small daily quota; visitors with their own key only have a light hourly cap. Client addresses are never stored, only a keyed hash that is enough to count runs.
 

@@ -15,8 +15,9 @@ namespace AuBtechReviewAgent;
 /// <summary>
 /// Screens the sources of a searched multivocal run (MLR block E, G9–G10): every source once, and a second time,
 /// independently, when <see cref="MultivocalSecondScreening"/> picks it (included, unsure or flagged, or in the random
-/// audit sample), with the plan's criteria and the same steps and answer format as the systematic review's screening
-/// (<see cref="PrismaReviewEngine.ScreeningProcedure"/>), so formal and grey sources get the same care. A source the two
+/// audit sample), with the plan's criteria and the systematic review's answer format and second screener's steps
+/// (<see cref="PrismaReviewEngine.ScreeningProcedure"/>), and first steps that ask for positive evidence
+/// (<see cref="FirstProcedure"/>), so formal and grey sources get the same care. A source the two
 /// screenings disagree on is kept and flagged, as in the systematic review. Sources with the same title under another
 /// address (an OpenAlex work with several DOIs, seen in a live run) are screened once. The run goes from "Searched"
 /// through "Screening" to "Screened".
@@ -30,8 +31,9 @@ public sealed partial class MultivocalScreener
     /// <summary>
     /// Part of the cache key: raise it whenever the grey screening prompt changes. v2: second screenings are targeted
     /// (<see cref="MultivocalSecondScreening"/>), so no answer cached under the rule of two screenings each is reused.
+    /// v3: the first screening looks for positive evidence (<see cref="FirstProcedure"/>).
     /// </summary>
-    public const string PromptVersion = "grey-screening-v2";
+    public const string PromptVersion = "grey-screening-v3";
 
     private static readonly JsonSerializerOptions Json = new() { WriteIndented = true };
     private static readonly ConcurrentDictionary<Guid, bool> Running = new();
@@ -186,12 +188,17 @@ public sealed partial class MultivocalScreener
         var chat = _chat();
         var firsts = await InParallelAsync(toScreen, item => ScreenFirstAsync(chat, plan, item.Record), (i, n) => progress?.Report($"{i} of {n} sources screened"));
 
+        // The pilot check: more than half of a pool's first 30 sources included is a warning on file, never a stop.
+        var decided = toScreen.Select((item, i) => (item, first: firsts[i])).Where(x => x.first.Answer != null).ToList();
+        foreach (bool formal in new[] { false, true })
+            if (MultivocalPilotCheck.Warning(decided.Where(x => file.Sources[x.item.Index].Formal == formal).Select(x => x.first.Answer!.IsIncluded), formal) is { } warning)
+                (file.Warnings ??= new()).Add(warning);
+
         // Second pass: only the sources the rule picks (MultivocalSecondScreening), each pool's audit sample drawn from
         // every source the first pass decided, whatever it decided.
         file.AuditSeed = MultivocalSecondScreening.SeedOf(runId);
         file.AuditShare = MultivocalSecondScreening.AuditShare;
         file.AuditMinimum = MultivocalSecondScreening.AuditMinimum;
-        var decided = toScreen.Select((item, i) => (item, first: firsts[i])).Where(x => x.first.Answer != null).ToList();
         var audit = new HashSet<string>(StringComparer.Ordinal);
         foreach (bool formal in new[] { false, true })
             audit.UnionWith(MultivocalSecondScreening.AuditSample(file.AuditSeed,

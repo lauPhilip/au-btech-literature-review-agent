@@ -49,7 +49,7 @@ public static partial class ThematicSynthesis
     /// <summary>Codes every study, a batch at a time. Studies that could not be coded are returned with the reason.</summary>
     public static async Task<(List<ThematicCode> Codes, List<UncodedStudy> Uncoded)> CodeStudiesAsync(
         IChatCompletionService chat, string objective, IReadOnlyList<ReferencedPaper> papers,
-        IReadOnlyList<StudyExtraction> extractions, int batchSize, int parallelism, Action<int, int>? progress = null)
+        IReadOnlyList<StudyExtraction> extractions, int batchSize, int parallelism, Action<int, int>? progress = null, IReadOnlyList<string>? questions = null)
     {
         var byRef = extractions.ToDictionary(e => e.ReferenceNumber);
         var batches = papers.OrderBy(p => p.ReferenceNumber).Chunk(Math.Max(1, batchSize)).ToList();
@@ -60,7 +60,7 @@ public static partial class ThematicSynthesis
             await throttle.WaitAsync();
             try
             {
-                var coded = await CodeBatchAsync(chat, objective, batch, byRef);
+                var coded = await CodeBatchAsync(chat, objective, batch, byRef, questions);
                 progress?.Invoke(Interlocked.Increment(ref finished), batches.Count);
                 return coded;
             }
@@ -92,7 +92,8 @@ public static partial class ThematicSynthesis
     }
 
     private static async Task<(List<ThematicCode>, List<UncodedStudy>)> CodeBatchAsync(
-        IChatCompletionService chat, string objective, IReadOnlyList<ReferencedPaper> batch, IReadOnlyDictionary<int, StudyExtraction> byRef)
+        IChatCompletionService chat, string objective, IReadOnlyList<ReferencedPaper> batch, IReadOnlyDictionary<int, StudyExtraction> byRef,
+        IReadOnlyList<string>? questions = null)
     {
         var data = new StringBuilder();
         var allowedFindings = new Dictionary<int, HashSet<string>>();
@@ -110,20 +111,22 @@ public static partial class ThematicSynthesis
             data.AppendLine();
         }
 
+        // With research questions a finding that bears only on one of them is still coded (the real runs dropped such codes).
+        string bearsOn = questions is { Count: > 0 } ? " or on any of the research questions" : "";
         string prompt = $$"""
             You are coding studies for the thematic synthesis of a systematic literature review (Thomas & Harden, 2008: line-by-line coding of findings, then descriptive themes).
 
-            REVIEW OBJECTIVE: "{{objective}}"
+            {{ReviewWriter.AimBlock(objective, questions)}}
             {{PromptSafety.ReviewerInputNotice}}
 
             {{PromptSafety.DataOnlyNotice}}
 
             {{PromptSafety.Wrap(data.ToString(), "the studies to code: verified findings or abstracts")}}
 
-            TASK: For each study, give 1 to 4 codes. A code is a short descriptive label (3 to 8 words) for one thing the study found, proposed or showed that bears on the review objective. Codes should be specific enough that two studies with the same code report the same kind of finding.
+            TASK: For each study, give 1 to 4 codes. A code is a short descriptive label (3 to 8 words) for one thing the study found, proposed or showed that bears on the review objective{{bearsOn}}. Codes should be specific enough that two studies with the same code report the same kind of finding.
             - Base every code on the study's listed findings and name them in "findings" (e.g. ["F3.1"]). Use only finding ids listed for that study.
             - For a study with "No verified findings", base the code on its abstract and copy a verbatim quote (one sentence, max 40 words, unbroken) from the abstract into "quote"; leave "findings" empty.
-            - If a study has nothing that bears on the objective, give "codes": [] and a one-sentence "reason".
+            - If a study has nothing that bears on the objective{{bearsOn}}, give "codes": [] and a one-sentence "reason".
             Respond ONLY with a minified JSON object:
             {"studies":[{"ref":3,"codes":[{"label":"...","findings":["F3.1"],"quote":""}],"reason":""}]}
             """;
@@ -155,7 +158,7 @@ public static partial class ThematicSynthesis
                     uncoded.Add(new UncodedStudy(p.ReferenceNumber, string.IsNullOrWhiteSpace(s.Reason) ? "No code bearing on the objective." : s.Reason.Trim()));
                     continue;
                 }
-                string evidence = EvidenceText(p, e);
+                var evidence = CanonicalText.Of(EvidenceText(p, e));
                 foreach (var c in valid)
                 {
                     var ids = (c.Findings ?? new()).Select(f => f.Trim().ToUpperInvariant()).Distinct().ToList();

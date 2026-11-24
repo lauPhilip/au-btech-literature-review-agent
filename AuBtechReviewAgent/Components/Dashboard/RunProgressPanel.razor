@@ -2,12 +2,12 @@
 @implements IDisposable
 
 @* New review while a run is going, waiting or stopped (redesign step 7). The main column, at most 760 px, has the
-   eyebrow with the step, the objective as the title, the overall bar and the seven steps (ReviewSteps), each done,
+   eyebrow with the step, the objective as the title, the live line of what happens now (LiveActivityLine), the overall bar and the seven steps (ReviewSteps), each done,
    running or waiting, with one line. The side column says the page can be closed and what is on record so far, with
    the way into the live log. The page adds its own parts through Notice (under the bar), Main (under the steps) and
    Side (under the side cards). The numbers come from ReviewStats, set by the engine through RunProgress; this
    component only shows them. On a phone only the active step keeps its line and the side cards are hidden, so the
-   screen fits 390 × 844. *@
+   screen fits 390 × 844; while the live line shows, the active step's line and the line's counts are left out there too. *@
 
 @{
     int percent = AuBtechReviewAgent.RunProgress.Percent(Stats);
@@ -17,6 +17,8 @@
     bool waitingForYou = Stage == AuBtechReviewAgent.PrismaReviewEngine.StageAwaitingReview;
     int current = AuBtechReviewAgent.ReviewSteps.Current(Stats, Stage);
     string barColor = failed ? "bg-not-supported-chart" : "bg-heading";
+    // On a phone the live line under the title says what the active step's line says, so that line is left out to fit 390 × 844.
+    bool liveShown = Running && !failed;
 }
 
 <div class="mx-auto w-full max-w-[1600px] px-[clamp(16px,3vw,40px)] py-4 sm:py-10">
@@ -25,6 +27,10 @@
         <section id="run-panel" class="mx-auto w-full max-w-[760px] min-w-0" aria-labelledby="run-title">
             <p class="font-display text-xs font-semibold uppercase tracking-[0.14em] @(failed ? "text-not-supported" : "text-muted")">@Eyebrow(failed, queued, waitingForYou, current)</p>
             <h1 id="run-title" class="mt-1 font-display text-[clamp(22px,2vw,32px)] font-semibold leading-tight tracking-[-0.025em] text-heading line-clamp-3 sm:mt-2">@Title</h1>
+            @if (liveShown)
+            {
+                <LiveActivityLine Line="AuBtechReviewAgent.LiveActivity.ForSystematic(Stats, Stage, QueuePosition, QueueText)" Class="mt-2 sm:mt-3" />
+            }
 
             <div class="ui-card mt-4 p-4 sm:mt-5 sm:p-6">
                 <div class="flex items-center justify-between gap-2 text-sm">
@@ -65,7 +71,7 @@
                             }
                             <span class="min-w-0">
                                 <span class="block font-display text-sm font-semibold @(state == "pending" ? "text-muted" : "text-heading")">@AuBtechReviewAgent.ReviewSteps.All[index].Title<span class="sr-only">@($" ({StateText(state)})")</span></span>
-                                <span class="block text-sm leading-snug text-muted @(active ? "" : "max-sm:hidden")">@line</span>
+                                <span class="block text-sm leading-snug text-muted @(active && !liveShown ? "" : "max-sm:hidden")">@line</span>
                             </span>
                         </li>
                     }
@@ -118,6 +124,9 @@
     [Parameter] public string Stage { get; set; } = "";
     [Parameter] public bool Running { get; set; }
     [Parameter] public int QueuePosition { get; set; }
+
+    /// <summary>The place in line with a rough wait ("You are 4th in line, about 25 minutes."), while the run waits.</summary>
+    [Parameter] public string? QueueText { get; set; }
     [Parameter] public DateTime? CompletedUtc { get; set; }
 
     /// <summary>The run's objective, shown as the title (the query when the run has no objective).</summary>
@@ -193,7 +202,8 @@
     private string CurrentLabel()
     {
         if (Stage == AuBtechReviewAgent.PrismaReviewEngine.StageQueued)
-            return QueuePosition > 0 ? $"Waiting for a free run slot (number {QueuePosition} in line)" : "Waiting for a free run slot";
+            return !string.IsNullOrEmpty(QueueText) ? $"Waiting for a free run slot. {QueueText}"
+                : QueuePosition > 0 ? $"Waiting for a free run slot (number {QueuePosition} in line)" : "Waiting for a free run slot";
         if (Stage == AuBtechReviewAgent.PrismaReviewEngine.StageAwaitingReview) return "Waiting for your screening decisions";
         if (Stage == AuBtechReviewAgent.PrismaReviewEngine.StageFailed) return "The run stopped with an error";
         if (Stage == AuBtechReviewAgent.PrismaReviewEngine.StageInterrupted) return "The run was interrupted";

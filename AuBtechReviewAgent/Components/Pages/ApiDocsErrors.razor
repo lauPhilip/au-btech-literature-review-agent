@@ -89,9 +89,11 @@
             ("400", Title(AuBtechReviewAgent.ApiProblems.Invalid("", Array.Empty<string>())), "Read the list in `errors`. Fix each field, and send the request again."),
             ("401", Title(AuBtechReviewAgent.ApiProblems.MissingKey()), "Send your Mistral key in the `X-Mistral-Key` header."),
             ("422", Title(AuBtechReviewAgent.ApiProblems.Flagged(Array.Empty<string>())), "Check the phrases in `flags`. If they are fine, send the same request with `acceptFlaggedInput` set to true."),
-            ("429", Title(AuBtechReviewAgent.ApiProblems.TooMany(TimeSpan.Zero)) + ", or " + Title(AuBtechReviewAgent.ApiProblems.TooManyCalls()).ToLowerInvariant(),
-                "Wait, then try again. `Retry-After` says how many seconds, when it is there. Too many calls clears within a minute."),
-            ("503", Title(AuBtechReviewAgent.ApiProblems.NoMistral()), "This server runs its own model, so it cannot use your key. Start the review on the website."),
+            ("429", Title(AuBtechReviewAgent.ApiProblems.TooMany(TimeSpan.Zero)) + ", or " + Title(AuBtechReviewAgent.ApiProblems.TooManyCalls()).ToLowerInvariant()
+                + ", or " + Title(AuBtechReviewAgent.ApiProblems.Busy(new AuBtechReviewAgent.RunAdmission(false))).ToLowerInvariant(),
+                "Wait, then try again. `Retry-After` says how many seconds, when it is there. Too many calls clears within a minute. With too many reviews waiting, let one finish first."),
+            ("503", Title(AuBtechReviewAgent.ApiProblems.NoMistral()) + ", or " + Title(AuBtechReviewAgent.ApiProblems.Busy(new AuBtechReviewAgent.RunAdmission(false, Busy: true))).ToLowerInvariant(),
+                "If the server runs its own model, it cannot use your key, so start the review on the website. If the tool is busy, try again after `Retry-After` seconds."),
         }),
         ("When you follow, read or cancel it", new[]
         {

@@ -72,14 +72,15 @@ public sealed partial class MultivocalRunner
     public static bool HasStepsLeft(string? stage) => stage is not (null or "" or MultivocalWriter.StageChecked);
 
     /// <summary>
-    /// Starts the run in the background and returns at once; false when it is running already or the key does not
-    /// fit. <see cref="RunAsync"/> does the work; tests call it directly.
+    /// Starts the run in the background and returns at once; false when it is running already, the key does not
+    /// fit, or the line refused it (the status then says why). <see cref="RunAsync"/> does the work; tests call it directly.
     /// </summary>
-    public bool Start(Guid runId, string? editKey)
+    public bool Start(Guid runId, string? editKey, string? client = null)
     {
         if (!_runs.CanEdit(runId, editKey)) return false;
         if (!TrySet(runId, new MultivocalRunStatus(true, "Starting", null, null, DateTime.UtcNow))) return false;
-        _ = Task.Run(() => RunStepsAsync(runId, editKey));
+        if (!Admit(runId, client)) return false;
+        _ = Task.Run(() => RunInLineAsync(runId, editKey));
         return true;
     }
 
@@ -88,7 +89,7 @@ public sealed partial class MultivocalRunner
     {
         if (!_runs.CanEdit(runId, editKey)) throw new InvalidOperationException("Only the browser that planned this run can run it.");
         if (!TrySet(runId, new MultivocalRunStatus(true, "Starting", null, null, DateTime.UtcNow))) throw new InvalidOperationException("This run is running already.");
-        await RunStepsAsync(runId, editKey);
+        await RunInLineAsync(runId, editKey);
     }
 
     private bool TrySet(Guid runId, MultivocalRunStatus status)

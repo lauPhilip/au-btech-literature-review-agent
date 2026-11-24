@@ -23,6 +23,12 @@ public static class ApiProblems
         $"This key or this address has started as many reviews as it may this hour. Try again {RunQuotaService.ResetText(wait)}.",
         new Dictionary<string, object?> { ["retryAfterSeconds"] = (int)Math.Ceiling(wait.TotalSeconds) });
 
+    /// <summary>The line is full (503), or this address has its share of runs running and waiting (429).</summary>
+    public static ApiProblem Busy(RunAdmission refusal) => refusal.Busy
+        ? new(503, "The tool is busy", refusal.Refusal ?? "Too many reviews are waiting. Try again later.",
+            new Dictionary<string, object?> { ["retryAfterSeconds"] = (int)Math.Ceiling((refusal.RetryAfter ?? TimeSpan.FromMinutes(15)).TotalSeconds) })
+        : new(429, "Too many reviews waiting", refusal.Refusal ?? "This address has as many reviews running or waiting as it may.");
+
     public static ApiProblem TooManyCalls() => new(429, "Too many calls",
         "Slow down a little. This key or this address has made too many calls in the last minute.");
 
