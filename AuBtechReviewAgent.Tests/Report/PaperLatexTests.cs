@@ -82,4 +82,14 @@ public class PaperLatexTests
         var unsafeChars = escaped.EnumerateRunes().Where(r => !LatexText.IsSafe(r)).Select(r => r.ToString()).ToList();
         Assert.Empty(unsafeChars);
     }
+
+    [Fact]
+    public void The_preamble_sets_text_in_T1_so_less_than_greater_than_and_bar_print_as_themselves()
+    {
+        // Issue #482: in the default OT1 encoding "<", ">" and "|" printed as "¡", "¿" and "—" in the PDF.
+        string tex = PaperLatex.Build(new ReviewPaper { Title = "Agents <and> tools | a review" });
+        Assert.Contains(@"\usepackage[T1]{fontenc}", tex);
+        Assert.True(tex.IndexOf(@"\usepackage[T1]{fontenc}", StringComparison.Ordinal) < tex.IndexOf(@"\usepackage{tgtermes}", StringComparison.Ordinal));
+        Assert.Contains("Agents <and> tools | a review", tex);
+    }
 }
