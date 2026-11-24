@@ -49,21 +49,19 @@ public sealed partial class MultivocalPages
         if (!_runs.CanEdit(runId, editKey)) throw new InvalidOperationException("Only the browser that planned this run can keep its pages.");
         var ledger = _searcher.LoadLedger(runId) ?? throw new InvalidOperationException("Search the run first.");
         var foundAddresses = ledger.Sources.Select(s => MultivocalSearcher.AddressKey(s.Record.Url)).ToHashSet();
-        var questions = records
-            .Where(r => foundAddresses.Contains(MultivocalSearcher.AddressKey(r.Url)))
-            .Select(r => (Record: r, Question: StackExchangeQuestion(r)))
-            .Where(q => q.Question != null)
-            .Select(q => (q.Record, Site: q.Question!.Value.Site, Id: q.Question.Value.Id))
-            .ToList();
+        var questions = new List<(GreyRecord Record, string Site, long Id)>();
+        foreach (var record in records)
+            if (foundAddresses.Contains(MultivocalSearcher.AddressKey(record.Url)) && StackExchangeQuestion(record) is var (site, id))
+                questions.Add((record, site, id));
         if (questions.Count < records.Count) throw new InvalidOperationException("Only Stack Exchange questions the searches found can be kept this way.");
 
         var kept = new List<PageSnapshot>();
-        foreach (var site in questions.GroupBy(q => q.Site, StringComparer.OrdinalIgnoreCase))
-            foreach (var batch in site.Chunk(StackExchangeText.MaxIds))
+        foreach (var bySite in questions.GroupBy(q => q.Site, StringComparer.OrdinalIgnoreCase))
+            foreach (var batch in bySite.Chunk(StackExchangeText.MaxIds))
             {
                 var accessed = DateTime.UtcNow;
                 StackExchangeBatch answer;
-                try { answer = await _stackExchange.FetchAsync(site.Key, batch.Select(q => q.Id).Distinct().ToList()); }
+                try { answer = await _stackExchange.FetchAsync(bySite.Key, batch.Select(q => q.Id).Distinct().ToList()); }
                 catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
                 {
                     answer = new StackExchangeBatch(new Dictionary<long, StackExchangeThread>(), Array.Empty<string>(),

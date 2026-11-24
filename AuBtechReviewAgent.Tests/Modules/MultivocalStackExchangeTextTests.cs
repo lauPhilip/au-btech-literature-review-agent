@@ -47,9 +47,13 @@ public class MultivocalStackExchangeTextTests : IDisposable
                 : string.Join(",", ids.Select(id =>
                     $$"""{"question_id":{{id}},"title":"Agents &quot;forget&quot; tools {{id}}","body":"<p>My agent forgets its tools.</p><pre><code>agent.run()</code></pre>","score":5,"owner":{"display_name":"Ana","link":"https://stackoverflow.com/users/1/ana"},"link":"https://stackoverflow.com/questions/{{id}}/slug","content_license":"CC BY-SA 4.0"}"""));
             string json = $$"""{"items":[{{items}}],"has_more":false,"quota_max":300,"quota_remaining":250{{extra}}}""";
-            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(json, Encoding.UTF8, "application/json") });
+            return Task.FromResult(Respond(HttpStatusCode.OK, json, "application/json"));
         }
     }
+
+    // The HttpClient that called the handler owns and disposes the response.
+    private static HttpResponseMessage Respond(HttpStatusCode status, string body, string type) =>
+        new(status) { Content = new StringContent(body, Encoding.UTF8, type) };
 
     /// <summary>The web: any page request is logged, and Stack Overflow refuses it as it does in real runs.</summary>
     private sealed class Web(List<string> log) : HttpMessageHandler
@@ -57,7 +61,7 @@ public class MultivocalStackExchangeTextTests : IDisposable
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
             lock (log) log.Add("fetch " + request.RequestUri);
-            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.Forbidden) { Content = new StringContent("") });
+            return Task.FromResult(Respond(HttpStatusCode.Forbidden, "", "text/html"));
         }
     }
 

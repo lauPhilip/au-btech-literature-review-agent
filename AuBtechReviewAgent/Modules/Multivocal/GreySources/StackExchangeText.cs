@@ -46,6 +46,7 @@ public sealed class StackExchangeText
     private DateTime _notBefore = DateTime.MinValue;
     private bool _quotaUsed;
 
+    /// <summary>A reader of the public API; the app keeps one, so its backoff and quota hold across runs.</summary>
     /// <param name="client">For tests; by default the grey sources' client, which decompresses the API's answers.</param>
     /// <param name="key">A free Stack Exchange API key, which raises the day's quota; optional.</param>
     public StackExchangeText(HttpClient? client = null, Func<TimeSpan, Task>? delay = null, string key = "", Func<DateTime>? clock = null)
@@ -71,18 +72,18 @@ public sealed class StackExchangeText
         var raw = new List<string>();
         var threads = new Dictionary<long, StackExchangeThread>();
 
-        var (questions, error) = await GetAsync(QuestionsUrl(site, ids), raw);
-        if (error != null) return new StackExchangeBatch(threads, raw, error);
+        var (questionsJson, error) = await GetAsync(QuestionsUrl(site, ids), raw);
+        if (questionsJson is not { } questions) return new StackExchangeBatch(threads, raw, error);
         var answers = new List<JsonElement>();
         for (int page = 1; page <= MaxAnswerPages; page++)
         {
-            var (json, answerError) = await GetAsync(AnswersUrl(site, ids, page), raw);
-            if (answerError != null) return new StackExchangeBatch(threads, raw, answerError);
-            answers.AddRange(Items(json!.Value));
-            if (!(json.Value.TryGetProperty("has_more", out var more) && more.ValueKind == JsonValueKind.True)) break;
+            var (answersJson, answerError) = await GetAsync(AnswersUrl(site, ids, page), raw);
+            if (answersJson is not { } json) return new StackExchangeBatch(threads, raw, answerError);
+            answers.AddRange(Items(json));
+            if (!(json.TryGetProperty("has_more", out var more) && more.ValueKind == JsonValueKind.True)) break;
         }
 
-        foreach (var q in Items(questions!.Value))
+        foreach (var q in Items(questions))
         {
             if (GreyJson.Long(q, "question_id") is not long id) continue;
             long? accepted = GreyJson.Long(q, "accepted_answer_id");
