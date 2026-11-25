@@ -104,9 +104,13 @@ else
 
             <div class="min-w-0">
         <CitationAttentionBar Attention="AttentionList" Index="attentionIndex" OnStep="StepAttention" HideFromLarge="true" />
-        <article class="mx-auto w-full max-w-[880px] rounded-card border border-line bg-page px-5 py-6 text-[17px] leading-[1.7] text-ink shadow-card sm:px-10 sm:py-10 [&_blockquote]:max-w-[70ch] [&_h3]:max-w-[70ch] [&_p]:max-w-[70ch] print:max-w-none print:rounded-none print:border-0 print:p-0 print:text-[11pt] print:leading-normal print:shadow-none">
+        <article class="mx-auto w-full max-w-[880px] rounded-card border border-line bg-page px-5 py-6 text-[17px] leading-[1.7] text-ink shadow-card sm:px-10 sm:py-10 [&_blockquote]:max-w-[70ch] [&_h3]:max-w-[70ch] [&_p]:max-w-[70ch] print:max-w-none print:rounded-none print:border-0 print:p-0 print:text-[11pt] print:leading-normal print:shadow-none journal">
+            @if (articleInfo != null)
+            {
+                <ArticleFront Info="articleInfo" />
+            }
 
-            <header class="border-b border-line pb-6">
+            <header class="border-b border-line pb-6 @(articleInfo != null ? "print:hidden" : "")">
                 <p class="font-display text-xs font-semibold uppercase tracking-[0.14em] text-muted">Systematic review · PRISMA 2020@(dateLine.Length > 0 ? $" · {dateLine}" : "")</p>
                 <h1 class="mt-2 max-w-[24ch] font-display text-[clamp(26px,2.4vw,40px)] font-semibold leading-tight tracking-[-0.025em] text-heading">@ScrubAnchors(report.TitleItem)</h1>
                 @if (runLine.Length > 0)
@@ -133,7 +137,7 @@ else
                 }
             </header>
 
-            <section id="@AuBtechReviewAgent.ReportOutline.AbstractId" data-report-section class="scroll-mt-20 pt-6">
+            <section id="@AuBtechReviewAgent.ReportOutline.AbstractId" data-report-section class="scroll-mt-20 pt-6 @(articleInfo != null ? "print:hidden" : "")">
                 <h2 class="font-display text-xl font-semibold tracking-tight text-heading">Abstract</h2>
                 <p class="mt-2">@ScrubAnchors(report.AbstractItem)</p>
             </section>
@@ -159,7 +163,7 @@ else
                 }
                 else
                 {
-                    <ol class="space-y-2 text-[15px] text-ink">
+                    <ol class="journal-refs space-y-2 text-[15px] text-ink">
                         @for (int i = 0; i < includedCitations.Count; i++)
                         {
                             int number = i + 1;
@@ -174,13 +178,10 @@ else
 
             <SpecMatrixAppendix Page="this" />
 
-            <div class="mt-12 border-t border-line pt-4 text-center text-xs uppercase tracking-[0.14em] text-muted">
+            @* On paper the front page names the run, the protocol and the links instead; a venue's name would read as the paper's journal. *@
+            <div class="mt-12 border-t border-line pt-4 text-center text-xs uppercase tracking-[0.14em] text-muted print:hidden">
                 OSSYM 2026 - 8th International Open Search Symposium
             </div>
-            @* Only on paper: where the printed report came from, so a printout can be traced back to its run. *@
-            <p class="hidden print:block mt-2 text-center text-xs text-muted">
-                Generated with TraceableAI · run @ReportRunId · @(report.GeneratedAt) · protocol @(string.IsNullOrWhiteSpace(report.ProtocolHash) ? "not recorded" : report.ProtocolHash)
-            </p>
 
         </article>
         @if (editLog.Edits.Count > 0 || CanEditText)

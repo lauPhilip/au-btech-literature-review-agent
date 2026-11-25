@@ -1,0 +1,82 @@
+/* The printed report as a journal article (wiki page 06). Plain CSS, not built by Tailwind, and only for print: A4
+   pages with even 15 mm margins, "page X of Y" at the foot, a running header from the second page (written per report
+   by Components/Paper/ArticleFront.razor), a front page with the article-info box beside the abstract, and a serif,
+   justified, hyphenated body with booktabs tables. One column: the reports carry wide tables (the appendix, the
+   guideline and pool tables) that do not fit an 87 mm column, and Chrome splits multi-column text badly across pages.
+   The margin boxes need Chrome 131 or later; other browsers print the same pages without header and page numbers. */
+@media print {
+    @page {
+        size: A4;
+        margin: 15mm;
+        @top-left { font: 8pt Georgia, "DejaVu Serif", serif; color: #555; vertical-align: bottom; padding-bottom: 4mm; }
+        @top-right { font: 8pt Georgia, "DejaVu Serif", serif; color: #555; vertical-align: bottom; padding-bottom: 4mm; }
+        @bottom-center { content: counter(page) " of " counter(pages); font: 8pt Georgia, "DejaVu Serif", serif; color: #555; vertical-align: top; padding-top: 4mm; }
+    }
+
+    .journal {
+        --journal-serif: Charter, "Bitstream Charter", "Sitka Text", Cambria, "Source Serif Pro", "Noto Serif", "DejaVu Serif", Georgia, serif;
+        font-family: var(--journal-serif);
+        font-size: 10pt !important;
+        line-height: 1.38 !important;
+        color: #000 !important;
+    }
+    .journal :where(p, li, dd, dt, blockquote, figcaption, caption, td, th, h1, h2, h3, h4, span, div, a, button, em, strong) { font-family: inherit; }
+    .journal :is(p, li, blockquote) {
+        font-size: 10pt !important;
+        line-height: 1.38 !important;
+        max-width: none !important;
+        text-align: justify;
+        hyphens: auto;
+        orphans: 3;
+        widows: 3;
+    }
+    .journal :is(h1, h2, h3, h4) { color: #000 !important; letter-spacing: 0 !important; break-after: avoid; break-inside: avoid; text-align: left; hyphens: manual; max-width: none !important; }
+    .journal h2 { font-size: 11pt !important; font-weight: 700 !important; margin-top: 12pt !important; }
+    .journal h3 { font-size: 10pt !important; font-weight: 700 !important; font-style: italic; margin-top: 8pt !important; }
+    .journal .text-muted { color: #333 !important; }
+    .journal .text-xs, .journal .text-\[13px\] { font-size: 8pt !important; }
+    .journal .space-y-10 > * + * { margin-top: 14pt !important; }
+    .journal :is(.pt-6, .pt-8) { padding-top: 0 !important; }
+
+    /* Citation numbers read as [n] in the text's own font. */
+    .journal button[id^="cite-"] { display: inline !important; font: inherit !important; min-width: 0 !important; margin: 0 !important; color: #000 !important; text-decoration: none; }
+
+    /* Controls that cannot work on paper; links stay, and lead to absolute addresses. */
+    .journal :is(button:not([id^="cite-"]), summary, textarea, input, select, [role="tablist"]) { display: none !important; }
+    .journal a { color: #000 !important; text-decoration: underline; text-decoration-thickness: 0.4pt; }
+
+    /* Tables in the booktabs style: a heavy rule above and below, a light one under the head, no other lines. */
+    .journal table { border-collapse: collapse !important; border: 0 !important; border-top: 1pt solid #000 !important; border-bottom: 1pt solid #000 !important; font-size: 8.5pt !important; line-height: 1.3 !important; }
+    .journal :is(tr, td, th, thead, tbody) { border: 0 !important; background: none !important; }
+    .journal thead tr:last-child th, .journal thead tr:last-child td { border-bottom: 0.5pt solid #000 !important; }
+    .journal :is(td, th) { padding: 2pt 6pt 2pt 0 !important; text-align: left; hyphens: auto; }
+    .journal caption { font-size: 8.5pt !important; font-weight: 400 !important; padding-bottom: 3pt; caption-side: top; text-align: left; color: #000 !important; }
+    .journal table, .journal figure { break-inside: avoid; }
+    .journal figure { border: 0 !important; background: none !important; padding: 0 !important; box-shadow: none !important; }
+    .journal figcaption { font-size: 8.5pt !important; text-align: left; }
+
+    /* References with a hanging indent. */
+    .journal .journal-refs { list-style: none; padding-left: 0; }
+    .journal .journal-refs > li { font-size: 8.5pt !important; line-height: 1.3 !important; padding-left: 2.2em !important; text-indent: -2.2em; text-align: left; margin-top: 2pt !important; break-inside: avoid; }
+
+    /* The front page. */
+    .journal-front { margin-bottom: 10pt; padding-bottom: 8pt; border-bottom: 1pt solid #000; break-inside: auto; }
+    .journal-front .journal-kind { font-size: 8pt !important; text-transform: uppercase; letter-spacing: 0.12em; color: #333; text-align: left; }
+    .journal-front .journal-title { font-size: 18pt !important; line-height: 1.2 !important; font-weight: 700; margin: 4pt 0 6pt; color: #000; }
+    .journal-front .journal-author { font-size: 11pt !important; text-align: left; }
+    .journal-front .journal-note, .journal-front .journal-footnote { font-size: 8pt !important; color: #333; text-align: left; }
+    .journal-front .journal-frontgrid { display: grid; grid-template-columns: 58mm 1fr; gap: 6mm; margin-top: 8pt; border-top: 1pt solid #000; padding-top: 6pt; }
+    .journal-front .journal-label { display: block; font-size: 7.5pt !important; font-weight: 700 !important; text-transform: uppercase; letter-spacing: 0.18em; margin: 0 0 3pt !important; }
+    .journal-front .journal-info { font-size: 7.5pt; line-height: 1.3; text-align: left; break-inside: avoid; }
+    .journal-front .journal-info dl { margin: 0 0 6pt; }
+    .journal-front .journal-info dt { font-weight: 700; font-size: 7.5pt; margin-top: 2pt; }
+    .journal-front .journal-info dd { margin: 0; font-size: 7.5pt; overflow-wrap: anywhere; }
+    .journal-front .journal-info :is(ul, li) { list-style: none; padding: 0; margin: 0; font-size: 7.5pt !important; line-height: 1.3 !important; text-align: left; overflow-wrap: anywhere; hyphens: manual; }
+    .journal-front .journal-keywords { margin-bottom: 6pt !important; }
+    .journal-front .journal-links li { margin-bottom: 2pt !important; }
+    .journal-front .journal-mono { font-family: "DejaVu Sans Mono", Consolas, monospace !important; font-size: 7pt; overflow-wrap: anywhere; }
+    .journal-front .journal-abstract { border-top: 0; border-bottom: 0; }
+    .journal-front .journal-abstract p { margin-top: 0; }
+    .journal-front .journal-cite { font-size: 8pt !important; margin-top: 8pt; padding-top: 4pt; border-top: 0.5pt solid #000; text-align: left; overflow-wrap: anywhere; hyphens: manual; }
+    .journal-front .journal-cite .journal-label { display: inline; margin-right: 4pt !important; }
+}
