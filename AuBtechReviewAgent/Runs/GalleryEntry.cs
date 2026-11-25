@@ -47,6 +47,9 @@ public sealed record GalleryEntry
     /// <summary>When a newer run of the same review replaced the report; null until then.</summary>
     public DateTime? UpdatedUtc { get; init; }
 
+    /// <summary>When the owner last said yes to the consent text (GalleryText.Consent); set on every add or replace. Null in entries made before it was recorded.</summary>
+    public DateTime? ConsentUtc { get; init; }
+
     /// <summary>The version of TraceableAI the run was made with, with its commit (ToolVersion).</summary>
     public string ToolVersion { get; init; } = "";
     public int Included { get; init; }

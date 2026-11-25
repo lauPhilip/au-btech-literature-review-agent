@@ -94,6 +94,7 @@ public sealed class GalleryStore
                 Id = same?.Id ?? NewId(stored),
                 AddedUtc = same?.AddedUtc ?? now,
                 UpdatedUtc = same == null ? null : now,
+                ConsentUtc = now,
                 OwnerTokenSha256 = GalleryFingerprint.OwnerToken(editKey!),
             };
             WriteEntry(entry, source, files);
