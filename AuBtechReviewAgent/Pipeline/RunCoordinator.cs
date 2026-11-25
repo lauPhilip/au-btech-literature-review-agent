@@ -53,6 +53,7 @@ public partial class RunCoordinator
     private readonly ConcurrentDictionary<Guid, TaskCompletionSource<IReadOnlyList<ScreeningOverride>>> _reviewGates = new();
     private readonly ConcurrentDictionary<Guid, DateTime> _active = new();
     private readonly ConcurrentDictionary<Guid, RunStop> _stops = new();
+    private readonly ConcurrentDictionary<Guid, DateTime> _held = new();
 
     public RunCoordinator(int maxConcurrent) : this(new RunsOptions { MaxConcurrentRuns = maxConcurrent }) { }
 
@@ -113,8 +114,20 @@ public partial class RunCoordinator
         lock (stop) stop.Closed = true;
     }
 
-    /// <summary>True while the run is queued, running or waiting for a screening review in this process.</summary>
-    public bool IsActive(Guid runId) => _active.ContainsKey(runId);
+    /// <summary>
+    /// True while the run is queued, running or waiting for a screening review in this process, or while another
+    /// module's runner holds it (<see cref="Hold"/>). A run that is active cannot be deleted, noted or cleaned up.
+    /// </summary>
+    public bool IsActive(Guid runId) => _active.ContainsKey(runId) || _held.ContainsKey(runId);
+
+    /// <summary>
+    /// Marks a run of another module (the multivocal runner) as active while its steps run, so the run store treats
+    /// it as running. It is not a systematic run: <see cref="ActiveRunIds"/> and <see cref="Cancel"/> leave it out.
+    /// </summary>
+    public void Hold(Guid runId) => _held[runId] = DateTime.UtcNow;
+
+    /// <summary>Ends a <see cref="Hold"/>.</summary>
+    public void Release(Guid runId) => _held.TryRemove(runId, out _);
 
     public IReadOnlyCollection<Guid> ActiveRunIds => _active.Keys.ToList();
 
