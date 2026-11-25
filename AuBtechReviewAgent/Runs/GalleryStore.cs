@@ -15,16 +15,18 @@ namespace AuBtechReviewAgent;
 public sealed record GalleryResult(bool Ok, string Message, GalleryEntry? Entry = null, bool Updated = false);
 
 /// <summary>
-/// The gallery of example reports: finished runs whose owners said yes to publishing them. Each entry is a folder,
-/// App_Data/gallery/{entry id}/, holding a copy of the run's report files (GallerySnapshot) and entry.json. It lives
-/// outside the run folders, as the metrics store does, so it is not removed by the run clean-up.
+/// The gallery of example reports: finished runs whose owners said yes to publishing them. Each review is a folder,
+/// App_Data/gallery/{entry id}/, holding entry.json and one sub-folder per version, v/{n}/, with a copy of that run's
+/// report files (GallerySnapshot). It lives outside the run folders, as the metrics store does, so it is not removed by
+/// the run clean-up.
 ///
-/// The rules: nothing is added without the owner's explicit consent and edit key; one review has one entry, so a new
-/// consent for the same fingerprint replaces the report in place (same address, "updated on"); the gallery keeps at
-/// most Gallery:MaxEntries entries and drops the one changed longest ago; whoever holds the run's edit key can withdraw
-/// the entry at any time; and an administrator hides an entry with Gallery:HiddenIds.
+/// The rules: nothing is added without the owner's explicit consent and edit key; one review has one entry, and a new
+/// consent for the same fingerprint adds a version to it, so earlier versions keep their addresses; the gallery keeps
+/// at most Gallery:MaxEntries versions in all (GalleryStore.Files.cs says which go first); whoever holds the edit key
+/// of a version's run can withdraw the entry at any time, which removes every version; and an administrator hides an
+/// entry with Gallery:HiddenIds.
 /// </summary>
-public sealed class GalleryStore
+public sealed partial class GalleryStore
 {
     private static readonly SemaphoreSlim Gate = new(1, 1);
     private static readonly JsonSerializerOptions Json = new() { WriteIndented = true, PropertyNameCaseInsensitive = true };
@@ -40,6 +42,7 @@ public sealed class GalleryStore
         _runs = runs;
         Root = Path.GetFullPath(Path.IsPathRooted(options.Folder) ? options.Folder : Path.Join(contentRoot, options.Folder));
         _hidden = new HashSet<string>(options.HiddenIds.Select(h => h.Trim().ToLowerInvariant()), StringComparer.Ordinal);
+        MoveOldEntriesIntoVersions();
     }
 
     public string Root { get; }
@@ -53,20 +56,32 @@ public sealed class GalleryStore
         return Path.Join(Root, entryId);
     }
 
-    /// <summary>Every entry the site shows, the most recently changed first; hidden ones are left out.</summary>
+    /// <summary>The folder of one version's copy: {entry}/v/{number}.</summary>
+    public string VersionFolderOf(string entryId, int number)
+    {
+        if (number < 1) throw new ArgumentOutOfRangeException(nameof(number), "Versions are numbered from 1.");
+        return Path.Join(FolderOf(entryId), "v", number.ToString(System.Globalization.CultureInfo.InvariantCulture));
+    }
+
+    /// <summary>Every entry the site shows, as its newest version, the most recently changed first; hidden ones are left out.</summary>
     public IReadOnlyList<GalleryEntry> List() =>
         !Enabled ? Array.Empty<GalleryEntry>() : AllStored().Where(e => !_hidden.Contains(e.Id)).OrderByDescending(e => e.LastChangedUtc).ToList();
 
-    /// <summary>One entry the site shows, or null (unknown, hidden or badly formed id).</summary>
+    /// <summary>One entry the site shows, as its newest version, or null (unknown, hidden or badly formed id).</summary>
     public GalleryEntry? Find(string? entryId) =>
         Enabled && GalleryFingerprint.IsEntryId(entryId) && !_hidden.Contains(entryId!) ? ReadEntry(Path.Join(Root, entryId!)) : null;
 
-    /// <summary>The shown entry made from this run, so its report page can say it is in the gallery.</summary>
-    public GalleryEntry? ForRun(Guid runId) => List().FirstOrDefault(e => e.RunId == runId);
+    /// <summary>One version of an entry the site shows, or null when the entry or the version is not there.</summary>
+    public GalleryEntry? Find(string? entryId, int version) =>
+        Find(entryId) is { } entry && entry.VersionOf(version) is { } v ? entry.ForVersion(v) : null;
+
+    /// <summary>The shown entry with a version made from this run, so its report page can say it is in the gallery.</summary>
+    public GalleryEntry? ForRun(Guid runId) => List().FirstOrDefault(e => e.Versions.Any(v => v.RunId == runId));
 
     /// <summary>
-    /// Adds the run's report to the gallery, or replaces the report of the same review. Refused without consent,
-    /// without the run's edit key, for a run that is still going, the example run, or a run that did not finish with a report.
+    /// Adds the run's report to the gallery, as a new entry or as the newest version of the same review. Refused without
+    /// consent, without the run's edit key, for a run that is still going, the example run, or a run that did not
+    /// finish with a report.
     /// </summary>
     public async Task<GalleryResult> AddAsync(Guid runId, string? editKey, bool consent)
     {
@@ -88,20 +103,28 @@ public sealed class GalleryStore
             var stored = AllStored();
             var same = stored.FirstOrDefault(e => e.Fingerprint == described.Fingerprint);
             if (same != null && _hidden.Contains(same.Id)) return new(false, "This review was taken down from the gallery by the site's administrator.");
+            var earlier = same?.Versions ?? new List<GalleryVersion>();
+            if (earlier.FirstOrDefault(v => v.RunId == runId) is { } already)
+                return new(true, $"This run is already in the gallery, as version {already.Number}.", same);
             var now = DateTime.UtcNow;
+            int number = (same?.LastVersion ?? 0) + 1;
+            var version = GalleryVersion.From(described, number, now, GalleryFingerprint.OwnerToken(editKey!));
             var entry = described with
             {
                 Id = same?.Id ?? NewId(stored),
                 AddedUtc = same?.AddedUtc ?? now,
                 UpdatedUtc = same == null ? null : now,
-                OwnerTokenSha256 = GalleryFingerprint.OwnerToken(editKey!),
+                Versions = earlier.Append(version).ToList(),
+                LastVersion = number,
+                Version = number,
             };
-            WriteEntry(entry, source, files);
+            CopyVersion(entry.Id, number, source, files);
+            WriteEntryFile(entry);
             DropOverCap(entry.Id);
-            _log.LogInformation("Gallery entry {Entry} {Action} from run {Run}.", entry.Id, same == null ? "added" : "updated", entry.ShortRunId);
+            _log.LogInformation("Gallery entry {Entry} version {Version} added from run {Run}.", entry.Id, number, version.ShortRunId);
             return same == null
                 ? new(true, "Added to the gallery.", entry)
-                : new(true, "This review was already in the gallery; its report is now this run's.", entry, Updated: true);
+                : new(true, $"This review was already in the gallery. This run is now its newest version, number {number}; the earlier versions stay.", entry, Updated: true);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
@@ -114,7 +137,11 @@ public sealed class GalleryStore
         }
     }
 
-    /// <summary>Removes an entry for good, with the edit key of the run it was made from.</summary>
+    /// <summary>
+    /// Removes the entry and every one of its versions for good, with the edit key of the run of any of its versions.
+    /// Removing never publishes anything, so the key of one version is enough: a person who re-ran a review holds a
+    /// different key for each run, and may no longer hold the oldest (browsers keep a key for 30 days).
+    /// </summary>
     public async Task<bool> WithdrawAsync(string? entryId, string? editKey)
     {
         if (!GalleryFingerprint.IsEntryId(entryId) || string.IsNullOrWhiteSpace(editKey) || editKey.Length > 100) return false;
@@ -124,7 +151,7 @@ public sealed class GalleryStore
             var entry = ReadEntry(Path.Join(Root, entryId!));
             if (entry == null || !CanWithdraw(entry, editKey)) return false;
             Directory.Delete(FolderOf(entry.Id), recursive: true);
-            _log.LogInformation("Gallery entry {Entry} withdrawn by its owner.", entry.Id);
+            _log.LogInformation("Gallery entry {Entry} and its {Count} version(s) withdrawn by an owner.", entry.Id, entry.Versions.Count);
             return true;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
@@ -138,68 +165,17 @@ public sealed class GalleryStore
         }
     }
 
-    /// <summary>True when the key is the edit key of the run the entry was made from.</summary>
-    public static bool CanWithdraw(GalleryEntry entry, string? editKey) =>
-        !string.IsNullOrWhiteSpace(editKey) && editKey.Length <= 100 && entry.OwnerTokenSha256.Length == 64 &&
-        CryptographicOperations.FixedTimeEquals(Encoding.ASCII.GetBytes(entry.OwnerTokenSha256), Encoding.ASCII.GetBytes(GalleryFingerprint.OwnerToken(editKey)));
+    /// <summary>True when the key is the edit key of a run one of the entry's versions was made from.</summary>
+    public static bool CanWithdraw(GalleryEntry entry, string? editKey) => entry.Versions.Any(v => OwnsVersion(v, editKey));
 
-    // The copy is written to a temporary folder and moved into place, so a reader never sees half an entry.
-    private void WriteEntry(GalleryEntry entry, string source, IReadOnlyList<string> files)
-    {
-        Directory.CreateDirectory(Root);
-        string temp = Path.Join(Root, ".new-" + entry.Id);
-        if (Directory.Exists(temp)) Directory.Delete(temp, recursive: true);
-        Directory.CreateDirectory(temp);
-        foreach (var file in files)
-        {
-            string from = Path.Join(source, Path.GetFileName(file));
-            if (File.Exists(from)) File.Copy(from, Path.Join(temp, Path.GetFileName(file)));
-        }
-        File.WriteAllText(Path.Join(temp, GalleryEntry.FileName), JsonSerializer.Serialize(entry, Json));
-        string target = FolderOf(entry.Id);
-        if (Directory.Exists(target)) Directory.Delete(target, recursive: true);
-        Directory.Move(temp, target);
-    }
-
-    private void DropOverCap(string keep)
-    {
-        var all = AllStored().OrderBy(e => e.LastChangedUtc).ToList();
-        foreach (var old in all.Where(e => e.Id != keep).Take(Math.Max(0, all.Count - MaxEntries)))
-        {
-            Directory.Delete(FolderOf(old.Id), recursive: true);
-            _log.LogInformation("Gallery entry {Entry} dropped: the gallery keeps {Max} reports.", old.Id, MaxEntries);
-        }
-    }
+    private static bool OwnsVersion(GalleryVersion version, string? editKey) =>
+        !string.IsNullOrWhiteSpace(editKey) && editKey.Length <= 100 && version.OwnerTokenSha256.Length == 64 &&
+        CryptographicOperations.FixedTimeEquals(Encoding.ASCII.GetBytes(version.OwnerTokenSha256), Encoding.ASCII.GetBytes(GalleryFingerprint.OwnerToken(editKey)));
 
     private string NewId(IReadOnlyList<GalleryEntry> stored)
     {
         string id;
         do id = GalleryFingerprint.NewEntryId(); while (stored.Any(e => e.Id == id) || _hidden.Contains(id));
         return id;
-    }
-
-    private List<GalleryEntry> AllStored()
-    {
-        if (!Directory.Exists(Root)) return new();
-        return Directory.EnumerateDirectories(Root)
-            .Where(d => GalleryFingerprint.IsEntryId(Path.GetFileName(d)))
-            .Select(ReadEntry).OfType<GalleryEntry>().ToList();
-    }
-
-    private static GalleryEntry? ReadEntry(string folder)
-    {
-        string path = Path.Join(folder, GalleryEntry.FileName);
-        if (!File.Exists(path)) return null;
-        try
-        {
-            var entry = JsonSerializer.Deserialize<GalleryEntry>(File.ReadAllText(path), Json);
-            return entry != null && entry.IsValidId && entry.Id == Path.GetFileName(folder) ? entry : null;
-        }
-        catch (Exception ex) when (ex is JsonException or IOException or UnauthorizedAccessException)
-        {
-            _log.LogWarning("Gallery entry {Folder} unreadable: {Message}",
-                PrismaReviewEngine.SanitizeLogMessage(Path.GetFileName(folder)), PrismaReviewEngine.SanitizeLogMessage(ex.Message));
-            return null;
-        }
     }
 }
