@@ -159,7 +159,7 @@ public partial class PrismaReviewEngine
         {
             new("Registration and Protocol", string.IsNullOrWhiteSpace(report.ProtocolItem) ? NoProtocolText : report.ProtocolItem),
             new("Support & Funding", report.SupportItem ?? ""),
-            new("Availability of Data and Code", "", (report.AvailabilityItem ?? "").Replace("_", @"\_")),
+            new("Availability of Data and Code", "", LatexBreaks.Allow((report.AvailabilityItem ?? "").Replace("_", @"\_"))),
         };
 
         var paper = new ReviewPaper

@@ -139,7 +139,9 @@ public static class PaperLatex
         // Two maths spans side by side ("2×10^6") become one, since "$$" would start display maths.
         escaped = Regex.Replace(escaped, @"(?<!\\)\$\$", "");
         // Markdown-style *italics* (used for venues in the APA references) -> real LaTeX italics.
-        return Regex.Replace(escaped, @"\*([^*\n]+)\*", @"\textit{$1}");
+        escaped = Regex.Replace(escaped, @"\*([^*\n]+)\*", @"\textit{$1}");
+        // A long address or hash may end the line at its separators, so it stays inside the margin.
+        return LatexBreaks.Allow(escaped);
     }
 
     private static string Body(PaperSection section) => section.Latex ?? Escape(section.Text);
@@ -152,7 +154,9 @@ public static class PaperLatex
         // as "¡", "¿" and "—" in running text (#482).
         sb.AppendLine(@"\usepackage[T1]{fontenc}");
         sb.AppendLine(@"\usepackage[utf8]{inputenc}");
-        sb.AppendLine(@"\usepackage[margin=0.8in]{geometry}");
+        // The same white space on all four sides of every page: 20 mm from the paper's edge to the text, and the page
+        // number counted inside the bottom margin (includefoot), so it sits 20 mm up as the first line sits 20 mm down.
+        sb.AppendLine(@"\usepackage[a4paper,margin=20mm,includefoot]{geometry}");
         sb.AppendLine(@"\usepackage{amsmath,amsfonts,amssymb}");
         sb.AppendLine(@"\usepackage{booktabs}");
         sb.AppendLine(@"\usepackage{ltablex}");
@@ -168,6 +172,9 @@ public static class PaperLatex
         sb.AppendLine(@"\usepackage{tgheros}");
         sb.AppendLine(@"\usepackage{tgcursor}");
         sb.AppendLine(@"\usepackage{multicol}");
+        sb.AppendLine(@"\usepackage{adjustbox}");
+        // Last resort for a justified line that cannot be filled without running into the margin.
+        sb.AppendLine(@"\setlength{\emergencystretch}{2em}");
 
         sb.AppendLine(@"\definecolor{auBlue}{HTML}{003B5C}");
         sb.AppendLine(@"\definecolor{greyText}{HTML}{4B5563}");
@@ -189,8 +196,9 @@ public static class PaperLatex
         sb.AppendLine(@"    \color{black}");
         sb.AppendLine(@"\end{center}");
 
-        sb.AppendLine(@"\noindent\colorbox{black!4}{");
-        sb.AppendLine(@"\parbox{\dimexpr\linewidth-2\fboxsep\relax}{");
+        // The "%" ends each line without a space, which would push the box 2.5 pt into the right margin.
+        sb.AppendLine(@"\noindent\colorbox{black!4}{%");
+        sb.AppendLine(@"\parbox{\dimexpr\linewidth-2\fboxsep\relax}{%");
         sb.AppendLine(@"    \small\sffamily\bfseries\color{auBlue} ABSTRACT \\ \vspace{4pt}");
         sb.AppendLine("    \\itshape\\rmfamily\\color{black} " + Escape(paper.Abstract));
         sb.AppendLine(@"}}");

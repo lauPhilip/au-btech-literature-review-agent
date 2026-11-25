@@ -123,7 +123,10 @@ public static partial class MultivocalPaperParts
         var sb = new StringBuilder();
         sb.AppendLine(@"\begin{figure}[H]");
         sb.AppendLine(@"\centering");
+        // Shrunk to the text width when wider (two arms with their side boxes are), never enlarged.
+        sb.AppendLine(@"\begin{adjustbox}{max width=\linewidth}");
         sb.Append(input.Ledger.HasFormalPool ? MultivocalFormalText.FlowTikz(input) : FlowTikz(Flow(input)));
+        sb.AppendLine(@"\end{adjustbox}");
         sb.AppendLine(@"\caption{Flow of sources from the searches to the synthesis}");
         sb.AppendLine(@"\end{figure}");
         sb.AppendLine(@"\vspace{6pt}");
@@ -170,23 +173,29 @@ public static partial class MultivocalPaperParts
 
     // ---------- LaTeX tables ----------
 
-    /// <summary>A table that fits one of the paper's two columns: equal paragraph columns, small type.</summary>
+    /// <summary>
+    /// A table that fits one of the paper's two columns: equal paragraph columns, small type. Each row is its own
+    /// tabular of the same column widths, stacked without a gap, so the columns can break between rows: a table of
+    /// one block cannot, and a long table ran off the foot of the page (a "Cited" column of 100 sources).
+    /// </summary>
     public static string ColumnTable(PaperTable table)
     {
         if (table.Headers.Count == 0) return "";
         var sb = new StringBuilder();
         // Each column gets an equal share of the line less its padding (3pt a side), so the table never runs into the next column.
         string width = (1.0 / table.Headers.Count).ToString("0.###", CultureInfo.InvariantCulture);
+        string columns = @"{@{}" + string.Concat(table.Headers.Select(_ => $@">{{\raggedright\arraybackslash}}p{{\dimexpr{width}\linewidth-6pt\relax}}")) + "@{}}";
         sb.AppendLine(@"\par\smallskip\noindent{\scriptsize\setlength{\tabcolsep}{3pt}");
-        if (table.Caption.Length > 0) sb.AppendLine(@"\textbf{" + PaperLatex.Escape(table.Caption) + @"}\\[2pt]");
-        sb.AppendLine(@"\begin{tabular}{@{}" + string.Concat(table.Headers.Select(_ => $@">{{\raggedright\arraybackslash}}p{{\dimexpr{width}\linewidth-6pt\relax}}")) + "@{}}");
+        if (table.Caption.Length > 0) sb.AppendLine(@"\textbf{" + PaperLatex.Escape(table.Caption) + @"}\par\nobreak\vspace{2pt}");
+        sb.AppendLine(@"\noindent\begin{tabular}" + columns);
         sb.AppendLine(@"\toprule");
         sb.AppendLine(string.Join(" & ", table.Headers.Select(h => @"\textbf{" + PaperLatex.Escape(h) + "}")) + @" \\");
         sb.AppendLine(@"\midrule");
-        foreach (var row in table.Rows) sb.AppendLine(string.Join(" & ", row.Select(c => PaperLatex.Escape(c))) + @" \\");
-        sb.AppendLine(@"\bottomrule");
-        sb.AppendLine(@"\end{tabular}");
-        if (!string.IsNullOrWhiteSpace(table.Note)) sb.AppendLine(@"\\[2pt]\textit{" + Prose(table.Note!) + "}");
+        sb.AppendLine(@"\end{tabular}\par\nointerlineskip\nobreak");
+        foreach (var row in table.Rows)
+            sb.AppendLine(@"\noindent\begin{tabular}" + columns + " " + string.Join(" & ", row.Select(c => PaperLatex.Escape(c))) + @" \\ \end{tabular}\par\nointerlineskip");
+        sb.AppendLine(@"\noindent\begin{tabular}" + columns + @" \bottomrule \end{tabular}\par");
+        if (!string.IsNullOrWhiteSpace(table.Note)) sb.AppendLine(@"\vspace{2pt}\noindent\textit{" + Prose(table.Note!) + "}");
         sb.AppendLine(@"}\par\smallskip");
         return sb.ToString();
     }
