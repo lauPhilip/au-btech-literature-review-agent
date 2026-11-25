@@ -40,7 +40,7 @@ Starting a review, proposing search strings, re-checking a citation, the editor'
 | `verify-upload` | Checking an archive on `/verify` | 20 |
 | `gallery-submit` | "Yes, add it" when adding a report to the gallery (`GalleryOffer.razor`), which copies the run's report files | 5 |
 
-`Site:ActionsPerHour` overrides any of them, for example `"Site": { "ActionsPerHour": { "propose-strings": 10 } }`; 0 means no limit. A refusal says when to try again, in the words of the quota ("Try again in 42 min."). Starting a review is also bound by the free quota and the one fair line; this limit only stops an address that keeps trying.
+`Site:ActionsPerHour` overrides any of them, for example `"Site": { "ActionsPerHour": { "propose-strings": 10 } }`; 0 means no limit. A refusal says when to try again, in the words of the quota ("Try again in 42 min."). Starting a review is also bound by the free quota and the one fair line; this limit only stops an address that keeps trying. A page that could not learn its address passes "unknown", and every such circuit shares one count (`ActionLimiter.UnknownAddress`); before, an unknown address was not limited at all, so losing the address was a way around every limit.
 
 ## Uploads
 
