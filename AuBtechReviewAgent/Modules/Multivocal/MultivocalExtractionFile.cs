@@ -32,6 +32,9 @@ public sealed class ExtractedAttribute
     /// <summary>The values of an open attribute that name one of the review's own included sources; kept on file, never counted.</summary>
     public List<ExtractedValue> OwnSource { get; set; } = new();
 
+    /// <summary>The values of an attribute about tools that are not a tool (<see cref="ToolNameRules.NotATool"/>); kept on file, never counted.</summary>
+    public List<ExtractedValue> NotATool { get; set; } = new();
+
     /// <summary>True when the source states nothing for this attribute (no supported value).</summary>
     public bool NotStated => Values.Count == 0;
 }
@@ -97,6 +100,15 @@ public sealed class MultivocalExtractionFile
     /// <summary>The values of open attributes left out because they name one of the review's own sources.</summary>
     public List<OwnSourceValue> OwnSourceValues { get; set; } = new();
 
+    /// <summary>The rules that split, matched and left out open values (<see cref="ToolNameRules.Version"/>); null for runs made before #466.</summary>
+    public string? NameRules { get; set; }
+
+    /// <summary>The values of open attributes that listed several names, with the names they were split into (#466).</summary>
+    public List<SplitValue> SplitValues { get; set; } = new();
+
+    /// <summary>The values of attributes about tools that were not counted, each with why (#466).</summary>
+    public List<NotToolValue> NotToolValues { get; set; } = new();
+
     /// <summary>How many sources have each value of an attribute: the systematic map's counts (G12), for RQs about frequency.</summary>
     public IReadOnlyList<(string Value, int Sources)> Counts(string attribute)
     {
@@ -126,4 +138,20 @@ public sealed class OwnSourceValue
     public string Attribute { get; set; } = "";
     public string Value { get; set; } = "";
     public string Source { get; set; } = "";
+}
+
+/// <summary>A value of an open attribute that listed several names, and the names it was split into.</summary>
+public sealed class SplitValue
+{
+    public string Attribute { get; set; } = "";
+    public string Value { get; set; } = "";
+    public List<string> Parts { get; set; } = new();
+}
+
+/// <summary>A value of an attribute about tools that is not a tool, with the rule's reason ("language model", ...).</summary>
+public sealed class NotToolValue
+{
+    public string Attribute { get; set; } = "";
+    public string Value { get; set; } = "";
+    public string Reason { get; set; } = "";
 }
