@@ -39,6 +39,9 @@ public class IncludedPaperMetricRow
     public string VenueName { get; set; } = string.Empty;
     public string? Doi { get; set; }
     public string? Url { get; set; }
+
+    /// <summary>Volume, issue, pages, publisher and arXiv number, and which of them the reference enrichment filled.</summary>
+    public ReferenceDetails? Details { get; set; }
 }
 
 public record ScreeningLog(
@@ -77,7 +80,9 @@ public record ScreeningLog(
     // For excluded records: the group of reasons (see ExclusionReasons), for the funnel and PRISMA item 16a.
     string? ExclusionReason = null,
     // Times cited, from the source's metadata on the day of the search; null when the source gave none.
-    int? CitedByCount = null
+    int? CitedByCount = null,
+    // Volume, issue, pages, publisher and arXiv number, from the venue string or the reference enrichment.
+    ReferenceDetails? Details = null
 );
 
 public class PlatformSearchLog
