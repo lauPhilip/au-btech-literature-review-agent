@@ -68,7 +68,11 @@ public class TrustPagesTests
         Assert.Contains("81 were judged supported", text);
         Assert.Contains("not checked by a human reviewer", text);
         Assert.DoesNotContain("citing papers", text); // citation chaining was not used
-        Assert.Contains("take full responsibility", AiUseStatement.Short(FinishedRun(false)));
+        // Neither version claims that anyone checked the output (the publisher audit, batch A).
+        Assert.DoesNotContain("take full responsibility", text);
+        Assert.DoesNotContain("reviewed", AiUseStatement.Short(FinishedRun(false)));
+        Assert.EndsWith(PaperDeclarations.Responsibility, AiUseStatement.Short(FinishedRun(false)));
+        Assert.Contains("The abstract and introduction were then given a language edit by the model", text);
     }
 
     [Fact]
