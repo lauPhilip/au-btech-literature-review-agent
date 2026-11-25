@@ -135,7 +135,7 @@ public partial class SpecMatrix
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (State.CurrentSessionId != Guid.Empty && editKeyFor != State.CurrentSessionId)
+        if (!InGallery && State.CurrentSessionId != Guid.Empty && editKeyFor != State.CurrentSessionId)
         {
             editKeyFor = State.CurrentSessionId;
             try { editKey = await JS.InvokeAsync<string?>("traceableReview.getEditKey", State.CurrentSessionId.ToString()); }
@@ -165,7 +165,13 @@ public partial class SpecMatrix
 
     protected override async Task OnParametersSetAsync()
     {
-        if (RunId is Guid id && id != Guid.Empty)
+        galleryEntry = null;
+        if (InGallery)
+        {
+            galleryEntry = Gallery.Find(GalleryId);
+            if (galleryEntry == null) { report = new PrismaReport(); return; }
+        }
+        else if (RunId is Guid id && id != Guid.Empty)
         {
             // A run made by another kind of review has its own report page.
             if (AuBtechReviewAgent.ReviewModules.ElsewhereFor(Runs.LoadHeader(id), AuBtechReviewAgent.ReviewMethod.SystematicKey) is string elsewhere)
@@ -200,9 +206,10 @@ public partial class SpecMatrix
         checkFilter = AuBtechReviewAgent.ReportOutline.Flagged;
         checkIndex = attentionIndex = -1;
 
-        string folder = Runs.FolderOf(State.CurrentSessionId);
+        string folder = ReportFolder();
         string reportPath = Path.Join(folder, "prisma-report.json");
-        hasProtocol = File.Exists(Path.Join(folder, "protocol.md"));
+        // The protocol's link is a download of the run, which a gallery copy outlives.
+        hasProtocol = !InGallery && File.Exists(Path.Join(folder, "protocol.md"));
         ResetEdits(folder);
 
         if (File.Exists(reportPath))
@@ -218,9 +225,10 @@ public partial class SpecMatrix
 
         await LoadAuditAsync(folder, reloadReport: false);
 
-        var state = ReviewEngine.LoadState(State.CurrentSessionId);
-        if (HasReport)
-            articleInfo = AuBtechReviewAgent.ArticleInfo.ForSystematic(State.CurrentSessionId, state, report, ScrubAnchors(report.TitleItem), ScrubAnchors(report.AbstractItem), hasProtocol);
+        var state = LoadLedger();
+        // The gallery shows a copy whose run may be gone, so its printout keeps the screen header instead of links to the run.
+        if (HasReport && !InGallery)
+            articleInfo = AuBtechReviewAgent.ArticleInfo.ForSystematic(ReportRunId, state, report, ScrubAnchors(report.TitleItem), ScrubAnchors(report.AbstractItem), hasProtocol);
         if (state == null) return;
 
         peerReviewOnlyToggle = state.PeerReviewOnlyToggle;
@@ -228,7 +236,7 @@ public partial class SpecMatrix
         flow = AuBtechReviewAgent.PrismaFlowCounts.From(state);
         runLine = RunLine(state);
         dateLine = state.CompletedUtc is DateTime done ? done.ToString("d MMMM yyyy", System.Globalization.CultureInfo.InvariantCulture) : "";
-        aiStatement = AuBtechReviewAgent.AiUseStatement.Methods(state, State.CurrentSessionId, editLog);
+        aiStatement = AuBtechReviewAgent.AiUseStatement.Methods(state, ReportRunId, editLog);
         aiShort = AuBtechReviewAgent.AiUseStatement.Short(state);
         researchQuestions = state.ResearchQuestions?.ToList() ?? new List<string>();
         passedPeerReviewCheck = state.Stats.PassedPeerReviewCheck;
@@ -239,7 +247,7 @@ public partial class SpecMatrix
         // Older runs have ReferenceNumber = 0 everywhere; OrderBy is stable, so they keep their order.
         tableRecords.AddRange(state.SynthesizedRecords.OrderBy(r => r.ReferenceNumber));
         fullTextUrls = state.FullTextUrls ?? new();
-        notes = Runs.LoadNotes(State.CurrentSessionId).ToList();
+        notes = InGallery ? new() : Runs.LoadNotes(State.CurrentSessionId).ToList(); // the gallery never copies notes
         includedCitations = tableRecords.Select(r => r.ApaCitation.Trim().TrimEnd('.')).ToList();
 
         platformShares = tableRecords

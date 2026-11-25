@@ -95,6 +95,7 @@ All of these can be set in `appsettings.json` (non-secret values only), user sec
 | `Synthesis:CodingBatchSize` | 6 | Studies per coding call |
 | `Metrics:Enabled` / `Metrics:Folder` | true / `App_Data/metrics` | The run metrics store behind the Metrics page |
 | `Metrics:Prices:Currency`, `Metrics:Prices:Models:<model>:InputPerMillion`, `CachedInputPerMillion`, `OutputPerMillion` | USD; mistral-large-latest 0.70 / 0.07 / 2.10, mistral-small-latest 0.15 / – / 0.60 | Prices per million tokens for the estimated cost of a run on the Metrics page and in the downloads' `estimated_cost`, worked out when shown, at today's prices. The repository's appsettings.json sets Mistral's list prices for Large 4 and Small 4 (issue #504); a missing cached price counts cached tokens at the input price. The code itself holds no prices, because they change: empty the section to turn the cost off, and update it when the provider's prices change |
+| `Gallery:Enabled` / `Gallery:Folder` / `Gallery:MaxEntries` / `Gallery:HiddenIds` | true / `App_Data/gallery` / 50 / empty | The gallery of example reports: whether owners can add reports, where the copies are kept (outside the run folders, never in the repository), how many it keeps, and the entry ids an administrator has taken down (12 hex digits each, from the address `/gallery/{id}`) |
 
 ## Several users at once
 
