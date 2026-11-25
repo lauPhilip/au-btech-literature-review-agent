@@ -42,9 +42,6 @@ public partial class PrismaReviewEngine
         /// </summary>
         public Lazy<Task<FallbackDraft>> Fallback { get; init; } = null!;
 
-        public string Outline => Fallback.Value.Result.Outline;
-        public ReportDraft Draft => Fallback.Value.Result.Draft;
-
         /// <summary>The first draft when it was written and succeeded, otherwise null.</summary>
         public ReportDraft? DraftIfWritten => Fallback.IsValueCreated && Fallback.Value.IsCompletedSuccessfully ? Fallback.Value.Result.Draft : null;
         public SystematicMethods Methods { get; init; } = null!;
@@ -106,7 +103,6 @@ public partial class PrismaReviewEngine
 
         try
         {
-            await fallback.Value;
             var methods = MethodsFromLedger(finalState, query, inc, exc, effectivePerspectives);
 
             // Only free prose is copy-edited. The title is left alone (the refiner once turned it into a

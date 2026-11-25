@@ -21,10 +21,12 @@ public class ReviewWriterTests : IDisposable
 
     private static string GoldenPath([CallerFilePath] string here = "") => Path.Join(Path.GetDirectoryName(here)!, "Golden", "systematic-writing-prompts.txt");
 
-    /// <summary>The markers of the prompts the writing stages send.</summary>
+    /// <summary>
+    /// The markers of the prompts the writing stages send. The grounded outline and the first draft are written only
+    /// when the thematic synthesis or the front matter fails, so a run of the thematic path sends neither (checked below).
+    /// </summary>
     private static readonly string[] WritingMarkers =
     {
-        "grounded synthesis outline",
         "You are writing one subsection of the Results",
         "You are revising one theme subsection",
         "You are writing the Discussion section",
@@ -102,6 +104,7 @@ public class ReviewWriterTests : IDisposable
 
         // The run went through every writing stage.
         foreach (var marker in WritingMarkers) Assert.Contains("=== " + marker, prompts);
+        Assert.Empty(Directory.GetFiles(_root, "grounded-outline.txt", SearchOption.AllDirectories)); // no outline, so no first draft either
         Assert.NotNull(state.ThematicSynthesis);
         Assert.Null(state.ThematicSynthesis!.FallbackReason);
         Assert.Equal("added 1 of 1 uncited studies", Assert.Single(state.ThematicSynthesis.Coverage).FillPass);
@@ -170,7 +173,6 @@ public class ReviewWriterTests : IDisposable
         // find the first already started; run together, each finds the other.
         var pairs = new[]
         {
-            ("grounded synthesis outline", "You are coding studies"),
             ("second, independent coder", "You are writing one subsection of the Results"),
             // The front matter waits for the closing sections (issue #446); the artifact runs beside them.
             ("You are writing the sections that follow the discussion of", "You are turning the results of a systematic literature review"),
