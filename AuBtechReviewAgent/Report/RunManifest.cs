@@ -35,6 +35,9 @@ public static class RunManifest
             ["ProtocolHash"] = protocolHash,
             ["AppVersion"] = RecordingChatCompletionService.AppVersion,
             ["Model"] = model,
+            // EU AI Act Art. 50(2): the archive says in machine-readable form that its report is AI-generated, and by what.
+            ["AiGenerated"] = true,
+            ["Generator"] = AiMarking.ManifestGenerator(new[] { model }),
             ["CreatedUtc"] = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ssZ"),
             ["HashAlgorithm"] = "SHA-256",
             ["Files"] = entries,
