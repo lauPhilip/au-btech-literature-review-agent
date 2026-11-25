@@ -234,6 +234,8 @@ public partial class PrismaReviewEngine
                 stop.ThrowIfCancellationRequested();
                 ctx.State.Stats.ProcessingStage = StageSynthesizing;
                 await PublishAsync(ctx);
+                // A retracted study is excluded before its full text is read (Report/PrismaReviewEngine.Retractions.cs).
+                await CheckRetractionsAsync(ctx);
                 await RetrieveFullTextsAsync(ctx);
                 stop.ThrowIfCancellationRequested();
                 await SynthesizeAsync(ctx);
