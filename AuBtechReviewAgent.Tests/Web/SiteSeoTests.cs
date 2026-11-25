@@ -19,7 +19,7 @@ public class SiteSeoTests
         XNamespace ns = "http://www.sitemaps.org/schemas/sitemap/0.9";
         var locs = doc.Descendants(ns + "loc").Select(e => e.Value).ToList();
 
-        Assert.Equal(new[] { "/", "/start", "/review", "/metrics", "/glossary", "/about", "/model-card", "/privacy", "/verify" }.Select(p => Base + p), locs);
+        Assert.Equal(new[] { "/", "/start", "/review", "/metrics", "/glossary", "/about", "/model-card", "/privacy", "/verify", "/accessibility" }.Select(p => Base + p), locs);
         Assert.Equal("urlset", doc.Root!.Name.LocalName);
     }
 
@@ -31,7 +31,7 @@ public class SiteSeoTests
         var undated = XDocument.Parse(SiteSeo.SitemapXml(Base));
 
         Assert.All(dated.Descendants(ns + "url"), url => Assert.Equal("2026-11-22", url.Element(ns + "lastmod")?.Value));
-        Assert.Equal(9, dated.Descendants(ns + "lastmod").Count());
+        Assert.Equal(10, dated.Descendants(ns + "lastmod").Count());
         Assert.Empty(undated.Descendants(ns + "lastmod"));
     }
 
