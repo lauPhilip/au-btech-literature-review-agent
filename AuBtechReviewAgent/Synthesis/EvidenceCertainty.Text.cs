@@ -14,7 +14,12 @@ public static partial class EvidenceCertainty
     private static string Cap(string s) => s.Length == 0 ? s : char.ToUpperInvariant(s[0]) + s[1..];
     private static string Count(int n, CertaintyWords w) => $"{Number(n)} {(n == 1 ? w.Source : w.Sources)}";
     private static string Refs(IEnumerable<int> refs) => string.Join(", ", refs.Select(r => $"[{r}]"));
-    private static string Percent(double share) => share == 0.5 ? "half" : $"{(share * 100).ToString("0", CultureInfo.InvariantCulture)}%";
+    // Compared as whole percentages, so no floating-point equality decides the word.
+    private static string Percent(double share)
+    {
+        int percent = (int)Math.Round(share * 100, MidpointRounding.AwayFromZero);
+        return percent == 50 ? "half" : $"{percent.ToString(CultureInfo.InvariantCulture)}%";
+    }
 
     /// <summary>The phrase after an answer: the overall level, the number of sources and the concerns that lowered it.</summary>
     private static string Phrase(CertaintyLevel overall, int n, int notEmpirical, List<CertaintyDomain> domains, CertaintyWords words)
