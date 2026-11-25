@@ -87,6 +87,10 @@ public class ThemeCoverage
     public List<int> CitedFinal { get; set; } = new();
     public List<int> NotCited { get; set; } = new();
     public string FillPass { get; set; } = "not needed";
+
+    /// <summary>What code decided about the subsection's shape (issue #464): send-backs for a list of sources, revisions of repeated claims; null when none.</summary>
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public List<string>? WritingNotes { get; set; }
 }
 
 /// <summary>The second, independent assignment of studies to themes and its agreement with the first.</summary>
