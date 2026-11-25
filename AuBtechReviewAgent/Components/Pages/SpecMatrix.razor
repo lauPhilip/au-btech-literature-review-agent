@@ -62,6 +62,7 @@ else
                         <a href="@($"{api}/references.bib")" target="_blank" class="flex min-h-[44px] items-center rounded-btn px-3 text-sm text-ink hover:bg-active">References as BibTeX</a>
                         <a href="@($"{api}/references.ris")" target="_blank" class="flex min-h-[44px] items-center rounded-btn px-3 text-sm text-ink hover:bg-active">References as RIS (Zotero, EndNote)</a>
                         <a href="@($"{api}/screened.ris")" target="_blank" class="flex min-h-[44px] items-center rounded-btn px-3 text-sm text-ink hover:bg-active" title="Every screened record, tagged included or excluded with the reason">Every screened record as RIS</a>
+                        <a href="@($"{api}/deposit")" class="flex min-h-[44px] items-center rounded-btn px-3 text-sm text-ink hover:bg-active" title="The archive without the papers and database records that may not be shared publicly">Archive to share on Zenodo or OSF</a>
                         <div class="border-t border-line pt-1">
                             @if (!canEdit)
                             {
