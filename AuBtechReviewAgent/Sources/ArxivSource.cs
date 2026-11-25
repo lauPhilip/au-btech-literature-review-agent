@@ -51,6 +51,9 @@ public class ArxivSource : IAcademicSource
         finally { Gate.Release(); }
     }
 
+    /// <summary>One request to the arXiv API through the app's spaced gate, as the reference enrichment asks by arXiv number.</summary>
+    public static Task<string> GetAsync(string url) => GetSpacedAsync(url, TimeSpan.FromSeconds(3), null, null);
+
     public async Task<List<AcademicPaper>> FetchPapersAsync(string query, int maxResults = 5)
     {
         _raw.Clear();
