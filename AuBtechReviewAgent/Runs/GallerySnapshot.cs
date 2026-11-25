@@ -7,10 +7,11 @@ using System.Text.Json;
 namespace AuBtechReviewAgent;
 
 /// <summary>
-/// What the gallery copies from a finished run, and what its catalogue card says about it. The copy holds only the
-/// files the report page reads, so the report can be drawn again, with the print layout of the day, after the run is
-/// gone. The reviewer's notes (reviewer-notes.json) and the edit key's record (owner.json) are never copied, and nor
-/// are the downloaded papers, the raw database answers or the model call log.
+/// What the gallery copies from a finished run, and what its catalogue card says about it. The copy holds the run's
+/// report files, the same files at the top of its archive that main.tex is written from, so the report can be drawn
+/// again, with the print layout of the day, after the run is gone. The reviewer's notes (reviewer-notes.json), the
+/// edit key's record (owner.json) and the model call log (llm-calls.json, which holds every prompt with the papers'
+/// text) are never copied, and nor are the downloaded papers or the raw database answers, which are in sub-folders.
 /// </summary>
 public static class GallerySnapshot
 {
@@ -21,18 +22,23 @@ public static class GallerySnapshot
     /// <summary>The largest copy the gallery takes of one run, so one entry cannot fill the disk.</summary>
     public const long MaxBytes = 25L * 1024 * 1024;
 
-    /// <summary>The files the systematic review's report page reads (Components/Pages/SpecMatrix*).</summary>
-    public static IReadOnlyList<string> SystematicFiles { get; } = new[]
-    {
-        RunHeader.FileName, ReportFile, LedgerFile, AuditFile, ReportEditLog.FileName, RunStore.ProtocolFile,
-    };
-
     /// <summary>Files that must never be copied, whatever a module lists.</summary>
-    public static IReadOnlyList<string> NeverCopied { get; } = new[] { RunStore.OwnerFile, RunStore.NotesFile };
+    public static IReadOnlyList<string> NeverCopied { get; } = new[] { RunStore.OwnerFile, RunStore.NotesFile, "llm-calls.json" };
+
+    /// <summary>
+    /// The systematic review's files at the top of its archive, without those never copied: what the report page reads
+    /// (Components/Pages/SpecMatrix*) and what a print render written from the run's files, like main.tex, needs.
+    /// </summary>
+    public static IReadOnlyList<string> SystematicFiles { get; } = ReviewModules.Default.ArchiveFiles
+        .Where(f => !NeverCopied.Contains(f, StringComparer.OrdinalIgnoreCase)).ToList();
 
     private static readonly JsonSerializerOptions Read = new() { PropertyNameCaseInsensitive = true };
 
-    /// <summary>The files to copy for a run of this module; empty for a module the gallery does not take yet.</summary>
+    /// <summary>
+    /// The files to copy for a run of this module; empty for a module the gallery does not take yet. A multivocal paper
+    /// cites web pages whose text is kept only for the run's lifetime (privacy page), so it needs a copy without that
+    /// text before it can be offered (#508).
+    /// </summary>
     public static IReadOnlyList<string> FilesFor(string module) =>
         (module == ReviewModules.Default.Key ? SystematicFiles : Array.Empty<string>())
             .Where(f => !NeverCopied.Contains(f, StringComparer.OrdinalIgnoreCase)).ToList();
