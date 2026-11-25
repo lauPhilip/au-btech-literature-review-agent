@@ -50,7 +50,7 @@ public static partial class ThematicSynthesis
     public static async Task<(List<ThematicCode> Codes, List<UncodedStudy> Uncoded)> CodeStudiesAsync(
         IChatCompletionService chat, string objective, IReadOnlyList<ReferencedPaper> papers,
         IReadOnlyList<StudyExtraction> extractions, int batchSize, int parallelism, Action<int, int>? progress = null, IReadOnlyList<string>? questions = null,
-        string criteria = "")
+        string criteria = "", SynthesisCache? cache = null, SynthesisReuse? reuse = null)
     {
         questions ??= Array.Empty<string>();
         var byRef = extractions.ToDictionary(e => e.ReferenceNumber);
@@ -62,7 +62,7 @@ public static partial class ThematicSynthesis
             await throttle.WaitAsync();
             try
             {
-                var coded = await CodeBatchAsync(chat, objective, batch, byRef, questions, criteria);
+                var coded = await CodeBatchAsync(chat, objective, batch, byRef, questions, criteria, cache);
                 progress?.Invoke(Interlocked.Increment(ref finished), batches.Count);
                 return coded;
             }
@@ -73,9 +73,10 @@ public static partial class ThematicSynthesis
         var uncoded = new List<UncodedStudy>();
         foreach (var task in work)
         {
-            var (c, u) = await task;
+            var (c, u, reused) = await task;
             codes.AddRange(c);
             uncoded.AddRange(u);
+            if (reuse != null) { reuse.CodingAnswers++; if (reused) reuse.CodingAnswersReused++; }
         }
         // Ids in reference order, so the codebook reads the same on every run with the same answers.
         codes = codes.OrderBy(c => c.Reference).ToList();
@@ -93,9 +94,9 @@ public static partial class ThematicSynthesis
         return sb.ToString();
     }
 
-    private static async Task<(List<ThematicCode>, List<UncodedStudy>)> CodeBatchAsync(
+    private static async Task<(List<ThematicCode>, List<UncodedStudy>, bool FromCache)> CodeBatchAsync(
         IChatCompletionService chat, string objective, IReadOnlyList<ReferencedPaper> batch, IReadOnlyDictionary<int, StudyExtraction> byRef,
-        IReadOnlyList<string> questions, string criteria)
+        IReadOnlyList<string> questions, string criteria, SynthesisCache? cache)
     {
         var data = new StringBuilder();
         var allowedFindings = new Dictionary<int, HashSet<string>>();
@@ -135,10 +136,12 @@ public static partial class ThematicSynthesis
 
         var codes = new List<ThematicCode>();
         var uncoded = new List<UncodedStudy>();
+        bool fromCache = false;
         try
         {
             var expected = batch.Select(p => p.ReferenceNumber).ToHashSet();
-            var answer = await LlmJson.GetAsync<CodingAnswer>(chat, prompt, PrismaReviewEngine.JsonMode(0.0), a =>
+            // A reused answer passes the same check again: every study answered, every finding id one of its verified findings.
+            string? Validate(CodingAnswer a)
             {
                 if (a.Studies == null) return "studies must be a list.";
                 var missing = expected.Except(a.Studies.Select(s => s.Ref)).ToList();
@@ -148,7 +151,8 @@ public static partial class ThematicSynthesis
                         if ((c.Findings ?? new()).Any(f => !allowedFindings[s.Ref].Contains(f.Trim())))
                             return $"study {s.Ref} uses a finding id that is not listed for it; use only {(allowedFindings[s.Ref].Count == 0 ? "a quote" : string.Join(", ", allowedFindings[s.Ref]))}.";
                 return CodeQuestionProblem(a.Studies.Where(s => expected.Contains(s.Ref)).SelectMany(s => (s.Codes ?? new()).Select(c => (s.Ref, c.Questions))), questions);
-            });
+            }
+            (var answer, fromCache) = await CachedAnswerAsync<CodingAnswer>(chat, prompt, PrismaReviewEngine.JsonMode(0.0), Validate, cache, CodingCacheKind, CodingPromptVersion);
 
             foreach (var p in batch)
             {
@@ -167,7 +171,7 @@ public static partial class ThematicSynthesis
                     string quote = (c.Quote ?? "").Trim();
                     string anchor = ids.Count > 0 ? "verified finding"
                         : CitationSupportChecker.QuoteOccursIn(quote, evidence) ? "verified quote" : "unanchored";
-                    codes.Add(new ThematicCode { Reference = p.ReferenceNumber, Label = c.Label.Trim(), FindingIds = ids, Quote = quote, Anchor = anchor, Questions = CodeQuestions(c.Questions, questions) });
+                    codes.Add(new ThematicCode { Reference = p.ReferenceNumber, Label = c.Label.Trim(), FindingIds = ids, Quote = quote, Anchor = anchor, Questions = CodeQuestions(c.Questions, questions), FromCache = fromCache ? true : null });
                 }
             }
         }
@@ -175,7 +179,7 @@ public static partial class ThematicSynthesis
         {
             uncoded.AddRange(batch.Select(p => new UncodedStudy(p.ReferenceNumber, $"The coding call failed ({ex.GetType().Name}).")));
         }
-        return (codes, uncoded);
+        return (codes, uncoded, fromCache);
     }
 
     // ─── 4. Coverage and text from data ─────────────────────────────────────────────────────────────────
@@ -239,6 +243,7 @@ public static partial class ThematicSynthesis
         sb.Append($"The findings were synthesised thematically, following the thematic synthesis method of Thomas and Harden (2008), with {model} performing each step. ");
         sb.Append($"First, the key findings extracted from each study (whose supporting quotes had been found in the paper's text) were coded; each code names the findings it comes from, and for studies without verified findings the code had to quote the abstract verbatim, which was checked in code ({book.Codes.Count(c => c.Anchor != "unanchored")} of {book.Codes.Count} codes were anchored this way). ");
         sb.Append($"Second, the codes were grouped into {book.Themes.Count} descriptive themes; a study belongs to a theme when one of its codes does, and the model's answer was rejected until every coded study was either placed in a theme or explicitly left out with a reason. ");
+        if (ReuseSentence(book.Reuse) is { Length: > 0 } reused) sb.Append(reused).Append(' ');
         if (book.SecondCoding is { } second)
         {
             sb.Append(second.Kappa is double k
