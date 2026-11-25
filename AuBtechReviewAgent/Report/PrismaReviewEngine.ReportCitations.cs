@@ -194,7 +194,7 @@ public partial class PrismaReviewEngine
         string Plain(string text, string field) => run.Plain(text, field);
 
         // Re-append the isolated diagram blocks to the overview field.
-        string fullSynthesisField = textOf["synthesisResultsItem"] + run.Draft.MermaidBlock + run.Draft.TikzBlock;
+        string fullSynthesisField = textOf["synthesisResultsItem"] + run.DraftIfWritten?.MermaidBlock + run.DraftIfWritten?.TikzBlock;
         string cleanDiscussionValidated = textOf["discussionItem"];
         foreach (var s in sections) s.Text = textOf[s.Field];
         if (artifact is { Error: null })
