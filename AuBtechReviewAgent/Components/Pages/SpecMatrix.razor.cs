@@ -118,6 +118,8 @@ public partial class SpecMatrix
             catch (Exception ex) when (ex is JsonException or IOException) { auditChecks.Clear(); rechecks = new(); }
         }
         rechecksLeft = auditChecks.Count == 0 ? 0 : Math.Max(0, AuBtechReviewAgent.PrismaReviewEngine.MaxRechecksPerRun - rechecks.Count);
+        // The front page's count follows a re-check or an edit, as the rest of the page does.
+        if (articleInfo != null) articleInfo = articleInfo with { Citations = AuBtechReviewAgent.VerdictTally.From(auditChecks, auditRemoved) };
 
         string reportPath = Path.Join(folder, "prisma-report.json");
         if (reloadReport && File.Exists(reportPath))
@@ -229,7 +231,8 @@ public partial class SpecMatrix
         var state = LoadLedger();
         // The gallery shows a copy whose run may be gone, so its printout keeps the screen header instead of links to the run.
         if (HasReport && !InGallery)
-            articleInfo = AuBtechReviewAgent.ArticleInfo.ForSystematic(ReportRunId, state, report, ScrubAnchors(report.TitleItem), ScrubAnchors(report.AbstractItem), hasProtocol);
+            articleInfo = AuBtechReviewAgent.ArticleInfo.ForSystematic(ReportRunId, state, report, ScrubAnchors(report.TitleItem), ScrubAnchors(report.AbstractItem), hasProtocol,
+                AuBtechReviewAgent.VerdictTally.From(auditChecks, auditRemoved));
         if (state == null) return;
 
         peerReviewOnlyToggle = state.PeerReviewOnlyToggle;
