@@ -59,7 +59,10 @@ public sealed class ReferenceEnricher
     private readonly string _contactEmail;
     private readonly string _openAlexKey;
 
+    /// <summary>Creates the enrichment with the way it fetches an address and the polite-pool contact details.</summary>
     /// <param name="get">Fetches an address; throws <see cref="HttpRequestException"/> with status 404 for an unknown work.</param>
+    /// <param name="contactEmail">Sent to Crossref and OpenAlex as mailto; never written to the audit file.</param>
+    /// <param name="openAlexKey">The OpenAlex key, when the server has one; never written to the audit file.</param>
     public ReferenceEnricher(Func<string, Task<string>> get, string contactEmail = "", string openAlexKey = "")
     {
         _get = get;
