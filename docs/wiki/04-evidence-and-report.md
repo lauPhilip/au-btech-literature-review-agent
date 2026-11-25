@@ -194,6 +194,21 @@ An edited sentence carries a small "edited" mark for every reader, which jumps t
 
 A theme subsection that cites a study not coded under that theme is flagged in the audit (`ThemeNote`) and counted in `ReviewStats.CitationsOutsideTheme`; it is not removed, because a study can legitimately be compared across themes, but a reader can see it.
 
+## Even margins in main.tex
+
+Both kinds of review build their main.tex through `PaperLatex.Build` (`Report/ReviewPaper.cs`), so they share one page layout. The page has the same white space on all four sides: `\usepackage[a4paper,margin=20mm,includefoot]{geometry}` puts 20 mm between the paper's edge and the text, and `includefoot` counts the page number inside the bottom margin, so the number sits 20 mm from the foot of the page as the first line sits 20 mm from the top. Before, the margin was 0.8 in (20.3 mm) at the sides and top, but the page number hung 9 mm from the foot.
+
+The visible unevenness was text running into the right margin. TeX breaks a line only at a space or a hyphen, so a web address, a DOI or a commit hash stuck out of its column, its table cell or the page. `LatexBreaks.Allow`, the last step of `PaperLatex.Escape`, lets LaTeX break a word of 20 characters or more after "/", ".", "_", "=", "?", "&", "#" and ":" when a letter or digit follows, and every 6 characters of a run of letters and digits that holds a digit (a hash, an archive time stamp). A break point prints nothing, and no hyphen is added. The Availability statement, which is LaTeX written in code, gets the same breaks. Three smaller causes were fixed too: a space before the abstract's box pushed it 2.5 pt into the margin; the multivocal review's flow diagram with two arms was 7 pt wider than the text, so it is now shrunk to the text width when wider (`adjustbox`, `max width=\linewidth`); and a table in one of the two columns (`MultivocalPaperParts.ColumnTable`) was one block that could not break, so a long "Cited" list ran 185 mm off the foot of the page. It is now a stack of one-row tables of the same column widths, so the column breaks between rows. `\emergencystretch` of 2 em is the last resort for a justified line that cannot otherwise be filled.
+
+| Paper | Overfull lines before | After | Widest gap between left and right margin before | After |
+|---|---|---|---|---|
+| Systematic golden main.tex | 1 | 0 | 0.9 mm (page 1) | 0.0 mm |
+| Systematic run c5ff8a41 | 5 | 0 | 10.0 mm (appendix DOIs) | 0.0 mm |
+| Systematic run cce1c6e4 | 5 | 0 | 34.7 mm (commit hash) | 0.0 mm |
+| Multivocal run 50e9a8e3 | 15 (and 2 overfull pages) | 0 | 57.0 mm (archived addresses) | 0.0 mm |
+
+`PaperMarginsTests` pins the preamble and the break points, and compiles a paper full of long addresses with pdflatex where it is installed (CI has none, so there it checks the markup only); `MultivocalPaperMarginsTests` pins the flow diagram's box and the one-row tables. The printed web report has even margins too: `@page { size: A4; margin: 15mm; }` in `Styles/tailwind.input.css` (see page 6, "Printing a report").
+
 ## Where to look when a report looks wrong
 
 | Symptom | Look in | Likely place in the code |

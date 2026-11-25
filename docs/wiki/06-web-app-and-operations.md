@@ -145,7 +145,7 @@ The CI job **Accessibility** starts the app and runs axe-core on the public page
 
 ### Printing a report and the statement on AI use
 
-Review Output has a "Print or save as PDF" button. The print styles (`@media print` in `Styles/tailwind.input.css`, and `print:` classes in `AppLayout.razor`, `LandingLayout.razor` and `SpecMatrix.razor`) release the fixed-height frame so the report flows over A4 pages, hide the top bar, buttons and citation popups, keep figures and table rows from splitting, and add a line at the end with the run id and protocol fingerprint, so a printout can be traced back to its run.
+Review Output has a "Print or save as PDF" button. The print styles (`@media print` in `Styles/tailwind.input.css`, and `print:` classes in `AppLayout.razor`, `LandingLayout.razor` and `SpecMatrix.razor`) release the fixed-height frame so the report flows over A4 pages with the same 15 mm margin on all four sides (before #505: 16 mm top and bottom, 14 mm at the sides), let a long address or code wrap rather than run past the edge and show the whole of a box that scrolls sideways on screen, hide the top bar, buttons and citation popups, keep figures and table rows from splitting, and add a line at the end with the run id and protocol fingerprint, so a printout can be traced back to its run.
 
 Section 6.4 of every report is a statement on the use of AI, built by `AiUseStatement` only from what the run recorded: the model and app version, the steps the model did, the screening agreement, whether a person checked the screening, and the citation verdicts. Two buttons copy it, or a one-sentence declaration, for a paper or thesis.
 
