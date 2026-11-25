@@ -95,6 +95,7 @@ All of these can be set in `appsettings.json` (non-secret values only), user sec
 | `Synthesis:CodingBatchSize` | 6 | Studies per coding call |
 | `Metrics:Enabled` / `Metrics:Folder` | true / `App_Data/metrics` | The run metrics store behind the Metrics page |
 | `Metrics:Prices:Currency`, `Metrics:Prices:Models:<model>:InputPerMillion`, `CachedInputPerMillion`, `OutputPerMillion` | empty (off) | Optional prices per million tokens for the `estimated_cost` column of the metrics downloads, worked out at download time; the code holds no prices, because they change |
+| `Gallery:Enabled` / `Gallery:Folder` / `Gallery:MaxEntries` / `Gallery:HiddenIds` | true / `App_Data/gallery` / 50 / empty | The gallery of example reports: whether owners can add reports, where the copies are kept (outside the run folders, never in the repository), how many it keeps, and the entry ids an administrator has taken down (12 hex digits each, from the address `/gallery/{id}`) |
 
 ## Several users at once
 
