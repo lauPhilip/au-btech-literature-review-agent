@@ -130,7 +130,7 @@ public static partial class CitationRepairer
                 }
                 string prompt = $$"""
                     You are correcting citations in a {{review}}. An automated check found that the sentences below attribute more to a cited paper than its text supports (not supported, or only partly supported). For each item, choose one action:
-                    - "rewrite": return the sentence with the part attributed to each flagged paper changed so that it says what the evidence below says, usually by narrowing it (drop the unsupported number, qualifier, scope or comparison). Change only that part; keep the rest of the sentence, its role in the paragraph and its citation markers (you may remove one, never add a new number).
+                    - "rewrite": return the sentence with the part attributed to each flagged paper changed so that it says what the evidence below says, usually by narrowing it (drop the unsupported number, qualifier, scope or comparison). Change only that part; keep the rest of the sentence, its role in the paragraph and its citation markers (you may remove one, never add a new number; a sentence cites at most {{ReviewWriter.MaxReferencesPerSentence}}).
                     - "drop_citation": the sentence is fine without the flagged paper; the flagged citation will be removed.
                     - "delete": the sentence cannot be supported and should be removed.
 

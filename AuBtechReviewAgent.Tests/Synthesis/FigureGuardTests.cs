@@ -30,6 +30,15 @@ public class FigureGuardTests
     }
 
     [Fact]
+    public void NumbersInNamesWrittenWithASpaceAreNotFigures()
+    {
+        var figures = ReviewWriter.ResultFigures("Agents built on Llama 3 reached Level 3 autonomy in Phase 2 trials, and version 2 cut errors by 12 % [1].");
+        Assert.Equal(new[] { "12" }, figures);
+        // A count after an opener, a percentage or a decimal after a name, and a sentence-initial count stay figures.
+        Assert.Equal(new[] { "0.8", "12", "40", "7" }, ReviewWriter.ResultFigures("Across 12 studies, Llama 0.8 scored higher. In 40 cases GPT 7 % fewer errors [2].").OrderBy(f => f));
+    }
+
+    [Fact]
     public void AFigureMayAppearInOnePlaceAfterTheResults()
     {
         Assert.Null(ReviewWriter.FigurePlacementProblem(Results, "", new[] { ("answer 1", "Agents find 34 % more [1]."), ("the discussion", "Coverage matters.") }));

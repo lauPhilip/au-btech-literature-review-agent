@@ -147,6 +147,7 @@ public partial class PrismaReviewEngine
             var theme = useThematic ? thematic!.Codebook.Themes.FirstOrDefault(t => t.Studies.Contains(refNo)) : null;
             notCited.Add(new UncodedStudy(refNo,
                 uncodedReason != null ? $"not coded: {uncodedReason.TrimEnd('.')}" :
+                theme != null && theme.Studies.Count > ReviewWriter.CiteEveryUpTo ? $"coded under \"{theme.Name}\", a theme of {theme.Studies.Count} studies synthesised from those that report its claims most directly; not cited after peer review and citation repair" :
                 theme != null ? $"coded under \"{theme.Name}\" but not cited after the fill pass, peer review and citation repair" :
                 "not cited by the synthesis"));
         }
