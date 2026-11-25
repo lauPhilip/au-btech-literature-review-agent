@@ -41,7 +41,7 @@ Add an entry to `Glossary.All` in `Glossary.cs` (a key, the term, and one or two
 
 ### Checking accessibility locally
 
-Start the app (`dotnet watch` in `AuBtechReviewAgent`), then in `tools/a11y` run `npm ci`, `npx playwright install chromium` and `node axe-check.mjs`. `BASE_URL` changes the address (default `http://localhost:5038`) and `A11Y_PAGES` the pages (default `/,/review,/metrics,/glossary`). Also try every changed page with the keyboard only: Tab through it, check that focus is always visible, and that Escape closes what it opened.
+Start the app (`dotnet watch` in `AuBtechReviewAgent`), then in `tools/a11y` run `npm ci`, `npx playwright install chromium` and `node axe-check.mjs`. `BASE_URL` changes the address (default `http://localhost:5038`) and `A11Y_PAGES` the pages (default `/,/review,/metrics,/glossary`). `CHROMIUM_PATH` points it at an installed Chrome instead of Playwright's own. The check opens every page asking for less motion and brings animations to rest before it measures, so a result does not depend on when a fade was caught (issue #503). Also try every changed page with the keyboard only: Tab through it, check that focus is always visible, and that Escape closes what it opened.
 
 `node print-check.mjs` in the same folder prints pages to PDF the way "Print or save as PDF" does and fails when a page is cut to one screen, when the top bar is printed or when the title is missing (issue #153). `PRINT_PAGES` lists the pages with the least number of A4 pages each must fill (CI: `/design/report=3,/about=1`), and `PRINT_OUT` names a folder for the PDFs; CI puts them with the screenshots in the `a11y-screenshots` artifact.
 

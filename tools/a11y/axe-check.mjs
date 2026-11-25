@@ -9,6 +9,10 @@
 //
 // A11Y_WORKERS pages are checked at once (default 4, issue #396), each in its own browser context as before, so a
 // page sees nothing of another. The log is printed in the order of the pages, whatever order they finish in.
+//
+// Every page is opened asking for less motion and checked only once its moving parts are at rest (issue #503). axe
+// reads colours as they are drawn, so text caught half-way through a fade failed colour contrast at random, most
+// often in the landing page's citation example. No page and no rule is left out; see settle() below.
 import { chromium } from 'playwright';
 import { AxeBuilder } from '@axe-core/playwright';
 import { mkdirSync, readFileSync } from 'node:fs';
@@ -29,7 +33,7 @@ const browser = await chromium.launch(process.env.CHROMIUM_PATH ? { executablePa
 async function check({ path, theme }) {
   const label = theme === 'dark' ? `${path} (dark)` : path;
   const lines = [];
-  const context = await browser.newContext();
+  const context = await browser.newContext({ reducedMotion: 'reduce' });
   try {
     if (theme === 'dark') await context.addInitScript(() => localStorage.setItem('traceableai-theme', 'dark'));
     const page = await context.newPage();
@@ -41,6 +45,7 @@ async function check({ path, theme }) {
     }
     if (extraCss) await page.addStyleTag({ content: extraCss });
     await page.waitForTimeout(1500);
+    await settle(page);
     const result = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa']).analyze();
     const blocking = result.violations.filter(v => v.impact === 'serious' || v.impact === 'critical');
     lines.push(`\n${label}: ${result.violations.length} violation(s), ${blocking.length} serious or critical`);
@@ -53,6 +58,21 @@ async function check({ path, theme }) {
   } finally {
     await context.close();
   }
+}
+
+// Brings every animation and transition to rest before axe looks. The page asks for less motion, so the landing
+// page's citation example is already stopped on its first verdict, fully drawn. Anything that still runs to an end
+// (a fade-in, a colour transition) is run to that end; anything that repeats for ever and is still running is paused
+// where it is, so the measurement and the screenshots see the same frame. Then two frames are drawn.
+async function settle(page) {
+  await page.evaluate(async () => {
+    for (const animation of document.getAnimations()) {
+      const end = animation.effect ? animation.effect.getComputedTiming().endTime : Infinity;
+      if (Number.isFinite(end)) animation.finish();
+      else if (animation.playState === 'running') animation.pause();
+    }
+    await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+  });
 }
 
 async function photograph(page, path, theme) {
