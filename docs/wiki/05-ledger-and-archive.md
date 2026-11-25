@@ -29,7 +29,7 @@ Every run has a folder `WorkspaceStore/{runId}/`, where the run id is a GUID wri
 
 The ledger is written with `SafeFile.WriteAllTextAsync`: a temporary copy is written and moved into place, so a reader never sees half a file. On Windows that move can briefly fail with "Access to the path is denied" while an antivirus scanner or the search indexer holds the previous version, which stopped runs that save many times a second (screening served from the cache). The move is therefore retried a few times, then the file is overwritten in place, and only if that also fails does the run stop.
 
-`main.tex`, `references.bib`, `references.ris`, `screened.ris` and `manifest.json` are not stored in the folder. They are built when someone downloads the archive, from the files above.
+`main.tex`, `references.bib`, `references.ris`, `screened.ris`, `certainty.json` (the certainty of each answer, when the run has research questions) and `manifest.json` are not stored in the folder. They are built when someone downloads the archive, from the files above.
 
 Outside the run folders, `App_Data/metrics/runs.jsonl` (`RunMetricsStore`) keeps one line of `RunMetrics` per completed run. It is not removed by the run clean-up, so quality can be compared across months of runs and app versions. It holds no research question (only a hash of it) and no paper text. `ConfigFingerprint` is a hash of the model, the app version and the settings that shape the output; runs with the same fingerprint were produced the same way. The prompt fingerprint in `llm-calls.json` cannot serve for this, because it hashes the prompts with their paper excerpts and so differs between any two reviews.
 
@@ -202,6 +202,7 @@ The pieces come from different places:
 | "Characteristics of the Included Studies" paragraph | `MethodsSectionWriter.IncludedSet`, then `MethodsSectionWriter.AppendixPointer` |
 | Discussion subsections for PRISMA items 23b to 23d, and the Conclusion section | `prisma-report.json`: `EvidenceLimitationsItem`, `ImplicationsItem`, `FutureResearchItem` and `ConclusionItem` from `ReviewWriter.WriteClosingAsync`, checked like the discussion; `ReviewLimitationsItem` (23c) from `MethodsSectionWriter.ReviewProcessLimitations`. Runs made before these existed leave them empty, and the sections are left out |
 | "Research Questions", the first subsection of the method, and the answers at the start of the Conclusion ("RQ1. question" in bold, then the answer) | `ReviewState.ResearchQuestions` and `PrismaReport.ResearchAnswers`, built by `ConclusionSection`; a run without research questions has neither |
+| "Certainty of the Evidence" in the method, the certainty summary and table in the results, and the phrase after each answer in the Conclusion | `SystematicCertainty.Assess` from `prisma-report.json`, the codebook and `extraction.json`; `CertaintyLatex`; also written as `certainty.json` |
 | PRISMA flow diagram (TikZ) | `PrismaFlowDiagram.ToTikz(PrismaFlowCounts.From(state))` |
 | Year bar chart and pie charts | computed from the included records; `LatexPie` |
 | Appendix: Tables A.1–A.3 (studies, extraction, MMAT) | `SynthesizedRecords`, `ExtractionTables` |
