@@ -176,13 +176,21 @@ public sealed partial class MultivocalWriter
     /// </summary>
     public byte[] Archive(Guid runId)
     {
+        using var memory = new MemoryStream();
+        return WriteArchive(runId, memory) ? memory.ToArray() : Array.Empty<byte>();
+    }
+
+    /// <summary>Writes the archive to <paramref name="output"/> one file at a time; false, writing nothing, when the run is not a multivocal run.</summary>
+    public bool WriteArchive(Guid runId, Stream output)
+    {
         var header = _runs.LoadHeader(runId);
         var module = ReviewModules.Find("multivocal");
-        if (header == null || module == null || ReviewModules.ElsewhereFor(header, module.Key) != null) return Array.Empty<byte>();
+        if (header == null || module == null || ReviewModules.ElsewhereFor(header, module.Key) != null) return false;
         var generated = new List<(string Path, byte[] Content)>();
         if (MainTex(runId) is { } tex) generated.Add((MultivocalPaper.MainTexFile, new System.Text.UTF8Encoding(false).GetBytes(tex)));
         var planned = _reporter.LoadInput(runId)?.Planned;
-        return RunArchive.Build(runId, _runs.FolderOf(runId), generated, module.ArchiveFiles, planned?.ProtocolSha256, Load(runId)?.Model);
+        RunArchive.Write(output, runId, _runs.FolderOf(runId), generated, module.ArchiveFiles, planned?.ProtocolSha256, Load(runId)?.Model);
+        return true;
     }
 
     // ---------- Writing ----------

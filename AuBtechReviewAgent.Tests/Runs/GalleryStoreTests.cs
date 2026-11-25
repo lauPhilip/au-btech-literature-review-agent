@@ -85,12 +85,14 @@ public class GalleryStoreTests : IDisposable
 
         var entry = (await gallery.AddAsync(id, key, consent: true)).Entry!;
 
-        var files = Directory.GetFiles(gallery.FolderOf(entry.Id)).Select(Path.GetFileName).ToHashSet();
+        Assert.True(File.Exists(Path.Join(gallery.FolderOf(entry.Id), GalleryEntry.FileName)));
+        // The folder that holds the report: the entry's own, or a version's inside it.
+        string copy = Path.GetDirectoryName(Directory.EnumerateFiles(gallery.FolderOf(entry.Id), GallerySnapshot.ReportFile, SearchOption.AllDirectories).Single())!;
+        var files = Directory.GetFiles(copy).Select(Path.GetFileName).ToHashSet();
         Assert.Contains(GallerySnapshot.ReportFile, files);
         Assert.Contains(GallerySnapshot.LedgerFile, files);
-        Assert.Contains(GalleryEntry.FileName, files);
         Assert.Contains("thematic-codebook.json", files); // a print render written from the run's files finds what main.tex uses
-        Assert.Empty(Directory.GetDirectories(gallery.FolderOf(entry.Id))); // no papers, no raw answers
+        Assert.Empty(Directory.GetDirectories(copy)); // no papers, no raw answers
         Assert.DoesNotContain(RunStore.NotesFile, files);
         Assert.DoesNotContain(RunStore.OwnerFile, files);
         Assert.DoesNotContain("llm-calls.json", files);
@@ -107,7 +109,7 @@ public class GalleryStoreTests : IDisposable
     }
 
     [Fact]
-    public async Task TheSameReviewReplacesItsEntryAndAnotherReviewAddsOne()
+    public async Task TheSameReviewKeepsItsEntryAndAnotherReviewAddsOne()
     {
         var runs = new RunStore(Workspace);
         var gallery = Store(runs);

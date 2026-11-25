@@ -56,7 +56,7 @@ public partial class Privacy
         ("Fingerprints of network addresses, for the free runs", "This server", "Two days"),
         ("Counts of requests per network address", "The server's memory only", "An hour at most, or until the server restarts"),
         ("Cached database answers and screening decisions", "This server", $"Deleted after {CacheDeletedAfterDays} days"),
-        ("A report you added to the gallery", "This server", "Until you withdraw it, a newer run of the same review replaces it, or the gallery is full"),
+        ("A report you added to the gallery", "This server", "Until you withdraw it, or the gallery is full; a newer run of the same review is kept as a new version"),
         ("The quality figures of a finished run (Metrics)", "This server", "No time limit; they hold no personal data"),
         ("Edit keys, the unfinished draft and your theme", "Your browser", "Edit keys and the draft 30 days; the theme until you clear it"),
         ("Your API keys", "Your browser tab", "Until you close the tab or press Clear session"),

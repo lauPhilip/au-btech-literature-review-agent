@@ -91,10 +91,11 @@ public static class PrivacyText
         "no network address.",
         "A report in the gallery is public: anyone can open it on this site, and search engines may find it. It shows the full ID of its run, " +
         $"so while the run itself is kept ({retentionDays} days) anyone could open that too. The copy stays after the run is " +
-        $"deleted, until the owner withdraws it, a newer run of the same review replaces it, or the gallery passes {maxEntries} " +
-        "reports and drops the one changed longest ago.",
+        "deleted, until the owner withdraws it. A newer run of the same review is kept as a new version, and the earlier versions stay, " +
+        $"each at its own address, until they are withdrawn. The gallery keeps at most {maxEntries} versions in all; past " +
+        "that it drops the oldest version of the review with the most versions, and a review leaves only when none has two.",
         "The owner can withdraw a report at any time, from its report page or its gallery page, with the browser that started the run; " +
-        "the copy is deleted at once. After the browser has dropped the run's edit key, or from another browser, ask for removal in the " +
+        "every version of it is deleted at once. Browsers keep a run's edit key for 30 days. After that, or from another browser, ask for removal in the " +
         "issues on GitHub and the site's administrator will take the report down.",
     };
 }

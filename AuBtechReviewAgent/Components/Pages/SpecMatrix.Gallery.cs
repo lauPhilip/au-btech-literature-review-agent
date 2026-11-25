@@ -12,17 +12,24 @@ public partial class SpecMatrix
     /// <summary>Set by the gallery page: draw this entry's copy instead of a run.</summary>
     [Parameter] public string? GalleryId { get; set; }
 
+    /// <summary>The version of the entry to draw; its newest when not set.</summary>
+    [Parameter] public int? GalleryVersion { get; set; }
+
     /// <summary>The gallery entry being shown, or null on a run's own report page.</summary>
     internal AuBtechReviewAgent.GalleryEntry? galleryEntry;
 
     internal bool InGallery => GalleryId != null;
+
+    /// <summary>The entry's version this page draws, or null when it is not in the gallery.</summary>
+    internal AuBtechReviewAgent.GalleryEntry? FindGalleryEntry() =>
+        GalleryVersion is int number ? Gallery.Find(GalleryId, number) : Gallery.Find(GalleryId);
 
     /// <summary>The run the report names: the gallery entry's run, or the run this page was opened for.</summary>
     internal Guid ReportRunId => galleryEntry?.RunId ?? State.CurrentSessionId;
 
     /// <summary>The folder the report is read from: the entry's copy in the gallery, or the run's own folder.</summary>
     internal string ReportFolder() =>
-        galleryEntry is { } entry ? Gallery.FolderOf(entry.Id) : Runs.FolderOf(State.CurrentSessionId);
+        galleryEntry is { } entry ? Gallery.VersionFolderOf(entry.Id, entry.Version) : Runs.FolderOf(State.CurrentSessionId);
 
     /// <summary>The run's ledger, from the same folder as the report.</summary>
     internal AuBtechReviewAgent.ReviewState? LoadLedger() =>
