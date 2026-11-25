@@ -76,6 +76,6 @@ public class FormalExtractionTextTests : IDisposable
         Assert.Equal("Summarisation", formal[0].Attributes.Single().Values.Single().Value);
         Assert.All(formal, s => Assert.All(s.Attributes.SelectMany(a => a.Values), v => Assert.Equal("found", run.Pages.CheckQuote(run.RunId, s.Address, v.Quote))));
         Assert.Contains("For 1 long full text, the model was given the first passages", MultivocalFormalText.ExtractionText(run.Reporter.LoadInput(run.RunId)!));
-        Assert.Equal("formal-extraction-v3", MultivocalExtractor.FormalPromptVersion);
+        Assert.Equal("formal-extraction-v4", MultivocalExtractor.FormalPromptVersion);
     }
 }

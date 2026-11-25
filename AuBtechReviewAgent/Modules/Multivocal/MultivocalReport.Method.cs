@@ -127,13 +127,26 @@ public sealed partial class MultivocalReporter
             $"{Num(extracted)} sources were extracted against it{(failed > 0 ? $" and {Num(failed)} could not be" : "")}; every value rests on a quote found in the kept text of the source's page, and what a page does not state was recorded as not stated." +
             GreyPageText.ExtractionMethod(input.Extraction) +
             " The kind of each source, whether it is grey or formal literature, its site, date and quality points were recorded in code." +
-            (input.Extraction.NameMerges.Count + input.Extraction.OwnSourceValues.Count > 0
-                ? $" For the open attributes, names were merged in code only where they match when case, punctuation, spaces and hyphens are ignored, or where one is given in brackets after the other ({Count(input.Extraction.NameMerges.Count, "merge")}), and {Count(input.Extraction.OwnSourceValues.Count, "value")} naming one of the review's own sources {(input.Extraction.OwnSourceValues.Count == 1 ? "was" : "were")} not counted; the data appendix lists both."
-                : "") +
+            OpenValuesText(input.Extraction, fixedMap.Attributes.Any(a => a.Open)) +
             (input.Ledger.HasFormalPool ? MultivocalFormalText.ExtractionText(input) : "")));
         section.Blocks.Add(ReportBlock.Table(new[] { "Attribute", "Question", "Values" },
             fixedMap.Attributes.Select(a => new[] { a.Name, a.Question, a.Open ? "open (named by each source)" : string.Join(", ", a.Values) })));
         return section;
+    }
+
+    /// <summary>
+    /// How the open attributes' names were made countable, in code: the rules of <see cref="ToolNameRules"/> with what they
+    /// did (#466), or for a run extracted before them, the merges and own-source values alone.
+    /// </summary>
+    private static string OpenValuesText(MultivocalExtractionFile x, bool anyOpen)
+    {
+        if (x.NameRules != null && anyOpen)
+            return $" For the open attributes, the names were made countable in code. {ToolNameRules.Described} " +
+                   $"{Count(x.SplitValues.Count, "value")} {(x.SplitValues.Count == 1 ? "was" : "were")} split, {Count(x.NameMerges.Count, "merge")} made, {Count(x.NotToolValues.Count, "value")} not counted as {(x.NotToolValues.Count == 1 ? "a tool" : "tools")} " +
+                   $"and {Count(x.OwnSourceValues.Count, "value")} naming one of the review's own sources not counted; the data appendix lists each.";
+        return x.NameMerges.Count + x.OwnSourceValues.Count > 0
+                ? $" For the open attributes, names were merged in code only where they match when case, punctuation, spaces and hyphens are ignored, or where one is given in brackets after the other ({Count(x.NameMerges.Count, "merge")}), and {Count(x.OwnSourceValues.Count, "value")} naming one of the review's own sources {(x.OwnSourceValues.Count == 1 ? "was" : "were")} not counted; the data appendix lists both."
+                : "";
     }
 
     private static ReportSection SynthesisMethod(MultivocalReportInput input)
