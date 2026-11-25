@@ -44,7 +44,7 @@ public class ModelAnswerNullFuzzTests
         var type = typeof(LlmJson).Assembly.GetType("AuBtechReviewAgent." + name);
         Assert.NotNull(type);
         var sample = Sample(type!, 0);
-        var variants = NullVariants(sample).ToList();
+        var variants = NullVariants(sample!).ToList();
         Assert.NotEmpty(variants);
         Validators.TryGetValue(type!, out var validate);
 
