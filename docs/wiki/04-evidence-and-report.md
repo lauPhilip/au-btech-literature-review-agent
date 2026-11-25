@@ -227,6 +227,27 @@ The visible unevenness was text running into the right margin. TeX breaks a line
 
 `PaperMarginsTests` pins the preamble and the break points, and compiles a paper full of long addresses with pdflatex where it is installed (CI has none, so there it checks the markup only); `MultivocalPaperMarginsTests` pins the flow diagram's box and the one-row tables. The printed web report has even margins too: `@page { size: A4; margin: 15mm; }` in `Styles/tailwind.input.css` (see page 6, "Printing a report").
 
+## The self-check of a finished paper
+
+Every finished systematic run checks its own paper in code, without a model call, once the report files are written (Lau, 25 November 2026). The checks look for what an editor notices first, the faults the hand review of run 50e9a8e3 found: numbers attached to the wrong count, a question without an answer, a missing discussion nobody mentions, the same figure in every section. Each check gives a pass, a note or a fault, the evidence (the part of the paper, its field, the sentence or the value) and a plain-English line on what it looks for. A fault changes nothing in the paper, which is already written; it is shown to the reader and the owner as it is.
+
+| # | Check | Fault when | Note when |
+|---|---|---|---|
+| 1 | Numbers in the abstract and conclusion | a number is neither a run count nor in the results, or a count names the wrong thing ("34 included" when 34 were screened) | |
+| 2 | Every research question answered | an answer is missing, or cites nothing and does not say why | the evidence cannot answer a question and the answer says so |
+| 3 | Discussion and closing parts present | the discussion, limitations, implications, future research or conclusion is empty and the paper does not say so | a part is missing and the paper says so, or a part has under 15 words |
+| 4 | At most 3 references per sentence | a written sentence cites more than three | |
+| 5 | Result figures not repeated | a result figure appears in more than one place after the results, or in the future research or conclusion | |
+| 6 | Included studies cited | a study is not cited in the results or discussion with no reason on file, or a theme rests on one study with no reason | the same, with a reason on file |
+| 7 | Citations backed by their sources | a citation is still not supported after repair, or none was checked | partly supported, not checkable or removed citations |
+| 8 | References complete and consistent | a cited number is not in the list, or a work is listed twice | an entry is cited nowhere, or lacks a year, venue or DOI |
+| 9 | Key terms used consistently | never | a theme is not named in the discussion, answers or conclusion, or a question's words are not in the answers |
+| 10 | Readability | never | a part's Flesch reading ease is below 10, or a sentence has more than 40 words |
+
+The checks are in `Report/PaperSelfCheck*.cs` and read one shape, `PaperCheckInput`: the paper's parts with their kind (abstract, theme, answer, conclusion, or text written in code, which is read for references but not judged), the run's counts with the words that name each one, the themes, the questions and answers, the reference list, the citation check and the reasons a source is not cited. The checks never read a run folder, so the multivocal module can fill the same shape from `mlr-paper.json` later; only the systematic review is wired now. `Modules/Systematic/SystematicSelfCheck.cs` fills it from `prisma-report.json`, the ledger and `citation-audit.json` (a study placed in no theme gets the codebook's reason), writes `self-check.json`, which is in the archive, and puts the counts in `ReviewStats.SelfCheckPassed`, `SelfCheckNotes` and `SelfCheckFaults`. A failure is logged and never fails the run. A run made before the self-check is checked from its files when its report is opened, and nothing is saved. The self-check is of the paper as the run finished it; an edit made later on the report page is not checked again. It is not part of main.tex: the paper is the review, and its quality notes belong beside it, not in it, so the golden files are unchanged.
+
+On the two real systematic runs of 19 November the self-check finds what a careful reader would. Run c5ff8a41 gets 4 passes, 2 notes and 4 faults: the limitations cite all four studies in one sentence; four result figures (34, 35, 40 and 90) come back in the answers, implications, future research and conclusion; study [4] is cited only in the limitations, although the paper's own coverage line, written under the older rule, says all four are cited, and the theme "Scenario Handling and Evaluation" rests on study [3] alone with no reason; and 4 of 59 citations are still not supported. Run cce1c6e4 gets 7 passes, 2 notes and 1 fault: 4 of 65 citations are still not supported. Both have one reference without a venue, and every part scores below 10 for reading ease, because the answers and closing parts are long single sentences.
+
 ## Where to look when a report looks wrong
 
 | Symptom | Look in | Likely place in the code |

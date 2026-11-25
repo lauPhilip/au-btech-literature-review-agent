@@ -134,6 +134,7 @@ public partial class PrismaReviewEngine
             var check = await CheckCitationsAsync(run);
             var coverage = await RecordCoverageAsync(run, check.Fields);
             await WriteReportFilesAsync(run, check, coverage);
+            SystematicSelfCheck.TryWriteFile(GetWorkspaceFolderPath(sessionId), finalState, _log);
         }
         catch (Exception fatalEx)
         {
