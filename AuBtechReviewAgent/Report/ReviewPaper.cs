@@ -103,12 +103,14 @@ public static class PaperLatex
         int lastSpace = reference.LastIndexOf(' ');
         if (reference.EndsWith('.') && reference[(lastSpace + 1)..].StartsWith("http", StringComparison.OrdinalIgnoreCase))
             reference = reference.TrimEnd('.');
-        return Escape(reference, ' ');
+        return Escape(reference, ' ', references: true);
     }
 
-    private static string Escape(string input, char trimEnd)
+    private static string Escape(string input, char trimEnd, bool references = false)
     {
         if (string.IsNullOrEmpty(input)) return string.Empty;
+        // In-text citations are set sorted and ranged ("[1–4]"); a reference holds none, but may hold brackets.
+        if (!references) input = CitationMarkers.Tidy(input);
         string cleanInput = input.Replace("https://doi.org/XXXX-XXXXXX", "")
                                  .Replace("https://doi.org/XXXXXXX.XXXXXXX", "")
                                  .Replace("https://doi.org/XX.XXXX/", "")
