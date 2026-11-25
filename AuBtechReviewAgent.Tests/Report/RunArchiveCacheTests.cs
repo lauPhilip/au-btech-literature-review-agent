@@ -124,10 +124,11 @@ public class RunArchiveCacheTests : IDisposable
         var (engine, runId, folder) = await FinishedRunAsync();
         var before = Directory.GetFiles(folder).Length;
 
-        var zip = RunArchiveCache.GetOrBuild(folder, RunFolderStamp.Of(folder)!, false, output => engine.WriteWorkspaceArchive(runId, output))!;
-        Assert.IsType<FileStream>(zip);
-        Assert.Equal(before + 1, Directory.GetFiles(folder).Length);
-        zip.Dispose();
+        using (var zip = RunArchiveCache.GetOrBuild(folder, RunFolderStamp.Of(folder)!, false, output => engine.WriteWorkspaceArchive(runId, output))!)
+        {
+            Assert.IsType<FileStream>(zip);
+            Assert.Equal(before + 1, Directory.GetFiles(folder).Length);
+        }
 
         Assert.Equal(before, Directory.GetFiles(folder).Length);
         Assert.Null(RunArchiveCache.GetOrBuild(folder, RunFolderStamp.Of(folder)!, true, _ => false));
