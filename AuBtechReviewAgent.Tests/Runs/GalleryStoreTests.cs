@@ -80,6 +80,8 @@ public class GalleryStoreTests : IDisposable
         var runs = new RunStore(Workspace);
         var gallery = Store(runs);
         var (id, key) = await FinishedRunAsync(runs, "AI in schools", new[] { "How is AI used?" }, title: "AI <script>alert(1)</script> in schools");
+        File.WriteAllText(Path.Join(runs.FolderOf(id), "thematic-codebook.json"), "{}");
+        Directory.CreateDirectory(Path.Join(runs.FolderOf(id), "SourceResponses"));
 
         var entry = (await gallery.AddAsync(id, key, consent: true)).Entry!;
 
@@ -87,6 +89,8 @@ public class GalleryStoreTests : IDisposable
         Assert.Contains(GallerySnapshot.ReportFile, files);
         Assert.Contains(GallerySnapshot.LedgerFile, files);
         Assert.Contains(GalleryEntry.FileName, files);
+        Assert.Contains("thematic-codebook.json", files); // a print render written from the run's files finds what main.tex uses
+        Assert.Empty(Directory.GetDirectories(gallery.FolderOf(entry.Id))); // no papers, no raw answers
         Assert.DoesNotContain(RunStore.NotesFile, files);
         Assert.DoesNotContain(RunStore.OwnerFile, files);
         Assert.DoesNotContain("llm-calls.json", files);
@@ -124,6 +128,20 @@ public class GalleryStoreTests : IDisposable
 
         Assert.False((await gallery.AddAsync(other.Id, other.Key, consent: true)).Updated);
         Assert.Equal(2, gallery.List().Count);
+    }
+
+    [Fact]
+    public async Task AMultivocalRunIsNotOfferedYet()
+    {
+        var runs = new RunStore(Workspace);
+        var gallery = Store(runs);
+        var (id, key) = await FinishedRunAsync(runs, "AI in schools", new[] { "How is AI used?" });
+        await RunHeader.WriteAsync(runs.FolderOf(id), new RunHeader(id, "multivocal", "grey", DateTime.UtcNow, "Checked", DateTime.UtcNow));
+
+        Assert.False((await gallery.AddAsync(id, key, consent: true)).Ok);
+        Assert.Empty(GallerySnapshot.FilesFor("multivocal"));
+        Assert.DoesNotContain("llm-calls.json", GallerySnapshot.SystematicFiles);
+        Assert.DoesNotContain(RunStore.NotesFile, GallerySnapshot.SystematicFiles);
     }
 
     [Fact]
