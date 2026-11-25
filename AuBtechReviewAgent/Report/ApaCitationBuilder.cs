@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Text.RegularExpressions;
 
@@ -17,8 +18,23 @@ public static partial class ApaCitationBuilder
     /// <summary>
     /// The one ordering used for the run's reference list. The [n] numbers the model cites, the extraction
     /// table and the LaTeX bibliography must all be sorted with this same comparer, or the numbers drift.
+    /// It alphabetises as APA 7 does (section 9.44): letter by letter, ignoring case and accents, so "Öner" sorts with
+    /// O and "Østergaard" before "Pajo", with nothing before something ("Lee, J." before "Leeds, A."). The italics
+    /// markers of a title-first reference are not letters, so they are left out of the comparison.
     /// </summary>
-    public static readonly StringComparer ReferenceOrder = StringComparer.OrdinalIgnoreCase;
+    public static readonly StringComparer ReferenceOrder = new ApaOrder();
+
+    private sealed class ApaOrder : StringComparer
+    {
+        private static readonly CompareInfo Letters = CultureInfo.InvariantCulture.CompareInfo;
+        private const CompareOptions Options = CompareOptions.IgnoreCase | CompareOptions.IgnoreNonSpace | CompareOptions.IgnoreKanaType | CompareOptions.IgnoreWidth;
+
+        private static string Plain(string? text) => (text ?? "").Replace("*", "", StringComparison.Ordinal);
+
+        public override int Compare(string? x, string? y) => Letters.Compare(Plain(x), Plain(y), Options);
+        public override bool Equals(string? x, string? y) => Compare(x, y) == 0;
+        public override int GetHashCode(string obj) => Letters.GetHashCode(Plain(obj), Options);
+    }
 
     public record ApaResult(string Citation, string VenueType, string VenueName, int Year)
     {
