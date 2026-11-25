@@ -65,4 +65,14 @@ public class BibliographyDetailsTests
 
         Assert.Contains("author = {{PSBC LLM Team}}", bib);
     }
+
+    [Fact]
+    public void ATitleInCapitalsIsSetAsInTheReferenceList()
+    {
+        var row = Row("Journals", "IJETRM", null, null);
+        row.Title = "AGENTIC AI FRAMEWORKS FOR AUTONOMOUS AUTOMOTIVE SOFTWARE VALIDATION";
+
+        Assert.Contains("title = {{Agentic AI frameworks for autonomous automotive software validation}}", BibliographyExporter.ToBibTeX(new[] { row }));
+        Assert.Contains("TI  - Agentic AI frameworks for autonomous automotive software validation", BibliographyExporter.ToRis(new[] { row }));
+    }
 }
