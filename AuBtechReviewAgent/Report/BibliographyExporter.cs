@@ -31,7 +31,7 @@ public static class BibliographyExporter
             var fields = new List<(string, string)>();
             // A list a source gave only in part ends in BibTeX's own "and others" (issue #470).
             if (r.Authors.Count > 0) fields.Add(("author", string.Join(" and ", r.Authors.Select(a => IsEtAl(a) ? "others" : BibAuthor(a)))));
-            fields.Add(("title", "{" + Bib(r.Title) + "}")); // double braces keep capitalisation
+            fields.Add(("title", "{" + Bib(ApaCitationBuilder.TitleAsGiven(r.Title)) + "}")); // double braces keep capitalisation; capitals only as in the reference list
             if (!string.IsNullOrWhiteSpace(r.VenueName))
                 fields.Add((type == "article" ? "journal" : type == "inproceedings" ? "booktitle" : "howpublished", Bib(r.VenueName)));
             else if (type == "misc" && r.Category == "Arxiv")
@@ -74,7 +74,7 @@ public static class BibliographyExporter
             };
             sb.AppendLine($"TY  - {type}");
             foreach (var a in r.Authors.Where(a => !IsEtAl(a))) sb.AppendLine($"AU  - {RisAuthor(a)}");
-            sb.AppendLine($"TI  - {OneLine(r.Title)}");
+            sb.AppendLine($"TI  - {ApaCitationBuilder.TitleAsGiven(r.Title)}");
             if (!string.IsNullOrWhiteSpace(r.VenueName)) sb.AppendLine($"T2  - {OneLine(r.VenueName)}");
             if (r.Year > 0) sb.AppendLine($"PY  - {r.Year}");
             var d = r.Details;
@@ -120,7 +120,7 @@ public static class BibliographyExporter
             };
             sb.AppendLine($"TY  - {type}");
             foreach (var a in (l.Authors ?? new List<string>()).Where(a => !IsEtAl(a))) sb.AppendLine($"AU  - {RisAuthor(a)}");
-            sb.AppendLine($"TI  - {OneLine(l.Title)}");
+            sb.AppendLine($"TI  - {ApaCitationBuilder.TitleAsGiven(l.Title)}");
             if (!string.IsNullOrWhiteSpace(l.VenueName)) sb.AppendLine($"T2  - {OneLine(l.VenueName)}");
             if (l.Year > 0) sb.AppendLine($"PY  - {l.Year}");
             if (!string.IsNullOrWhiteSpace(l.Doi)) sb.AppendLine($"DO  - {l.Doi}");

@@ -39,7 +39,7 @@ public class ReviewPaperTests : IDisposable
         string tex = reader.ReadToEnd().Replace("\r\n", "\n");
         tex = Regex.Replace(tex, @"\d{4}-\d{2}-\d{2}( \d{2}:\d{2}(:\d{2})?)?", "DATE");
         tex = Regex.Replace(tex, @"Protocol Hash: \S+", "Protocol Hash: HASH");
-        tex = Regex.Replace(tex, @"fingerprint [0-9a-f]{16}", "fingerprint FINGERPRINT");
+        tex = Regex.Replace(tex, @"fingerprint (?:[0-9a-f]|\\allowbreak\{\}){16,}", "fingerprint FINGERPRINT"); // with its break points
         tex = Regex.Replace(tex, @"version [^ ]+\)", "version VERSION)");
         tex = Regex.Replace(tex, @"This run used version .*?(?= The run archive)", "This run used VERSION.");
         return tex;

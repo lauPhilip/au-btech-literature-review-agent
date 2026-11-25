@@ -86,7 +86,7 @@ The JSON has the same fields with their types, plus three objects the CSV leaves
 | `cached_input_tokens` | tokens | The part of `input_tokens` the provider served from its prompt cache. |
 | `output_tokens` | tokens | Completion tokens, the reasoning tokens included. |
 | `reasoning_tokens` | tokens | The part of `output_tokens` the model spent reasoning. |
-| `estimated_cost` | money | Empty unless the deployment sets a price table (`Metrics:Prices`). Worked out at download time from `cost_by_model` and today's table, not the price on the day of the run; empty when any model that used tokens has no price. |
+| `estimated_cost` | money | Worked out at download time from `cost_by_model` and the price table (`Metrics:Prices`, which the repository sets to Mistral's list prices in USD), so at today's prices, not the price on the day of the run; reasoning tokens are billed as output. Empty when the table is empty, the run did not count its tokens by model, or any model that used tokens has no price. The Metrics page shows the same figure. |
 | `cost_currency` | ISO 4217 | The currency of `estimated_cost`. |
 
 The multivocal review's two pools follow, first the grey pool (`grey_…`) and then the formal pool of academic records (`formal_…`). They are empty for a systematic run, and the formal columns are empty for a run with grey sources only. Both pools have these columns.
