@@ -1,0 +1,102 @@
+@inject AuBtechReviewAgent.GalleryStore Gallery
+@inject AuBtechReviewAgent.ActionLimiter Actions
+@inject AuBtechReviewAgent.RunsOptions RunsOptions
+
+@* The owner's offer to add a finished report to the public gallery (Runs/GalleryStore.cs). The report page shows it
+   only with the run's edit key, so a reader with the link never sees it. Nothing is added until the owner reads the
+   consent text and presses "Yes, add it". The same component lets the owner withdraw the entry again. *@
+
+<div class="mb-4 border border-line bg-soft px-4 py-3 text-sm print:hidden" data-gallery-offer>
+    @if (entry != null && !asking)
+    {
+        <p class="text-ink">
+            @(updated ? "This review was already in the gallery; it now shows this run's report." : "This report is in the public gallery.")
+            <a href="@($"/gallery/{entry.Id}")" class="ml-1 font-medium text-heading underline underline-offset-2">Open it in the gallery</a>
+        </p>
+        @if (!confirmWithdraw)
+        {
+            <button type="button" class="ui-btn-secondary ui-btn-sm mt-2 min-h-[44px]" @onclick="() => confirmWithdraw = true">Withdraw from the gallery</button>
+        }
+        else
+        {
+            <div class="mt-2 flex flex-wrap items-center gap-2" role="group" aria-label="Withdraw from the gallery">
+                <span class="text-ink">Remove it from the gallery for good?</span>
+                <button type="button" class="ui-btn-danger ui-btn-sm min-h-[44px]" @onclick="WithdrawAsync" disabled="@busy">Withdraw</button>
+                <button type="button" class="ui-btn-secondary ui-btn-sm min-h-[44px]" @onclick="() => confirmWithdraw = false">Keep it</button>
+            </div>
+        }
+    }
+    else if (!asking)
+    {
+        <div class="flex flex-wrap items-center justify-between gap-2">
+            <p class="text-ink">Share this report as an example? Only you see this, because this browser started the run.</p>
+            <button type="button" class="ui-btn-secondary ui-btn-sm min-h-[44px]" @onclick="() => { asking = true; message = null; }">Add to the gallery?</button>
+        </div>
+    }
+    else
+    {
+        <div id="gallery-consent" role="region" aria-labelledby="gallery-consent-title">
+            <h2 id="gallery-consent-title" class="font-display text-base font-semibold text-heading">Add this report to the public gallery?</h2>
+            <ul class="mt-2 list-disc space-y-1 pl-5 text-ink">
+                @foreach (var line in AuBtechReviewAgent.GalleryText.Consent(RunsOptions.RetentionDays))
+                {
+                    <li>@line</li>
+                }
+            </ul>
+            <div class="mt-3 flex flex-wrap gap-2">
+                <button type="button" class="ui-btn-primary ui-btn-sm min-h-[44px]" @onclick="AddAsync" disabled="@busy">@(busy ? "Adding…" : "Yes, add it")</button>
+                <button type="button" class="ui-btn-secondary ui-btn-sm min-h-[44px]" @onclick="() => asking = false">No, not now</button>
+            </div>
+        </div>
+    }
+    @if (message != null)
+    {
+        <p class="mt-2 @(failed ? "text-not-supported" : "text-ink")" role="status">@message</p>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public Guid RunId { get; set; }
+    [Parameter] public string? EditKey { get; set; }
+    [Parameter] public string? ClientAddress { get; set; }
+
+    private AuBtechReviewAgent.GalleryEntry? entry;
+    private bool asking, busy, failed, updated, confirmWithdraw;
+    private string? message;
+
+    protected override void OnParametersSet()
+    {
+        if (!busy) entry = Gallery.ForRun(RunId);
+    }
+
+    private async Task AddAsync()
+    {
+        if (busy) return;
+        if (!Actions.TryTake(AuBtechReviewAgent.ActionLimiter.GallerySubmit, ClientAddress ?? "unknown", out string limited))
+        {
+            (message, failed) = (limited, true);
+            return;
+        }
+        busy = true;
+        try
+        {
+            var result = await Gallery.AddAsync(RunId, EditKey, consent: true);
+            (message, failed, updated) = (result.Ok ? null : result.Message, !result.Ok, result.Updated);
+            if (result.Ok) { entry = result.Entry; asking = false; }
+        }
+        finally { busy = false; }
+    }
+
+    private async Task WithdrawAsync()
+    {
+        if (busy || entry == null) return;
+        busy = true;
+        try
+        {
+            bool done = await Gallery.WithdrawAsync(entry.Id, EditKey);
+            (message, failed) = done ? ("Withdrawn. The report is no longer in the gallery.", false) : ("It could not be withdrawn. Try again later.", true);
+            if (done) { entry = null; confirmWithdraw = false; updated = false; }
+        }
+        finally { busy = false; }
+    }
+}

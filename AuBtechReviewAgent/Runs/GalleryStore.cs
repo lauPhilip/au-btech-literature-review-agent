@@ -197,7 +197,8 @@ public sealed class GalleryStore
         }
         catch (Exception ex) when (ex is JsonException or IOException or UnauthorizedAccessException)
         {
-            _log.LogWarning("Gallery entry {Folder} unreadable: {Message}", Path.GetFileName(folder), ex.Message);
+            _log.LogWarning("Gallery entry {Folder} unreadable: {Message}",
+                PrismaReviewEngine.SanitizeLogMessage(Path.GetFileName(folder)), PrismaReviewEngine.SanitizeLogMessage(ex.Message));
             return null;
         }
     }
