@@ -38,14 +38,14 @@ public partial class PrismaReviewEngine
         using var throttle = new SemaphoreSlim(4);
         var downloads = included.Select(async paper =>
         {
-            await throttle.WaitAsync();
+            await throttle.WaitAsync(ctx.Stop);
             try
             {
                 return FullTextFetcher != null
                     ? await FullTextFetcher(paper, ctx.Workspace)
-                    : await DocumentRAGUtility.IngestAndChunkPaperAsync(paper, ctx.Workspace, OpenSources.ContactEmail);
+                    : await DocumentRAGUtility.IngestAndChunkPaperAsync(paper, ctx.Workspace, OpenSources.ContactEmail, ctx.Stop);
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not OperationCanceledException || !ctx.Stop.IsCancellationRequested)
             {
                 return new FullTextResult(Array.Empty<DocumentChunk>(), $"none (download failed: {SanitizeLogMessage(ex.Message)})", null);
             }
