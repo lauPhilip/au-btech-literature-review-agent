@@ -107,7 +107,7 @@ public class CancelRunTests : IDisposable
         await runB.WaitAsync(TimeSpan.FromSeconds(30));
         Assert.Equal(PrismaReviewEngine.StageComplete, engine.LoadState(b)!.Stats.ProcessingStage);
 
-        Assert.True(quota.GiveBackAfter(lease!, ended));
+        Assert.True(quota.GiveBackAfter(lease!, ended, engine.LoadState(a)!.RunSettings!.LlmCalls));
         Assert.Equal(1, quota.GetStatus("1.2.3.4", QuotaTier.Free).Remaining);
     }
 

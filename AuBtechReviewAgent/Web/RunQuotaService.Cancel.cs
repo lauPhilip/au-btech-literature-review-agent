@@ -40,12 +40,4 @@ public partial class RunQuotaService
         Refund(lease);
         return true;
     }
-
-    /// <summary>The old two-argument form, kept only until its last caller passes the run's model calls.</summary>
-    public bool GiveBackAfter(QuotaLease lease, Exception ended)
-    {
-        if (ended is RunCancelledException) return RefundCancelled(lease);
-        Refund(lease);
-        return true;
-    }
 }
