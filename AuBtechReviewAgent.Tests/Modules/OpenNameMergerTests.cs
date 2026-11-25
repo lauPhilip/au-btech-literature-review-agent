@@ -62,10 +62,10 @@ public class OpenNameMergerTests
     [Fact]
     public void ToolsThatOnlyShareAWordStayApart()
     {
-        var file = Run(Source("Post one", "Agent"), Source("Post two", "Agent Skills"));
+        var file = Run(Source("Post one", "Cursor"), Source("Post two", "Cursor Rules"));
 
         Assert.Empty(file.NameMerges);
-        Assert.Equal(new[] { "Agent", "Agent Skills" }, file.Counts(Tools).Select(c => c.Value).Where(v => v != "not stated").OrderBy(v => v));
+        Assert.Equal(new[] { "Cursor", "Cursor Rules" }, file.Counts(Tools).Select(c => c.Value).Where(v => v != "not stated").OrderBy(v => v));
     }
 
     [Theory]
