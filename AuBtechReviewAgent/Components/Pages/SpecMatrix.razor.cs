@@ -65,13 +65,14 @@ public partial class SpecMatrix
 
     internal static string Deg(double d) => d.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
 
-    /// <summary>One line under the title: studies and records, themes, citations checked and the app version.</summary>
-    internal static string RunLine(AuBtechReviewAgent.ReviewState state)
+    /// <summary>One line under the title: studies and records, themes, citations checked (as the report counts them) and the app version.</summary>
+    public static string RunLine(AuBtechReviewAgent.ReviewState state, AuBtechReviewAgent.VerdictTally citations)
     {
         var s = state.Stats;
+        int cited = citations.Checked;
         var parts = new List<string> { $"{s.Included} {(s.Included == 1 ? "study" : "studies")} from {s.TotalIdentified} {(s.TotalIdentified == 1 ? "record" : "records")}" };
         if (s.ThemesIdentified > 0) parts.Add($"{s.ThemesIdentified} {(s.ThemesIdentified == 1 ? "theme" : "themes")}");
-        if (s.CitationsChecked > 0) parts.Add($"{s.CitationsChecked} {(s.CitationsChecked == 1 ? "citation" : "citations")} checked");
+        if (cited > 0) parts.Add($"{cited} {(cited == 1 ? "citation" : "citations")} checked");
         string? version = state.RunSettings?.AppVersion;
         if (!string.IsNullOrWhiteSpace(version)) parts.Add("TraceableAI " + AuBtechReviewAgent.ToolVersion.Display(version));
         return string.Join(" · ", parts);
@@ -234,7 +235,7 @@ public partial class SpecMatrix
         peerReviewOnlyToggle = state.PeerReviewOnlyToggle;
         stats = state.Stats;
         flow = AuBtechReviewAgent.PrismaFlowCounts.From(state);
-        runLine = RunLine(state);
+        runLine = RunLine(state, AuBtechReviewAgent.VerdictTally.From(auditChecks, auditRemoved));
         dateLine = state.CompletedUtc is DateTime done ? done.ToString("d MMMM yyyy", System.Globalization.CultureInfo.InvariantCulture) : "";
         aiStatement = AuBtechReviewAgent.AiUseStatement.Methods(state, ReportRunId, editLog);
         aiShort = AuBtechReviewAgent.AiUseStatement.Short(state);
