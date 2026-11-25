@@ -55,4 +55,27 @@ public class PaperDeclarationsTests
         Assert.Contains("Springer Nature and Wiley", latex);
         Assert.Contains("Long statement.", latex);
     }
+
+    [Fact]
+    public void TheArtifactSentenceSaysTheModelChoseTheContentAndCodeDrewIt()
+    {
+        Assert.Equal("", AiUseStatement.ArtifactSentence(null));
+        Assert.Equal("", AiUseStatement.ArtifactSentence(new ReviewArtifact { Kind = ArtifactKinds.ConceptMap, Error = "no findings" }));
+        string map = AiUseStatement.ArtifactSentence(new ReviewArtifact { Kind = ArtifactKinds.ConceptMap });
+        Assert.Contains("concept map", map);
+        Assert.Contains("chosen by the model from the findings and drawn in code", map);
+        Assert.Contains("laid out in code", AiUseStatement.ArtifactSentence(new ReviewArtifact { Kind = ArtifactKinds.Table }));
+    }
+
+    [Fact]
+    public void TheMethodsStatementNamesTheLanguageEditAndTheArtifact()
+    {
+        var state = new ReviewState { Stats = new ReviewStats() };
+        string plain = AiUseStatement.Methods(state, Guid.Empty);
+        Assert.Contains("language edit by the model, for clear and direct prose", plain);
+        Assert.DoesNotContain("concept map", plain);
+        string withMap = AiUseStatement.Methods(state, Guid.Empty, artifact: new ReviewArtifact { Kind = ArtifactKinds.ConceptMap });
+        Assert.Contains("The content of the concept map", withMap);
+        Assert.EndsWith(PaperDeclarations.Responsibility, withMap);
+    }
 }
