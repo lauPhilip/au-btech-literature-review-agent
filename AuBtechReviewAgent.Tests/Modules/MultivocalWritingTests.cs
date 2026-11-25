@@ -215,9 +215,10 @@ public class MultivocalWritingTests
         Assert.Contains("could not be verified", built.DiscussionNotes[^1].Text);
         Assert.Equal("Conclusion", built.Conclusion!.Heading);
         Assert.Equal("Summary for practitioners", built.Summary!.Heading);
-        Assert.Equal(new[] { "Use of artificial intelligence", "Registration and protocol", "Availability" }, built.Declarations.Select(d => d.Heading));
-        Assert.Contains("This run used version ", built.Declarations.Last().Text);
-        Assert.DoesNotContain("+", built.Declarations.Last().Text);
+        Assert.Equal(new[] { "Use of artificial intelligence", "Registration and protocol", "Availability", "Support and funding", "Competing Interests", "Ethics Approval", "Author Contributions" },
+            built.Declarations.Select(d => d.Heading));
+        Assert.Contains("This run used version ", built.Declarations[2].Text);
+        Assert.DoesNotContain("+", built.Declarations[2].Text);
         Assert.Equal(3, built.References.Count);
 
         string tex = PaperLatex.Build(built);
