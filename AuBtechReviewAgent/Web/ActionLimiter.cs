@@ -7,14 +7,14 @@ namespace AuBtechReviewAgent;
 /// <summary>
 /// Limits per client address on the actions that cost a model call or a call to another server and are started over
 /// the live connection, which the HTTP rate limiter never sees: starting a review, proposing search strings,
-/// re-checking a citation, the editor's check of a changed sentence, and checking an uploaded archive. A page's own
+/// re-checking a citation, the editor's check of a changed sentence, checking an uploaded archive, and adding a report to the gallery. A page's own
 /// count (five proposals a page) starts again with every reload; this one does not. Counts are kept in memory per
 /// address for an hour and are lost on a restart. A refusal is logged as the HTTP limiter logs it (SiteRateLimits).
 /// </summary>
 public sealed class ActionLimiter
 {
     public const string StartReview = "start-review", ProposeStrings = "propose-strings", Recheck = "recheck",
-        EditorCheck = "editor-check", VerifyUpload = "verify-upload";
+        EditorCheck = "editor-check", VerifyUpload = "verify-upload", GallerySubmit = "gallery-submit";
 
     /// <summary>The defaults per address per hour; "Site:ActionsPerHour" in the configuration overrides any of them.</summary>
     public static IReadOnlyDictionary<string, int> Defaults { get; } = new Dictionary<string, int>
@@ -24,6 +24,8 @@ public sealed class ActionLimiter
         [Recheck] = 30,
         [EditorCheck] = 60,
         [VerifyUpload] = 20,
+        // Adding a report copies its files to the gallery; a few an hour is plenty for an owner.
+        [GallerySubmit] = 5,
     };
 
     private readonly Dictionary<string, int> _perHour;
