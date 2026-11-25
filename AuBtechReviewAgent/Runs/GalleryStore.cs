@@ -156,9 +156,36 @@ public sealed class GalleryStore
             if (File.Exists(from)) File.Copy(from, Path.Join(temp, Path.GetFileName(file)));
         }
         File.WriteAllText(Path.Join(temp, GalleryEntry.FileName), JsonSerializer.Serialize(entry, Json));
-        string target = FolderOf(entry.Id);
-        if (Directory.Exists(target)) Directory.Delete(target, recursive: true);
-        Directory.Move(temp, target);
+        Swap(temp, FolderOf(entry.Id));
+    }
+
+    /// <summary>
+    /// Puts a new entry folder in place of the old one with two renames, never a delete first: the old report is moved
+    /// aside, the new one moved in, and only then is the old one removed. If the new one cannot be moved in, the old
+    /// one goes back, so a failed replace leaves the published report as it was instead of losing it.
+    /// </summary>
+    public static void Swap(string temp, string target, Action<string, string>? move = null)
+    {
+        move ??= Directory.Move;
+        if (!Directory.Exists(target))
+        {
+            move(temp, target);
+            return;
+        }
+        string aside = target + ".old-" + Guid.NewGuid().ToString("N");
+        move(target, aside);
+        try { move(temp, target); }
+        catch
+        {
+            Directory.Move(aside, target);
+            throw;
+        }
+        try { Directory.Delete(aside, recursive: true); }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            // The entry is replaced; a left-over copy is not an entry (its name is not an id) and is never shown.
+            _log.LogWarning("Gallery: the replaced report could not be removed: {Message}", ex.GetType().Name);
+        }
     }
 
     private void DropOverCap(string keep)
