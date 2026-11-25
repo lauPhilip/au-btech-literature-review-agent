@@ -168,6 +168,7 @@ public partial class PrismaReviewEngine
             Title = (report.TitleItem ?? "Systematic Review Manuscript").Replace("[Source Context Anchor 1]", "").Trim(),
             ProtocolHash = string.IsNullOrWhiteSpace(report.ProtocolHash) ? "not recorded" : report.ProtocolHash,
             GeneratedAt = report.GeneratedAt ?? DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss UTC"),
+            Models = AiMarking.Clean(new[] { state?.RunSettings?.Model, state?.RunSettings?.FastModel }),
             Abstract = report.AbstractItem ?? "",
             Rationale = report.RationaleItem ?? "",
             Objectives = report.ObjectivesItem ?? "",
