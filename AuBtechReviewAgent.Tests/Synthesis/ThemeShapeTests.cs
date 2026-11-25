@@ -35,6 +35,26 @@ public class ThemeShapeTests
     }
 
     [Fact]
+    public async Task ALargeThemeIsSentBackWhenItListsAndGetsNoFillPass()
+    {
+        var evidence = Evidence(7);
+        var model = new FakeChatService()
+            .Returns($$"""{"heading":"Logs","text":"{{List}}"}""")
+            .Returns($$"""{"heading":"Logs","text":"{{Synthesised}}"}""");
+
+        var (section, coverage) = await ReviewWriter.WriteThemeAsync(model, WritingProfile.Systematic, "Map logging", evidence, evidence.Themes[0], 1, referenceCount: 7);
+
+        Assert.Equal(2, model.Prompts.Count); // no fill pass
+        Assert.Contains("2. Synthesise, do not list:", model.Prompts[0]);
+        Assert.DoesNotContain("Cite every one of these", model.Prompts[0]);
+        Assert.Contains("reads as a list of studies", model.Prompts[1]);
+        Assert.Equal(Synthesised, section!.Text);
+        Assert.Equal(new[] { 7 }, coverage.NotCited);
+        Assert.StartsWith("not run: a theme of 7 studies is synthesised", coverage.FillPass);
+        Assert.Contains(coverage.WritingNotes!, n => n.StartsWith("The subsection was sent back for a list of one-source summaries (1 of 2)"));
+    }
+
+    [Fact]
     public void AClaimAnEarlierThemeReportsIsARepeat()
     {
         var sections = new List<SynthesisSection>
@@ -91,4 +111,11 @@ public class ThemeShapeTests
         Assert.StartsWith("Agents become", sections[1].Text);
         Assert.StartsWith("Revision of 1 repeated sentence(s) rejected: the revision dropped the citation of [1]", Assert.Single(coverage[0].WritingNotes!));
     }
+
+    internal static ReviewEvidence Evidence(int sources, int themeSources = -1) => new()
+    {
+        Sources = Enumerable.Range(1, Math.Max(sources, 4)).Select(r => new EvidenceSource { Reference = r, ReferenceLine = $"Author {r} (2025). Study {r}.", Findings = new[] { new EvidenceFinding($"F{r}.1", $"Finding {r}", $"Quote {r}.") } }).ToList(),
+        Themes = new[] { new EvidenceTheme { Id = "T1", Name = "Logs", Description = "Logging agent actions.", Sources = Enumerable.Range(1, themeSources < 0 ? sources : themeSources).ToList() } },
+        BaseFacts = $"{sources} studies.",
+    };
 }
