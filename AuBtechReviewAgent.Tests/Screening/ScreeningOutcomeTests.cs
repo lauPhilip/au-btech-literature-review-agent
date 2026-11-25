@@ -50,7 +50,7 @@ public class ScreeningOutcomeTests : IDisposable
         var paper = new AcademicPaper("CACHED_1", "Agent cached paper", "An abstract about agents.", "Published: 2025", new() { "Jane Doe", "Kim Lee" }, "Future Internet");
         cache.Set("search", ReviewCache.Key("search-v1", "Google Scholar Gateway", "agent loops", "3"),
             new { Papers = new List<AcademicPaper> { paper }, Raw = new List<string> { "{\"cached\":true}" } });
-        string ScreeningKey(string screener, string model) => ReviewCache.Key("screening-v6", screener, model, Inclusion, Exclusion,
+        string ScreeningKey(string screener, string model) => ReviewCache.Key("screening-v6", PrismaReviewEngine.ScreeningTemplateSha256(screener == "second"), screener, model, Inclusion, Exclusion,
             paper.Title, paper.Abstract, paper.JournalSource, paper.PublishedDate, "Jane Doe;Kim Lee");
         cache.Set("screening", ScreeningKey("first", "mistral-large-latest"),
             new ScreeningAnswer { Decision = "Included", Reasoning = "cached first", BriefSummary = "cached", Confidence = "high" });

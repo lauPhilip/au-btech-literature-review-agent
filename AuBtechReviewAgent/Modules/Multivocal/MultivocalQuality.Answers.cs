@@ -108,7 +108,7 @@ public sealed partial class MultivocalQualityAssessor
         IChatCompletionService chat, MultivocalPlan plan, GreyRecord record, string text, string textSha, bool selected)
     {
         string topic = TopicLine(plan);
-        string key = ReviewCache.Key(PromptVersion, _model, topic, record.Title, record.Producer, record.Site, record.Kind, textSha, selected ? text : null);
+        string key = ReviewCache.Key(PromptVersion, TemplateSha256, _model, topic, record.Title, record.Producer, record.Site, record.Kind, textSha, selected ? text : null);
         if (_cache.TryGet<ModelQualityAnswers>("grey-quality", key, out var cached) && cached != null && ModelQualityAnswers.Validate(cached) == null)
             return (cached, true);
         var answer = await AskAsync(chat, topic, record, text, selected);
@@ -131,7 +131,7 @@ public sealed partial class MultivocalQualityAssessor
     /// opinion piece its main claim and four of the critical questions for an expert opinion (G13). With
     /// <paramref name="selected"/>, the text is selected passages of a long page (<see cref="GreyPageText.ForQuality"/>).
     /// </summary>
-    public static async Task<ModelQualityAnswers> AskAsync(IChatCompletionService chat, string topic, GreyRecord record, string text, bool selected = false)
+    public static string Prompt(string topic, GreyRecord record, string text, bool selected)
     {
         string items = string.Join("\n", GreyQualityChecklist.ModelItems.Select(i => $"{i.Id} ({i.Group}) {i.Question}"));
         string about = $"""
@@ -140,7 +140,7 @@ public sealed partial class MultivocalQualityAssessor
             - Published on: {record.Site}
             - By: {(record.Producer.Length > 0 ? record.Producer : "not given")}
             """;
-        var prompt = $$"""
+        return $$"""
             You assess the quality of one grey literature source for a multivocal literature review, with the quality checklist of Garousi et al. (2019, Table 7).
             The review is about: {{PromptSafety.Wrap(topic, "review topic")}}
 
@@ -172,6 +172,26 @@ public sealed partial class MultivocalQualityAssessor
             Respond ONLY with a valid minified JSON object of this shape, with one entry per item, in order:
             {{AnswerShape}}
             """;
+    }
+
+    private static readonly Lazy<string> Template = new(() => PromptTemplate.Hash(Templates()));
+
+    /// <summary>The fingerprint of the quality prompt's fixed text, whole page and selected passages, part of the cache key.</summary>
+    public static string TemplateSha256 => Template.Value;
+
+    /// <summary>The quality prompt written with placeholders, for a whole page and for selected passages.</summary>
+    public static IEnumerable<string> Templates()
+    {
+        string S(string name) => PromptTemplate.Slot(name);
+        var record = new GreyRecord(S("id"), S("title"), S("summary"), S("url"), S("producer"), S("site"), S("kind"), null, new Dictionary<string, long>());
+        yield return Prompt(S("topic"), record, S("text"), false);
+        yield return Prompt(S("topic"), record, S("text"), true);
+    }
+
+    /// <summary>Asks the model for the answers to <see cref="Prompt"/>, checked in code.</summary>
+    public static async Task<ModelQualityAnswers> AskAsync(IChatCompletionService chat, string topic, GreyRecord record, string text, bool selected = false)
+    {
+        string prompt = Prompt(topic, record, text, selected);
         return await LlmJson.GetAsync<ModelQualityAnswers>(chat, prompt, LlmJson.JsonMode(0.0), ModelQualityAnswers.Validate);
     }
 }
