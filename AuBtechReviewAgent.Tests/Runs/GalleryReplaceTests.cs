@@ -4,7 +4,7 @@ using Xunit;
 namespace AuBtechReviewAgent.Tests;
 
 /// <summary>
-/// A newer run of the same review replaces its gallery entry atomically: the old report is moved aside before the new
+/// A gallery copy is put in place atomically: an old folder is moved aside before the new
 /// one is moved in, never deleted first, so a failed replace leaves the published report in place.
 /// </summary>
 public class GalleryReplaceTests : IDisposable

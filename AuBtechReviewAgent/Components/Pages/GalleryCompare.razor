@@ -1,0 +1,83 @@
+@page "/gallery/{Id}/compare"
+@layout AppLayout
+@inject AuBtechReviewAgent.GalleryStore Store
+@inject AuBtechReviewAgent.ReviewModulesOptions ModuleOptions
+@inject AuBtechReviewAgent.RunMetricsStore Metrics
+@inject NavigationManager Nav
+
+@* Two versions of one review side by side: a table of what changed, computed in code from the files each version keeps
+   (GalleryComparison). A plain page without a live connection; the versions are chosen with ?from=&to=. *@
+
+@if (entry != null && from != null && to != null)
+{
+    <SeoHead Title="@($"Compare versions {from.Version} and {to.Version}: {entry.Title}")" Path="@($"/gallery/{entry.Id}/compare")" BreadcrumbName="Gallery" NoIndex="true"
+             Description="Two versions of an example report made with TraceableAI, compared figure by figure." />
+
+    <div class="mx-auto w-full max-w-[960px] px-[clamp(16px,3vw,40px)] py-6 sm:py-10">
+        <a href="@($"/gallery/{entry.Id}")" class="ui-btn-ghost min-h-[44px] px-2"><span aria-hidden="true">←</span> Back to the report</a>
+        <header class="mt-4">
+            <p class="font-display text-xs font-semibold uppercase tracking-[0.14em] text-muted">Compare versions</p>
+            <h1 class="mt-2 font-display text-[clamp(22px,2vw,32px)] font-semibold leading-tight text-heading">@entry.Title</h1>
+            <p class="mt-2 text-sm text-muted">
+                Version @from.Version against version @to.Version. Every figure comes from the files each version keeps; nothing is estimated by a model.
+                The change is the second minus the first.
+            </p>
+        </header>
+
+        <div class="mt-6 overflow-x-auto">
+            <table class="w-full border-collapse text-left text-sm" data-gallery-compare>
+                <caption class="sr-only">What changed between version @from.Version and version @to.Version</caption>
+                <thead>
+                    <tr class="border-b-2 border-line text-xs uppercase tracking-[0.08em] text-muted">
+                        <th scope="col" class="py-2 pr-3 font-semibold">Figure</th>
+                        <th scope="col" class="py-2 pr-3 font-semibold"><a href="@AuBtechReviewAgent.GalleryCard.VersionPath(entry.Id, from.Version)" class="text-heading underline underline-offset-2">Version @from.Version</a></th>
+                        <th scope="col" class="py-2 pr-3 font-semibold"><a href="@AuBtechReviewAgent.GalleryCard.VersionPath(entry.Id, to.Version)" class="text-heading underline underline-offset-2">Version @to.Version</a></th>
+                        <th scope="col" class="py-2 font-semibold">Change</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var row in rows)
+                    {
+                        <tr class="border-b border-line align-top">
+                            <th scope="row" class="py-2 pr-3 font-medium text-heading">@row.Label</th>
+                            <td class="py-2 pr-3 text-ink">@row.From</td>
+                            <td class="py-2 pr-3 text-ink">@row.To</td>
+                            <td class="py-2 @(row.Change is "same" or "same share" or "–" ? "text-muted" : "font-medium text-ink")">@row.Change</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public string Id { get; set; } = "";
+    [SupplyParameterFromQuery(Name = "from")] public int? From { get; set; }
+    [SupplyParameterFromQuery(Name = "to")] public int? To { get; set; }
+
+    private AuBtechReviewAgent.GalleryEntry? entry, from, to;
+    private IReadOnlyList<AuBtechReviewAgent.ComparisonRow> rows = Array.Empty<AuBtechReviewAgent.ComparisonRow>();
+
+    protected override void OnParametersSet()
+    {
+        entry = Store.Find(Id);
+        if (entry == null || !ModuleOptions.Shows(entry.Card) || entry.Versions.Count < 2)
+        {
+            entry = null;
+            Nav.NotFound();
+            return;
+        }
+        // Without a choice, the version before the newest against the newest.
+        var numbers = entry.Versions.Select(v => v.Number).OrderByDescending(n => n).ToList();
+        from = Store.Find(Id, From ?? numbers[1]);
+        to = Store.Find(Id, To ?? numbers[0]);
+        if (from == null || to == null)
+        {
+            entry = null;
+            Nav.NotFound();
+            return;
+        }
+        rows = AuBtechReviewAgent.GalleryComparison.Rows(from, Store.VersionFolderOf(entry.Id, from.Version), to, Store.VersionFolderOf(entry.Id, to.Version), Metrics.Prices);
+    }
+}

@@ -2,8 +2,9 @@
 @inject IJSRuntime JS
 @inject NavigationManager Nav
 
-@* The owner's withdraw button on a gallery entry. It appears only when this browser still holds the edit key of the
-   run the entry was made from (browsers keep a key for 30 days); everyone else sees nothing. *@
+@* The owner's withdraw button on a gallery entry. It appears only when this browser still holds the edit key of a
+   run one of the entry's versions was made from (browsers keep a key for 30 days); everyone else sees nothing.
+   Withdrawing removes every version (GalleryStore.WithdrawAsync). *@
 
 @if (canWithdraw)
 {
@@ -16,7 +17,7 @@
         else
         {
             <div class="flex flex-wrap items-center gap-2" role="group" aria-label="Withdraw from the gallery">
-                <span class="text-ink">Remove this report from the gallery for good?</span>
+                <span class="text-ink">Remove this report and all its versions from the gallery for good?</span>
                 <button type="button" class="ui-btn-danger ui-btn-sm min-h-[44px]" @onclick="WithdrawAsync" disabled="@busy">Withdraw</button>
                 <button type="button" class="ui-btn-secondary ui-btn-sm min-h-[44px]" @onclick="() => confirm = false">Keep it</button>
             </div>
@@ -30,7 +31,7 @@
 
 @code {
     [Parameter, EditorRequired] public string EntryId { get; set; } = "";
-    [Parameter, EditorRequired] public Guid RunId { get; set; }
+    [Parameter, EditorRequired] public IReadOnlyList<Guid> RunIds { get; set; } = Array.Empty<Guid>();
 
     private string? editKey;
     private bool canWithdraw, confirm, busy, failed;
@@ -38,9 +39,16 @@
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (!firstRender) return;
-        try { editKey = await JS.InvokeAsync<string?>("traceableReview.getEditKey", RunId.ToString()); }
-        catch (Exception ex) when (ex is JSException or JSDisconnectedException or TaskCanceledException) { editKey = null; }
-        canWithdraw = Store.Find(EntryId) is { } entry && AuBtechReviewAgent.GalleryStore.CanWithdraw(entry, editKey);
+        if (Store.Find(EntryId) is not { } entry) return;
+        foreach (var runId in RunIds.Distinct())
+        {
+            string? key;
+            try { key = await JS.InvokeAsync<string?>("traceableReview.getEditKey", runId.ToString()); }
+            catch (Exception ex) when (ex is JSException or JSDisconnectedException or TaskCanceledException) { return; }
+            if (!AuBtechReviewAgent.GalleryStore.CanWithdraw(entry, key)) continue;
+            (editKey, canWithdraw) = (key, true);
+            break;
+        }
         if (canWithdraw) StateHasChanged();
     }
 
