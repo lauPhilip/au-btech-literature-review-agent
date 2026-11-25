@@ -16,7 +16,7 @@ public class ReviewMcpTests
 {
     private const string Key = "mcp-KEY-41d0-traceable-test-do-not-store";
 
-    private static async Task<McpClient> ConnectAsync(ApiTestHost host, string? key = Key)
+    private static async Task<McpClient> ConnectAsync(ApiTestHost host, string? key = Key, string? protocolVersion = null)
     {
         var options = new HttpClientTransportOptions
         {
@@ -24,7 +24,9 @@ public class ReviewMcpTests
             TransportMode = HttpTransportMode.StreamableHttp,
             AdditionalHeaders = key == null ? new Dictionary<string, string>() : new Dictionary<string, string> { [ApiEndpoints.MistralKeyHeader] = key },
         };
-        return await McpClient.CreateAsync(new HttpClientTransport(options, host.CreateClient()));
+        // No version: the client picks the newest the server speaks. A version pins it, as an older client would.
+        var clientOptions = new McpClientOptions { ProtocolVersion = protocolVersion };
+        return await McpClient.CreateAsync(new HttpClientTransport(options, host.CreateClient()), clientOptions);
     }
 
     private static async Task<(bool Error, string Text)> CallAsync(McpClient client, string tool, Dictionary<string, object?> arguments)
@@ -41,6 +43,22 @@ public class ReviewMcpTests
         await using var client = await ConnectAsync(host);
         var names = (await client.ListToolsAsync()).Select(t => t.Name).OrderBy(n => n, StringComparer.Ordinal).ToList();
         Assert.Equal(new[] { "cancel_review", "get_review_file", "get_review_report", "get_review_status", "start_literature_review" }, names);
+    }
+
+    // 2025-11-25 opens with the initialize handshake, as clients built on SDK 1.x do; 2026-07-28 sends the version
+    // and the standard headers with every request and has no handshake. The stateless server must answer both.
+    [Theory]
+    [InlineData("2025-11-25")]
+    [InlineData("2026-07-28")]
+    public async Task Clients_on_the_older_and_the_newer_protocol_both_reach_the_tools(string version)
+    {
+        using var host = new ApiTestHost();
+        await using var client = await ConnectAsync(host, protocolVersion: version);
+        Assert.Equal(version, client.NegotiatedProtocolVersion);
+        Assert.Equal(5, (await client.ListToolsAsync()).Count);
+        var (error, text) = await CallAsync(client, "get_review_status", new() { ["id"] = "not-a-run" });
+        Assert.True(error);
+        Assert.Contains("run id is not valid", text);
     }
 
     [Fact]
