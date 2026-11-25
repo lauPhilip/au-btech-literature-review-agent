@@ -52,7 +52,7 @@ public partial class Privacy
     /// <summary>What is kept, where, and for how long; the periods come from the configuration.</summary>
     private (string What, string Where, string HowLong)[] Retention => new[]
     {
-        ("Your review and everything it produced", "This server", $"{RunsOptions.RetentionDays} days after the run was created, or until you delete it"),
+        ("Your review and everything it produced", "This server", $"{RunsOptions.RetentionDays} days after the run last changed, or until you delete it"),
         ("Fingerprints of network addresses, for the free runs", "This server", "Two days"),
         ("Counts of requests per network address", "The server's memory only", "An hour at most, or until the server restarts"),
         ("Cached database answers and screening decisions", "This server", $"Deleted after {CacheDeletedAfterDays} days"),

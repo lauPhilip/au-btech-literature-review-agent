@@ -10,8 +10,8 @@ public static class PrivacyText
     public static string[] Address(int freeRunsPerDay) => new[]
     {
         $"Free runs are limited to {freeRunsPerDay} per day per network address. To count them, your address is replaced " +
-        "by a keyed fingerprint (HMAC-SHA-256 with a secret that exists only on this server) before anything is stored, so the stored value " +
-        "cannot be turned back into an address. Counts older than two days are deleted.",
+        "by a keyed fingerprint (HMAC-SHA-256 with a secret that exists only on this server) before anything is stored. Without that secret " +
+        "the stored value cannot be turned back into an address, and the server never tries to. Counts older than two days are deleted.",
         "To keep the tool fair and to slow down automated traffic, the server also counts in its memory how many pages, downloads and " +
         "costly actions (starting a review, proposing search strings, checking a citation again, checking an archive) come from one " +
         "address, and how many reviews it has running or waiting. These counts are never written to disk. They are gone after an hour " +
@@ -27,7 +27,8 @@ public static class PrivacyText
         "everything the run produces: the protocol, the search results, every screening decision, the downloaded open-access papers, the " +
         "report and a record of every model call. This is what makes the review checkable." + (grey ? " A grey literature review saves its " +
         "plan the same way: the need for the review, its research questions, search strings, criteria and quality threshold." : ""),
-        $"A run is kept for {retentionDays} days after it is created and then deleted automatically, files and all. Anyone who has " +
+        $"A run is kept for {retentionDays} days after it last changed and then deleted automatically, files and all, within the hour " +
+        "after that. Anyone who has " +
         "the link to a run can read it, but only the browser that started it can change or delete it; the links contain a random identifier " +
         "that cannot be guessed, and they are not listed anywhere or shown to search engines.",
     };
