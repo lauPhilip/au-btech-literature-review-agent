@@ -1,3 +1,4 @@
+using System;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 
@@ -11,6 +12,13 @@ namespace AuBtechReviewAgent;
 public static class AppLog
 {
     public static ILoggerFactory Factory { get; set; } = NullLoggerFactory.Instance;
-    public static ILogger For<T>() => Factory.CreateLogger<T>();
-    public static ILogger For(string category) => Factory.CreateLogger(category);
+    public static ILogger For<T>() => For(typeof(T).FullName ?? typeof(T).Name);
+
+    // After the app has stopped (a test host disposed, a shutdown) the factory is disposed; logging then goes nowhere
+    // instead of failing the work that wanted to log.
+    public static ILogger For(string category)
+    {
+        try { return Factory.CreateLogger(category); }
+        catch (ObjectDisposedException) { return NullLogger.Instance; }
+    }
 }
