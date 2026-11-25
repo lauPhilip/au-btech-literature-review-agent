@@ -142,7 +142,7 @@ public static partial class PaperSelfCheck
     {
         var checks = new List<Func<PaperCheckInput, PaperCheck>>
         {
-            NumbersCheck, AnswersCheck, PartsCheck, FiguresCheck, CoverageCheck,
+            NumbersCheck, AnswersCheck, PartsCheck, CitationLoadCheck, FiguresCheck, CoverageCheck, CitationCheckCheck, ReferencesCheck,
         };
         var results = checks.Select((check, i) =>
         {
