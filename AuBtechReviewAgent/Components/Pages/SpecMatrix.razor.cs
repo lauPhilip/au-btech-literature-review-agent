@@ -236,7 +236,7 @@ public partial class SpecMatrix
         flow = AuBtechReviewAgent.PrismaFlowCounts.From(state);
         runLine = RunLine(state);
         dateLine = state.CompletedUtc is DateTime done ? done.ToString("d MMMM yyyy", System.Globalization.CultureInfo.InvariantCulture) : "";
-        aiStatement = AuBtechReviewAgent.AiUseStatement.Methods(state, ReportRunId, editLog);
+        aiStatement = AuBtechReviewAgent.AiUseStatement.Methods(state, ReportRunId, editLog, report.Artifact);
         aiShort = AuBtechReviewAgent.AiUseStatement.Short(state);
         researchQuestions = state.ResearchQuestions?.ToList() ?? new List<string>();
         passedPeerReviewCheck = state.Stats.PassedPeerReviewCheck;
