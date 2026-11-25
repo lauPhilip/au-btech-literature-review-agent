@@ -83,7 +83,9 @@ public static partial class StudyExtractor
     /// <summary>The evidence basis of such a study.</summary>
     public const string NoText = "no text";
 
-    public static async Task<StudyExtraction> ExtractAsync(IChatCompletionService chat, ReferencedPaper paper, int excerpts = 8)
+    /// <summary>Extracts and appraises one study; every value comes with a quote checked against the text sent.</summary>
+    /// <param name="focus">The run's research questions, objective and cache; null keeps the extraction as it was (MMAT for the multivocal review).</param>
+    public static async Task<StudyExtraction> ExtractAsync(IChatCompletionService chat, ReferencedPaper paper, int excerpts = 8, ExtractionFocus? focus = null)
     {
         var result = new StudyExtraction { ReferenceNumber = paper.ReferenceNumber, PaperId = paper.PaperId, Title = paper.Title,
             EvidenceBasis = paper.HasFullText ? "full text" : "abstract only" };
@@ -105,7 +107,7 @@ public static partial class StudyExtractor
         // The MMAT questions ask about data collection, analysis and how the results follow from the data, which the
         // extraction passages often miss; a full-text study then got "can't tell" on every question (issue #149).
         var appraisalTerms = TextRelevance.Terms("data collection collected interviews questionnaire survey observation analysis analysed analyzed coding themes randomised randomized control group baseline outcome measured measures response rate integration qualitative quantitative mixed rationale interpretation");
-        var chunks = GroundingContextBuilder.SelectChunks(paper.Chunks, terms, excerpts);
+        var chunks = ExtractionChunks(paper.Chunks, terms, focus, excerpts);
         var appraisalChunks = GroundingContextBuilder.SelectChunks(paper.Chunks, appraisalTerms, excerpts + AppraisalExcerpts)
             .Where(c => !chunks.Contains(c)).Take(AppraisalExcerpts).ToList();
         var evidence = new StringBuilder();
@@ -113,33 +115,42 @@ public static partial class StudyExtractor
         evidence.AppendLine($"Abstract: {(string.IsNullOrWhiteSpace(paper.Abstract) ? "(no abstract available)" : paper.Abstract)}");
         foreach (var c in chunks.Concat(appraisalChunks)) evidence.AppendLine($"[page {c.PageNumber}] {c.Text}");
         string evidenceText = evidence.ToString();
+        var canonical = CanonicalText.Of(evidenceText);
 
         string criteriaList = string.Join("\n", MmatCriteria.Select(kv => $"- {kv.Key}: " + string.Join(" | ", kv.Value)));
+        var (questionBlock, findingRule, questionField) = QuestionPrompt(focus);
         string prompt = $$"""
             You are extracting data from one study for a systematic literature review, and appraising its quality with the Mixed Methods Appraisal Tool (MMAT, 2018).
 
             {{PromptSafety.DataOnlyNotice}}
 
             STUDY: [{{paper.ReferenceNumber}}] {{paper.Title}}
-            {{PromptSafety.Wrap(evidenceText, "paper text: abstract and selected passages")}}
+            {{PromptSafety.Wrap(evidenceText, "paper text: abstract and selected passages")}}{{questionBlock}}
 
             TASK 1 - EXTRACTION. Fill each field from the text above. Every value must have a verbatim quote (one sentence, max 40 words) copied exactly from the text as one unbroken passage (no "...", no rephrasing). If the text does not say, use value "not reported" and an empty quote.
             - studyType: one short phrase (e.g. "design science artefact with case study", "controlled experiment", "survey", "literature review", "position paper").
             - method, sample: a short value of at most {{ShortValueWords}} words in your own words, e.g. "semi-structured interviews" or "24 engineering students". Never copy the quote into the value; the quote is the proof, the value is the answer.
             - limitations: one short sentence of at most {{SentenceWords}} words.
-            - keyFindings: 1 to 3 findings, each one short sentence of at most {{SentenceWords}} words.
+            - keyFindings: 1 to 3 findings, each one short sentence of at most {{SentenceWords}} words.{{findingRule}}
             - Keep every number with its unit and sign as the text gives it (write "40-90%", not "40-90").
 
             TASK 2 - APPRAISAL. First decide if the study is empirical (it has a research question and collects or analyses data to answer it). If not (e.g. a position paper, a system description without evaluation, or a literature review), set appraisalCategory to "not_empirical" and appraisal to []. Otherwise choose ONE category and answer all five of its criteria, each with its id (e.g. "1.1") and "yes", "no" or "cant_tell". A "yes" or "no" needs a verbatim quote that shows it; use "cant_tell" with an empty quote only when the text above does not show it. When passages from the full text are given, most criteria can be answered from them.
             {{criteriaList}}
 
             Respond ONLY with a minified JSON object:
-            {"studyType":"...","method":{"value":"...","quote":"..."},"sample":{"value":"...","quote":"..."},"keyFindings":[{"value":"...","quote":"..."}],"limitations":{"value":"...","quote":"..."},"appraisalCategory":"...","appraisal":[{"id":"3.1","answer":"yes","quote":"..."}]}
+            {"studyType":"...","method":{"value":"...","quote":"..."},"sample":{"value":"...","quote":"..."},"keyFindings":[{"value":"...","quote":"..."{{questionField}}}],"limitations":{"value":"...","quote":"..."},"appraisalCategory":"...","appraisal":[{"id":"3.1","answer":"yes","quote":"..."}]}
             """;
 
         var settings = new MistralAIPromptExecutionSettings { Temperature = 0.0 };
         settings.ExtensionData ??= new Dictionary<string, object>();
         settings.ExtensionData["response_format"] = new { type = "json_object" };
+
+        // The same prompt (text sent, questions, prompt version) to the same model gives back the same extraction,
+        // so a rerun on the same studies agrees with the first run and costs nothing (issue #430).
+        var cache = focus?.Cache is { Enabled: true } enabled ? enabled : null;
+        string cacheKey = ReviewCache.Key(PromptVersion, focus?.Model, prompt);
+        if (cache != null && cache.TryGet<StudyExtraction>("extraction", cacheKey, out var cached) && cached is { Error: null })
+            return Reuse(cached, canonical);
 
         try
         {
@@ -149,20 +160,20 @@ public static partial class StudyExtractor
             try
             {
                 answer = await LlmJson.GetAsync<ExtractionAnswer>(chat, prompt, settings,
-                    a => BasicProblem(a) ?? StrictProblem(a, evidenceText, paper.HasFullText));
+                    a => BasicProblem(a) ?? QuestionProblem(a, focus) ?? StrictProblem(a, canonical, paper.HasFullText));
             }
             catch (LlmOutputException)
             {
                 answer = await LlmJson.GetAsync<ExtractionAnswer>(chat, prompt, settings, BasicProblem);
-                string? left = StrictProblem(answer, evidenceText, paper.HasFullText);
+                string? left = StrictProblem(answer, canonical, paper.HasFullText);
                 if (left != null) result.Note = $"Kept after a second try with a problem the model did not fix: {left}";
             }
 
             result.StudyType = answer.StudyType.Trim();
-            result.Method = Verify(answer.Method, evidenceText);
-            result.Sample = Verify(answer.Sample, evidenceText);
-            result.Limitations = Verify(answer.Limitations, evidenceText);
-            result.KeyFindings = (answer.KeyFindings ?? new()).Take(3).Select(f => Verify(f, evidenceText)).ToList();
+            result.Method = Verify(answer.Method, canonical);
+            result.Sample = Verify(answer.Sample, canonical);
+            result.Limitations = Verify(answer.Limitations, canonical);
+            result.KeyFindings = PickFindings(answer.KeyFindings, focus).Select(f => Verify(f, canonical)).ToList();
             result.AppraisalCategory = answer.AppraisalCategory;
 
             if (MmatCriteria.TryGetValue(answer.AppraisalCategory, out var criteria))
@@ -172,12 +183,13 @@ public static partial class StudyExtractor
                     string id = criteria[i].Split(' ')[0];
                     var given = answer.Appraisal?.FirstOrDefault(x => CriterionId(x.Id) == id) ?? answer.Appraisal?.ElementAtOrDefault(i);
                     var a = new AppraisalAnswer { Id = id, Criterion = criteria[i][(id.Length + 1)..], Answer = given == null ? "cant_tell" : NormalAnswer(given.Answer), Quote = given?.Quote ?? "" };
-                    a.QuoteVerified = CitationSupportChecker.QuoteOccursIn(a.Quote, evidenceText);
+                    a.QuoteVerified = CitationSupportChecker.QuoteOccursIn(a.Quote, canonical);
                     // A "yes" or "no" must be backed by text that is really in the paper; otherwise it cannot be told.
                     if (a.Answer != "cant_tell" && !a.QuoteVerified) a.Answer = "cant_tell";
                     result.Appraisal.Add(a);
                 }
             }
+            cache?.Set("extraction", cacheKey, result);
         }
         catch (Exception ex)
         {

@@ -110,7 +110,7 @@ public sealed partial class MultivocalSearcher
     }
 
     /// <summary>The formal source as the pipeline's common record: authors as its producer, the venue as its site, the abstract as its summary.</summary>
-    private static GreyRecord RecordOf(AcademicPaper paper, string address, string database) => new(
+    internal static GreyRecord RecordOf(AcademicPaper paper, string address, string database) => new(
         paper.Id,
         paper.Title ?? "",
         paper.Abstract ?? "",
@@ -128,12 +128,12 @@ public sealed partial class MultivocalSearcher
             ? date
             : null;
 
-    private static RemovedRecord Removed(AcademicPaper paper, string database, string query, string reason, string? duplicateOf = null) =>
+    internal static RemovedRecord Removed(AcademicPaper paper, string database, string query, string reason, string? duplicateOf = null) =>
         new(paper.Id, paper.Title ?? "", database, query, ApaCitationBuilder.ExtractYear(paper.PublishedDate), reason, duplicateOf,
             PrismaReviewEngine.NormalizeDoi(paper.Doi));
 
     /// <summary>Every raw answer of one academic search, as received, with its SHA-256 (XML for arXiv, JSON for the others).</summary>
-    private static async Task SaveFormalRawAsync(string rawFolder, string baseName, IReadOnlyList<string> raw, GreySearchLog log)
+    internal static async Task SaveFormalRawAsync(string rawFolder, string baseName, IReadOnlyList<string> raw, GreySearchLog log)
     {
         var names = new List<string>();
         var hashes = new List<string>();

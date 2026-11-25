@@ -13,6 +13,18 @@ public class RunsOptions
     /// <summary>How many reviews may call the language model at the same time. Others wait in line.</summary>
     public int MaxConcurrentRuns { get; set; } = 3;
 
+    /// <summary>The most slots one client (network address) may hold at once; its next run lets others pass.</summary>
+    public int MaxRunningPerClient { get; set; } = 2;
+
+    /// <summary>The most runs one client may have waiting on top of those running; more are refused.</summary>
+    public int MaxQueuedPerClient { get; set; } = 3;
+
+    /// <summary>The longest the line may grow. A run beyond it is refused with "The tool is busy" instead of waiting for hours.</summary>
+    public int MaxQueuedRuns { get; set; } = 100;
+
+    /// <summary>How long a run holds a slot, for the wait shown in line until a few runs have been timed.</summary>
+    public int TypicalRunMinutes { get; set; } = 12;
+
     /// <summary>How long a finished run's folder (and its link) is kept before the cleanup job deletes it.</summary>
     public int RetentionDays { get; set; } = 7;
 
@@ -31,22 +43,23 @@ public record ScreeningOverride(string PaperId, string Decision, string? Note);
 
 /// <summary>
 /// Keeps track of the runs that are alive in this process and hands out a limited number of "slots" for
-/// the model-heavy phases, first come first served. Everything here is in memory: after an app restart
-/// no run is active, and PrismaReviewEngine.MarkInterruptedRuns tidies up the ledgers that were cut off.
+/// the model-heavy phases, through one fair line (RunCoordinator.Queue.cs). Everything here is in memory: after an
+/// app restart no run is active, and PrismaReviewEngine.MarkInterruptedRuns tidies up the ledgers that were cut off.
 /// </summary>
-public class RunCoordinator
+public partial class RunCoordinator
 {
     private readonly int _maxConcurrent;
-    private readonly object _gate = new();
-    private int _running;
-    private readonly LinkedList<(Guid RunId, TaskCompletionSource Ticket)> _queue = new();
+    private readonly RunsOptions _options;
     private readonly ConcurrentDictionary<Guid, TaskCompletionSource<IReadOnlyList<ScreeningOverride>>> _reviewGates = new();
     private readonly ConcurrentDictionary<Guid, DateTime> _active = new();
     private readonly ConcurrentDictionary<Guid, RunStop> _stops = new();
 
-    public RunCoordinator(int maxConcurrent)
+    public RunCoordinator(int maxConcurrent) : this(new RunsOptions { MaxConcurrentRuns = maxConcurrent }) { }
+
+    public RunCoordinator(RunsOptions options)
     {
-        _maxConcurrent = Math.Max(1, maxConcurrent);
+        _options = options;
+        _maxConcurrent = Math.Max(1, options.MaxConcurrentRuns);
     }
 
     public int MaxConcurrent => _maxConcurrent;
@@ -65,6 +78,7 @@ public class RunCoordinator
         _active.TryRemove(runId, out _);
         _reviewGates.TryRemove(runId, out _);
         _stops.TryRemove(runId, out _);
+        Withdraw(runId);
     }
 
     /// <summary>
@@ -104,69 +118,6 @@ public class RunCoordinator
 
     public IReadOnlyCollection<Guid> ActiveRunIds => _active.Keys.ToList();
 
-    /// <summary>1-based place in the waiting line, or 0 when the run is not waiting.</summary>
-    public int QueuePosition(Guid runId)
-    {
-        lock (_gate)
-        {
-            int i = 1;
-            foreach (var entry in _queue)
-            {
-                if (entry.RunId == runId) return i;
-                i++;
-            }
-            return 0;
-        }
-    }
-
-    /// <summary>
-    /// Waits for a free slot. The returned handle must be disposed to give the slot back. Waiting runs are
-    /// served strictly in arrival order (SemaphoreSlim does not promise that).
-    /// </summary>
-    public async Task<IDisposable> AcquireSlotAsync(Guid runId, CancellationToken cancellationToken = default)
-    {
-        TaskCompletionSource ticket;
-        LinkedListNode<(Guid, TaskCompletionSource)> node;
-        lock (_gate)
-        {
-            if (_running < _maxConcurrent && _queue.Count == 0)
-            {
-                _running++;
-                return new Slot(this);
-            }
-            ticket = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-            node = _queue.AddLast((runId, ticket));
-        }
-
-        using (cancellationToken.Register(() =>
-        {
-            lock (_gate)
-            {
-                if (node.List != null) { _queue.Remove(node); ticket.TrySetCanceled(); }
-            }
-        }))
-        {
-            await ticket.Task.ConfigureAwait(false);
-        }
-        return new Slot(this); // the slot was handed over by Release, so _running already counts it
-    }
-
-    private void Release()
-    {
-        lock (_gate)
-        {
-            if (_queue.First is { } next)
-            {
-                _queue.RemoveFirst();
-                next.Value.Ticket.TrySetResult(); // hand the slot straight to the next run in line
-            }
-            else
-            {
-                _running = Math.Max(0, _running - 1);
-            }
-        }
-    }
-
     /// <summary>Opens the review gate so the dashboard can submit decisions (call before announcing the pause).</summary>
     public void OpenScreeningReview(Guid runId) =>
         _reviewGates.GetOrAdd(runId, _ => new TaskCompletionSource<IReadOnlyList<ScreeningOverride>>(TaskCreationOptions.RunContinuationsAsynchronously));
@@ -197,12 +148,5 @@ public class RunCoordinator
         public string? Reason { get; set; }
         public DateTime RequestedUtc { get; set; }
         public bool Closed { get; set; }
-    }
-
-    private sealed class Slot : IDisposable
-    {
-        private RunCoordinator? _owner;
-        public Slot(RunCoordinator owner) => _owner = owner;
-        public void Dispose() => Interlocked.Exchange(ref _owner, null)?.Release();
     }
 }

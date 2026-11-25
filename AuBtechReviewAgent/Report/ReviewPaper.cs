@@ -63,6 +63,9 @@ public sealed class ReviewPaper
     /// </summary>
     public PaperSection? Summary { get; init; }
 
+    /// <summary>A conclusion after <see cref="Summary"/>, when the module writes one apart (the multivocal review); the systematic review's is its <see cref="Summary"/>.</summary>
+    public PaperSection? Conclusion { get; init; }
+
     /// <summary>Support, registration and protocol, availability.</summary>
     public List<PaperSection> Declarations { get; init; } = new();
 
@@ -120,8 +123,9 @@ public static class PaperLatex
         escaped = Regex.Replace(escaped, @"(?<![\w.])(\d+(?:\.\d+)?)\\textasciicircum (-?\d+)(?!\w)", m => $"${m.Groups[1].Value}^{{{m.Groups[2].Value}}}$");
         // Straight double quotes print as two closing quotes in LaTeX; use proper ``opening'' and closing quotes.
         escaped = Regex.Replace(escaped, "\"([^\"\n]*)\"", "``$1''");
-        // Symbols the run's own text uses that pdflatex cannot set from UTF-8 (Cohen's κ in a multivocal method, say).
-        escaped = escaped.Replace("κ", @"$\kappa$").Replace("≥", @"$\geq$").Replace("≤", @"$\leq$").Replace("→", @"$\rightarrow$").Replace("×", @"$\times$");
+        // Characters pdflatex cannot set from UTF-8 with this preamble: Cohen's κ in a multivocal method, a Greek letter
+        // in a source's name ("α-UMi", #475), an emoji in a repository's title.
+        escaped = LatexText.Map(escaped);
         // Two maths spans side by side ("2×10^6") become one, since "$$" would start display maths.
         escaped = Regex.Replace(escaped, @"(?<!\\)\$\$", "");
         // Markdown-style *italics* (used for venues in the APA references) -> real LaTeX italics.
@@ -134,6 +138,9 @@ public static class PaperLatex
     {
         var sb = new StringBuilder();
         sb.AppendLine(@"\documentclass[9pt,a4paper]{article}");
+        // T1, the encoding the TeX Gyre fonts below are made for: in the default OT1 encoding "<", ">" and "|" print
+        // as "¡", "¿" and "—" in running text (#482).
+        sb.AppendLine(@"\usepackage[T1]{fontenc}");
         sb.AppendLine(@"\usepackage[utf8]{inputenc}");
         sb.AppendLine(@"\usepackage[margin=0.8in]{geometry}");
         sb.AppendLine(@"\usepackage{amsmath,amsfonts,amssymb}");
@@ -234,6 +241,11 @@ public static class PaperLatex
         {
             sb.AppendLine($"\\section{{{Escape(paper.Summary.Heading)}}}");
             sb.AppendLine(Body(paper.Summary));
+        }
+        if (paper.Conclusion != null)
+        {
+            sb.AppendLine($"\\section{{{Escape(paper.Conclusion.Heading)}}}");
+            sb.AppendLine(Body(paper.Conclusion));
         }
 
         sb.AppendLine(@"\section{Declarations}");

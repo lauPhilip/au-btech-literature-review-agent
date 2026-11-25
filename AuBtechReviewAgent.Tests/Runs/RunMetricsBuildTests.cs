@@ -136,6 +136,11 @@ public class RunMetricsBuildTests
         Assert.Equal(new[] { "extraction", "screening" }, m.CostByStage.Keys);
         Assert.Equal((2, 2.5, 110L), (m.CostByStage["screening"].Calls, m.CostByStage["screening"].Seconds, m.CostByStage["screening"].Tokens));
         Assert.Equal((1, 0.3, 0L), (m.CostByStage["extraction"].Calls, m.CostByStage["extraction"].Seconds, m.CostByStage["extraction"].Tokens));
+        // Issue #414: input and output apart (the first call reported only a total), and the failed call with no usage.
+        Assert.Equal((5L, 5L, 0L, 1), (m.InputTokens, m.OutputTokens, m.ReasoningTokens, m.CallsWithoutUsage));
+        Assert.Equal((1, 1), (m.CostByStage["screening"].Retries, m.CostByStage["extraction"].Failures));
+        Assert.Equal(new[] { "unknown" }, m.CostByModel!.Keys);
+        Assert.Equal("systematic", m.ReviewType);
     }
 
     [Fact]

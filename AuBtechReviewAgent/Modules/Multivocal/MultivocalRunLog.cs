@@ -87,6 +87,7 @@ public static class MultivocalRunLog
             Model = paper.Model,
             QueryHash = RunMetrics.Sha(string.Join("|", plan.Numbered().Select(q => q.Question.Text))),
             Settings = settings,
+            ReviewType = Module,
         };
         m.ConfigFingerprint = RunMetrics.Sha(string.Join("|", new[] { m.Model, m.AppVersion }.Concat(settings.OrderBy(kv => kv.Key, StringComparer.Ordinal).Select(kv => $"{kv.Key}={kv.Value}"))));
 
@@ -95,13 +96,19 @@ public static class MultivocalRunLog
         m.Screened = f.Screened;
         m.Included = f.Passed;
         m.ScreeningKappa = input.Screening.Kappa;
+        // Flagged for the reviewer, as in the systematic review, and how many of them nobody looked at (#473).
+        m.UncertainDecisions = input.Screening.Sources.Count(x => x.Uncertain);
+        m.FlaggedNotLookedAt = input.Screening.Sources.Count(x => x.NeedsLook);
         m.FullTextRetrieved = f.Extracted;
         m.FullTextShare = f.Passed == 0 ? 0 : Math.Round((double)f.Extracted / f.Passed, 4);
 
         m.SourcesBySearch = input.Ledger.Searches.Where(x => x.Error == null).GroupBy(x => x.Source)
             .OrderBy(g => g.Key, StringComparer.Ordinal).ToDictionary(g => g.Key, g => g.Sum(x => x.New));
-        var scored = input.Quality.Sources.Where(x => x.Outcome is "Passed" or "Below threshold").ToList();
-        m.MeanQualityPoints = scored.Count == 0 ? null : Math.Round(scored.Average(x => x.Points), 1);
+        // Each pool apart (issue #415); Table 7 points are the grey sources' only, as academic sources are appraised with MMAT.
+        m.GreyPool = Pool(false, input);
+        m.FormalPool = input.Ledger.HasFormalPool ? Pool(true, input) : null;
+        m.ScreeningKappaBasis = m.ScreeningKappa == null ? null : KappaBasis(input.Screening);
+        m.MeanQualityPoints = m.GreyPool.MeanTable7Points;
         m.MaxQualityPoints = input.Quality.MaxPoints;
 
         var synthesis = input.Synthesis;
@@ -151,27 +158,51 @@ public static class MultivocalRunLog
         int words = m.SynthesisWords + m.DiscussionWords;
         m.CitationsPer100Words = words == 0 ? 0 : Math.Round(refsPerSentence.Sum() * 100.0 / words, 2);
 
-        m.LlmCalls = calls.Count;
-        m.LlmRetries = calls.Sum(c => Math.Max(0, c.Attempts - 1));
-        m.LlmFailures = calls.Count(c => c.Outcome != "ok");
-        m.Tokens = calls.Sum(c => RunMetrics.TokensIn(c.Usage));
-        m.CostByStage = calls.GroupBy(c => c.Stage).OrderBy(g => g.Key, StringComparer.Ordinal).ToDictionary(g => g.Key, g => new StageCost
-        {
-            Calls = g.Count(),
-            Seconds = Math.Round(g.Sum(c => c.DurationMs) / 1000.0, 1),
-            Tokens = g.Sum(c => RunMetrics.TokensIn(c.Usage)),
-        });
+        m.AddCost(calls);
         if (paper.CheckedUtc is DateTime done && input.Ledger.SearchedUtc != default)
             m.DurationMinutes = Math.Round((done - input.Ledger.SearchedUtc).TotalMinutes, 1);
         return m;
     }
+
+    /// <summary>The figures of one pool, from the counts the run view and the flow diagram use (<see cref="MultivocalPools.For"/>).</summary>
+    public static PoolMetrics Pool(bool formal, MultivocalReportInput input)
+    {
+        var c = MultivocalPools.For(formal, input.Ledger, input.Screening, input.Quality, input.Extraction);
+        var assessed = input.Quality.Sources.Where(q => q.Formal == formal).ToList();
+        var p = new PoolMetrics
+        {
+            Identified = c.Identified, DuplicatesRemoved = c.DuplicatesRemoved, NoAddressRemoved = c.NoAddressRemoved,
+            DuplicatesAtScreening = c.DuplicatesAtScreening, NotScreened = c.NotScreened, Screened = c.Screened, Included = c.Included, Excluded = c.Excluded,
+            Kappa = c.Kappa, KappaBasis = c.Kappa == null ? null : KappaBasis(input.Screening),
+            ScreenedTwice = c.Second?.ScreenedTwice ?? 0, AuditSample = c.Second?.Audit ?? 0,
+            TargetedSecond = c.Second?.TargetedTotal ?? 0, TargetedAgreed = c.Second?.TargetedAgreed ?? 0,
+            Kept = c.Kept, BelowThreshold = c.BelowThreshold, NotAssessed = c.NotAssessed, Extracted = c.Extracted, NotExtracted = c.NotExtracted,
+            AbstractOnly = c.AbstractOnly,
+        };
+        if (formal)
+        {
+            var appraised = assessed.Where(q => q.Mmat != null).ToList();
+            p.MmatAppraised = appraised.Count;
+            p.MmatEmpirical = appraised.Count(q => q.Mmat!.Appraisal.Count > 0);
+        }
+        else
+        {
+            var scored = assessed.Where(q => q.Outcome is "Passed" or "Below threshold").ToList();
+            p.Table7Scored = scored.Count;
+            p.MeanTable7Points = scored.Count == 0 ? null : Math.Round(scored.Average(x => x.Points), 1);
+        }
+        return p;
+    }
+
+    /// <summary>What a run's κ is computed over: its random audit sample, or every source in a run screened before the rule (no seed).</summary>
+    public static string KappaBasis(MultivocalScreeningFile screening) => screening.AuditSeed != null ? "audit sample" : "all sources";
 
     private static int Words(string? text) => string.IsNullOrWhiteSpace(text) ? 0 : Regex.Matches(text, @"\S+").Count;
 
     private static LlmCallRecord Copy(LlmCallRecord c) => new()
     {
         Sequence = c.Sequence, Stage = c.Stage, StartedUtc = c.StartedUtc, DurationMs = c.DurationMs, ModelRequested = c.ModelRequested,
-        ModelReported = c.ModelReported, Temperature = c.Temperature, Attempts = c.Attempts, Outcome = c.Outcome,
+        ModelReported = c.ModelReported, Temperature = c.Temperature, ReasoningEffort = c.ReasoningEffort, Attempts = c.Attempts, Outcome = c.Outcome,
         PromptSha256 = c.PromptSha256, PromptChars = c.PromptChars, ResponseSha256 = c.ResponseSha256, ResponseChars = c.ResponseChars, Usage = c.Usage,
     };
 }

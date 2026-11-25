@@ -29,6 +29,17 @@ public static class CitationView
         _ => "text-gray-500",
     };
 
+    /// <summary>The colour of a citation's chip and of its verdict label: the five verdicts, and grey when not checked.</summary>
+    public static string Chip(string? verdict) => verdict switch
+    {
+        CitationSupportChecker.Supported => "border-supported-border bg-supported-fill text-supported",
+        CitationSupportChecker.Partial => "border-partly-border bg-partly-fill text-partly",
+        CitationSupportChecker.NotSupported => "border-not-supported-border bg-not-supported-fill text-not-supported",
+        CitationSupportChecker.InsufficientEvidence => "border-abstract-only-border bg-abstract-only-fill text-abstract-only",
+        CitationSupportChecker.Unverifiable => "border-unverifiable-border bg-unverifiable-fill text-unverifiable",
+        _ => "border-line bg-soft text-muted",
+    };
+
     /// <summary>The id of a citation number on the page.</summary>
     public static string CiteId(string field, int sentence, int reference) => $"cite-{field}-{sentence}-{reference}";
 

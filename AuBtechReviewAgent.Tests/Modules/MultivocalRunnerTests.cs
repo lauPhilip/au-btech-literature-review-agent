@@ -66,10 +66,10 @@ public class MultivocalRunnerTests : IDisposable
     /// <summary>The fake model's answers for writing and checking the paper of the run's one source; null for any other prompt.</summary>
     private static string? WritingAnswer(string prompt) =>
         prompt.Contains("You are writing one subsection of the Results") ? """{"heading":"Summaries","text":"Sources keep a running summary of the conversation [1]."}"""
-        : prompt.Contains("You are writing the Discussion section") ? """{"text":"Running summaries keep agent contexts short [1]."}"""
+        : prompt.Contains("You are writing the Discussion section") ? """{"answers":["Sources keep a running summary of the conversation [1]."],"text":"Running summaries keep agent contexts short [1]."}"""
         : prompt.Contains("You are writing the summary for practitioners") ? """{"lead":"For developers.","items":["Keep a running summary [1].","Summarise old turns [1].","Keep the summary short [1]."]}"""
         : prompt.Contains("You are writing the title") ? """{"title":"Context engineering: a grey literature review","abstract":"One source keeps running summaries.","rationale":"Agents keep a running summary [1].","objectives":"To map the practices."}"""
-        : prompt.Contains("grounded synthesis outline") || prompt.Contains("strict but constructive peer reviewer") || prompt.Contains("rigorous academic copyeditor") || prompt.Contains("You are checking citations")
+        : prompt.Contains("grounded synthesis outline") || prompt.Contains("You are writing the sections that follow the discussion of") || prompt.Contains("strict but constructive peer reviewer") || prompt.Contains("rigorous academic copyeditor") || prompt.Contains("You are checking citations")
             ? MultivocalWritingTests.Respond(prompt)
             : null;
 

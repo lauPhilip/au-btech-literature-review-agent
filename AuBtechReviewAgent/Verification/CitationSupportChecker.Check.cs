@@ -189,6 +189,8 @@ public static partial class CitationSupportChecker
                     if (key != null && ParseVerdicts(raw).Count > 0) cache!.Cache.Set("citation-check", key, new CachedAnswer { Text = raw });
                 }
                 var parsed = ParseVerdicts(raw);
+                // Each excerpt is made canonical once, however many sentences quote it.
+                var canonical = excerpts.Select(e => CanonicalText.Of(e.Text)).ToList();
 
                 for (int i = 0; i < sentences.Count; i++)
                 {
@@ -205,9 +207,9 @@ public static partial class CitationSupportChecker
                             r.Reason = $"The excerpts do not mention this. {v.Reason}".Trim();
                         }
                         r.Quote = v.Quote;
-                        var excerpt = excerpts.FirstOrDefault(e => e.Label.Split(' ')[0].Equals(v.Excerpt, StringComparison.OrdinalIgnoreCase));
-                        r.EvidenceLocation = excerpt.Label;
-                        r.QuoteVerified = QuoteOccursIn(v.Quote, excerpt.Text);
+                        int at = excerpts.FindIndex(e => e.Label.Split(' ')[0].Equals(v.Excerpt, StringComparison.OrdinalIgnoreCase));
+                        r.EvidenceLocation = at < 0 ? null : excerpts[at].Label;
+                        r.QuoteVerified = at >= 0 && QuoteOccursIn(v.Quote, canonical[at]);
 
                         // A positive verdict must be backed by a quote that is really there.
                         if (r.Verdict is Supported or Partial && !r.QuoteVerified)

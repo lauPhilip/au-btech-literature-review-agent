@@ -46,6 +46,16 @@
     }
     <MultivocalProgressPanel Stage="@stage" Status="Runner.StatusOf(planned.RunId)" Ledger="ledger" Screening="screening" Quality="quality"
                              Map="map" Extraction="extraction" Synthesis="synthesis" Paper="paper" />
+    @if (screening?.Warnings is { Count: > 0 } warnings)
+    {
+        <div class="bg-partly-fill border border-partly-border text-partly p-2 text-xs space-y-0.5" role="status">
+            @foreach (var warning in warnings)
+            {
+                <p>@warning</p>
+            }
+            <p>The run goes on. Look at the included sources on the Sources found tab, and narrow the criteria in your next plan if they let in too much.</p>
+        </div>
+    }
     @if (runRunning && notifyPermission is "default" or "granted")
     {
         @* Runs take a while; people switch tabs. This asks the browser to say when the run is done, as on the systematic review's page. *@

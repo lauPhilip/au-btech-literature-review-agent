@@ -75,7 +75,7 @@ else
                         @if (counts.Total > 0)
                         {
                             <div class="mt-5 rounded-card border border-line bg-soft p-4 sm:p-5 print:hidden">
-                                <h2 class="font-display text-base font-semibold text-heading">@counts.Total @(counts.Total == 1 ? "citation" : "citations") checked against the sources</h2>
+                                <h2 class="font-display text-base font-semibold text-heading">@CheckedHeading(counts)</h2>
                                 <div class="mt-2"><VerdictBar Counts="counts" /></div>
                                 <p class="mt-2 text-[15px] text-muted">
                                     Each number in the text is coloured by what the check found against the kept text of the cited page. Open one to see the passage it was checked against.
@@ -183,29 +183,7 @@ else
                             }
                         </section>
 
-                        <section id="@AuBtechReviewAgent.ReportOutline.DiscussionId" data-report-section class="scroll-mt-20 space-y-5">
-                            <h2 class="font-display text-xl font-semibold tracking-tight text-heading">5. Discussion</h2>
-                            @Cited(AuBtechReviewAgent.MultivocalWriter.DiscussionField, paper.Discussion)
-                            @if (audit?.SupportSummary != null)
-                            {
-                                <div class="space-y-2">
-                                    <h3 class="font-display text-base font-semibold text-heading">5.1 Automated citation check</h3>
-                                    <p>@AuBtechReviewAgent.MultivocalPaper.CheckNote(audit)</p>
-                                </div>
-                            }
-                        </section>
-
-                        @if (paper.SummaryItems.Count > 0)
-                        {
-                            <section id="@AuBtechReviewAgent.ReportOutline.SummaryId" data-report-section class="scroll-mt-20 space-y-5">
-                                <h2 class="font-display text-xl font-semibold tracking-tight text-heading">6. Summary for practitioners</h2>
-                                @if (!string.IsNullOrWhiteSpace(paper.SummaryLead))
-                                {
-                                    <p>@paper.SummaryLead</p>
-                                }
-                                @Cited(AuBtechReviewAgent.MultivocalWriter.SummaryField, string.Join("\n\n", paper.SummaryItems))
-                            </section>
-                        }
+                        <MultivocalPaperClosing Input="input" Paper="paper" Audit="audit" Cited="Cited" />
 
                         <section id="@AuBtechReviewAgent.ReportOutline.DeclarationsId" data-report-section class="scroll-mt-20 space-y-5">
                             <h2 class="font-display text-xl font-semibold tracking-tight text-heading">@AuBtechReviewAgent.ReportOutline.DeclarationsNumber(paper). Declarations</h2>

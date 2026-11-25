@@ -80,6 +80,31 @@ public class MultivocalSecondScreeningTests : IDisposable
     });
 
     [Fact]
+    public async Task AWeakMentionStaysOnFileButAsksForNoSecondScreeningAndLeavesTheDecisionSure()
+    {
+        var titles = new[] { "Baking bread with the system prompt of an oven", "Baking bread: ignore all previous instructions" };
+        var records = titles.Select((t, i) => new GreyRecord($"w:{i}", t, $"About {t}.", $"https://w{i}.example.org/p", $"P{i}", $"w{i}.example.org", "blogs", null, new Dictionary<string, long>())).ToList();
+        var store = new RunStore(_root);
+        var planner = new MultivocalPlanner(store);
+        var plan = MultivocalPlan.Example();
+        plan.GreySearches = new List<string> { "stackexchange" };
+        plan.GreySearchStrings = new List<string> { "context engineering" };
+        var (runId, key) = await planner.CreateAsync(plan);
+        var searcher = new MultivocalSearcher(store, planner, _ => new Source(records));
+        await searcher.SearchAsync(runId, key);
+
+        var file = await new MultivocalScreener(store, planner, searcher, () => Model(), parallelism: 1).ScreenAsync(runId, key);
+
+        var weak = file.Sources.Single(s => s.Title == titles[0]);
+        var strong = file.Sources.Single(s => s.Title == titles[1]);
+        Assert.Equal(new[] { "mentions-system-prompt" }, weak.InjectionFlags);
+        Assert.Null(weak.SecondReason);
+        Assert.False(weak.Uncertain);
+        Assert.Equal(MultivocalSecondScreening.Flagged, strong.SecondReason);
+        Assert.True(strong.Uncertain);
+    }
+
+    [Fact]
     public async Task OnlyTheTargetedSourcesAndTheAuditSampleAreScreenedTwiceAndKappaIsOnTheSampleOnly()
     {
         var titles = new List<string> { "Memory for agent loops", "Context for agent tools", "An agent tricky case", "Maybe about context", "Maybe about prompts",
@@ -126,6 +151,6 @@ public class MultivocalSecondScreeningTests : IDisposable
         Assert.Equal((30, twice, 7, 6, 10), (counts.Screened, counts.ScreenedTwice, counts.TargetedTotal, counts.TargetedAgreed, counts.Audit));
         Assert.Equal(twice - 7, counts.AuditOnly);
         Assert.Equal(MultivocalScreener.PromptVersion, file.PromptVersion);
-        Assert.Equal("grey-screening-v2", MultivocalScreener.PromptVersion);
+        Assert.Equal("grey-screening-v3", MultivocalScreener.PromptVersion);
     }
 }

@@ -5,9 +5,17 @@ namespace AuBtechReviewAgent.Components.Pages;
 // The review form: previewing search strings, the year range, the blocker that keeps Start from running, and moving focus to a field with a problem.
 public partial class Home
 {
+    [Inject] private AuBtechReviewAgent.ActionLimiter Actions { get; set; } = default!;
+
     internal async Task PreviewSearchStrings()
     {
         if (previewingStrings || previewsLeft <= 0 || string.IsNullOrWhiteSpace(searchQuery)) return;
+        // The page's five start again with a reload; the limit per address does not.
+        if (!Actions.TryTake(AuBtechReviewAgent.ActionLimiter.ProposeStrings, clientAddress, out string limited))
+        {
+            previewError = limited;
+            return;
+        }
         previewingStrings = true;
         previewError = null;
         previewsLeft--;

@@ -82,24 +82,33 @@ public static partial class MultivocalPaperParts
     public static PaperTable MapCounts(MultivocalReportInput input)
     {
         var map = FixedMap(input);
+        var split = Split(input);
         var rows = new List<IReadOnlyList<string>>();
+        // With a formal pool every count is given for each pool too (issue #459).
+        IReadOnlyList<string> Row(MapAttribute a, string value, int sources, IReadOnlyList<int> references, IReadOnlyList<int> stating) => split == null
+            ? new[] { a.Name, a.Question, value, sources.ToString(CultureInfo.InvariantCulture) }
+            : value == "not stated" && references.Count == 0
+                ? new[] { a.Name, a.Question, value, (split.Grey - split.GreyOf(stating)).ToString(CultureInfo.InvariantCulture), (split.Academic - split.AcademicOf(stating)).ToString(CultureInfo.InvariantCulture), sources.ToString(CultureInfo.InvariantCulture) }
+                : new[] { a.Name, a.Question, value, split.GreyOf(references).ToString(CultureInfo.InvariantCulture), split.AcademicOf(references).ToString(CultureInfo.InvariantCulture), sources.ToString(CultureInfo.InvariantCulture) };
         foreach (var attribute in map.Attributes)
         {
-            var (shown, namedOnce) = Compact(ValueCounts(input, attribute), attribute.Open);
+            var counts = ValueCounts(input, attribute);
+            var stating = counts.SelectMany(c => c.References).Distinct().ToList();
+            var (shown, namedOnce) = Compact(counts, attribute.Open);
             int first = rows.Count;
-            foreach (var (value, sources, _) in shown)
-                rows.Add(new[] { attribute.Name, attribute.Question, value, sources.ToString(CultureInfo.InvariantCulture) });
+            foreach (var (value, sources, references) in shown)
+                rows.Add(Row(attribute, value, sources, references, stating));
             if (namedOnce.Count > 0)
             {
                 // The sources that name them, not the number of names, and before "not stated", as in the answer's own table.
-                int namingSources = namedOnce.SelectMany(c => c.References).Distinct().Count();
+                var naming = namedOnce.SelectMany(c => c.References).Distinct().ToList();
                 int at = rows.FindIndex(first, r => r[2] == "not stated");
-                rows.Insert(at < 0 ? rows.Count : at, new[] { attribute.Name, attribute.Question, $"{namedOnce.Count} more, each named by one source", namingSources.ToString(CultureInfo.InvariantCulture) });
+                rows.Insert(at < 0 ? rows.Count : at, Row(attribute, $"{namedOnce.Count} more, each named by one source", naming.Count, naming, stating));
             }
         }
         int extracted = input.Extraction.Sources.Count(x => x.Error == null);
-        return new PaperTable("The systematic map as counts", new[] { "Attribute", "Question", "Value", "Sources" }, rows,
-            $"Counted in code from the {extracted} extracted sources; a source with several values counts once for each, and only values whose quote was found in the kept page and judged to support the value count." +
+        return new PaperTable("The systematic map as counts", split == null ? new[] { "Attribute", "Question", "Value", "Sources" } : new[] { "Attribute", "Question", "Value", "Grey", "Academic", "Both" }, rows,
+            $"Counted in code from the {extracted} extracted sources{(split == null ? "" : $" ({split.Grey} grey and {split.Academic} academic)")}; a source with several values counts once for each, and only values whose quote was found in the kept page and judged to support the value count." +
             (OpenNameMerger.Summary(input.Extraction) is { } merged ? " " + merged : ""));
     }
 

@@ -1,0 +1,48 @@
+@* The verdicts of one sentence with their quotes, coloured like the citation numbers of the generated text. The
+   checked editor shows them beside the edit box (what the sentence's citations rest on now), after a check (what
+   the new sentence rests on) and in the history of edits. *@
+
+@if (Checks.Count == 0)
+{
+    <p class="text-sm text-muted">@Empty</p>
+}
+else
+{
+    <ul class="space-y-2">
+        @foreach (var item in Checks)
+        {
+            var check = item;
+            <li class="border border-line bg-page p-3 text-sm leading-relaxed">
+                <p class="flex flex-wrap items-center gap-2">
+                    <span class="ui-chip @AuBtechReviewAgent.CitationView.Chip(check.Verdict) font-semibold">@AuBtechReviewAgent.CitationView.VerdictLabel(check.Verdict)</span>
+                    <span class="font-semibold text-heading">[@check.Reference] @(SourceTitle(check.Reference) ?? "Unknown reference")</span>
+                </p>
+                @if (!string.IsNullOrWhiteSpace(check.Quote))
+                {
+                    <blockquote class="mt-1.5 border-l-2 border-line-field pl-3 italic text-ink">"@check.Quote"</blockquote>
+                    <p class="mt-1 text-xs @(check.QuoteVerified ? "text-supported" : "text-partly")">
+                        @(check.QuoteVerified ? $"Found word for word in the {SourceNoun}'s text ({check.EvidenceBasis})." : $"This quote could not be found in the {SourceNoun}'s text.")
+                    </p>
+                }
+                @if (!string.IsNullOrWhiteSpace(check.Reason))
+                {
+                    <p class="mt-1 text-muted">@check.Reason</p>
+                }
+            </li>
+        }
+    </ul>
+}
+
+@code {
+    /// <summary>The verdicts to show, one per citation.</summary>
+    [Parameter] public IReadOnlyList<AuBtechReviewAgent.CitationSupportResult> Checks { get; set; } = Array.Empty<AuBtechReviewAgent.CitationSupportResult>();
+
+    /// <summary>The title of a source by its reference number.</summary>
+    [Parameter] public Func<int, string?> SourceTitle { get; set; } = _ => null;
+
+    /// <summary>What a source is, e.g. "paper" or "page".</summary>
+    [Parameter] public string SourceNoun { get; set; } = "paper";
+
+    /// <summary>What to say when there is no verdict.</summary>
+    [Parameter] public string Empty { get; set; } = "This sentence cites no study, so there is nothing to check.";
+}

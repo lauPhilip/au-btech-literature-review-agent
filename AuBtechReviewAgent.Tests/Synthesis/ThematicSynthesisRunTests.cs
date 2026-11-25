@@ -26,7 +26,7 @@ public class ThematicSynthesisRunTests : IDisposable
             return JsonSerializer.Serialize(new { studies });
         }
         if (prompt.Contains("You are building the codebook"))
-            return """{"themes":[{"name":"Fault recovery and oversight","description":"How agents recover and are overseen.","codes":["C1","C2"]},{"name":"Governance of agent actions","description":"Auditing what agents do.","codes":["C2"]}],"unassigned":[]}""";
+            return """{"themes":[{"name":"Fault recovery and oversight","description":"How agents recover and are overseen.","codes":["C1","C2"]},{"name":"Governance of agent actions","description":"Auditing what agents do.","codes":["C2"],"singleStudyReason":"Only this study covers it."}],"unassigned":[]}""";
         if (prompt.Contains("second, independent coder"))
             return """{"studies":[{"ref":1,"themes":["T1"]},{"ref":2,"themes":["T1","T2"]}]}""";
         if (prompt.Contains("You are writing one subsection"))

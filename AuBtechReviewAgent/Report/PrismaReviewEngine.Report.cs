@@ -55,6 +55,9 @@ public partial class PrismaReviewEngine
         ReportProgress(ctx.RunId, ctx.State, RunProgress.FullText, 0, $"Fetching open-access full texts of {included.Count} studies");
         for (int i = 0; i < included.Count; i++)
         {
+            // The live line names the paper waited for now ("Reading the full text of Doe et al., 2025"), built in code.
+            ReportProgress(ctx.RunId, ctx.State, RunProgress.FullText, (double)i / included.Count, Of(i, included.Count, "papers"),
+                LiveActivity.ShortCite(included[i].Authors, included[i].PublishedDate, included[i].Title));
             var result = await downloads[i];
             ReportProgress(ctx.RunId, ctx.State, RunProgress.FullText, (double)(i + 1) / included.Count, Of(i + 1, included.Count, "papers"));
             // Text a reader never sees is taken out before anything reads it (#369); what was removed is on file below.
@@ -80,6 +83,8 @@ public partial class PrismaReviewEngine
         using var throttle = new SemaphoreSlim(Math.Max(1, Llm.QualityParallelism));
         int extracted = 0;
         ReportProgress(ctx.RunId, ctx.State, RunProgress.Extraction, 0, $"Extracting and appraising {papers.Count} studies");
+        // With research questions the extraction looks for what answers them (issue #430); every run reuses an identical earlier extraction.
+        var focus = new ExtractionFocus(ctx.State.ResearchQuestions, ctx.Request.Objective, Cache, Llm.ModelFor("extraction"));
         var work = papers.Select(async p =>
         {
             await throttle.WaitAsync();
@@ -87,7 +92,7 @@ public partial class PrismaReviewEngine
             {
                 StudyExtraction result;
                 using (LlmStage.Begin("extraction"))
-                    result = await StudyExtractor.ExtractAsync(ctx.Chat, p);
+                    result = await StudyExtractor.ExtractAsync(ctx.Chat, p, focus: focus);
                 int n = Interlocked.Increment(ref extracted);
                 ReportProgress(ctx.RunId, ctx.State, RunProgress.Extraction, (double)n / papers.Count, Of(n, papers.Count, "studies"));
                 return result;

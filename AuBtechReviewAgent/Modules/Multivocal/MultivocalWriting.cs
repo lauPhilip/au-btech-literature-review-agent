@@ -69,7 +69,23 @@ public sealed partial class MultivocalWriter
 
     public static bool IsRunning(Guid runId) => Running.ContainsKey(runId);
 
-    public MultivocalPaperFile? Load(Guid runId) => Read<MultivocalPaperFile>(Path.Join(_runs.FolderOf(runId), PaperFile));
+    /// <summary>The run's paper, with the version that wrote it taken from the run's own files when the paper predates the field.</summary>
+    public MultivocalPaperFile? Load(Guid runId)
+    {
+        string folder = _runs.FolderOf(runId);
+        var paper = Read<MultivocalPaperFile>(Path.Join(folder, PaperFile));
+        if (paper != null && string.IsNullOrWhiteSpace(paper.AppVersion)) paper.AppVersion = RecordedVersion(folder);
+        return paper;
+    }
+
+    /// <summary>The version recorded in a run's files: run-metrics.json, else llm-calls.json; null when neither records one.</summary>
+    public static string? RecordedVersion(string folder)
+    {
+        string? fromMetrics = Read<RunMetrics>(Path.Join(folder, MultivocalRunLog.MetricsFile))?.AppVersion;
+        if (!string.IsNullOrWhiteSpace(fromMetrics)) return fromMetrics;
+        string? fromCalls = MultivocalRunLog.LoadCalls(folder)?.RunSettings?.AppVersion;
+        return string.IsNullOrWhiteSpace(fromCalls) ? null : fromCalls;
+    }
 
     public MultivocalCitationAudit? LoadAudit(Guid runId) => Read<MultivocalCitationAudit>(Path.Join(_runs.FolderOf(runId), AuditFile));
 
@@ -117,8 +133,15 @@ public sealed partial class MultivocalWriter
         BaseFactsFrom = "counted in code from the run's files",
         SourceTexts = "excerpts from the kept page texts of the included sources",
         LeanEvidence = true,
+        QuestionIds = plan.Numbered().Select(q => q.Number).ToList(),
+        // The limitations, implications and conclusion are written after the discussion (issue #461), as Garousi et al.
+        // (2019) give them: threats to validity, and implications for practitioners and for researchers.
         DiscussionParts =
-            "(a) what the themes together say about the goal, (b) the state of the practice: where the 1st-tier sources (such as white papers and documentation) and the 3rd-tier sources (such as blog posts) agree or differ, (c) gaps the sources leave open and directions for research and practice, (d) implications for practitioners, (e) in one paragraph, the limitations of the evidence (grey literature, not peer reviewed, pages read as kept on the access date) and of this review (automated screening, extraction and synthesis by a language model).",
+            "(a) what the answers and the themes together say about the goal, (b) the state of the practice: where the 1st-tier sources (such as white papers and documentation) and the 3rd-tier sources (such as blog posts)" +
+            (plan.UsesFormalPool ? ", and the grey and the academic sources," : "") + " agree or differ, (c) how strong the evidence behind the main findings is. Do not write the limitations, the implications, the directions for research or a conclusion: they are separate sections written after this one.",
+        LimitationsPart = "the limitations of the evidence (the threats to validity of Garousi et al. 2019)",
+        ImplicationsPart = "the implications for practitioners (Garousi et al. 2019)",
+        FutureResearchPart = "the implications for researchers: the directions for future research",
     };
 
     /// <summary>The kind of a result whose theme section the model could not write.</summary>
@@ -129,24 +152,8 @@ public sealed partial class MultivocalWriter
         "The section on this theme could not be written: the language model's answer failed the checks in code twice. " +
         "The theme's quotations are listed in the data appendix.";
 
-    /// <summary>The facts about the review the abstract may use, counted in code.</summary>
-    public static string FrontMatterFacts(MultivocalReportInput input, int? sectionsWritten = null)
-    {
-        var f = MultivocalPaperParts.Flow(input);
-        var plan = input.Planned.Plan;
-        var inCode = plan.Numbered().Where(q => MultivocalPaperParts.AnsweredInCode(q.Question.Type)).Select(q => q.Number).ToHashSet();
-        int themed = input.Synthesis.Themes.Count(t => !inCode.Contains(t.Question));
-        int written = Math.Min(sectionsWritten ?? themed, themed);
-        return $"Kind of review: {plan.ReviewKind} following the Garousi et al. (2019) guidelines. " +
-               $"Grey sources found by the searches: {f.Found}, from {f.Searches} searches. " + MultivocalScreeningText.Facts(input.Screening, f.Screened) +
-               $"Included at screening, before the quality check: {f.Included}; excluded at screening: {f.Excluded}. " +
-               $"Passed the quality check ({input.Quality.Threshold} of {input.Quality.MaxPoints} points or more) and kept for the synthesis: {f.Passed}; below the threshold: {f.BelowThreshold}; not assessed (page not readable): {f.NotAssessed}. " +
-               $"Extracted against the systematic map: {f.Extracted}. Findings: {f.Findings}. Themes written up as result sections: {written}" +
-               (written < themed ? $"; {themed - written} more {(themed - written == 1 ? "theme" : "themes")} could not be written up and {(themed - written == 1 ? "is" : "are")} listed with {(themed - written == 1 ? "its" : "their")} sources only" : "") +
-               (themed == f.Themes ? ". " : $" (of {f.Themes} themes formed in the synthesis; the others belong to questions answered by counting, shown as tables). ") +
-               $"Research questions: {plan.Numbered().Count}. " +
-               "Use each number only with the meaning given here: the sources the results rest on are the ones kept for the synthesis, not the ones included at screening.";
-    }
+    /// <summary>The facts about the review the abstract may use, counted in code (<see cref="MultivocalFrontMatter.Facts"/>).</summary>
+    public static string FrontMatterFacts(MultivocalReportInput input, int? sectionsWritten = null) => MultivocalFrontMatter.Facts(input, sectionsWritten);
 
     // ---------- The paper as main.tex, and the archive ----------
 

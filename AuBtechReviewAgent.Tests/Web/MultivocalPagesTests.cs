@@ -56,8 +56,13 @@ public class MultivocalPagesTests
         string? page = Source("Modules", "Multivocal", "Pages", "MultivocalPaperPage.razor");
         if (page == null) return; // not run from the repository (packaged tests)
 
-        foreach (string id in new[] { "AbstractId", "IntroductionId", "MethodologyId", "StudiesId", "ResultsId", "DiscussionId", "SummaryId", "DeclarationsId", "ReferencesId" })
+        // The discussion, the summary and the conclusion are in their own component (issue #461).
+        string? closing = Source("Modules", "Multivocal", "Pages", "MultivocalPaperClosing.razor");
+        foreach (string id in new[] { "AbstractId", "IntroductionId", "MethodologyId", "StudiesId", "ResultsId", "DeclarationsId", "ReferencesId" })
             Assert.Contains($"id=\"@AuBtechReviewAgent.ReportOutline.{id}\" data-report-section", page);
+        foreach (string id in new[] { "DiscussionId", "SummaryId", "MultivocalConclusionId" })
+            Assert.Contains($"id=\"@AuBtechReviewAgent.ReportOutline.{id}\" data-report-section", closing);
+        Assert.Contains("<MultivocalPaperClosing ", page);
         Assert.Contains("id=\"@AuBtechReviewAgent.ReportOutline.ResultId(k)\" data-report-section", page);
         Assert.Contains("<ReportContents Entries=\"Outline\"", page);
         Assert.Contains("<CitationCheckPanel ", page);

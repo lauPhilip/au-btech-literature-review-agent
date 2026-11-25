@@ -53,6 +53,19 @@ public sealed partial class MultivocalWriter
     public const string RationaleField = "rationale";
     public const string DiscussionField = "discussion";
     public const string SummaryField = "summary";
+    public const string LimitationsField = "limitations";
+    public const string ImplicationsField = "implications";
+    public const string FutureResearchField = "future-research";
+    public const string ConclusionField = "conclusion";
+
+    /// <summary>The parts after the discussion, by their check field, with how to read and set each on the paper.</summary>
+    private static IEnumerable<(string Field, Func<MultivocalPaperFile, string> Get, Action<MultivocalPaperFile, string> Set)> ClosingParts() => new (string, Func<MultivocalPaperFile, string>, Action<MultivocalPaperFile, string>)[]
+    {
+        (LimitationsField, f => f.Limitations, (f, t) => f.Limitations = t),
+        (ImplicationsField, f => f.Implications, (f, t) => f.Implications = t),
+        (FutureResearchField, f => f.FutureResearch, (f, t) => f.FutureResearch = t),
+        (ConclusionField, f => f.Conclusion, (f, t) => f.Conclusion = t),
+    };
 
     /// <summary>
     /// The check itself, on the paper in place: the prose is cleaned of Markdown, citations outside the reference list
@@ -75,7 +88,10 @@ public sealed partial class MultivocalWriter
         }
         var fields = new List<(string Field, string Text)> { (RationaleField, Plain(file.Rationale, RationaleField)) };
         fields.AddRange(file.Results.Where(r => r.Kind == "theme").Select(r => (r.Field, Plain(r.Text, r.Field))));
+        // The answers the model wrote come first, as the paper prints them; the answers in code are counted, not checked.
+        fields.AddRange(file.Answers.Where(a => a.Kind == "written").Select(a => (a.Field, Plain(a.Text, a.Field))));
         fields.Add((DiscussionField, Plain(file.Discussion, DiscussionField)));
+        fields.AddRange(ClosingParts().Where(p => !string.IsNullOrWhiteSpace(p.Get(file))).Select(p => (p.Field, Plain(p.Get(file), p.Field))));
         if (file.SummaryItems.Count > 0) fields.Add((SummaryField, string.Join("\n", file.SummaryItems.Select(i => Plain(i, SummaryField)))));
         for (int i = 0; i < fields.Count; i++)
         {
@@ -101,6 +117,10 @@ public sealed partial class MultivocalWriter
         foreach (var result in file.Results.Where(r => r.Kind == "theme"))
             result.Text = text.GetValueOrDefault(result.Field, result.Text);
         file.Discussion = text.GetValueOrDefault(DiscussionField, file.Discussion);
+        foreach (var answer in file.Answers.Where(a => a.Kind == "written"))
+            answer.Text = text.GetValueOrDefault(answer.Field, answer.Text);
+        foreach (var (field, get, set) in ClosingParts())
+            set(file, text.GetValueOrDefault(field, get(file)));
         if (text.TryGetValue(SummaryField, out var summary))
         {
             var items = summary.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();

@@ -39,13 +39,6 @@ public class VerdictCounts
     }
 }
 
-public class StageCost
-{
-    public int Calls { get; set; }
-    public double Seconds { get; set; }
-    public long Tokens { get; set; }
-}
-
 /// <summary>
 /// Quality and cost figures of one completed run, computed in code from the run's own files. Written to
 /// run-metrics.json in the run folder and appended to the metrics store, which outlives the run folder, so
@@ -74,6 +67,10 @@ public partial class RunMetrics
     public int Included { get; set; }
     public double? ScreeningKappa { get; set; }
     public int UncertainDecisions { get; set; }
+
+    /// <summary>Of <see cref="UncertainDecisions"/>, those the reviewer never looked at (multivocal runs, #473); null, and left out, otherwise.</summary>
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public int? FlaggedNotLookedAt { get; set; }
     public int FullTextRetrieved { get; set; }
     public double FullTextShare { get; set; }
 
@@ -141,9 +138,38 @@ public partial class RunMetrics
     public double DurationMinutes { get; set; }
     public Dictionary<string, StageCost> CostByStage { get; set; } = new();
 
-    /// <summary>Whether the run is a multivocal one (setting Module = "multivocal"); systematic runs have no Module setting.</summary>
+    // Effort (issue #414): null in lines written before it, where these were never counted.
+    /// <summary>Input tokens of every call (prompt_tokens), the cached ones included.</summary>
+    public long? InputTokens { get; set; }
+
+    /// <summary>The part of <see cref="InputTokens"/> the provider served from its prompt cache.</summary>
+    public long? CachedInputTokens { get; set; }
+
+    /// <summary>Output tokens of every call (completion_tokens), the reasoning tokens included.</summary>
+    public long? OutputTokens { get; set; }
+
+    /// <summary>The part of <see cref="OutputTokens"/> the model spent reasoning.</summary>
+    public long? ReasoningTokens { get; set; }
+
+    /// <summary>The summed time of every call, in minutes; calls run side by side, so it can exceed <see cref="DurationMinutes"/>.</summary>
+    public double? LlmMinutes { get; set; }
+
+    /// <summary>Calls whose usage was not reported (failed calls, mostly); their tokens are not in the totals.</summary>
+    public int? CallsWithoutUsage { get; set; }
+
+    /// <summary>The effort of each model the run called (the main model, and the fast model when one took some stages).</summary>
+    public Dictionary<string, StageCost>? CostByModel { get; set; }
+
+    /// <summary>"systematic" or "multivocal" (issue #415); null in older lines, which <see cref="Type"/> reads from the settings.</summary>
+    public string? ReviewType { get; set; }
+
+    /// <summary>The kind of review: <see cref="ReviewType"/>, or for an older line "multivocal" when its setting Module says so.</summary>
     [System.Text.Json.Serialization.JsonIgnore]
-    public bool IsMultivocal => Settings.TryGetValue("Module", out var module) && module == "multivocal";
+    public string Type => ReviewType ?? (Settings.TryGetValue("Module", out var module) && module == "multivocal" ? "multivocal" : "systematic");
+
+    /// <summary>Whether the run is a multivocal one.</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public bool IsMultivocal => Type == "multivocal";
 
     /// <summary>Whether the run was made before versions came from git tags, when every build said 1.0.0.</summary>
     [System.Text.Json.Serialization.JsonIgnore]
@@ -158,31 +184,26 @@ public partial class RunMetrics
 
     private static int Words(string? text) => string.IsNullOrWhiteSpace(text) ? 0 : Regex.Matches(text, @"\S+").Count;
 
-    /// <summary>Total tokens from the usage object a provider reported (Mistral and OpenAI-style names).</summary>
-    public static long TokensIn(string? usageJson)
+    /// <summary>Total tokens from the usage a provider reported, stored once or twice encoded (<see cref="LlmUsage"/>).</summary>
+    public static long TokensIn(string? usageJson) => LlmUsage.Parse(usageJson).Total;
+
+    /// <summary>Fills the effort figures from the run's call log: totals, by stage and by model (issue #414).</summary>
+    public void AddCost(IReadOnlyList<LlmCallRecord> calls)
     {
-        if (string.IsNullOrWhiteSpace(usageJson)) return 0;
-        try
-        {
-            using var doc = JsonDocument.Parse(usageJson);
-            long total = 0, parts = 0;
-            void Walk(JsonElement e)
-            {
-                if (e.ValueKind != JsonValueKind.Object) return;
-                foreach (var p in e.EnumerateObject())
-                {
-                    string name = p.Name.Replace("_", "").ToLowerInvariant();
-                    if (p.Value.ValueKind == JsonValueKind.Number && p.Value.TryGetInt64(out long n))
-                    {
-                        if (name == "totaltokens") total = n;
-                        else if (name is "prompttokens" or "completiontokens" or "inputtokencount" or "outputtokencount") parts += n;
-                    }
-                    else Walk(p.Value);
-                }
-            }
-            Walk(doc.RootElement);
-            return total > 0 ? total : parts;
-        }
-        catch (JsonException) { return 0; }
+        var all = StageCost.Of(calls);
+        LlmCalls = all.Calls;
+        LlmRetries = all.Retries ?? 0;
+        LlmFailures = all.Failures ?? 0;
+        Tokens = all.Tokens;
+        InputTokens = all.InputTokens;
+        CachedInputTokens = all.CachedInputTokens;
+        OutputTokens = all.OutputTokens;
+        ReasoningTokens = all.ReasoningTokens;
+        CallsWithoutUsage = all.CallsWithoutUsage;
+        LlmMinutes = Math.Round(calls.Sum(c => c.DurationMs) / 60000.0, 1);
+        CostByStage = calls.GroupBy(c => c.Stage).OrderBy(g => g.Key, StringComparer.Ordinal).ToDictionary(g => g.Key, g => StageCost.Of(g));
+        // By the model the call was sent to: a failed call has no reported model, and the provider may report a dated name.
+        CostByModel = calls.GroupBy(c => string.IsNullOrEmpty(c.ModelRequested) ? "unknown" : c.ModelRequested)
+            .OrderBy(g => g.Key, StringComparer.Ordinal).ToDictionary(g => g.Key, g => StageCost.Of(g));
     }
 }

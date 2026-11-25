@@ -14,7 +14,7 @@ public static partial class MultivocalFormalText
     public static string DataText(MultivocalReportInput input)
     {
         var (grey, formal) = Pools(input);
-        return $"The grey searches found {Count(grey.Identified, "source")} and the academic databases returned {Count(formal.Identified, "record")}, of which {Num(formal.DuplicatesRemoved + formal.NoAddressRemoved)} {Was(formal.DuplicatesRemoved + formal.NoAddressRemoved)} set aside before screening. " +
+        return $"The grey searches found {Count(grey.Identified, "source")} and the academic databases{(formal.ViaSeeds > 0 ? $" and citation chaining from the most-cited included sources ({Num(formal.ViaSeeds)})" : "")} returned {Count(formal.Identified, "record")}, of which {Num(formal.DuplicatesRemoved + formal.NoAddressRemoved)} {Was(formal.DuplicatesRemoved + formal.NoAddressRemoved)} set aside before screening. " +
                $"{Num(grey.Screened)} grey and {Num(formal.Screened)} academic sources were screened, and {Num(grey.Included)} and {Num(formal.Included)} included; " +
                $"{Count(grey.Kept, "grey source")} passed the quality threshold of {input.Quality.Threshold} points and {Count(formal.Kept, "academic source")} {Was(formal.Kept)} appraised with MMAT, " +
                $"and {Num(grey.Extracted)} grey and {Num(formal.Extracted)} academic sources were extracted against the systematic map ({Num(formal.AbstractOnly)} academic on the abstract alone). " +
@@ -35,17 +35,22 @@ public static partial class MultivocalFormalText
         // Each side box sits beside the step its sources left at (#362): screening beside the screening box, quality beside the quality step.
         sb.AppendLine($@"\node[side, left=of gscreened] (gout) {{Same title: {g.DuplicatesAtScreening}\\Not screened: {g.NotScreened}\\Excluded: {g.Excluded}}};");
         sb.AppendLine($@"\node[side, left=of gkept] (glow) {{Below the threshold: {g.BelowThreshold}\\Not assessed: {g.NotAssessed}}};");
-        sb.AppendLine($@"\node[box, right=1.2cm of gfound] (ffound) {{Academic records found: {f.Identified}}};");
+        string viaSeeds = f.ViaSeeds > 0 ? $@"\\{{\scriptsize of which by citation chaining from the most-cited: {f.ViaSeeds}}}" : "";
+        sb.AppendLine($@"\node[box, right=1.2cm of gfound] (ffound) {{Academic records found: {f.Identified}{viaSeeds}}};");
         sb.AppendLine($@"\node[box, below=of ffound] (fscreened) {{{MultivocalScreeningText.FlowBox(input.Screening, f.Screened, f.Second?.ScreenedTwice ?? 0)}}};");
         sb.AppendLine($@"\node[box, below=of fscreened] (fincluded) {{Included: {f.Included}}};");
         sb.AppendLine($@"\node[box, below=of fincluded] (fkept) {{Appraised with MMAT: {f.Kept}}};");
         sb.AppendLine($@"\node[box, below=of fkept] (fextracted) {{Extracted: {f.Extracted}\\{{\scriptsize of which on the abstract only: {f.AbstractOnly}}}}};");
         sb.AppendLine($@"\node[side, right=of fscreened] (fout) {{Duplicates by DOI or title: {f.DuplicatesRemoved}\\No web address: {f.NoAddressRemoved}\\Same title: {f.DuplicatesAtScreening}\\Not screened: {f.NotScreened}\\Excluded: {f.Excluded}}};");
         sb.AppendLine($@"\node[side, right=of fkept] (fnotappraised) {{Not appraised: {f.NotAssessed}}};");
-        sb.AppendLine($@"\node[box, text width=8cm, below=0.8cm of gextracted.south east, anchor=north west, xshift=-1.8cm] (themes) {{Synthesised: {Count(input.Synthesis.Findings.Count, "finding")} in {Count(input.Synthesis.Themes.Count, "theme")}}};");
+        // The sources kept but not extracted get a box in each arm, so each column adds up from step to step (#467).
+        sb.AppendLine($@"\node[side, left=of gextracted] (gnotextracted) {{Could not be extracted: {g.NotExtracted}}};");
+        sb.AppendLine($@"\node[side, right=of fextracted] (fnotextracted) {{Could not be extracted: {f.NotExtracted}}};");
+        sb.AppendLine($@"\node[box, text width=8cm, below=0.8cm of gextracted.south east, anchor=north west, xshift=-1.8cm] (themes) {{Synthesised: {Count(input.Synthesis.Findings.Count, "finding")} in {Count(MultivocalPaperParts.ShownThemes(input).Count, "theme")}}};");
         foreach (string arm in new[] { "g", "f" })
             sb.AppendLine($@"\draw[->] ({arm}found) -- ({arm}screened); \draw[->] ({arm}screened) -- ({arm}included); \draw[->] ({arm}included) -- ({arm}kept); \draw[->] ({arm}kept) -- ({arm}extracted); \draw[->] ({arm}extracted) -- (themes);");
         sb.AppendLine(@"\draw[->] (gscreened) -- (gout); \draw[->] (fscreened) -- (fout); \draw[->] (gkept) -- (glow); \draw[->] (fkept) -- (fnotappraised);");
+        sb.AppendLine(@"\draw[->] (gextracted) -- (gnotextracted); \draw[->] (fextracted) -- (fnotextracted);");
         sb.AppendLine(@"\end{tikzpicture}");
         return sb.ToString();
     }

@@ -61,7 +61,7 @@ public class ReviewMcpTests
         var until = DateTime.UtcNow.AddSeconds(90);
         while (DateTime.UtcNow < until && !PrismaReviewEngine.IsFinishedStage(stage))
         {
-            await Task.Delay(750);
+            await Task.Delay(ApiTestHost.PollInterval);
             (error, text) = await CallAsync(client, "get_review_status", new() { ["id"] = id.ToString() });
             Assert.False(error, text);
             stage = JsonDocument.Parse(text).RootElement.GetProperty("stage").GetString()!;

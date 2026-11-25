@@ -23,7 +23,7 @@ public sealed partial class MultivocalWriter
         int referenceCount = evidence.Sources.Count;
         string goal = string.IsNullOrWhiteSpace(plan.Goal) ? plan.Topic : plan.Goal;
         string referenceLines = evidence.ReferenceLines();
-        var file = new MultivocalPaperFile { RunId = input.Planned.RunId, WrittenUtc = DateTime.UtcNow, Model = model };
+        var file = new MultivocalPaperFile { RunId = input.Planned.RunId, WrittenUtc = DateTime.UtcNow, Model = model, AppVersion = RecordingChatCompletionService.AppVersion };
         void Warn(string message)
         {
             file.Notes.Add(message);
@@ -63,9 +63,7 @@ public sealed partial class MultivocalWriter
                 file.Results.Add(new PaperResult
                 {
                     Question = number, QuestionText = question.Text, Kind = "code", Field = $"answer-{number}", Heading = $"{number}: {question.Text}",
-                    Text = input.Synthesis.Unanswered.Contains(number)
-                        ? "No extracted source states anything this question asks about, so the review cannot answer it from these sources."
-                        : "The sources' findings on this question formed no theme that could be written up, so the review does not answer it.",
+                    Text = input.Synthesis.Unanswered.Contains(number) ? NoSourceText : NoThemeText,
                 });
                 continue;
             }
@@ -94,35 +92,42 @@ public sealed partial class MultivocalWriter
         }
         var forDiscussion = file.Results.Select(r => new SynthesisSection { Field = r.Field, Heading = r.Heading, Text = r.Text }).ToList();
 
-        // 3. The discussion, from all the results.
-        Step(3, "the discussion");
-        string discussion;
-        using (LlmStage.Begin("discussion"))
-            discussion = await ReviewWriter.WriteDiscussionAsync(chat, profile, plan.Topic, goal, forDiscussion, evidence, referenceCount, Warn);
+        // 3. The answers to the research questions, then the discussion that builds on them, from all the results (issue #461).
+        Step(3, "the answers and the discussion");
+        var (_, questions) = Questions(plan);
+        var discussed = await DiscussAsync(chat, profile, plan, goal, forDiscussion, evidence, referenceCount, AnsweredWithoutModel(plan, file.Results), Warn);
+        string discussion = discussed.Text;
+        file.Answers = Answers(input, file.Results, discussion.Length == 0 ? null : discussed.Answers);
+        var answerTexts = file.Answers.Select(a => a.Text).ToList();
 
         // 4. The automated peer review of the theme sections and the discussion, with one revision.
         Step(4, "the automated peer review");
         if (sections.Count > 0 && discussion.Length > 0)
         {
             using (LlmStage.Begin("automated-peer-review"))
-                (file.PeerReview, discussion) = await ReviewWriter.PeerReviewAsync(chat, profile, sections, discussion, evidence, referenceCount, parallelism, Warn);
+                (file.PeerReview, discussion) = await ReviewWriter.PeerReviewAsync(chat, profile, sections, discussion, evidence, referenceCount, parallelism, Warn,
+                    goal, questions, answerTexts);
             foreach (var result in file.Results.Where(r => r.Kind == "theme"))
                 result.Text = sections.FirstOrDefault(s => s.Field == result.Field)?.Text ?? result.Text;
             forDiscussion = file.Results.Select(r => new SynthesisSection { Field = r.Field, Heading = r.Heading, Text = r.Text }).ToList();
         }
         file.Discussion = discussion;
 
-        // 5. The summary for practitioners (G14), from the checked-to-be results and the discussion only.
-        Step(5, "the summary for practitioners");
+        // 5. The limitations of the evidence, the implications and the conclusion, from the discussion and its answers;
+        // then the summary for practitioners (G14), from the checked-to-be results and the discussion only.
+        Step(5, "the closing sections and the summary for practitioners");
+        if (discussion.Length > 0) await CloseAsync(chat, profile, input, file, goal, forDiscussion, evidence, referenceCount, sections.Count, Warn);
         var summary = await ReviewWriter.WritePractitionerSummaryAsync(chat, profile, plan.Topic, goal, MultivocalReporter.Audience(plan.Audience),
             forDiscussion, discussion, referenceLines, referenceCount, Warn);
         file.SummaryLead = summary?.Lead;
         file.SummaryItems = summary?.Items.ToList() ?? new List<string>();
 
-        // 6. Last, the title, abstract, rationale and objectives, with the numbers counted in code; then the style pass.
+        // 6. Last, the title, abstract, rationale and objectives, with the numbers counted in code, the answers and the
+        // conclusion as given text, and the objectives written in code from the questions; then the style pass.
         Step(6, "the title, abstract and introduction");
         var front = await ReviewWriter.WriteFrontMatterAsync(chat, profile, plan.Topic, goal, FrontMatterFacts(input, sections.Count), forDiscussion, discussion,
-            referenceLines, referenceCount, Warn);
+            referenceLines, referenceCount, Warn, abstractRule: text => MultivocalFrontMatter.AbstractProblem(text, input) ?? MultivocalRelationship.AbstractProblem(text, input),
+            questions: questions, answers: answerTexts, conclusion: file.Conclusion);
         file.Title = front?.Title ?? $"{plan.Topic}: a {plan.ReviewKind}";
         file.Style.Add(new StyleDeltaLog("Title", file.Title, file.Title, Applied: false, Note: "The title is not sent through the style pass." + (front == null ? " The front-matter step failed; the title is the topic and the kind of review." : "")));
         using (LlmStage.Begin("style"))
@@ -137,9 +142,9 @@ public sealed partial class MultivocalWriter
             file.Abstract = await Refine("Abstract", front?.Abstract);
             file.Rationale = ReviewWriter.CitedSentencesOnly(await Refine("Rationale", front?.Rationale), out var uncited);
             if (uncited != null) file.Style.Add(uncited);
-            file.Objectives = await Refine("Objectives", front?.Objectives);
         }
-        if (front == null) file.Objectives = $"The review set out to {LowerFirst(goal.TrimEnd('.'))}.";
+        file.Objectives = ReviewWriter.ObjectivesFromQuestions(questions, profile) ?? front?.Objectives ?? $"The review set out to {LowerFirst(goal.TrimEnd('.'))}.";
+        file.Style.Add(new StyleDeltaLog("Objectives", file.Objectives, file.Objectives, Applied: false, Note: "Written in code from the research questions in the protocol; not sent through the style pass."));
         return (file, outline);
     }
 

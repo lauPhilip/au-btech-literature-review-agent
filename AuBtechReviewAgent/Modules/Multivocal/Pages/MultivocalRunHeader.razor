@@ -1,0 +1,39 @@
+@using AuBtechReviewAgent.Components.Dashboard
+@* The head of a planned multivocal run (/mlr/{id}), like the systematic review's run view (RunProgressPanel): an
+   eyebrow with the state and "step n of 8", the topic as the title, and while the run goes the live line of what it
+   is doing now (LiveActivityLine with MultivocalLiveActivity), which also has the run's polite live region. The topic
+   is the reviewer's text and is shown as text. *@
+
+<p class="font-display text-xs font-semibold uppercase tracking-[0.14em] @(Stopped ? "text-not-supported" : "text-muted")">@EyebrowFor(Stage, Status)</p>
+<h1 class="mt-1 font-display text-[clamp(22px,2vw,32px)] font-semibold leading-tight tracking-[-0.025em] text-heading line-clamp-3 sm:mt-2">@(string.IsNullOrWhiteSpace(Topic) ? "Your review" : Topic)</h1>
+<LiveActivityLine Line="AuBtechReviewAgent.MultivocalLiveActivity.For(Status, Found)" Announce="true" Class="mt-2" />
+
+@code {
+    /// <summary>The run's topic, shown as the title.</summary>
+    [Parameter] public string? Topic { get; set; }
+
+    /// <summary>The stage in the run's header file.</summary>
+    [Parameter] public string Stage { get; set; } = "";
+
+    /// <summary>The runner's status of the run; null when it has not run in this process.</summary>
+    [Parameter] public AuBtechReviewAgent.MultivocalRunStatus? Status { get; set; }
+
+    /// <summary>"312 found · 41 included", the sources on file so far (MultivocalLiveActivity.Counts).</summary>
+    [Parameter] public string? Found { get; set; }
+
+    private bool Stopped => Status is { Running: false, Error: not null } && Stage != AuBtechReviewAgent.MultivocalWriter.StageChecked;
+
+    /// <summary>"Review running · step 2 of 8", and the same for a run that stopped, was cancelled or is not finished.</summary>
+    public static string EyebrowFor(string stage, AuBtechReviewAgent.MultivocalRunStatus? status)
+    {
+        int count = AuBtechReviewAgent.MultivocalProgress.Steps.Count;
+        int current = AuBtechReviewAgent.MultivocalProgress.CurrentIndex(stage);
+        if (current >= count) return "Review complete";
+        string of = $"step {Math.Clamp(current + 1, 1, count)} of {count}";
+        if (status is { Running: true, Step: AuBtechReviewAgent.MultivocalRunner.StepWaiting }) return "Review waiting for a free slot";
+        if (status is { Running: true }) return $"Review running · {of}";
+        if (status?.Step == AuBtechReviewAgent.PrismaReviewEngine.StageCancelled) return $"Review cancelled · {of}";
+        if (status is { Error: not null }) return $"Review stopped · {of}";
+        return $"Review not finished · {of}";
+    }
+}

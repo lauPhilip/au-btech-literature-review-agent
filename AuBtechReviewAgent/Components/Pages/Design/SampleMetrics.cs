@@ -73,6 +73,28 @@ public static class SampleMetrics
             SynthesisWords = 1800 + n * 97 % 900,
             DiscussionWords = 600 + n * 53 % 300,
             DurationMinutes = 14 + n % 6 * 2.5,
-        };
+            LlmCalls = 50 + n * 7 % 40,
+            LlmRetries = n % 4 == 0 ? 2 : 0,
+            LlmFailures = n % 9 == 0 ? 1 : 0,
+        }.WithTokens(n);
+    }
+
+    // The first five runs were made before tokens were counted (issue #414), so the page shows their dashes.
+    private static RunMetrics WithTokens(this RunMetrics run, int n)
+    {
+        if (run.IsMultivocal)
+            run.GreyPool = new PoolMetrics
+            {
+                Identified = run.Identified, Screened = run.Screened, Included = run.Included + 4, Kept = run.Included, Kappa = run.ScreeningKappa,
+                KappaBasis = n % 2 == 0 ? "audit sample" : "all sources", Table7Scored = run.Included + 4, MeanTable7Points = 11.5,
+            };
+        if (n < 5) return run;
+        run.InputTokens = 180_000 + n * 13_000 % 90_000;
+        run.CachedInputTokens = run.InputTokens / 3;
+        run.OutputTokens = 60_000 + n * 7_000 % 40_000;
+        run.ReasoningTokens = run.OutputTokens * 4 / 5;
+        run.Tokens = run.InputTokens.Value + run.OutputTokens.Value;
+        run.LlmMinutes = Math.Round(run.DurationMinutes * 2.3, 1);
+        return run;
     }
 }

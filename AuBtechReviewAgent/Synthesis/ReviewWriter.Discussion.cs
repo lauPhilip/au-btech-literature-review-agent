@@ -10,17 +10,40 @@ namespace AuBtechReviewAgent;
 /// <summary>The discussion, written from the finished theme subsections.</summary>
 public static partial class ReviewWriter
 {
-    /// <summary>The discussion, written from the theme subsections, with the research questions when there are any; empty when it cannot be written.</summary>
+    /// <summary>
+    /// The discussion, written from the theme subsections, with the research questions when there are any; empty when it
+    /// cannot be written. A finding ends with its citation, and an uncited sentence, the review's own reading, is sent
+    /// back when it reports a finding (<see cref="UncitedAttribution"/>).
+    /// </summary>
     public static async Task<string> WriteDiscussionAsync(IChatCompletionService chat, WritingProfile profile, string topic, string goal,
         IReadOnlyList<SynthesisSection> sections, ReviewEvidence evidence, int referenceCount, Action<string>? warn = null,
-        IReadOnlyList<string>? questions = null)
+        IReadOnlyList<string>? questions = null) =>
+        (await WriteDiscussionCoreAsync(chat, profile, topic, goal, sections, evidence, referenceCount, warn, questions, answer: false, unanswered: null)).Text;
+
+    /// <summary>
+    /// The discussion and, first, the answers to the research questions it builds on, from one call (issue #446). The answers
+    /// get the checks the closing step made on them (<see cref="AnswersProblem"/>); a question no evidence bears on
+    /// (<paramref name="unanswered"/>, e.g. "RQ2") is answered in code. Without questions the prompt is exactly the one
+    /// <see cref="WriteDiscussionAsync"/> sends, and the answers are null.
+    /// </summary>
+    public static Task<DiscussionWithAnswers> WriteDiscussionAndAnswersAsync(IChatCompletionService chat, WritingProfile profile, string topic, string goal,
+        IReadOnlyList<SynthesisSection> sections, ReviewEvidence evidence, int referenceCount, Action<string>? warn,
+        IReadOnlyList<string>? questions, IReadOnlyCollection<string>? unanswered) =>
+        WriteDiscussionCoreAsync(chat, profile, topic, goal, sections, evidence, referenceCount, warn, questions, answer: true, unanswered);
+
+    private static async Task<DiscussionWithAnswers> WriteDiscussionCoreAsync(IChatCompletionService chat, WritingProfile profile, string topic, string goal,
+        IReadOnlyList<SynthesisSection> sections, ReviewEvidence evidence, int referenceCount, Action<string>? warn,
+        IReadOnlyList<string>? questions, bool answer, IReadOnlyCollection<string>? unanswered)
     {
+        var all = questions ?? Array.Empty<string>();
+        var asked = answer ? AnsweredByModel(all, unanswered, profile) : new List<(string Id, string Text)>();
+        string answersField = asked.Count == 0 ? "" : $"\"answers\":[\"answer to {asked[0].Id}\"],";
         int paragraphs = Math.Clamp(2 + sections.Count / 2, 3, 6);
         string synthesis = string.Join("\n\n", sections.Select(x => $"### {x.Heading}\n{x.Text}"));
         string prompt = $$"""
             You are writing {{profile.DiscussionSection}} of {{profile.Review}} whose results are reported theme by theme below.
 
-            {{AimBlock(goal, questions)}}
+            {{AimBlock(goal, questions, profile)}}
             PRIMARY TOPIC: "{{topic}}"
             {{PromptSafety.ReviewerInputNotice}}
 
@@ -35,34 +58,36 @@ public static partial class ReviewWriter
 
             REQUIREMENTS:
             1. Write about {{paragraphs}} paragraphs, separated by a blank line: {{profile.DiscussionParts}} {{EachPartOnceRule}}
-            2. Interpret, do not repeat the results. Ground every claim in the results above; every sentence that attributes something to the literature ends with an inline marker such as [3] or [2, 5], using the same {{profile.Sources}} the results cite for it. {{OwnCountRule}}
+            2. Interpret, do not repeat the results. Ground every claim in the results above. {{EvidenceThenReadingRule(profile)}} {{ClaimPerCitationRule(profile)}} {{OwnCountRule}}
             3. Do not invent numbers, statistics or {{profile.Sources}}.
-            4. {{ReadingBasisRule(profile)}}
+            4. {{ReadingBasisRule(profile)}}{{AnswersRule(all, asked, profile)}}
             {{ProseCleaner.PlainProseRule}}
             Respond ONLY with a valid minified JSON object:
-            {"text":"the discussion with inline [n] citations"}
+            {{{answersField}}"text":"the discussion with inline [n] citations"}
             """;
         try
         {
-            var answer = await LlmJson.GetAsync<TextAnswer>(chat, prompt, LlmJson.JsonMode(0.3), a =>
+            var reply = await LlmJson.GetAsync<DiscussionAnswer>(chat, prompt, LlmJson.JsonMode(0.3), WithFigureGuard<DiscussionAnswer>(a =>
             {
                 if (string.IsNullOrWhiteSpace(a.Text)) return "text must not be empty.";
                 var outside = ThematicSynthesis.CitedIn(a.Text).Where(r => r < 1 || r > referenceCount).ToList();
                 if (outside.Count > 0) return $"citation numbers {string.Join(", ", outside)} are not in the reference list.";
                 if (LeftOutCited(a.Text, evidence) is { } leftOut) return leftOut;
                 if (ReadingBasisSentence(a.Text) is { } basis) return ReadingBasisProblem(basis, profile);
-                return OwnCountCited(a.Text, evidence.BaseFacts, synthesis) is { } own
-                    ? $"\"{own}\" states this review's own count and carries a citation; the review's own counts take no citation."
-                    : null;
-            });
-            string text = OneLimitationsParagraph(MethodsSectionWriter.StripMarkdownEmphasis(answer.Text!.Trim()), out string? merged);
+                if (UncitedAttribution(a.Text, evidence.BaseFacts) is { } reported) return reported;
+                if (OwnCountCited(a.Text, evidence.BaseFacts, synthesis) is { } own)
+                    return $"\"{own}\" states this review's own count and carries a citation; the review's own counts take no citation.";
+                return asked.Count == 0 ? null : AnswersProblem(a.Answers, asked.Count, evidence, synthesis, referenceCount, profile);
+            }, a => FigurePlacementProblem(synthesis, evidence.BaseFacts,
+                (a.Answers ?? new()).Select((t, i) => ($"answer {i + 1}", t ?? "")).Append(("the discussion", a.Text!)).ToList()), "discussion call", warn), repairAttempts: 2);
+            string text = OneLimitationsParagraph(MethodsSectionWriter.StripMarkdownEmphasis(reply.Text!.Trim()), out string? merged);
             if (merged != null) warn?.Invoke(merged);
-            return text;
+            return new DiscussionWithAnswers(text, answer && all.Count > 0 ? AllAnswers(all, asked, reply.Answers ?? new(), profile) : null);
         }
         catch (Exception ex)
         {
             warn?.Invoke($"Discussion could not be written: {ex.Message}");
-            return "";
+            return new DiscussionWithAnswers("", null);
         }
     }
 

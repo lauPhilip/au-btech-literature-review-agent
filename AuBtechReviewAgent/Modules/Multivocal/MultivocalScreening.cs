@@ -15,8 +15,9 @@ namespace AuBtechReviewAgent;
 /// <summary>
 /// Screens the sources of a searched multivocal run (MLR block E, G9–G10): every source once, and a second time,
 /// independently, when <see cref="MultivocalSecondScreening"/> picks it (included, unsure or flagged, or in the random
-/// audit sample), with the plan's criteria and the same steps and answer format as the systematic review's screening
-/// (<see cref="PrismaReviewEngine.ScreeningProcedure"/>), so formal and grey sources get the same care. A source the two
+/// audit sample), with the plan's criteria and the systematic review's answer format and second screener's steps
+/// (<see cref="PrismaReviewEngine.ScreeningProcedure"/>), and first steps that ask for positive evidence
+/// (<see cref="FirstProcedure"/>), so formal and grey sources get the same care. A source the two
 /// screenings disagree on is kept and flagged, as in the systematic review. Sources with the same title under another
 /// address (an OpenAlex work with several DOIs, seen in a live run) are screened once. The run goes from "Searched"
 /// through "Screening" to "Screened".
@@ -30,8 +31,9 @@ public sealed partial class MultivocalScreener
     /// <summary>
     /// Part of the cache key: raise it whenever the grey screening prompt changes. v2: second screenings are targeted
     /// (<see cref="MultivocalSecondScreening"/>), so no answer cached under the rule of two screenings each is reused.
+    /// v3: the first screening looks for positive evidence (<see cref="FirstProcedure"/>).
     /// </summary>
-    public const string PromptVersion = "grey-screening-v2";
+    public const string PromptVersion = "grey-screening-v3";
 
     private static readonly JsonSerializerOptions Json = new() { WriteIndented = true };
     private static readonly ConcurrentDictionary<Guid, bool> Running = new();
@@ -161,6 +163,9 @@ public sealed partial class MultivocalScreener
         // The same title by the same producer under another address is screened once; the copies point to it.
         var byTitle = new Dictionary<string, string>(StringComparer.Ordinal);
         var toScreen = new List<(int Index, GreyRecord Record)>();
+        file.AuditSeed = MultivocalSecondScreening.SeedOf(runId);
+        file.AuditShare = MultivocalSecondScreening.AuditShare;
+        file.AuditMinimum = MultivocalSecondScreening.AuditMinimum;
         foreach (var found in ledger.Sources)
         {
             var r = found.Record;
@@ -182,36 +187,9 @@ public sealed partial class MultivocalScreener
             file.Sources.Add(entry);
         }
 
-        // First pass: every source once.
         var chat = _chat();
-        var firsts = await InParallelAsync(toScreen, item => ScreenFirstAsync(chat, plan, item.Record), (i, n) => progress?.Report($"{i} of {n} sources screened"));
-
-        // Second pass: only the sources the rule picks (MultivocalSecondScreening), each pool's audit sample drawn from
-        // every source the first pass decided, whatever it decided.
-        file.AuditSeed = MultivocalSecondScreening.SeedOf(runId);
-        file.AuditShare = MultivocalSecondScreening.AuditShare;
-        file.AuditMinimum = MultivocalSecondScreening.AuditMinimum;
-        var decided = toScreen.Select((item, i) => (item, first: firsts[i])).Where(x => x.first.Answer != null).ToList();
-        var audit = new HashSet<string>(StringComparer.Ordinal);
-        foreach (bool formal in new[] { false, true })
-            audit.UnionWith(MultivocalSecondScreening.AuditSample(file.AuditSeed,
-                decided.Where(x => file.Sources[x.item.Index].Formal == formal).Select(x => file.Sources[x.item.Index].Address)));
-        var again = new List<(int Index, GreyRecord Record)>();
-        foreach (var (item, first) in decided)
-        {
-            var entry = file.Sources[item.Index];
-            entry.SecondReason = MultivocalSecondScreening.TargetReason(first.Answer!, item.Record.Summary.Length > 0, first.Flags.Count > 0);
-            entry.AuditSample = audit.Contains(entry.Address);
-            if (entry.SecondReason != null || entry.AuditSample) again.Add(item);
-        }
-        var seconds = await InParallelAsync(again, item => ScreenSecondAsync(chat, plan, item.Record), (i, n) => progress?.Report($"{i} of {n} second screenings"));
-        var secondOf = again.Select((item, i) => (item.Index, seconds[i])).ToDictionary(x => x.Index, x => x.Item2);
-
-        for (int i = 0; i < toScreen.Count; i++)
-        {
-            var (index, record) = toScreen[i];
-            Apply(file.Sources[index], firsts[i], secondOf.TryGetValue(index, out var second) ? second : null, record);
-        }
+        await ScreenBatchAsync(plan, file, toScreen, chat, progress);
+        await ChainFromSeedsAsync(runId, plan, ledger, file, byTitle, chat, progress);
 
         // κ over the audit sample only: the targeted second screenings are reported apart, as counts.
         var sample = file.Sources.Where(s => s.AuditSample && s.Decision != "Error").ToList();
@@ -223,6 +201,48 @@ public sealed partial class MultivocalScreener
             file.KappaFormal = MultivocalSecondScreening.Kappa(sample.Where(s => s.Formal));
         }
         return file;
+    }
+
+    /// <summary>
+    /// Screens one batch of sources, already entered in <paramref name="file"/>: every source once, then a second time where
+    /// the rule picks it (MultivocalSecondScreening), each pool's audit sample drawn from the batch. The found sources are
+    /// one batch; the sources the seed step of the formal pool finds later are another, screened the same way.
+    /// </summary>
+    private async Task ScreenBatchAsync(MultivocalPlan plan, MultivocalScreeningFile file, List<(int Index, GreyRecord Record)> toScreen,
+        IChatCompletionService chat, IProgress<string>? progress, bool pilot = true)
+    {
+        // First pass: every source once.
+        var firsts = await InParallelAsync(toScreen, item => ScreenFirstAsync(chat, plan, item.Record), (i, n) => progress?.Report($"{i} of {n} sources screened"));
+
+        // The pilot check: more than half of a pool's first 30 sources included is a warning on file, never a stop. It looks
+        // at the found sources only; the seed step's sources are not a pilot of the criteria.
+        var decided = toScreen.Select((item, i) => (item, first: firsts[i])).Where(x => x.first.Answer != null).ToList();
+        foreach (bool formal in new[] { false, true })
+            if (pilot && MultivocalPilotCheck.Warning(decided.Where(x => file.Sources[x.item.Index].Formal == formal).Select(x => x.first.Answer!.IsIncluded), formal) is { } warning)
+                (file.Warnings ??= new()).Add(warning);
+
+        // Second pass: only the sources the rule picks (MultivocalSecondScreening), each pool's audit sample drawn from
+        // every source the first pass decided, whatever it decided.
+        var audit = new HashSet<string>(StringComparer.Ordinal);
+        foreach (bool formal in new[] { false, true })
+            audit.UnionWith(MultivocalSecondScreening.AuditSample(file.AuditSeed ?? MultivocalSecondScreening.SeedOf(file.RunId),
+                decided.Where(x => file.Sources[x.item.Index].Formal == formal).Select(x => file.Sources[x.item.Index].Address)));
+        var again = new List<(int Index, GreyRecord Record)>();
+        foreach (var (item, first) in decided)
+        {
+            var entry = file.Sources[item.Index];
+            entry.SecondReason = MultivocalSecondScreening.TargetReason(first.Answer!, item.Record.Summary.Length > 0, PromptSafety.AnyStrong(first.Flags));
+            entry.AuditSample = audit.Contains(entry.Address);
+            if (entry.SecondReason != null || entry.AuditSample) again.Add(item);
+        }
+        var seconds = await InParallelAsync(again, item => ScreenSecondAsync(chat, plan, item.Record), (i, n) => progress?.Report($"{i} of {n} second screenings"));
+        var secondOf = again.Select((item, i) => (item.Index, seconds[i])).ToDictionary(x => x.Index, x => x.Item2);
+
+        for (int i = 0; i < toScreen.Count; i++)
+        {
+            var (index, record) = toScreen[i];
+            Apply(file.Sources[index], firsts[i], secondOf.TryGetValue(index, out var second) ? second : null, record);
+        }
     }
 
     private async Task<List<T>> InParallelAsync<T>(List<(int Index, GreyRecord Record)> items, Func<(int Index, GreyRecord Record), Task<T>> screen, Action<int, int> report)

@@ -27,15 +27,23 @@
    card is on every review planned here is a grey literature review.
    /mlr/{id} shows a planned run and its protocol. *@
 
-<SeoHead Title="@((GreyOnly ? "Grey literature review" : "Multivocal literature review") + (CardOn ? "" : " (preview)"))" Path="/mlr" NoIndex="true"
+<SeoHead Title="@TabTitle()" Path="/mlr" NoIndex="true"
          Description="Plan a grey literature review following the Garousi et al. (2019) guidelines, with every citation checked against its source." />
 
 <div class="max-w-7xl w-full mx-auto p-4 lg:p-6 space-y-4">
 
     <div class="flex flex-wrap items-end justify-between gap-3">
-        <div>
-            <h1 class="font-display text-[clamp(26px,2.4vw,40px)] font-semibold leading-tight tracking-[-0.025em] text-heading">@(planned != null ? "Your review" : "New review")</h1>
-            <p class="text-sm text-muted mt-1">
+        <div class="min-w-0 max-w-[760px]">
+            @if (planned != null)
+            {
+                <MultivocalRunHeader Topic="@planned.Plan.Topic" Stage="@stage" Status="Runner.StatusOf(planned.RunId)"
+                                     Found="@AuBtechReviewAgent.MultivocalLiveActivity.Counts(ledger, screening)" />
+            }
+            else
+            {
+                <h1 class="font-display text-[clamp(26px,2.4vw,40px)] font-semibold leading-tight tracking-[-0.025em] text-heading">New review</h1>
+            }
+            <p class="text-sm text-muted mt-2">
                 A @(GreyOnly ? "grey literature" : "multivocal") review following
                 <a href="@Method.StandardUrl" target="_blank" rel="noopener" class="underline decoration-dotted underline-offset-2" title="@Method.StandardReference">Garousi et al. (2019)</a>,
                 in which every citation will be checked against its source. <a href="/glossary" class="text-heading underline underline-offset-2">Glossary</a>
@@ -147,6 +155,19 @@
                             {
                                 <p class="bg-supported-fill border border-supported-border text-supported p-2 text-xs">Everything is filled in. Check the protocol, then write it.</p>
                             }
+                            @if (CriteriaWarnings.Count > 0)
+                            {
+                                <div class="bg-partly-fill border border-partly-border text-partly p-2 text-xs space-y-1" role="status">
+                                    <p class="font-semibold">Your criteria may let in many sources:</p>
+                                    <ul class="list-disc pl-4 space-y-0.5">
+                                        @foreach (var warning in CriteriaWarnings)
+                                        {
+                                            <li>@warning</li>
+                                        }
+                                    </ul>
+                                    <p>Every included source is read, scored and extracted, so broad criteria make the run slow. You can still start the review. <button type="button" @onclick="() => GoTo(3)" class="underline decoration-dotted underline-offset-2">Change the criteria</button></p>
+                                </div>
+                            }
                         }
                     </div>
 
@@ -173,6 +194,7 @@
                             }
                             else
                             {
+                                <Honeypot Id="mlr-website" @bind-Value="honeypot" />
                                 <button type="button" class="ui-btn-primary" disabled="@(Problems.Count > 0 || !FlagsConfirmed || saving)" @onclick="WriteProtocolAsync">Start the review</button>
                             }
                         </div>

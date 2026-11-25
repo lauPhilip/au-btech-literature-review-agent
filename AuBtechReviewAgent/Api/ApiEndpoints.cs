@@ -51,7 +51,7 @@ public static class ApiEndpoints
         // limiter only looks at the API's own addresses; the site and its downloads keep their own limits.
         services.Configure<RateLimiterOptions>(options =>
         {
-            options.GlobalLimiter = PartitionedRateLimiter.CreateChained(
+            var apiLimiter = PartitionedRateLimiter.CreateChained(
                 PartitionedRateLimiter.Create<HttpContext, string>(context => IsApiPath(context.Request.Path)
                     ? PerMinute("address:" + RunQuotaService.NormalizeClientAddress(context.Connection.RemoteIpAddress))
                     : RateLimitPartition.GetNoLimiter("site")),
@@ -62,8 +62,12 @@ public static class ApiEndpoints
                         ? PerMinute("key:" + fingerprint.Of(key))
                         : RateLimitPartition.GetNoLimiter("site");
                 }));
+            // The site's own limiter (SiteRateLimits) comes first; it lets the API's addresses through to this one.
+            options.GlobalLimiter = options.GlobalLimiter is { } site ? PartitionedRateLimiter.CreateChained(site, apiLimiter) : apiLimiter;
+            var siteRejected = options.OnRejected;
             options.OnRejected = async (context, cancellationToken) =>
             {
+                if (siteRejected != null) await siteRejected(context, cancellationToken); // Retry-After and the log line
                 if (!IsApiPath(context.HttpContext.Request.Path)) return;
                 await Problem(ApiProblems.TooManyCalls()).ExecuteAsync(context.HttpContext);
             };

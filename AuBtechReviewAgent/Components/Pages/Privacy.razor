@@ -86,7 +86,7 @@
     private (string Title, string Text)[] Summary => new[]
     {
         ("No account, no tracking", "No sign-up, no analytics, no advertising cookies."),
-        ("Your network address", $"Only used to count free runs, stored as a keyed fingerprint, and forgotten after two days."),
+        ("Your network address", $"Only used to count free runs and to slow down automated traffic. Written to disk only as a keyed fingerprint, and forgotten after two days."),
         ("Your review", $"Kept on this server for {RunsOptions.RetentionDays} days, then deleted. You can delete it sooner."),
         ("Your API keys", "Kept encrypted in this browser tab only, and gone when you close it."),
     };
@@ -103,6 +103,11 @@
             $"Free runs are limited to {QuotaOptions.FreeRunsPerDay} per day per network address. To count them, your address is replaced " +
             "by a keyed fingerprint (HMAC-SHA-256 with a secret that exists only on this server) before anything is stored, so the stored value " +
             "cannot be turned back into an address. Counts older than two days are deleted.",
+            "To keep the tool fair and to slow down automated traffic, the server also counts in its memory how many pages, downloads and " +
+            "costly actions (starting a review, proposing search strings, checking a citation again, checking an archive) come from one " +
+            "address, and how many reviews it has running or waiting. These counts are never written to disk. They are gone after an hour " +
+            "at most, or when the server restarts. When a request is refused because too many came from one address, the server's log notes " +
+            "a short fingerprint that changes with every restart, never the address itself.",
             "Like any web server, the hosting provider may keep standard access logs (address, time, page) for operating and securing the server.",
         }),
         ("review", "Your review", new[]
@@ -141,6 +146,10 @@
             "quotes and a link to the Wayback Machine's nearest capture. TraceableAI only builds that link; it does not ask the Internet Archive to " +
             "make a capture. A page may name its authors or the people who answered on a forum; they are kept only as they appear on the page and in " +
             "the reference to it.",
+            "Stack Overflow and the other Stack Exchange sites refuse automated page requests, so for a question the review's search found there, " +
+            "the server asks the public Stack Exchange API for the question and its answers instead of fetching the page. The text and the API's " +
+            "answers are kept with the run in the same way, for the same time, and are not part of the archive. Because these posts are shared " +
+            "under CC BY-SA, the archive's page record also names each post's author as the site shows it, with links to the post and the author's profile.",
         }),
         ("reuse", "What is kept longer", new[]
         {
@@ -150,7 +159,8 @@
             $"reuses its model decisions the same way, also for {CacheOptions.ScreeningDecisionDays} days: the screening, the quality points, the " +
             "extracted values and the checks of values and citations, each with the short quotes it rests on but not the page's text." : ""),
             "For the public Metrics page, every finished run leaves a line of quality figures: how many citations were supported, coverage, " +
-            "time and cost. It contains no research question, criteria or paper text, and no network address.",
+            "time and cost. It contains no research question, criteria or paper text, and no network address. Anyone can download these lines " +
+            "from the Metrics page as CSV or JSON, with only the first eight characters of each run's ID, so a file cannot be used to open a run.",
         }),
     };
 

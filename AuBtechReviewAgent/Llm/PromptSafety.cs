@@ -12,11 +12,11 @@ namespace AuBtechReviewAgent;
 /// citation check. Two layers:
 ///  1. every piece of third-party text is wrapped in clearly labelled markers, and the prompt says that
 ///     text inside them is data to evaluate, never instructions (Wrap + DataOnlyNotice);
-///  2. the text is scanned for instruction-like phrases, and a hit is written to the ledger and marks the
-///     screening decision as uncertain so a human looks at it (Scan).
+///  2. the text is scanned for instruction-like phrases, and a hit is written to the ledger; a strong hit, a phrase
+///     aimed at the model, marks the screening decision as uncertain so a human looks at it (Scan, IsStrong).
 /// Neither layer is proof against a determined attacker; together they make steering visible.
 /// </summary>
-public static class PromptSafety
+public static partial class PromptSafety
 {
     public const string OpenTag = "<<<UNTRUSTED_SOURCE_TEXT";
     public const string CloseTag = "UNTRUSTED_SOURCE_TEXT>>>";
@@ -50,39 +50,24 @@ public static class PromptSafety
         return $"{OpenTag} ({safeLabel})\n{body}\n{CloseTag}";
     }
 
-    private static readonly (string Name, Regex Pattern)[] Patterns =
-    {
-        ("ignore-instructions", new Regex(@"\b(ignore|disregard|forget|override)\b[^.\n]{0,40}\b(instructions?|rules|criteria|prompt|guidelines)\b", RegexOptions.IgnoreCase | RegexOptions.Compiled)),
-        ("addresses-the-model", new Regex(@"\b(you are|act as|as an?)\s+(an?\s+)?(ai|assistant|language model|llm|chatbot|reviewer bot)\b", RegexOptions.IgnoreCase | RegexOptions.Compiled)),
-        ("mentions-system-prompt", new Regex(@"\b(system|developer)\s+(prompt|message|instructions?)\b", RegexOptions.IgnoreCase | RegexOptions.Compiled)),
-        ("demands-inclusion", new Regex(@"\b(must|should|always)\s+be\s+(included|accepted|approved|selected)\b|\b(include|accept|approve|select)\s+this\s+(paper|study|article|work)\b|\bdo not exclude\b", RegexOptions.IgnoreCase | RegexOptions.Compiled)),
-        ("claims-criteria-met", new Regex(@"\bmeets?\s+(all\s+)?(the\s+)?(inclusion|eligibility)\s+criteria\b", RegexOptions.IgnoreCase | RegexOptions.Compiled)),
-        ("chat-markup", new Regex(@"<\|?(system|assistant|user|im_start|im_end)\|?>|\[/?INST\]|###\s*(system|instruction)", RegexOptions.IgnoreCase | RegexOptions.Compiled)),
-        ("output-format-command", new Regex(@"\b(respond|reply|answer|output)\s+(only\s+)?(with|in)\s+(json|yes|no|""?included""?)\b", RegexOptions.IgnoreCase | RegexOptions.Compiled)),
-        ("reveal-instructions", new Regex(@"\b(reveal|print|repeat|show|output|tell me)\b[^.\n]{0,30}\b(your|the|these|above)\s+(instructions|prompt|rules|system message)\b", RegexOptions.IgnoreCase | RegexOptions.Compiled)),
-        ("role-change", new Regex(@"\b(you are now|from now on,? you|pretend (to be|you are))\b|\bnew instructions\s*:", RegexOptions.IgnoreCase | RegexOptions.Compiled)),
-    };
-
     /// <summary>The first match of one named pattern in the text, or null.</summary>
     public static Match? FirstMatch(string pattern, string text)
     {
-        foreach (var (name, regex) in Patterns)
-            if (name == pattern) { var m = regex.Match(text); return m.Success ? m : null; }
-        return null;
+        var m = Patterns.FirstOrDefault(p => p.Name == pattern)?.Regex.Match(text);
+        return m is { Success: true } ? m : null;
     }
 
     /// <summary>
     /// Every instruction-like pattern in a source's kept text, each with its first match and a little context (#366).
     /// Null when there is none, so a file without hits looks as before. A hit is for the reviewer to look at: a paper
-    /// about prompt injection quotes such phrases honestly, so it never changes a decision.
+    /// about prompt injection quotes such phrases honestly, so it never changes a decision. Weak hits are listed too
+    /// (<see cref="IsStrong"/>); a weak one whose strong one is found is left out.
     /// </summary>
     public static List<SourceFlag>? Find(string? text)
     {
         if (string.IsNullOrWhiteSpace(text)) return null;
         text = HiddenText.RemoveInvisible(text).Text; // a zero-width character can split a phrase (#369)
-        var flags = new List<SourceFlag>();
-        foreach (var (name, pattern) in Patterns)
-            if (pattern.Match(text) is { Success: true } match) flags.Add(new SourceFlag(name, Excerpt(text, match)));
+        var flags = Matches(text).Select(m => new SourceFlag(m.Pattern.Name, Excerpt(text, m.Match))).ToList();
         return flags.Count > 0 ? flags : null;
     }
 
@@ -95,8 +80,8 @@ public static class PromptSafety
     }
 
     /// <summary>
-    /// Names of the instruction-like patterns found in the text (empty when none). Text spelled in Unicode tag
-    /// characters shows nothing on screen, so when it reads like instructions it adds <see cref="HiddenText.FlagPattern"/>
+    /// Names of the instruction-like patterns found in the text (empty when none), weak ones included. Text spelled in
+    /// Unicode tag characters shows nothing on screen, so when it holds a strong phrase it adds <see cref="HiddenText.FlagPattern"/>
     /// last, as the scan of a kept text does (#373).
     /// </summary>
     public static IReadOnlyList<string> Scan(params string?[] texts)
@@ -107,9 +92,9 @@ public static class PromptSafety
         {
             if (string.IsNullOrWhiteSpace(text)) continue;
             var clean = HiddenText.RemoveInvisible(text);
-            foreach (var (name, pattern) in Patterns)
-                if (!hits.Contains(name) && pattern.IsMatch(clean.Text)) hits.Add(name);
-            hidden |= clean.Hidden.Length > 0 && Patterns.Any(p => p.Pattern.IsMatch(clean.Hidden));
+            foreach (var (pattern, _) in Matches(clean.Text))
+                if (!hits.Contains(pattern.Name)) hits.Add(pattern.Name);
+            hidden |= clean.Hidden.Length > 0 && Matches(clean.Hidden).Any(m => m.Pattern.Strong);
         }
         if (hidden) hits.Add(HiddenText.FlagPattern);
         return hits;

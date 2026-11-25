@@ -172,7 +172,8 @@ public class ReviewWriterTests : IDisposable
         {
             ("grounded synthesis outline", "You are coding studies"),
             ("second, independent coder", "You are writing one subsection of the Results"),
-            ("You are writing the title, abstract, rationale and objectives", "You are turning the results of a systematic literature review"),
+            // The front matter waits for the closing sections (issue #446); the artifact runs beside them.
+            ("You are writing the sections that follow the discussion of", "You are turning the results of a systematic literature review"),
         };
         var chat = new PairedChat(pairs);
         var engine = new PrismaReviewEngine("test-key", "", null, null, null, new RunsOptions { MaxConcurrentRuns = 1 })

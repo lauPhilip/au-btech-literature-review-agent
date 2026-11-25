@@ -85,6 +85,24 @@ class ReleaseFeatureTests(unittest.TestCase):
         self.assertEqual(code, 0, errors)
         self.assertIn("prerelease=true\n", output)
 
+    def test_body_out_writes_the_composed_body_as_release_yml_asks(self):
+        self.commit(CHANGELOG, citation("0.1.0", "2026-11-20"))
+        self.git("tag", "-a", "v0.1.0", "-m", "Research questions")
+        generated = self.repo / "generated.md"
+        generated.write_text("## What's Changed\n* One by @a in https://x/pull/1\n\n**Full Changelog**: x\n",
+                             encoding="utf-8")
+        body = self.repo / "body.md"
+
+        with mock.patch("sys.stderr"), mock.patch("sys.stdout"):
+            code = rc.main(["v0.1.0", "--repo", str(self.repo), "--body-out", str(body),
+                            "--generated-notes", str(generated), "--previous-tag", "v0.0.9"])
+
+        self.assertEqual(code, 0)
+        text = body.read_text(encoding="utf-8")
+        self.assertIn("## Added\n\n- Research questions on the start form. 🎉", text)
+        self.assertIn("<summary>The 1 pull request in this version</summary>", text)
+        self.assertIn("compare/v0.0.9...v0.1.0", text)
+
     def test_lightweight_tag_stops_with_the_reason(self):
         self.commit(CHANGELOG, citation("0.1.0", "2026-11-20"))
         self.git("tag", "v0.1.0")

@@ -1,7 +1,5 @@
 using AuBtechReviewAgent.Components;
 using Microsoft.AspNetCore.HttpOverrides;
-using Microsoft.AspNetCore.RateLimiting;
-using System.Threading.RateLimiting;
 
 // Pages format numbers like the paper ("0.63", not the Danish server's "0,63"); see Web/SiteCulture.cs.
 AuBtechReviewAgent.SiteCulture.Apply();
@@ -41,23 +39,14 @@ builder.Services.Configure<ForwardedHeadersOptions>(options =>
     }
 });
 
-// 2. RATE LIMITING
-// Review runs are limited by RunQuotaService (per client address per day, see the Quota section in
-// appsettings.json). Runs start over the Blazor SignalR circuit, which HTTP rate-limiting middleware never
-// sees, so the middleware limiter only guards the one plain HTTP endpoint: the archive download.
-builder.Services.AddRateLimiter(options =>
-{
-    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
-    options.AddPolicy("ArchiveDownloadPolicy", httpContext =>
-        RateLimitPartition.GetFixedWindowLimiter(
-            partitionKey: AuBtechReviewAgent.RunQuotaService.NormalizeClientAddress(httpContext.Connection.RemoteIpAddress),
-            factory: _ => new FixedWindowRateLimiterOptions
-            {
-                PermitLimit = 20,
-                Window = TimeSpan.FromMinutes(1),
-                QueueLimit = 0
-            }));
-});
+// 2. RATE LIMITING AND OTHER LIMITS
+// Every plain HTTP address counts per client address (Web/SiteRateLimits.cs); the API chains its own limiter after
+// it. Runs start over the Blazor SignalR circuit, which HTTP rate limiting never sees: there the quota
+// (RunQuotaService), the one fair line (RunCoordinator) and the per-address limits on costly actions (ActionLimiter) apply.
+var siteLimits = builder.Configuration.GetSection("Site:Limits").Get<AuBtechReviewAgent.SiteLimitOptions>() ?? new AuBtechReviewAgent.SiteLimitOptions();
+AuBtechReviewAgent.SiteRateLimits.AddSiteRateLimits(builder.Services, siteLimits);
+builder.Services.AddSingleton(new AuBtechReviewAgent.ActionLimiter(builder.Configuration.GetSection("Site:ActionsPerHour").Get<Dictionary<string, int>>()));
+AuBtechReviewAgent.SiteRateLimits.LimitRequestBodies(builder, siteLimits);
 
 var quotaOptions = builder.Configuration.GetSection("Quota").Get<AuBtechReviewAgent.QuotaOptions>() ?? new AuBtechReviewAgent.QuotaOptions();
 builder.Services.AddSingleton(quotaOptions); // read by the privacy page
@@ -66,7 +55,8 @@ builder.Services.AddSingleton(new AuBtechReviewAgent.RunQuotaService(
 builder.Services.AddHttpContextAccessor();
 
 builder.Services.AddRazorComponents()
-    .AddInteractiveServerComponents();
+    .AddInteractiveServerComponents(AuBtechReviewAgent.SiteRateLimits.LimitCircuits)
+    .AddHubOptions(AuBtechReviewAgent.SiteRateLimits.LimitHub);
 
 builder.Services.AddScoped<AuBtechReviewAgent.UiStateContainer>();
 
@@ -109,7 +99,12 @@ var reviewEngine = new AuBtechReviewAgent.PrismaReviewEngine(mistralApiKey, else
 };
 builder.Services.AddSingleton(reviewEngine);
 builder.Services.AddSingleton(reviewEngine.Store); // the run folders, shared by every kind of review
-var multivocalPlanner = new AuBtechReviewAgent.MultivocalPlanner(reviewEngine.Store);
+// The seed step of the formal pool is named in the protocol with the server's settings, as in the systematic review.
+var multivocalPlanner = new AuBtechReviewAgent.MultivocalPlanner(reviewEngine.Store)
+{
+    SeedStudies = Math.Clamp(openSources.SeedStudies, 0, 50),
+    SeedChainingPerDirection = Math.Clamp(openSources.SeedChainingPerDirection, 1, AuBtechReviewAgent.CitationSeeds.PoolPerDirection),
+};
 builder.Services.AddSingleton(multivocalPlanner); // multivocal planning (preview)
 var multivocalSearcher = new AuBtechReviewAgent.MultivocalSearcher(reviewEngine.Store, multivocalPlanner, key => AuBtechReviewAgent.GreySourceCatalog.Create(key, openSources.ContactEmail),
     reviewEngine.CreateServerSource); // the formal pool: the systematic review's databases, with the server's keys
@@ -119,7 +114,13 @@ builder.Services.AddSingleton(multivocalSearcher); // multivocal grey searches (
 var multivocalChat = () => (Microsoft.SemanticKernel.ChatCompletion.IChatCompletionService?)AuBtechReviewAgent.LlmRecording.Current
     ?? AuBtechReviewAgent.LlmFactory.CreateForReview(llmOptions, mistralApiKey, runsOptions.MaxConcurrentRuns);
 var multivocalScreener = new AuBtechReviewAgent.MultivocalScreener(reviewEngine.Store, multivocalPlanner, multivocalSearcher,
-    multivocalChat, reviewEngine.Cache, llmOptions.ModelFor("screening"), llmOptions.ParallelismFor("screening"), llmOptions.ModelFor);
+    multivocalChat, reviewEngine.Cache, llmOptions.ModelFor("screening"), llmOptions.ParallelismFor("screening"), llmOptions.ModelFor)
+{
+    // The formal pool's seed step: the most-cited included academic sources built out through OpenAlex, as in the systematic review.
+    CitationGraph = () => new AuBtechReviewAgent.OpenAlexSource(openSources.ContactEmail, openSources.OpenAlexApiKey),
+    SeedStudies = multivocalPlanner.SeedStudies,
+    SeedChainingPerDirection = multivocalPlanner.SeedChainingPerDirection,
+};
 builder.Services.AddSingleton(multivocalScreener); // grey screening (preview)
 var multivocalPages = new AuBtechReviewAgent.MultivocalPages(reviewEngine.Store, multivocalSearcher, new AuBtechReviewAgent.PageFetcher(),
     (paper, folder) => AuBtechReviewAgent.DocumentRAGUtility.IngestAndChunkPaperAsync(paper, folder, openSources.ContactEmail)); // a formal source's open full text
@@ -144,7 +145,8 @@ var multivocalWriter = new AuBtechReviewAgent.MultivocalWriter(reviewEngine.Stor
 builder.Services.AddSingleton(multivocalWriter); // writing and checking the paper (preview)
 var multivocalRunner = new AuBtechReviewAgent.MultivocalRunner(reviewEngine.Store, multivocalSearcher, multivocalScreener, multivocalQuality,
     multivocalMapper, multivocalExtractor, multivocalSynthesiser, multivocalPages, multivocalWriter,
-    () => AuBtechReviewAgent.LlmFactory.CreateForReview(llmOptions, mistralApiKey, runsOptions.MaxConcurrentRuns), llmOptions.Model);
+    () => AuBtechReviewAgent.LlmFactory.CreateForReview(llmOptions, mistralApiKey, runsOptions.MaxConcurrentRuns), llmOptions.Model)
+    { Coordinator = reviewEngine.Coordinator }; // one line for every kind of review
 builder.Services.AddSingleton(multivocalRunner); // runs the steps one after another (preview)
 reviewEngine.AddCanceller(multivocalRunner.Cancel); // so CancelRun reaches grey literature runs too
 // Modules shown as a preview while they are being built (Development only; see ReviewModulesOptions).
@@ -204,9 +206,13 @@ app.UseAntiforgery();
 app.MapStaticAssets();
 
 app.UseRateLimiter();
+AuBtechReviewAgent.SiteRateLimits.UseRequestBodyLimit(app, siteLimits);
 
 // The run downloads, with Last-Modified, an ETag and the kept archive of a finished run (Web/WorkspaceDownloads.cs).
 AuBtechReviewAgent.WorkspaceDownloads.MapWorkspaceDownloads(app, reviewEngine, multivocalWriter, multivocalReporter);
+
+// The Metrics page's figures as CSV and JSON, for papers about the tool (Web/MetricsDownloads.cs).
+AuBtechReviewAgent.MetricsDownloads.MapMetricsDownloads(app, metricsStore, app.Services.GetRequiredService<AuBtechReviewAgent.ReviewModulesOptions>(), metricsOptions.Prices);
 
 // For search engines: which pages to crawl, and the list of public pages (see SiteSeo).
 var siteConfiguration = app.Configuration;

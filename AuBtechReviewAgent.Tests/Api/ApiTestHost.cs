@@ -76,11 +76,30 @@ internal sealed class ApiTestHost : WebApplicationFactory<Program>
         builder.ConfigureTestServices(services => services.AddSingleton(Engine));
     }
 
+    /// <summary>How long the tests wait between two looks at a run. The run is in memory, so a look is cheap.</summary>
+    public static readonly TimeSpan PollInterval = TimeSpan.FromMilliseconds(20);
+
     /// <summary>Waits until the run has finished and left the coordinator, so every file it writes is on disk.</summary>
     public async Task WaitForRunAsync(Guid runId, TimeSpan timeout)
     {
         var until = DateTime.UtcNow + timeout;
-        while (Engine.IsRunActive(runId) && DateTime.UtcNow < until) await Task.Delay(200);
+        while (Engine.IsRunActive(runId) && DateTime.UtcNow < until) await Task.Delay(PollInterval);
+    }
+
+    /// <summary>Asks the API for the run's status until its stage is a finished one, then waits for the run to leave
+    /// the coordinator; returns the last status.</summary>
+    public async Task<JsonElement> WaitForFinishedStatusAsync(HttpClient client, Guid id)
+    {
+        JsonElement status;
+        var until = DateTime.UtcNow.AddSeconds(90);
+        while (true)
+        {
+            status = await client.GetFromJsonAsync<JsonElement>($"/api/v1/reviews/{id}");
+            if (PrismaReviewEngine.IsFinishedStage(status.GetProperty("stage").GetString()) || DateTime.UtcNow >= until) break;
+            await Task.Delay(PollInterval);
+        }
+        await WaitForRunAsync(id, TimeSpan.FromSeconds(30));
+        return status;
     }
 
     /// <summary>Starts a review through the API with the given key and waits until it has finished; returns its id.</summary>
@@ -89,14 +108,7 @@ internal sealed class ApiTestHost : WebApplicationFactory<Program>
         using var response = await ReviewApiTests.PostAsync(client, ReviewApiTests.GoodBody(), key);
         response.EnsureSuccessStatusCode();
         var id = (await response.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
-        var until = DateTime.UtcNow.AddSeconds(90);
-        while (DateTime.UtcNow < until)
-        {
-            var status = await client.GetFromJsonAsync<JsonElement>($"/api/v1/reviews/{id}");
-            if (PrismaReviewEngine.IsFinishedStage(status.GetProperty("stage").GetString())) break;
-            await Task.Delay(750);
-        }
-        await WaitForRunAsync(id, TimeSpan.FromSeconds(30));
+        await WaitForFinishedStatusAsync(client, id);
         return id;
     }
 

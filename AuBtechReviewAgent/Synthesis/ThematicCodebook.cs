@@ -47,6 +47,10 @@ public class ThematicCode
 
     /// <summary>"verified finding", "verified quote" or "unanchored" (the evidence could not be confirmed in code).</summary>
     public string Anchor { get; set; } = "";
+
+    /// <summary>The research questions the code bears on ("RQ1"), checked in code; null (and not written) for a run without research questions.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public List<string>? Questions { get; set; }
 }
 
 public class Theme
@@ -62,6 +66,10 @@ public class Theme
     /// <summary>The research questions the theme answers ("RQ1"); null when the run has none.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public List<string>? Questions { get; set; }
+
+    /// <summary>Why the theme rests on one study, as the codebook gave it (issue #447); null for a theme of two or more studies.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? SingleStudyReason { get; set; }
 }
 
 public record UncodedStudy(int Reference, string Reason);
