@@ -28,7 +28,7 @@ public sealed class MultivocalPlan
     public List<PlannedQuestion> Questions { get; set; } = new() { new PlannedQuestion() };
 
     public List<string> GreyTypes { get; set; } = new() { "white-papers", "documentation", "blogs", "qa" };
-    public List<string> GreySearches { get; set; } = new() { "stackexchange", "github", "openalex-grey", "zenodo", "backlinks" };
+    public List<string> GreySearches { get; set; } = new() { "stackexchange", "github", "openalex-grey", "zenodo" };
 
     /// <summary>
     /// The search strings sent to the grey literature searches, in this order. Grey literature uses its own words
@@ -95,13 +95,21 @@ public sealed class MultivocalPlan
     public bool HasCriteria => InclusionCriteria.Trim().Length > 0;
 
     /// <summary>
-    /// For the effort-bounded rule: how many top hits of each search string are looked at. The paper uses 100; a plan
-    /// starts at 20, since every hit is screened twice by a model, and the reviewer can raise it on the form.
+    /// For the effort-bounded rule and saturation (<see cref="UsesTopHits"/>): how many top hits of each search string are
+    /// looked at. The paper uses 100; a plan starts at 20, since every hit is screened by a model, many twice, and the
+    /// reviewer can raise it on the form.
     /// </summary>
     public int TopHits { get; set; } = DefaultTopHits;
 
     /// <summary>The top hits a new plan starts with.</summary>
     public const int DefaultTopHits = 20;
+
+    /// <summary>
+    /// Whether <see cref="TopHits"/> bounds the search: under the effort-bounded rule and under saturation, which takes
+    /// each string's hits up to it (#486); evidence exhaustion takes every hit the search returns.
+    /// </summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public bool UsesTopHits => StoppingRule is "effort" or "saturation";
 
     /// <summary>Grey sources scoring below this many of the 20 quality points are excluded (decision 4; the paper's example uses 10).</summary>
     public int QualityThreshold { get; set; } = 10;
@@ -166,7 +174,7 @@ public sealed class MultivocalPlan
             new() { Text = "Is the use of retrieval for context related to fewer reported agent failures?", Type = "relationship" },
         },
         GreyTypes = new List<string> { "white-papers", "documentation", "blogs", "qa", "code" },
-        GreySearches = new List<string> { "stackexchange", "github", "openalex-grey", "backlinks" },
+        GreySearches = new List<string> { "stackexchange", "github", "openalex-grey" },
         GreySearchStrings = new List<string> { "context engineering", "LLM agent context window" },
         InclusionCriteria = "Sources whose main subject is how the context of an LLM agent is built, selected or managed, meaning what goes into its context window and why. A source must explain at least one such practice, or evaluate one, in enough detail that a developer could apply it.",
         ExclusionCriteria = "Sources that mention an agent's context only in passing; generic tutorials on retrieval-augmented generation or vector databases; release notes and changelogs; code repositories whose README does not explain a practice; marketing pages without technical content; sources only about the wording of prompts for single chat requests; sources not in English.",
@@ -226,6 +234,8 @@ public sealed class MultivocalPlan
         InclusionCriteria = Clean(InclusionCriteria);
         ExclusionCriteria = Clean(ExclusionCriteria);
         foreach (var q in Questions) q.Text = Clean(q.Text);
+        // A search that is not built yet (backlink snowballing, #474) is not planned, so the protocol never promises it.
+        GreySearches = GreySearches.Where(GreySourceCatalog.IsBuilt).ToList();
         GreySearchStrings = GreySearchStrings.Select(t => ReviewInputGuard.Normalize(t ?? "", singleLine: true)).Where(t => t.Length > 0).ToList();
         FormalSearchStrings = Distinct(FormalSearchStrings.Select(t => ReviewInputGuard.Normalize(t ?? "", singleLine: true)));
         FormalStringsProposed = Distinct(FormalStringsProposed.Select(t => ReviewInputGuard.Normalize(t ?? "", singleLine: true)));
@@ -269,6 +279,8 @@ public sealed class MultivocalPlan
             problems.Add("Choose at least one kind of grey literature.");
         if (GreySearches.Count == 0 || GreySearches.Any(s => MultivocalGuidelines.GreySearches.All(g => g.Key != s)))
             problems.Add("Choose at least one place to search.");
+        foreach (var key in GreySearches.Where(k => MultivocalGuidelines.GreySearches.Any(g => g.Key == k) && !GreySourceCatalog.IsBuilt(k)))
+            problems.Add($"{MultivocalGuidelines.SearchLabel(key)} is not available yet; leave it out.");
         if (MultivocalGuidelines.StoppingRules.All(r => r.Key != StoppingRule)) problems.Add("Choose a stopping rule.");
         if (!HasCriteria) problems.Add("Say what a source must be about to be included (the inclusion criteria).");
         if (GreySearchStrings.Count > MaxSearchStrings) problems.Add($"Use at most {MaxSearchStrings} search strings.");
@@ -276,7 +288,7 @@ public sealed class MultivocalPlan
         if (FormalDatabases.Any(k => SourceCatalog.Find(k) == null)) problems.Add("Choose the academic databases from the list.");
         if (FormalSearchStrings.Count > MaxSearchStrings) problems.Add($"Use at most {MaxSearchStrings} search strings for academic databases.");
         if (FormalSearchStrings.Any(t => t.Length > MaxSearchStringLength)) problems.Add($"Keep every search string for academic databases under {MaxSearchStringLength} characters.");
-        if (StoppingRule == "effort" && TopHits is < 10 or > 500) problems.Add("Look at between 10 and 500 top hits per search string.");
+        if (UsesTopHits && TopHits is < 10 or > 500) problems.Add("Look at between 10 and 500 top hits per search string.");
         if (QualityThreshold is < 1 or > MultivocalGuidelines.QualityPointsMax)
             problems.Add($"Set the quality threshold between 1 and {MultivocalGuidelines.QualityPointsMax} points.");
         return problems;

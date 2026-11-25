@@ -99,9 +99,13 @@ public static class MultivocalProtocol
             WriteFormalStrings(sb, plan);
         var rule = MultivocalGuidelines.StoppingRules.First(r => r.Key == plan.StoppingRule);
         // The effort-bounded label already says "the top hits of each search string"; with the number it is said once.
-        sb.AppendLine(plan.StoppingRule == "effort"
-            ? $"Stopping rule (G8): Effort bounded: the top {plan.TopHits} hits of each search string."
-            : $"Stopping rule (G8): {rule.Label}.");
+        // Saturation takes each string's hits up to the same number, so the protocol states it as the ledger records it (#486).
+        sb.AppendLine(plan.StoppingRule switch
+        {
+            "effort" => $"Stopping rule (G8): Effort bounded: the top {plan.TopHits} hits of each search string.",
+            "saturation" => $"Stopping rule (G8): {rule.Label}; the strings are searched in order, up to the top {plan.TopHits} hits of each.",
+            _ => $"Stopping rule (G8): {rule.Label}.",
+        });
         sb.AppendLine();
 
         sb.AppendLine("## 5. Selection and quality (G9–G11)");

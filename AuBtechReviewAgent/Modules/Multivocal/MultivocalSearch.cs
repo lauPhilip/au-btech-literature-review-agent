@@ -201,7 +201,7 @@ public sealed partial class MultivocalSearcher
         {
             "effort" when plan.TopHits > MaxPerSearch => $"Effort bounded: the top {MaxPerSearch} hits of each search string (the plan asked for {plan.TopHits}; each search returns one page of at most {MaxPerSearch}).",
             "effort" => $"Effort bounded: the top {perSearch} hits of each search string.",
-            "saturation" => $"Theoretical saturation: the strings were searched in order, up to {perSearch} hits each, and a search stopped taking further strings once a string added no new source.",
+            "saturation" => $"Theoretical saturation: the strings were searched in order, up to {perSearch} hits each{(plan.TopHits > MaxPerSearch ? $" (the plan asked for {plan.TopHits}; each search returns one page of at most {MaxPerSearch})" : "")}, and a search stopped taking further strings once a string added no new source.",
             _ => $"Evidence exhaustion, as far as the searches allow: every hit on the first page of each search, at most {MaxPerSearch}.",
         };
 

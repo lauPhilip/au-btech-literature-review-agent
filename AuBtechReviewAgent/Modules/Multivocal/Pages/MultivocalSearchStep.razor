@@ -20,7 +20,15 @@
         @foreach (var search in AuBtechReviewAgent.MultivocalGuidelines.GreySearches)
         {
             var s = search;
-            <label class="flex items-start gap-2 text-sm text-ink cursor-pointer select-none"><input type="checkbox" class="w-4 h-4 mt-0.5 accent-brand" checked="@Page.plan.GreySearches.Contains(s.Key)" @onchange="e => Page.plan.GreySearches = MultivocalStart.Toggle(Page.plan.GreySearches, s.Key, e, AuBtechReviewAgent.MultivocalGuidelines.GreySearches.Select(t => t.Key))" /> <span>@s.Label</span></label>
+            @if (AuBtechReviewAgent.GreySourceCatalog.IsBuilt(s.Key))
+            {
+                <label class="flex items-start gap-2 text-sm text-ink cursor-pointer select-none"><input type="checkbox" class="w-4 h-4 mt-0.5 accent-brand" checked="@Page.plan.GreySearches.Contains(s.Key)" @onchange="e => Page.plan.GreySearches = MultivocalStart.Toggle(Page.plan.GreySearches, s.Key, e, AuBtechReviewAgent.MultivocalGuidelines.GreySearches.Select(t => t.Key).Where(AuBtechReviewAgent.GreySourceCatalog.IsBuilt))" /> <span>@s.Label</span></label>
+            }
+            else
+            {
+                @* Shown so the reviewer knows the guidelines name it, but it cannot be chosen until it is built (#474). *@
+                <label class="flex items-start gap-2 text-sm text-muted select-none"><input type="checkbox" class="w-4 h-4 mt-0.5 accent-brand" disabled aria-describedby="@($"not-built-{s.Key}")" /> <span>@s.Label <span id="@($"not-built-{s.Key}")" class="text-xs">(not available yet)</span></span></label>
+            }
         }
     </div>
     <p class="text-xs text-muted mt-1.5">No general web search engine is used: none is free and allows its results to be kept. Practitioners and authors are not contacted.</p>
@@ -153,10 +161,10 @@
                 }
             </div>
         </fieldset>
-        @if (Page.plan.StoppingRule == "effort")
+        @if (Page.plan.UsesTopHits)
         {
             <div class="flex items-center justify-between gap-3">
-                <label for="p-top" class="text-sm text-ink">Top hits per search string<span class="block text-xs text-muted">The paper looks at the first 100. A plan starts at 20, since each hit is screened, many of them twice; raise it for a fuller search.</span></label>
+                <label for="p-top" class="text-sm text-ink">Top hits per search string<span class="block text-xs text-muted">@(Page.plan.StoppingRule == "saturation" ? "Each string is searched up to this many hits, in order, until one adds no new source. " : "The paper looks at the first 100. ")A plan starts at 20, since each hit is screened, many of them twice; raise it for a fuller search.</span></label>
                 <input id="p-top" type="number" min="10" max="500" class="ui-input w-20 text-center" @bind="Page.plan.TopHits" />
             </div>
         }

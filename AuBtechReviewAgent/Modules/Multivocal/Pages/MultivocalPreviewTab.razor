@@ -46,7 +46,7 @@
             string stop = p.StoppingRule switch
             {
                 "effort" => $"the top {p.TopHits} hits of each search string",
-                "saturation" => "until new sources add nothing new",
+                "saturation" => $"up to {p.TopHits} hits of each search string, until new sources add nothing new",
                 _ => "every hit of every search string",
             };
             // The same stages as the systematic review's preview, in the guidelines' words; built ones are marked.

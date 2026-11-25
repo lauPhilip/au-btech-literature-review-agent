@@ -133,7 +133,7 @@ public partial class MultivocalStart
                 if (plan.GreySearches.Count == 0) return "Choose at least one place to search (step 4).";
                 if (!plan.HasCriteria) return "Say what a source must be about to be included (step 4).";
                 if (plan.QualityThreshold is < 1 or > MultivocalGuidelines.QualityPointsMax) return "Set the quality threshold between 1 and 20 points (step 4).";
-                if (plan.StoppingRule == "effort" && plan.TopHits is < 10 or > 500) return "Look at between 10 and 500 top hits per search string (step 4).";
+                if (plan.UsesTopHits && plan.TopHits is < 10 or > 500) return "Look at between 10 and 500 top hits per search string (step 4).";
                 return null;
             default:
                 if (Problems.Count > 0) return Problems[0];
@@ -157,7 +157,7 @@ public partial class MultivocalStart
     internal string StoppingSummary() => plan.StoppingRule switch
     {
         "effort" => $"top {plan.TopHits} hits",
-        "saturation" => "until saturation",
+        "saturation" => $"until saturation, up to {plan.TopHits} hits",
         _ => "every hit",
     };
 

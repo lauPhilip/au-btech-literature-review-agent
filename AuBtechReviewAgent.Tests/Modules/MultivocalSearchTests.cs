@@ -13,7 +13,7 @@ public class MultivocalSearchTests : IDisposable
     public void Dispose() => TestFolders.TryDelete(_root);
 
     /// <summary>A grey source that answers from a script: one list of records per search string.</summary>
-    private sealed class FakeGreySource : IGreySource
+    internal sealed class FakeGreySource : IGreySource
     {
         private readonly Func<string, int, List<GreyRecord>> _answer;
         private readonly List<string> _raw = new();
@@ -69,7 +69,7 @@ public class MultivocalSearchTests : IDisposable
         Assert.Equal(2, ledger.Sources.Count);
         Assert.Equal(new[] { "stackexchange: context engineering", "github: context engineering", "github: agent memory" },
             ledger.Sources.Single(s => s.Record.Url.Contains("example.org")).FoundBy);
-        Assert.Equal("backlinks", Assert.Single(ledger.Skipped).Source);
+        Assert.Empty(ledger.Skipped); // backlink snowballing is not built, so the planner left it out of the plan (#474)
 
         string folder = store.FolderOf(runId);
         foreach (var search in ledger.Searches)
