@@ -191,6 +191,7 @@ public partial class PrismaReviewEngine
             VenueName = log.VenueName,
             Doi = log.Doi,
             Url = log.Url,
+            Details = log.Details,
         };
     }
 
