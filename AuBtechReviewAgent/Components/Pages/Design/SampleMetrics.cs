@@ -79,7 +79,8 @@ public static class SampleMetrics
         }.WithTokens(n);
     }
 
-    // The first five runs were made before tokens were counted (issue #414), so the page shows their dashes.
+    // The first five runs were made before tokens were counted (issue #414), so the page shows their dashes; the later ones
+    // count their tokens by model, for the estimated cost (issue #504).
     private static RunMetrics WithTokens(this RunMetrics run, int n)
     {
         if (run.IsMultivocal)
@@ -95,6 +96,13 @@ public static class SampleMetrics
         run.ReasoningTokens = run.OutputTokens * 4 / 5;
         run.Tokens = run.InputTokens.Value + run.OutputTokens.Value;
         run.LlmMinutes = Math.Round(run.DurationMinutes * 2.3, 1);
+        // Most tokens go to the main model and a fifth of the input to the fast one; run 7 used a model with no price, so its cost is a dash.
+        long main = run.InputTokens.Value * 4 / 5;
+        run.CostByModel = new()
+        {
+            [n == 7 ? "mistral-medium-latest" : "mistral-large-latest"] = new StageCost { InputTokens = main, CachedInputTokens = run.CachedInputTokens, OutputTokens = run.OutputTokens - 5_000 },
+            ["mistral-small-latest"] = new StageCost { InputTokens = run.InputTokens - main, CachedInputTokens = 0, OutputTokens = 5_000 },
+        };
         return run;
     }
 }

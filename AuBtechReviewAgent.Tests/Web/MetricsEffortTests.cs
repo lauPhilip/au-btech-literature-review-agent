@@ -91,6 +91,9 @@ public class MetricsEffortTests
         var runs = SampleMetrics.Runs().Where(r => !r.IsMultivocal).ToList();
         Assert.Contains(runs, r => r.InputTokens == null);
         Assert.Contains(runs, r => r.InputTokens > 0 && r.ReasoningTokens < r.OutputTokens);
+        var prices = new MetricsPrices { Currency = "USD", Models = { ["mistral-large-latest"] = new ModelPrice(), ["mistral-small-latest"] = new ModelPrice() } };
+        Assert.Contains(runs, r => prices.Cost(r) != null);
+        Assert.Contains(runs, r => prices.Unpriced(r).SequenceEqual(new[] { "mistral-medium-latest" })); // the dash on /design/metrics
     }
 
     private static async Task<string> RenderAsync(IReadOnlyList<RunMetrics> runs, MetricsPrices? prices = null)
