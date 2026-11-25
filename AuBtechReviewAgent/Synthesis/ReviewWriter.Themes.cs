@@ -79,7 +79,8 @@ public static partial class ReviewWriter
         $"Write so that each citation backs exactly what it is attached to: put a marker right after the claim it supports, one finding per citation, and cite several {profile.Sources} together only when each of them states the whole claim. " +
         $"When {profile.Sources} differ, give each its own claim and marker (\"one reports X [1], while another reports Y [2]\"); never attribute a comparison, ranking or trend across {profile.Sources} to a {profile.Source} that does not make it itself. " +
         $"Use no number, count or proportion (\"three approaches\", \"most {profile.Sources}\", \"four of six\") unless it is in the evidence or the facts above; a count of this review's own {profile.Sources} comes from those facts and takes no citation. " +
-        $"Do not add a qualifier (\"always\", \"all\", \"widely\"), a scope or a causal link that the {profile.Source} does not state.";
+        $"Do not add a qualifier (\"always\", \"all\", \"widely\"), a scope or a causal link that the {profile.Source} does not state." +
+        " " + CitationLoadRule(profile);
 
     /// <summary>
     /// Writes one subsection per theme, at most <paramref name="parallelism"/> at a time, assembled in theme order.
@@ -111,6 +112,9 @@ public static partial class ReviewWriter
             coverage.Add(themeCoverage);
             if (section != null) sections.Add(section);
         }
+        // The themes are written at the same time, so none sees the others; a claim another theme already reports is
+        // pointed out afterwards, in theme order (issue #464).
+        await RevisitRepeatsAsync(chat, profile, evidence, sections, coverage, referenceCount);
         return (sections, coverage);
     }
 
@@ -125,7 +129,6 @@ public static partial class ReviewWriter
         string themeEvidence = string.Join("\n", theme.Sources.Select(r => evidence.SourceBlock(r, theme, excerpts, profile.LeanEvidence)));
         string otherThemes = string.Join("; ", evidence.Themes.Where(t => t.Id != theme.Id).Select(t => t.Name));
         int paragraphs = ThematicSynthesis.ParagraphsFor(theme.Sources.Count);
-        string sourceList = string.Join(", ", theme.Sources.Select(r => $"[{r}]"));
         string s = profile.Source, ss = profile.Sources;
         // The theme's own counts (issue #146), when the module gives them; without them the prompt is as before.
         string themeFacts = theme.Facts.Length == 0 ? ""
@@ -150,7 +153,7 @@ public static partial class ReviewWriter
 
             REQUIREMENTS:
             1. Write about {{paragraphs}} paragraph{{(paragraphs == 1 ? "" : "s")}} of synthesis, not a list of summaries: group {{ss}} that report the same thing, compare and contrast them, and name agreements, tensions and gaps within the theme. Separate paragraphs with a blank line.
-            2. Cite every one of these {{ss}} at least once: {{sourceList}}. A {{s}} may be cited together with others when they report the same finding ("... [3, 7, 12]").
+            2. {{WhichSourcesRule(profile, theme.Sources)}}
             3. Every sentence that states a finding, comparison or claim from the literature ends with an inline marker like [3] or [2, 5]. Attribute to a {{s}} only what its findings or excerpts above actually say; prefer the verified findings. Do not invent numbers, statistics or venue names.
             4. "heading" is a short subsection title for the theme (at most 10 words, no numbering).
             5. {{ReadingBasisRule(profile)}}
@@ -166,14 +169,16 @@ public static partial class ReviewWriter
         {
             using (LlmStage.Begin("theme-sections"))
             {
-                var answer = await LlmJson.GetAsync<SectionAnswer>(chat, prompt, LlmJson.JsonMode(0.3), a =>
+                void Note(string message) => (coverage.WritingNotes ??= new()).Add(message);
+                var answer = await LlmJson.GetAsync<SectionAnswer>(chat, prompt, LlmJson.JsonMode(0.3), WithSoftGuard<SectionAnswer>(a =>
                 {
                     if (string.IsNullOrWhiteSpace(a.Text)) return "text must not be empty.";
                     var cited = ThematicSynthesis.CitedIn(a.Text);
                     if (cited.Count == 0) return "the text must carry inline [n] citations.";
                     var outside = cited.Where(r => r < 1 || r > referenceCount).ToList();
-                    return outside.Count > 0 ? $"citation numbers {string.Join(", ", outside)} are not in the reference list." : null;
-                });
+                    if (outside.Count > 0) return $"citation numbers {string.Join(", ", outside)} are not in the reference list.";
+                    return CitationLoadSendBack(a.Text, "subsection", Note);
+                }, a => ListingProblem(a.Text!, theme.Sources.Count, profile), "subsection", "a list of one-source summaries", Note), repairAttempts: 2);
                 text = MethodsSectionWriter.StripMarkdownEmphasis(answer.Text!.Trim());
                 // The heading is always the theme's name from the codebook, set in code, so the subsection, the overview
                 // and the evidence map name a theme the same way (issue #165). The model's own heading is not used.
@@ -190,7 +195,9 @@ public static partial class ReviewWriter
 
         coverage.CitedAfterWriting = ThematicSynthesis.CitedIn(text).Intersect(theme.Sources).ToList();
         var missing = theme.Sources.Except(coverage.CitedAfterWriting).ToList();
-        if (missing.Count > 0)
+        if (missing.Count > 0 && theme.Sources.Count > CiteEveryUpTo)
+            coverage.FillPass = $"not run: a theme of {theme.Sources.Count} {ss} is synthesised from its most direct {ss}, and its uncited {ss} are listed in the coverage";
+        else if (missing.Count > 0)
         {
             string missingEvidence = string.Join("\n", missing.Select(r => evidence.SourceBlock(r, theme, 2, profile.LeanEvidence)));
             string fillPrompt = $$"""
@@ -219,8 +226,9 @@ public static partial class ReviewWriter
             {
                 using (LlmStage.Begin("coverage-fill"))
                 {
+                    string before = text;
                     var answer = await LlmJson.GetAsync<TextAnswer>(chat, fillPrompt, LlmJson.JsonMode(0.2), a =>
-                        string.IsNullOrWhiteSpace(a.Text) ? "text must not be empty." : null);
+                        string.IsNullOrWhiteSpace(a.Text) ? "text must not be empty." : CitationLoadSendBack(a.Text, "fill pass", m => (coverage.WritingNotes ??= new()).Add(m), before));
                     string revised = MethodsSectionWriter.StripMarkdownEmphasis(answer.Text!.Trim());
                     string? problem = ThematicSynthesis.RevisionProblem(text, revised, referenceCount);
                     if (problem == null)

@@ -62,6 +62,7 @@ public partial class PrismaReviewEngine
                these two sections should carry at least one citation.
             3. No placeholder venue names, no fabricated statistics. Ground every claim in the outline and
                context above.
+            4. {{ReviewWriter.CitationLoadRule(WritingProfile.Systematic)}}
 
             {{ProseCleaner.PlainProseRule}}
             Respond ONLY with a valid minified JSON object matching this structure exactly:
@@ -71,7 +72,8 @@ public partial class PrismaReviewEngine
         try
         {
             var answer = await LlmJson.GetAsync<SectionsAnswer>(chat, prompt, JsonMode(0.3), a =>
-                string.IsNullOrWhiteSpace(a.Synthesis) || string.IsNullOrWhiteSpace(a.Discussion) ? "both synthesis and discussion must be non-empty text." : null);
+                string.IsNullOrWhiteSpace(a.Synthesis) || string.IsNullOrWhiteSpace(a.Discussion) ? "both synthesis and discussion must be non-empty text." :
+                ReviewWriter.CitationLoadProblem(a.Synthesis, part: "the synthesis") ?? ReviewWriter.CitationLoadProblem(a.Discussion, part: "the discussion"), repairAttempts: 2);
             return (answer.Synthesis!, answer.Discussion!);
         }
         catch (Exception ex)
@@ -154,7 +156,7 @@ public partial class PrismaReviewEngine
             You are the author revising two sections of a systematic review in response to peer-review
             feedback. Apply the feedback to improve depth and citation coverage. Keep every valid inline [n]
             citation, add the citations the feedback asks for using ONLY numbers from the reference list, and
-            do not invent numbers or fabricate claims.
+            do not invent numbers or fabricate claims. {{ReviewWriter.CitationLoadRule(WritingProfile.Systematic)}}
 
             REFERENCE LIST (valid citation numbers):
             {{referenceListMapping}}
@@ -176,7 +178,8 @@ public partial class PrismaReviewEngine
         try
         {
             var answer = await LlmJson.GetAsync<SectionsAnswer>(chat, revisePrompt, JsonMode(0.3), a =>
-                string.IsNullOrWhiteSpace(a.Synthesis) && string.IsNullOrWhiteSpace(a.Discussion) ? "synthesis and discussion must not both be empty." : null);
+                string.IsNullOrWhiteSpace(a.Synthesis) && string.IsNullOrWhiteSpace(a.Discussion) ? "synthesis and discussion must not both be empty." :
+                ReviewWriter.CitationLoadProblem(a.Synthesis, synthesis, "the synthesis") ?? ReviewWriter.CitationLoadProblem(a.Discussion, discussion, "the discussion"));
             if (!string.IsNullOrWhiteSpace(answer.Synthesis)) log.SynthesisAfter = answer.Synthesis;
             if (!string.IsNullOrWhiteSpace(answer.Discussion)) log.DiscussionAfter = answer.Discussion;
             log.Verdict = $"Revisions applied in response to {comments.Count} reviewer comment(s)";

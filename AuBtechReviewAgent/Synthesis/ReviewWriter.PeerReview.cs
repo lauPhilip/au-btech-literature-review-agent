@@ -96,7 +96,7 @@ public static partial class ReviewWriter
                 string themeRule = allowed == null ? "" : $"\n\nThis section reports one theme: cite only its {profile.Sources}, {Markers(allowed)}, even where the feedback asks for others.";
                 string feedback = Named(string.Join("\n", group.Select(c => $"- [{c.Severity}] {c.Issue} -> {c.Suggestion}")));
                 string revisePrompt = $$"""
-                    You are the author revising one section of {{profile.ReviewShort}} in response to peer-review feedback. Apply the feedback. Keep every existing inline [n] citation, cite ONLY numbers from the reference list, and do not invent claims, numbers or {{profile.Sources}}.
+                    You are the author revising one section of {{profile.ReviewShort}} in response to peer-review feedback. Apply the feedback. Keep every existing inline [n] citation, cite ONLY numbers from the reference list, and do not invent claims, numbers or {{profile.Sources}}. {{CitationLoadRule(profile)}}
 
                     REFERENCE LIST (valid citation numbers):
                     {{evidence.ReferenceLines()}}
@@ -118,7 +118,7 @@ public static partial class ReviewWriter
                 try
                 {
                     var answer = await LlmJson.GetAsync<TextAnswer>(chat, revisePrompt, LlmJson.JsonMode(0.3), a =>
-                        string.IsNullOrWhiteSpace(a.Text) ? "text must not be empty." : null);
+                        string.IsNullOrWhiteSpace(a.Text) ? "text must not be empty." : CitationLoadSendBack(a.Text, "peer-review revision", warn, before));
                     string after = Named(MethodsSectionWriter.StripMarkdownEmphasis(answer.Text!.Trim()));
                     string? problem = ThematicSynthesis.RevisionProblem(before, after, referenceCount)
                         ?? (allowed == null ? null : OutsideTheme(before, after, allowed, profile))
