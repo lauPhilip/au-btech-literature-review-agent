@@ -5,6 +5,7 @@ using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Text;
+using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 
@@ -35,6 +36,21 @@ public sealed class ReferenceEnrichmentEntry
     public List<string> NotUsed { get; set; } = new();
     public string Before { get; set; } = "";
     public string After { get; set; } = "";
+
+    /// <summary>
+    /// The reference's fields after the enrichment, so a review that keeps its records as the database gave them (the
+    /// multivocal ledger) can cite the completed reference from this file; null, and left out, when nothing was filled.
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public CompletedReference? Completed { get; set; }
+}
+
+/// <summary>The authors, venue and details of a reference as the enrichment completed them.</summary>
+public sealed class CompletedReference
+{
+    public List<string> Authors { get; set; } = new();
+    public string Venue { get; set; } = "";
+    public ReferenceDetails? Details { get; set; }
 }
 
 /// <summary>reference-enrichment.json: every lookup of the run's references and every field it filled.</summary>
@@ -120,6 +136,8 @@ public sealed class ReferenceEnricher
         }
         var merged = ReferenceMerge.Merge(log, usable, entry.Filled);
         entry.After = merged.ApaCitation;
+        if (entry.Filled.Count > 0)
+            entry.Completed = new CompletedReference { Authors = merged.Authors?.ToList() ?? new(), Venue = merged.VenueName ?? "", Details = merged.Details };
         return (merged, entry);
     }
 
