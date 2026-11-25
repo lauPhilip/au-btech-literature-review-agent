@@ -1,0 +1,130 @@
+@page "/accessibility"
+@layout AppLayout
+
+@* The accessibility statement, in the order of Digitaliseringsstyrelsen's WAS-Tool statement: scope, compliance status,
+   what is not accessible, how the statement was prepared, feedback and enforcement. The gaps are real ones found in the
+   code and in the CI check (tools/a11y/axe-check.mjs, the accessibility job in .github/workflows/ci.yml); review the
+   statement when either changes, and at least once a year. If the site becomes an Aarhus University service, the
+   statement moves to was.digst.dk and this page links to it. *@
+
+<SeoHead Title="Accessibility statement" Path="/accessibility"
+         Description="How accessible TraceableAI is, what is known not to be accessible, how that was checked, and where to send feedback or complain." />
+
+<DocPage Current="/accessibility" Sections="DocSections" Eyebrow="Accessibility" Title="Accessibility statement">
+    <Lead>
+        The @Owner wants everyone to be able to use TraceableAI. This statement says how far the site meets the
+        accessibility rules for Danish public websites, and what is not yet accessible.
+    </Lead>
+    <ChildContent>
+        <section class="mt-10 scroll-mt-6" aria-labelledby="scope">
+            <h2 id="scope" class="font-display text-xl font-semibold tracking-tight text-heading">Which site this covers</h2>
+            <p class="mt-4 text-ink">
+                This statement covers <a href="@SiteUrl" class="text-heading underline underline-offset-2">@SiteHost</a>: its
+                pages, the reports it shows and the files it offers for download. It does not cover the project's pages on
+                GitHub or the other sites it links to. It follows the Danish act on the accessibility of public bodies' websites
+                and mobile apps (Act no. 692 of 8 June 2018). The site is not yet an official Aarhus University website, but it
+                follows the same rules as one.
+            </p>
+        </section>
+
+        <section class="mt-10 scroll-mt-6" aria-labelledby="status">
+            <h2 id="status" class="font-display text-xl font-semibold tracking-tight text-heading">Compliance status</h2>
+            <p class="mt-4 text-ink">
+                The site is <strong class="font-semibold text-heading">partially compliant</strong> with WCAG 2.1 level AA, the
+                standard that EN 301 549 sets for websites. It is built to WCAG 2.2 level AA. The content listed under the next
+                heading does not yet meet the standard.
+            </p>
+        </section>
+
+        <section class="mt-10 scroll-mt-6" aria-labelledby="gaps">
+            <h2 id="gaps" class="font-display text-xl font-semibold tracking-tight text-heading">What is not accessible</h2>
+            <p class="mt-4 text-ink">These are the problems we know of. We plan to fix them; none is claimed as a disproportionate burden.</p>
+            <div class="mt-5 rounded-card border border-line bg-page overflow-x-auto" tabindex="0" role="region" aria-label="Known problems, scrolls sideways">
+                <table class="w-full text-sm">
+                    <caption class="sr-only">Content that is not accessible, the problem and the WCAG success criterion</caption>
+                    <thead class="bg-soft text-left text-muted">
+                        <tr><th scope="col" class="px-4 py-3 font-medium">Content</th><th scope="col" class="px-4 py-3 font-medium">The problem</th><th scope="col" class="px-4 py-3 font-medium">WCAG 2.1</th></tr>
+                    </thead>
+                    <tbody class="divide-y divide-line text-ink">
+                        @foreach (var (content, problem, criterion) in Gaps)
+                        {
+                            <tr><th scope="row" class="px-4 py-3 text-left font-medium text-heading align-top">@content</th><td class="px-4 py-3 align-top">@problem</td><td class="px-4 py-3 align-top">@criterion</td></tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+            <p class="mt-4 text-ink">
+                Outside the scope of the act: the grey literature review is still being built and is not open to the public, so
+                it has not been assessed. Text that sources and users write is shown as written.
+            </p>
+        </section>
+
+        <section class="mt-10 scroll-mt-6" aria-labelledby="method">
+            <h2 id="method" class="font-display text-xl font-semibold tracking-tight text-heading">How this statement was prepared</h2>
+            <p class="mt-4 text-ink">
+                The team behind TraceableAI assessed the site itself. There has been no external audit and no test with users of
+                screen readers yet. On every change to the code, an automated check opens the public pages in a browser and runs
+                axe-core with the WCAG 2.0, 2.1 and 2.2 rules for levels A and AA, in the light and the dark theme. A serious or
+                critical problem stops the change. Problems that axe-core rates as moderate or minor do not, so some may remain.
+            </p>
+            <p class="mt-4 text-ink">
+                A real review cannot be made in the check, so the pages of a run and of a report are checked with sample data.
+                The reports in the gallery are not in the automated check yet. Larger changes are also tried with the keyboard
+                only. Automated checks find only part of the problems.
+            </p>
+            <p class="mt-4 text-ink">The statement was prepared on @Prepared and last reviewed on @Reviewed.</p>
+        </section>
+
+        <section class="mt-10 scroll-mt-6" aria-labelledby="feedback">
+            <h2 id="feedback" class="font-display text-xl font-semibold tracking-tight text-heading">Feedback and contact</h2>
+            <p class="mt-4 text-ink">
+                If something on the site does not work for you, or you need content in another form, tell us in the
+                <a href="@ContactUrl" class="text-heading underline underline-offset-2">issues on GitHub</a>. Say which page it is
+                and what went wrong. Issues are public, so leave out personal details. Until the site has its own contact address,
+                this is the way to reach the team.
+            </p>
+        </section>
+
+        <section class="mt-10 scroll-mt-6" aria-labelledby="enforcement">
+            <h2 id="enforcement" class="font-display text-xl font-semibold tracking-tight text-heading">Enforcement</h2>
+            <p class="mt-4 text-ink">
+                The Danish Agency for Digital Government (Digitaliseringsstyrelsen) supervises the accessibility of public
+                websites. If you are not happy with our answer, you can
+                <a href="@EnforcementUrl" class="text-heading underline underline-offset-2">contact Digitaliseringsstyrelsen about web accessibility</a>.
+            </p>
+            <p class="mt-4 text-ink">
+                If TraceableAI becomes an Aarhus University service, this statement will move to was.digst.dk, where Danish public
+                bodies publish their statements, and this page will link to it.
+            </p>
+        </section>
+    </ChildContent>
+</DocPage>
+
+@code {
+    /// <summary>The site the statement covers.</summary>
+    public const string SiteUrl = "https://au-btech-literature-review-agent.dk";
+    private static string SiteHost => new Uri(SiteUrl).Host;
+
+    /// <summary>Digitaliseringsstyrelsen's questions and answers on web accessibility, linked from borger.dk's page on it.</summary>
+    public const string EnforcementUrl = "https://digst.dk/digital-inklusion/webtilgaengelighed/spoergsmaal-og-svar-qa/";
+
+    private const string Owner = "Department of Business Development and Technology (BTECH) at Aarhus University";
+    private const string Prepared = "25 November 2026";
+    private const string Reviewed = "25 November 2026";
+    private static string ContactUrl => $"{AuBtechReviewAgent.SiteSeo.RepositoryUrl}/issues";
+
+    /// <summary>Known problems: what, why, and the WCAG 2.1 success criterion.</summary>
+    public static readonly (string Content, string Problem, string Criterion)[] Gaps =
+    {
+        ("The diagram in a report", "The figure the model draws is a picture with no text description. Only its boxes that cite a study are repeated as text under it.", "1.1.1 Non-text content"),
+        ("Text from sources", "Titles, abstracts, quotes and web pages are shown in their own language, and the page does not mark a language other than English.", "3.1.2 Language of parts"),
+        ("Files for download", "The LaTeX manuscript, BibTeX, RIS, CSV, JSON and the archive are source and data files and have not been checked. The report page and its print view hold the same text.", "Not assessed"),
+        ("A report in the gallery", "Shown in the print layout on screen, which the automated check does not open yet, so problems may not have been found.", "Not assessed"),
+    };
+
+    private static readonly IReadOnlyList<(string Id, string Label)> DocSections = new[]
+    {
+        ("scope", "Which site this covers"), ("status", "Compliance status"), ("gaps", "What is not accessible"),
+        ("method", "How this statement was prepared"), ("feedback", "Feedback and contact"), ("enforcement", "Enforcement"),
+    };
+}

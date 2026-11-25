@@ -133,6 +133,26 @@ public class GalleryStoreTests : IDisposable
     }
 
     [Fact]
+    public async Task TheEntryRecordsWhenTheOwnerSaidYesEachTime()
+    {
+        var runs = new RunStore(Workspace);
+        var gallery = Store(runs);
+        var first = await FinishedRunAsync(runs, "AI in schools", new[] { "How is AI used?" });
+        var again = await FinishedRunAsync(runs, "AI in schools", new[] { "How is AI used?" });
+
+        var before = DateTime.UtcNow;
+        var added = (await gallery.AddAsync(first.Id, first.Key, consent: true)).Entry!;
+        Assert.NotNull(added.ConsentUtc);
+        Assert.InRange(added.ConsentUtc!.Value, before, DateTime.UtcNow);
+        Assert.Equal(added.ConsentUtc, Assert.Single(gallery.List()).ConsentUtc); // read back from entry.json
+
+        var replaced = (await gallery.AddAsync(again.Id, again.Key, consent: true)).Entry!;
+        Assert.True(replaced.ConsentUtc >= added.ConsentUtc);
+        Assert.Equal(replaced.UpdatedUtc, replaced.ConsentUtc);
+        Assert.Equal(added.AddedUtc, replaced.AddedUtc);
+    }
+
+    [Fact]
     public async Task AMultivocalRunIsNotOfferedYet()
     {
         var runs = new RunStore(Workspace);

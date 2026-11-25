@@ -1,7 +1,8 @@
 @* The footer. On app pages it is one slim line that never moves: the name, and the pages about trust (About,
-   Model card, Privacy, Verify an archive, Glossary) with GitHub; on phones only the name, About, Privacy and GitHub,
-   so it stays one line at 390 px (issue #244).
-   The landing page (Landing="true") names the department and OSSYM 2026, with Metrics, Docs and GitHub. *@
+   Model card, Privacy, Verify an archive, Glossary, Accessibility) with GitHub; on phones only the name, About, Privacy
+   and Accessibility, so it stays one line at 390 px (issue #244). Privacy and Accessibility are on every page, as on a
+   public body's site (issues #543, #544); GitHub is one click away on About.
+   The landing page (Landing="true") names the department and OSSYM 2026, with Metrics, Example reports, Privacy, Accessibility, Docs and GitHub. *@
 
 <footer class="shrink-0 border-t border-line bg-page text-sm text-muted print:hidden">
     <div class="mx-auto flex w-full max-w-[1600px] flex-wrap items-center justify-between gap-x-6 gap-y-1 px-[clamp(16px,3vw,40px)] py-1">
@@ -12,6 +13,8 @@
                 <ul class="-mx-2 flex flex-wrap items-center">
                     <li><a href="/metrics" class="@LinkClass">Metrics</a></li>
                     <li><a href="/gallery" class="@LinkClass">Example reports</a></li>
+                    <li><a href="/privacy" class="@LinkClass">Privacy</a></li>
+                    <li><a href="/accessibility" class="@LinkClass">Accessibility</a></li>
                     <li><a href="@($"{AuBtechReviewAgent.SiteSeo.RepositoryUrl}/blob/master/docs/wiki/README.md")" class="@LinkClass">Docs</a></li>
                     <li><a href="@AuBtechReviewAgent.SiteSeo.RepositoryUrl" class="@LinkClass">GitHub</a></li>
                 </ul>
@@ -28,7 +31,8 @@
                     <li><a href="/privacy" class="@LinkClass">Privacy</a></li>
                     <li class="hidden sm:block"><a href="/verify" class="@LinkClass">Verify an archive</a></li>
                     <li class="hidden sm:block"><a href="/glossary" class="@LinkClass">Glossary</a></li>
-                    <li><a href="@AuBtechReviewAgent.SiteSeo.RepositoryUrl" class="@LinkClass">GitHub</a></li>
+                    <li><a href="/accessibility" class="@LinkClass">Accessibility</a></li>
+                    <li class="hidden sm:block"><a href="@AuBtechReviewAgent.SiteSeo.RepositoryUrl" class="@LinkClass">GitHub</a></li>
                 </ul>
             </nav>
         }

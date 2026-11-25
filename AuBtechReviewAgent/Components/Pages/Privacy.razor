@@ -1,14 +1,8 @@
 @page "/privacy"
 @layout AppLayout
-@inject AuBtechReviewAgent.RunsOptions RunsOptions
-@inject AuBtechReviewAgent.CacheOptions CacheOptions
-@inject AuBtechReviewAgent.QuotaOptions QuotaOptions
-@inject AuBtechReviewAgent.ReviewModulesOptions ModuleOptions
-@inject AuBtechReviewAgent.GalleryOptions GalleryOptions
 
-@* Everything on this page describes what the code does (RunQuotaService, ReviewCache, SessionCleanupWorker,
-   RunMetricsStore, GalleryStore, the key dialog, and for grey literature MultivocalPages, PageFetcher and RobotsRules); the numbers
-   come from the running configuration. Update it with the code. *@
+@* Everything on this page describes what the code does; the words are in Privacy.razor.cs and Web/PrivacyText.cs,
+   which name the classes they describe, and the numbers come from the running configuration. Update it with the code. *@
 
 <SeoHead Title="Privacy" Path="/privacy"
          Description="@(Grey ? "What TraceableAI stores, for how long, what it sends to the language model, the scholarly databases and the grey literature sites, and how it keeps the web pages a review cites. No accounts, no tracking." : "What TraceableAI stores, for how long, and what it sends to the language model and the scholarly databases. No accounts, no tracking.")" />
@@ -19,8 +13,6 @@
             show it to you, for a limited time, and nothing else.
     </Lead>
     <ChildContent>
-
-
         <div class="mt-10 rounded-card border border-line bg-page p-6 grid grid-cols-1 sm:grid-cols-2 gap-5 text-sm">
             @foreach (var (title, text) in Summary)
             {
@@ -30,6 +22,21 @@
                 </div>
             }
         </div>
+
+        <section class="mt-10 scroll-mt-6" aria-labelledby="controller">
+            <h2 id="controller" class="font-display text-xl font-semibold tracking-tight text-heading">Who is responsible</h2>
+            <p class="mt-4 text-ink">
+                TraceableAI is run by the @Controller, Herning, Denmark. The department is the data controller for what this
+                server stores. The site is a research tool and not yet an official Aarhus University website, but it follows the
+                same rules as one.
+            </p>
+            <p class="mt-4 text-ink">
+                Until the site has its own contact address, questions and requests go to the
+                <a href="@ContactUrl" class="text-heading underline underline-offset-2">issues on GitHub</a>. Issues are public,
+                so write only that you have a request about your data, without personal details, and you will get a private way to
+                send the rest.
+            </p>
+        </section>
 
         @foreach (var (id, heading, paragraphs) in Sections.Where(x => Grey || x.Id != "web-pages"))
         {
@@ -41,6 +48,24 @@
                 }
             </section>
         }
+
+        <section class="mt-10 scroll-mt-6" aria-labelledby="retention">
+            <h2 id="retention" class="font-display text-xl font-semibold tracking-tight text-heading">How long things are kept</h2>
+            <div class="mt-5 rounded-card border border-line bg-page overflow-x-auto" tabindex="0" role="region" aria-label="How long things are kept, scrolls sideways">
+                <table class="w-full text-sm">
+                    <caption class="sr-only">What is kept, where, and for how long</caption>
+                    <thead class="bg-soft text-left text-muted">
+                        <tr><th scope="col" class="px-4 py-3 font-medium">What</th><th scope="col" class="px-4 py-3 font-medium">Where</th><th scope="col" class="px-4 py-3 font-medium">How long</th></tr>
+                    </thead>
+                    <tbody class="divide-y divide-line text-ink">
+                        @foreach (var (what, where, howLong) in Retention)
+                        {
+                            <tr><th scope="row" class="px-4 py-3 text-left font-medium text-heading align-top">@what</th><td class="px-4 py-3 align-top">@where</td><td class="px-4 py-3 align-top">@howLong</td></tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </section>
 
         <section class="mt-10 scroll-mt-6" aria-labelledby="third-parties">
             <h2 id="third-parties" class="font-display text-xl font-semibold tracking-tight text-heading">Who else receives what</h2>
@@ -58,7 +83,22 @@
                     </tbody>
                 </table>
             </div>
-            <p class="mt-4 text-ink">Each of these services has its own privacy policy. None of them receives your network address from TraceableAI; they see the server's.</p>
+            <p class="mt-4 text-ink">Mistral AI and the hosting provider handle data on the department's behalf. The search services receive only what a search needs. Each of these services has its own privacy policy. None of them receives your network address from TraceableAI; they see the server's.</p>
+        </section>
+
+        <section class="mt-10 scroll-mt-6" aria-labelledby="rights">
+            <h2 id="rights" class="font-display text-xl font-semibold tracking-tight text-heading">Your rights</h2>
+            <p class="mt-4 text-ink">
+                Under the GDPR you can ask to see the data kept about you, to have it corrected or erased, and to restrict its use.
+                You can also object to its use. There are no accounts, so the site can only find your data through the link of
+                your run. Send that link with your request. You can delete a run yourself at any time.
+            </p>
+            <p class="mt-4 text-ink">
+                The fingerprints of network addresses are not linked to a run or to anything else about you, so they cannot be
+                looked up for you. They are gone after two days. If you think your data is handled wrongly, you can complain to
+                <a href="@DatatilsynetUrl" class="text-heading underline underline-offset-2">Datatilsynet</a>, the Danish Data
+                Protection Agency.
+            </p>
         </section>
 
         <section class="mt-10 scroll-mt-6" aria-labelledby="choices">
@@ -68,133 +108,9 @@
                 you added to the gallery from its report page or its gallery page. You can use your own
                 Mistral key, or run TraceableAI on your own computer with a local model, so that nothing leaves your machine
                 except the database searches. Questions about this page go to the
-                <a href="@($"{AuBtechReviewAgent.SiteSeo.RepositoryUrl}/issues")" class="text-heading underline underline-offset-2">issues on GitHub</a>.
+                <a href="@ContactUrl" class="text-heading underline underline-offset-2">issues on GitHub</a>.
             </p>
             <p class="mt-4 text-sm text-muted">Last updated November 2026. The page is generated from the app's own settings, so the periods above are the ones this server uses.</p>
         </section>
     </ChildContent>
 </DocPage>
-
-@code {
-    /// <summary>The sections listed under this page in the trust pages' side list.</summary>
-    private IReadOnlyList<(string Id, string Label)> DocSections =>
-        Sections.Where(x => Grey || x.Id != "web-pages").Select(x => (x.Id, x.Heading))
-            .Concat(new[] { ("third-parties", "Who else receives what"), ("choices", "Your choices") })
-            .ToList();
-
-    /// <summary>Whether the grey literature review is described: its card is on, or its module is in preview.</summary>
-    private bool Grey => ModuleOptions.Shows("grey");
-
-    private (string Title, string Text)[] Summary => new[]
-    {
-        ("No account, no tracking", "No sign-up, no analytics, no advertising cookies."),
-        ("Your network address", $"Only used to count free runs and to slow down automated traffic. Written to disk only as a keyed fingerprint, and forgotten after two days."),
-        ("Your review", $"Kept on this server for {RunsOptions.RetentionDays} days, then deleted. You can delete it sooner."),
-        ("Your API keys", "Kept encrypted in this browser tab only, and gone when you close it."),
-    };
-
-    private (string Id, string Heading, string[] Paragraphs)[] Sections => new[]
-    {
-        ("cookies", "Cookies and tracking", new[]
-        {
-            "TraceableAI uses no analytics, advertising or tracking cookies, and loads no scripts, fonts or images from other sites. " +
-            "The only cookie is a technical one the web framework sets to protect forms against requests from other sites; it identifies no one.",
-        }),
-        ("address", "Your network address", new[]
-        {
-            $"Free runs are limited to {QuotaOptions.FreeRunsPerDay} per day per network address. To count them, your address is replaced " +
-            "by a keyed fingerprint (HMAC-SHA-256 with a secret that exists only on this server) before anything is stored, so the stored value " +
-            "cannot be turned back into an address. Counts older than two days are deleted.",
-            "To keep the tool fair and to slow down automated traffic, the server also counts in its memory how many pages, downloads and " +
-            "costly actions (starting a review, proposing search strings, checking a citation again, checking an archive) come from one " +
-            "address, and how many reviews it has running or waiting. These counts are never written to disk. They are gone after an hour " +
-            "at most, or when the server restarts. When a request is refused because too many came from one address, the server's log notes " +
-            "a short fingerprint that changes with every restart, never the address itself.",
-            "Like any web server, the hosting provider may keep standard access logs (address, time, page) for operating and securing the server.",
-        }),
-        ("review", "Your review", new[]
-        {
-            "What you type in the review form (search query, objective, criteria, artifact instruction) is saved with the run, together with " +
-            "everything the run produces: the protocol, the search results, every screening decision, the downloaded open-access papers, the " +
-            "report and a record of every model call. This is what makes the review checkable." + (Grey ? " A grey literature review saves its " +
-            "plan the same way: the need for the review, its research questions, search strings, criteria and quality threshold." : ""),
-            $"A run is kept for {RunsOptions.RetentionDays} days after it is created and then deleted automatically, files and all. Anyone who has " +
-            "the link to a run can read it, but only the browser that started it can change or delete it; the links contain a random identifier that cannot be guessed, and they are not listed anywhere or shown to search engines.",
-        }),
-        ("keys", "Your API keys", new[]
-        {
-            "Keys you enter under API keys are kept encrypted in your browser tab's session storage. The server uses them only to make the " +
-            "calls of your run; it does not write them to disk or to its logs. They are gone when you close the tab, or when you press Clear session.",
-        }),
-        ("browser", "What your browser keeps", new[]
-        {
-            "While you fill in the review form, an unfinished draft (the question, criteria and options, never your keys) is kept in your browser's " +
-            "local storage, so closing the tab does not lose it. It stays on your device until you start the review or press Start empty, and is " +
-            "ignored after 30 days. If you ask to be notified when a review is ready, your browser shows the notification; nothing is sent anywhere else.",
-            "When you start a review, your browser also keeps a random edit key for that run. Only the browser that has it can delete the run, " +
-            "change its screening, check a citation again or write notes; anyone else with the link can only read it. The server stores only a " +
-            "fingerprint of the key, and the key is dropped from your browser after 30 days.",
-        }),
-        ("web-pages", "Web pages a grey literature review reads", new[]
-        {
-            "A grey literature review cites web pages, such as blog posts, documentation, forum answers and reports, so it keeps a " +
-            "snapshot of each page it reads. The server fetches only pages that the review's own searches found. Before it fetches anything from a " +
-            $"site it reads the site's robots.txt for its name, {AuBtechReviewAgent.RobotsRules.ProductToken}, and fetches nothing the site disallows " +
-            "(nothing at all when the site has a robots.txt that cannot be read, as RFC 9309 asks). It sends at most one request a second to a site, or slower when the site asks for it, " +
-            "never signs in, skips pages behind a sign-in and stops at 10 MB. Its requests name TraceableAI and link to this project.",
-            $"The main text of each page is kept with the run, on this server, for the run's lifetime of {RunsOptions.RetentionDays} days, so that the " +
-            "citation check can be repeated against the same text, and it is deleted with the run. It is not part of the run's archive and is not " +
-            "shared: the archive holds the page's address, the date it was read, a fingerprint (SHA-256) of its text, the short passages the review " +
-            "quotes and a link to the Wayback Machine's nearest capture. TraceableAI only builds that link; it does not ask the Internet Archive to " +
-            "make a capture. A page may name its authors or the people who answered on a forum; they are kept only as they appear on the page and in " +
-            "the reference to it.",
-            "Stack Overflow and the other Stack Exchange sites refuse automated page requests, so for a question the review's search found there, " +
-            "the server asks the public Stack Exchange API for the question and its answers instead of fetching the page. The text and the API's " +
-            "answers are kept with the run in the same way, for the same time, and are not part of the archive. Because these posts are shared " +
-            "under CC BY-SA, the archive's page record also names each post's author as the site shows it, with links to the post and the author's profile.",
-        }),
-        ("reuse", "What is kept longer", new[]
-        {
-            $"To save time and cost, a database's answer to a search is reused for {CacheOptions.SearchResponseHours} hours, and a screening " +
-            $"decision for the same paper, criteria and model is reused for {CacheOptions.ScreeningDecisionDays} days. They are filed under a " +
-            "fingerprint of the request and contain the papers' metadata and the decision, not who asked." + (Grey ? " A grey literature review " +
-            $"reuses its model decisions the same way, also for {CacheOptions.ScreeningDecisionDays} days: the screening, the quality points, the " +
-            "extracted values and the checks of values and citations, each with the short quotes it rests on but not the page's text." : ""),
-            "For the public Metrics page, every finished run leaves a line of quality figures: how many citations were supported, coverage, " +
-            "time and cost. It contains no research question, criteria or paper text, and no network address. Anyone can download these lines " +
-            "from the Metrics page as CSV or JSON, with only the first eight characters of each run's ID, so a file cannot be used to open a run.",
-        }),
-        ("gallery", "The gallery of example reports", new[]
-        {
-            "Nothing goes into the gallery unless the browser that started a run adds it and says yes to the text that explains what is " +
-            "published. Readers with only the link never see the button. The gallery then keeps a copy of the files the report is written from, " +
-            "the same files as at the top of the run's archive: the report, the run's ledger with the topic, research questions and criteria, the " +
-            "extracted data, themes and citation checks with their short quotes from the sources, the edit history and the protocol. It does not " +
-            "copy your notes, the edit key's record, the record of model calls, the downloaded papers or the raw database answers, and it keeps " +
-            "no network address.",
-            "A report in the gallery is public: anyone can open it on this site, and search engines may find it. It shows the full ID of its run, " +
-            $"so while the run itself is kept ({RunsOptions.RetentionDays} days) anyone could open that too. The copy stays after the run is " +
-            "deleted, until the owner withdraws it. A newer run of the same review is kept as a new version, and the earlier versions stay, " +
-            $"each at its own address, until they are withdrawn. The gallery keeps at most {GalleryOptions.MaxEntries} versions in all; past " +
-            "that it drops the oldest version of the review with the most versions, and a review leaves only when none has two.",
-            "The owner can withdraw a report at any time, from its report page or its gallery page, with the browser that started the run; " +
-            "every version of it is deleted at once. Browsers keep a run's edit key for 30 days. After that, or from another browser, ask for removal in the " +
-            "issues on GitHub and the site's administrator will take the report down.",
-        }),
-    };
-
-    private static readonly (string Service, string Receives)[] ThirdParties =
-    {
-        ("Mistral AI (the language model)", "Your question, objective and criteria, and titles, abstracts and text of the papers, to screen, extract, write and check. Runs with your own key go through your own Mistral account."),
-        ("arXiv, OpenAlex, Semantic Scholar, Crossref", "Your search query and its extra phrasings, and the identifiers of included papers for citation chaining."),
-        ("Scopus, ScienceDirect, IEEE Xplore", "Your search query, only when a key for them is set."),
-        ("Unpaywall, Zenodo and publishers' open-access servers", "The DOI or link of an included paper, to download a legal open-access copy."),
-    };
-
-    /// <summary>The services a grey literature review adds; listed while it is described (<see cref="Grey"/>).</summary>
-    private static readonly (string Service, string Receives)[] GreyThirdParties =
-    {
-        ("Stack Exchange, GitHub, Hacker News (Algolia), OpenAlex and Zenodo", "In a grey literature review: the review's grey search strings, to find practitioner posts, repositories, discussions, reports and theses."),
-        ("The sites of the sources found", "In a grey literature review: a request for robots.txt and for the page of a source the searches found, from the server, naming TraceableAI."),
-    };
-}

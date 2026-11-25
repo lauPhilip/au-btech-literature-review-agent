@@ -114,6 +114,7 @@ public sealed partial class GalleryStore
                 Id = same?.Id ?? NewId(stored),
                 AddedUtc = same?.AddedUtc ?? now,
                 UpdatedUtc = same == null ? null : now,
+                ConsentUtc = now,
                 Versions = earlier.Append(version).ToList(),
                 LastVersion = number,
                 Version = number,
