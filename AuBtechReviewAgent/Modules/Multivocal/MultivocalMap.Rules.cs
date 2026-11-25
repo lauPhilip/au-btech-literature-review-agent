@@ -129,6 +129,10 @@ public sealed partial class MultivocalMapper
     {
         var attributes = proposed.Where(a => !IsKnownFact(a)).ToList();
         if (Problem(attributes, plan) is { } problem) return problem;
+        // A relationship is answered by pairing its two sides per source (issue #458); one side alone can only collect outcomes.
+        var oneSided = MultivocalRelationship.Questions(plan).FirstOrDefault(q => attributes.Count(a => a.Serves(q.Number)) == 1);
+        if (oneSided.Number != null)
+            return $"{oneSided.Number} asks whether two things are related, but only \"{attributes.First(a => a.Serves(oneSided.Number)).Name}\" serves it; give it one attribute for each side, or add {oneSided.Number} to the \"alsoFor\" list of an attribute that records the other side.";
         var crowded = attributes.GroupBy(a => a.Question).FirstOrDefault(g => g.Count() > MaxModelAttributesPerQuestion);
         if (crowded != null) return $"{crowded.Key} has {crowded.Count()} attributes; give each question at most {MaxModelAttributesPerQuestion}.";
         var shared = attributes
