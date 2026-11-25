@@ -45,7 +45,7 @@ public sealed class MetricsOverview
                 string.Join(", ", g.First().Settings.Select(kv => $"{kv.Key}={kv.Value}")) + $", model={g.First().Model}",
                 g.Count(), Pool(g.Select(r => r.CitationsFinal)),
                 Mean(g.Select(r => r.ScreeningKappa)), g.Average(r => r.DurationMinutes),
-                g.Max(r => r.CompletedUtc) ?? "") { Removed = g.Sum(r => r.Removed) })
+                g.Max(r => r.CompletedUtc) ?? "") { Removed = g.Sum(r => r.Removed), Members = g.ToList() })
             .OrderByDescending(g => g.LatestUtc, StringComparer.Ordinal)
             .ToList();
     }
@@ -130,5 +130,8 @@ public sealed class MetricsOverview
         double? ScreeningKappa, double MinutesPerRun, string LatestUtc)
     {
         public int Removed { get; init; }
+
+        /// <summary>The group's runs, for figures the page works out itself, such as the estimated cost per run.</summary>
+        public IReadOnlyList<RunMetrics> Members { get; init; } = Array.Empty<RunMetrics>();
     }
 }
