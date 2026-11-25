@@ -174,8 +174,16 @@ public sealed partial class PageFetcher
         using var document = PdfDocument.Open(bytes);
         string title = document.Information?.Title?.Trim() ?? "";
         var text = new StringBuilder();
-        foreach (var page in document.GetPages()) text.Append(page.Text).Append('\n');
-        return (title, PageText.ReadPlain(text.ToString()));
+        var hidden = new StringBuilder();
+        int parts = 0;
+        foreach (var (_, page) in PdfVisibleText.Pages(document)) // letters a reader never sees are left out (#534)
+        {
+            text.Append(page.Text).Append('\n');
+            parts += page.HiddenParts;
+            if (page.Hidden.Length > 0) hidden.Append(page.Hidden).Append('\n');
+        }
+        var plain = PageText.ReadPlain(text.ToString());
+        return (title, plain with { HiddenElements = plain.HiddenElements + parts, Hidden = plain.Hidden + hidden });
     }
 
     /// <summary>The charset the server names, else the one the page declares, else UTF-8.</summary>
