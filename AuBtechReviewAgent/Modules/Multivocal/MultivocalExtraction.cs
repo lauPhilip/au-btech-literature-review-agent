@@ -22,10 +22,10 @@ public sealed class MultivocalExtractor
     public const string ExtractionFile = "multivocal-extraction.json";
     public const string StageExtracting = "Extracting";
     public const string StageExtracted = "Extracted";
-    public const string PromptVersion = "grey-extraction-v3";
+    public const string PromptVersion = "grey-extraction-v4";
 
     /// <summary>Part of the cache key of a formal source's extraction, whose prompt names it as academic (block I-5).</summary>
-    public const string FormalPromptVersion = "formal-extraction-v3";
+    public const string FormalPromptVersion = "formal-extraction-v4";
 
     private static readonly JsonSerializerOptions Json = new() { WriteIndented = true };
     private static readonly ConcurrentDictionary<Guid, bool> Running = new();
@@ -246,6 +246,7 @@ public sealed class MultivocalExtractor
 
             For every attribute, give the values this page states, each with a short passage copied word for word from the page text that shows it.
             Use only the listed values for an attribute with a list; use "Other" only when it is listed and nothing else fits. Give at most one value where it says "exactly one".
+            For an open-text attribute, give each name as its own value, never a list of names in one value. When it asks for tools, frameworks or platforms, name the software only: not language models, programming languages or methods.
             When the page says nothing for an attribute, give no values for it: "not stated" is recorded automatically. Never guess.
             Also say in one sentence what the source sets out to do (its purpose), with a word-for-word quote.
 
