@@ -1,0 +1,71 @@
+@* The versions of one review in the gallery, newest first, each at its own address, and a plain form (GET, no live
+   connection) that opens the comparison of two of them. Every value comes from entry.json and is shown as text. *@
+
+<section class="mt-4 border border-line bg-page p-4 text-sm sm:p-5" aria-labelledby="versions-title" data-gallery-versions>
+    <h2 id="versions-title" class="font-display text-base font-semibold text-heading">Versions</h2>
+    <p class="mt-1 text-muted">Each run of this review that its owner added is kept as a version, with its own address. The newest is shown by default.</p>
+    <div class="mt-3 overflow-x-auto">
+        <table class="w-full border-collapse text-left">
+            <thead>
+                <tr class="border-b border-line text-xs uppercase tracking-[0.08em] text-muted">
+                    <th scope="col" class="py-2 pr-3 font-semibold">Version</th>
+                    <th scope="col" class="py-2 pr-3 font-semibold">Added</th>
+                    <th scope="col" class="py-2 pr-3 font-semibold">Tool</th>
+                    <th scope="col" class="py-2 font-semibold">Counts</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var version in Entry.Versions.OrderByDescending(v => v.Number))
+                {
+                    var v = version;
+                    bool current = v.Number == Current;
+                    <tr class="border-b border-line align-top">
+                        <th scope="row" class="py-2 pr-3 font-medium">
+                            @if (current)
+                            {
+                                <span aria-current="page" class="text-heading">@v.Number (shown)</span>
+                            }
+                            else
+                            {
+                                <a href="@AuBtechReviewAgent.GalleryCard.VersionPath(Entry.Id, v.Number)" class="text-heading underline underline-offset-2">Version @v.Number</a>
+                            }
+                        </th>
+                        <td class="py-2 pr-3 text-ink">@AuBtechReviewAgent.GalleryCard.Date(v.AddedUtc)</td>
+                        <td class="py-2 pr-3 text-ink">@AuBtechReviewAgent.ToolVersion.Display(v.ToolVersion) · run @v.ShortRunId</td>
+                        <td class="py-2 text-ink">@AuBtechReviewAgent.GalleryCard.VersionCounts(v)</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+    @if (Entry.Versions.Count > 1)
+    {
+        var numbers = Entry.Versions.Select(v => v.Number).OrderByDescending(n => n).ToList();
+        <form method="get" action="@($"/gallery/{Entry.Id}/compare")" class="mt-3 flex flex-wrap items-end gap-2" aria-label="Compare two versions">
+            <label class="flex flex-col text-xs text-muted">From
+                <select name="from" class="ui-input mt-1 min-h-[44px]">
+                    @foreach (var n in numbers)
+                    {
+                        <option value="@n" selected="@(n == numbers[1])">Version @n</option>
+                    }
+                </select>
+            </label>
+            <label class="flex flex-col text-xs text-muted">To
+                <select name="to" class="ui-input mt-1 min-h-[44px]">
+                    @foreach (var n in numbers)
+                    {
+                        <option value="@n" selected="@(n == numbers[0])">Version @n</option>
+                    }
+                </select>
+            </label>
+            <button type="submit" class="ui-btn-secondary ui-btn-sm min-h-[44px]">Compare</button>
+        </form>
+    }
+</section>
+
+@code {
+    [Parameter, EditorRequired] public AuBtechReviewAgent.GalleryEntry Entry { get; set; } = default!;
+
+    /// <summary>The version the page shows.</summary>
+    [Parameter] public int Current { get; set; }
+}
