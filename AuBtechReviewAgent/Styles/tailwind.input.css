@@ -30,9 +30,10 @@
 
 /* Theme tokens. tailwind.config.js maps its theme-aware colours (page, soft, ink, muted, line, primary, the
    five verdicts, ...) to these variables, written as "R G B" so opacity modifiers work. The light values are
-   on :root; data-theme="dark" on <html> switches them. Every text colour reaches 4.5:1 on its fill and page. */
+   on :root; data-theme="dark" on <html> switches them. Every text colour reaches 4.5:1 on its fill and page.
+   The gallery's print view keeps the light values in either theme, as paper does. */
 @layer base {
-    :root {
+    [data-theme="dark"] .ui-print-view, :root {
         --navy: 19 41 75;              /* #13294B */
         --page: 255 255 255;           /* #FFFFFF */
         --soft: 246 248 251;           /* #F6F8FB */
@@ -271,3 +272,23 @@
     thead { display: table-header-group; }
 }
 
+
+/* The print layout on screen, for the gallery (Components/Pages/GalleryReport.razor): inside .ui-print-view every
+   print: utility the pages use applies as it would on paper. Tailwind cannot add a selector to its print variant,
+   so the list is kept here; GalleryPrintViewTests fails when a page uses a print: utility missing from it. */
+.ui-print-view { color: rgb(var(--text)); background-color: rgb(var(--page)); }
+.ui-print-view .print\:hidden { display: none; }
+.ui-print-view .print\:block { display: block; }
+.ui-print-view .print\:overflow-visible { overflow: visible; }
+.ui-print-view .print\:p-0 { padding: 0; }
+.ui-print-view .print\:max-w-none { max-width: none; }
+.ui-print-view .print\:border-0 { border-width: 0; }
+.ui-print-view .print\:shadow-none { box-shadow: none; }
+.ui-print-view .print\:rounded-none { border-radius: 0; }
+.ui-print-view .print\:min-w-0 { min-width: 0; }
+.ui-print-view .print\:h-auto { height: auto; }
+.ui-print-view .print\:w-auto { width: auto; }
+.ui-print-view .print\:bg-white { background-color: #ffffff; }
+.ui-print-view .print\:bg-transparent { background-color: transparent; }
+.ui-print-view .print\:text-\[11pt\] { font-size: 11pt; }
+.ui-print-view .print\:leading-normal { line-height: 1.5; }

@@ -28,10 +28,40 @@ public static partial class ReviewWriter
     public static HashSet<string> ResultFigures(string text, string facts = "")
     {
         var own = NumbersIn(facts ?? "");
-        return Figure.Matches(Regex.Replace(text ?? "", @"\[[^\]]*\]", ""))
+        string plain = Regex.Replace(text ?? "", @"\[[^\]]*\]", "");
+        return Figure.Matches(plain)
+            .Where(m => !IsNameNumber(plain, m))
             .Select(m => m.Value.TrimEnd('.', ','))
             .Where(n => !own.Contains(n) && !(n.Length == 4 && int.TryParse(n, out int y) && y >= 1900 && y <= 2099))
             .ToHashSet();
+    }
+
+    // The word before a number and the text after it ("Llama 3 was", "Phase 2 trials").
+    private static readonly Regex WordBefore = new(@"(\p{L}[\p{L}\-]*)\s$", RegexOptions.Compiled);
+    private static readonly Regex FigureAfter = new(@"^\s*(?:%|percent|per\s*cent|percentage|[.,]\d|x\b|×|-fold|fold\b)", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+    // Words that name a numbered thing in lower case too ("level 3", "phase 2").
+    private static readonly HashSet<string> NumberedNouns = new(StringComparer.OrdinalIgnoreCase)
+        { "level", "phase", "version", "step", "stage", "tier", "type", "round", "wave", "generation", "table", "figure", "section", "chapter", "item", "rq", "gpt", "llama", "claude", "gemini", "mistral", "qwen", "python", "web" };
+
+    // Capitalised words that open a sentence or a phrase before a real count ("Across 12 studies", "In 40 cases").
+    private static readonly HashSet<string> CountOpeners = new(StringComparer.OrdinalIgnoreCase)
+        { "a", "about", "across", "after", "all", "almost", "among", "approximately", "around", "at", "before", "between", "by", "each", "every", "for", "from", "here", "in", "just", "nearly", "of", "on", "only", "over", "roughly", "some", "the", "these", "those", "to", "under", "up", "with", "within", "both", "and", "or", "than", "while", "whereas", "but" };
+
+    /// <summary>
+    /// Whether a number is part of a name written with a space ("Llama 3", "Level 3", "Phase 2"): a whole number right
+    /// after a word that names a numbered thing, or after a capitalised word that is not a common opener of a count, and not
+    /// followed by a percent sign, a decimal or a fold. Such numbers are not result figures (issue #452's guard misread them).
+    /// </summary>
+    private static bool IsNameNumber(string text, Match number)
+    {
+        if (number.Value.Contains('.') || number.Value.Contains(',') || number.Value.Length > 3) return false;
+        if (FigureAfter.IsMatch(text[(number.Index + number.Length)..])) return false;
+        var before = WordBefore.Match(text[..number.Index]);
+        if (!before.Success) return false;
+        string word = before.Groups[1].Value;
+        if (NumberedNouns.Contains(word)) return true;
+        return char.IsUpper(word[0]) && !CountOpeners.Contains(word);
     }
 
     /// <summary>
@@ -63,21 +93,6 @@ public static partial class ReviewWriter
     /// figure problem does so at most <see cref="FigureSendBacks"/> times, each written to <paramref name="note"/>, and an
     /// answer whose figure problem is left after that is kept, with a note that says so.
     /// </summary>
-    public static Func<T, string?> WithFigureGuard<T>(Func<T, string?> hard, Func<T, string?> figures, string step, Action<string>? note)
-    {
-        int sentBack = 0;
-        return answer =>
-        {
-            if (hard(answer) is { } problem) return problem;
-            if (figures(answer) is not { } figure) return null;
-            if (sentBack < FigureSendBacks)
-            {
-                sentBack++;
-                note?.Invoke($"The {step} was sent back for a repeated result figure ({sentBack} of {FigureSendBacks}): {figure}");
-                return figure;
-            }
-            note?.Invoke($"The {step} was kept after {FigureSendBacks} send-backs with a repeated result figure: {figure}");
-            return null;
-        };
-    }
+    public static Func<T, string?> WithFigureGuard<T>(Func<T, string?> hard, Func<T, string?> figures, string step, Action<string>? note) =>
+        WithSoftGuard(hard, figures, step, "a repeated result figure", note, FigureSendBacks);
 }
