@@ -42,7 +42,11 @@ public partial class PrismaReviewEngine
         }
     }
 
-    private static Task<string> DefaultReferenceLookup(string url) =>
+    /// <summary>
+    /// The reference enrichment's fetch on the server: Crossref and OpenAlex through OpenSourceHttp, arXiv through its spaced
+    /// gate. The multivocal review's formal pool uses the same one (Program.cs).
+    /// </summary>
+    internal static Task<string> DefaultReferenceLookup(string url) =>
         url.StartsWith("https://export.arxiv.org/", StringComparison.Ordinal)
             ? ArxivSource.GetAsync(url)
             : OpenSourceHttp.GetStringAsync(url, maxAttempts: 3);
