@@ -57,14 +57,23 @@ public class NoNetworkTests
     [Fact]
     public async Task AFakeHandlerIsNotStopped()
     {
-        using var client = new HttpClient(new Answers());
+        using var handler = new Answers();
+        using var client = new HttpClient(handler, disposeHandler: false);
         var answer = await client.GetStringAsync("https://api.crossref.org/works/10.1000/x");
         Assert.Equal("fake", answer);
     }
 
+    // The answer belongs to the handler and is disposed with it.
     private sealed class Answers : HttpMessageHandler
     {
-        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) =>
-            Task.FromResult(new HttpResponseMessage(System.Net.HttpStatusCode.OK) { Content = new StringContent("fake") });
+        private readonly HttpResponseMessage _answer = new(System.Net.HttpStatusCode.OK) { Content = new StringContent("fake") };
+
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) => Task.FromResult(_answer);
+
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing) _answer.Dispose();
+            base.Dispose(disposing);
+        }
     }
 }
