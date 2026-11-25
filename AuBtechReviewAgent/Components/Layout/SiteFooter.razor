@@ -1,6 +1,7 @@
 @* The footer. On app pages it is one slim line that never moves: the name, and the pages about trust (About,
-   Model card, Privacy, Verify an archive, Glossary) with GitHub; on phones only the name, About, Privacy and GitHub,
-   so it stays one line at 390 px (issue #244).
+   Model card, Privacy, Verify an archive, Glossary, Accessibility) with GitHub; on phones only the name, About, Privacy
+   and Accessibility, so it stays one line at 390 px (issue #244). Privacy and Accessibility are on every page, as on a
+   public body's site (issues #543, #544); GitHub is one click away on About.
    The landing page (Landing="true") names the department and OSSYM 2026, with Metrics, Docs and GitHub. *@
 
 <footer class="shrink-0 border-t border-line bg-page text-sm text-muted print:hidden">
@@ -28,7 +29,8 @@
                     <li><a href="/privacy" class="@LinkClass">Privacy</a></li>
                     <li class="hidden sm:block"><a href="/verify" class="@LinkClass">Verify an archive</a></li>
                     <li class="hidden sm:block"><a href="/glossary" class="@LinkClass">Glossary</a></li>
-                    <li><a href="@AuBtechReviewAgent.SiteSeo.RepositoryUrl" class="@LinkClass">GitHub</a></li>
+                    <li><a href="/accessibility" class="@LinkClass">Accessibility</a></li>
+                    <li class="hidden sm:block"><a href="@AuBtechReviewAgent.SiteSeo.RepositoryUrl" class="@LinkClass">GitHub</a></li>
                 </ul>
             </nav>
         }

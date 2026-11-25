@@ -1,5 +1,5 @@
-@* The template of the five trust pages (redesign step 10): About and FAQ, Model card, Privacy, Glossary and Verify an
-   archive. From 1024 px a 240 px side list of the five pages sticks to the left, with the current page's sections
+@* The template of the trust pages (redesign step 10): About and FAQ, Model card, Privacy, Glossary, Verify an
+   archive and the accessibility statement (issue #544). From 1024 px a 240 px side list of the five pages sticks to the left, with the current page's sections
    indented under it; the page itself is one reading card. A section link jumps inside the content area through
    data-jump-to (wwwroot/js/review-output.js), because the page has <base href="/">. On a phone the side list is hidden.
    With the API switched on (ApiSwitch), its documentation page is listed last. *@
@@ -49,13 +49,14 @@
 </div>
 
 @code {
-    /// <summary>The five trust pages, in the order of the side list (the footer links to the same pages).</summary>
+    /// <summary>The trust pages, in the order of the side list (the footer links to the same pages).</summary>
     public static readonly (string Href, string Label)[] Pages =
     {
         ("/about", "About and FAQ"), ("/model-card", "Model card"), ("/privacy", "Privacy"), ("/glossary", "Glossary"), ("/verify", "Verify an archive"),
+        ("/accessibility", "Accessibility"),
     };
 
-    /// <summary>The pages in the side list: the five, and the API's page while the API is on.</summary>
+    /// <summary>The pages in the side list: the trust pages, and the API's page while the API is on.</summary>
     private IEnumerable<(string Href, string Label)> Shown =>
         (Services.GetService(typeof(AuBtechReviewAgent.ApiSwitch)) as AuBtechReviewAgent.ApiSwitch)?.Enabled == true
             ? Pages.Append((AuBtechReviewAgent.ApiSwitch.DocsPath, AuBtechReviewAgent.ApiSwitch.DocsLabel))
