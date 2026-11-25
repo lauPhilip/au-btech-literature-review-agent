@@ -17,7 +17,7 @@ public sealed class SystematicModule : IReviewModule
     {
         RunHeader.FileName, RunStore.ProtocolFile, "transparent-process.json", "prisma-report.json", "llm-calls.json", "extraction.json",
         "citation-audit.json", RunStore.NotesFile, ReportEditLog.FileName, "thematic-codebook.json", "run-metrics.json", "peer-review-feedback.json",
-        "stylistic-transformation-ledger.json", "grounded-outline.txt",
+        "stylistic-transformation-ledger.json", "grounded-outline.txt", ReferenceEnrichmentFile.FileName,
     };
 
     public IReadOnlyList<ReviewMethod> Cards { get; } = new[]

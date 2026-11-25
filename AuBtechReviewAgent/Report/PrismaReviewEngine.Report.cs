@@ -114,6 +114,9 @@ public partial class PrismaReviewEngine
         var reviewState = ctx.State;
         var request = ctx.Request;
 
+        // Gaps in the references are filled before they are numbered, since a fuller author list can change the order.
+        await EnrichReferencesAsync(ctx);
+
         // One ordering for the whole report. The reference list shown to the model, the [n] markers it
         // writes, the extraction table and the LaTeX bibliography are all numbered from this list.
         var includedPapers = reviewState.Phases.Screening
