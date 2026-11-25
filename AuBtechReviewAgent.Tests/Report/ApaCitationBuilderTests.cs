@@ -172,6 +172,26 @@ public class ApaCitationBuilderTests
     }
 
     [Fact]
+    public void ReferenceOrderSortsAccentedNamesWithTheirLetterAsApaDoes()
+    {
+        // Ordinal order put every accented initial after "Z": "Öner" and "Østergaard" came last.
+        var citations = new[]
+        {
+            "Zhang, W. (2025)", "Öner, B. (2024)", "Oliveira, C. (2023)", "Østergaard, D. (2025)", "Pajo, P. (2025)",
+            "Ölçer, E. (2022)", "Leeds, A. (2021)", "Lee, J. (2020)", "*Agentic AI handbook* (2024)", "Éclair, F. (2020)",
+        };
+
+        var ordered = citations.OrderBy(c => c, ApaCitationBuilder.ReferenceOrder).ToList();
+
+        Assert.Equal(new[]
+        {
+            "*Agentic AI handbook* (2024)", "Éclair, F. (2020)", "Lee, J. (2020)", "Leeds, A. (2021)", "Ölçer, E. (2022)",
+            "Oliveira, C. (2023)", "Öner, B. (2024)", "Østergaard, D. (2025)", "Pajo, P. (2025)", "Zhang, W. (2025)",
+        }, ordered);
+        Assert.Equal(0, ApaCitationBuilder.ReferenceOrder.Compare("Öner, B.", "oner, b."));
+    }
+
+    [Fact]
     public void ItalicSpansSetTheJournalAndVolumeInItalicsWithoutAsterisks()
     {
         var spans = ApaCitationBuilder.ItalicSpans("Ge, Y. (2025). GridSage. *Applied Sciences*, *14*(2), 1\u201310.");

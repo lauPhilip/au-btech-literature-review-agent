@@ -217,6 +217,8 @@ public sealed partial class MultivocalRunner
                 await _extractor.ExtractAsync(runId, editKey, progress);
                 break;
             case MultivocalExtractor.StageExtracted:
+                // The formal references are completed once the sources they cite are known, before anything cites them.
+                await EnrichReferencesAsync(runId);
                 await _synthesiser.SynthesiseAsync(runId, editKey, progress);
                 break;
             case MultivocalSynthesiser.StageSynthesised:

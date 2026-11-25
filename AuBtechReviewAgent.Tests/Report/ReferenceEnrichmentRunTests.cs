@@ -53,6 +53,8 @@ public class ReferenceEnrichmentRunTests : IDisposable
         Assert.Contains("author = {Doe, Jane and Liu, Jun-wei}", bib);
         Assert.Contains("pages = {45--60}", bib);
         Assert.Contains("VL  - 12", Read("references.ris"));
+        // The methods text says how the references were completed, in code from reference-enrichment.json.
+        Assert.Contains("the reference of the one included study with a DOI or arXiv number was looked up in code at Crossref by that identifier, and it gained the full author list, the volume, the issue and the pages. No language model was involved", Read("main.tex"));
 
         var audit = JsonSerializer.Deserialize<ReferenceEnrichmentFile>(Read(ReferenceEnrichmentFile.FileName))!;
         var entry = Assert.Single(audit.References, r => r.Doi == "10.3390/fi1234567");

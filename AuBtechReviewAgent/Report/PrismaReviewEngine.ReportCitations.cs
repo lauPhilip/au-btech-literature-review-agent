@@ -264,7 +264,9 @@ public partial class PrismaReviewEngine
                 .Select((question, i) => new ResearchAnswer { Number = i + 1, Question = question, Answer = textOf[$"researchAnswer{i + 1}"] })
                 .ToList(),
             // Items 9-11 from the extraction and MMAT appraisal the run actually produced.
-            BiasAssessmentItem = MethodsSectionWriter.DataAndAppraisal(finalState.Extractions ?? new List<StudyExtraction>(), Llm.DisplayName),
+            // The references were completed before they were numbered; that step is part of the data collection (rules 2 and 3).
+            BiasAssessmentItem = (MethodsSectionWriter.DataAndAppraisal(finalState.Extractions ?? new List<StudyExtraction>(), Llm.DisplayName) + " " +
+                ReferenceEnrichmentText.Sentence(ReferenceEnrichmentText.Load(GetWorkspaceFolderPath(sessionId)), "included study", "included studies")).Trim(),
             ProtocolItem = MethodsSectionWriter.Protocol(finalState.ProtocolSha256, finalState.Timestamp, finalState.ResearchQuestions is { Count: > 0 }),
             SupportItem = _supportStatement,
             ProtocolHash = finalState.ProtocolHash,

@@ -151,7 +151,12 @@ builder.Services.AddSingleton(multivocalWriter); // writing and checking the pap
 var multivocalRunner = new AuBtechReviewAgent.MultivocalRunner(reviewEngine.Store, multivocalSearcher, multivocalScreener, multivocalQuality,
     multivocalMapper, multivocalExtractor, multivocalSynthesiser, multivocalPages, multivocalWriter,
     () => AuBtechReviewAgent.LlmFactory.CreateForReview(llmOptions, mistralApiKey, runsOptions.MaxConcurrentRuns), llmOptions.Model)
-    { Coordinator = reviewEngine.Coordinator }; // one line for every kind of review
+    {
+        Coordinator = reviewEngine.Coordinator, // one line for every kind of review
+        // The formal pool's references are completed as the systematic review's are.
+        ReferenceLookup = AuBtechReviewAgent.PrismaReviewEngine.DefaultReferenceLookup,
+        ReferenceContact = openSources,
+    };
 builder.Services.AddSingleton(multivocalRunner); // runs the steps one after another (preview)
 reviewEngine.AddCanceller(multivocalRunner.Cancel); // so CancelRun reaches grey literature runs too
 // Modules shown as a preview while they are being built (Development only; see ReviewModulesOptions).

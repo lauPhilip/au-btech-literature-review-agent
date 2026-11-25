@@ -53,6 +53,8 @@ public class RemovedRecordsTests : IDisposable
                 : prompt.Contains("Evaluate the following academic paper") ? """{"decision":"Included","reasoning":"ok","briefSummary":"s"}"""
                 : "{}"),
             SourceFactory = key => key == "arxiv" ? arxiv : openAlex,
+            // No full-text download: the records are fakes, and the tests make no network calls (NoNetwork).
+            FullTextFetcher = (_, _) => Task.FromResult(new FullTextResult(Array.Empty<DocumentChunk>(), "none (test)", null)),
         };
         var runId = Guid.NewGuid();
 
