@@ -145,7 +145,7 @@ Respond ONLY with a valid minified JSON object:
 { "comments": [ { "section": "one of: synthesis-1, discussion", "severity": "high, medium, or low", "issue": "what is wrong or weak", "suggestion": "how to fix it" } ] }
 If a section is already strong, return few or no comments for it.
 === You are the author revising one section
-You are the author revising one section of a systematic review in response to peer-review feedback. Apply the feedback. Keep every existing inline [n] citation, cite ONLY numbers from the reference list, and do not invent claims, numbers or studies.
+You are the author revising one section of a systematic review in response to peer-review feedback. Apply the feedback. Keep every existing inline [n] citation, cite ONLY numbers from the reference list, and do not invent claims, numbers or studies. A sentence cites at most 3 studies in all its markers together, and ideally one or two. Where more studies report the same thing, cite the one to 3 whose evidence is strongest or most direct; say how many others agree only when the facts you are given count them, and otherwise cite only those. Code sends back a sentence that cites more than 3.
 
 REFERENCE LIST (valid citation numbers):
 [1] - Doe, J. (2025). Agent loops for safe orchestration. *Future Internet*. https://doi.org/10.3390/fi1234567
@@ -196,7 +196,7 @@ Recovery and audits complement each other [1, 2].
 REQUIREMENTS:
 1. "title": one line, at most 25 words, no full stop, naming the topic and the kind of review.
 2. "abstract": one paragraph of 150 to 250 words: background, method, main results by theme, and what they mean. No citations. Use no number that is not in the facts or the results above.
-3. "rationale": one or two paragraphs on why the review is needed. Every sentence but the last states the problem from what the studies say and ends with an inline [n] marker, using the studies the results cite for it; these sentences use no result figure (no number, percentage or effect size from the results). The last sentence has no citation and states what is not yet known, the gap this review addresses; it names no study, number or study design and uses none of these words: report, found, show, demonstrate, observe, "studies", "the literature". Add no background from general knowledge: leave out a sentence you cannot cite, since code removes every other rationale sentence without a citation.
+3. "rationale": one or two paragraphs on why the review is needed. Every sentence but the last states the problem from what the studies say and ends with an inline [n] marker, using the studies the results cite for it; these sentences use no result figure (no number, percentage or effect size from the results) and cite at most 3 studies each, ideally one or two. The last sentence has no citation and states what is not yet known, the gap this review addresses; it names no study, number or study design and uses none of these words: report, found, show, demonstrate, observe, "studies", "the literature". Add no background from general knowledge: leave out a sentence you cannot cite, since code removes every other rationale sentence without a citation.
 4. "objectives": the objective and what the review set out to answer, in two or three sentences, without citations.
 Write plain paragraphs separated by a blank line: no Markdown, no headings, no bullet or numbered lists, no tables and no bold or italics.
 Respond ONLY with a valid minified JSON object:

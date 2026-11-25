@@ -76,6 +76,7 @@ public static partial class ReviewWriter
             1. "lead": one plain sentence saying whom the summary is for and what it covers. No citations.
             2. "items": three to {{MaxSummaryItems}} checklist items a practitioner can act on or check against, in plain words and in the order of importance the results give them. Each item is ONE sentence of at most 35 words that ends with an inline [n] marker for the {{profile.Sources}} the results cite for it.
             3. Say how strong the support is where the results say so (for example, when a practice rests only on blog posts). Do not invent numbers, practices, tools or {{profile.Sources}}.
+            4. {{CitationLoadRule(profile)}}
             {{ProseCleaner.PlainProseRule}}
             Respond ONLY with a valid minified JSON object:
             {"lead":"...","items":["... [n]","... [n, m]"]}
@@ -84,7 +85,7 @@ public static partial class ReviewWriter
         {
             using (LlmStage.Begin("practitioner-summary"))
             {
-                var answer = await LlmJson.GetAsync<SummaryAnswer>(chat, prompt, LlmJson.JsonMode(0.3), a => SummaryProblem(a, results, referenceCount), repairAttempts: 2);
+                var answer = await LlmJson.GetAsync<SummaryAnswer>(chat, prompt, LlmJson.JsonMode(0.3), a => SummaryProblem(a, results, referenceCount) is { } problem ? Noted(problem, "summary for practitioners", warn) : null, repairAttempts: 2);
                 return new PractitionerSummary(
                     MethodsSectionWriter.StripMarkdownEmphasis(answer.Lead!.Trim()),
                     answer.Items!.Select(i => MethodsSectionWriter.StripMarkdownEmphasis(i.Trim())).ToList());
@@ -109,6 +110,8 @@ public static partial class ReviewWriter
         if (tooLong >= 0) return $"item {tooLong + 1} is too long; keep each item to one sentence of at most 35 words.";
         var outside = items.SelectMany(ThematicSynthesis.CitedIn).Where(r => r < 1 || r > referenceCount).Distinct().ToList();
         if (outside.Count > 0) return $"citation numbers {string.Join(", ", outside)} are not in the reference list.";
+        int heavy = items.FindIndex(i => CitationLoadProblem(i) != null);
+        if (heavy >= 0) return $"item {heavy + 1}: {CitationLoadProblem(items[heavy])}";
         var known = NumbersIn(results);
         var unknown = items.SelectMany(NumbersIn).Where(n => !known.Contains(n)).Distinct().ToList();
         return unknown.Count > 0 ? $"the items use {string.Join(", ", unknown)}, which is not in the results; use only their numbers." : null;
@@ -159,7 +162,7 @@ public static partial class ReviewWriter
             REQUIREMENTS:
             1. "title": one line, at most 25 words, no full stop, naming the topic and the kind of review.
             2. "abstract": one paragraph of 150 to 250 words: background, method, main results by theme, and what they mean. No citations. Use no number that is not in the facts or the results above.
-            3. "rationale": one or two paragraphs on why the review is needed. Every sentence but the last states the problem from what the {{profile.Sources}} say and ends with an inline [n] marker, using the {{profile.Sources}} the results cite for it; these sentences use no result figure (no number, percentage or effect size from the results). The last sentence has no citation and states what is not yet known, the gap this review addresses; it names no {{profile.Source}}, number or {{profile.Source}} design and uses none of these words: report, found, show, demonstrate, observe, "studies", "the literature". Add no background from general knowledge: leave out a sentence you cannot cite, since code removes every other rationale sentence without a citation.
+            3. "rationale": one or two paragraphs on why the review is needed. Every sentence but the last states the problem from what the {{profile.Sources}} say and ends with an inline [n] marker, using the {{profile.Sources}} the results cite for it; these sentences use no result figure (no number, percentage or effect size from the results) and cite at most {{MaxReferencesPerSentence}} {{profile.Sources}} each, ideally one or two. The last sentence has no citation and states what is not yet known, the gap this review addresses; it names no {{profile.Source}}, number or {{profile.Source}} design and uses none of these words: report, found, show, demonstrate, observe, "studies", "the literature". Add no background from general knowledge: leave out a sentence you cannot cite, since code removes every other rationale sentence without a citation.
             4. {{objectivesRule}}
             {{ProseCleaner.PlainProseRule}}
             Respond ONLY with a valid minified JSON object:
@@ -170,7 +173,7 @@ public static partial class ReviewWriter
         {
             using (LlmStage.Begin("front-matter"))
             {
-                var answer = await LlmJson.GetAsync<FrontMatterAnswer>(chat, prompt, LlmJson.JsonMode(0.3), a => FrontMatterProblem(a, allowedNumbers, referenceCount, codeObjectives == null, facts) ?? abstractRule?.Invoke(a.Abstract!), repairAttempts: 2);
+                var answer = await LlmJson.GetAsync<FrontMatterAnswer>(chat, prompt, LlmJson.JsonMode(0.3), a => Noted(FrontMatterProblem(a, allowedNumbers, referenceCount, codeObjectives == null, facts), "front-matter call", warn) ?? abstractRule?.Invoke(a.Abstract!), repairAttempts: 2);
                 return new FrontMatter(
                     answer.Title!.Trim().TrimEnd('.'),
                     MethodsSectionWriter.StripMarkdownEmphasis(answer.Abstract!.Trim()),
@@ -195,6 +198,7 @@ public static partial class ReviewWriter
         if (ThematicSynthesis.CitedIn(a.Rationale).Count == 0) return "the rationale has no citation; every sentence of it ends with the [n] of the sources the results cite for it.";
         var outside = ThematicSynthesis.CitedIn(a.Rationale).Where(r => r < 1 || r > referenceCount).ToList();
         if (outside.Count > 0) return $"citation numbers {string.Join(", ", outside)} are not in the reference list.";
+        if (CitationLoadProblem(a.Rationale, part: "the rationale") is { } load) return load;
         // The rationale states the problem and the gap; a result figure belongs to the results (the audit of two real runs).
         var figures = NumbersIn(a.Rationale).Where(n => !NumbersIn(facts).Contains(n)).ToList();
         if (figures.Count > 0) return $"the rationale uses {string.Join(", ", figures)}; it states the problem and the gap, not the results, so leave out result figures.";
