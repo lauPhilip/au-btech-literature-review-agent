@@ -74,9 +74,15 @@ public class ReportFallbackTests : IDisposable
         Assert.Contains("REVIEW OBJECTIVE: \"Map agent loop safety\"\nPRIMARY TOPIC: \"agent loops\"\n", cited);
 
         string critique = Assert.Single(prompts, p => p.Contains("RESULTS AND SYNTHESIS (Item 20a):"));
+        // The fallback's peer review gets the facts counted in code, as the shared peer review does (issue #456's follow-up).
+        Assert.Contains("FACTS ABOUT THE REVIEW AND ITS STUDIES (counted in code; the only facts about the studies and their designs)", critique);
+        Assert.Contains($"included: {state.Stats.Included};", critique);
+        Assert.Contains("Evidence base (from the data extraction): ", critique);
         Assert.Contains("RESULTS AND SYNTHESIS (Item 20a):\nAgent loops recover from faults through supervisor checks [1]. Governance layers audit agent actions [2].\n\nDISCUSSION (Item 23a):\nLoops and audits complement each other [1, 2].\n", critique);
         string revise = Assert.Single(prompts, p => p.Contains("revising two sections of a systematic review"));
         Assert.Contains("PEER-REVIEW FEEDBACK:\n- [high] (synthesis) Thin. -> Compare.\n", revise);
+        Assert.Contains("FACTS ABOUT THE REVIEW AND ITS STUDIES (counted in code; do not change them, and describe the studies only as they say):", revise);
+        Assert.Contains("A sentence cites at most 3 studies in all its markers together", cited);
 
         Assert.Equal(Revised, report.SynthesisResultsItem);
         Assert.Equal("Loops and audits complement each other [1, 2].", report.DiscussionItem);
@@ -105,9 +111,26 @@ public class ReportFallbackTests : IDisposable
             ? throw new InvalidOperationException("draft down")
             : ReviewWriterTests.Respond(prompt);
 
-        var (_, state, report, _) = await RunAsync(Failing, thematic: true);
+        // The first draft is written only on the fallback path, so its failure ends the report there.
+        var (_, state, report, _) = await RunAsync(Failing, thematic: false);
 
         Assert.Equal("Checklist Synthesis generation completely faulted: draft down", report.TitleItem);
         Assert.Equal("The report could not be generated: draft down", state.FailureMessage);
+    }
+
+    [Fact]
+    public async Task WhenTheFrontMatterFailsTheFirstDraftIsWrittenThenAndItsTitleUsed()
+    {
+        string FrontFails(string prompt) => prompt.Contains("You are writing the title, abstract, rationale and objectives")
+            ? throw new InvalidOperationException("front matter down")
+            : prompt.Contains("elite academic meta-analyst") || prompt.Contains("grounded synthesis outline") ? PipelineTests.Respond(prompt)
+            : ReviewWriterTests.Respond(prompt);
+
+        var (prompts, _, report, folder) = await RunAsync(FrontFails, thematic: true);
+
+        Assert.Single(prompts, p => p.Contains("elite academic meta-analyst"));
+        Assert.True(File.Exists(Path.Join(folder, "grounded-outline.txt")));
+        Assert.Equal("Agent Loops: A Systematic Review", report.TitleItem);
+        Assert.NotEmpty(report.SynthesisSections!);
     }
 }
