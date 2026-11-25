@@ -160,4 +160,8 @@ public partial class Home
             StateHasChanged();
         });
     }
+
+    /// <summary>The run's place in line and a rough wait while it is queued, from the one line every review shares.</summary>
+    internal string? QueueText() => stage == AuBtechReviewAgent.PrismaReviewEngine.StageQueued
+        ? ReviewEngine.Coordinator.PlaceOf(currentSessionId)?.Text : null;
 }

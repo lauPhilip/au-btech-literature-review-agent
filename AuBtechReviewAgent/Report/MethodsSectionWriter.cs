@@ -89,7 +89,12 @@ public static partial class MethodsSectionWriter
     /// how the seeds were ranked, that code chose them from included records only, and what building out kept. Empty
     /// without a seed record.
     /// </summary>
-    public static string SeedChaining(SeedChainingRecord? seeds, string records = "included record")
+    /// <param name="seeds">The seed record on file.</param>
+    /// <param name="records">What the seeds are, in the singular ("included record").</param>
+    /// <param name="listed">The sentence that says where the seeds are listed.</param>
+    /// <param name="failedChainedOrdinarily">True when a seed whose look-up failed is chained the ordinary way instead (the systematic review).</param>
+    public static string SeedChaining(SeedChainingRecord? seeds, string records = "included record", string listed = "The appendix lists the seeds. ",
+        bool failedChainedOrdinarily = true)
     {
         if (seeds == null) return "";
         string Plural(int n, string one) => n == 1 ? one : one.EndsWith('y') ? one[..^1] + "ies" : one + "s";
@@ -99,7 +104,7 @@ public static partial class MethodsSectionWriter
                 : $"No seed studies were chosen, because no {records} had a DOI. ";
         var sb = new StringBuilder();
         int n = seeds.Seeds.Count;
-        sb.Append($"First, the {(n == 1 ? "" : n + " ")}{Plural(n, records)} with the most citations per year {(n == 1 ? "was" : "were")} taken as seed {Plural(n, "study")}. ");
+        sb.Append($"First, the {(n == 1 ? "" : n + " ")}{Plural(n, records)} with the most citations per year {(n == 1 ? "was taken as the seed study" : "were taken as seed studies")}. ");
         sb.Append($"Citations per year are the citation count in the database's metadata on the day of the search divided by the years from publication to {seeds.ReferenceYear}, the publication year counting as one, so a recent study could compete with an older one; ties went to more citations, then to the newer study. ");
         sb.Append("The seeds were chosen in code from these counts, not by a language model, and only from records already included at screening, so a highly cited but irrelevant paper could not become a seed. ");
         if (seeds.WithoutCount > 0)
@@ -108,8 +113,10 @@ public static partial class MethodsSectionWriter
         sb.Append($"For each seed, up to {seeds.PoolPerDirection} of the works it cites and up to {seeds.PoolPerDirection} of the most cited works citing it were retrieved from OpenAlex and ranked the same way, and {kept} kept ({seeds.Identified} record{(seeds.Identified == 1 ? "" : "s")} identified this way). ");
         int failed = seeds.Seeds.Count(x => x.Error != null);
         if (failed > 0)
-            sb.Append($"The look-up failed for {failed} seed{(failed == 1 ? "" : "s")}, which {(failed == 1 ? "was" : "were")} chained like the other included records instead. ");
-        sb.Append("The appendix lists the seeds. ");
+            sb.Append($"The look-up failed for {failed} seed{(failed == 1 ? "" : "s")}, " + (failedChainedOrdinarily
+                ? $"which {(failed == 1 ? "was" : "were")} chained like the other included records instead. "
+                : $"so nothing was found from {(failed == 1 ? "it" : "them")}. "));
+        sb.Append(listed);
         return sb.ToString();
     }
 

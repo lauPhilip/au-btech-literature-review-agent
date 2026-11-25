@@ -180,6 +180,7 @@ public sealed partial class MultivocalMapper
             7. Do not add attributes for what is already known about every source: {{string.Join(", ", KnownFacts.Select(f => f.Name.ToLowerInvariant()))}}, and the source's producer.
             8. Name each attribute in plain words with spaces ("Tool or framework", not "ToolOrFramework").
             9. Every research question needs an attribute. A question that only asks how often, or whether, the values of another question's attribute occur (such as "how often is each practice mentioned?") gets no attribute of its own: add its number to that attribute's "alsoFor" list instead.
+            10. A question of type Relationship ("are X and Y related?") needs one attribute for each side, so the review can pair them per source: one for X (such as whether retrieval is used) and one for Y (such as the reported failures). An attribute of another question can be one side: add the relationship question's number to its "alsoFor" list.
             Use two to {{MaxValues}} values per attribute.
 
             {{AnswerShape}}

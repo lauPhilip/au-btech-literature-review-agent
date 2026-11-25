@@ -124,16 +124,22 @@ public static partial class CitationSupportChecker
     }
 
     /// <summary>True when the quote (whitespace/case-insensitive, at least 20 characters) occurs in the excerpt.</summary>
-    public static bool QuoteOccursIn(string? quote, string? excerpt)
+    public static bool QuoteOccursIn(string? quote, string? excerpt) => QuoteOccursIn(quote, CanonicalText.Of(excerpt));
+
+    /// <summary>
+    /// The same check against a text made canonical once (<see cref="CanonicalText.Of"/>): a source checked against
+    /// many quotes is normalised once instead of once per quote, which on a long page is most of the cost.
+    /// </summary>
+    public static bool QuoteOccursIn(string? quote, CanonicalText excerpt)
     {
-        if (string.IsNullOrWhiteSpace(quote) || string.IsNullOrWhiteSpace(excerpt)) return false;
-        string text = Canonical(excerpt);
+        if (string.IsNullOrWhiteSpace(quote) || excerpt.IsBlank) return false;
+        string text = excerpt.Value;
 
         // Models often shorten a quote with "..." (seen in real runs); every part must then occur, in order.
         // Parts shorter than 10 letters are ignored, so an ellipsis cannot turn a quote into loose keywords.
         // A joining word after an ellipsis ("... and use tools") is the model's glue, not part of the source.
-        var parts = Regex.Split(quote, @"\.{3}|…")
-            .Select((p, i) => i == 0 ? p : Regex.Replace(p, @"^[\s,;:]*(and|or|but)\s+", "", RegexOptions.IgnoreCase))
+        var parts = Ellipsis().Split(quote)
+            .Select((p, i) => i == 0 ? p : Glue().Replace(p, ""))
             .Select(Canonical).Where(p => p.Length > 0).ToList();
         if (parts.Count > 1) parts = parts.Where(p => p.Length >= 10).ToList();
         if (parts.Count == 0 || parts.Sum(p => p.Length) < 15) return false;
@@ -147,6 +153,12 @@ public static partial class CitationSupportChecker
         }
         return true;
     }
+
+    [GeneratedRegex(@"\.{3}|…")]
+    private static partial Regex Ellipsis();
+
+    [GeneratedRegex(@"^[\s,;:]*(and|or|but)\s+", RegexOptions.IgnoreCase)]
+    private static partial Regex Glue();
 
     /// <summary>
     /// Letters and digits only, lower case, after Unicode normalisation. PDF text has line-break hyphens,

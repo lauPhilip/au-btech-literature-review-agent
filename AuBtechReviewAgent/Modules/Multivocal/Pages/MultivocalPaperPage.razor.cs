@@ -29,6 +29,8 @@ public partial class MultivocalPaperPage
         }
         input = Reporter.LoadInput(RunId);
         paper = Writer.Load(RunId);
+        // Only for display: a question answered in code is shown by its answer in code (issue #458).
+        if (paper != null && input != null) paper.Results = MultivocalPaper.ShownResults(input, paper);
         audit = Writer.LoadAudit(RunId);
         checks = audit?.SupportChecks ?? new List<CitationSupportResult>();
         references = input == null ? Array.Empty<GreyReference>() : GreyReferences.Build(input.Ledger, input.Pages, input.Extraction);
@@ -51,7 +53,17 @@ public partial class MultivocalPaperPage
         if (field == MultivocalWriter.RationaleField) return -1;
         int result = paper?.Results.FindIndex(r => r.Field == field) ?? -1;
         if (result >= 0) return 1 + result;
-        return field == MultivocalWriter.DiscussionField ? 2000 : 3000;
+        int answer = paper?.Answers.FindIndex(a => a.Field == field) ?? -1;
+        if (answer >= 0) return 1000 + answer;
+        return field switch
+        {
+            MultivocalWriter.DiscussionField => 2000,
+            MultivocalWriter.LimitationsField => 2001,
+            MultivocalWriter.ImplicationsField => 2002,
+            MultivocalWriter.FutureResearchField => 2003,
+            MultivocalWriter.SummaryField => 3000,
+            _ => 4000,
+        };
     }
 
     private List<CitationSupportResult> Attention => CitationView.Attention(checks, FieldRank);
@@ -66,6 +78,17 @@ public partial class MultivocalPaperPage
             var flow = MultivocalPaperParts.Flow(input!);
             return $"{flow.Extracted} sources · {flow.Found} found · {flow.Themes} themes · {checks.Count} citations checked";
         }
+    }
+
+    /// <summary>
+    /// The heading of the citation-check card: the citations checked, the same number as the line under the title and the
+    /// check note, and the removed ones on their own (#467: the card said 1419 where the rest of the page said 1283).
+    /// </summary>
+    public static string CheckedHeading(VerdictTally counts)
+    {
+        int checkedCount = counts.Total - counts.Removed;
+        string text = $"{checkedCount} {(checkedCount == 1 ? "citation" : "citations")} checked against the sources";
+        return counts.Removed == 0 ? text : $"{text}, and {counts.Removed} removed";
     }
 
     // The citation-check panel (from 1500 px): which citations it steps through, and where it is.

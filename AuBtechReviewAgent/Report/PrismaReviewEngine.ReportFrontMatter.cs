@@ -52,7 +52,8 @@ public partial class PrismaReviewEngine
 
     /// <summary>
     /// The title, abstract, rationale and objectives, the artifact and the closing sections, all written from the
-    /// finished results. The front matter is written by the step every kind of review shares (Synthesis/ReviewWriter.cs):
+    /// finished results. The front matter is written after the closing sections and gets the answers to the research
+    /// questions and the conclusion as checked text, so the abstract states the review's reading as they do (issue #446). The front matter is written by the step every kind of review shares (Synthesis/ReviewWriter.cs):
     /// the abstract may only use numbers counted in code or stated in the results, and the rationale's citations are
     /// checked later like every other sentence. The first draft's versions are kept only for when that step fails.
     /// </summary>
@@ -71,14 +72,18 @@ public partial class PrismaReviewEngine
         ReportProgress(run.SessionId, finalState, RunProgress.Synthesis, RunProgress.Phase(RunProgress.SynthesisPhases, 5, 1), "Title, abstract and introduction");
         var resultSections = sections.Count > 0 ? (IReadOnlyList<SynthesisSection>)sections
             : new[] { new SynthesisSection { Field = "synthesisResultsItem", Heading = "Results", Text = synthesisProse } };
-        // The front matter (then its copy-edit) and the artifact both read the finished sections and neither reads the
-        // other, so they run at the same time; results are used in the same order as before.
-        async Task<(FrontMatter? Front, (string Text, StyleDeltaLog Delta) Abstract, (string Text, StyleDeltaLog Delta) Rationale, (string Text, StyleDeltaLog Delta) Objectives)> FrontAndStyleAsync()
+        // The artifact and the closing sections read the finished sections and neither reads the other, so they run at the
+        // same time; the front matter (then its copy-edit) waits for the closing sections, whose answers and conclusion it
+        // is given (issue #446). Results are used in the same order as before.
+        async Task<(FrontMatter? Front, (string Text, StyleDeltaLog Delta) Abstract, (string Text, StyleDeltaLog Delta) Rationale, (string Text, StyleDeltaLog Delta) Objectives)> FrontAndStyleAsync(Task<ClosingSections?> closingTask)
         {
+            var closing = await closingTask;
             var written = await ReviewWriter.WriteFrontMatterAsync(chat, WritingProfile.Systematic, query, explicitObjective,
                 FrontMatterFacts(finalState, useThematic ? thematic!.Codebook : null, includedFacts, screeningFacts) + EvidenceBaseFacts(useThematic ? thematic!.Evidence : null),
                 resultSections, discussionText, referenceListMapping, referenceCount, message => _log.LogWarning("{Message}", SanitizeLogMessage(message)),
-                abstractRule: text => AbstractCountsProblem(text, finalState.Stats), questions: finalState.ResearchQuestions);
+                abstractRule: text => AbstractCountsProblem(text, finalState.Stats) ?? AbstractUnplacedProblem(text, finalState.Stats.Included, useThematic ? thematic!.Codebook.Uncoded.Count : 0),
+                questions: finalState.ResearchQuestions,
+                answers: closing?.Answers ?? thematic?.Answers, conclusion: closing?.Conclusion);
             using (LlmStage.Begin("style"))
             {
                 // Three separate copy-edits, sent together. Objectives written in code from the research questions are not copy-edited.
@@ -106,17 +111,22 @@ public partial class PrismaReviewEngine
         }
 
         // The limitations of the evidence, the implications, the future research and the conclusion (PRISMA 23b, 23d)
-        // read the same finished sections, so they are written beside the front matter and the artifact.
+        // read the same finished sections and the answers written with the discussion, so they are written beside the artifact.
         async Task<ClosingSections?> ClosingAsync() => useThematic && thematic!.Evidence != null
             ? await ReviewWriter.WriteClosingAsync(chat, WritingProfile.Systematic, query, explicitObjective,
                 FrontMatterFacts(finalState, thematic.Codebook, includedFacts, screeningFacts), resultSections, discussionText,
-                thematic.Evidence, referenceCount, message => _log.LogWarning("{Message}", SanitizeLogMessage(message)),
-                finalState.ResearchQuestions, thematic.Codebook.Unanswered?.Select(u => u.Question).ToList())
+                thematic.Evidence, referenceCount, message =>
+                {
+                    // On file with the discussion's notes, so a figure sent back or kept is in thematic-codebook.json (issue #452).
+                    _log.LogWarning("{Message}", SanitizeLogMessage(message));
+                    lock (thematic.Codebook) (thematic.Codebook.WritingNotes ??= new()).Add(message);
+                },
+                finalState.ResearchQuestions, thematic.Codebook.Unanswered?.Select(u => u.Question).ToList(), thematic.Answers)
             : null;
 
-        var frontTask = FrontAndStyleAsync();
         var artifactTask = ArtifactAsync();
         var closingTask = ClosingAsync();
+        var frontTask = FrontAndStyleAsync(closingTask);
         await Task.WhenAll(frontTask, artifactTask, closingTask); // a failure of any is thrown here, after all have finished
         run.Closing = await closingTask;
         var (front, styledAbstract, styledRationale, styledObjectives) = await frontTask;
@@ -151,6 +161,7 @@ public partial class PrismaReviewEngine
             $"Full text was read for {s.FullTextRetrieved} of the {s.Included} included studies; the others were read from their abstracts.",
         };
         if (book != null) lines.Add($"Thematic synthesis: {book.Themes.Count} theme{(book.Themes.Count == 1 ? "" : "s")} from {book.Codes.Count} code{(book.Codes.Count == 1 ? "" : "s")}.");
+        if (book is { Uncoded.Count: > 0 }) lines.Add(UnplacedFact(book.Uncoded.Count));
         if (RemovalsBeforeScreening(s).Any(r => r.Label != "duplicates"))
             lines.Add("Wherever both the records identified and the records screened are given, every removal between them is given too, as listed above.");
         return string.Join("\n", lines);
@@ -200,6 +211,26 @@ public partial class PrismaReviewEngine
         return missing.Count == 0 ? null
             : $"the abstract gives the {s.TotalIdentified} records identified and the {s.Screened} screened but leaves out " +
               $"{string.Join(" and ", missing.Select(r => $"{r.Label} ({r.Count})"))}; give every removal between them, as the facts list them.";
+    }
+
+    /// <summary>The fact line on the included studies the themes leave out (issue #447), for the front matter and the closing sections.</summary>
+    public static string UnplacedFact(int unplaced) =>
+        $"Studies placed in no theme: {unplaced} (the themes rest on the others; an abstract that describes the themes or gives the included studies says so).";
+
+    private static readonly Regex ThemeWord = new(@"\bthem(?:e|es|atic)\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+    /// <summary>
+    /// Null when the abstract does not hide the studies placed in no theme; otherwise why it does (issue #447). An abstract
+    /// that speaks of the themes or gives the number of included studies, when some studies are in no theme, must give
+    /// that number too, in digits or in words, so it cannot read as if every included study were synthesised.
+    /// </summary>
+    public static string? AbstractUnplacedProblem(string abstractText, int included, int unplaced)
+    {
+        if (unplaced <= 0 || string.IsNullOrWhiteSpace(abstractText)) return null;
+        var numbers = ReviewWriter.CountsIn(abstractText);
+        if (!ThemeWord.IsMatch(abstractText) && !numbers.Contains(included.ToString())) return null;
+        return numbers.Contains(unplaced.ToString()) ? null
+            : $"the abstract describes the themes or the {included} included studies but not the {unplaced} placed in no theme; say how many studies the themes leave out, as the facts give it.";
     }
 
     /// <summary>

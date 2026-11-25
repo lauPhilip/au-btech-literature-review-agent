@@ -1,0 +1,36 @@
+@* The live line under a running review's title, for both kinds of review: what is happening right now ("Screening
+   record 120 of 431") with a small running count, worked out in code from the progress the run reports
+   (LiveActivity, MultivocalLiveActivity). Titles, queries and questions are shown as text, never as markup. A dot
+   pulses while the run works, and the sentence fades in when the kind of work changes, not with every count; both
+   stand still for people whose system asks for less motion. With Announce, a polite live region says only the kind
+   of work, through LiveAnnouncer, so a screen reader is not read every count; the systematic page has its own region. *@
+
+@if (Line is { } line)
+{
+    bool waiting = line.Kind is "queue" or "your-check";
+    <p class="@(string.IsNullOrEmpty(Class) ? "ui-live" : $"ui-live {Class}")" data-kind="@line.Kind">
+        <span class="@(waiting ? "ui-live-dot ui-live-dot-wait" : "ui-live-dot")" aria-hidden="true"></span>
+        <span @key="line.Kind" class="ui-live-text">@line.Text@(waiting ? "" : "…")</span>
+        @if (!string.IsNullOrEmpty(line.Count))
+        {
+            <span class="ui-live-count">@line.Count</span>
+        }
+    </p>
+}
+@if (Announce)
+{
+    <p class="sr-only" role="status" aria-live="polite">@_announcer.Next(Line?.Announce, DateTime.UtcNow)</p>
+}
+
+@code {
+    /// <summary>The line to show; nothing is shown when it is null (a run that is not running).</summary>
+    [Parameter] public AuBtechReviewAgent.LiveLine? Line { get; set; }
+
+    /// <summary>Whether this line has its own live region; off where the page announces the run itself.</summary>
+    [Parameter] public bool Announce { get; set; }
+
+    /// <summary>Extra classes for the line, such as its margin.</summary>
+    [Parameter] public string? Class { get; set; }
+
+    private readonly AuBtechReviewAgent.LiveAnnouncer _announcer = new();
+}

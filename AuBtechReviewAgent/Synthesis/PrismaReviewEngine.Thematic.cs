@@ -28,6 +28,9 @@ public partial class PrismaReviewEngine
         public ThematicCodebook Codebook { get; init; } = new();
         public List<SynthesisSection> Sections { get; } = new();
         public string Discussion { get; set; } = "";
+
+        /// <summary>The answers to the research questions, written with the discussion (issue #446); null without questions or when it failed.</summary>
+        public IReadOnlyList<string>? Answers { get; set; }
         public PeerReviewLog? PeerReview { get; set; }
 
         /// <summary>The evidence the sections were written from, for the closing sections written after them.</summary>
@@ -47,7 +50,7 @@ public partial class PrismaReviewEngine
         var result = new ThematicResult { Codebook = book };
         var extractions = state.Extractions ?? new List<StudyExtraction>();
         string goal = string.IsNullOrWhiteSpace(objective) ? query : objective;
-        // The research questions go to every step from the codebook on (issue #124); without them the prompts are as before.
+        // The research questions go to every step from the coding on (issues #124, #430); without them the prompts are as before.
         var questions = state.ResearchQuestions ?? new List<string>();
 
         // 1. Coding
@@ -57,7 +60,8 @@ public partial class PrismaReviewEngine
             ReportProgress(runId, state, RunProgress.Synthesis, RunProgress.Phase(RunProgress.SynthesisPhases, 1, 0), $"Coding {papers.Count} studies");
             var (c, uncoded) = await ThematicSynthesis.CodeStudiesAsync(chat, goal, papers, extractions,
                 Synthesis.CodingBatchSize, Llm.QualityParallelism,
-                (done, total) => ReportProgress(runId, state, RunProgress.Synthesis, RunProgress.Phase(RunProgress.SynthesisPhases, 1, (double)done / total), $"Coding studies: {Of(done, total, "batches")}"));
+                (done, total) => ReportProgress(runId, state, RunProgress.Synthesis, RunProgress.Phase(RunProgress.SynthesisPhases, 1, (double)done / total), $"Coding studies: {Of(done, total, "batches")}"),
+                questions, CriteriaForCodebook(state));
             codes = c;
             book.Codes = codes;
             book.Uncoded.AddRange(uncoded);
@@ -123,19 +127,22 @@ public partial class PrismaReviewEngine
             return result;
         }
 
-        // 5. Discussion from the subsections
+        // 5. The answers to the research questions, then the discussion that builds on them, from the subsections (issue #446)
         ReportProgress(runId, state, RunProgress.Synthesis, RunProgress.Phase(RunProgress.SynthesisPhases, 4, 0), "Writing the discussion");
         using (LlmStage.Begin("discussion"))
-            result.Discussion = await ReviewWriter.WriteDiscussionAsync(chat, profile, query, goal, result.Sections, evidence, referenceCount, message =>
+        {
+            var written = await ReviewWriter.WriteDiscussionAndAnswersAsync(chat, profile, query, goal, result.Sections, evidence, referenceCount, message =>
             {
                 Warn(message);
                 (book.WritingNotes ??= new()).Add(message);
-            }, questions);
+            }, questions, book.Unanswered?.Select(u => u.Question).ToList());
+            (result.Discussion, result.Answers) = (written.Text, written.Answers);
+        }
 
         // 6. Peer review, per section, with the same coverage guard as the fill pass
         ReportProgress(runId, state, RunProgress.Synthesis, RunProgress.Phase(RunProgress.SynthesisPhases, 5, 0), "Automated peer review");
         using (LlmStage.Begin("automated-peer-review"))
-            (result.PeerReview, result.Discussion) = await ReviewWriter.PeerReviewAsync(chat, profile, result.Sections, result.Discussion, evidence, referenceCount, Llm.QualityParallelism, Warn, goal, questions);
+            (result.PeerReview, result.Discussion) = await ReviewWriter.PeerReviewAsync(chat, profile, result.Sections, result.Discussion, evidence, referenceCount, Llm.QualityParallelism, Warn, goal, questions, result.Answers);
 
         return result;
     }

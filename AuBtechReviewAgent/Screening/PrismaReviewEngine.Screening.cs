@@ -118,7 +118,9 @@ public partial class PrismaReviewEngine
         var paper = o.Paper;
         var apa = ApaCitationBuilder.Build(paper);
         var flags = o.Flags.Count > 0 ? o.Flags.ToList() : null;
-        if (flags != null) stats.InjectionSuspected++;
+        // Every hit is logged; only a phrase aimed at the model (a strong one) marks the decision uncertain (#472).
+        bool suspected = PromptSafety.AnyStrong(flags);
+        if (suspected) stats.InjectionSuspected++;
         stats.CacheHits += o.CacheHits;
 
         ScreeningLog Log(string decision, string reasoning, string summary) => new(
@@ -163,7 +165,7 @@ public partial class PrismaReviewEngine
             confidence = "low";
             reasoning = "(No abstract was available, so this decision rests on the title and venue only.) " + reasoning;
         }
-        bool uncertain = !agree || confidence == "low" || flags != null;
+        bool uncertain = !agree || confidence == "low" || suspected;
 
         stats.Screened++;
         if (decision == "Included") stats.Included++; else stats.Excluded++;

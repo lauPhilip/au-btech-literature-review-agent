@@ -101,15 +101,24 @@ public partial class MultivocalStart
     }
 
     /// <summary>
-    /// What an academic source's kept text is (decision 8): its full text and where it came from, or its abstract alone.
-    /// Null for a grey source's page.
+    /// What an academic source's kept text is (decision 8): its full text and where it came from, or its abstract alone;
+    /// for a Stack Exchange question, that it came from the API, with its authors (#453). Null for a grey source's page.
     /// </summary>
     public static string? TextBasisLine(PageSnapshot snapshot) => snapshot.TextBasis switch
     {
         null => null,
+        { } api when api.StartsWith(MultivocalPages.StackExchangeBasisPrefix, StringComparison.Ordinal) =>
+            $"Kept {snapshot.AccessedUtc:yyyy-MM-dd HH:mm} UTC from the {api} (the site refuses automated page requests) · {snapshot.Characters:N0} characters · SHA-256 {snapshot.TextSha256[..Math.Min(12, snapshot.TextSha256.Length)]}… · CC BY-SA, by {StackExchangeAuthors(snapshot)}",
         MultivocalPages.FullTextBasis => $"Full text kept {snapshot.AccessedUtc:yyyy-MM-dd HH:mm} UTC from {snapshot.FullTextSource ?? "an open-access copy"} · {snapshot.Characters:N0} characters · SHA-256 {snapshot.TextSha256[..Math.Min(12, snapshot.TextSha256.Length)]}…",
         _ => $"Abstract only: no open full text ({(snapshot.FullTextSource ?? "none").Replace("none (", "").TrimEnd(')')}), so quotes come from the abstract · SHA-256 {snapshot.TextSha256[..Math.Min(12, snapshot.TextSha256.Length)]}…",
     };
+
+    /// <summary>The authors of a kept Stack Exchange thread, for its CC BY-SA attribution.</summary>
+    public static string StackExchangeAuthors(PageSnapshot snapshot)
+    {
+        var names = (snapshot.Attribution ?? new()).Select(c => c.Author).Where(a => a.Length > 0).Distinct().ToList();
+        return names.Count == 0 ? "its authors" : names.Count <= 3 ? string.Join(", ", names) : $"{string.Join(", ", names.Take(3))} and {names.Count - 3} more";
+    }
 
     internal static string DecisionLabel(GreyScreening d) => d.Decision switch
     {

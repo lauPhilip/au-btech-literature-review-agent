@@ -107,16 +107,8 @@ public partial class ApiDocsPageTests(ITestOutputHelper output)
         AssertSameShape(ApiDocExamples.Started("http://localhost"), startAnswer);
 
         var id = startAnswer.GetProperty("id").GetGuid();
-        var until = DateTime.UtcNow.AddSeconds(90);
-        JsonElement status;
-        do
-        {
-            await Task.Delay(500);
-            status = await client.GetFromJsonAsync<JsonElement>($"/api/v1/reviews/{id}");
-        }
-        while (!PrismaReviewEngine.IsFinishedStage(status.GetProperty("stage").GetString()) && DateTime.UtcNow < until);
-        await host.WaitForRunAsync(id, TimeSpan.FromSeconds(30));
-        status = await client.GetFromJsonAsync<JsonElement>($"/api/v1/reviews/{id}");
+        await host.WaitForFinishedStatusAsync(client, id);
+        var status = await client.GetFromJsonAsync<JsonElement>($"/api/v1/reviews/{id}");
         Assert.Equal(PrismaReviewEngine.StageComplete, status.GetProperty("stage").GetString());
         AssertSameShape(ApiDocExamples.Status("http://localhost"), status);
         AssertSameShape(ApiDocExamples.Report, await client.GetFromJsonAsync<JsonElement>($"/api/v1/reviews/{id}/report"));

@@ -56,9 +56,26 @@ public partial class SpecMatrix
     internal AuBtechReviewAgent.CitationRecheck? RecheckOf((string Field, int Sentence, int Reference) c) =>
         rechecks.LastOrDefault(r => r.Field == c.Field && r.SentenceIndex == c.Sentence && r.Reference == c.Reference);
 
+    [Inject] private Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor { get; set; } = default!;
+    [Inject] private AuBtechReviewAgent.ActionLimiter Actions { get; set; } = default!;
+
+    // The address the re-check limit counts by, read during the prerender as the review form reads it.
+    [PersistentState]
+    public string? PrerenderClientAddress { get; set; }
+
+    protected override void OnInitialized() =>
+        PrerenderClientAddress ??= AuBtechReviewAgent.RunQuotaService.NormalizeClientAddress(HttpContextAccessor.HttpContext?.Connection.RemoteIpAddress);
+
     internal async Task RecheckAsync((string Field, int Sentence, int Reference) c)
     {
         if (rechecking) return;
+        // Five a run, and on top a limit per address, so many runs cannot be re-checked in a loop.
+        if (!Actions.TryTake(AuBtechReviewAgent.ActionLimiter.Recheck, PrerenderClientAddress ?? "unknown", out string limited))
+        {
+            recheckMessage = limited;
+            recheckFailed = true;
+            return;
+        }
         rechecking = true;
         recheckMessage = null;
         recheckFailed = false;

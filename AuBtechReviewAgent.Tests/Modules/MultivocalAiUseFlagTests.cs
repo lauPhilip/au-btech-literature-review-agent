@@ -19,7 +19,7 @@ public class MultivocalAiUseFlagTests : IDisposable
     {
         var kept = pages.Pages.Where(p => !string.IsNullOrEmpty(p.TextFile)).ToList();
         Assert.Equal(1, kept.Count(p => p.InjectionFlags != null));
-        return $"The kept text of 1 of {kept.Count} {(kept.Count == 1 ? "source" : "sources")} contained phrases that look like instructions to a model; it was flagged for the reviewer and changed no decision.";
+        return $"The kept text of 1 of {kept.Count} {(kept.Count == 1 ? "source" : "sources")} contained phrases addressed to a model as instructions; it was flagged for the reviewer and changed no decision.";
     }
 
     [Theory]
@@ -32,7 +32,7 @@ public class MultivocalAiUseFlagTests : IDisposable
         string tex = ModuleKit.Text(run.Archive[MultivocalPaper.MainTexFile]);
 
         Assert.Contains(PaperLatex.Escape(Expected(pages)), tex);
-        Assert.Equal(1, tex.Split("instructions to a model").Length - 1);
+        Assert.Equal(1, tex.Split("addressed to a model").Length - 1);
     }
 
     [Fact]
@@ -57,6 +57,6 @@ public class MultivocalAiUseFlagTests : IDisposable
 
         string text = MultivocalPaper.AiUse(input, run.Writer.Load(run.RunId)!);
 
-        Assert.DoesNotContain("instructions to a model", text);
+        Assert.DoesNotContain("addressed to a model", text);
     }
 }

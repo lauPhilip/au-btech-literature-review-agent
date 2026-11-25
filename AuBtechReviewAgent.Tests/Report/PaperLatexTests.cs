@@ -54,4 +54,42 @@ public class PaperLatexTests
         Assert.Equal(string.Empty, PaperLatex.Escape(""));
         Assert.Equal(string.Empty, PaperLatex.EscapeReference(null!));
     }
+
+    [Theory]
+    [InlineData("α-UMi [97]", @"$\alpha$-UMi [97]")]
+    [InlineData("Cohen's κ ≥ 0.6", @"Cohen's $\kappa$ $\geq$ 0.6")]
+    [InlineData("λ-calculus and Δt", @"$\lambda$-calculus and $\Delta$t")]
+    [InlineData("Mäkinen, Öner, Preuß, Jiménez", "Mäkinen, Öner, Preuß, Jiménez")]
+    [InlineData("Wąsik and Þór", "Wasik and Thór")]
+    [InlineData("«guillemets» and „low quotes“", "``guillemets'' and ``low quotes“")]
+    [InlineData("Agents 🤖 at work", "Agents  at work")]
+    [InlineData("中文 title", "?? title")]
+    [InlineData("zero\u200Bwidth and thin\u2009space", "zerowidth and thin space")]
+    [InlineData("ά and ǫ", @"$\alpha$ and o")]
+    [InlineData("x ≈ 2 – 3 … done", @"x $\approx$ 2 – 3 … done")]
+    public void Characters_pdflatex_cannot_set_are_mapped_or_replaced(string input, string expected)
+    {
+        // Issue #475: main.tex stopped in pdflatex on "α" in a source's name.
+        Assert.Equal(expected, PaperLatex.Escape(System.Text.RegularExpressions.Regex.Unescape(input)));
+    }
+
+    [Fact]
+    public void Every_character_of_the_escaped_text_is_one_the_preamble_sets()
+    {
+        string tricky = "α β γ Ω ∑ √ ∞ ≠ ← ↔ ⇒ ✓ ★ ¹ ⁴ ₂ Ð ð Đ Ŋ Ę Į Ų ‹›‚„«» 😀 🇩🇰 한국어 русский עברית ‐ – — ‘’ “” • … € ™ ° ± µ ½ ß Æ Œ Ł ł ő ű č š ž ı ș ț";
+        string escaped = PaperLatex.Escape(tricky);
+
+        var unsafeChars = escaped.EnumerateRunes().Where(r => !LatexText.IsSafe(r)).Select(r => r.ToString()).ToList();
+        Assert.Empty(unsafeChars);
+    }
+
+    [Fact]
+    public void The_preamble_sets_text_in_T1_so_less_than_greater_than_and_bar_print_as_themselves()
+    {
+        // Issue #482: in the default OT1 encoding "<", ">" and "|" printed as "¡", "¿" and "—" in the PDF.
+        string tex = PaperLatex.Build(new ReviewPaper { Title = "Agents <and> tools | a review" });
+        Assert.Contains(@"\usepackage[T1]{fontenc}", tex);
+        Assert.True(tex.IndexOf(@"\usepackage[T1]{fontenc}", StringComparison.Ordinal) < tex.IndexOf(@"\usepackage{tgtermes}", StringComparison.Ordinal));
+        Assert.Contains("Agents <and> tools | a review", tex);
+    }
 }

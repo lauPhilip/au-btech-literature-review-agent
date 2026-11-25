@@ -37,7 +37,10 @@ public class MultivocalPaperPageSourceTests
         string? page = PageSource();
         if (page == null) return;
         Assert.Contains("if (field == MultivocalWriter.RationaleField) return -1;", page.Replace("AuBtechReviewAgent.", ""));
-        Assert.Contains("return field == MultivocalWriter.DiscussionField ? 2000 : 3000;", page.Replace("AuBtechReviewAgent.", ""));
+        // The answers come before the discussion and its parts, then the summary and the conclusion, as the page shows them (issue #461).
+        Assert.Contains("if (answer >= 0) return 1000 + answer;", page);
+        Assert.Contains("MultivocalWriter.DiscussionField => 2000,", page.Replace("AuBtechReviewAgent.", ""));
+        Assert.Contains("MultivocalWriter.SummaryField => 3000,", page.Replace("AuBtechReviewAgent.", ""));
         Assert.Contains("CitationView.Attention(checks, FieldRank)", page);
         Assert.Contains("ReportOutline.InOrder(checks, checkFilter, FieldRank)", page);
         Assert.Contains("ReportOutline.Multivocal(paper!)", page);

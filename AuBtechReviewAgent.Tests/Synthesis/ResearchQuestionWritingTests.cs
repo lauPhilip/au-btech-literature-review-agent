@@ -22,8 +22,11 @@ public class ResearchQuestionWritingTests : IDisposable
     {
         if (prompt.Contains("You are building the codebook"))
             return """{"themes":[{"name":"Recovery and oversight","description":"How agent loops recover and are overseen.","codes":["C1","C2"],"questions":["RQ1"]}],"unassigned":[],"unanswered":[{"question":"RQ2","reason":"No study certifies agent loops."}]}""";
+        // The discussion call writes the answer to RQ1 first (issue #446).
+        if (prompt.Contains("You are writing the Discussion section"))
+            return $$"""{"answers":["{{Answer}}"],"text":"Recovery and audits complement each other [1, 2]."}""";
         if (prompt.Contains("You are writing the sections that follow the discussion of"))
-            return $$"""{"limitations":"The evidence rests on abstracts only [1].","implications":"Teams should add supervisor checks [1].","futureResearch":"Certification of agent loops needs study [2].","conclusion":"Safe agent loops need recovery and oversight, while certification is still open.","answers":["{{Answer}}"]}""";
+            return """{"limitations":"The evidence rests on abstracts only [1].","implications":"Teams should add supervisor checks [1].","futureResearch":"Certification of agent loops needs study [2].","conclusion":"Safe agent loops need recovery and oversight, while certification is still open."}""";
         return ReviewWriterTests.Respond(prompt);
     }
 
@@ -56,13 +59,24 @@ public class ResearchQuestionWritingTests : IDisposable
         string front = Prompt("You are writing the title, abstract, rationale and objectives");
         Assert.Contains("4. \"objectives\" are written in code from the research questions above; do not write them.", front);
         Assert.EndsWith("{\"title\":\"...\",\"abstract\":\"...\",\"rationale\":\"... [n] ...\"}", front.TrimEnd());
+        // It is written after the closing sections, from the answers and the conclusion as given text (issue #446).
+        Assert.Contains($"\nRQ1: {Answer}\nRQ2: {ReviewWriter.UnansweredText(WritingProfile.Systematic)}\n\nCONCLUSION (written and checked before this step; the abstract ends on the same reading, in its own words):\nSafe agent loops need recovery and oversight, while certification is still open.\n", front);
         var report = System.Text.Json.JsonSerializer.Deserialize<PrismaReport>(File.ReadAllText(Path.Join(_root, runId.ToString("N"), "prisma-report.json")))!;
         Assert.Equal("The review set out to answer two research questions: (RQ1) How do agent loops recover from faults?; (RQ2) How are agent loops certified?", report.ObjectivesItem);
 
-        // The model answers RQ1 only; RQ2, which no code bears on, is answered in code and kept in the codebook.
+        // The discussion call answers RQ1 first (issue #446); RQ2, which no code bears on, is answered in code.
+        string discussion = Prompt("You are writing the Discussion section");
+        Assert.Contains("\"answers\": exactly 1 answer(s), one for each of RQ1 in that order", discussion);
+        Assert.Contains("No evidence bears on RQ2, so it is answered in code; give no answer for it.", discussion);
+
+        // The critique sees the answers as context and judges whether each section serves its question (issue #447).
+        string critique = Prompt("strict but constructive peer reviewer");
+        Assert.Contains($"ANSWERS TO THE RESEARCH QUESTIONS (written with the discussion and checked; not under review here):\nRQ1: {Answer}\n", critique);
+        Assert.Contains("(f) whether each section serves the research question it is for", critique);
+        // The closing step gets both answers as given text and asks for none; RQ2's stays in the codebook.
         string closing = Prompt("You are writing the sections that follow the discussion of");
-        Assert.Contains("RQ1: How do agent loops recover from faults?\nNo evidence bears on these, so they are answered in code; give no answer for them: RQ2: How are agent loops certified?\n", closing);
-        Assert.Contains("6. \"answers\": exactly 1 answer(s)", closing);
+        Assert.Contains($"RQ1: How do agent loops recover from faults?\nAnswer: {Answer}\nRQ2: How are agent loops certified?\nAnswer: {ReviewWriter.UnansweredText(WritingProfile.Systematic)}\n", closing);
+        Assert.DoesNotContain("\"answers\"", closing);
         Assert.Equal(new[] { Answer, ReviewWriter.UnansweredText(WritingProfile.Systematic) }, report.ResearchAnswers.Select(a => a.Answer));
         Assert.Equal(new[] { 1, 2 }, report.ResearchAnswers.Select(a => a.Number));
         var book = engine.LoadState(runId)!.ThematicSynthesis!;

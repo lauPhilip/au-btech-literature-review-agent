@@ -91,7 +91,8 @@ public sealed partial class MultivocalSynthesiser
             // Every quote is checked again against the kept page text before it is used; one that is no longer there
             // (the kept text was changed or removed) is left out, and the note says how many.
             var extracted = Findings(extraction, fixedMap, records, points);
-            var checkedFindings = extracted.Where(f => _pages.CheckQuote(runId, f.Address, f.Quote) == "found").ToList();
+            var checkQuote = _pages.QuoteChecker(runId);
+            var checkedFindings = extracted.Where(f => checkQuote(f.Address, f.Quote) == "found").ToList();
             if (checkedFindings.Count < extracted.Count)
                 file.Notes.Add($"{extracted.Count - checkedFindings.Count} extracted value(s) were left out because their quote is no longer in the kept page text.");
             // A value that only says the source does not state it ("Not addressed") is not a finding.
@@ -126,6 +127,9 @@ public sealed partial class MultivocalSynthesiser
                 file.NotCoded.AddRange(groups.Where(IsOther).Select(g => new NotCodedValue { Question = question, Attribute = g.Attribute, Findings = g.Findings, Sources = g.Sources }));
                 groups = groups.Where(g => !IsOther(g)).ToList();
                 if (groups.Count == 0) continue;
+                // A question about frequency or existence is answered by counting, in code, so it gets no themes (#462):
+                // a real run formed six themes for one, which the paper never showed but still counted.
+                if (MultivocalPaperParts.AnsweredInCode(q.Type)) continue;
                 progress?.Report($"{question}: {findings.Count} findings in {groups.Count} values; naming the themes");
                 await SynthesiseQuestionAsync(chat, planned.Plan.Topic, question, q.Text, groups, findings, open, file, progress);
             }

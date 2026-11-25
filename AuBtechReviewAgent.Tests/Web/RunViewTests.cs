@@ -71,7 +71,7 @@ public class RunViewTests
     }
 
     [Fact]
-    public async Task OnAPhoneOnlyTheActiveStepKeepsItsLineAndTheSideCardsAreHidden()
+    public async Task OnAPhoneTheLiveLineStandsForTheActiveStepsLineAndTheSideCardsAreHidden()
     {
         string html = await RenderAsync<RunProgressPanel>(new()
         {
@@ -80,7 +80,9 @@ public class RunViewTests
             ["Running"] = true,
         });
 
-        Assert.Equal(ReviewSteps.Count - 1, Count(html, "text-muted max-sm:hidden\">"));
+        // The live line under the title says what the active step does, so on a phone no step keeps its line.
+        Assert.Equal(ReviewSteps.Count, Count(html, "text-muted max-sm:hidden\">"));
+        Assert.Contains("class=\"ui-live mt-2 sm:mt-3\"", html);
         Assert.Contains("You can close this page. The review keeps running.", html);
         Assert.Contains("You can close this page</h2>", html);
         Assert.Equal(2, Count(html, "ui-card p-4 max-sm:hidden sm:p-5"));

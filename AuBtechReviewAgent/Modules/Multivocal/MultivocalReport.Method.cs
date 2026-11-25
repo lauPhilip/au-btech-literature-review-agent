@@ -52,7 +52,7 @@ public sealed partial class MultivocalReporter
         section.Blocks.Add(ReportBlock.Paragraph(
             $"{covered} On {ledger.SearchedUtc:yyyy-MM-dd} (UTC), {Count(ran.Count, "search", "searches")} ran across {Count(ran.Select(s => s.Source).Distinct().Count(), "source")} " +
             $"with {Count(plan.EffectiveGreySearchStrings.Count, "search string")} ({Join(plan.EffectiveGreySearchStrings.Select(t => $"\"{t}\""))}) and found {Count(ledger.GreyPool.Count(), "source")} (G7). " +
-            $"Each raw answer was saved as received, with its SHA-256 fingerprint. Stopping rule (G8): {Sentence(ledger.StoppingApplied)}"));
+            $"{MultivocalFormalText.RawAnswersSentence(ledger.Searches.Where(s => !s.Formal))} Stopping rule (G8): {Sentence(ledger.StoppingApplied)}"));
         section.Blocks.Add(ReportBlock.Table(new[] { "Source", "Search string", "Returned", "New" },
             ledger.Searches.Where(s => !s.Formal).Select(s => new[] { MultivocalGuidelines.SearchLabel(s.Source), s.SearchString, s.Error == null ? Num(s.Returned) : $"failed: {s.Error}", Num(s.New) })));
         if (ledger.HasFormalPool) section.Blocks.AddRange(MultivocalFormalText.SearchBlocks(input));
@@ -69,13 +69,11 @@ public sealed partial class MultivocalReporter
     {
         var s = input.Screening;
         var section = new ReportSection { Heading = "3. Selection (G9, G10)" };
-        int reviewed = s.Sources.Count(x => x.Reviewed);
-        int changed = s.Sources.Count(x => x.Reviewed && x.ModelDecision != null && x.ModelDecision != x.Decision);
         section.Blocks.Add(ReportBlock.Paragraph(
             MultivocalScreeningText.Method(s) +
             $"{Num(s.Count("Included"))} were included, {Num(s.Count("Excluded"))} excluded and {Num(s.Count("Duplicate"))} set aside as duplicates of a source with the same title" +
             $"{(s.Count("Error") > 0 ? $"; {Num(s.Count("Error"))} could not be screened" : "")}. " +
-            $"The reviewer looked at {Count(reviewed, "decision")} and changed {Num(changed)}; the model's decision stays on file next to the reviewer's."));
+            MultivocalScreeningText.Flagged(s).TrimEnd()));
         if (input.Ledger.HasFormalPool) section.Blocks.Add(ReportBlock.Paragraph(MultivocalFormalText.SelectionText(input)));
         section.Blocks.Add(ReportBlock.Paragraph($"Inclusion criteria: {Sentence(s.InclusionCriteria)} Exclusion criteria: {(s.ExclusionCriteria.Trim().Length > 0 ? Sentence(s.ExclusionCriteria) : "none.")}"));
         var reasons = s.Sources.Where(x => x.Decision == "Excluded")
@@ -142,15 +140,19 @@ public sealed partial class MultivocalReporter
     {
         var s = input.Synthesis;
         var section = new ReportSection { Heading = "6. Synthesis (G13)" };
+        // Only what the paper shows is counted (#462): a question answered by counting has no themes and no second placement.
+        var shown = MultivocalPaperParts.ShownThemes(input);
+        var themed = shown.Select(t => t.Question).ToHashSet();
+        var placements = s.SecondPlacements.Where(a => a.Kappa != null && themed.Contains(a.Question)).ToList();
         int notCoded = s.NotCoded.Sum(n => n.Findings.Count);
         section.Blocks.Add(ReportBlock.Paragraph(
             $"Each extracted value with its quote became a finding; {Count(s.Findings.Count, "finding")} remained after every quote was checked again against the kept page text, never the live page, and checked by the language model for whether it supports its value" +
             (s.Unsupported.Count > 0 ? $" ({Count(s.Unsupported.Count, "value")} left out as not supported)" : "") + ". " +
             "For each research question, the findings were grouped in code by attribute and value, the map's values serving as the first codes; the language model then named the themes, placed the values in them, and named the tensions between sources within a theme. " +
-            (s.SecondPlacements.Any(a => a.Kappa != null)
-                ? $"A second, independent placement of the values in the other order agreed with the first with Cohen's κ = {string.Join(", ", s.SecondPlacements.Where(a => a.Kappa != null).Select(a => $"{a.Kappa!.Value.ToString("0.00", CultureInfo.InvariantCulture)} for {a.Question}"))}; it did not change the themes. "
+            (placements.Count > 0
+                ? $"A second, independent placement of the values in the other order agreed with the first with Cohen's κ = {string.Join(", ", placements.Select(a => $"{a.Kappa!.Value.ToString("0.00", CultureInfo.InvariantCulture)} for {a.Question}"))}; it did not change the themes. "
                 : "") +
-            $"The review produced {Count(s.Themes.Count, "theme")}. What each theme rests on (how many sources, their outlet tiers and quality points, grey or formal literature) was counted in code, never by the model." +
+            $"The review produced {Count(shown.Count, "theme")}. What each theme rests on (how many sources, their outlet tiers and quality points, grey or formal literature) was counted in code, never by the model." +
             (notCoded > 0 ? $" {Count(notCoded, "finding")} had the map's \"Other\" value; they are listed under their question as not coded by the map, not themed." : "") +
             (s.Unassigned.Count > 0 ? $" {Count(s.Unassigned.Count, "value")} fit no theme; they are listed with the reason." : "") +
             (input.Ledger.HasFormalPool ? MultivocalFormalText.SynthesisText(input) : "")));

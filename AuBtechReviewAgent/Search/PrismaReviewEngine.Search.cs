@@ -167,13 +167,18 @@ public partial class PrismaReviewEngine
                 Status = "Running",
                 QueryUsed = query,
             };
+            // The live line names the database and string being asked now (LiveActivity); the bar does not move.
+            string subject = LiveActivity.SearchSubjectOf(source.SourceName, query);
+            int before = Volatile.Read(ref ctx.SearchPassesDone);
+            ReportProgress(ctx.RunId, ctx.State, RunProgress.Search, 0.05 + 0.95 * before / Math.Max(1, ctx.SearchPassesTotal), Of(before, ctx.SearchPassesTotal, "searches"), subject);
 
             List<AcademicPaper> papers = new();
             List<string> raw = new();
             string cacheKey = ReviewCache.Key("search-v1", source.SourceName, query, perPerspectiveCap.ToString());
             try
             {
-                if (Cache.TryGet<SearchCacheEntry>("search", cacheKey, out var cached) && cached != null)
+                // An entry with papers but no raw answer predates the Scopus and IEEE Xplore fix (#469): search again, so the answer is kept.
+                if (Cache.TryGet<SearchCacheEntry>("search", cacheKey, out var cached) && cached != null && (cached.Raw.Count > 0 || cached.Papers.Count == 0))
                 {
                     papers = cached.Papers;
                     raw = cached.Raw;
@@ -199,7 +204,7 @@ public partial class PrismaReviewEngine
             foreach (var paper in papers) distinct.Add(paper.Id);
             passes.Add(new SearchPass(log, papers, p));
             int searched = Interlocked.Increment(ref ctx.SearchPassesDone);
-            ReportProgress(ctx.RunId, ctx.State, RunProgress.Search, 0.05 + 0.95 * searched / ctx.SearchPassesTotal, Of(searched, ctx.SearchPassesTotal, "searches"));
+            ReportProgress(ctx.RunId, ctx.State, RunProgress.Search, 0.05 + 0.95 * searched / ctx.SearchPassesTotal, Of(searched, ctx.SearchPassesTotal, "searches"), subject);
         }
         return passes;
     }

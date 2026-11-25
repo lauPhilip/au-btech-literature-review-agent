@@ -32,6 +32,22 @@ public sealed class PaperResult
 }
 
 /// <summary>
+/// The answer to one research question, printed in one place after the results (issue #461): written by the model with
+/// the discussion and checked like it ("written"), or written in code ("code") for a question answered by counting,
+/// one no source bears on, or one whose answer could not be written.
+/// </summary>
+public sealed class QuestionAnswer
+{
+    public string Question { get; set; } = "";
+    public string QuestionText { get; set; } = "";
+    public string Kind { get; set; } = "code";
+    public string Text { get; set; } = "";
+
+    /// <summary>The field the citation check names a written answer by.</summary>
+    public string Field => $"rq-answer-{Question}";
+}
+
+/// <summary>
 /// The written paper of a multivocal run (mlr-paper.json), before and after the citation check: the title, abstract,
 /// rationale and objectives, the results in question order, the discussion and the summary for practitioners, with
 /// the outline, the coverage of each theme, the peer review and the style pass on file. The method, the data section,
@@ -49,6 +65,15 @@ public sealed class MultivocalPaperFile
     public string Objectives { get; set; } = "";
     public List<PaperResult> Results { get; set; } = new();
     public string Discussion { get; set; } = "";
+
+    /// <summary>The answer to each research question, in the plan's order; empty in a paper written before issue #461.</summary>
+    public List<QuestionAnswer> Answers { get; set; } = new();
+
+    /// <summary>The parts after the discussion (Garousi et al. 2019: threats to validity, implications for practitioners and researchers) and the conclusion; empty when they could not be written.</summary>
+    public string Limitations { get; set; } = "";
+    public string Implications { get; set; } = "";
+    public string FutureResearch { get; set; } = "";
+    public string Conclusion { get; set; } = "";
     public string? SummaryLead { get; set; }
     public List<string> SummaryItems { get; set; } = new();
     public List<ThemeCoverage> Coverage { get; set; } = new();
@@ -64,6 +89,13 @@ public sealed class MultivocalPaperFile
 
     /// <summary>The model that answered the citation checks when it was not <see cref="Model"/> (Llm:FastModel); null otherwise.</summary>
     public string? CheckModel { get; set; }
+
+    /// <summary>
+    /// The version of TraceableAI that wrote the paper, as <see cref="ToolVersion"/> reads it; the declarations name it, not
+    /// the version of the server that shows the paper (#468). A run written before it was recorded takes the version in its
+    /// run-metrics.json or llm-calls.json when it is loaded; null when the run's files record none.
+    /// </summary>
+    public string? AppVersion { get; set; }
 }
 
 /// <summary>A source the paper does not cite, and why.</summary>

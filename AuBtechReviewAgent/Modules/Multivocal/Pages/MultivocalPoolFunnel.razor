@@ -8,6 +8,10 @@
     </thead>
     <tbody>
         @Row("Found", Grey.Identified, Formal.Identified, true)
+        @if (Formal.ViaSeeds > 0)
+        {
+            @Row("of which by citation chaining from the most-cited", null, Formal.ViaSeeds, false)
+        }
         @if (Formal.DuplicatesRemoved + Formal.NoAddressRemoved > 0)
         {
             @Row("− Duplicates by DOI or title", null, Formal.DuplicatesRemoved, false)
@@ -45,6 +49,11 @@
         }
         @if (Extracted)
         {
+            @if (Grey.NotExtracted + Formal.NotExtracted > 0)
+            {
+                @* Kept but not extracted, so each column adds up from the kept sources to the extracted ones (#467). *@
+                @Row("− Could not be extracted", Grey.NotExtracted, Formal.NotExtracted, false)
+            }
             @Row("Extracted", Grey.Extracted, Formal.Extracted, true)
             @Row("of which on the abstract only", null, Formal.AbstractOnly, false)
         }

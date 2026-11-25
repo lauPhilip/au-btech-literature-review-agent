@@ -13,16 +13,20 @@ namespace AuBtechReviewAgent;
 /// declarations, the statement on the use of AI and the references. <see cref="PaperLatex.Build"/> writes it as
 /// main.tex; the paper page shows the same parts.
 /// </summary>
-public static class MultivocalPaper
+public static partial class MultivocalPaper
 {
     public const string MainTexFile = "main.tex";
 
     public static string KindLabel(MultivocalPlan plan) =>
         plan.UsesFormalPool ? "AI-GENERATED MULTIVOCAL LITERATURE REVIEW" : "AI-GENERATED GREY LITERATURE REVIEW";
 
-    /// <summary>The objectives as written, followed by the research questions from the plan, in code.</summary>
+    /// <summary>
+    /// The objectives: written in code from the research questions since issue #461, and so given as they are; in a paper
+    /// written before, the model's objectives followed by the research questions from the plan, in code.
+    /// </summary>
     public static string Objectives(MultivocalPlan plan, string written)
     {
+        if (written.TrimStart().StartsWith("The review set out to answer", System.StringComparison.Ordinal)) return written.Trim();
         var questions = plan.Numbered().Select(q => $"{q.Number}: {q.Question.Text.Trim().TrimEnd('?')}?");
         return $"{written.Trim()} The research questions were {string.Join("; ", questions)}".Trim();
     }
@@ -32,7 +36,8 @@ public static class MultivocalPaper
     {
         var plan = input.Planned.Plan;
         var themes = new List<PaperSection>();
-        foreach (var result in paper.Results)
+        var shown = ShownResults(input, paper);
+        foreach (var result in shown)
         {
             if (result.Kind == "theme")
             {
@@ -47,8 +52,6 @@ public static class MultivocalPaper
                 : new PaperSection(result.Heading, result.Text, MultivocalPaperParts.Prose(result.Text)));
         }
 
-        var notes = new List<PaperSection>();
-        if (audit?.SupportSummary != null) notes.Add(new PaperSection("Automated citation check", CheckNote(audit)));
 
         PaperSection? summary = null;
         if (paper.SummaryItems.Count > 0)
@@ -75,11 +78,13 @@ public static class MultivocalPaper
             DataText = MultivocalPaperParts.DataText(input),
             DataLatex = MultivocalPaperParts.DataLatex(input),
             ResultsHeading = "Results",
-            ResultsText = ResultsText(paper),
+            ResultsText = ResultsText(new MultivocalPaperFile { Results = shown }),
             Themes = themes,
-            Discussion = paper.Discussion,
-            DiscussionNotes = notes,
+            // The discussion is in its parts, so the answers come first (issue #461).
+            Discussion = "",
+            DiscussionNotes = DiscussionParts(input, paper, audit),
             Summary = summary,
+            Conclusion = ConclusionSection(paper),
             Declarations = Declarations(input, paper),
             References = GreyReferences.Build(input.Ledger, input.Pages, input.Extraction).Select(GreyReferences.Line).ToList(),
         };
@@ -91,7 +96,7 @@ public static class MultivocalPaper
         int themes = paper.Results.Count(r => r.Kind == "theme");
         int unwritten = paper.Results.Count(r => r.Kind == MultivocalWriter.UnwrittenKind);
         return $"The results answer each research question in turn. The {themes} theme section{(themes == 1 ? " was" : "s were")} written by the language model from the findings of {(themes == 1 ? "its theme" : "each theme")} only, and every citation in {(themes == 1 ? "it" : "them")} was checked against the kept page of the source it cites; " +
-               "the note under each theme, on what it rests on, and the answers to questions about frequency or existence are counted in code." +
+               "the note under each theme, on what it rests on, and the answers to questions about frequency, existence or a relationship are counted in code." +
                (unwritten == 0 ? "" : $" The section{(unwritten == 1 ? "" : "s")} on {unwritten} more theme{(unwritten == 1 ? "" : "s")} could not be written; {(unwritten == 1 ? "it is" : "they are")} kept in {(unwritten == 1 ? "its" : "their")} place with what {(unwritten == 1 ? "it rests" : "they rest")} on.");
     }
 
@@ -130,8 +135,15 @@ public static class MultivocalPaper
         new PaperSection("Registration and protocol",
             $"The review was not registered. Its protocol (need and audience, the decision to include grey literature, research questions, kinds of grey literature, searches and search strings, stopping rule, criteria and quality threshold) was written on {input.Planned.CreatedUtc:yyyy-MM-dd} (UTC), before any search; its SHA-256 fingerprint begins {Short(input.Planned.ProtocolSha256)}. The file is part of the run archive."),
         new PaperSection("Availability",
-            ($"The code of the tool is openly available at {ToolVersion.RepositoryUrl}. {ToolVersion.PaperSentence(ToolVersion.Current)} The run archive contains the protocol, the raw search answers, every screening decision and quality score with its quotes, the systematic map, the extraction, the synthesis, the written paper, the citation audit and a manifest.json with the SHA-256 fingerprint of every file. The kept page texts are fingerprinted but not redistributed.")),
+            ($"The code of the tool is openly available at {ToolVersion.RepositoryUrl}. {VersionSentence(paper.AppVersion)} The run archive contains the protocol, the raw search answers, every screening decision and quality score with its quotes, the systematic map, the extraction, the synthesis, the written paper, the citation audit and a manifest.json with the SHA-256 fingerprint of every file. The kept page texts are fingerprinted but not redistributed.")),
     };
+
+    /// <summary>The run's own version without the commit (#468), or "unknown" when its files record none.</summary>
+    public static string VersionNumber(string? version) => ToolVersion.Number(version) is { Length: > 0 } number ? number : "unknown";
+
+    /// <summary>The availability sentence on the run's own version; a run whose files record none says so.</summary>
+    public static string VersionSentence(string? version) =>
+        ToolVersion.Number(version).Length > 0 ? ToolVersion.PaperSentence(version) : "The run's files do not record which version of the tool made it.";
 
     /// <summary>The statement on the use of AI, written in code from what the run did.</summary>
     public static string AiUse(MultivocalReportInput input, MultivocalPaperFile paper)
@@ -143,19 +155,20 @@ public static class MultivocalPaper
             : $"the large language models {paper.Model} and {JoinList(others.Select(o => o.Model).ToList())}";
         string subject = others.Count == 0 ? "The model was" : "The models were";
         var text = new StringBuilder();
-        text.Append(inv, $"This review was conducted with TraceableAI (version {RecordingChatCompletionService.AppVersion.Split('+')[0]}), an open-source tool, following the multivocal literature review guidelines of Garousi et al. (2019), with {model}, in {paper.WrittenUtc.ToString("MMMM yyyy", inv)} (run {input.Planned.RunId}). ");
+        text.Append(inv, $"This review was conducted with TraceableAI (version {VersionNumber(paper.AppVersion)}), an open-source tool, following the multivocal literature review guidelines of Garousi et al. (2019), with {model}, in {paper.WrittenUtc.ToString("MMMM yyyy", inv)} (run {input.Planned.RunId}). ");
         if (others.Count > 0)
             text.Append($"Of these, {string.Join("; ", others.Select(o => $"{o.Model} answered {JoinList(o.Tasks)}"))}, and {paper.Model} did every other step that used a model. ");
         text.Append("The protocol was written by the authors and fingerprinted before the search. ");
         if (input.Ledger.HasFormalPool)
         {
-            text.Append(MultivocalFormalText.AiUseTasks(input, subject));
+            text.Append(MultivocalFormalText.AiUseTasks(input, subject, WrittenParts(paper)));
             text.Append(MultivocalFormalText.AiUseKappa(input));
+            text.Append(MultivocalFormalText.AiUseSeeds(input));
         }
         else
         {
-            text.Append(subject).Append(" used for ").Append(MultivocalScreeningText.AiUseTask(input.Screening, "the grey sources", "the criteria")).Append(", scoring their quality on the guidelines' checklist, proposing the systematic map, extracting each source's values, checking that each value's quote supports it, grouping the findings into themes, writing the theme sections, the discussion, the summary for practitioners and the title, abstract and introduction, and checking each citation against the kept page of the source it cites. ");
-            text.Append("Every value, quality point and citation verdict counts only with a quote found verbatim in the kept page text; the method, the counts, the figures, the answers to questions about frequency or existence and the references were written in code. ");
+            text.Append(subject).Append(" used for ").Append(MultivocalScreeningText.AiUseTask(input.Screening, "the grey sources", "the criteria")).Append(", scoring their quality on the guidelines' checklist, proposing the systematic map, extracting each source's values, checking that each value's quote supports it, grouping the findings into themes, writing ").Append(WrittenParts(paper)).Append(", and checking each citation against the kept page of the source it cites. ");
+            text.Append("Every value, quality point and citation verdict counts only with a quote found verbatim in the kept page text; the method, the counts, the figures, the answers to questions about frequency, existence or a relationship and the references were written in code. ");
             text.Append(MultivocalScreeningText.AiUseAgreement(input.Screening, bothPools: false));
         }
         int reviewed = input.Screening.Sources.Count(s => s.Reviewed);
@@ -171,16 +184,34 @@ public static class MultivocalPaper
     /// The models other than the paper's that answered a step (Llm:FastModel), each with what it did, from the run's
     /// files: the screening file names the screenings' model and the paper file the citation checks' model.
     /// </summary>
-    private static List<(string Model, List<string> Tasks)> OtherModels(MultivocalReportInput input, MultivocalPaperFile paper)
+    private static List<(string Model, List<string> Tasks)> OtherModels(MultivocalReportInput input, MultivocalPaperFile paper) =>
+        OtherModels(input, paper.Model, paper.CheckModel);
+
+    private static List<(string Model, List<string> Tasks)> OtherModels(MultivocalReportInput input, string mainModel, string? checkModel)
     {
         var steps = new List<(string Model, string Task)>();
-        string main = paper.Model.Trim();
+        string main = mainModel.Trim();
         if (main.Length == 0) return new();
         string screening = input.Screening.Model.Trim();
         if (screening.Length > 0 && screening != main) steps.Add((screening, input.Screening.AuditSeed == null || MultivocalSecondScreening.Count(input.Screening, null).AllTwice ? "both screenings of every source" : "every screening, first and second"));
-        string check = paper.CheckModel?.Trim() ?? "";
+        string check = checkModel?.Trim() ?? "";
         if (check.Length > 0 && check != main) steps.Add((check, "the citation checks"));
         return steps.GroupBy(s => s.Model, StringComparer.Ordinal).Select(g => (g.Key, g.Select(s => s.Task).ToList())).ToList();
+    }
+
+    /// <summary>
+    /// The data appendix's line on the models (#484), in the words of the statement on AI use: one model, or each model
+    /// other than the main one with what it answered. The main model is the paper's, or the synthesis's before the paper
+    /// is written; the citation checks' model is known only from the paper's file. Null when no model is on file.
+    /// </summary>
+    public static string? ModelsLine(MultivocalReportInput input, MultivocalPaperFile? paper)
+    {
+        string main = (paper?.Model is { Length: > 0 } written ? written : input.Synthesis.Model).Trim();
+        if (main.Length == 0) return null;
+        var others = OtherModels(input, main, paper?.CheckModel);
+        return others.Count == 0
+            ? $"Language model: {main}"
+            : $"Language models: {string.Join("; ", others.Select(o => $"{o.Model} answered {JoinList(o.Tasks)}"))}, and {main} did every other step that used a model";
     }
 
     private static string JoinList(IReadOnlyList<string> items) => items.Count switch

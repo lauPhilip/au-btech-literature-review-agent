@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -55,7 +56,8 @@ public sealed class PageSnapshot
 
     /// <summary>
     /// For a formal source: "full text" or "abstract only", the text the source is quoted and checked against
-    /// (decision 8); null, and left out of the file, for a grey source's page.
+    /// (decision 8); for a Stack Exchange question, "Stack Exchange API: question and N answers" (#453); null, and left
+    /// out of the file, for a grey source's page.
     /// </summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? TextBasis { get; set; }
@@ -63,6 +65,14 @@ public sealed class PageSnapshot
     /// <summary>For a formal source: where its open full text came from, or why there was none, as the systematic review says it.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? FullTextSource { get; set; }
+
+    /// <summary>For a text kept from an API (a Stack Exchange question, #453): the raw answers it came from, with their SHA-256.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public List<ApiResponseFile>? ApiResponses { get; set; }
+
+    /// <summary>Who wrote each part of the kept text, with links and licence, where the licence asks for attribution (CC BY-SA).</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public List<ContentCredit>? Attribution { get; set; }
 }
 
 /// <summary>The page snapshots of a multivocal run (multivocal-pages.json), which is in the run archive.</summary>
@@ -76,7 +86,8 @@ public sealed class MultivocalPagesFile
 /// Keeps the text of the grey sources' pages for a searched multivocal run. Only pages the run's searches found
 /// can be fetched, so the run never fetches an address typed in or made up; fetching goes through
 /// <see cref="PageFetcher"/>, which obeys robots.txt and paces each site. Keeping a page again replaces its snapshot.
-/// A formal source's text is its open full text or, without one, its abstract (MultivocalPages.Formal.cs).
+/// A formal source's text is its open full text or, without one, its abstract (MultivocalPages.Formal.cs); a Stack
+/// Exchange question's is the question and its answers from the API (MultivocalPages.StackExchange.cs).
 /// </summary>
 public sealed partial class MultivocalPages
 {
@@ -86,13 +97,15 @@ public sealed partial class MultivocalPages
     public const string TextFolder = "PageText";
 
     private static readonly JsonSerializerOptions Json = new() { WriteIndented = true };
-    private static readonly SemaphoreSlim Gate = new(1, 1);
+    /// <summary>One lock per run for its pages file, so keeping pages in one run never waits on another run.</summary>
+    private static readonly ConcurrentDictionary<Guid, SemaphoreSlim> Gates = new();
 
     private readonly RunStore _runs;
     private readonly MultivocalSearcher _searcher;
     private readonly PageFetcher _fetcher;
 
     private readonly Func<AcademicPaper, string, Task<FullTextResult>>? _fullText;
+    private readonly StackExchangeText _stackExchange;
 
     /// <summary>The page snapshots of the run folders.</summary>
     /// <param name="runs">The run folders.</param>
@@ -100,8 +113,11 @@ public sealed partial class MultivocalPages
     /// <param name="fetcher">Fetches a grey source's page.</param>
     /// <param name="fullText">Finds a formal source's open full text, as the systematic review does (into the folder
     /// given); without it, every formal source is kept on its abstract.</param>
-    public MultivocalPages(RunStore runs, MultivocalSearcher searcher, PageFetcher fetcher, Func<AcademicPaper, string, Task<FullTextResult>>? fullText = null)
+    /// <param name="stackExchange">Keeps a Stack Exchange question's text from the API (#453); by default the public API without a key.</param>
+    public MultivocalPages(RunStore runs, MultivocalSearcher searcher, PageFetcher fetcher, Func<AcademicPaper, string, Task<FullTextResult>>? fullText = null,
+        StackExchangeText? stackExchange = null)
     {
+        _stackExchange = stackExchange ?? new StackExchangeText();
         _runs = runs;
         _searcher = searcher;
         _fetcher = fetcher;
@@ -131,12 +147,27 @@ public sealed partial class MultivocalPages
     /// the live page, which may have changed since the access date; a kept text whose SHA-256 no longer matches counts
     /// as missing. Returns "found", "not found" or "no kept page".
     /// </summary>
-    public string CheckQuote(Guid runId, string address, string quote)
+    public string CheckQuote(Guid runId, string address, string quote) => QuoteChecker(runId)(address, quote);
+
+    /// <summary>
+    /// <see cref="CheckQuote"/> for many quotes of one run: the pages file is read once, and each kept text once,
+    /// checked against its fingerprint and made canonical once, however many quotes are checked in it.
+    /// </summary>
+    public Func<string, string, string> QuoteChecker(Guid runId)
     {
-        var snapshot = Load(runId).Pages.FirstOrDefault(p => MultivocalSearcher.AddressKey(p.Url) == address);
-        string? text = snapshot is { NotKept: null } ? ReadText(runId, snapshot) : null;
-        if (text == null) return "no kept page";
-        return CitationSupportChecker.QuoteOccursIn(quote, text) ? "found" : "not found";
+        var pages = Load(runId).Pages;
+        var texts = new Dictionary<string, CanonicalText?>();
+        return (address, quote) =>
+        {
+            if (!texts.TryGetValue(address, out var text))
+            {
+                var snapshot = pages.FirstOrDefault(p => MultivocalSearcher.AddressKey(p.Url) == address);
+                string? kept = snapshot is { NotKept: null } ? ReadText(runId, snapshot) : null;
+                texts[address] = text = kept == null ? null : CanonicalText.Of(kept);
+            }
+            if (text == null) return "no kept page";
+            return CitationSupportChecker.QuoteOccursIn(quote, text) ? "found" : "not found";
+        };
     }
 
     /// <summary>Fetches one found source's page and keeps its text. Needs the run's edit key.</summary>
@@ -148,6 +179,7 @@ public sealed partial class MultivocalPages
         var found = ledger.Sources.FirstOrDefault(s => MultivocalSearcher.AddressKey(s.Record.Url) == address)
             ?? throw new InvalidOperationException("Only pages the searches found can be kept.");
         if (found.Paper is { } paper) return await KeepFormalAsync(runId, found.Record, paper);
+        if (StackExchangeQuestion(found.Record) != null) return (await KeepStackExchangeAsync(runId, editKey, new[] { found.Record }))[0];
 
         var accessed = DateTime.UtcNow;
         var page = await _fetcher.FetchAsync(found.Record.Url);
@@ -183,7 +215,8 @@ public sealed partial class MultivocalPages
         }
 
         string folder = _runs.FolderOf(runId);
-        await Gate.WaitAsync();
+        var gate = Gates.GetOrAdd(runId, _ => new SemaphoreSlim(1, 1));
+        await gate.WaitAsync();
         try
         {
             if (text != null)
@@ -206,7 +239,7 @@ public sealed partial class MultivocalPages
         }
         finally
         {
-            Gate.Release();
+            gate.Release();
         }
     }
 

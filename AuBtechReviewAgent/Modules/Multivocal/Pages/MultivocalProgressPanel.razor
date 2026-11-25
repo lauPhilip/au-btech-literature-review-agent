@@ -3,7 +3,8 @@
 @* The progress of a multivocal run, laid out like the systematic review's progress tab (RunProgressPanel and
    PrismaFunnel): the overall bar with the elapsed time, the step running with its progress line, the list of steps,
    and below it the funnel of the sources from search to synthesis. The numbers come from the run's files and the
-   runner's status (MultivocalProgress); this component only shows them. *@
+   runner's status (MultivocalProgress); this component only shows them. The progress line is not a live region:
+   it changes with every count, so the page's head (MultivocalRunHeader) announces only the kind of work. *@
 
 @{
     bool complete = Stage == AuBtechReviewAgent.MultivocalWriter.StageChecked;
@@ -23,7 +24,7 @@
         <div class="h-full @barColor transition-all duration-500 @(running && percent == 0 ? "animate-pulse w-1/12" : "")" style="@(percent > 0 ? $"width:{percent}%" : "")"></div>
     </div>
 
-    <p class="text-[11px] text-ink leading-snug" role="status" aria-live="polite">
+    <p class="text-[11px] text-ink leading-snug">
         <span class="font-semibold">@CurrentLabel(complete, running, failed)</span>
         @if (running && !string.IsNullOrWhiteSpace(Status!.Progress))
         {

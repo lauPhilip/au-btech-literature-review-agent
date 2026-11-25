@@ -35,7 +35,7 @@ public class ReviewApiTests
         return await client.SendAsync(message);
     }
 
-    private static async Task<JsonElement> ProblemOf(HttpResponseMessage response)
+    internal static async Task<JsonElement> ProblemOf(HttpResponseMessage response)
     {
         Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
         return await response.Content.ReadFromJsonAsync<JsonElement>();
@@ -121,16 +121,8 @@ public class ReviewApiTests
         string editKey = started.GetProperty("editKey").GetString()!;
         Assert.EndsWith($"/api/v1/reviews/{id}", response.Headers.Location?.ToString());
 
-        JsonElement status = default;
-        var until = DateTime.UtcNow.AddSeconds(90);
-        while (DateTime.UtcNow < until)
-        {
-            status = await client.GetFromJsonAsync<JsonElement>($"/api/v1/reviews/{id}");
-            if (PrismaReviewEngine.IsFinishedStage(status.GetProperty("stage").GetString())) break;
-            await Task.Delay(750);
-        }
-        await host.WaitForRunAsync(id, TimeSpan.FromSeconds(30));
-        status = await client.GetFromJsonAsync<JsonElement>($"/api/v1/reviews/{id}");
+        await host.WaitForFinishedStatusAsync(client, id);
+        var status = await client.GetFromJsonAsync<JsonElement>($"/api/v1/reviews/{id}");
 
         if (status.GetProperty("stage").GetString() != PrismaReviewEngine.StageComplete) Assert.Fail(status.ToString());
         Assert.Equal(7, status.GetProperty("step").GetInt32());

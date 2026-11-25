@@ -31,6 +31,11 @@ public static partial class MethodsSectionWriter
         var sb = new StringBuilder();
         sb.Append($"For each included study, a language model {ModelInBrackets(model, "temperature 0")} extracted the study type, method, sample, up to three key findings and the stated limitations ");
         sb.Append($"from the full text where it could be retrieved ({fullText} of {extractions.Count} studies) and otherwise from the abstract. ");
+        if (extractions.Any(e => e.KeyFindings.Any(f => f.Question != null)))
+            sb.Append($"The passages were chosen with the words of the research questions weighted above the generic ones, and each key finding names the research question it bears on (checked in code against the questions); up to {StudyExtractor.ExtraFindings} further findings were kept for a study only when they answered a question none of its first three answered. ");
+        int reused = extractions.Count(e => e.FromCache == true);
+        if (reused > 0)
+            sb.Append($"{reused} extraction{(reused == 1 ? " was" : "s were")} reused from an earlier identical one (same text, research questions, model and prompt version), marked in extraction.json. ");
         sb.Append("Every extracted value had to come with a verbatim quote, which was checked against the paper's text in code");
         sb.Append(values.Count > 0 ? $"; {values.Count(v => v.QuoteVerified)} of {values.Count} quotes were found. " : ". ");
         sb.Append("Study quality was appraised with the Mixed Methods Appraisal Tool (MMAT, 2018): the model chose the study category and answered its five criteria with yes, no or can't tell, each backed by a quote; an answer whose quote could not be found in the text was changed to can't tell. ");
