@@ -17,6 +17,7 @@ public partial class MultivocalPaperPage
     private (string Field, int Sentence, int Reference)? openCitation;
     private int attentionIndex = -1;
     private string? pendingFocus;
+    private ArticleInfo? articleInfo;
 
     protected override void OnParametersSet()
     {
@@ -34,6 +35,9 @@ public partial class MultivocalPaperPage
         audit = Writer.LoadAudit(RunId);
         checks = audit?.SupportChecks ?? new List<CitationSupportResult>();
         references = input == null ? Array.Empty<GreyReference>() : GreyReferences.Build(input.Ledger, input.Pages, input.Extraction);
+        articleInfo = input != null && paper?.CheckedUtc != null
+            ? MultivocalArticleInfo.For(input, paper, File.Exists(Path.Join(Runs.FolderOf(RunId), "protocol.md")))
+            : null;
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
