@@ -149,7 +149,7 @@ public static class PaperLatex
     public static string Build(ReviewPaper paper)
     {
         var sb = new StringBuilder();
-        sb.AppendLine(@"\documentclass[9pt,a4paper]{article}");
+        sb.AppendLine(@"\documentclass[10pt,a4paper]{article}");
         // T1, the encoding the TeX Gyre fonts below are made for: in the default OT1 encoding "<", ">" and "|" print
         // as "¡", "¿" and "—" in running text (#482).
         sb.AppendLine(@"\usepackage[T1]{fontenc}");
