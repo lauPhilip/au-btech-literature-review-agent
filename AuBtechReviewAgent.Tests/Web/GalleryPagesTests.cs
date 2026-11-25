@@ -90,6 +90,20 @@ public sealed class GalleryPagesTests : IDisposable
     }
 
     [Fact]
+    public async Task AnEntryOfAReviewWhoseCardIsNotShownStaysOutOfSight()
+    {
+        var entry = await AddedEntryAsync("A multivocal review");
+        // The same entry, as if a multivocal run had made it: that card is still "coming soon" in production.
+        string path = Path.Join(GalleryFolder, entry.Id, GalleryEntry.FileName);
+        File.WriteAllText(path, System.Text.Json.JsonSerializer.Serialize(entry with { Module = "multivocal", Card = "multivocal" }));
+        using var host = new Host(GalleryFolder);
+        using var client = host.CreateClient();
+
+        Assert.DoesNotContain(entry.Id, await client.GetStringAsync("/gallery"));
+        Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync($"/gallery/{entry.Id}")).StatusCode);
+    }
+
+    [Fact]
     public void ThePrintViewCoversEveryPrintUtilityThePagesUse()
     {
         string? dir = AppContext.BaseDirectory;
