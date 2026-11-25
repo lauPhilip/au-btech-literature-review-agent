@@ -70,6 +70,7 @@ public static partial class MultivocalPaper
             Title = paper.Title,
             ProtocolHash = string.IsNullOrWhiteSpace(input.Planned.ProtocolSha256) ? "not recorded" : input.Planned.ProtocolSha256,
             GeneratedAt = paper.WrittenUtc.ToString("yyyy-MM-dd HH:mm:ss 'UTC'", CultureInfo.InvariantCulture),
+            Models = MultivocalArticleInfo.ModelsOf(input, paper),
             Abstract = paper.Abstract,
             Rationale = paper.Rationale,
             Objectives = Objectives(plan, paper.Objectives),

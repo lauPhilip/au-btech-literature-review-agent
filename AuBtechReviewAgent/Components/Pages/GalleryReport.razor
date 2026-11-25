@@ -10,7 +10,7 @@
 
 @if (entry != null)
 {
-    <SeoHead Title="@entry.Title" Path="@($"/gallery/{entry.Id}")" BreadcrumbName="Gallery"
+    <SeoHead Title="@entry.Title" Path="@($"/gallery/{entry.Id}")" BreadcrumbName="Gallery" AiGeneratedBy="@(Array.Empty<string>())"
              Description="@($"An example {AuBtechReviewAgent.GalleryCard.TypeLabel(entry.Card).ToLowerInvariant()} made with TraceableAI, shown as it prints, with every citation checked against its source.")" />
 
     <div class="mx-auto w-full max-w-[960px] px-[clamp(16px,3vw,40px)] py-6 sm:py-10">
