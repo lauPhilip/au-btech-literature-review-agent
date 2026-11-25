@@ -59,4 +59,41 @@ public class MultivocalAiUseFlagTests : IDisposable
 
         Assert.DoesNotContain("addressed to a model", text);
     }
+
+    [Fact]
+    public async Task AnOlderRunsFlagsAreJudgedAgainFromTheKeptTextWhenThePaperIsRebuilt()
+    {
+        var run = await FormalKit.RunAsync(_root);
+        string file = Path.Join(run.Store.FolderOf(run.RunId), MultivocalPages.PagesFile);
+        var pages = JsonSerializer.Deserialize<MultivocalPagesFile>(File.ReadAllText(file))!;
+        var kept = pages.Pages.Where(p => !string.IsNullOrEmpty(p.TextFile)).ToList();
+        Assert.All(kept.Where(p => p.InjectionFlags != null), p => Assert.Equal(PromptSafety.ScanVersion, p.FlagScan));
+
+        // As the scan before #472 wrote them: a strong name on a page whose text holds no phrase aimed at the model, and no version.
+        var clean = kept.First(p => p.InjectionFlags == null);
+        clean.InjectionFlags = new() { new("ignore-instructions", "you can ignore these rules in a .gitignore") };
+        var flagged = kept.Single(p => p.InjectionFlags != null && p != clean);
+        flagged.FlagScan = null;
+        File.WriteAllText(file, JsonSerializer.Serialize(pages));
+
+        var input = run.Reporter.LoadInput(run.RunId)!;
+        Assert.Null(input.Pages.Pages.Single(p => p.Url == clean.Url).InjectionFlags);
+        Assert.True(PromptSafety.AnyStrong(input.Pages.Pages.Single(p => p.Url == flagged.Url).InjectionFlags));
+        Assert.Contains(Expected(input.Pages), MultivocalPaper.AiUse(input, run.Writer.Load(run.RunId)!));
+        Assert.Equal("ignore-instructions", JsonSerializer.Deserialize<MultivocalPagesFile>(File.ReadAllText(file))!.Pages.Single(p => p.Url == clean.Url).InjectionFlags![0].Pattern);
+    }
+
+    [Fact]
+    public async Task APageWithOnlyWeakMentionsIsNotCountedAsFlagged()
+    {
+        var run = await FormalKit.RunAsync(_root);
+        var input = run.Reporter.LoadInput(run.RunId)!;
+        var clean = input.Pages.Pages.First(p => !string.IsNullOrEmpty(p.TextFile) && p.InjectionFlags == null);
+        clean.InjectionFlags = new() { new("mentions-system-prompt", "the system prompt holds the role") };
+
+        string text = MultivocalPaper.AiUse(input, run.Writer.Load(run.RunId)!);
+
+        Assert.Contains("The kept text of 1 of", text);
+        Assert.Contains("The kept text of 1 more only named prompts or model instructions as a subject", text);
+    }
 }

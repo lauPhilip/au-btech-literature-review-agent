@@ -106,7 +106,7 @@ public sealed partial class MultivocalReporter
         var extraction = _extractor.Load(runId);
         var synthesis = _synthesiser.Load(runId);
         if (planned == null || ledger == null || screening == null || quality == null || map == null || extraction == null || synthesis == null) return null;
-        return new MultivocalReportInput(planned, ledger, screening, _pages.Load(runId), quality, map, extraction, synthesis);
+        return new MultivocalReportInput(planned, ledger, screening, _pages.WithCurrentFlags(runId, _pages.Load(runId)), quality, map, extraction, synthesis);
     }
 
     /// <summary>The report, written in code from the run's files; <paramref name="paper"/>, once written, names the citation checks' model.</summary>

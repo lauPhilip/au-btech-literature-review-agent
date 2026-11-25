@@ -51,6 +51,18 @@ public class ThematicCode
     /// <summary>The research questions the code bears on ("RQ1"), checked in code; null (and not written) for a run without research questions.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public List<string>? Questions { get; set; }
+
+    /// <summary>True when the coding answer was reused from an earlier identical one and checked again in code; null (and not written) otherwise.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public bool? FromCache { get; set; }
+}
+
+/// <summary>How many coding answers, and whether the codebook, were reused from earlier identical ones (written only when the cache is on).</summary>
+public class SynthesisReuse
+{
+    public int CodingAnswers { get; set; }
+    public int CodingAnswersReused { get; set; }
+    public bool CodebookReused { get; set; }
 }
 
 public class Theme
@@ -112,6 +124,10 @@ public class ThematicCodebook
     public List<UnansweredQuestion>? Unanswered { get; set; }
     public List<ThemeCoverage> Coverage { get; set; } = new();
     public SecondCoding? SecondCoding { get; set; }
+
+    /// <summary>What the coding and codebook reused from the cache; null when the cache is off.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public SynthesisReuse? Reuse { get; set; }
 
     /// <summary>Included studies cited nowhere in the synthesis or discussion, with the reason.</summary>
     public List<UncodedStudy> NotCited { get; set; } = new();

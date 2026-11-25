@@ -174,8 +174,11 @@ public static partial class MultivocalPaper
         int reviewed = input.Screening.Sources.Count(s => s.Reviewed);
         text.Append(reviewed > 0 ? string.Create(inv, $"A human reviewer checked {reviewed} screening decisions within the tool. ") : "Screening decisions were not checked by a human reviewer within the tool. ");
         var kept = input.Pages.Pages.Where(p => !string.IsNullOrEmpty(p.TextFile)).ToList();
-        int flagged = kept.Where(p => p.InjectionFlags is { Count: > 0 }).Select(p => MultivocalSearcher.AddressKey(p.Url)).Distinct().Count();
-        text.Append(AiUseStatement.FlaggedSources(flagged, kept.Select(p => MultivocalSearcher.AddressKey(p.Url)).Distinct().Count(), "kept text", "source", "sources"));
+        // Only a strong flag is counted as one; a page that only names prompts is a mention (#472, lost in a merge and put back).
+        var withHits = kept.Where(p => p.InjectionFlags is { Count: > 0 }).ToList();
+        int flagged = withHits.Where(p => PromptSafety.AnyStrong(p.InjectionFlags)).Select(p => MultivocalSearcher.AddressKey(p.Url)).Distinct().Count();
+        int mentioned = withHits.Select(p => MultivocalSearcher.AddressKey(p.Url)).Distinct().Count() - flagged;
+        text.Append(AiUseStatement.FlaggedSources(flagged, kept.Select(p => MultivocalSearcher.AddressKey(p.Url)).Distinct().Count(), "kept text", "source", "sources", mentioned));
         text.Append("The authors reviewed the output and take full responsibility for the content.");
         return text.ToString();
     }
