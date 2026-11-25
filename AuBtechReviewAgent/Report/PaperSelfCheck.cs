@@ -70,6 +70,12 @@ public sealed class PaperCheckInput
     public CitationSupportSummary? CitationsInitial { get; init; }
     public int CitationsRemoved { get; init; }
 
+    /// <summary>
+    /// The citation check's counts as the run page shows them (from the ledger, with <c>Removed</c> set); null when the
+    /// module keeps none. They should equal the report's (<see cref="CitationsFinal"/>); run 596541db showed 109 and 113.
+    /// </summary>
+    public CitationSupportSummary? CitationsShown { get; init; }
+
     /// <summary>The closing parts every paper of this kind has, with the names a reader knows them by.</summary>
     public Dictionary<PaperPartKind, string> ExpectedParts { get; init; } = new()
     {

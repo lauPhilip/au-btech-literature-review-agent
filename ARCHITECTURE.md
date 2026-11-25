@@ -59,7 +59,7 @@ These rules are why the code looks the way it does. A change that breaks one of 
 
 **Everything is on file.** Each run writes its protocol before searching, its raw database answers, every decision with its reasoning, every model call and the citation audit to its folder. The archive fingerprints every file with SHA-256 in `manifest.json`.
 
-**Results are reproducible where they can be.** Decisions run at temperature 0, and every prompt that makes decisions has a version that is part of the cache key. When you change a screening prompt, raise `ScreeningPromptVersion`.
+**Results are reproducible where they can be.** Decisions run at temperature 0, and every prompt that makes decisions has a version that is part of the cache key. The key also holds the prompt itself: the whole prompt for the extraction, coding, codebook, citation check and repair sense, and a SHA-256 of the fixed text for screening, the multivocal quality and extraction steps and the formal appraisal (`PromptTemplate`), so an edited prompt is never answered from the cache. Still raise the version when you change a prompt (`ScreeningPromptVersion` for screening): `PromptTemplateVersionTests` fails when a prompt's text changes but its version does not.
 
 ## Where state lives
 

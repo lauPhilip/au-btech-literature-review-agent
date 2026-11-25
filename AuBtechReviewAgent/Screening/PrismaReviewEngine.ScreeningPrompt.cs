@@ -16,40 +16,8 @@ public partial class PrismaReviewEngine
     /// </summary>
     public static async Task<ScreeningAnswer> ScreenPaperAsync(IChatCompletionService chatService, AcademicPaper paper, string inclusionCriteria, string exclusionCriteria, bool secondScreener = false)
     {
-        string authorList = string.Join(", ", paper.Authors ?? new List<string>());
         bool noAbstract = string.IsNullOrWhiteSpace(paper.Abstract);
-        string record = $"""
-            - Title: {paper.Title}
-            - Authors: {authorList}
-            - Date Context: {paper.PublishedDate}
-            - Publication/Journal Venue: {paper.JournalSource}
-            - Abstract: {(noAbstract ? "(none: this record has no abstract)" : paper.Abstract)}
-            """;
-        string noAbstractNotice = noAbstract
-            ? "\nTHIS RECORD HAS NO ABSTRACT. Judge it on the title and venue only, and do not describe or quote an abstract in the reasoning or the summary.\n"
-            : "";
-
-        string procedure = ScreeningProcedure(secondScreener);
-
-        var prompt = $$"""
-            Evaluate the following academic paper against the provided systematically structured PRISMA parameters.
-
-            CRITERIA DIRECTIVES (from the reviewer):
-            - Inclusion Thresholds: {{inclusionCriteria}}
-            - Exclusion Thresholds: {{exclusionCriteria}}
-
-            {{PromptSafety.ReviewerInputNotice}}
-
-            {{PromptSafety.DataOnlyNotice}}
-
-            PAPER TARGET DATA:
-            {{PromptSafety.Wrap(record, "paper metadata and abstract")}}
-            {{noAbstractNotice}}
-            {{procedure}}
-            (The reference string is built separately from the source metadata - do not write one.)
-
-            {{ScreeningAnswerFormat}}
-            """;
+        string prompt = ScreeningPrompt(paper, inclusionCriteria, exclusionCriteria, secondScreener);
 
         if (!noAbstract)
             return (await LlmJson.GetAsync<ScreeningAnswer>(chatService, prompt, JsonMode(0.0), ScreeningAnswer.Validate)).Normalized();
@@ -68,6 +36,65 @@ public partial class PrismaReviewEngine
             return answer;
         }
     }
+
+    /// <summary>The screening prompt for one record, as sent to the model.</summary>
+    public static string ScreeningPrompt(AcademicPaper paper, string inclusionCriteria, string exclusionCriteria, bool secondScreener)
+    {
+        string authorList = string.Join(", ", paper.Authors ?? new List<string>());
+        bool noAbstract = string.IsNullOrWhiteSpace(paper.Abstract);
+        string record = $"""
+            - Title: {paper.Title}
+            - Authors: {authorList}
+            - Date Context: {paper.PublishedDate}
+            - Publication/Journal Venue: {paper.JournalSource}
+            - Abstract: {(noAbstract ? "(none: this record has no abstract)" : paper.Abstract)}
+            """;
+        string noAbstractNotice = noAbstract
+            ? "\nTHIS RECORD HAS NO ABSTRACT. Judge it on the title and venue only, and do not describe or quote an abstract in the reasoning or the summary.\n"
+            : "";
+
+        string procedure = ScreeningProcedure(secondScreener);
+
+        return $$"""
+            Evaluate the following academic paper against the provided systematically structured PRISMA parameters.
+
+            CRITERIA DIRECTIVES (from the reviewer):
+            - Inclusion Thresholds: {{inclusionCriteria}}
+            - Exclusion Thresholds: {{exclusionCriteria}}
+
+            {{PromptSafety.ReviewerInputNotice}}
+
+            {{PromptSafety.DataOnlyNotice}}
+
+            PAPER TARGET DATA:
+            {{PromptSafety.Wrap(record, "paper metadata and abstract")}}
+            {{noAbstractNotice}}
+            {{procedure}}
+            (The reference string is built separately from the source metadata - do not write one.)
+
+            {{ScreeningAnswerFormat}}
+            """;
+    }
+
+    private static readonly Lazy<string>[] ScreeningTemplates = { new(() => TemplateOf(false)), new(() => TemplateOf(true)) };
+
+    /// <summary>
+    /// The fingerprint of one screener's fixed prompt text, with and without an abstract, part of the screening cache key
+    /// so an edit to the prompt, or to the shared <see cref="ScreeningProcedure"/>, is never answered from the cache.
+    /// </summary>
+    public static string ScreeningTemplateSha256(bool secondScreener) => ScreeningTemplates[secondScreener ? 1 : 0].Value;
+
+    /// <summary>The screening prompts written with placeholders, with an abstract and without: the fixed text only.</summary>
+    public static IEnumerable<string> ScreeningTemplate(bool secondScreener)
+    {
+        AcademicPaper Paper(string abstractText) => new(PromptTemplate.Slot("id"), PromptTemplate.Slot("title"), abstractText,
+            PromptTemplate.Slot("date"), new List<string> { PromptTemplate.Slot("authors") }, PromptTemplate.Slot("venue"));
+        string inclusion = PromptTemplate.Slot("inclusion"), exclusion = PromptTemplate.Slot("exclusion");
+        yield return ScreeningPrompt(Paper(PromptTemplate.Slot("abstract")), inclusion, exclusion, secondScreener);
+        yield return ScreeningPrompt(Paper(""), inclusion, exclusion, secondScreener);
+    }
+
+    private static string TemplateOf(bool secondScreener) => PromptTemplate.Hash(ScreeningTemplate(secondScreener));
 
     /// <summary>Put before a reason that speaks of an abstract the record does not have.</summary>
     public const string AbstractClaimWarning = "(Warning: this reason mentions an abstract, but the record has none, so that part was not read from the record.)";
