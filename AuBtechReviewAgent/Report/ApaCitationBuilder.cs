@@ -20,7 +20,11 @@ public static partial class ApaCitationBuilder
     /// </summary>
     public static readonly StringComparer ReferenceOrder = StringComparer.OrdinalIgnoreCase;
 
-    public record ApaResult(string Citation, string VenueType, string VenueName, int Year);
+    public record ApaResult(string Citation, string VenueType, string VenueName, int Year)
+    {
+        /// <summary>Volume, issue, pages, publisher and arXiv identifier, or null when the record has none.</summary>
+        public ReferenceDetails? Details { get; init; }
+    }
 
     // Venue strings some adapters fill in when the API gave no real venue. They are not venues, so they
     // must never be printed as one or used for the quartile lookup.
@@ -41,70 +45,94 @@ public static partial class ApaCitationBuilder
     private static readonly Regex ConferencePattern =
         new(@"\b(conference|proceedings|symposium|workshop|congress)\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
-    public static ApaResult Build(AcademicPaper paper)
+    /// <summary>
+    /// Builds the reference. <paramref name="known"/> holds details found outside the venue string, from the reference
+    /// enrichment (Crossref, OpenAlex, arXiv); they win over what the venue string carries.
+    /// </summary>
+    public static ApaResult Build(AcademicPaper paper, ReferenceDetails? known = null)
     {
         string authors = FormatAuthorList(paper.Authors ?? new List<string>());
         int year = ExtractYear(paper.PublishedDate);
         string yearText = year > 0 ? year.ToString() : "n.d.";
-        string title = CleanText(paper.Title).TrimEnd('.');
+        string title = TitleAsGiven(paper.Title);
         string venue = CleanVenue(paper.JournalSource);
-        // APA 7 sets volume and issue as "*Journal*, *14*(2), 1–10", not inside the italic name (issue #151).
-        string locator = "";
+        // A book's record often repeats its title as the venue; the work then stands alone.
+        if (Comparable(venue) == Comparable(title)) venue = "";
+        var parsed = new ReferenceDetails { ArxivId = ReferenceDetails.ArxivIdOf(paper.Doi, paper.Id, paper.Url, paper.JournalSource) };
         var volumeIssue = VolumeIssuePattern.Match(venue);
         if (volumeIssue.Success && !ConferencePattern.IsMatch(venue))
         {
             venue = volumeIssue.Groups["name"].Value.Trim().TrimEnd(',');
-            locator = $", *{volumeIssue.Groups["vol"].Value}*"
-                      + (volumeIssue.Groups["iss"].Success ? $"({volumeIssue.Groups["iss"].Value})" : "")
-                      + (volumeIssue.Groups["pages"].Success ? ", " + Regex.Replace(volumeIssue.Groups["pages"].Value, @"\s*[-\u2013]+\s*", "\u2013") : "");
+            parsed.Volume = volumeIssue.Groups["vol"].Value;
+            if (volumeIssue.Groups["iss"].Success) parsed.Issue = volumeIssue.Groups["iss"].Value;
+            if (volumeIssue.Groups["pages"].Success) parsed.Pages = ReferenceDetails.PageRange(volumeIssue.Groups["pages"].Value);
         }
+        var details = (known ?? new ReferenceDetails()).Or(parsed);
         string link = BuildLink(paper);
-        bool isArxiv = (paper.Id ?? "").Contains("arxiv.org", StringComparison.OrdinalIgnoreCase)
-                       || (paper.Doi ?? "").Contains("10.48550/arxiv", StringComparison.OrdinalIgnoreCase);
 
         string venueType;
         string venuePart;
-        if (string.IsNullOrEmpty(venue))
+        bool standAlone = string.IsNullOrEmpty(venue);
+        if (standAlone)
         {
-            // No venue: an arXiv record without a journal_ref is a preprint; anything else is unknown.
+            // No venue: an arXiv record without a journal_ref is a preprint, cited with its identifier (APA 7, 10.8).
             venueType = "Preprints";
-            venuePart = isArxiv ? "arXiv." : "";
+            venuePart = details.ArxivId != null ? "arXiv." : "";
         }
-        else if (venue.Contains("Transactions", StringComparison.OrdinalIgnoreCase))
+        else if (ConferencePattern.IsMatch(venue) && !venue.Contains("Transactions", StringComparison.OrdinalIgnoreCase))
         {
-            venueType = "Transactions";
-            venuePart = $"*{venue}*{locator}.";
-        }
-        else if (ConferencePattern.IsMatch(venue))
-        {
+            // APA 7 (10.5): a paper in published proceedings is a chapter: "In *Proceedings* (pp. 1–5). Publisher."
             venueType = "Conferences";
-            venuePart = $"In *{venue}*.";
+            var inParens = new List<string>();
+            if (details.Volume != null) inParens.Add($"Vol. {details.Volume}");
+            if (details.Pages != null) inParens.Add((details.Pages.Contains('\u2013') ? "pp. " : "p. ") + details.Pages);
+            else if (details.ArticleNumber != null) inParens.Add($"Article {details.ArticleNumber}");
+            venuePart = $"In *{venue}*" + (inParens.Count > 0 ? $" ({string.Join(", ", inParens)})" : "") + ".";
+            if (!string.IsNullOrWhiteSpace(details.Publisher) && Comparable(details.Publisher) != Comparable(venue))
+                venuePart += $" {CleanText(details.Publisher).TrimEnd('.')}.";
         }
         else
         {
-            venueType = "Journals";
-            venuePart = $"*{venue}*{locator}.";
+            // APA 7 sets volume and issue as "*Journal*, *14*(2), 1–10", not inside the italic name (issue #151).
+            venueType = venue.Contains("Transactions", StringComparison.OrdinalIgnoreCase) ? "Transactions" : "Journals";
+            venuePart = $"*{venue}*{JournalLocator(details)}.";
         }
+
+        // APA 7: a work that stands alone (no journal or proceedings around it) has its title in italics, and a preprint
+        // gives its number after the title.
+        string titlePart = (standAlone ? $"*{title}*" : title)
+                           + (standAlone && details.ArxivId != null ? $" (arXiv:{details.ArxivId})" : "");
+        titlePart += title.EndsWith('?') || title.EndsWith('!') ? "" : ".";
 
         // APA: when there is no author, the title moves into the author position.
         var parts = new List<string>();
         if (string.IsNullOrEmpty(authors))
         {
-            parts.Add($"{title}.");
+            parts.Add(titlePart);
             parts.Add($"({yearText}).");
         }
         else
         {
             parts.Add($"{authors} ({yearText}).");
-            parts.Add($"{title}.");
+            parts.Add(titlePart);
         }
         if (!string.IsNullOrEmpty(venuePart)) parts.Add(venuePart);
         // A venue with only the arXiv link: the link is the preprint, not the published version, so say so.
         bool preprintLink = Regex.IsMatch(link, @"10\.48550/arxiv\.|//arxiv\.org/", RegexOptions.IgnoreCase);
-        if (!string.IsNullOrEmpty(link)) parts.Add(!string.IsNullOrEmpty(venue) && preprintLink ? $"Preprint: {link}" : link);
+        if (!string.IsNullOrEmpty(link)) parts.Add(!standAlone && preprintLink ? $"Preprint: {link}" : link);
 
-        return new ApaResult(string.Join(" ", parts), venueType, venue, year);
+        return new ApaResult(string.Join(" ", parts), venueType, venue, year) { Details = details.IsEmpty && details.EnrichedFrom == null ? null : details };
     }
+
+    // ", *14*(2), 1–10", ", *14*, Article 104512", or "" when there is no volume.
+    private static string JournalLocator(ReferenceDetails d)
+    {
+        if (d.Volume == null) return d.Pages != null ? $", {d.Pages}" : d.ArticleNumber != null ? $", Article {d.ArticleNumber}" : "";
+        return $", *{d.Volume}*" + (d.Issue != null ? $"({d.Issue})" : "")
+               + (d.Pages != null ? $", {d.Pages}" : d.ArticleNumber != null ? $", Article {d.ArticleNumber}" : "");
+    }
+
+    private static string Comparable(string? s) => Regex.Replace((s ?? "").ToLowerInvariant(), @"[^\p{L}\p{N}]+", "");
 
     /// <summary>A run of a reference's text, set in italics or not.</summary>
     public record TextSpan(string Text, bool Italic);
@@ -159,6 +187,37 @@ public static partial class ApaCitationBuilder
         // Scholar/ResearchGate summaries often end with the year ("Future Internet, 2025"); drop it.
         v = Regex.Replace(v, @",?\s*(19|20)\d{2}\s*$", "").Trim().TrimEnd(',');
         return v;
+    }
+
+    // Short words that are ordinary English, not acronyms, when a title comes in capitals.
+    private static readonly HashSet<string> CommonShortWords = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "a", "an", "the", "and", "or", "nor", "but", "of", "in", "on", "at", "to", "for", "by", "via", "as", "is", "are", "be",
+        "it", "its", "new", "use", "how", "why", "who", "can", "do", "we", "our", "not", "all", "one", "two", "way", "key", "per",
+        "off", "out", "up", "vs", "with", "from", "into",
+    };
+
+    /// <summary>
+    /// The title as the source gave it, without a closing full stop. Titles keep their capitalisation, because turning a
+    /// title into sentence case in code would lower proper nouns the source got right ("Python", "Bayesian"). The one
+    /// exception is a title in capitals only ("AGENTIC AI FRAMEWORKS FOR ..."), which APA would never print: it becomes
+    /// sentence case, and words of up to three letters that are not ordinary words stay in capitals ("AI", "LLM").
+    /// </summary>
+    public static string TitleAsGiven(string? raw)
+    {
+        string title = CleanText(raw).TrimEnd('.');
+        if (!title.Any(char.IsLetter) || title.Any(char.IsLower) || title.Count(char.IsLetter) < 12) return title;
+        bool startOfSentence = true;
+        return Regex.Replace(title, @"[\p{L}\p{N}'’]+|[:?!.—]", m =>
+        {
+            string w = m.Value;
+            if (w.Length == 1 && ":?!.—".Contains(w)) { startOfSentence = true; return w; }
+            bool acronym = w.Any(char.IsDigit) || (w.Length <= 3 && !CommonShortWords.Contains(w));
+            string word = acronym ? w : w.ToLowerInvariant();
+            if (startOfSentence && !acronym) word = char.ToUpperInvariant(word[0]) + word[1..];
+            startOfSentence = false;
+            return word;
+        });
     }
 
     // Asterisks would break the italic markers used for venues; collapse stray whitespace/newlines.

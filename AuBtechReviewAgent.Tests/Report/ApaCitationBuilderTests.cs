@@ -59,7 +59,8 @@ public class ApaCitationBuilderTests
 
         var result = ApaCitationBuilder.Build(paper);
 
-        Assert.Equal("Setiawan, L., & Mittal, A. (2026). LLMoxie: Exploring Agentic AI for Scientific Software Development. arXiv. https://doi.org/10.48550/arXiv.2607.02703", result.Citation);
+        // APA 7 (10.8): a preprint stands alone, so its title is in italics, followed by its arXiv number.
+        Assert.Equal("Setiawan, L., & Mittal, A. (2026). *LLMoxie: Exploring Agentic AI for Scientific Software Development* (arXiv:2607.02703). arXiv. https://doi.org/10.48550/arXiv.2607.02703", result.Citation);
         Assert.Equal("Preprints", result.VenueType);
         Assert.Equal("", result.VenueName);
     }
