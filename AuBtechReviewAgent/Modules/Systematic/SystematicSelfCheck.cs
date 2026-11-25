@@ -149,6 +149,16 @@ public static class SystematicSelfCheck
         return file;
     }
 
+    /// <summary><see cref="WriteFile"/> for the end of a run: a failure is logged and never fails the run, which is already written.</summary>
+    public static void TryWriteFile(string folder, ReviewState state, Microsoft.Extensions.Logging.ILogger log)
+    {
+        try { WriteFile(folder, state); }
+        catch (Exception ex)
+        {
+            Microsoft.Extensions.Logging.LoggerExtensions.LogWarning(log, "The self-check was not written: {Message}", PrismaReviewEngine.SanitizeLogMessage(ex.Message));
+        }
+    }
+
     /// <summary>The self-check on file, or for a run made before it a fresh one from its files (not saved); null without a report.</summary>
     public static PaperSelfCheckFile? Load(string folder)
     {

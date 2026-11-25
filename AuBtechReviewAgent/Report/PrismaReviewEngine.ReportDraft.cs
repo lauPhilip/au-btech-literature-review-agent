@@ -120,7 +120,7 @@ public partial class PrismaReviewEngine
             var check = await CheckCitationsAsync(run);
             var coverage = await RecordCoverageAsync(run, check.Fields);
             await WriteReportFilesAsync(run, check, coverage);
-            WriteSelfCheck(sessionId, finalState);
+            SystematicSelfCheck.TryWriteFile(GetWorkspaceFolderPath(sessionId), finalState, _log);
         }
         catch (Exception fatalEx)
         {
@@ -134,16 +134,6 @@ public partial class PrismaReviewEngine
             };
             await File.WriteAllTextAsync(GetReportFilePath(sessionId), JsonSerializer.Serialize(failureReport, new JsonSerializerOptions { WriteIndented = true }));
             finalState.FailureMessage = $"The report could not be generated: {SanitizeLogMessage(fatalEx.Message)}";
-        }
-    }
-
-    /// <summary>The self-check of the finished paper (self-check.json), in code; it never fails the run, which is already written.</summary>
-    private void WriteSelfCheck(Guid sessionId, ReviewState state)
-    {
-        try { SystematicSelfCheck.WriteFile(GetWorkspaceFolderPath(sessionId), state); }
-        catch (Exception ex)
-        {
-            _log.LogWarning("Run {RunId}: the self-check was not written: {Message}", sessionId, SanitizeLogMessage(ex.Message));
         }
     }
 
