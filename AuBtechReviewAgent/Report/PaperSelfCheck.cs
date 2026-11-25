@@ -70,6 +70,16 @@ public sealed class PaperCheckInput
     public CitationSupportSummary? CitationsInitial { get; init; }
     public int CitationsRemoved { get; init; }
 
+    /// <summary>The closing parts every paper of this kind has, with the names a reader knows them by.</summary>
+    public Dictionary<PaperPartKind, string> ExpectedParts { get; init; } = new()
+    {
+        [PaperPartKind.Discussion] = "discussion",
+        [PaperPartKind.Limitations] = "limitations of the evidence",
+        [PaperPartKind.Implications] = "implications",
+        [PaperPartKind.FutureResearch] = "directions for future research",
+        [PaperPartKind.Conclusion] = "conclusion",
+    };
+
     /// <summary>The words the review is named by: "study" and "studies", or "source" and "sources".</summary>
     public string Source { get; init; } = "study";
     public string Sources { get; init; } = "studies";
@@ -132,7 +142,7 @@ public static partial class PaperSelfCheck
     {
         var checks = new List<Func<PaperCheckInput, PaperCheck>>
         {
-            NumbersCheck, FiguresCheck,
+            NumbersCheck, AnswersCheck, PartsCheck, FiguresCheck, CoverageCheck,
         };
         var results = checks.Select((check, i) =>
         {
