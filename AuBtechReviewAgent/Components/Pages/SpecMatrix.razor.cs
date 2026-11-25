@@ -45,6 +45,8 @@ public partial class SpecMatrix
     internal AuBtechReviewAgent.ReviewStats? stats;
     internal AuBtechReviewAgent.PrismaFlowCounts? flow;
     internal string runLine = "";
+    /// <summary>The printed front page (Components/Paper/ArticleFront.razor); null until the report is loaded.</summary>
+    internal AuBtechReviewAgent.ArticleInfo? articleInfo;
     internal string dateLine = "";
 
     /// <summary>The sections of this report, for the contents list (the page gives each the same id).</summary>
@@ -200,6 +202,7 @@ public partial class SpecMatrix
         stats = null;
         flow = null;
         runLine = dateLine = "";
+        articleInfo = null;
         checkFilter = AuBtechReviewAgent.ReportOutline.Flagged;
         checkIndex = attentionIndex = -1;
 
@@ -223,6 +226,9 @@ public partial class SpecMatrix
         await LoadAuditAsync(folder, reloadReport: false);
 
         var state = LoadLedger();
+        // The gallery shows a copy whose run may be gone, so its printout keeps the screen header instead of links to the run.
+        if (HasReport && !InGallery)
+            articleInfo = AuBtechReviewAgent.ArticleInfo.ForSystematic(ReportRunId, state, report, ScrubAnchors(report.TitleItem), ScrubAnchors(report.AbstractItem), hasProtocol);
         if (state == null) return;
 
         peerReviewOnlyToggle = state.PeerReviewOnlyToggle;

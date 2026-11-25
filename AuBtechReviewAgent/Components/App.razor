@@ -16,6 +16,8 @@
        third-party scripts and can run under a strict Content-Security-Policy. It comes after app.css, as the
        CDN version did, so its reset (e.g. links inherit their colour) still wins over app.css. *@
     <link rel="stylesheet" href="@Assets["css/tailwind.css"]" />
+    @* The printed report's journal layout (wiki page 06); plain CSS, for print only. *@
+    <link rel="stylesheet" href="@Assets["css/journal-print.css"]" media="print" />
     <link rel="icon" href="favicon.ico" sizes="any" />
     <link rel="icon" href="favicon.svg" type="image/svg+xml" />
     <link rel="icon" type="image/png" sizes="192x192" href="favicon.png" />

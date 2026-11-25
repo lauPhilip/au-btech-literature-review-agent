@@ -184,9 +184,9 @@
                 }
                 continue;
             }
-            <span class="text-muted">[</span>
+            @* One unbreakable group, so a line never ends between "[" and its first number; it may break after a comma. *@
             var refs = AuBtechReviewAgent.CitationSupportChecker.ReferencesIn(part);
-            for (int r = 0; r < refs.Count; r++)
+            <span class="whitespace-nowrap"><span class="text-muted">[</span>@for (int r = 0; r < refs.Count; r++)
             {
                 int reference = refs[r];
                 var check = FindCheck(Field, sentenceIndex, reference);
@@ -196,9 +196,11 @@
                         aria-label="@($"Reference {reference}: {(check == null ? "not checked" : AuBtechReviewAgent.CitationView.VerdictLabel(check.Verdict).ToLowerInvariant())}")"
                         aria-expanded="@(isOpen ? "true" : "false")" aria-controls="@($"verdict-{Field}")"
                         @onclick="() => OnToggle.InvokeAsync((Field, sentenceIndex, reference))" @onclick:stopPropagation="Editable">@reference</button>
-                @(r < refs.Count - 1 ? ", " : "")
-            }
-            <span class="text-muted">]</span>
+                if (r < refs.Count - 1)
+                {
+                    <span class="whitespace-normal">, </span>
+                }
+            }<span class="text-muted">]</span></span>
         }
     };
 
