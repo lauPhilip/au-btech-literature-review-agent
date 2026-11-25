@@ -4,9 +4,10 @@
 @inject AuBtechReviewAgent.CacheOptions CacheOptions
 @inject AuBtechReviewAgent.QuotaOptions QuotaOptions
 @inject AuBtechReviewAgent.ReviewModulesOptions ModuleOptions
+@inject AuBtechReviewAgent.GalleryOptions GalleryOptions
 
 @* Everything on this page describes what the code does (RunQuotaService, ReviewCache, SessionCleanupWorker,
-   RunMetricsStore, the key dialog, and for grey literature MultivocalPages, PageFetcher and RobotsRules); the numbers
+   RunMetricsStore, GalleryStore, the key dialog, and for grey literature MultivocalPages, PageFetcher and RobotsRules); the numbers
    come from the running configuration. Update it with the code. *@
 
 <SeoHead Title="Privacy" Path="/privacy"
@@ -63,12 +64,13 @@
         <section class="mt-10 scroll-mt-6" aria-labelledby="choices">
             <h2 id="choices" class="font-display text-xl font-semibold tracking-tight text-heading">Your choices</h2>
             <p class="mt-4 text-ink">
-                You can delete a run and all its files at any time from its dashboard or report page. You can use your own
+                You can delete a run and all its files at any time from its dashboard or report page, and withdraw a report
+                you added to the gallery from its report page or its gallery page. You can use your own
                 Mistral key, or run TraceableAI on your own computer with a local model, so that nothing leaves your machine
                 except the database searches. Questions about this page go to the
                 <a href="@($"{AuBtechReviewAgent.SiteSeo.RepositoryUrl}/issues")" class="text-heading underline underline-offset-2">issues on GitHub</a>.
             </p>
-            <p class="mt-4 text-sm text-muted">Last updated October 2026. The page is generated from the app's own settings, so the periods above are the ones this server uses.</p>
+            <p class="mt-4 text-sm text-muted">Last updated November 2026. The page is generated from the app's own settings, so the periods above are the ones this server uses.</p>
         </section>
     </ChildContent>
 </DocPage>
@@ -161,6 +163,21 @@
             "For the public Metrics page, every finished run leaves a line of quality figures: how many citations were supported, coverage, " +
             "time and cost. It contains no research question, criteria or paper text, and no network address. Anyone can download these lines " +
             "from the Metrics page as CSV or JSON, with only the first eight characters of each run's ID, so a file cannot be used to open a run.",
+        }),
+        ("gallery", "The gallery of example reports", new[]
+        {
+            "Nothing goes into the gallery unless the browser that started a run adds it and says yes to the text that explains what is " +
+            "published. Readers with only the link never see the button. The gallery then keeps a copy of the files the report is drawn from: " +
+            "the report, the run's ledger with the topic, research questions and criteria, the citation checks with their short quotes from the " +
+            "sources, the edit history and the protocol. It does not copy your notes, the edit key's record, the downloaded papers, the raw " +
+            "database answers or the record of model calls, and it keeps no network address.",
+            "A report in the gallery is public: anyone can open it on this site, and search engines may find it. It shows the full ID of its run, " +
+            $"so while the run itself is kept ({RunsOptions.RetentionDays} days) anyone could open that too. The copy stays after the run is " +
+            $"deleted, until the owner withdraws it, a newer run of the same review replaces it, or the gallery passes {GalleryOptions.MaxEntries} " +
+            "reports and drops the one changed longest ago.",
+            "The owner can withdraw a report at any time, from its report page or its gallery page, with the browser that started the run; " +
+            "the copy is deleted at once. Browsers keep a run's edit key for 30 days. After that, or from another browser, ask for removal in the " +
+            "issues on GitHub and the site's administrator will take the report down.",
         }),
     };
 
