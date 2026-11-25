@@ -6,6 +6,60 @@ Each version's section becomes the notes of its GitHub release, so write it for 
 
 ## [Unreleased]
 
+The systematic review now answers its research questions first and cites what the studies found, not its own readings. Many prompts changed, from extraction to the peer review, so a run can differ from 0.5.0, most of all a run with research questions. The multivocal review, still in preview, learned a lot from its first real run. And the site now puts every review in one fair line and keeps bots at the door.
+
+### Added
+
+The review now reads each study with your research questions in mind. It picks the passages to read by the words of your questions, asks for the findings that answer them, and tags each finding with its question. The themes are built the same way, so a code that bears on a question is never dropped. Each finding still needs a quote found word for word in the study. A run without research questions reads the studies as before. A study read before with the same model, questions and text is now taken from the cache, and the methods say how many were.
+
+The answers to the research questions are now written first. The discussion builds on them instead of saying them again. The conclusion and the end of the abstract are written from the checked answers, so the review states its main reading once, not three times in three ways.
+
+You can now edit the finished report on its page. The browser that started the run sees "Edit the text". Click a sentence, rewrite it and press "Check and save". Every citation in it is checked again, and you see the new verdicts with their quotes. An edited sentence gets a small mark, and a panel under the report lists every edit, with the text before and after. You can undo your newest edit of a sentence. The parts written in code, such as the method, the counts and the references, cannot be edited.
+
+The multivocal review now builds out from its most cited academic sources, as the systematic review does. Code picks the ten included papers with the most citations per year, and screens the works they cite and the works that cite them. The method lists the seeds in a table.
+
+The multivocal paper now answers each research question in one place, then discusses, then closes with the limits of the evidence, what it means for practitioners and researchers, and a conclusion. If the discussion cannot be written, the paper says so, and the statement on AI use names only the parts that were.
+
+A multivocal question about a relationship is now answered in code by pairing both sides for each source. If the map holds only one side, the paper says the question cannot be answered. Counts now show the grey sources, the academic sources and both, each with its share.
+
+The multivocal paper now says how many screening decisions were flagged for the reviewer, why, and how many nobody looked at.
+
+While a review runs, a line under its title now says what it is doing right now, such as "Screening record 120 of 431…", with a small count of what was found, screened and included.
+
+Every kind of review now waits in one fair line. One address can have two reviews running and three waiting, and the line holds up to a hundred. A waiting review shows its place and a rough wait, such as "You are 4th in line, about 25 minutes". Closing the page keeps your place, and "Leave the line" gives it back.
+
+The Metrics page now shows how much work each run took: minutes, model calls, retries, tokens and call time. Researchers can download every run's figures as CSV or JSON, with a page that explains each column. The files hold no question, no paper text and no user data. A multivocal run now keeps its figures for the grey and the academic sources apart.
+
+### Changed
+
+The review now cites findings, not its own readings. A sentence that reports what a study found ends with its citation. The review's own reading is a separate sentence with no citation, and code checks that it names no study, number or design. A recommendation or a proposal for future research takes no citation. The rationale ends with one sentence on what is not yet known. When the repair fixes a citation, it knows what the section is for, so it no longer turns a proposal into a finding. In the runs we checked, most flagged citations came from these sections, so expect fewer flags and fewer citations there.
+
+A result figure from a theme may now appear in the abstract and in one place after the results, not in every section. Think of it as one encore, not four. 🎤 The future research and the conclusion use none. A part that repeats a figure is sent back up to twice and then kept, so the check can never cost the run a section.
+
+The peer review now gets the facts. It sees each study's design, which studies sit in each theme and which sit in none. It may state no fact the facts do not give, may not ask a theme to cite a study outside it, and judges a theme on one study by how well it reports that study. With research questions, it also checks that each section serves its question. A theme on one study now needs a reason why that study alone answers part of the aim.
+
+The report is more honest about what it synthesised. The line "The synthesis and discussion cite X of Y" now counts only the themes, the overview and the discussion. The abstract gives the number of studies placed in no theme when it gives the number of included studies.
+
+The scan for text that tries to steer the model now flags only phrases aimed at the model, such as "ignore all previous instructions". A page that only talks about a "system prompt" is still logged but no longer flagged, screened again or counted in the statement on AI use. A review about prompts now gets far fewer false alarms. This holds for both kinds of review.
+
+The multivocal review screens more strictly. A source is kept only when its main subject meets the criteria. The planning form warns when the criteria look broad, and the run warns when more than half of the first thirty sources are kept.
+
+The multivocal review now fetches every page before it calls the model, and a page has 90 seconds to arrive. A site whose robots.txt could not be read is tried again after ten minutes, not a day. Stack Overflow questions are now read through the Stack Exchange API, with their answers, since the site turns page requests away.
+
+Checking quotes is faster. Each source's text is made ready once, not again for every quote. The answers are exactly the same.
+
+The site now guards itself against bots. Pages, downloads and the actions that cost a model call have limits per address, generous enough for a class on one campus network. Uploads to the archive check are capped and handled one at a time. The start forms carry a hidden field that only bots fill in. The privacy page says what is counted and for how long.
+
+### Fixed
+
+Scopus authors are now named the right way round, and a Scopus paper is cited "Liu, J., et al." with the year it went online, not a year in the future. The raw answers of Scopus and IEEE Xplore are now kept with the other databases' answers. A grey source is credited to its real producer, such as the GitHub account or the company behind a blog, and a web address is never an author.
+
+The paper's PDF now prints "<", ">" and "|" as typed, not as "¡", "¿" and "—". A Greek letter or an emoji in a title no longer stops main.tex from compiling. A form no longer fails on half of an emoji.
+
+The token count of a run was always 0, because the model's usage was read the wrong way. It is now right, for both kinds of review.
+
+The multivocal paper now counts its own steps right. Its flow figure adds up, each reason for a paper that could not be rated is given once, a theme with only academic sources no longer claims a grey score of 0, and the paper names the run's own version. The abstract keeps the grey and academic numbers apart. The data appendix names both models, and the call log keeps the reasoning effort when a run is started more than once.
+
 ## [0.5.0] - 2026-11-23
 
 TraceableAI has a new look, an API for other tools and a guard against text that tries to steer the model. Many prompts changed, so a run can differ from 0.4.0. A multivocal review, still in preview, now costs far less.
