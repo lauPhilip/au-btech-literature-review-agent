@@ -15,7 +15,7 @@ public class MetricsOptions
     /// <summary>Folder of the metrics store (relative paths are resolved against the content root).</summary>
     public string Folder { get; set; } = Path.Join("App_Data", "metrics");
 
-    /// <summary>An optional price table for the downloads' estimated cost; empty, so off, unless a deployment sets it (issue #414).</summary>
+    /// <summary>An optional price table for the estimated cost of a run, on the Metrics page and in the downloads; off when empty (issues #414, #504).</summary>
     public MetricsPrices Prices { get; set; } = new();
 }
 
@@ -43,6 +43,9 @@ public class RunMetricsStore
 
     public bool Enabled => _options.Enabled;
     public string FilePath => _file;
+
+    /// <summary>The price table for the estimated cost of a run (off when empty).</summary>
+    public MetricsPrices Prices => _options.Prices;
 
     public void Append(RunMetrics metrics)
     {

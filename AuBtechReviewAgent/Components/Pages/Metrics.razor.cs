@@ -64,5 +64,7 @@ public partial class Metrics
             ? AuBtechReviewAgent.SampleMetrics.Runs().Where(r => r.IsMultivocal == Grey)
             : Store.ReadAll(multivocal: Grey));
 
+    private string Cost(double? cost) => cost is double c ? Store.Prices.Format(c) : "–";
+
     private static string Pct(double share) => AuBtechReviewAgent.MetricsOverview.Percent(share);
 }

@@ -1,0 +1,29 @@
+TY  - JOUR
+AU  - Doe, Jane
+AU  - Liu, Jun-wei
+TI  - Agent loops for safe orchestration
+T2  - Future Internet
+PY  - 2025
+VL  - 12
+IS  - 3
+SP  - 45
+EP  - 60
+DO  - 10.3390/fi1234567
+UR  - https://doi.org/10.3390/fi1234567
+N1  - An agent paper.
+N1  - Reference [1] in the TraceableAI review
+KW  - TraceableAI
+KW  - included
+ER  - 
+
+TY  - CONF
+AU  - Lee, Kim
+TI  - Agent governance layers
+T2  - Proceedings of the Conference on Agents
+PY  - 2026
+N1  - An agent paper.
+N1  - Reference [2] in the TraceableAI review
+KW  - TraceableAI
+KW  - included
+ER  - 
+

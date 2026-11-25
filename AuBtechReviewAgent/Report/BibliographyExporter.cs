@@ -31,14 +31,26 @@ public static class BibliographyExporter
             var fields = new List<(string, string)>();
             // A list a source gave only in part ends in BibTeX's own "and others" (issue #470).
             if (r.Authors.Count > 0) fields.Add(("author", string.Join(" and ", r.Authors.Select(a => IsEtAl(a) ? "others" : BibAuthor(a)))));
-            fields.Add(("title", "{" + Bib(r.Title) + "}")); // double braces keep capitalisation
+            fields.Add(("title", "{" + Bib(ApaCitationBuilder.TitleAsGiven(r.Title)) + "}")); // double braces keep capitalisation; capitals only as in the reference list
             if (!string.IsNullOrWhiteSpace(r.VenueName))
                 fields.Add((type == "article" ? "journal" : type == "inproceedings" ? "booktitle" : "howpublished", Bib(r.VenueName)));
             else if (type == "misc" && r.Category == "Arxiv")
                 fields.Add(("howpublished", "arXiv"));
             if (r.Year > 0) fields.Add(("year", r.Year.ToString(CultureInfo.InvariantCulture)));
+            var d = r.Details;
+            if (d?.Volume != null) fields.Add(("volume", Bib(d.Volume)));
+            if (d?.Issue != null) fields.Add(("number", Bib(d.Issue)));
+            if (d?.Pages != null) fields.Add(("pages", Bib(d.Pages.Replace("\u2013", "--"))));
+            else if (d?.ArticleNumber != null) fields.Add(("eid", Bib(d.ArticleNumber)));
+            if (d?.Publisher != null && type == "inproceedings") fields.Add(("publisher", Bib(d.Publisher)));
             if (!string.IsNullOrWhiteSpace(r.Doi)) fields.Add(("doi", r.Doi!));
-            if (PrismaReviewEngine.IsWebAddress(r.Url)) fields.Add(("url", r.Url!)); // only http(s): a source can return any scheme
+            // The database's landing page adds nothing when the DOI is there; only http(s), since a source can return any scheme.
+            else if (PrismaReviewEngine.IsWebAddress(r.Url)) fields.Add(("url", r.Url!));
+            if (d?.ArxivId != null)
+            {
+                fields.Add(("eprint", d.ArxivId));
+                fields.Add(("archiveprefix", "arXiv"));
+            }
             fields.Add(("note", Bib($"Included in TraceableAI review as reference [{r.ReferenceNumber}]")));
 
             sb.AppendLine($"@{type}{{{key},");
@@ -62,11 +74,24 @@ public static class BibliographyExporter
             };
             sb.AppendLine($"TY  - {type}");
             foreach (var a in r.Authors.Where(a => !IsEtAl(a))) sb.AppendLine($"AU  - {RisAuthor(a)}");
-            sb.AppendLine($"TI  - {OneLine(r.Title)}");
+            sb.AppendLine($"TI  - {ApaCitationBuilder.TitleAsGiven(r.Title)}");
             if (!string.IsNullOrWhiteSpace(r.VenueName)) sb.AppendLine($"T2  - {OneLine(r.VenueName)}");
             if (r.Year > 0) sb.AppendLine($"PY  - {r.Year}");
+            var d = r.Details;
+            if (d?.Volume != null) sb.AppendLine($"VL  - {OneLine(d.Volume)}");
+            if (d?.Issue != null) sb.AppendLine($"IS  - {OneLine(d.Issue)}");
+            if (d?.Pages != null)
+            {
+                var (start, end) = ReferenceDetails.SplitPages(OneLine(d.Pages));
+                sb.AppendLine($"SP  - {start}");
+                if (end != null) sb.AppendLine($"EP  - {end}");
+            }
+            else if (d?.ArticleNumber != null) sb.AppendLine($"SP  - {OneLine(d.ArticleNumber)}");
+            if (d?.Publisher != null) sb.AppendLine($"PB  - {OneLine(d.Publisher)}");
             if (!string.IsNullOrWhiteSpace(r.Doi)) sb.AppendLine($"DO  - {r.Doi}");
-            if (PrismaReviewEngine.IsWebAddress(r.Url)) sb.AppendLine($"UR  - {r.Url}");
+            if (!string.IsNullOrWhiteSpace(r.Doi)) sb.AppendLine($"UR  - https://doi.org/{r.Doi}");
+            else if (PrismaReviewEngine.IsWebAddress(r.Url)) sb.AppendLine($"UR  - {r.Url}");
+            if (d?.ArxivId != null) sb.AppendLine($"M1  - arXiv:{d.ArxivId}");
             if (!string.IsNullOrWhiteSpace(r.Summary)) sb.AppendLine($"N1  - {OneLine(r.Summary)}");
             sb.AppendLine($"N1  - Reference [{r.ReferenceNumber}] in the TraceableAI review");
             sb.AppendLine("KW  - TraceableAI");
@@ -95,7 +120,7 @@ public static class BibliographyExporter
             };
             sb.AppendLine($"TY  - {type}");
             foreach (var a in (l.Authors ?? new List<string>()).Where(a => !IsEtAl(a))) sb.AppendLine($"AU  - {RisAuthor(a)}");
-            sb.AppendLine($"TI  - {OneLine(l.Title)}");
+            sb.AppendLine($"TI  - {ApaCitationBuilder.TitleAsGiven(l.Title)}");
             if (!string.IsNullOrWhiteSpace(l.VenueName)) sb.AppendLine($"T2  - {OneLine(l.VenueName)}");
             if (l.Year > 0) sb.AppendLine($"PY  - {l.Year}");
             if (!string.IsNullOrWhiteSpace(l.Doi)) sb.AppendLine($"DO  - {l.Doi}");
@@ -149,8 +174,9 @@ public static class BibliographyExporter
 
     private static bool IsEtAl(string author) => author.Trim().Equals(ApaCitationBuilder.EtAl, StringComparison.OrdinalIgnoreCase);
 
-    // BibTeX and RIS both prefer "Surname, Given".
-    private static string BibAuthor(string author) => Bib(RisAuthor(author));
+    // BibTeX and RIS both prefer "Surname, Given"; a group author ("PSBC LLM Team") is braced so BibTeX keeps it whole.
+    private static string BibAuthor(string author) =>
+        ApaCitationBuilder.FormatAuthor(author) is var apa && apa.Contains(',') ? Bib(RisAuthor(author)) : "{" + Bib(author) + "}";
 
     private static string RisAuthor(string author)
     {

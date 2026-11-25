@@ -52,6 +52,9 @@ public partial class PrismaReviewEngine
         string goal = string.IsNullOrWhiteSpace(objective) ? query : objective;
         // The research questions go to every step from the coding on (issues #124, #430); without them the prompts are as before.
         var questions = state.ResearchQuestions ?? new List<string>();
+        // Coding and codebook answers are reused from an identical earlier prompt to the same model, so a rerun on the same
+        // studies gets the same themes; the counts go to thematic-codebook.json and the methods text.
+        if (Cache.Enabled) book.Reuse = new SynthesisReuse();
 
         // 1. Coding
         List<ThematicCode> codes;
@@ -61,7 +64,7 @@ public partial class PrismaReviewEngine
             var (c, uncoded) = await ThematicSynthesis.CodeStudiesAsync(chat, goal, papers, extractions,
                 Synthesis.CodingBatchSize, Llm.QualityParallelism,
                 (done, total) => ReportProgress(runId, state, RunProgress.Synthesis, RunProgress.Phase(RunProgress.SynthesisPhases, 1, (double)done / total), $"Coding studies: {Of(done, total, "batches")}"),
-                questions, CriteriaForCodebook(state));
+                questions, CriteriaForCodebook(state), new SynthesisCache(Cache, Llm.ModelFor("thematic-coding")), book.Reuse);
             codes = c;
             book.Codes = codes;
             book.Uncoded.AddRange(uncoded);
@@ -79,7 +82,8 @@ public partial class PrismaReviewEngine
             using (LlmStage.Begin("thematic-codebook"))
             {
                 var unanswered = questions.Count == 0 ? null : new List<UnansweredQuestion>();
-                var (themes, unplaced) = await ThematicSynthesis.BuildCodebookAsync(chat, goal, codes, Math.Max(2, Synthesis.MaxThemes), CriteriaForCodebook(state), questions, unanswered);
+                var (themes, unplaced) = await ThematicSynthesis.BuildCodebookAsync(chat, goal, codes, Math.Max(2, Synthesis.MaxThemes), CriteriaForCodebook(state), questions, unanswered,
+                    new SynthesisCache(Cache, Llm.ModelFor("thematic-codebook")), book.Reuse);
                 book.Unanswered = unanswered;
                 book.Themes = themes;
                 book.Uncoded.AddRange(unplaced);

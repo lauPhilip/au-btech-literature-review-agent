@@ -145,4 +145,41 @@ public class ThematicSynthesisRunTests : IDisposable
         Assert.Contains("synthesised narratively", report.SynthesisMethodsItem);
         Assert.Equal(0, state.Stats.ThemesIdentified);
     }
+
+    [Fact]
+    public async Task ASecondRunOnTheSameStudiesReusesTheCodingAndCodebookAndGetsTheSameThemes()
+    {
+        var cache = new ReviewCache(new CacheOptions { Folder = Path.Join(_root, "cache") }, _root);
+        async Task<(ReviewState State, PrismaReport Report, FakeChatService Chat)> Run()
+        {
+            var chat = new FakeChatService().RespondsWith(Respond);
+            var engine = new PrismaReviewEngine("test-key", "", null, null, null, new RunsOptions())
+            {
+                WorkspaceRoot = _root,
+                Cache = cache,
+                ChatFactory = _ => chat,
+                SourceFactory = _ => new PipelineTests.FakeSource(),
+                FullTextFetcher = (_, _) => Task.FromResult(new FullTextResult(Array.Empty<DocumentChunk>(), "none (test)", null)),
+            };
+            var runId = Guid.NewGuid();
+            await engine.RunReviewAsync(runId, new ReviewRequest("agent loops", "Map agent loop safety", "Agent architecture", "Agronomy", 3, SelectedSources: new[] { "arxiv" }));
+            string file = Path.Join(_root, runId.ToString("N"), "prisma-report.json");
+            return (engine.LoadState(runId)!, JsonSerializer.Deserialize<PrismaReport>(File.ReadAllText(file))!, chat);
+        }
+
+        var (first, firstReport, _) = await Run();
+        var (second, report, chat) = await Run();
+
+        string prompts = string.Join("\n", chat.Prompts);
+        Assert.DoesNotContain("You are coding studies for the thematic synthesis", prompts);
+        Assert.DoesNotContain("You are building the codebook", prompts);
+        var reuse = second.ThematicSynthesis!.Reuse!;
+        Assert.Equal((1, 1, true), (reuse.CodingAnswers, reuse.CodingAnswersReused, reuse.CodebookReused));
+        Assert.All(second.ThematicSynthesis.Codes, c => Assert.True(c.FromCache));
+        Assert.Equal(first.ThematicSynthesis!.Themes.Select(t => (t.Name, string.Join(",", t.Studies))),
+            second.ThematicSynthesis.Themes.Select(t => (t.Name, string.Join(",", t.Studies))));
+        Assert.Equal((0, 0, false), (first.ThematicSynthesis.Reuse!.CodingAnswersReused, 0, first.ThematicSynthesis.Reuse.CodebookReused));
+        Assert.DoesNotContain("coding answer", firstReport.SynthesisMethodsItem);
+        Assert.Contains("1 of 1 coding answer and the codebook were reused from an earlier identical answer", report.SynthesisMethodsItem);
+    }
 }

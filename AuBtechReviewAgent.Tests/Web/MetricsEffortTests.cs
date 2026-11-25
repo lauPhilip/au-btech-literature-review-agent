@@ -10,8 +10,15 @@ namespace AuBtechReviewAgent.Tests;
 /// <summary>The Metrics page's effort table (issue #414), rendered with Blazor's HtmlRenderer.</summary>
 public class MetricsEffortTests
 {
-    private static RunMetrics Run(string id, string completed, long? input, double minutes) => new()
+    private static readonly MetricsPrices Prices = new()
     {
+        Currency = "USD",
+        Models = { ["mistral-large-latest"] = new ModelPrice { InputPerMillion = 0.70, CachedInputPerMillion = 0.07, OutputPerMillion = 2.10 } },
+    };
+
+    private static RunMetrics Run(string id, string completed, long? input, double minutes, string model = "mistral-large-latest") => new()
+    {
+        CostByModel = input is long i ? new() { [model] = new StageCost { InputTokens = i, CachedInputTokens = 0, OutputTokens = i / 2 } } : null,
         RunId = id + "000000000000000000000000",
         CompletedUtc = completed,
         AppVersion = "0.5.0+abcdef1234",
@@ -42,7 +49,41 @@ public class MetricsEffortTests
         Assert.Contains(">15.0<", html); // the mean minutes over both runs
         Assert.DoesNotContain("$", html); // tokens only, no prices
         Assert.DoesNotContain("€", html);
+        Assert.DoesNotContain("Estimated cost", html);
+        Assert.DoesNotContain("today's prices", html);
     }
+
+    [Fact]
+    public async Task WithPricesEachRunShowsItsEstimatedCostWithTheMeanAndTotal()
+    {
+        // 1.2M input at $0.70 and 0.6M output at $2.10 per million: $0.84 + $1.26 = $2.10; 0.4M and 0.2M: $0.70.
+        var runs = new[] { Run("aaaaaaaa", "2026-11-01T10:00:00Z", null, 10), Run("bbbbbbbb", "2026-11-02T10:00:00Z", 1_200_000, 20), Run("cccccccc", "2026-11-03T10:00:00Z", 400_000, 20) };
+
+        string html = await RenderAsync(runs, Prices);
+
+        Assert.Contains(">Estimated cost</th>", html);
+        Assert.Contains("Estimated at today's prices from the token counts; not the price on the day of the run; reasoning tokens are billed as output.", html.Replace("&#x27;", "'"));
+        Assert.Contains(">$2.10<", html);
+        Assert.Contains(">$0.70<", html);
+        Assert.Contains(">$1.40<", html); // the mean over the two runs with a cost
+        Assert.Contains(">$2.80<", html); // the total
+        Assert.Contains(">Total</th>", html);
+        Assert.DoesNotContain("No price for", html);
+    }
+
+    [Fact]
+    public async Task ARunWithAnUnpricedModelShowsADashAndANote()
+    {
+        var runs = new[] { Run("aaaaaaaa", "2026-11-01T10:00:00Z", 400_000, 10, "mistral-medium-latest"), Run("bbbbbbbb", "2026-11-02T10:00:00Z", 400_000, 20) };
+
+        string html = await RenderAsync(runs, Prices);
+
+        Assert.Contains("title=\"No price for mistral-medium-latest\"", html);
+        Assert.Contains("no price in the table (mistral-medium-latest)", html);
+        Assert.Equal(3, CountOf(html, ">$0.70<")); // the priced run, and the mean and the total over it alone
+    }
+
+    private static int CountOf(string text, string part) => (text.Length - text.Replace(part, "").Length) / part.Length;
 
     [Fact]
     public void TheSampleRunsShowBothOldAndNewRuns()
@@ -50,9 +91,12 @@ public class MetricsEffortTests
         var runs = SampleMetrics.Runs().Where(r => !r.IsMultivocal).ToList();
         Assert.Contains(runs, r => r.InputTokens == null);
         Assert.Contains(runs, r => r.InputTokens > 0 && r.ReasoningTokens < r.OutputTokens);
+        var prices = new MetricsPrices { Currency = "USD", Models = { ["mistral-large-latest"] = new ModelPrice(), ["mistral-small-latest"] = new ModelPrice() } };
+        Assert.Contains(runs, r => prices.Cost(r) != null);
+        Assert.Contains(runs, r => prices.Unpriced(r).SequenceEqual(new[] { "mistral-medium-latest" })); // the dash on /design/metrics
     }
 
-    private static async Task<string> RenderAsync(IReadOnlyList<RunMetrics> runs)
+    private static async Task<string> RenderAsync(IReadOnlyList<RunMetrics> runs, MetricsPrices? prices = null)
     {
         var services = new ServiceCollection();
         services.AddLogging();
@@ -60,7 +104,7 @@ public class MetricsEffortTests
         await using var renderer = new HtmlRenderer(provider, provider.GetRequiredService<ILoggerFactory>());
         return await renderer.Dispatcher.InvokeAsync(async () =>
         {
-            var output = await renderer.RenderComponentAsync<MetricsEffort>(ParameterView.FromDictionary(new Dictionary<string, object?> { ["Runs"] = runs }));
+            var output = await renderer.RenderComponentAsync<MetricsEffort>(ParameterView.FromDictionary(new Dictionary<string, object?> { ["Runs"] = runs, ["Prices"] = prices ?? MetricsPrices.None }));
             return output.ToHtmlString();
         });
     }

@@ -59,7 +59,9 @@ public static class AiUseStatement
             text.Append("; a supporting verdict counted only when its quote was found verbatim in the paper. ");
         }
         // A paper that only lost invisible characters is on file too (#369), but it held nothing that reads like instructions.
-        var withHits = state.FullTextFlags?.Where(f => f.Flags.Count > 0).ToList() ?? new();
+        // Flags from an older run's scan are judged again with the current patterns (#478), so an old name is not taken as strong.
+        var withHits = state.FullTextFlags?.Select(f => f with { Flags = PromptSafety.Current(f.Flags, f.Scan) ?? new() })
+            .Where(f => f.Flags.Count > 0).ToList() ?? new();
         int flagged = withHits.Where(f => PromptSafety.AnyStrong(f.Flags)).Select(f => f.PaperId).Distinct().Count();
         int mentioned = withHits.Select(f => f.PaperId).Distinct().Count() - flagged;
         text.Append(FlaggedSources(flagged, s.FullTextRetrieved, "full text", "included study", "included studies", mentioned));

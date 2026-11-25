@@ -172,4 +172,7 @@ public class ReviewPhases
 /// </summary>
 public sealed record SourceTextFlags(string PaperId, string Title, List<SourceFlag> Flags,
     [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
-    HiddenTextRemoved? Removed = null);
+    HiddenTextRemoved? Removed = null,
+    // The scan that found the flags (PromptSafety.ScanVersion); null for an older run, whose flags are judged again when counted.
+    [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    string? Scan = null);
