@@ -116,7 +116,8 @@ public static class FormalKit
         MultivocalWriter Writer, MultivocalReporter Reporter, FakeChatService Model, Database Academic, MultivocalPages Pages, MultivocalQualityAssessor Quality);
 
     /// <summary>Plans a multivocal review with one grey search and one academic database, and runs it as far as it goes.</summary>
-    public static async Task<Run> RunAsync(string root, Func<string, string?>? respond = null, Func<AcademicPaper, string, Task<FullTextResult>>? fullText = null)
+    public static async Task<Run> RunAsync(string root, Func<string, string?>? respond = null, Func<AcademicPaper, string, Task<FullTextResult>>? fullText = null,
+        Func<string, Task<string>>? referenceLookup = null)
     {
         var store = new RunStore(root);
         var model = new FakeChatService().RespondsWith(p => respond?.Invoke(p) ?? Appraisal(p) ?? Extraction(p) ?? Placement(p) ?? ModuleKit.RespondMultivocal(p));
@@ -139,7 +140,10 @@ public static class FormalKit
         var synthesiser = new MultivocalSynthesiser(store, planner, searcher, assessor, mapper, extractor, pages, Chat);
         var reporter = new MultivocalReporter(store, planner, searcher, screener, pages, assessor, mapper, extractor, synthesiser);
         var writer = new MultivocalWriter(store, reporter, pages, Chat, "fake-model", parallelism: 1);
-        var runner = new MultivocalRunner(store, searcher, screener, assessor, mapper, extractor, synthesiser, pages, writer, () => model, "fake-model");
+        var runner = new MultivocalRunner(store, searcher, screener, assessor, mapper, extractor, synthesiser, pages, writer, () => model, "fake-model")
+        {
+            ReferenceLookup = referenceLookup,
+        };
         await runner.RunAsync(runId, key);
         return new Run(store, runId, key, runner, searcher, screener, writer, reporter, model, academic, pages, assessor);
     }
