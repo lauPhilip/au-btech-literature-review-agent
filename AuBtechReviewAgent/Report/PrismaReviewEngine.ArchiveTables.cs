@@ -31,7 +31,8 @@ public partial class PrismaReviewEngine
         ab.AppendLine(@"\midrule");
         foreach (var row in records)
         {
-            string title = EscapeLatexText(row.Title);
+            string title = EscapeLatexText(row.Title)
+                + (string.IsNullOrEmpty(row.IntegrityNote) ? "" : $"\\newline\\textit{{{EscapeLatexText(row.IntegrityNote)}}}");
             string summary = EscapeLatexText(row.Summary);
             string rationale = EscapeLatexText(row.InclusionRationale);
             // The database by its display name, as on the paper page (issue #133).
