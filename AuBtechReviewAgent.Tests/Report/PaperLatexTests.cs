@@ -16,7 +16,7 @@ public class PaperLatexTests
     [InlineData("See https://example.org/", "See https://example.org/")]
     public void Escape_keeps_the_closing_punctuation(string input, string expected)
     {
-        Assert.Equal(expected, PaperLatex.Escape(input));
+        Assert.Equal(expected, PaperLatex.Escape(input).Replace(LatexBreaks.Break, ""));
     }
 
     [Theory]
@@ -25,7 +25,7 @@ public class PaperLatexTests
     [InlineData("https://doi.org/10.1/abc/", "https://doi.org/10.1/abc")]
     public void EscapeReference_trims_a_trailing_full_stop_comma_or_slash(string input, string expected)
     {
-        Assert.Equal(expected, PaperLatex.EscapeReference(input));
+        Assert.Equal(expected, PaperLatex.EscapeReference(input).Replace(LatexBreaks.Break, ""));
     }
 
     [Fact]
