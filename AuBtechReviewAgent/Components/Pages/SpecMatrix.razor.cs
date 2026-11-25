@@ -168,7 +168,7 @@ public partial class SpecMatrix
         galleryEntry = null;
         if (InGallery)
         {
-            galleryEntry = Gallery.Find(GalleryId);
+            galleryEntry = FindGalleryEntry();
             if (galleryEntry == null) { report = new PrismaReport(); return; }
         }
         else if (RunId is Guid id && id != Guid.Empty)
