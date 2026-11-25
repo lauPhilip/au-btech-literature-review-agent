@@ -86,6 +86,11 @@ var metricsOptions = builder.Configuration.GetSection("Metrics").Get<AuBtechRevi
 var metricsStore = new AuBtechReviewAgent.RunMetricsStore(metricsOptions, builder.Environment.ContentRootPath);
 builder.Services.AddSingleton(metricsStore);
 
+// The gallery of example reports, kept in App_Data/gallery by the owners' consent (see the Gallery section).
+var galleryOptions = builder.Configuration.GetSection("Gallery").Get<AuBtechReviewAgent.GalleryOptions>() ?? new AuBtechReviewAgent.GalleryOptions();
+builder.Services.AddSingleton(galleryOptions);
+builder.Services.AddSingleton(sp => new AuBtechReviewAgent.GalleryStore(galleryOptions, builder.Environment.ContentRootPath, sp.GetRequiredService<AuBtechReviewAgent.RunStore>()));
+
 // Thematic synthesis, dual coding and citation repair (see the Synthesis section).
 var synthesisOptions = builder.Configuration.GetSection("Synthesis").Get<AuBtechReviewAgent.SynthesisOptions>() ?? new AuBtechReviewAgent.SynthesisOptions();
 
