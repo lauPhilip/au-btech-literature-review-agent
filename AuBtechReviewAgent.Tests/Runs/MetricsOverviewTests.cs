@@ -55,6 +55,7 @@ public class MetricsOverviewTests
         Assert.Equal(2, older.Runs);
         Assert.Equal(0.6, older.ScreeningKappa!.Value, 3);
         Assert.Equal(15, older.MinutesPerRun, 3);
+        Assert.Equal(new[] { "a", "b" }, older.Members.Select(r => r.RunId)); // for the page's cost per run
         Assert.Equal(0.7, overview.ScreeningKappa!.Value, 3);
         Assert.Equal(20, overview.MinutesPerRun, 3);
         Assert.Equal("–", MetricsOverview.Kappa(null));
