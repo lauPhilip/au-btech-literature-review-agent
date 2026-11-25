@@ -49,7 +49,7 @@ public class GreyPassageMeasureTests
             Assert.Contains("For 29 long pages, the model was given the start and the end of the page and the passages that share the most words with each checklist item", method);
             Assert.Contains("For 30 long pages, the model was given the first passages and the passages that share the most words with the map and the questions", method);
             Assert.Equal("grey-quality-v4", MultivocalQualityAssessor.PromptVersion);
-            Assert.Equal("grey-extraction-v3", MultivocalExtractor.PromptVersion);
+            Assert.Equal("grey-extraction-v4", MultivocalExtractor.PromptVersion);
 
             // Before #391 the quality check and the extraction sent 1,119,627 and 1,047,357 characters on this run.
             Assert.True(byStage["quality"] < 600_000, $"quality {byStage["quality"]}");
