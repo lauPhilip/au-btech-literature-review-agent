@@ -128,7 +128,7 @@ public class ApaCitationBuilderTests
     [InlineData("Jane A. Doe", "Doe, J. A.")]
     [InlineData("A Bandi", "Bandi, A.")]
     [InlineData("Doe, J.", "Doe, J.")]
-    [InlineData("Jean-Paul Sartre", "Sartre, J. P.")]
+    [InlineData("Jean-Paul Sartre", "Sartre, J.-P.")]
     [InlineData("…", "")]
     [InlineData("Liu J.", "Liu, J.")]
     [InlineData("Wang J.P.", "Wang, J. P.")]

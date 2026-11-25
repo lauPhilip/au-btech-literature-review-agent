@@ -67,11 +67,10 @@ public static partial class ApaCitationBuilder
         return first == 0 ? tokens.Count : first;
     }
 
-    // "Jane", "A.", "Jean-Paul", "J.P." -> "J. A. J. P. J. P."
+    // APA 7 (9.8): "Jane A." -> "J. A."; a hyphenated given name keeps its hyphen, "Jean-Paul" -> "J.-P."; "J.P." -> "J. P."
     private static string Initials(IEnumerable<string> given) =>
-        string.Join(" ", given
-            .SelectMany(t => t.Split(new[] { '-', '.' }, StringSplitOptions.RemoveEmptyEntries))
-            .Select(p => char.ToUpperInvariant(p[0]) + "."));
+        string.Join(" ", given.SelectMany(t => t.Replace(".-", "-").Split('.', StringSplitOptions.RemoveEmptyEntries)).Select(t =>
+            string.Join("-", t.Split('-', StringSplitOptions.RemoveEmptyEntries).Select(p => char.ToUpperInvariant(p[0]) + "."))));
 
     /// <summary>
     /// APA 7 author list: "A", "A, & B", "A, B, & C"; more than 20 authors -> first 19, "...", last. A list a source gave
