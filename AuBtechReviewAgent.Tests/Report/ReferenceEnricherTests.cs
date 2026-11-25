@@ -36,6 +36,10 @@ public class ReferenceEnricherTests : IDisposable
         Assert.Equal("Crossref", entry.Filled["authors"]);
         Assert.Equal("Crossref", logs[0].Details!.EnrichedFrom!["volume"]);
         Assert.Equal("OLD", entry.Before);
+        // The completed fields are on file, so the multivocal review can cite them without changing its ledger.
+        Assert.Equal(logs[0].Authors, entry.Completed!.Authors);
+        Assert.Equal("ACM Transactions on Software Engineering and Methodology", entry.Completed.Venue);
+        Assert.Equal("35", entry.Completed.Details!.Volume);
         var lookup = Assert.Single(entry.Lookups);
         Assert.DoesNotContain("mailto", lookup.Url);
         Assert.Contains("mailto=team%40example.org", Assert.Single(_asked));
