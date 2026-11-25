@@ -24,8 +24,36 @@ public sealed partial class GalleryStore
             string from = Path.Join(source, Path.GetFileName(file));
             if (File.Exists(from)) File.Copy(from, Path.Join(temp, Path.GetFileName(file)));
         }
-        if (Directory.Exists(target)) Directory.Delete(target, recursive: true);
-        Directory.Move(temp, target);
+        Swap(temp, target);
+    }
+
+    /// <summary>
+    /// Puts a new folder in place of an old one with two renames, never a delete first: the old copy is moved aside,
+    /// the new one moved in, and only then is the old one removed. If the new one cannot be moved in, the old one goes
+    /// back, so a failed write leaves what was published as it was instead of losing it.
+    /// </summary>
+    public static void Swap(string temp, string target, Action<string, string>? move = null)
+    {
+        move ??= Directory.Move;
+        if (!Directory.Exists(target))
+        {
+            move(temp, target);
+            return;
+        }
+        string aside = target + ".old-" + Guid.NewGuid().ToString("N");
+        move(target, aside);
+        try { move(temp, target); }
+        catch
+        {
+            Directory.Move(aside, target);
+            throw;
+        }
+        try { Directory.Delete(aside, recursive: true); }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            // The folder is replaced; a left-over copy is not a version or an entry (its name is neither) and is never shown.
+            _log.LogWarning("Gallery: the replaced copy could not be removed: {Message}", ex.GetType().Name);
+        }
     }
 
     private void WriteEntryFile(GalleryEntry entry)
