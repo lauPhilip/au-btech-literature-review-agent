@@ -87,6 +87,8 @@ public class MultivocalWritingTests
         // The prompts name the review and its sources, and the abstract's numbers come from code.
         Assert.Contains(model.Prompts, p => p.Contains("You are writing one subsection of the Results") && p.Contains("a grey literature review following the Garousi et al. (2019) guidelines") && p.Contains("SOURCE [1]"));
         Assert.Contains(model.Prompts, p => p.Contains("You are writing the title") && p.Contains("Included at screening, before the quality check: 3; excluded at screening: 1.") && p.Contains("kept for the synthesis: 3"));
+        // Issue #461: the front matter knows which sources are 3rd-tier, so the rationale does not open on one as fact.
+        Assert.Contains(model.Prompts, p => p.Contains("You are writing the title") && p.Contains("WEAK EVIDENCE") && p.Contains("it is a 3rd-tier grey source"));
         Assert.Contains(model.Prompts, p => p.Contains("You are writing the summary for practitioners") && p.Contains("WRITTEN FOR: " + MultivocalReporter.Audience(input.Planned.Plan.Audience)));
         // The prompts number the questions as the plan does, the model answers only RQ1, and the front matter gets the answers and the conclusion.
         string discussion = Assert.Single(model.Prompts, p => p.Contains("You are writing the Discussion section"));
