@@ -55,11 +55,14 @@ public static partial class PaperSelfCheck
                 "A citation still judged not supported stays in the paper, marked in red; a partly supported one is marked too. Removed citations were still not supported after the repair.",
         };
         var s = input.CitationsFinal;
+        var shown = ShownMismatches(input);
         if (s == null || s.Checked == 0)
         {
             bool anyCited = input.Written.Any(p => ThematicSynthesis.CitedIn(p.Text).Count > 0);
-            check.Outcome = anyCited ? CheckOutcome.Fault : CheckOutcome.Pass;
-            check.Summary = anyCited ? "The paper cites sources, but no citation was checked." : "The paper cites no sources, so there was nothing to check.";
+            check.Evidence.AddRange(shown);
+            check.Outcome = anyCited || shown.Count > 0 ? CheckOutcome.Fault : CheckOutcome.Pass;
+            check.Summary = anyCited ? "The paper cites sources, but no citation was checked."
+                : shown.Count > 0 ? "The run page gives citation counts the report does not have." : "The paper cites no sources, so there was nothing to check.";
             return check;
         }
         if (s.NotSupported > 0)
@@ -72,11 +75,33 @@ public static partial class PaperSelfCheck
             check.Evidence.Add(new("Citation check", "", $"{input.CitationsRemoved} removed", "Still not supported after the repair, so taken out of the paper."));
         if (input.CitationsInitial is { } before)
             check.Evidence.Add(new("Citation check", "", $"Before repair: {before.NotSupported} not supported, {before.PartiallySupported} partly", $"Of {before.Checked} citations first checked."));
-        check.Outcome = s.NotSupported > 0 ? CheckOutcome.Fault
+        check.Evidence.AddRange(shown);
+        check.Outcome = s.NotSupported > 0 || shown.Count > 0 ? CheckOutcome.Fault
             : s.PartiallySupported + s.InsufficientEvidence + s.Unverifiable + input.CitationsRemoved > 0 ? CheckOutcome.Note : CheckOutcome.Pass;
         check.Summary = $"{s.Checked} checked: {Percent(s.Supported, s.Checked)} supported, {Percent(s.PartiallySupported, s.Checked)} partly, {Percent(s.NotSupported, s.Checked)} not supported" +
-            (input.CitationsRemoved > 0 ? $"; {input.CitationsRemoved} removed." : ".");
+            (input.CitationsRemoved > 0 ? $"; {input.CitationsRemoved} removed" : "") +
+            (shown.Count > 0 ? "; the run page gives other counts." : ".");
         return check;
+    }
+
+    /// <summary>Each count of the citation check where the run page and the report differ; empty when they agree or the page has none.</summary>
+    private static List<CheckEvidence> ShownMismatches(PaperCheckInput input)
+    {
+        var evidence = new List<CheckEvidence>();
+        if (input.CitationsShown is not { } page) return evidence;
+        var report = input.CitationsFinal ?? new CitationSupportSummary();
+        foreach (var (what, onPage, inReport) in new[]
+                 {
+                     ("checked", page.Checked, report.Checked),
+                     ("supported", page.Supported, report.Supported),
+                     ("partly supported", page.PartiallySupported, report.PartiallySupported),
+                     ("not supported", page.NotSupported, report.NotSupported),
+                     ("removed", page.Removed, input.CitationsRemoved),
+                 })
+            if (onPage != inReport)
+                evidence.Add(new("Run page", "", $"{onPage} {what} on the run page, {inReport} in the report",
+                    "The run page and the report should give the same count of the citation check."));
+        return evidence;
     }
 
     private static string Key(string? text) => Regex.Replace((text ?? "").ToLowerInvariant(), @"[^\p{L}\p{N}]", "");

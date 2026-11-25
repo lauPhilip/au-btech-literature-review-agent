@@ -59,6 +59,11 @@ public static class SystematicSelfCheck
             CitationsFinal = audit.Final,
             CitationsInitial = audit.Initial,
             CitationsRemoved = audit.Removed,
+            CitationsShown = new CitationSupportSummary
+            {
+                Checked = state.Stats.CitationsChecked, Supported = state.Stats.CitationsSupported, PartiallySupported = state.Stats.CitationsPartiallySupported,
+                NotSupported = state.Stats.CitationsNotSupported, Removed = state.Stats.CitationsRemoved,
+            },
         };
     }
 
