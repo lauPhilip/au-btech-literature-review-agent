@@ -28,7 +28,8 @@ public sealed record GreyReference(
     string? WaybackUrl,
     DateTime? UpdatedUtc = null,
     AcademicPaper? Paper = null,
-    string? TextBasis = null);
+    string? TextBasis = null,
+    ReferenceDetails? Details = null);
 
 /// <summary>
 /// The references of a multivocal run, and their exports: references.bib and references.ris for the sources the
@@ -45,7 +46,8 @@ public static partial class GreyReferences
 
     /// <summary>
     /// The references of the sources that were extracted, in the order of the source repository
-    /// (<see cref="MultivocalReporter.SourceNumbers"/>).
+    /// (<see cref="MultivocalReporter.SourceNumbers"/>). A formal source is cited as the run's reference enrichment
+    /// completed it (<see cref="MultivocalLedger.References"/>).
     /// </summary>
     public static IReadOnlyList<GreyReference> Build(MultivocalLedger ledger, MultivocalPagesFile pages, MultivocalExtractionFile extraction)
     {
@@ -56,7 +58,12 @@ public static partial class GreyReferences
         return extraction.Sources
             .Where(s => numbers.ContainsKey(s.Address))
             .Select(s => Reference(numbers[s.Address], s.Address, records.GetValueOrDefault(s.Address), snapshots.GetValueOrDefault(s.Address), s.Title, s.Url)
-                with { Paper = papers.GetValueOrDefault(s.Address), TextBasis = snapshots.GetValueOrDefault(s.Address)?.TextBasis })
+                with
+                {
+                    Paper = papers.TryGetValue(s.Address, out var formal) ? formal.Paper : null,
+                    Details = papers.TryGetValue(s.Address, out var known) ? known.Details : null,
+                    TextBasis = snapshots.GetValueOrDefault(s.Address)?.TextBasis,
+                })
             .OrderBy(r => r.Number)
             .ToList();
     }
@@ -177,9 +184,9 @@ public static partial class GreyReferences
         var sb = new StringBuilder();
         foreach (var s in screening.Sources)
         {
-            if (papers.GetValueOrDefault(s.Address) is { } paper)
+            if (papers.TryGetValue(s.Address, out var formal))
             {
-                sb.Append(FormalScreenedRis(s, paper, numbers));
+                sb.Append(FormalScreenedRis(s, formal, numbers));
                 continue;
             }
             var record = records.GetValueOrDefault(s.Address);

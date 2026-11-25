@@ -92,6 +92,13 @@ public sealed class MultivocalLedger
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public List<GreySearchLog>? SeedSearches { get; set; }
 
+    /// <summary>
+    /// The run's reference-enrichment.json, attached when the ledger is loaded, so the formal sources are cited as the
+    /// enrichment completed them while the ledger keeps the database's record; null before the enrichment ran.
+    /// </summary>
+    [JsonIgnore]
+    public ReferenceEnrichmentFile? References { get; set; }
+
     [JsonIgnore]
     public IEnumerable<FoundGreySource> GreyPool => Sources.Where(s => !s.IsFormal);
 
@@ -143,12 +150,17 @@ public sealed partial class MultivocalSearcher
     internal async Task SaveLedgerAsync(Guid runId, MultivocalLedger ledger) =>
         await SafeFile.WriteAllTextAsync(Path.Join(_runs.FolderOf(runId), LedgerFile), JsonSerializer.Serialize(ledger, Json));
 
-    /// <summary>The ledger of a searched run, or null.</summary>
+    /// <summary>The ledger of a searched run, with its reference-enrichment.json attached, or null.</summary>
     public MultivocalLedger? LoadLedger(Guid runId)
     {
         string path = Path.Join(_runs.FolderOf(runId), LedgerFile);
         if (!File.Exists(path)) return null;
-        try { return JsonSerializer.Deserialize<MultivocalLedger>(File.ReadAllText(path), Json); }
+        try
+        {
+            var ledger = JsonSerializer.Deserialize<MultivocalLedger>(File.ReadAllText(path), Json);
+            if (ledger != null) ledger.References = ReferenceEnrichmentText.Load(_runs.FolderOf(runId));
+            return ledger;
+        }
         catch (JsonException) { return null; }
     }
 
