@@ -102,8 +102,19 @@ public class PaperSelfCheckNumbersTests
             conclusion: "Defects fell by 41%, so agents help."), "figures");
 
         Assert.Equal(CheckOutcome.Fault, check.Outcome);
-        Assert.Equal(new[] { "researchAnswer1", "conclusionItem" }, check.Evidence.Select(e => e.Field));
-        Assert.Contains("Agents cut defects by 41%", check.Evidence[0].Text);
+        var e = Assert.Single(check.Evidence);
+        Assert.Equal("researchAnswer1", e.Field);
+        Assert.Equal("Answer to RQ1, Conclusion", e.Part);
+        Assert.Contains("Agents cut defects by 41%", e.Text);
+        Assert.Equal("41 from the results appears again in: Discussion, Answer to RQ1 and Conclusion. Conclusion should use none.", e.Detail);
+    }
+
+    [Fact]
+    public void ThePartOfAPartitiveIsNotReadAsWhatTheNounCounts()
+    {
+        var check = SelfCheckPaper.Check(SelfCheckPaper.Input("Full texts were read for 2 of the 4 full texts found."), "numbers");
+
+        Assert.Equal(CheckOutcome.Pass, check.Outcome);
     }
 
     [Fact]

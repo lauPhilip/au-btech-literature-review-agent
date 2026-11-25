@@ -23,6 +23,8 @@ public static partial class PaperSelfCheck
     private static readonly Regex PercentAfter = new(@"^\s*(?:%|percent|per\s*cent|percentage|[.,]\d|x\b|×|-fold|fold\b)", RegexOptions.IgnoreCase | RegexOptions.Compiled);
     private static readonly Regex ClauseStop = new(@"[,;:—–()]|\b(?:of|and|while|but|after|from|whereas|than|with)\b|\d", RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
+    private static readonly Regex Partitive = new(@"\d\s+(?:out\s+)?of\s+(?:the\s+|all\s+)?$", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
     /// <summary>A text without citation markers and without names that carry a number, so only figures and counts are left.</summary>
     internal static string Plain(string text) => AcronymNumber.Replace(Regex.Replace(text ?? "", @"\[[^\]]*\]", ""), "");
 
@@ -83,7 +85,8 @@ public static partial class PaperSelfCheck
                         check.Evidence.Add(new(part.Name, part.Field, Short(sentence), $"{value} is neither one of the run's counts nor a figure in the results."));
                         continue;
                     }
-                    if (figure) continue;
+                    // "3 of the 4 included studies": the second number is the whole the first is part of, not what the noun counts.
+                    if (figure || Partitive.IsMatch(sentence[..index])) continue;
                     var named = NamedFacts(sentence, index, length, input.Facts);
                     if (named.Count == 0 || named.Any(f => f.Value.ToString() == value)) continue;
                     var actual = input.Facts.Where(f => f.Value.ToString() == value).Select(f => f.Label).ToList();
@@ -122,19 +125,23 @@ public static partial class PaperSelfCheck
         var figures = ReviewWriter.ResultFigures(Plain(string.Join("\n", results.Select(p => p.Text))), facts);
         var after = input.Of(PaperPartKind.Discussion, PaperPartKind.Answer, PaperPartKind.Limitations, PaperPartKind.Implications).ToList();
         var none = input.Of(PaperPartKind.FutureResearch, PaperPartKind.Conclusion).ToList();
+        int repeated = 0;
         foreach (var figure in figures.OrderBy(f => f, StringComparer.Ordinal))
         {
             var used = after.Where(p => ReviewWriter.ResultFigures(Plain(p.Text), facts).Contains(figure)).ToList();
-            if (used.Count > 1)
-                foreach (var p in used.Skip(1))
-                    check.Evidence.Add(new(p.Name, p.Field, Short(SentenceWith(p.Text, figure, facts)), $"{figure} is a result figure that {used[0].Name.ToLowerInvariant()} already repeats."));
-            foreach (var p in none.Where(p => ReviewWriter.ResultFigures(Plain(p.Text), facts).Contains(figure)))
-                check.Evidence.Add(new(p.Name, p.Field, Short(SentenceWith(p.Text, figure, facts)), $"{figure} is a result figure; this part should say what it means instead."));
+            var barred = none.Where(p => ReviewWriter.ResultFigures(Plain(p.Text), facts).Contains(figure)).ToList();
+            var extra = used.Skip(1).Concat(barred).ToList();
+            if (extra.Count == 0) continue;
+            repeated++;
+            var places = used.Concat(barred).Select(p => p.Name).ToList();
+            string where = places.Count == 1 ? places[0] : string.Join(", ", places.Take(places.Count - 1)) + " and " + places[^1];
+            check.Evidence.Add(new(string.Join(", ", extra.Select(p => p.Name)), extra[0].Field, Short(SentenceWith(extra[0].Text, figure, facts)),
+                $"{figure} from the results appears again in: {where}." + (barred.Count > 0 ? $" {string.Join(" and ", barred.Select(p => p.Name))} should use none." : "")));
         }
         check.Outcome = check.Evidence.Count == 0 ? CheckOutcome.Pass : CheckOutcome.Fault;
         check.Summary = figures.Count == 0 ? "The results give no figures to repeat."
             : check.Evidence.Count == 0 ? $"None of the {Plural(figures.Count, "result figure", "result figures")} is repeated beyond its place."
-            : $"{Plural(check.Evidence.Count, "result figure is", "result figures are")} repeated where the rule does not allow it.";
+            : $"{Plural(repeated, "result figure is", "result figures are")} repeated where the rule does not allow it.";
         return check;
     }
 }
