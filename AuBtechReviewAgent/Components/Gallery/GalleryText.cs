@@ -16,13 +16,14 @@ public static class GalleryText
         "Your topic and research questions will be visible, in the report and on its card in the gallery.",
         "The gallery is public. Anyone can open it on this site without a link, and search engines may find it.",
         $"The report names its run, so for the rest of the run's {retentionDays} days anyone could also open the run itself.",
-        "You can withdraw it at any time, here or on its gallery page, from this browser.",
-        "If you add another run of the same review later, its report replaces this one.",
+        "You can withdraw it at any time, here or on its gallery page, from this browser. Withdrawing removes every version of it.",
+        "If you add another run of the same review later, it becomes the newest version. Earlier versions stay in the gallery, each at its own address, unless you withdraw them.",
     };
 
     /// <summary>The rule for duplicates, as the gallery page explains it.</summary>
     public const string SameReviewRule =
         "Each review is in the gallery once. Two runs are the same review when they are the same kind of review with the " +
         "same topic and research questions, ignoring capitals, punctuation and spacing. When an owner adds a newer run of " +
-        "the same review, its report replaces the older one, and the card says when it was updated.";
+        "the same review, it becomes the newest version. The card shows the newest, and the earlier versions stay at their " +
+        "own addresses, where you can compare two of them.";
 }

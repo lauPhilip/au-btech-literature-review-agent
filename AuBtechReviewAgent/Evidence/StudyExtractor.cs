@@ -83,6 +83,42 @@ public static partial class StudyExtractor
     /// <summary>The evidence basis of such a study.</summary>
     public const string NoText = "no text";
 
+    /// <summary>The extraction and appraisal prompt for one study: the text sent, and the research questions when there are any.</summary>
+    public static string Prompt(int referenceNumber, string title, string evidenceText, ExtractionFocus? focus)
+    {
+        string criteriaList = string.Join("\n", MmatCriteria.Select(kv => $"- {kv.Key}: " + string.Join(" | ", kv.Value)));
+        var (questionBlock, findingRule, questionField) = QuestionPrompt(focus);
+        return $$"""
+            You are extracting data from one study for a systematic literature review, and appraising its quality with the Mixed Methods Appraisal Tool (MMAT, 2018).
+
+            {{PromptSafety.DataOnlyNotice}}
+
+            STUDY: [{{referenceNumber}}] {{title}}
+            {{PromptSafety.Wrap(evidenceText, "paper text: abstract and selected passages")}}{{questionBlock}}
+
+            TASK 1 - EXTRACTION. Fill each field from the text above. Every value must have a verbatim quote (one sentence, max 40 words) copied exactly from the text as one unbroken passage (no "...", no rephrasing). If the text does not say, use value "not reported" and an empty quote.
+            - studyType: one short phrase (e.g. "design science artefact with case study", "controlled experiment", "survey", "literature review", "position paper").
+            - method, sample: a short value of at most {{ShortValueWords}} words in your own words, e.g. "semi-structured interviews" or "24 engineering students". Never copy the quote into the value; the quote is the proof, the value is the answer.
+            - limitations: one short sentence of at most {{SentenceWords}} words.
+            - keyFindings: 1 to 3 findings, each one short sentence of at most {{SentenceWords}} words.{{findingRule}}
+            - Keep every number with its unit and sign as the text gives it (write "40-90%", not "40-90").
+
+            TASK 2 - APPRAISAL. First decide if the study is empirical (it has a research question and collects or analyses data to answer it). If not (e.g. a position paper, a system description without evaluation, or a literature review), set appraisalCategory to "not_empirical" and appraisal to []. Otherwise choose ONE category and answer all five of its criteria, each with its id (e.g. "1.1") and "yes", "no" or "cant_tell". A "yes" or "no" needs a verbatim quote that shows it; use "cant_tell" with an empty quote only when the text above does not show it. When passages from the full text are given, most criteria can be answered from them.
+            {{criteriaList}}
+
+            Respond ONLY with a minified JSON object:
+            {"studyType":"...","method":{"value":"...","quote":"..."},"sample":{"value":"...","quote":"..."},"keyFindings":[{"value":"...","quote":"..."{{questionField}}}],"limitations":{"value":"...","quote":"..."},"appraisalCategory":"...","appraisal":[{"id":"3.1","answer":"yes","quote":"..."}]}
+            """;
+    }
+
+    private static readonly Lazy<string> MmatTemplate = new(() => PromptTemplate.Hash(Prompt(0, PromptTemplate.Slot("title"), PromptTemplate.Slot("text"), null)));
+
+    /// <summary>
+    /// The fingerprint of the prompt's fixed text without research questions, as the multivocal review's formal appraisal
+    /// sends it: part of that appraisal's cache key, since it keeps the answer itself rather than this cache's.
+    /// </summary>
+    public static string MmatTemplateSha256 => MmatTemplate.Value;
+
     /// <summary>Extracts and appraises one study; every value comes with a quote checked against the text sent.</summary>
     /// <param name="focus">The run's research questions, objective and cache; null keeps the extraction as it was (MMAT for the multivocal review).</param>
     public static async Task<StudyExtraction> ExtractAsync(IChatCompletionService chat, ReferencedPaper paper, int excerpts = 8, ExtractionFocus? focus = null)
@@ -117,29 +153,7 @@ public static partial class StudyExtractor
         string evidenceText = evidence.ToString();
         var canonical = CanonicalText.Of(evidenceText);
 
-        string criteriaList = string.Join("\n", MmatCriteria.Select(kv => $"- {kv.Key}: " + string.Join(" | ", kv.Value)));
-        var (questionBlock, findingRule, questionField) = QuestionPrompt(focus);
-        string prompt = $$"""
-            You are extracting data from one study for a systematic literature review, and appraising its quality with the Mixed Methods Appraisal Tool (MMAT, 2018).
-
-            {{PromptSafety.DataOnlyNotice}}
-
-            STUDY: [{{paper.ReferenceNumber}}] {{paper.Title}}
-            {{PromptSafety.Wrap(evidenceText, "paper text: abstract and selected passages")}}{{questionBlock}}
-
-            TASK 1 - EXTRACTION. Fill each field from the text above. Every value must have a verbatim quote (one sentence, max 40 words) copied exactly from the text as one unbroken passage (no "...", no rephrasing). If the text does not say, use value "not reported" and an empty quote.
-            - studyType: one short phrase (e.g. "design science artefact with case study", "controlled experiment", "survey", "literature review", "position paper").
-            - method, sample: a short value of at most {{ShortValueWords}} words in your own words, e.g. "semi-structured interviews" or "24 engineering students". Never copy the quote into the value; the quote is the proof, the value is the answer.
-            - limitations: one short sentence of at most {{SentenceWords}} words.
-            - keyFindings: 1 to 3 findings, each one short sentence of at most {{SentenceWords}} words.{{findingRule}}
-            - Keep every number with its unit and sign as the text gives it (write "40-90%", not "40-90").
-
-            TASK 2 - APPRAISAL. First decide if the study is empirical (it has a research question and collects or analyses data to answer it). If not (e.g. a position paper, a system description without evaluation, or a literature review), set appraisalCategory to "not_empirical" and appraisal to []. Otherwise choose ONE category and answer all five of its criteria, each with its id (e.g. "1.1") and "yes", "no" or "cant_tell". A "yes" or "no" needs a verbatim quote that shows it; use "cant_tell" with an empty quote only when the text above does not show it. When passages from the full text are given, most criteria can be answered from them.
-            {{criteriaList}}
-
-            Respond ONLY with a minified JSON object:
-            {"studyType":"...","method":{"value":"...","quote":"..."},"sample":{"value":"...","quote":"..."},"keyFindings":[{"value":"...","quote":"..."{{questionField}}}],"limitations":{"value":"...","quote":"..."},"appraisalCategory":"...","appraisal":[{"id":"3.1","answer":"yes","quote":"..."}]}
-            """;
+        string prompt = Prompt(paper.ReferenceNumber, paper.Title, evidenceText, focus);
 
         var settings = new MistralAIPromptExecutionSettings { Temperature = 0.0 };
         settings.ExtensionData ??= new Dictionary<string, object>();
