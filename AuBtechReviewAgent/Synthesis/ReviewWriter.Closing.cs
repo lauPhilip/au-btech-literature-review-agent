@@ -105,7 +105,7 @@ public static partial class ReviewWriter
         {
             ClosingAnswer answer;
             using (LlmStage.Begin("closing"))
-                answer = await LlmJson.GetAsync<ClosingAnswer>(chat, prompt, LlmJson.JsonMode(0.3), WithFigureGuard<ClosingAnswer>(a => ClosingProblem(a.Limitations, a.Implications, a.FutureResearch, a.Conclusion, checkedText + "\n" + facts + "\n" + evidence.BaseFacts, referenceCount,
+                answer = await LlmJson.GetAsync<ClosingAnswer>(chat, prompt, LlmJson.JsonMode(0.3), WithFigureGuard<ClosingAnswer>(a => CitationLoadSendBack(string.Join("\n", new[] { a.Limitations, a.Implications, a.FutureResearch, a.Conclusion }.Concat(a.Answers ?? new())), "closing call", warn) ?? ClosingProblem(a.Limitations, a.Implications, a.FutureResearch, a.Conclusion, checkedText + "\n" + facts + "\n" + evidence.BaseFacts, referenceCount,
                     a.Answers, questions.Count, ownFacts: facts + "\n" + evidence.BaseFacts, results: checkedText, evidence: evidence, profile: profile, givenAnswers: given),
                     a => ClosingFigureProblem(a, sections, discussion, given, facts + "\n" + evidence.BaseFacts), "closing call", warn), repairAttempts: 2);
             string Clean(string? text) => MethodsSectionWriter.StripMarkdownEmphasis(text!.Trim());
@@ -157,6 +157,8 @@ public static partial class ReviewWriter
             return $"conclusion sentence {repeat.Sentence} restates the answer to RQ{repeat.Answer}; the answers are printed just before the conclusion, so say what they mean together for the review objective instead.";
         if (printed != null && ThematicSynthesis.CitedIn(conclusion).Count > 0)
             return "the conclusion takes no citations when there are research questions: the answers carry them, and the conclusion is the review's own reading of the answers together.";
+        foreach (var (name, text) in parts)
+            if (CitationLoadProblem(text, part: name) is { } load) return load;
         foreach (var (name, text) in parts)
             if (OwnCountCited(text!, ownFacts, results) is { } own)
                 return $"{name}: \"{own}\" states this review's own count and carries a citation; the review's own counts take no citation.";
