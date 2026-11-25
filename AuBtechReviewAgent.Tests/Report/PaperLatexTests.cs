@@ -20,10 +20,12 @@ public class PaperLatexTests
     }
 
     [Theory]
-    [InlineData("Smith, J. (2024). A study. *Journal*.", @"Smith, J. (2024). A study. \textit{Journal}")]
+    // APA 7: a reference ends with a full stop, except after its DOI or address.
+    [InlineData("Smith, J. (2024). A study. *Journal*.", @"Smith, J. (2024). A study. \textit{Journal}.")]
     [InlineData("Smith, J. (2024). A study, ", "Smith, J. (2024). A study")]
-    [InlineData("https://doi.org/10.1/abc/", "https://doi.org/10.1/abc")]
-    public void EscapeReference_trims_a_trailing_full_stop_comma_or_slash(string input, string expected)
+    [InlineData("https://doi.org/10.1/abc/", "https://doi.org/10.1/abc/")]
+    [InlineData("Smith, J. (2024). A study. https://doi.org/10.1/abc.", "Smith, J. (2024). A study. https://doi.org/10.1/abc")]
+    public void EscapeReference_keeps_the_full_stop_except_after_a_link(string input, string expected)
     {
         Assert.Equal(expected, PaperLatex.EscapeReference(input));
     }
@@ -33,7 +35,7 @@ public class PaperLatexTests
     {
         const string input = "50% of A & B cost $5 in #1_x.";
         Assert.Equal(@"50\% of A \& B cost \$5 in \#1\_x.", PaperLatex.Escape(input));
-        Assert.Equal(@"50\% of A \& B cost \$5 in \#1\_x", PaperLatex.EscapeReference(input));
+        Assert.Equal(@"50\% of A \& B cost \$5 in \#1\_x.", PaperLatex.EscapeReference(input));
     }
 
     [Theory]
