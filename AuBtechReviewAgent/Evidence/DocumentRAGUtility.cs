@@ -17,7 +17,14 @@ namespace AuBtechReviewAgent;
 public record DocumentChunk(string SourceId, int PageNumber, string Text);
 
 /// <summary>Where a paper's full text came from (or why there is none), for the ledger.</summary>
-public record FullTextResult(IReadOnlyList<DocumentChunk> Chunks, string Source, string? Url);
+public record FullTextResult(IReadOnlyList<DocumentChunk> Chunks, string Source, string? Url)
+{
+    /// <summary>Runs of letters a reader of the PDF never sees, taken out of the chunks (#534).</summary>
+    public int HiddenParts { get; init; }
+
+    /// <summary>The text of those runs, for the scan.</summary>
+    public string Hidden { get; init; } = "";
+}
 
 public static class DocumentRAGUtility
 {
@@ -82,7 +89,8 @@ public static class DocumentRAGUtility
         }
 
         if (!File.Exists(pdfPath)) return new FullTextResult(Array.Empty<DocumentChunk>(), candidates.Count == 0 && string.IsNullOrWhiteSpace(contactEmail) ? "none (no open-access copy known)" : "none (no legal open-access PDF found)", null);
-        return new FullTextResult(ChunkPdf(pdfPath, sourceId), label, usedUrl);
+        var pdf = ReadPdf(pdfPath, sourceId);
+        return new FullTextResult(pdf.Chunks, label, usedUrl) { HiddenParts = pdf.HiddenParts, Hidden = pdf.Hidden };
     }
 
     /// <summary>The id the chunks are tagged with (the last path segment of the paper id).</summary>
@@ -249,16 +257,23 @@ public static class DocumentRAGUtility
         return Encoding.ASCII.GetString(head, 0, n).Contains("%PDF-");
     }
 
-    /// <summary>Extracts the text page by page and splits it into 600-character chunks with 100 characters of overlap.</summary>
-    public static List<DocumentChunk> ChunkPdf(string pdfPath, string sourceId)
+    /// <summary>Extracts the visible text page by page and splits it into 600-character chunks with 100 characters of overlap.</summary>
+    public static List<DocumentChunk> ChunkPdf(string pdfPath, string sourceId) => ReadPdf(pdfPath, sourceId).Chunks;
+
+    /// <summary>The chunks of the text a reader sees (<see cref="PdfVisibleText"/>), and the hidden runs taken out of it.</summary>
+    public static (List<DocumentChunk> Chunks, int HiddenParts, string Hidden) ReadPdf(string pdfPath, string sourceId)
     {
         var chunks = new List<DocumentChunk>();
+        var hidden = new StringBuilder();
+        int parts = 0;
         try
         {
             using PdfDocument document = PdfDocument.Open(pdfPath);
-            foreach (var page in document.GetPages())
+            foreach (var (number, visible) in PdfVisibleText.Pages(document))
             {
-                string pageText = Regex.Replace(page.Text?.Trim() ?? "", @"\s+", " ");
+                parts += visible.HiddenParts;
+                if (visible.Hidden.Length > 0) hidden.Append(visible.Hidden).Append('\n');
+                string pageText = Regex.Replace(visible.Text.Trim(), @"\s+", " ");
                 if (string.IsNullOrWhiteSpace(pageText)) continue;
 
                 const int chunkSize = 600, overlap = 100;
@@ -267,10 +282,10 @@ public static class DocumentRAGUtility
                     if (i + chunkSize > pageText.Length)
                     {
                         string finalSegment = pageText.Substring(i).Trim();
-                        if (finalSegment.Length > 50) chunks.Add(new DocumentChunk(sourceId, page.Number, finalSegment));
+                        if (finalSegment.Length > 50) chunks.Add(new DocumentChunk(sourceId, number, finalSegment));
                         break;
                     }
-                    chunks.Add(new DocumentChunk(sourceId, page.Number, pageText.Substring(i, chunkSize).Trim()));
+                    chunks.Add(new DocumentChunk(sourceId, number, pageText.Substring(i, chunkSize).Trim()));
                 }
             }
         }
@@ -278,6 +293,6 @@ public static class DocumentRAGUtility
         {
             _log.LogInformation("Could not read PDF {File}: {Message}", Path.GetFileName(pdfPath), ex.Message);
         }
-        return chunks;
+        return (chunks, parts, hidden.ToString());
     }
 }
