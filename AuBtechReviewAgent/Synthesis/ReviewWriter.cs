@@ -134,7 +134,8 @@ public static partial class ReviewWriter
     /// </summary>
     public static async Task<FrontMatter?> WriteFrontMatterAsync(IChatCompletionService chat, WritingProfile profile, string topic, string goal,
         string facts, IReadOnlyList<SynthesisSection> sections, string discussion, string referenceLines, int referenceCount, Action<string>? warn = null,
-        Func<string, string?>? abstractRule = null, IReadOnlyList<string>? questions = null, IReadOnlyList<string>? answers = null, string? conclusion = null)
+        Func<string, string?>? abstractRule = null, IReadOnlyList<string>? questions = null, IReadOnlyList<string>? answers = null, string? conclusion = null,
+        IReadOnlyDictionary<int, string>? weakSources = null)
     {
         string results = string.Join("\n\n", sections.Select(x => $"### {x.Heading}\n{x.Text}")) + $"\n\n### Discussion\n{discussion}";
         string readingBlock = (answers is { Count: > 0 } ? $"\n\nANSWERS TO THE RESEARCH QUESTIONS (written and checked before this step; the abstract's results and what they mean agree with them):\n{AnswerLines(answers, profile)}" : "")
@@ -151,7 +152,7 @@ public static partial class ReviewWriter
             {{PromptSafety.ReviewerInputNotice}}
 
             FACTS ABOUT THE REVIEW (counted in code; the only numbers about the review you may use):
-            {{facts}}
+            {{facts}}{{WeakSourcesBlock(weakSources, profile)}}
 
             REFERENCE LIST (cite ONLY these numbers):
             {{referenceLines}}
@@ -162,7 +163,7 @@ public static partial class ReviewWriter
             REQUIREMENTS:
             1. "title": one line, at most 25 words, no full stop, naming the topic and the kind of review.
             2. "abstract": one paragraph of 150 to 250 words: background, method, main results by theme, and what they mean. No citations. Use no number that is not in the facts or the results above.
-            3. "rationale": one or two paragraphs on why the review is needed. Every sentence but the last states the problem from what the {{profile.Sources}} say and ends with an inline [n] marker, using the {{profile.Sources}} the results cite for it; these sentences use no result figure (no number, percentage or effect size from the results) and cite at most {{MaxReferencesPerSentence}} {{profile.Sources}} each, ideally one or two. The last sentence has no citation and states what is not yet known, the gap this review addresses; it names no {{profile.Source}}, number or {{profile.Source}} design and uses none of these words: report, found, show, demonstrate, observe, "studies", "the literature". Add no background from general knowledge: leave out a sentence you cannot cite, since code removes every other rationale sentence without a citation.
+            3. "rationale": one or two paragraphs on why the review is needed. Every sentence but the last states the problem from what the {{profile.Sources}} say and ends with an inline [n] marker, using the {{profile.Sources}} the results cite for it; these sentences use no result figure (no number, percentage or effect size from the results) and cite at most {{MaxReferencesPerSentence}} {{profile.Sources}} each, ideally one or two. The last sentence has no citation and states what is not yet known, the gap this review addresses; it names no {{profile.Source}}, number or {{profile.Source}} design and uses none of these words: report, found, show, demonstrate, observe, "studies", "the literature". Add no background from general knowledge: leave out a sentence you cannot cite, since code removes every other rationale sentence without a citation.{{WeakOpeningRule(weakSources, profile)}}
             4. {{objectivesRule}}
             {{ProseCleaner.PlainProseRule}}
             Respond ONLY with a valid minified JSON object:
@@ -173,7 +174,9 @@ public static partial class ReviewWriter
         {
             using (LlmStage.Begin("front-matter"))
             {
-                var answer = await LlmJson.GetAsync<FrontMatterAnswer>(chat, prompt, LlmJson.JsonMode(0.3), a => Noted(FrontMatterProblem(a, allowedNumbers, referenceCount, codeObjectives == null, facts), "front-matter call", warn) ?? abstractRule?.Invoke(a.Abstract!), repairAttempts: 2);
+                var answer = await LlmJson.GetAsync<FrontMatterAnswer>(chat, prompt, LlmJson.JsonMode(0.3), WithSoftGuard<FrontMatterAnswer>(
+                    a => Noted(FrontMatterProblem(a, allowedNumbers, referenceCount, codeObjectives == null, facts), "front-matter call", warn) ?? abstractRule?.Invoke(a.Abstract!),
+                    a => WeakOpeningProblem(a.Rationale, weakSources, profile), "front-matter call", "a rationale that opens on one weak source", warn), repairAttempts: 2);
                 return new FrontMatter(
                     answer.Title!.Trim().TrimEnd('.'),
                     MethodsSectionWriter.StripMarkdownEmphasis(answer.Abstract!.Trim()),
