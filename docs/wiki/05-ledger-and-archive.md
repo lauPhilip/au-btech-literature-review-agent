@@ -15,7 +15,7 @@ Every run has a folder `WorkspaceStore/{runId}/`, where the run id is a GUID wri
 | `*.pdf` | `DocumentRAGUtility` | during synthesis | Open-access full texts used in the run |
 | `extraction.json` | `ExtractStudiesAsync` | during synthesis | Data extraction and MMAT answers with quotes |
 | `grounded-outline.txt` | report generation | during synthesis | Themes, claims and supporting reference numbers |
-| `thematic-codebook.json` | report generation | during synthesis | Codes with their anchors, themes, second coding and kappa, coverage per theme, studies not cited and why |
+| `thematic-codebook.json` | report generation | during synthesis | Codes with their anchors (`FromCache` on a code reused from the cache), themes, second coding and kappa, coverage per theme, studies not cited and why, and `Reuse`: how many coding answers and whether the codebook were reused |
 | `peer-review-feedback.json` | report generation | during synthesis | Reviewer comments; text before and after revision; each section revision and whether the guard kept it |
 | `stylistic-transformation-ledger.json` | report generation | during synthesis | Each stylistic rewrite, before and after |
 | `reviewer-notes.json` | Review Output page | when the reviewer saves a note | The reviewer's own notes on citations and included studies (`ReviewerNote`), never sent to the model |
