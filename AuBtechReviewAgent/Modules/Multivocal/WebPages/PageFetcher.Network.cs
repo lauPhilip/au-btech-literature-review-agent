@@ -19,7 +19,7 @@ namespace AuBtechReviewAgent;
 // private address is refused too.
 public sealed partial class PageFetcher
 {
-    private static SocketsHttpHandler PublicOnlyHandler() => new()
+    internal static SocketsHttpHandler PublicOnlyHandler() => new()
     {
         AllowAutoRedirect = false, // followed by hand, so each hop is checked
         AutomaticDecompression = DecompressionMethods.All,
