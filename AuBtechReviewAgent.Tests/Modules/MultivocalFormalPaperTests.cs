@@ -51,7 +51,7 @@ public class MultivocalFormalPaperTests
     {
         var (_, tex) = await Paper();
 
-        Assert.Contains("What this theme rests on: 3 sources [1, 2, 3] (1 grey and 2 academic)", tex);
+        Assert.Contains("What this theme rests on: 3 sources [1–3] (1 grey and 2 academic)", tex);
         Assert.Contains("with a mean quality of the grey sources of", tex);
     }
 

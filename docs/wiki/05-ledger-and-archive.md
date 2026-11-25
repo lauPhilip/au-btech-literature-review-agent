@@ -15,9 +15,10 @@ Every run has a folder `WorkspaceStore/{runId}/`, where the run id is a GUID wri
 | `*.pdf` | `DocumentRAGUtility` | during synthesis | Open-access full texts used in the run |
 | `extraction.json` | `ExtractStudiesAsync` | during synthesis | Data extraction and MMAT answers with quotes |
 | `grounded-outline.txt` | report generation | during synthesis | Themes, claims and supporting reference numbers |
-| `thematic-codebook.json` | report generation | during synthesis | Codes with their anchors, themes, second coding and kappa, coverage per theme, studies not cited and why |
+| `thematic-codebook.json` | report generation | during synthesis | Codes with their anchors (`FromCache` on a code reused from the cache), themes, second coding and kappa, coverage per theme, studies not cited and why, and `Reuse`: how many coding answers and whether the codebook were reused |
 | `peer-review-feedback.json` | report generation | during synthesis | Reviewer comments; text before and after revision; each section revision and whether the guard kept it |
 | `stylistic-transformation-ledger.json` | report generation | during synthesis | Each stylistic rewrite, before and after |
+| `reference-enrichment.json` | `EnrichReferencesAsync` | before the references are numbered | Per included study with a DOI or arXiv number: each lookup (service, address without e-mail or key, status, the saved answer in `SourceResponses/` and its SHA-256), the fields it filled and from which service, answers not used and why, and the reference before and after |
 | `reviewer-notes.json` | Review Output page | when the reviewer saves a note | The reviewer's own notes on citations and included studies (`ReviewerNote`), never sent to the model |
 | `report-edits.json` | `EditReportSentenceAsync`, `UndoReportEditAsync` | when the reviewer edits or undoes a sentence of the finished report | Every edit in order (`ReportEditLog`): the field and sentence number, the text before and after, who (the edit key's owner) and when, a verdict with its quote for each citation in the new text, the model and the app version; an undo is one more entry. The run's own files are never changed; the page, main.tex and the API put the edits in place when they read the report |
 | `owner.json` | dashboard | when the run starts | The SHA-256 of the run's edit key; not part of the archive |

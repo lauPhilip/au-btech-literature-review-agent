@@ -94,13 +94,23 @@ public static class PaperLatex
     public static string Escape(string input) => Escape(input, ' ');
 
     /// <summary>
-    /// Escapes one line of the reference list, which ends without a full stop, comma or slash, as a bibitem does.
+    /// Escapes one line of the reference list. APA 7 ends a reference with a full stop, except after its DOI or address,
+    /// where a full stop would read as part of the link; only that one is removed.
     /// </summary>
-    public static string EscapeReference(string input) => Escape(input, ' ', ',', '.', '/');
+    public static string EscapeReference(string input)
+    {
+        string reference = (input ?? "").TrimEnd(' ', ',');
+        int lastSpace = reference.LastIndexOf(' ');
+        if (reference.EndsWith('.') && reference[(lastSpace + 1)..].StartsWith("http", StringComparison.OrdinalIgnoreCase))
+            reference = reference.TrimEnd('.');
+        return Escape(reference, ' ', references: true);
+    }
 
-    private static string Escape(string input, params char[] trimEnd)
+    private static string Escape(string input, char trimEnd, bool references = false)
     {
         if (string.IsNullOrEmpty(input)) return string.Empty;
+        // In-text citations are set sorted and ranged ("[1–4]"); a reference holds none, but may hold brackets.
+        if (!references) input = CitationMarkers.Tidy(input);
         string cleanInput = input.Replace("https://doi.org/XXXX-XXXXXX", "")
                                  .Replace("https://doi.org/XXXXXXX.XXXXXXX", "")
                                  .Replace("https://doi.org/XX.XXXX/", "")

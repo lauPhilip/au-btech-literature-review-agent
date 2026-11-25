@@ -126,7 +126,7 @@ public partial class PrismaReviewEngine
         ScreeningLog Log(string decision, string reasoning, string summary) => new(
             paper.Id, paper.Title, decision, reasoning, apa.Citation, summary,
             apa.VenueType, apa.VenueName, apa.Year, paper.Authors, paper.Doi, paper.Url, paper.Abstract,
-            InjectionFlags: flags, Origin: origin, CitedByCount: paper.CitedByCount);
+            InjectionFlags: flags, Origin: origin, CitedByCount: paper.CitedByCount, Details: apa.Details);
 
         if (o.Error != null)
         {

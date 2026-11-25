@@ -69,7 +69,7 @@ public partial class PrismaReviewEngine
             ctx.State.FullTextFlags?.RemoveAll(f => f.PaperId == included[i].Id);
             var flags = HiddenText.Flags(string.Join("\n", chunks.Select(c => c.Text)), hidden);
             if (flags != null || removed != null)
-                (ctx.State.FullTextFlags ??= new()).Add(new SourceTextFlags(included[i].Id, included[i].Title, flags ?? new(), removed));
+                (ctx.State.FullTextFlags ??= new()).Add(new SourceTextFlags(included[i].Id, included[i].Title, flags ?? new(), removed, PromptSafety.ScanVersion));
         }
         await PublishAsync(ctx);
     }
@@ -113,6 +113,9 @@ public partial class PrismaReviewEngine
     {
         var reviewState = ctx.State;
         var request = ctx.Request;
+
+        // Gaps in the references are filled before they are numbered, since a fuller author list can change the order.
+        await EnrichReferencesAsync(ctx);
 
         // One ordering for the whole report. The reference list shown to the model, the [n] markers it
         // writes, the extraction table and the LaTeX bibliography are all numbered from this list.
@@ -191,6 +194,7 @@ public partial class PrismaReviewEngine
             VenueName = log.VenueName,
             Doi = log.Doi,
             Url = log.Url,
+            Details = log.Details,
         };
     }
 

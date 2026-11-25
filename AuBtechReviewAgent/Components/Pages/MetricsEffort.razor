@@ -1,7 +1,8 @@
 @* The Metrics page's effort table (issue #414): per run, newest first, the wall-clock minutes, the model calls with
    their retries and failures, the tokens in and out (with the reasoning part of the output) and the summed call time,
-   all from run-metrics.json, which counts them from llm-calls.json. No prices: they change, so the page counts tokens.
-   Runs made before these were counted show a dash. The table's cells use the page's classes (Metrics.razor.cs). *@
+   all from run-metrics.json, which counts them from llm-calls.json. When the deployment sets a price table
+   (Metrics:Prices), an estimated cost per run follows, worked out at today's prices (issue #504); without one the
+   table counts tokens only. Runs made before these were counted show a dash. The cells use the page's classes (Metrics.razor.cs). *@
 
 @using System.Globalization
 
@@ -12,12 +13,20 @@
         Calls are the model calls; a retry is a call sent again after a busy or failed answer. Output tokens include the reasoning tokens.
         Call time adds up the time of every call, and calls run side by side, so it can be longer than the run. A dash means the run was made before this was counted.
     </p>
+    @if (Priced)
+    {
+        <p class="mt-2 max-w-[70ch] text-[15px] text-muted">
+            Estimated at today's prices from the token counts; not the price on the day of the run; reasoning tokens are billed as output.
+            The cost is in @Prices.Currency.
+        </p>
+    }
     <div class="mt-4 max-h-[70vh] overflow-auto border border-line" tabindex="0" role="region" aria-labelledby="effort-title">
         <table class="w-full border-separate border-spacing-0 text-sm">
             <thead>
                 <tr>
                     @Th("Run") @Th("Version") @Th("Minutes", true) @Th("Calls", true) @Th("Retries", true) @Th("Failed", true)
                     @Th("Input tokens", true) @Th("Output tokens", true) @Th("Of which reasoning", true) @Th("Call time (min)", true)
+                    @if (Priced) { @Th("Estimated cost", true) }
                 </tr>
             </thead>
             <tbody>
@@ -35,6 +44,11 @@
                         <td class="@Metrics.TdNum">@Count(r.OutputTokens)</td>
                         <td class="@Metrics.TdNum">@Count(r.ReasoningTokens)</td>
                         <td class="@Metrics.TdNum">@(r.LlmMinutes is double m ? m.ToString("0.0", Culture) : "–")</td>
+                        @if (Priced)
+                        {
+                            var unpriced = Prices.Unpriced(r);
+                            <td class="@Metrics.TdNum" title="@(unpriced.Count > 0 ? "No price for " + string.Join(", ", unpriced) : null)">@Cost(Prices.Cost(r))</td>
+                        }
                     </tr>
                 }
             </tbody>
@@ -49,10 +63,25 @@
                     <td class="@Metrics.TdNum">@Mean(Runs.Select(r => (double?)r.OutputTokens), "N0")</td>
                     <td class="@Metrics.TdNum">@Mean(Runs.Select(r => (double?)r.ReasoningTokens), "N0")</td>
                     <td class="@Metrics.TdNum">@Mean(Runs.Select(r => r.LlmMinutes), "0.0")</td>
+                    @if (Priced) { <td class="@Metrics.TdNum">@Cost(Prices.MeanCost(Runs))</td> }
                 </tr>
+                @if (Priced)
+                {
+                    <tr class="bg-soft font-semibold">
+                        <th scope="row" class="@Metrics.Td text-left" colspan="2">Total</th>
+                        <td class="@Metrics.Td" colspan="8"></td>
+                        <td class="@Metrics.TdNum">@Cost(Prices.TotalCost(Runs))</td>
+                    </tr>
+                }
             </tfoot>
         </table>
     </div>
+    @if (Priced && Unpriced.Count > 0)
+    {
+        <p class="mt-2 max-w-[70ch] text-sm text-muted">
+            A dash for the cost means the run used a model with no price in the table (@string.Join(", ", Unpriced)), so it is left out of the mean and the total.
+        </p>
+    }
 </section>
 
 @code {
@@ -60,6 +89,14 @@
 
     /// <summary>The runs, oldest first, as the page holds them.</summary>
     [Parameter, EditorRequired] public IReadOnlyList<AuBtechReviewAgent.RunMetrics> Runs { get; set; } = Array.Empty<AuBtechReviewAgent.RunMetrics>();
+
+    /// <summary>The price table for the estimated cost; off by default, and then the table counts tokens only.</summary>
+    [Parameter] public AuBtechReviewAgent.MetricsPrices Prices { get; set; } = AuBtechReviewAgent.MetricsPrices.None;
+
+    private bool Priced => Prices.Enabled;
+    private IReadOnlyList<string> Unpriced => Runs.SelectMany(Prices.Unpriced).Distinct().OrderBy(m => m, StringComparer.Ordinal).ToList();
+
+    private string Cost(double? cost) => cost is double c ? Prices.Format(c) : "–";
 
     private static string Count(long? n) => n is long v ? v.ToString("N0", Culture) : "–";
 

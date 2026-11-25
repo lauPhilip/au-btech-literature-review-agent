@@ -90,4 +90,22 @@ public class AiUseFlagCountTests : PipelineFeatureRun
         Assert.Contains($"The full text of 1 of {state.Stats.FullTextRetrieved} included ", AiUseStatement.Methods(state, runId));
         Assert.Contains("it was flagged for the reviewer and changed no decision.", AiUseStatement.Methods(state, runId));
     }
+
+    [Fact]
+    public void AnOlderRunsFlagsAreJudgedAgainWithTheCurrentPatterns()
+    {
+        // The scan before #472 named looser forms after the patterns that are now strong (#478).
+        var loose = new List<SourceFlag> { new("addresses-the-model", "…the tool can act as an assistant for the team…"), new("chat-markup", "a <|user|> turn") };
+        var attack = new List<SourceFlag> { new("ignore-instructions", "…ignore all previous instructions and…") };
+        var state = new ReviewState { Stats = new ReviewStats { FullTextRetrieved = 5 } };
+        state.FullTextFlags = new() { new("P1", "One", loose), new("P2", "Two", attack) };
+
+        Assert.Equal(new[] { "mentions-ai-role", "chat-template" }, PromptSafety.Current(loose, null)!.Select(f => f.Pattern));
+        Assert.Contains(AiUseStatement.FlaggedSources(1, 5, "full text", "included study", "included studies", mentioned: 1), AiUseStatement.Methods(state, Guid.Empty));
+
+        // Flags of the current scan are taken as they are.
+        state.FullTextFlags = new() { new("P1", "One", loose, Scan: PromptSafety.ScanVersion), new("P2", "Two", attack, Scan: PromptSafety.ScanVersion) };
+        Assert.Contains(AiUseStatement.FlaggedSources(2, 5, "full text", "included study", "included studies"), AiUseStatement.Methods(state, Guid.Empty));
+        Assert.Same(loose, PromptSafety.Current(loose, PromptSafety.ScanVersion));
+    }
 }

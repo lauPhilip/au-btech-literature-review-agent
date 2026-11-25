@@ -44,6 +44,10 @@ public sealed class PageSnapshot
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public List<SourceFlag>? InjectionFlags { get; set; }
 
+    /// <summary>The scan that found <see cref="InjectionFlags"/> (<see cref="PromptSafety.ScanVersion"/>); null for an older page.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? FlagScan { get; set; }
+
     /// <summary>
     /// What was taken out of the text before it was kept, because a reader never sees it (#369): invisible characters
     /// and hidden parts of the page. Null, and left out of the file, when nothing was.
@@ -143,6 +147,18 @@ public sealed partial class MultivocalPages
     }
 
     /// <summary>
+    /// The pages with the flags of every older page judged again with the current patterns, from its kept text (#478), so
+    /// a paper rebuilt from an older run counts only phrases aimed at the model. Only pages with flags are read again, as
+    /// the current patterns narrowed the older ones; the pages file itself is not changed.
+    /// </summary>
+    public MultivocalPagesFile WithCurrentFlags(Guid runId, MultivocalPagesFile file)
+    {
+        foreach (var page in file.Pages.Where(p => p.InjectionFlags is { Count: > 0 } && p.FlagScan != PromptSafety.ScanVersion))
+            page.InjectionFlags = PromptSafety.Current(page.InjectionFlags, page.FlagScan, page.NotKept == null ? ReadText(runId, page) : null);
+        return file;
+    }
+
+    /// <summary>
     /// The citation check of a multivocal review: whether a quote is in the source's kept page text. It never looks at
     /// the live page, which may have changed since the access date; a kept text whose SHA-256 no longer matches counts
     /// as missing. Returns "found", "not found" or "no kept page".
@@ -212,6 +228,7 @@ public sealed partial class MultivocalPages
             text = clean.Text;
             snapshot.HiddenText = HiddenTextRemoved.Of((removed?.InvisibleCharacters ?? 0) + clean.InvisibleCharacters, removed?.HiddenElements ?? 0);
             snapshot.InjectionFlags = AuBtechReviewAgent.HiddenText.Flags(text, hidden + "\n" + clean.Hidden);
+            snapshot.FlagScan = snapshot.InjectionFlags == null ? null : PromptSafety.ScanVersion;
         }
 
         string folder = _runs.FolderOf(runId);

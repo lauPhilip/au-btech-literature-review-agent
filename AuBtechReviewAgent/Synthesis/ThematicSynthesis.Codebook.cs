@@ -26,7 +26,7 @@ public static partial class ThematicSynthesis
     /// </summary>
     public static async Task<(List<Theme> Themes, List<UncodedStudy> Unplaced)> BuildCodebookAsync(
         IChatCompletionService chat, string objective, IReadOnlyList<ThematicCode> codes, int maxThemes, string criteria = "",
-        IReadOnlyList<string>? questions = null, List<UnansweredQuestion>? unanswered = null)
+        IReadOnlyList<string>? questions = null, List<UnansweredQuestion>? unanswered = null, SynthesisCache? cache = null, SynthesisReuse? reuse = null)
     {
         questions ??= Array.Empty<string>();
         var questionIds = questions.Select((_, i) => ReviewWriter.QuestionId(i)).ToList();
@@ -64,7 +64,8 @@ public static partial class ThematicSynthesis
             {"themes":[{"name":"...","description":"...","codes":["C1","C4"]{{questionField}}}],"unassigned":[{"code":"C9","reason":"..."}]{{unansweredField}}}
             """;
 
-        var answer = await LlmJson.GetAsync<CodebookAnswer>(chat, prompt, PrismaReviewEngine.JsonMode(0.1), a =>
+        // A reused codebook passes the same check again: known code ids only, every coded study placed or left out with a reason.
+        string? Validate(CodebookAnswer a)
         {
             if (a.Themes == null || a.Themes.Count == 0) return "themes must be a non-empty list.";
             if (a.Themes.Count > max) return $"give at most {max} themes.";
@@ -76,7 +77,9 @@ public static partial class ThematicSynthesis
                 return $"studies {string.Join(", ", unplaced)} are in no theme and none of their codes is listed as unassigned. Place one of their codes in the best fitting theme, or list the codes under unassigned with a reason.";
             if (SingleStudyThemeProblem(a.Themes.Select(t => (t.Name, t.Codes!.AsEnumerable(), t.SingleStudyReason)), codes, studies.Count) is { } single) return single;
             return questions.Count == 0 ? null : QuestionProblem(questionIds, a.Themes.Select(t => (IEnumerable<string>)(t.Questions ?? new())), (a.Unanswered ?? new()).Select(u => u.Question));
-        });
+        }
+        var (answer, fromCache) = await CachedAnswerAsync<CodebookAnswer>(chat, prompt, PrismaReviewEngine.JsonMode(0.1), Validate, cache, CodebookCacheKind, CodebookPromptVersion);
+        if (reuse != null) reuse.CodebookReused = fromCache;
 
         var byId = codes.ToDictionary(c => c.Id, StringComparer.OrdinalIgnoreCase);
         var themes = answer.Themes!.Select(t =>
