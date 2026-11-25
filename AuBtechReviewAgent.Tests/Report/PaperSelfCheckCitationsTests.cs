@@ -107,4 +107,39 @@ public class PaperSelfCheckCitationsTests
         Assert.Contains(check.Evidence, e => e.Text == "[5]" && e.Detail.Contains("cited nowhere"));
         Assert.Equal("5 entries; the reference completion filled 3 fields in 1; 1 without a year, 1 without a DOI.", check.Summary);
     }
+
+    [Fact]
+    public void TheRunPageAgreeingWithTheReportChangesNothing()
+    {
+        var final = new CitationSupportSummary { Checked = 5, Supported = 5 };
+        var check = SelfCheckPaper.Check(new PaperCheckInput { Parts = SelfCheckPaper.Input().Parts, CitationsFinal = final,
+            CitationsShown = new CitationSupportSummary { Checked = 5, Supported = 5 } }, "citation-check");
+
+        Assert.Equal(CheckOutcome.Pass, check.Outcome);
+        Assert.Empty(check.Evidence);
+    }
+
+    [Fact]
+    public void ARunPageCountOtherThanTheReportsIsAFaultWithBothNumbers()
+    {
+        // Run 596541db: the run page said 109 citations checked, the report 113.
+        var check = SelfCheckPaper.Check(new PaperCheckInput { Parts = SelfCheckPaper.Input().Parts, CitationsRemoved = 4,
+            CitationsFinal = new CitationSupportSummary { Checked = 113, Supported = 113 },
+            CitationsShown = new CitationSupportSummary { Checked = 109, Supported = 109, Removed = 4 } }, "citation-check");
+
+        Assert.Equal(CheckOutcome.Fault, check.Outcome);
+        Assert.EndsWith("; the run page gives other counts.", check.Summary);
+        var shown = check.Evidence.Where(e => e.Part == "Run page").Select(e => e.Text).ToList();
+        Assert.Equal(new[] { "109 checked on the run page, 113 in the report", "109 supported on the run page, 113 in the report" }, shown);
+    }
+
+    [Fact]
+    public void RunPageCountsWithoutACheckInTheReportAreAFault()
+    {
+        var check = SelfCheckPaper.Check(new PaperCheckInput { CitationsShown = new CitationSupportSummary { Checked = 3, Supported = 3 } }, "citation-check");
+
+        Assert.Equal(CheckOutcome.Fault, check.Outcome);
+        Assert.Equal("The run page gives citation counts the report does not have.", check.Summary);
+        Assert.Equal(2, check.Evidence.Count);
+    }
 }
