@@ -76,6 +76,8 @@ Every error is a problem detail (RFC 9457, `application/problem+json`) with a ti
 
 The MCP server lets another assistant run a review as a tool. It speaks the Model Context Protocol over Streamable HTTP at `/mcp`, with the official C# SDK (`ModelContextProtocol.AspNetCore`), behind the same switch as the REST API. It is stateless: every call stands on its own, and nothing from one caller is kept for the next. The code is in `AuBtechReviewAgent/Mcp/`.
 
+The SDK is version 2.x, which speaks two revisions of the protocol at the same address. A client on the newer revision (2026-07-28) sends the protocol version and standard headers with every request and has no handshake. A client on the older one (2025-11-25), such as one built on SDK 1.x, opens with the `initialize` handshake. The server stays stateless for both, so it keeps no session and sends no `Mcp-Session-Id`. The test `Clients_on_the_older_and_the_newer_protocol_both_reach_the_tools` pins each revision in turn and calls the tools through it. The tools use no sampling, elicitation or roots, which a stateless 2.x server cannot ask an older client for.
+
 | Tool | What it does |
 |---|---|
 | `start_literature_review` | Starts a review with the form's fields and returns the run id and edit key at once |
