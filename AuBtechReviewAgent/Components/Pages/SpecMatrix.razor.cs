@@ -23,6 +23,7 @@ public partial class SpecMatrix
     /// <summary>How many citations the second repair pass removed (RemovedCitations in citation-audit.json).</summary>
     internal int auditRemoved;
     internal AuBtechReviewAgent.ThematicCodebook? codebook;
+    internal AuBtechReviewAgent.CertaintyFile? certainty;
     internal int journalCount, conferenceCount, transactionsCount, proceedingsCount, preprintCount;
 
     internal sealed record PlatformShare(string Category, string Label, int Count, string Color, string Badge);
@@ -188,6 +189,7 @@ public partial class SpecMatrix
         extractions.Clear();
         auditChecks.Clear();
         codebook = null;
+        certainty = null;
         publicationsByYear = new();
         platformShares = new();
         journalCount = conferenceCount = transactionsCount = proceedingsCount = preprintCount = 0;
@@ -243,6 +245,7 @@ public partial class SpecMatrix
         failedPeerReviewCheck = state.Stats.FailedPeerReviewCheck;
         if (state.Extractions != null) extractions.AddRange(state.Extractions);
         codebook = state.ThematicSynthesis;
+        certainty = AuBtechReviewAgent.SystematicCertainty.Assess(report, codebook, extractions);
 
         // Older runs have ReferenceNumber = 0 everywhere; OrderBy is stable, so they keep their order.
         tableRecords.AddRange(state.SynthesizedRecords.OrderBy(r => r.ReferenceNumber));
