@@ -72,6 +72,7 @@ public static partial class ReviewWriter
                 if (string.IsNullOrWhiteSpace(a.Text)) return "text must not be empty.";
                 var outside = ThematicSynthesis.CitedIn(a.Text).Where(r => r < 1 || r > referenceCount).ToList();
                 if (outside.Count > 0) return $"citation numbers {string.Join(", ", outside)} are not in the reference list.";
+                if (CitationLoadSendBack(string.Join("\n", (a.Answers ?? new()).Append(a.Text)), "discussion call", warn) is { } load) return load;
                 if (LeftOutCited(a.Text, evidence) is { } leftOut) return leftOut;
                 if (ReadingBasisSentence(a.Text) is { } basis) return ReadingBasisProblem(basis, profile);
                 if (UncitedAttribution(a.Text, evidence.BaseFacts) is { } reported) return reported;
