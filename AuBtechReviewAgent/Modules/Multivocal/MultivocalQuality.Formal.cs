@@ -31,7 +31,7 @@ public sealed partial class MultivocalQualityAssessor
         result.TextSha256 = snapshot.TextSha256;
         result.TextBasis = snapshot.TextBasis;
 
-        string key = ReviewCache.Key(FormalAppraisalVersion, _model, paper.Id, paper.Title ?? "", snapshot.TextSha256);
+        string key = ReviewCache.Key(FormalAppraisalVersion, StudyExtractor.MmatTemplateSha256, _model, paper.Id, paper.Title ?? "", snapshot.TextSha256);
         if (_cache.TryGet<StudyExtraction>("formal-appraisal", key, out var cached) && cached is { Error: null })
         {
             result.FromCache = true;
