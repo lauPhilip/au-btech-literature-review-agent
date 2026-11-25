@@ -69,7 +69,7 @@ public partial class PrismaReviewEngine
             ctx.State.FullTextFlags?.RemoveAll(f => f.PaperId == included[i].Id);
             var flags = HiddenText.Flags(string.Join("\n", chunks.Select(c => c.Text)), hidden);
             if (flags != null || removed != null)
-                (ctx.State.FullTextFlags ??= new()).Add(new SourceTextFlags(included[i].Id, included[i].Title, flags ?? new(), removed));
+                (ctx.State.FullTextFlags ??= new()).Add(new SourceTextFlags(included[i].Id, included[i].Title, flags ?? new(), removed, PromptSafety.ScanVersion));
         }
         await PublishAsync(ctx);
     }
