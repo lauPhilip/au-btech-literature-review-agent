@@ -186,7 +186,8 @@ public static partial class ThematicSynthesis
 
     /// <summary>
     /// Guard for every revision of a section (coverage fill, peer review): the revision may not lose a study
-    /// the section cited, and may only cite numbers in the reference list. Returns null when acceptable.
+    /// the section cited, may only cite numbers in the reference list, and may add no sentence that cites more than
+    /// <see cref="ReviewWriter.MaxReferencesPerSentence"/> references. Returns null when acceptable.
     /// </summary>
     public static string? RevisionProblem(string before, string after, int referenceCount)
     {
@@ -195,7 +196,7 @@ public static partial class ThematicSynthesis
         if (lost.Count > 0) return $"the revision dropped the citation of {string.Join(", ", lost.Select(r => $"[{r}]"))}";
         var outOfRange = CitedIn(after).Where(r => r < 1 || r > referenceCount).ToList();
         if (outOfRange.Count > 0) return $"the revision cites numbers outside the reference list: {string.Join(", ", outOfRange)}";
-        return null;
+        return ReviewWriter.CitationLoadProblem(after, before) is { } load ? $"the revision breaks the rule on references per sentence ({load})" : null;
     }
 
     /// <summary>The overview paragraph that opens the synthesis, written from the codebook (no model involved).</summary>
@@ -245,7 +246,8 @@ public static partial class ThematicSynthesis
                 ? $"A second, independent coding assigned the studies to the same themes; agreement over {second.CellsCompared} study-theme decisions was Cohen's kappa = {k.ToString("0.00", CultureInfo.InvariantCulture)} ({second.Disagreements.Count} disagreement{(second.Disagreements.Count == 1 ? "" : "s")}, listed in thematic-codebook.json). "
                 : $"A second, independent coding was attempted but could not be completed ({second.Error}). ");
         }
-        sb.Append("Third, each theme was written up as a subsection from its own studies only, with every study of the theme to be cited; studies still uncited were given to one further revision pass. ");
+        sb.Append($"Third, each theme was written up as a subsection from its own studies only, with no sentence citing more than {ReviewWriter.MaxReferencesPerSentence} studies; " +
+            $"in a theme of up to {ReviewWriter.CiteEveryUpTo} studies every study was to be cited, and studies still uncited were given to one further revision pass, while a larger theme was synthesised from the studies that report its claims most directly, and its uncited studies are listed with the citation coverage. ");
         sb.Append(repairEnabled
             ? $"Finally, the part of every cited sentence attributed to a paper was checked against that paper{checkedBy}; sentences judged not supported or only partly supported were rewritten once from the paper's evidence and checked again."
             : $"Finally, the part of every cited sentence attributed to a paper was checked against that paper{checkedBy}.");
