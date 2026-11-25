@@ -34,6 +34,73 @@ public class CitationLoadTests
         const string Before = "Agents log their tool calls [1, 2, 3, 4].";
         Assert.Null(ReviewWriter.CitationLoadProblem(Before + " Loops recover [5].", Before));
         Assert.NotNull(ReviewWriter.CitationLoadProblem("Agents log every call [1, 2, 3, 4].", Before));
+        Assert.Contains("the revision breaks the rule on references per sentence", ThematicSynthesis.RevisionProblem("Logs [1]. Audits [2, 3, 4].", "Logs and audits [1, 2, 3, 4].", 4)!);
+    }
+
+    [Fact]
+    public void ThePromptRuleNamesTheNumberCodeChecks()
+    {
+        string rule = ReviewWriter.CitationLoadRule(WritingProfile.Systematic);
+        Assert.Contains("A sentence cites at most 3 studies in all its markers together, and ideally one or two.", rule);
+        Assert.Contains(rule, ReviewWriter.ClaimPerCitationRule(WritingProfile.Systematic));
+    }
+
+    [Fact]
+    public async Task ASubsectionWithAFourReferenceSentenceIsSentBackAndTheSendBackIsOnFile()
+    {
+        var evidence = ThemeShapeTests.Evidence(3);
+        var model = new FakeChatService()
+            .Returns("""{"heading":"Logs","text":"Agents log every tool call [1, 2, 3, 4]."}""")
+            .Returns("""{"heading":"Logs","text":"Agents log every tool call [1, 2], and replay them [3]."}""");
+
+        var (section, coverage) = await ReviewWriter.WriteThemeAsync(model, WritingProfile.Systematic, "Map logging", evidence, evidence.Themes[0], 1, referenceCount: 4);
+
+        Assert.Equal("Agents log every tool call [1, 2], and replay them [3].", section!.Text);
+        Assert.Contains("cites 4 references", model.Prompts[1]);
+        Assert.Contains(coverage.WritingNotes!, n => n.StartsWith("The subsection was sent back for citing too many references in one sentence"));
+    }
+
+    [Fact]
+    public void AClosingPartThatCitesFourReferencesInASentenceIsSentBack()
+    {
+        string? problem = ReviewWriter.ClosingProblem("The evidence rests on surveys [1, 2, 3, 4].", "Teams should log calls.", "Trials are missing.", "Logging matters.", "", 4);
+        Assert.StartsWith("limitations: the sentence \"The evidence rests on surveys [1, 2, 3, 4].\" cites 4 references", problem);
+        Assert.Null(ReviewWriter.ClosingProblem("The evidence rests on surveys [1, 2, 3].", "Teams should log calls.", "Trials are missing.", "Logging matters.", "", 4));
+    }
+
+    [Fact]
+    public async Task ARationaleSentenceWithFourReferencesIsSentBackAndOnFile()
+    {
+        static string Front(string rationale) => System.Text.Json.JsonSerializer.Serialize(new Dictionary<string, string>
+            { ["title"] = "Agent memory: a systematic review", ["abstract"] = "We read the studies.", ["rationale"] = rationale, ["objectives"] = "To map agent memory." });
+        var model = new FakeChatService().Returns(Front("Agents keep a running summary [1], [2], [3] and [4].")).Returns(Front("Agents keep a running summary [1, 2]."));
+        var notes = new List<string>();
+
+        var front = await ReviewWriter.WriteFrontMatterAsync(model, WritingProfile.Systematic, "agent memory", "Map agent memory", "Studies: 4.",
+            new[] { new SynthesisSection { Field = "synthesis-1", Heading = "Memory", Text = "Agents keep a running summary [1, 2]." } }, "", "[1] A. [2] B. [3] C. [4] D.", 4, notes.Add);
+
+        Assert.Equal("Agents keep a running summary [1, 2].", front!.Rationale);
+        Assert.Contains("YOUR PREVIOUS ANSWER WAS REJECTED: the rationale: the sentence", model.Prompts[1]);
+        Assert.Contains("cite at most 3 studies each, ideally one or two", model.Prompts[0]);
+        Assert.StartsWith("The front-matter call was sent back for citing too many references in one sentence", Assert.Single(notes));
+    }
+
+    [Fact]
+    public async Task TheRepairNeverAddsAFourthReference()
+    {
+        const string Sentence = "Agents log every tool call [1, 2, 3].";
+        var chat = new FakeChatService().RespondsWith(_ => """{"repairs":[{"id":1,"action":"rewrite","sentence":"Agents log tool calls [1, 2, 3, 4].","reason":"widened"}]}""");
+        var flagged = new CitationSupportResult { Field = "synthesis-1", SentenceIndex = 0, Sentence = Sentence, Reference = 1, Verdict = CitationSupportChecker.Partial, Reason = "only some calls" };
+        var papers = Enumerable.Range(1, 4).Select(r => new ReferencedPaper(r, $"p{r}", $"Paper {r}", "Agents log tool calls.", Array.Empty<DocumentChunk>())).ToList();
+
+        var (fields, _, repairs) = await CitationRepairer.RepairAsync(chat, new() { ("synthesis-1", Sentence) }, new() { flagged }, papers,
+            new Dictionary<int, IReadOnlyList<string>>(), referenceCount: 4);
+
+        Assert.Equal(Sentence, Assert.Single(fields).Text);
+        var repair = Assert.Single(repairs);
+        Assert.Equal("rejected", repair.Action);
+        Assert.Contains("added citations 4", repair.Note);
+        Assert.Contains(chat.Prompts, p => p.Contains("never add a new number; a sentence cites at most 3"));
     }
 
     [Fact]
