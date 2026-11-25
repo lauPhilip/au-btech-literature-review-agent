@@ -29,6 +29,13 @@ public sealed class EvidenceSource
 
     /// <summary>The source's text: its chunks, for excerpts and the citation check, and its abstract.</summary>
     public ReferencedPaper? Text { get; init; }
+
+    /// <summary>
+    /// Why the source is weak evidence on its own, written in code (a study that is not empirical or meets few appraisal
+    /// criteria, a 3rd-tier grey source); null when it is not. The front matter may not open on such a source alone as
+    /// established fact (<see cref="ReviewWriter.WeakOpeningProblem"/>).
+    /// </summary>
+    public string? Weak { get; init; }
 }
 
 /// <summary>One theme the review reports: its sources, and the codes that put each source in it.</summary>
@@ -88,6 +95,10 @@ public sealed class ReviewEvidence
     private Dictionary<int, EvidenceSource> ByReference => _byReference ??= Sources.ToDictionary(s => s.Reference);
 
     public EvidenceSource? Source(int reference) => ByReference.GetValueOrDefault(reference);
+
+    /// <summary>The sources that are weak evidence on their own, with the reason (<see cref="EvidenceSource.Weak"/>).</summary>
+    public IReadOnlyDictionary<int, string> WeakSources() =>
+        Sources.Where(s => s.Weak != null).GroupBy(s => s.Reference).ToDictionary(g => g.Key, g => g.First().Weak!);
 
     /// <summary>The reference-list lines of the given sources, in number order.</summary>
     public string ReferenceLines(IEnumerable<int> references) =>

@@ -103,7 +103,7 @@ public class CitedRationaleTests : IDisposable
 
         var (paper, _) = await MultivocalWriter.WritePaperAsync(model, input, _ => "We keep a running summary of the conversation.", "fake-model", parallelism: 1);
 
-        Assert.Equal("Agents keep a running summary of the conversation [1].", paper.Rationale);
+        Assert.Equal("One developer guide suggests that agents keep a running summary of the conversation [1].", paper.Rationale);
         var dropped = Assert.Single(paper.Style, d => d.FieldName == ReviewWriter.RationaleCitedOnlyField);
         Assert.Contains(Urgent, dropped.Note);
     }

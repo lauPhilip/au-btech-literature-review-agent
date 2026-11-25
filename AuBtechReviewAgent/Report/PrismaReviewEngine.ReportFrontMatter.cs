@@ -75,25 +75,32 @@ public partial class PrismaReviewEngine
         // The artifact and the closing sections read the finished sections and neither reads the other, so they run at the
         // same time; the front matter (then its copy-edit) waits for the closing sections, whose answers and conclusion it
         // is given (issue #446). Results are used in the same order as before.
-        async Task<(FrontMatter? Front, (string Text, StyleDeltaLog Delta) Abstract, (string Text, StyleDeltaLog Delta) Rationale, (string Text, StyleDeltaLog Delta) Objectives)> FrontAndStyleAsync(Task<ClosingSections?> closingTask)
+        async Task<(FrontMatter? Front, ReportDraft? Draft, (string Text, StyleDeltaLog Delta) Abstract, (string Text, StyleDeltaLog Delta) Rationale, (string Text, StyleDeltaLog Delta) Objectives)> FrontAndStyleAsync(Task<ClosingSections?> closingTask)
         {
             var closing = await closingTask;
             var written = await ReviewWriter.WriteFrontMatterAsync(chat, WritingProfile.Systematic, query, explicitObjective,
                 FrontMatterFacts(finalState, useThematic ? thematic!.Codebook : null, includedFacts, screeningFacts) + EvidenceBaseFacts(useThematic ? thematic!.Evidence : null),
-                resultSections, discussionText, referenceListMapping, referenceCount, message => _log.LogWarning("{Message}", SanitizeLogMessage(message)),
+                resultSections, discussionText, referenceListMapping, referenceCount, message =>
+                {
+                    _log.LogWarning("{Message}", SanitizeLogMessage(message));
+                    if (thematic != null) lock (thematic.Codebook) (thematic.Codebook.WritingNotes ??= new()).Add(message);
+                },
                 abstractRule: text => AbstractCountsProblem(text, finalState.Stats) ?? AbstractUnplacedProblem(text, finalState.Stats.Included, useThematic ? thematic!.Codebook.Uncoded.Count : 0),
                 questions: finalState.ResearchQuestions,
-                answers: closing?.Answers ?? thematic?.Answers, conclusion: closing?.Conclusion);
+                answers: closing?.Answers ?? thematic?.Answers, conclusion: closing?.Conclusion,
+                weakSources: SystematicEvidence.WeakSources(finalState.Extractions ?? new List<StudyExtraction>()));
+            // The first draft is written only now, and only when the front-matter step failed.
+            var draft = written == null ? (await run.Fallback.Value).Draft : null;
             using (LlmStage.Begin("style"))
             {
                 // Three separate copy-edits, sent together. Objectives written in code from the research questions are not copy-edited.
-                var abstractTask = StylisticRefinerUtility.RefineAcademicProseAsync(chat, "Abstract", written?.Abstract ?? run.Draft.Abstract);
-                var rationaleTask = StylisticRefinerUtility.RefineAcademicProseAsync(chat, "Rationale", written?.Rationale ?? run.Draft.Rationale);
+                var abstractTask = StylisticRefinerUtility.RefineAcademicProseAsync(chat, "Abstract", written?.Abstract ?? draft!.Abstract);
+                var rationaleTask = StylisticRefinerUtility.RefineAcademicProseAsync(chat, "Rationale", written?.Rationale ?? draft!.Rationale);
                 var objectivesTask = ReviewWriter.ObjectivesFromQuestions(finalState.ResearchQuestions) is { } codeObjectives
                     ? Task.FromResult((codeObjectives, new StyleDeltaLog("Objectives", codeObjectives, codeObjectives, Applied: false, Note: "Written in code from the research questions in the protocol; not sent through the stylistic pass.")))
-                    : StylisticRefinerUtility.RefineAcademicProseAsync(chat, "Objectives", written?.Objectives ?? run.Draft.Objectives);
+                    : StylisticRefinerUtility.RefineAcademicProseAsync(chat, "Objectives", written?.Objectives ?? draft!.Objectives);
                 await Task.WhenAll(abstractTask, rationaleTask, objectivesTask);
-                return (written, await abstractTask, await rationaleTask, await objectivesTask);
+                return (written, draft, await abstractTask, await rationaleTask, await objectivesTask);
             }
         }
 
@@ -129,11 +136,11 @@ public partial class PrismaReviewEngine
         var frontTask = FrontAndStyleAsync(closingTask);
         await Task.WhenAll(frontTask, artifactTask, closingTask); // a failure of any is thrown here, after all have finished
         run.Closing = await closingTask;
-        var (front, styledAbstract, styledRationale, styledObjectives) = await frontTask;
+        var (front, draft, styledAbstract, styledRationale, styledObjectives) = await frontTask;
         run.Artifact = await artifactTask;
 
         string frontNote = front == null ? "The front-matter step failed; the first draft's text was used." : "";
-        string titleText = front?.Title ?? run.Draft.Title;
+        string titleText = front?.Title ?? draft!.Title;
         run.Title = CleanTitle(titleText, query);
         run.Deltas.Add(new StyleDeltaLog("Title", titleText, run.Title, Applied: false, Note: "Title is not sent through the stylistic pass." + (frontNote.Length > 0 ? " " + frontNote : "")));
         run.Deltas.Add(styledAbstract.Delta);
@@ -142,9 +149,9 @@ public partial class PrismaReviewEngine
         run.Abstract = styledAbstract.Text;
         run.Rationale = styledRationale.Text;
         run.Objectives = styledObjectives.Text;
-        if (string.IsNullOrWhiteSpace(run.Abstract)) run.Abstract = front?.Abstract ?? run.Draft.Abstract;
-        if (string.IsNullOrWhiteSpace(run.Rationale)) run.Rationale = front?.Rationale ?? run.Draft.Rationale;
-        if (string.IsNullOrWhiteSpace(run.Objectives)) run.Objectives = front?.Objectives ?? run.Draft.Objectives;
+        if (string.IsNullOrWhiteSpace(run.Abstract)) run.Abstract = front?.Abstract ?? draft!.Abstract;
+        if (string.IsNullOrWhiteSpace(run.Rationale)) run.Rationale = front?.Rationale ?? draft!.Rationale;
+        if (string.IsNullOrWhiteSpace(run.Objectives)) run.Objectives = front?.Objectives ?? draft!.Objectives;
         run.Rationale = ReviewWriter.CitedSentencesOnly(run.Rationale, out var uncited);
         if (uncited != null) run.Deltas.Add(uncited);
     }

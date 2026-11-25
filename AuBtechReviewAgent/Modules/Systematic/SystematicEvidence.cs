@@ -28,6 +28,7 @@ public static class SystematicEvidence
                 Findings = ThematicSynthesis.VerifiedFindings(e).Select(f => new EvidenceFinding(f.Id, f.Finding.Value, f.Finding.Quote)).ToList(),
                 Codes = book.Codes.Where(c => c.Reference == r.ReferenceNumber).Select(c => c.Label).ToList(),
                 Text = paper,
+                Weak = WeakBecause(e),
             };
         }).ToList();
         // A study with a paper but no record of its own still gets a source, so its evidence is never lost.
@@ -42,6 +43,7 @@ public static class SystematicEvidence
                 Findings = ThematicSynthesis.VerifiedFindings(e).Select(f => new EvidenceFinding(f.Id, f.Finding.Value, f.Finding.Quote)).ToList(),
                 Codes = book.Codes.Where(c => c.Reference == p.ReferenceNumber).Select(c => c.Label).ToList(),
                 Text = p,
+                Weak = WeakBecause(e),
             };
         }));
         var themes = book.Themes.Select(t => new EvidenceTheme
@@ -117,6 +119,27 @@ public static class SystematicEvidence
             : $" By MMAT category: {string.Join(", ", groups)}" + (uncategorised.Count > 0 ? $"; no category for {Counted(uncategorised)}." : ".");
         return read + designs;
     }
+
+    /// <summary>
+    /// Why a study is weak evidence on its own, from its extraction and appraisal, or null: nothing was extracted, it had
+    /// no text, it is not empirical, or it fails more than half of the MMAT criteria it was appraised on ("can't tell", which mostly
+    /// means the abstract does not say, is not a failure). A study without an extraction is not judged. Used so the rationale does not open on such a study alone as established fact.
+    /// </summary>
+    public static string? WeakBecause(StudyExtraction? e)
+    {
+        if (e == null) return null;
+        if (e.Error != null) return "nothing was extracted from it";
+        if (e.AppraisalCategory == StudyExtractor.NotAppraised) return "it had neither an abstract nor a full text";
+        if (e.AppraisalCategory == "not_empirical") return "it is not empirical (a position paper, system description or review)";
+        int no = e.Appraisal.Count(a => a.Answer == "no");
+        if (e.Appraisal.Count > 0 && no * 2 > e.Appraisal.Count) return $"it fails {no} of the {e.Appraisal.Count} MMAT criteria";
+        return null;
+    }
+
+    /// <summary>The included studies that are weak evidence on their own (<see cref="WeakBecause"/>), by reference number.</summary>
+    public static IReadOnlyDictionary<int, string> WeakSources(IEnumerable<StudyExtraction> extractions) =>
+        extractions.Select(e => (e.ReferenceNumber, Why: WeakBecause(e))).Where(x => x.Why != null)
+            .GroupBy(x => x.ReferenceNumber).ToDictionary(g => g.Key, g => g.First().Why!);
 
     /// <summary>An MMAT category as the tables print it, e.g. "quantitative descriptive".</summary>
     public static string CategoryLabel(string category) => category.Trim().Replace('_', ' ');

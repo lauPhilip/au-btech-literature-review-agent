@@ -11,7 +11,7 @@ namespace AuBtechReviewAgent.Tests;
 /// </summary>
 public class MultivocalAbstractPoolsTests : IDisposable
 {
-    private const string Rationale = "Agents keep a running summary [1].";
+    private const string Rationale = "One developer guide suggests that agents keep a running summary [1].";
     private readonly string _root = Path.Join(Path.GetTempPath(), "mlrpools-" + Guid.NewGuid().ToString("N"));
 
     public void Dispose() => TestFolders.TryDelete(_root);

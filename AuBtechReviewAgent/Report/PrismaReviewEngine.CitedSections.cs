@@ -90,7 +90,7 @@ public partial class PrismaReviewEngine
     // cost and latency bounded.
     private async Task<PeerReviewLog> PeerReviewAndReviseAsync(
         IChatCompletionService chat, string synthesis, string discussion,
-        string referenceListMapping, string groundedOutline)
+        string referenceListMapping, string groundedOutline, string facts)
     {
         var log = new PeerReviewLog
         {
@@ -117,6 +117,9 @@ public partial class PrismaReviewEngine
 
             CLAIM-TO-SOURCE OUTLINE:
             {{(string.IsNullOrWhiteSpace(groundedOutline) ? "(not available)" : groundedOutline)}}
+
+            FACTS ABOUT THE REVIEW AND ITS STUDIES (counted in code; the only facts about the studies and their designs): judge what a section says about the studies (how many there are, their designs, what they were read from) only against these facts, do not contradict them, and never state a fact about the studies that they do not give.
+            {{facts}}
 
             RESULTS AND SYNTHESIS (Item 20a):
             {{synthesis}}
@@ -161,6 +164,9 @@ public partial class PrismaReviewEngine
             REFERENCE LIST (valid citation numbers):
             {{referenceListMapping}}
 
+            FACTS ABOUT THE REVIEW AND ITS STUDIES (counted in code; do not change them, and describe the studies only as they say):
+            {{facts}}
+
             PEER-REVIEW FEEDBACK:
             {{feedbackText}}
 
@@ -194,6 +200,15 @@ public partial class PrismaReviewEngine
     }
 
     /// <summary>
+    /// The facts the fallback writer's peer review gets (issue #456's follow-up): the run's counts, as the front matter
+    /// gets them, and the evidence base from the extraction, with each study's design. Without them the critique once
+    /// asserted a false fact about the study designs and the revision applied it.
+    /// </summary>
+    private static string FallbackFacts(ReportRun run) =>
+        FrontMatterFacts(run.State, null, run.IncludedFacts, run.ScreeningFacts) +
+        $"\nEvidence base (from the data extraction): {SystematicEvidence.BaseFacts(run.State.Extractions ?? new List<StudyExtraction>())}";
+
+    /// <summary>
     /// The synthesis and discussion: from the thematic synthesis when it wrote them, otherwise from one
     /// citation-mandatory pass and its peer review. The peer review is saved to peer-review-feedback.json either way.
     /// </summary>
@@ -210,18 +225,19 @@ public partial class PrismaReviewEngine
         else
         {
             string citedSynthesis, citedDiscussion;
+            var (outline, draft) = await run.Fallback.Value;
             ReportProgress(run.SessionId, run.State, RunProgress.Synthesis, RunProgress.Phase(RunProgress.SynthesisPhases, 3, 0), "Writing the synthesis and discussion");
             using (LlmStage.Begin("cited-sections"))
                 (citedSynthesis, citedDiscussion) = await GenerateCitedSectionsAsync(
-                    run.Chat, run.Query, run.Objective, run.Outline, run.ReferenceList, run.GroundedChunks, run.ReferenceCount);
+                    run.Chat, run.Query, run.Objective, outline, run.ReferenceList, run.GroundedChunks, run.ReferenceCount);
 
             // Fall back to the base multi-field draft only if the dedicated pass returned nothing.
-            if (string.IsNullOrWhiteSpace(citedSynthesis)) citedSynthesis = run.Draft.SynthesisText;
-            if (string.IsNullOrWhiteSpace(citedDiscussion)) citedDiscussion = run.Draft.Discussion;
+            if (string.IsNullOrWhiteSpace(citedSynthesis)) citedSynthesis = draft.SynthesisText;
+            if (string.IsNullOrWhiteSpace(citedDiscussion)) citedDiscussion = draft.Discussion;
 
             ReportProgress(run.SessionId, run.State, RunProgress.Synthesis, RunProgress.Phase(RunProgress.SynthesisPhases, 5, 0), "Automated peer review");
             using (LlmStage.Begin("automated-peer-review"))
-                peerReview = await PeerReviewAndReviseAsync(run.Chat, citedSynthesis, citedDiscussion, run.ReferenceList, run.Outline);
+                peerReview = await PeerReviewAndReviseAsync(run.Chat, citedSynthesis, citedDiscussion, run.ReferenceList, outline, FallbackFacts(run));
             run.SynthesisProse = peerReview.SynthesisAfter;
             run.DiscussionText = peerReview.DiscussionAfter;
         }

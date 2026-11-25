@@ -31,11 +31,19 @@ public partial class PrismaReviewEngine
         public string ReferenceList { get; init; } = "";
         public int ReferenceCount { get; init; }
         public string GroundedChunks { get; init; } = "";
-        public string Outline { get; init; } = "";
         public IReadOnlyList<ReferencedPaper> Papers { get; init; } = Array.Empty<ReferencedPaper>();
         public string IncludedFacts { get; init; } = "";
         public string ScreeningFacts { get; init; } = "";
-        public ReportDraft Draft { get; init; } = null!;
+
+        /// <summary>
+        /// The grounded outline and the first PRISMA draft, written the first time a step needs them: the fallback
+        /// writer, or the front matter when its own step failed. A run whose thematic synthesis and front matter succeed
+        /// never writes them (about 6 % of a run's tokens went to them for nothing).
+        /// </summary>
+        public Lazy<Task<FallbackDraft>> Fallback { get; init; } = null!;
+
+        /// <summary>The first draft when it was written and succeeded, otherwise null.</summary>
+        public ReportDraft? DraftIfWritten => Fallback.IsValueCreated && Fallback.Value.IsCompletedSuccessfully ? Fallback.Value.Result.Draft : null;
         public SystematicMethods Methods { get; init; } = null!;
         public ThematicResult? Thematic { get; init; }
         public bool UseThematic { get; init; }
@@ -61,6 +69,9 @@ public partial class PrismaReviewEngine
         }
     }
 
+    /// <summary>The grounded outline and the first PRISMA draft written from it.</summary>
+    private sealed record FallbackDraft(string Outline, ReportDraft Draft);
+
     /// <summary>The fields of the first PRISMA draft, and the diagram blocks taken out of it.</summary>
     private sealed record ReportDraft(string MermaidBlock, string TikzBlock, string Title, string Abstract, string Rationale,
         string Objectives, string Discussion, string SynthesisText);
@@ -73,22 +84,25 @@ public partial class PrismaReviewEngine
             : "(none - single literal query only)";
 
         ReportProgress(sessionId, finalState, RunProgress.Synthesis, 0, "Outline and report draft");
-        // The thematic synthesis reads neither the outline nor the first draft below (the draft is only its fallback), so
-        // it starts now and runs while they are written; it is awaited where its result is used, and on every way out.
+        // The thematic synthesis reads neither the outline nor the first draft (the draft is only its fallback), so it
+        // starts now; it is awaited where its result is used, and on every way out.
         var papersForCheck = referencedPapers ?? Array.Empty<ReferencedPaper>();
         Task<ThematicResult>? thematicTask = Synthesis.ThematicSynthesis && papersForCheck.Count > 0
             ? ThematicOrFallbackAsync(sessionId, chat, query, explicitObjective, finalState, papersForCheck, referenceCount)
             : null;
 
-        string groundedOutline = await WriteGroundedOutlineAsync(sessionId, chat, query, explicitObjective, groundedChunksText, referenceListMapping);
         string includedFacts = IncludedFacts(finalState);
         string screeningFacts = ScreeningFacts(finalState);
-        string reportPrompt = ReportDraftPrompt(query, supplementaryPerspectives, explicitObjective, inc, exc, includedFacts, screeningFacts,
-            referenceListMapping, groundedChunksText, groundedOutline);
+        var fallback = new Lazy<Task<FallbackDraft>>(async () =>
+        {
+            string groundedOutline = await WriteGroundedOutlineAsync(sessionId, chat, query, explicitObjective, groundedChunksText, referenceListMapping);
+            string reportPrompt = ReportDraftPrompt(query, supplementaryPerspectives, explicitObjective, inc, exc, includedFacts, screeningFacts,
+                referenceListMapping, groundedChunksText, groundedOutline);
+            return new FallbackDraft(groundedOutline, await WriteReportDraftAsync(chat, reportPrompt));
+        });
 
         try
         {
-            var draft = await WriteReportDraftAsync(chat, reportPrompt);
             var methods = MethodsFromLedger(finalState, query, inc, exc, effectivePerspectives);
 
             // Only free prose is copy-edited. The title is left alone (the refiner once turned it into a
@@ -112,8 +126,8 @@ public partial class PrismaReviewEngine
             {
                 SessionId = sessionId, Chat = chat, Query = query, Objective = explicitObjective, State = finalState,
                 ReferenceList = referenceListMapping, ReferenceCount = referenceCount, GroundedChunks = groundedChunksText,
-                Outline = groundedOutline, Papers = papersForCheck, IncludedFacts = includedFacts, ScreeningFacts = screeningFacts,
-                Draft = draft, Methods = methods, Thematic = thematic, UseThematic = useThematic,
+                Papers = papersForCheck, IncludedFacts = includedFacts, ScreeningFacts = screeningFacts,
+                Fallback = fallback, Methods = methods, Thematic = thematic, UseThematic = useThematic,
             };
             await WriteSynthesisAndDiscussionAsync(run);
             await WriteFrontArtifactAndClosingAsync(run);

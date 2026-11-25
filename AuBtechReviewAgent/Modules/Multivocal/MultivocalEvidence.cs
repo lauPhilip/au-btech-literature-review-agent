@@ -52,6 +52,7 @@ public static class MultivocalEvidence
                 Findings = findings.Select(f => new EvidenceFinding(f.Id, $"{f.Attribute}: {f.Value}", f.Quote)).ToList(),
                 Codes = findings.Select(f => $"{f.Attribute}: {f.Value}").Distinct().ToList(),
                 Text = new ReferencedPaper(number, extracted.Address, extracted.Title, record?.Summary ?? "", Chunks(extracted.Address, text)),
+                Weak = Weak(record),
             });
         }
 
@@ -88,6 +89,14 @@ public static class MultivocalEvidence
             BaseFacts = BaseFacts(input, records, points),
         };
         return new MultivocalPaperEvidence(evidence, questionOf);
+    }
+
+    /// <summary>Why a grey source is weak evidence on its own (a 3rd-tier outlet, issue #461), or null; academic sources are not judged here.</summary>
+    public static string? Weak(GreyRecord? record)
+    {
+        if (record == null || record.Kind == MultivocalSearcher.FormalKind || MultivocalSynthesiser.TierOf(record.Kind) != 3) return null;
+        string label = MultivocalGuidelines.GreyTypes.FirstOrDefault(t => t.Key == record.Kind).Label ?? (record.Kind.Length > 0 ? record.Kind : "grey source");
+        return $"it is a 3rd-tier grey source ({label.ToLowerInvariant()})";
     }
 
     /// <summary>One line on what kind of source it is, for the writer: kind, outlet tier, quality points and year.</summary>
