@@ -29,7 +29,8 @@ public class MetricsPricesTests
         var large = prices.Models["mistral-large-latest"];
         Assert.Equal((0.70, 0.07, 2.10), (large.InputPerMillion, large.CachedInputPerMillion, large.OutputPerMillion));
         var small = prices.Models["mistral-small-latest"];
-        Assert.Equal((0.15, (double?)null, 0.60), (small.InputPerMillion, small.CachedInputPerMillion, small.OutputPerMillion));
+        Assert.Equal((0.15, 0.60), (small.InputPerMillion, small.OutputPerMillion));
+        Assert.Null(small.CachedInputPerMillion); // cached tokens then cost the input price
     }
 
     [Fact]
