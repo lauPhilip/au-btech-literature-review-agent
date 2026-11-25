@@ -63,21 +63,6 @@ public static partial class ReviewWriter
     /// figure problem does so at most <see cref="FigureSendBacks"/> times, each written to <paramref name="note"/>, and an
     /// answer whose figure problem is left after that is kept, with a note that says so.
     /// </summary>
-    public static Func<T, string?> WithFigureGuard<T>(Func<T, string?> hard, Func<T, string?> figures, string step, Action<string>? note)
-    {
-        int sentBack = 0;
-        return answer =>
-        {
-            if (hard(answer) is { } problem) return problem;
-            if (figures(answer) is not { } figure) return null;
-            if (sentBack < FigureSendBacks)
-            {
-                sentBack++;
-                note?.Invoke($"The {step} was sent back for a repeated result figure ({sentBack} of {FigureSendBacks}): {figure}");
-                return figure;
-            }
-            note?.Invoke($"The {step} was kept after {FigureSendBacks} send-backs with a repeated result figure: {figure}");
-            return null;
-        };
-    }
+    public static Func<T, string?> WithFigureGuard<T>(Func<T, string?> hard, Func<T, string?> figures, string step, Action<string>? note) =>
+        WithSoftGuard(hard, figures, step, "a repeated result figure", note, FigureSendBacks);
 }
