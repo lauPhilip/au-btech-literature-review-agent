@@ -32,7 +32,7 @@ public class MultivocalWritingTests
         if (prompt.Contains("You are writing the summary for practitioners"))
             return """{"lead":"For developers who build LLM agents.","items":["Keep a running summary of the conversation [1, 2].","Retrieve only the documents the agent needs [2].","Treat framework advice from forums with care [3]."]}""";
         if (prompt.Contains("You are writing the title, abstract, rationale and objectives"))
-            return """{"title":"Context engineering for LLM agents: a grey literature review","abstract":"We screened 4 grey sources twice and extracted 3; their findings form 2 themes. Summaries and retrieval keep agent contexts short.","rationale":"Agents keep a running summary of the conversation [1].","objectives":"To map the practices developers use to decide what goes into an agent's context window."}""";
+            return """{"title":"Context engineering for LLM agents: a grey literature review","abstract":"We screened 4 grey sources twice and extracted 3; their findings form 2 themes. Summaries and retrieval keep agent contexts short.","rationale":"One developer guide suggests that agents keep a running summary of the conversation [1].","objectives":"To map the practices developers use to decide what goes into an agent's context window."}""";
         if (prompt.Contains("rigorous academic copyeditor"))
             return Regex.Match(prompt, @"ORIGINAL DRAFT:\s*(.*?)\s*TASK:", RegexOptions.Singleline).Groups[1].Value.Trim();
         if (prompt.Contains("You are checking citations"))
