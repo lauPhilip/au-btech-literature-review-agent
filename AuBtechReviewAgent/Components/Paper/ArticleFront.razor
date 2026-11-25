@@ -1,0 +1,77 @@
+@* The front page of a printed report, laid out like a journal article (wiki page 06): title, author line, the
+   article-info box beside the abstract, keywords, links and how to cite, then a rule under which the body starts. It
+   has a journal's layout but no journal's identity: no publisher, journal name, volume, issue, page range or DOI. The
+   author is the tool, marked as an AI system. It renders on paper only, unless OnScreen is set (a print preview). It
+   needs no interactivity, so a page that renders reports without a live connection can use it as it is. *@
+@inject NavigationManager Nav
+
+@* The running header (CSS margin boxes); every character of the title is escaped in ArticleInfo.RunningHeaderCss. *@
+<style>@((MarkupString)Info.RunningHeaderCss())</style>
+<header class="journal-front @(OnScreen ? "" : "hidden print:block")" aria-label="Article information">
+    <p class="journal-kind">@Info.Kind · @Info.Guideline</p>
+    <h1 class="journal-title">@Info.Title</h1>
+    <p class="journal-author">@ArticleInfo.Author<sup>*</sup></p>
+    <p class="journal-note"><sup>*</sup> @ArticleInfo.AuthorNote</p>
+    <p class="journal-note">@ArticleInfo.NotPeerReviewed</p>
+
+    <div class="journal-frontgrid">
+        <aside class="journal-info" aria-label="Article info">
+            <h2 class="journal-label">Article info</h2>
+            <dl>
+                <dt>Run</dt><dd class="journal-mono">@Info.RunId</dd>
+                <dt>Review</dt><dd>@Info.Kind, reported following @Info.Guideline</dd>
+                <dt>Protocol written</dt><dd>@ArticleInfo.Date(Info.ProtocolWrittenUtc)</dd>
+                <dt>Searched</dt><dd>@ArticleInfo.Date(Info.SearchedUtc)</dd>
+                <dt>Completed</dt><dd>@ArticleInfo.Date(Info.CompletedUtc)</dd>
+                <dt>Counts</dt><dd>@Info.Found @Info.FoundLabel; @Info.Included @Info.IncludedLabel</dd>
+                <dt>Tool</dt>
+                <dd>
+                    @Info.ToolLine
+                    @if (AuBtechReviewAgent.ToolVersion.Commit(Info.AppVersion) is { } commit)
+                    {
+                        <br /><span>commit </span><a class="journal-mono" href="@AuBtechReviewAgent.ToolVersion.CodeUrl(Info.AppVersion)">@(commit.Length > 12 ? commit[..12] : commit)</a>
+                    }
+                </dd>
+                <dt>@(Info.Models.Count == 1 ? "Model" : "Models")</dt><dd>@(Info.Models.Count == 0 ? "not recorded" : string.Join(", ", Info.Models))</dd>
+                <dt>Protocol fingerprint</dt><dd class="journal-mono">@(Info.ProtocolFingerprint.Length == 0 ? "not recorded" : $"SHA-256 {Info.ProtocolFingerprint}")</dd>
+            </dl>
+            @if (Info.Keywords.Count > 0)
+            {
+                <h2 class="journal-label">Keywords<sup>†</sup></h2>
+                <ul class="journal-keywords">
+                    @foreach (var keyword in Info.Keywords)
+                    {
+                        <li>@keyword</li>
+                    }
+                </ul>
+            }
+            <h2 class="journal-label">Links</h2>
+            <ul class="journal-links">
+                <li>Report: <a href="@Link(Info.ReportPath)">@Link(Info.ReportPath)</a></li>
+                <li>Archive (all files, fingerprinted): <a href="@Link(Info.ArchivePath)">@Link(Info.ArchivePath)</a></li>
+                @if (Info.HasProtocol)
+                {
+                    <li>Protocol: <a href="@Link(Info.ProtocolPath)">@Link(Info.ProtocolPath)</a></li>
+                }
+            </ul>
+        </aside>
+        <div class="journal-abstract">
+            <h2 class="journal-label">Abstract</h2>
+            <p>@Info.Abstract</p>
+        </div>
+    </div>
+    <p class="journal-cite"><span class="journal-label">How to cite</span> @Info.HowToCite(Nav.BaseUri)</p>
+    @if (Info.Keywords.Count > 0)
+    {
+        <p class="journal-footnote"><sup>†</sup> Keywords are taken in code from the protocol's topic, the search strings and the names of the themes; no language model chose them.</p>
+    }
+</header>
+
+@code {
+    [Parameter, EditorRequired] public AuBtechReviewAgent.ArticleInfo Info { get; set; } = default!;
+
+    /// <summary>Show the front page on screen as well, for a print preview; by default it is on paper only.</summary>
+    [Parameter] public bool OnScreen { get; set; }
+
+    private string Link(string path) => AuBtechReviewAgent.ArticleInfo.Absolute(Nav.BaseUri, path);
+}
