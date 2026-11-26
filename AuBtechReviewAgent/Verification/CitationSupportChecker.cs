@@ -123,7 +123,10 @@ public static partial class CitationSupportChecker
         return parts;
     }
 
-    /// <summary>True when the quote (whitespace/case-insensitive, at least 20 characters) occurs in the excerpt.</summary>
+    /// <summary>
+    /// True when the quote (whitespace/case-insensitive, at least 20 characters) occurs in the excerpt as one run of
+    /// text: not across a sentence end or paragraph break the quote does not have (#606, <see cref="QuoteSpan"/>).
+    /// </summary>
     public static bool QuoteOccursIn(string? quote, string? excerpt) => QuoteOccursIn(quote, CanonicalText.Of(excerpt));
 
     /// <summary>
@@ -133,25 +136,18 @@ public static partial class CitationSupportChecker
     public static bool QuoteOccursIn(string? quote, CanonicalText excerpt)
     {
         if (string.IsNullOrWhiteSpace(quote) || excerpt.IsBlank) return false;
-        string text = excerpt.Value;
+        _ = excerpt.Value; // made first, as before, so a text that cannot be normalised refuses before the quote
 
-        // Models often shorten a quote with "..." (seen in real runs); every part must then occur, in order.
+        // Models often shorten a quote with "..." (seen in real runs); every part must then occur, in order, with a
+        // short gap inside one paragraph between two parts (QuoteSpan.MaxElidedCharacters).
         // Parts shorter than 10 letters are ignored, so an ellipsis cannot turn a quote into loose keywords.
         // A joining word after an ellipsis ("... and use tools") is the model's glue, not part of the source.
         var parts = Ellipsis().Split(quote)
             .Select((p, i) => i == 0 ? p : Glue().Replace(p, ""))
-            .Select(Canonical).Where(p => p.Length > 0).ToList();
-        if (parts.Count > 1) parts = parts.Where(p => p.Length >= 10).ToList();
-        if (parts.Count == 0 || parts.Sum(p => p.Length) < 15) return false;
-
-        int from = 0;
-        foreach (var part in parts)
-        {
-            int at = text.IndexOf(part, from, StringComparison.Ordinal);
-            if (at < 0) return false;
-            from = at + part.Length;
-        }
-        return true;
+            .Select(p => (Raw: p, Canon: Canonical(p))).Where(p => p.Canon.Length > 0).ToList();
+        if (parts.Count > 1) parts = parts.Where(p => p.Canon.Length >= 10).ToList();
+        if (parts.Count == 0 || parts.Sum(p => p.Canon.Length) < 15) return false;
+        return QuoteSpan.Place(parts, excerpt);
     }
 
     [GeneratedRegex(@"\.{3}|…")]
