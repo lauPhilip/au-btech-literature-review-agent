@@ -26,7 +26,8 @@ public sealed record PrismaChecklistContext
     public string? CertaintyTable { get; init; }
     public bool HumanScreeningReview { get; init; }
     public bool HasProtocol { get; init; }
-    public bool CompetingInterestsDeclared { get; init; }
+    /// <summary>True when the run recorded a funding statement; otherwise the paper has the authors' placeholder.</summary>
+    public bool FundingDeclared { get; init; }
 }
 
 /// <summary>
@@ -113,8 +114,8 @@ public static class PrismaChecklist
             new("24a", "Registration", S("Registration and Protocol"), When(Has("Registration and Protocol"), "Reported: not registered")),
             new("24b", "Protocol", S("Registration and Protocol"), When(Has("Registration and Protocol"), c.HasProtocol ? "Reported: protocol.md with its fingerprint" : "Not done: run made before protocols were written")),
             new("24c", "Amendments to the protocol", S("Registration and Protocol"), When(Has("Registration and Protocol"), c.HasProtocol ? "Reported: dated amendments in protocol.md" : "Not done")),
-            new("25", "Support", S("Support & Funding"), When(Has("Support & Funding"), "Reported")),
-            new("26", "Competing interests", S("Competing Interests"), When(Has("Competing Interests"), c.CompetingInterestsDeclared ? "Reported" : "Partly: not reported by the reviewer")),
+            new("25", "Support", S("Support & Funding"), When(Has("Support & Funding"), c.FundingDeclared ? "Reported" : "Partly: a placeholder for the authors to complete")),
+            new("26", "Competing interests", S("Competing Interests"), When(Has("Competing Interests"), "Partly: a placeholder for the authors to complete")),
             new("27", "Availability of data, code and other materials", S("Availability of Data and Code"), When(Has("Availability of Data and Code"), "Reported: code repository and run archive")),
         };
     }
