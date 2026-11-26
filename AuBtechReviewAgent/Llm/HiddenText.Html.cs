@@ -12,7 +12,8 @@ namespace AuBtechReviewAgent;
 public static partial class HiddenText
 {
     private const RegexOptions Options = RegexOptions.Singleline | RegexOptions.IgnoreCase | RegexOptions.CultureInvariant;
-    private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(5);
+    /// <summary>A property, not a field, so the regexes of every part of this partial class can use it whatever order their fields start in.</summary>
+    private static TimeSpan Timeout => TimeSpan.FromSeconds(5);
 
     private static readonly Regex Tag = new(@"<(/?)([a-zA-Z][a-zA-Z0-9:\-]*)((?:[^>""']|""[^""]*""|'[^']*')*)>", Options, Timeout);
     private static readonly Regex Attribute = new(@"([^\s=/""'>]+)(?:\s*=\s*(?:""([^""]*)""|'([^']*)'|([^\s""'>]+)))?", Options, Timeout);
@@ -22,26 +23,48 @@ public static partial class HiddenText
 
     /// <summary>
     /// The page's HTML without its hidden elements, how many were dropped, and their text. An element is hidden by the
-    /// hidden attribute, aria-hidden="true", or an inline style that shows nothing (<see cref="StyleHides"/>). A
-    /// stylesheet or a class is not read, so a class such as "hidden" is not seen. An element that is never closed is
+    /// hidden attribute, aria-hidden="true", a hiding class (<see cref="ClassHides"/>), or a style that shows nothing
+    /// (<see cref="StyleHides"/>): its inline style together with the rules of the page's own style blocks
+    /// (<see cref="PageStyleSheet"/>, #535), and text in the colour of the background it is drawn on, set on the
+    /// element or on one around it (#536). External stylesheets are not fetched. An element that is never closed is
     /// dropped up to the next closing tag, which is about where a browser would end it.
     /// </summary>
-    public static CleanedText DropHiddenHtml(string? html)
+    /// <param name="sheet">The page's style rules; read from <paramref name="html"/> when not given.</param>
+    public static CleanedText DropHiddenHtml(string? html, PageStyleSheet? sheet = null)
     {
         if (string.IsNullOrEmpty(html)) return new CleanedText("", 0, 0, "");
+        sheet ??= PageStyleSheet.Of(html);
         var tags = Tag.Matches(html).ToList();
         var closes = MatchingCloses(tags);
 
         var kept = new StringBuilder(html.Length);
         var hidden = new StringBuilder();
+        var open = new List<HtmlElement>();
         int copied = 0, elements = 0;
         for (int i = 0; i < tags.Count; i++)
         {
             var tag = tags[i];
-            if (tag.Index < copied || tag.Groups[1].Length > 0 || Void.Contains(tag.Groups[2].Value) || !Hides(tag.Groups[3].Value)) continue;
+            string name = tag.Groups[2].Value.ToLowerInvariant();
+            if (tag.Index < copied || Void.Contains(name)) continue;
+            if (tag.Groups[1].Length > 0)
+            {
+                int at = open.FindLastIndex(e => e.Name == name);
+                if (at >= 0) open.RemoveRange(at, open.Count - at);
+                continue;
+            }
+            if (ClosesItself.Contains(name) && open.Count > 0 && open[^1].Name == name) open.RemoveAt(open.Count - 1);
+
+            var element = Element(name, tag.Groups[3].Value, out bool hiddenByAttribute);
+            element.Computed = sheet.Cascade(element, open);
+            bool selfClosing = tag.Groups[3].Value.TrimEnd().EndsWith('/');
+            if (Structure.Contains(name) || !(hiddenByAttribute || ClassHides(element.Classes) || StyleHides(element.Computed) || SameAsBackground(element, open)))
+            {
+                if (!selfClosing) open.Add(element);
+                continue;
+            }
 
             int end;
-            if (tag.Groups[3].Value.TrimEnd().EndsWith('/')) end = tag.Index + tag.Length;
+            if (selfClosing) end = tag.Index + tag.Length;
             else if (closes[i] is int close) end = tags[close].Index + tags[close].Length;
             else
             {
@@ -56,6 +79,12 @@ public static partial class HiddenText
         kept.Append(html, copied, html.Length - copied);
         return new CleanedText(kept.ToString(), 0, elements, hidden.ToString());
     }
+
+    /// <summary>The page itself is never dropped as a whole, whatever its style says.</summary>
+    private static readonly HashSet<string> Structure = new(StringComparer.Ordinal) { "html", "head", "body" };
+
+    /// <summary>Elements a browser closes when the same one opens again, so they do not pile up as ancestors.</summary>
+    private static readonly HashSet<string> ClosesItself = new(StringComparer.Ordinal) { "p", "li", "dt", "dd", "tr", "td", "th", "option" };
 
     /// <summary>For every opening tag, the index of its closing tag of the same name, matched by nesting; one pass.</summary>
     private static int?[] MatchingCloses(List<Match> tags)
@@ -77,17 +106,22 @@ public static partial class HiddenText
     public static string TextOf(string html) =>
         Regex.Replace(WebUtility.HtmlDecode(Regex.Replace(html, "<[^>]+>", " ", Options, Timeout)), @"\s+", " ", RegexOptions.None, Timeout).Trim();
 
-    private static bool Hides(string attributes)
+    private static HtmlElement Element(string name, string attributes, out bool hidden)
     {
+        hidden = false;
+        string? id = null, style = "";
+        string[] classes = Array.Empty<string>();
         foreach (Match a in Attribute.Matches(attributes))
         {
-            string name = a.Groups[1].Value.ToLowerInvariant();
+            string attribute = a.Groups[1].Value.ToLowerInvariant();
             string value = WebUtility.HtmlDecode(a.Groups[2].Success ? a.Groups[2].Value : a.Groups[3].Success ? a.Groups[3].Value : a.Groups[4].Value);
-            if (name == "hidden") return true;
-            if (name == "aria-hidden" && value.Trim().Equals("true", StringComparison.OrdinalIgnoreCase)) return true;
-            if (name == "style" && StyleHides(value)) return true;
+            if (attribute == "hidden") hidden = true;
+            else if (attribute == "aria-hidden" && value.Trim().Equals("true", StringComparison.OrdinalIgnoreCase)) hidden = true;
+            else if (attribute == "style") style = value;
+            else if (attribute == "id") id = value.Trim();
+            else if (attribute == "class") classes = value.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
         }
-        return false;
+        return new HtmlElement(name, id, classes, style);
     }
 
     /// <summary>
@@ -97,14 +131,14 @@ public static partial class HiddenText
     /// </summary>
     public static bool StyleHides(string style)
     {
-        var d = new Dictionary<string, string>();
-        foreach (var declaration in style.Split(';'))
-        {
-            int colon = declaration.IndexOf(':');
-            if (colon <= 0) continue;
-            string value = declaration[(colon + 1)..].Replace("!important", "", StringComparison.OrdinalIgnoreCase).Trim().ToLowerInvariant();
-            d[declaration[..colon].Trim().ToLowerInvariant()] = value;
-        }
+        var d = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var (name, value, _) in PageStyleSheet.Declarations(style)) d[name] = value;
+        return StyleHides(d);
+    }
+
+    /// <summary>Whether a style, as a dictionary of declarations after the cascade, shows nothing; see <see cref="StyleHides(string)"/>.</summary>
+    public static bool StyleHides(IReadOnlyDictionary<string, string> d)
+    {
         string Get(string name) => d.TryGetValue(name, out var v) ? v : "";
 
         if (Get("display") == "none" || Get("visibility") is "hidden" or "collapse") return true;
@@ -116,44 +150,6 @@ public static partial class HiddenText
 
         var color = Color(Get("color"));
         if (color is { A: 0 }) return true;
-        var background = Color(Get("background-color")) ?? Color(Get("background").Split(' ', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault());
-        return color is { } c && background is { A: > 0 } b
-            && Math.Abs(c.R - b.R) <= 16 && Math.Abs(c.G - b.G) <= 16 && Math.Abs(c.B - b.B) <= 16;
-    }
-
-    /// <summary>The leading number of a CSS length, such as -9999 for "-9999px"; null when there is none.</summary>
-    private static double? Number(string value)
-    {
-        var m = Regex.Match(value, @"^-?(\d+(\.\d*)?|\.\d+)", RegexOptions.None, Timeout);
-        return m.Success ? double.Parse(m.Value, CultureInfo.InvariantCulture) : null;
-    }
-
-    private readonly record struct Rgba(int R, int G, int B, double A);
-
-    /// <summary>A CSS colour written as a hex code, rgb()/rgba(), white, black or transparent; null for anything else.</summary>
-    private static Rgba? Color(string? value)
-    {
-        value = (value ?? "").Trim().ToLowerInvariant();
-        switch (value)
-        {
-            case "white": return new Rgba(255, 255, 255, 1);
-            case "black": return new Rgba(0, 0, 0, 1);
-            case "transparent": return new Rgba(0, 0, 0, 0);
-        }
-        if (Regex.Match(value, @"^#([0-9a-f]{3,8})$", RegexOptions.None, Timeout) is { Success: true } hex)
-        {
-            string h = hex.Groups[1].Value;
-            if (h.Length is 3 or 4) h = string.Concat(h.Select(ch => $"{ch}{ch}"));
-            if (h.Length is not (6 or 8)) return null;
-            int Channel(int at) => int.Parse(h.Substring(at, 2), NumberStyles.HexNumber, CultureInfo.InvariantCulture);
-            return new Rgba(Channel(0), Channel(2), Channel(4), h.Length == 8 ? Channel(6) / 255.0 : 1);
-        }
-        if (Regex.Match(value, @"^rgba?\(\s*(\d+)[\s,]+(\d+)[\s,]+(\d+)\s*(?:[,/]\s*([\d.]+)(%?))?\s*\)$", RegexOptions.None, Timeout) is { Success: true } rgb)
-        {
-            double alpha = rgb.Groups[4].Success ? double.Parse(rgb.Groups[4].Value, CultureInfo.InvariantCulture) / (rgb.Groups[5].Value == "%" ? 100 : 1) : 1;
-            return new Rgba(int.Parse(rgb.Groups[1].Value, CultureInfo.InvariantCulture), int.Parse(rgb.Groups[2].Value, CultureInfo.InvariantCulture),
-                int.Parse(rgb.Groups[3].Value, CultureInfo.InvariantCulture), alpha);
-        }
-        return null;
+        return color is { } c && Background(d) is { Declared: true, Colour: { } b } && Near(c, b);
     }
 }

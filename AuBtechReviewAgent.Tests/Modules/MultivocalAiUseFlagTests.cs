@@ -32,7 +32,8 @@ public class MultivocalAiUseFlagTests : IDisposable
         string tex = ModuleKit.Text(run.Archive[MultivocalPaper.MainTexFile]);
 
         Assert.Contains(PaperLatex.Escape(Expected(pages)), tex);
-        Assert.Equal(1, tex.Split("addressed to a model").Length - 1);
+        // Once in the declarations and once in the methods variant of the appendix for publishers.
+        Assert.Equal(2, tex.Split("addressed to a model").Length - 1);
     }
 
     [Fact]
@@ -45,7 +46,7 @@ public class MultivocalAiUseFlagTests : IDisposable
         var aiUse = MultivocalPaper.Declarations(input, paper).Single(d => d.Heading == "Use of artificial intelligence");
 
         Assert.Contains(Expected(input.Pages), aiUse.Text);
-        Assert.EndsWith("changed no decision. The authors reviewed the output and take full responsibility for the content.", aiUse.Text);
+        Assert.EndsWith("changed no decision. " + AiUseStatement.LanguageEdit("abstract and rationale") + PaperDeclarations.Responsibility, aiUse.Text);
     }
 
     [Fact]

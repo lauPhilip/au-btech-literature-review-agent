@@ -18,6 +18,7 @@ The wiki describes the design as it is in the repository. When you change how so
 | [8. Setup and configuration](08-setup-and-configuration.md) | Keys, local models, Docker, every setting with its default, several users at once, and what the checks can and cannot catch |
 | [9. The API and the MCP server](09-api-and-mcp.md) | How another tool starts a review with its own key and follows it, the limits, and why the key is never written |
 | [10. Limits against overload and abuse](10-limits-and-abuse.md) | What one address may do per minute and per hour, how uploads and live connections are capped, the hidden field that stops form bots, and the options for a CAPTCHA |
+| [11. Compliance](11-compliance.md) | How every report says, to a reader and to a machine, that it is AI-generated (EU AI Act Art. 50), and where the privacy and accessibility statements are |
 
 ## The project in one paragraph
 

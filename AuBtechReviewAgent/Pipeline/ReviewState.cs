@@ -63,6 +63,11 @@ public class ReviewState
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public List<SourceTextFlags>? FullTextFlags { get; set; }
 
+    // The retraction check of the included studies' DOIs (also retraction-check.json); null, and left out of the
+    // ledger, when the run did not check, so a run without it is written exactly as before.
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public RetractionCheckFile? RetractionCheck { get; set; }
+
     // Data extraction and MMAT appraisal per included study (also written to extraction.json).
     public List<StudyExtraction> Extractions { get; set; } = new();
 

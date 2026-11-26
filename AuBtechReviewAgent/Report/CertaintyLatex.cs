@@ -38,8 +38,11 @@ public static class CertaintyLatex
         yield return $"Sensitivity: {a.SensitivitySentence}";
     }
 
-    /// <summary>The results in plain sentences, then the table "Certainty of the Evidence for Each Answer", numbered in the results.</summary>
-    public static string Table(CertaintyFile file, string number)
+    /// <summary>
+    /// The results in plain sentences, then the table "Certainty of the Evidence for Each Answer" with its caption and
+    /// the label tab:certainty; LaTeX numbers it among the results' tables.
+    /// </summary>
+    public static string Table(CertaintyFile file)
     {
         static string E(string s) => PaperLatex.Escape(s);
         var sb = new StringBuilder();
@@ -47,18 +50,17 @@ public static class CertaintyLatex
         if (summary.Length > 0) sb.AppendLine(E(summary)).AppendLine();
         sb.AppendLine(@"\vspace{6pt}");
         sb.AppendLine(@"{\scriptsize");
-        sb.AppendLine(@"\begin{tabularx}{\textwidth}{>{\hsize=0.25\hsize}X >{\hsize=1.3\hsize}X >{\hsize=0.35\hsize}X >{\hsize=0.9\hsize}X >{\hsize=0.45\hsize}X >{\hsize=1.75\hsize}X}");
-        sb.AppendLine($"\\multicolumn{{6}}{{l}}{{\\normalsize\\textbf{{Table {number}: Certainty of the Evidence for Each Answer}}}} \\\\");
-        sb.AppendLine(@"\toprule");
-        sb.AppendLine(@"\textbf{RQ} & \textbf{Answer in brief} & \textbf{Studies} & \textbf{Concerns} & \textbf{Certainty} & \textbf{Reasons} \\");
-        sb.AppendLine(@"\midrule");
+        sb.AppendLine(@"\begin{tabularx}{\textwidth}{>{\hsize=0.25\hsize}Y >{\hsize=1.3\hsize}Y >{\hsize=0.35\hsize}Y >{\hsize=0.9\hsize}Y >{\hsize=0.45\hsize}Y >{\hsize=1.75\hsize}Y}");
+        sb.Append(PaperLatex.TableHead(@"\normalsize Certainty of the Evidence for Each Answer", "tab:certainty",
+            @"\textbf{RQ} & \textbf{Answer in brief} & \textbf{Studies} & \textbf{Concerns} & \textbf{Certainty} & \textbf{Reasons}"));
         foreach (var a in file.Answers)
         {
-            string studies = a.Sources.Count == 0 ? "0" : $"{a.Sources.Count} ({string.Join(", ", a.Sources.Select(r => $"{{[}}{r}{{]}}"))})";
+            string studies = a.Sources.Count == 0 ? "0" : $"{a.Sources.Count} (\\cite{{{string.Join(",", a.Sources.Select(r => "ref" + r))}}})";
             string concerns = a.NotRated != null ? "--" : string.Join(@" \newline ", ConcernLines(a).Select(E));
             string reasons = string.Join(@" \newline ", ReasonLines(a).Select(E));
-            sb.AppendLine($"RQ{a.Number} & {E(a.AnswerInBrief)} & {studies} & {concerns} & {E(a.Overall ?? "not rated")} & {reasons} \\\\ \\hline");
+            sb.AppendLine($"RQ{a.Number} & {E(a.AnswerInBrief)} & {studies} & {concerns} & {E(a.Overall ?? "not rated")} & {reasons} \\\\ \\addlinespace");
         }
+        sb.AppendLine(@"\bottomrule");
         sb.AppendLine(@"\end{tabularx}");
         sb.AppendLine(@"\vspace{2pt}\noindent " + E($"Rated in code by a rule inspired by GRADE-CERQual and GRADE; an automated approximation, not a formal assessment by people. Thresholds and reasons: {CertaintyFile.FileName}.") + "}");
         sb.AppendLine(@"\vspace{10pt}");

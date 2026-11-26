@@ -1,0 +1,15 @@
+@* The machine-readable marks that a report page is AI-generated (EU AI Act Art. 50(2)): meta tags and schema.org
+   data, all written in code by AiMarking. SeoHead puts them in the page's head when a report page passes its models.
+   The JSON-LD block is data, not a script: the Content-Security-Policy does not apply to it and nothing runs. *@
+@foreach (var tag in AuBtechReviewAgent.AiMarking.HtmlMeta(Models, AuBtechReviewAgent.RecordingChatCompletionService.AppVersion))
+{
+    var name = tag.Name;
+    var content = tag.Content;
+    <meta name="@name" content="@content" />
+}
+@((MarkupString)$"<script type=\"application/ld+json\">{AuBtechReviewAgent.AiMarking.JsonLd(Models)}</script>")
+
+@code {
+    /// <summary>The language models the report was written with; empty when none is recorded.</summary>
+    [Parameter] public IReadOnlyList<string>? Models { get; set; }
+}
