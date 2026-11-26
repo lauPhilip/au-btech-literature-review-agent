@@ -26,12 +26,12 @@ public class ReferenceEnricherTests : IDisposable
     public async Task AScopusFirstAuthorBecomesTheFullListWithNamesFromTheirParts()
     {
         var enricher = new ReferenceEnricher(Answers(new() { ["api.crossref.org/works/10.1145/3796507"] = ReferenceAnswersTests.CrossrefJson }), "team@example.org");
-        var scopus = Log("SCOPUS_ID:1", "Large Language Model-Based Agents for Software Engineering: A Survey", new() { "Jun-wei L.", ApaCitationBuilder.EtAl },
+        var scopus = Log("SCOPUS_ID:1", "Large language model-based agents for software engineering: A survey", new() { "Jun-wei L.", ApaCitationBuilder.EtAl },
             "ACM Transactions on Software Engineering and Methodology", "10.1145/3796507");
 
         var (logs, audit) = await enricher.EnrichAsync(new[] { scopus }, _run);
 
-        Assert.Equal("Liu, J., Wang, K., & SE Agents Consortium (2026). Large Language Model-Based Agents for Software Engineering: A Survey. *ACM Transactions on Software Engineering and Methodology*, *35*(2), 1–79. https://doi.org/10.1145/3796507", logs[0].ApaCitation);
+        Assert.Equal("Liu, J., Wang, K., & SE Agents Consortium (2026). Large language model-based agents for software engineering: A survey. *ACM Transactions on Software Engineering and Methodology*, *35*(2), 1–79. https://doi.org/10.1145/3796507", logs[0].ApaCitation);
         var entry = Assert.Single(audit.References);
         Assert.Equal("Crossref", entry.Filled["authors"]);
         Assert.Equal("Crossref", logs[0].Details!.EnrichedFrom!["volume"]);
