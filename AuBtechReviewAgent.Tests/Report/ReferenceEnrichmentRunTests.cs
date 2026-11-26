@@ -47,7 +47,9 @@ public class ReferenceEnrichmentRunTests : IDisposable
         using var archive = new ZipArchive(new MemoryStream(engine.GenerateWorkspaceArchiveFromDisk(runId)));
         string Read(string name) { using var r = new StreamReader(archive.GetEntry(name)!.Open()); return r.ReadToEnd(); }
 
-        Assert.Single(asked, u => u.Contains("crossref"));
+        // The enrichment asks Crossref once; the retraction check (RetractionCheck.cs) also asks it for update notices.
+        Assert.Single(asked, u => u.Contains("crossref") && !u.Contains("filter=updates:"));
+        Assert.Single(asked, u => u.Contains("crossref") && u.Contains("filter=updates:"));
         Assert.Contains(@"} Doe, J., \& Liu, J.-W. (2025). Agent loops for safe orchestration.\ \textit{Future Internet}, \textit{12}(3), 45–60.\ \url{https://doi.org/10.3390/fi1234567}", Read("main.tex"));
         string bib = Read("references.bib");
         Assert.Contains("author = {Doe, Jane and Liu, Jun-wei}", bib);
