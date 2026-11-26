@@ -64,33 +64,47 @@ public partial class PrismaReviewEngine
         ctx.SearchPassesTotal = Math.Max(1, ctx.Sources.Count * searchPerspectives.Count);
         ReportProgress(ctx.RunId, reviewState, RunProgress.Search, 0.05, $"Searching {ctx.Sources.Count} source(s) with {searchPerspectives.Count} search string(s)");
 
-        // All sources are queried at the same time; each source runs its search strings one after another.
-        // The results are then processed in a fixed order (source order, then search-string order), so the
-        // duplicate decisions and the ledger do not depend on which source happened to answer first.
-        var fetches = await Task.WhenAll(ctx.Sources.Select((source, index) =>
-            FetchSourceAsync(ctx, source, index, searchPerspectives, maxResults)));
-
-        var candidates = new List<(AcademicPaper Paper, string SourceName)>();
-        for (int s = 0; s < ctx.Sources.Count; s++)
+        // The search strings are run in rounds: each round asks every source that has not yet filled its cap with the
+        // same string, all sources at the same time. The answers of a round are processed in source order, so the
+        // duplicate decisions and the ledger do not depend on which source happened to answer first. A source stops
+        // taking strings once its cap is filled by records that go on to screening; duplicates and records outside
+        // the year range do not use up the cap (issue #562).
+        int perPerspectiveCap = Math.Max(1, (int)Math.Ceiling(maxResults / (double)searchPerspectives.Count));
+        var kept = new int[ctx.Sources.Count];
+        var passesBySource = ctx.Sources.Select(_ => new List<SearchPass>()).ToArray();
+        var candidatesBySource = ctx.Sources.Select(_ => new List<(AcademicPaper Paper, string SourceName)>()).ToArray();
+        for (int p = 0; p < searchPerspectives.Count; p++)
         {
-            var source = ctx.Sources[s];
-            int kept = 0;
-            foreach (var pass in fetches[s])
+            var open = Enumerable.Range(0, ctx.Sources.Count).Where(s => kept[s] < maxResults).ToList();
+            if (open.Count == 0) break; // every source has filled its cap: the remaining strings are not run at all
+            string query = searchPerspectives[p];
+            int round = p;
+            var answers = await Task.WhenAll(open.Select(s => FetchPassAsync(ctx, ctx.Sources[s], s, query, round, perPerspectiveCap)));
+            for (int i = 0; i < open.Count; i++)
             {
-                reviewState.SearchLogs.Add(pass.Log);
-                if (pass.Log.FromCache) reviewState.Stats.CacheHits++;
+                int s = open[i];
+                var pass = answers[i];
+                passesBySource[s].Add(pass);
                 reviewState.Stats.TotalIdentified += pass.Papers.Count;
 
                 // Every identified record lands in exactly one bucket (duplicate, outside years, over cap, or
                 // candidate), so the PRISMA flow diagram adds up, and every removal is written to the ledger.
                 foreach (var candidate in pass.Papers)
                 {
-                    if (!Admit(ctx, candidate, source.SourceName, pass.Log.QueryUsed, yearFrom, yearTo, capReached: kept >= maxResults)) continue;
-                    kept++;
-                    candidates.Add((candidate, source.SourceName));
+                    if (!Admit(ctx, candidate, ctx.Sources[s].SourceName, query, yearFrom, yearTo, capReached: kept[s] >= maxResults)) continue;
+                    kept[s]++;
+                    candidatesBySource[s].Add((candidate, ctx.Sources[s].SourceName));
                 }
             }
         }
+        // The ledger lists the searches and the candidates by source, then by search string, as before.
+        var fetches = passesBySource;
+        foreach (var pass in fetches.SelectMany(f => f))
+        {
+            reviewState.SearchLogs.Add(pass.Log);
+            if (pass.Log.FromCache) reviewState.Stats.CacheHits++;
+        }
+        var candidates = candidatesBySource.SelectMany(c => c).ToList();
         reviewState.SearchStringYields = SearchSaturation.Compute(searchPerspectives,
             fetches.SelectMany(f => f).Select<SearchPass, (int, IReadOnlyList<AcademicPaper>)>(pass => (pass.StringIndex, pass.Papers)));
         OnProgressUpdated?.Invoke(ctx.RunId, reviewState.Stats);
@@ -145,68 +159,55 @@ public partial class PrismaReviewEngine
     }
 
     /// <summary>
-    /// Runs the search strings against one source, one after another, and stops once the source has returned
-    /// enough distinct records to fill its cap. Responses come from the cache when a fresh one exists; every
+    /// Runs one search string against one source. The answer comes from the cache when a fresh one exists; every
     /// raw response actually used is saved in SourceResponses/ with its SHA-256 fingerprint.
     /// </summary>
-    private async Task<List<SearchPass>> FetchSourceAsync(RunContext ctx, IAcademicSource source, int sourceIndex, List<string> perspectives, int maxResults)
+    private async Task<SearchPass> FetchPassAsync(RunContext ctx, IAcademicSource source, int sourceIndex, string query, int p, int perPerspectiveCap)
     {
-        var passes = new List<SearchPass>();
-        var distinct = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        // maxResults is a per-source cap: split the budget across the search strings.
-        int perPerspectiveCap = Math.Max(1, (int)Math.Ceiling(maxResults / (double)perspectives.Count));
-
-        for (int p = 0; p < perspectives.Count; p++)
+        var log = new PlatformSearchLog
         {
-            if (distinct.Count >= maxResults) break; // cap met - the remaining search strings are not run at all
-            string query = perspectives[p];
-            var log = new PlatformSearchLog
-            {
-                SourceName = source.SourceName,
-                Timestamp = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss UTC"),
-                Status = "Running",
-                QueryUsed = query,
-            };
-            // The live line names the database and string being asked now (LiveActivity); the bar does not move.
-            string subject = LiveActivity.SearchSubjectOf(source.SourceName, query);
-            int before = Volatile.Read(ref ctx.SearchPassesDone);
-            ReportProgress(ctx.RunId, ctx.State, RunProgress.Search, 0.05 + 0.95 * before / Math.Max(1, ctx.SearchPassesTotal), Of(before, ctx.SearchPassesTotal, "searches"), subject);
+            SourceName = source.SourceName,
+            Timestamp = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss UTC"),
+            Status = "Running",
+            QueryUsed = query,
+        };
+        // The live line names the database and string being asked now (LiveActivity); the bar does not move.
+        string subject = LiveActivity.SearchSubjectOf(source.SourceName, query);
+        int before = Volatile.Read(ref ctx.SearchPassesDone);
+        ReportProgress(ctx.RunId, ctx.State, RunProgress.Search, 0.05 + 0.95 * before / Math.Max(1, ctx.SearchPassesTotal), Of(before, ctx.SearchPassesTotal, "searches"), subject);
 
-            List<AcademicPaper> papers = new();
-            List<string> raw = new();
-            string cacheKey = ReviewCache.Key("search-v1", source.SourceName, query, perPerspectiveCap.ToString());
-            try
+        List<AcademicPaper> papers = new();
+        List<string> raw = new();
+        string cacheKey = ReviewCache.Key("search-v1", source.SourceName, query, perPerspectiveCap.ToString());
+        try
+        {
+            // An entry with papers but no raw answer predates the Scopus and IEEE Xplore fix (#469): search again, so the answer is kept.
+            if (Cache.TryGet<SearchCacheEntry>("search", cacheKey, out var cached) && cached != null && (cached.Raw.Count > 0 || cached.Papers.Count == 0))
             {
-                // An entry with papers but no raw answer predates the Scopus and IEEE Xplore fix (#469): search again, so the answer is kept.
-                if (Cache.TryGet<SearchCacheEntry>("search", cacheKey, out var cached) && cached != null && (cached.Raw.Count > 0 || cached.Papers.Count == 0))
-                {
-                    papers = cached.Papers;
-                    raw = cached.Raw;
-                    log.FromCache = true;
-                }
-                else
-                {
-                    papers = await source.FetchPapersAsync(query, maxResults: perPerspectiveCap);
-                    raw = source.LastRawResponses.ToList();
-                    Cache.Set("search", cacheKey, new SearchCacheEntry { Papers = papers, Raw = raw });
-                }
-                log.Status = "Completed Successfully";
-                log.PapersFound = papers.Count;
+                papers = cached.Papers;
+                raw = cached.Raw;
+                log.FromCache = true;
             }
-            catch (Exception ex)
+            else
             {
-                log.Status = "Faulted / Refused Connection";
-                log.ErrorMessage = SanitizeLogMessage(ex.Message);
-                _log.LogWarning("Run {RunId}: {Source} failed on \"{Query}\": {Message}", ctx.RunId, source.SourceName, query, log.ErrorMessage);
+                papers = await source.FetchPapersAsync(query, maxResults: perPerspectiveCap);
+                raw = source.LastRawResponses.ToList();
+                Cache.Set("search", cacheKey, new SearchCacheEntry { Papers = papers, Raw = raw });
             }
-
-            SaveRawResponses(ctx, log, raw, $"{sourceIndex + 1:00}-{Slug(source.SourceName)}-q{p + 1}");
-            foreach (var paper in papers) distinct.Add(paper.Id);
-            passes.Add(new SearchPass(log, papers, p));
-            int searched = Interlocked.Increment(ref ctx.SearchPassesDone);
-            ReportProgress(ctx.RunId, ctx.State, RunProgress.Search, 0.05 + 0.95 * searched / ctx.SearchPassesTotal, Of(searched, ctx.SearchPassesTotal, "searches"), subject);
+            log.Status = "Completed Successfully";
+            log.PapersFound = papers.Count;
         }
-        return passes;
+        catch (Exception ex)
+        {
+            log.Status = "Faulted / Refused Connection";
+            log.ErrorMessage = SanitizeLogMessage(ex.Message);
+            _log.LogWarning("Run {RunId}: {Source} failed on \"{Query}\": {Message}", ctx.RunId, source.SourceName, query, log.ErrorMessage);
+        }
+
+        SaveRawResponses(ctx, log, raw, $"{sourceIndex + 1:00}-{Slug(source.SourceName)}-q{p + 1}");
+        int searched = Interlocked.Increment(ref ctx.SearchPassesDone);
+        ReportProgress(ctx.RunId, ctx.State, RunProgress.Search, 0.05 + 0.95 * searched / ctx.SearchPassesTotal, Of(searched, ctx.SearchPassesTotal, "searches"), subject);
+        return new SearchPass(log, papers, p);
     }
 
     /// <summary>Writes the raw responses of one search call to SourceResponses/ and notes file names and fingerprints in the log.</summary>
