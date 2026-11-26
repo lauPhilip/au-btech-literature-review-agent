@@ -241,7 +241,7 @@ public partial class SpecMatrix
         if (HasReport)
             articleInfo = AuBtechReviewAgent.ArticleInfo.ForSystematic(ReportRunId, state, report, ScrubAnchors(report.TitleItem), ScrubAnchors(report.AbstractItem), hasProtocol,
                 AuBtechReviewAgent.VerdictTally.From(auditChecks, auditRemoved), InGallery ? ReportHref : null, AuBtechReviewAgent.GallerySelfCheck.Read(folder),
-                state?.Extractions is { Count: > 0 } withExtractions ? AuBtechReviewAgent.SecondaryStudy.In(withExtractions).Count : null,
+                state?.Extractions is { Count: > 0 } withExtractions ? AuBtechReviewAgent.SecondaryStudy.ReviewCount(withExtractions) : null,
                 AuBtechReviewAgent.RetractionTally.From(state?.RetractionCheck));
         selfCheck = File.Exists(Path.Join(folder, AuBtechReviewAgent.PaperSelfCheckFile.FileName)) || state == null
             ? AuBtechReviewAgent.SystematicSelfCheck.Load(folder) : AuBtechReviewAgent.SystematicSelfCheck.Check(folder, state);
