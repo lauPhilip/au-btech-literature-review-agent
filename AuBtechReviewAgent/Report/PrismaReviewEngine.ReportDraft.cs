@@ -53,6 +53,9 @@ public partial class PrismaReviewEngine
         public string DiscussionText { get; set; } = "";
         public ReviewArtifact? Artifact { get; set; }
         public ClosingSections? Closing { get; set; }
+        /// <summary>The answers the paper prints, one per research question (issue #561), and whether they were assembled in code.</summary>
+        public IReadOnlyList<string>? Answers { get; set; }
+        public bool AnswersFromEvidence { get; set; }
         public string Title { get; set; } = "";
         public string Abstract { get; set; } = "";
         public string Rationale { get; set; } = "";

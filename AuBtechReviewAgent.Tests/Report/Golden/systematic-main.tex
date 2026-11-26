@@ -134,7 +134,9 @@ No other databases, registers, websites or reference lists were consulted.
 \subsection{Search Execution}\label{sec:search-execution}
 
 The primary search string was ``agent loops''.
-To improve recall, the language model proposed 2 additional search strings, each of which was also run against every source: ``agent orchestration safety''; ``agent fault recovery''.
+To improve recall, the language model proposed 2 additional search strings: ``agent orchestration safety''; ``agent fault recovery''.
+The search strings were run in order, and a source stopped taking further strings once its cap was filled.
+``agent orchestration safety'' and ``agent fault recovery'' were not run, because every source had already filled its cap.
 At most 3 records from each source went on to screening, across all search strings.
 Duplicates did not count towards this limit, so a source can show more records identified in the flow diagram.
 Duplicates were removed across all sources by identifier, DOI and normalised title (0 removed).
@@ -301,6 +303,11 @@ This was a pilot run, not a comprehensive search: the search took at most 3 reco
 An automated check compared the part of each cited sentence attributed to a paper with the text of that paper.
 Of 5 citations checked, 5 were judged supported, 0 partially supported, 0 not supported, and 0 could not be verified.
 Every verdict, with the quoted evidence, is listed in citation-audit.\allowbreak{}json; these are model judgements and should be spot-checked by a human reviewer.
+
+\section{Conclusion}\label{sec:conclusion}
+
+The conclusion, the limitations of the evidence, the implications and the directions for future research could not be written: the language model's answer failed the checks in code on every try.
+The results and the discussion above stand as they are.
 
 \section{Declarations}\label{sec:declarations}
 

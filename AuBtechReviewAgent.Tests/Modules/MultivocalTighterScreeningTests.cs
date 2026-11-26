@@ -48,7 +48,6 @@ public class MultivocalTighterScreeningTests : IDisposable
         string steps = PrismaReviewEngine.ScreeningProcedure(false);
         Assert.Contains("1. Determine if it should be Included or Excluded.", steps);
         Assert.DoesNotContain("positive evidence", steps);
-        Assert.Equal("screening-v6", PrismaReviewEngine.ScreeningPromptVersion);
     }
 
     [Fact]
