@@ -60,10 +60,11 @@ public partial class PrismaReviewEngine
             fields.Add(("implicationsItem", Plain(closing.Implications, "implicationsItem")));
             fields.Add(("futureResearchItem", Plain(closing.FutureResearch, "futureResearchItem")));
             fields.Add(("conclusionItem", Plain(closing.Conclusion, "conclusionItem")));
-            // One field per answer to a research question, so each is checked and repaired on its own.
-            for (int i = 0; i < (closing.Answers?.Count ?? 0); i++)
-                fields.Add(($"researchAnswer{i + 1}", Plain(closing.Answers![i], $"researchAnswer{i + 1}")));
         }
+        // One field per answer to a research question, so each is checked and repaired on its own; the answers are kept
+        // when the closing step fails (issue #561).
+        for (int i = 0; i < (run.Answers?.Count ?? 0); i++)
+            fields.Add(($"researchAnswer{i + 1}", Plain(run.Answers![i], $"researchAnswer{i + 1}")));
         if (artifact is { Error: null }) fields.AddRange(artifact.CitableTexts().ToList());
 
         // STORM-style traceability guardrail: every [n] citation marker the model writes must resolve to
@@ -259,8 +260,8 @@ public partial class PrismaReviewEngine
             ReviewLimitationsItem = MethodsSectionWriter.ReviewProcessLimitations(finalState, Llm.DisplayNameFor("screening"), Llm.DisplayName),
             ImplicationsItem = closing == null ? "" : textOf["implicationsItem"],
             FutureResearchItem = closing == null ? "" : textOf["futureResearchItem"],
-            ConclusionItem = closing == null ? "" : textOf["conclusionItem"],
-            ResearchAnswers = closing?.Answers == null ? new List<ResearchAnswer>() : finalState.ResearchQuestions
+            ConclusionItem = closing == null ? ClosingUnwrittenText(run.UseThematic && thematic?.Evidence != null, run.Answers != null, run.AnswersFromEvidence) : textOf["conclusionItem"],
+            ResearchAnswers = run.Answers == null ? new List<ResearchAnswer>() : finalState.ResearchQuestions
                 .Select((question, i) => new ResearchAnswer { Number = i + 1, Question = question, Answer = textOf[$"researchAnswer{i + 1}"] })
                 .ToList(),
             // Items 9-11 from the extraction and MMAT appraisal the run actually produced.
