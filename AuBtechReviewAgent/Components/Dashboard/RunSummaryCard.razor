@@ -42,6 +42,14 @@
                     <p class="mt-1 text-sm text-muted">No citations were checked in this run. The report says why.</p>
                 }
 
+                @if (SelfCheckLine(Stats) is { } selfCheckLine)
+                {
+                    <p class="mt-3 text-sm text-ink" data-self-check-line>
+                        <span class="font-semibold">The paper checked itself:</span> @selfCheckLine.
+                        <a href="@($"/spec-matrix/{RunId}#{AuBtechReviewAgent.ReportOutline.SelfCheckId}")" class="font-semibold text-heading underline underline-offset-2">See the checks<span class="sr-only"> in the report</span></a>
+                    </p>
+                }
+
                 <div class="mt-4 flex flex-col gap-2 border-t border-line pt-4 sm:flex-row sm:items-center sm:gap-3">
                     <a href="@report" class="ui-btn-primary min-h-[52px] px-7 text-base max-sm:w-full">Open the report</a>
                     @if (flagged > 0)
@@ -109,6 +117,10 @@
         if (s.Included > 0) parts.Add($"{s.StudiesCitedInSynthesis} of {s.Included} cited");
         return string.Join(" · ", parts);
     }
+
+    /// <summary>"8 checks passed, 2 notes, 1 fault" from the run's figures; null for a run made before the self-check, which has no figures to show.</summary>
+    public static string? SelfCheckLine(AuBtechReviewAgent.ReviewStats s) =>
+        s.SelfCheckPassed is int passed ? AuBtechReviewAgent.PaperSelfCheck.SummaryLine(passed, s.SelfCheckNotes ?? 0, s.SelfCheckFaults ?? 0) : null;
 
     /// <summary>The bar as one sentence, for screen readers.</summary>
     public static string BarSentence(AuBtechReviewAgent.ReviewStats s) => AuBtechReviewAgent.VerdictTally.From(s).Sentence(s.CitationsChecked + s.CitationsRemoved);
