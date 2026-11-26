@@ -30,6 +30,10 @@
         {
             @Sentence(sentenceIndex)
         }
+        if (unconfirmed.Contains(sentenceIndex))
+        {
+            <sup class="font-semibold text-not-supported" title="@AuBtechReviewAgent.CitationMarkers.UnconfirmedNote">†<span class="sr-only">@(" " + AuBtechReviewAgent.CitationMarkers.UnconfirmedNote)</span></sup>
+        }
         if (Edited != null && Edited.TryGetValue(sentenceIndex, out int editNumber))
         {
             <a href="@($"{HistoryHref}#{EditHistoryId(editNumber)}")" data-jump-to="@EditHistoryId(editNumber)"
@@ -39,6 +43,10 @@
         @(" ")
     }
 </p>
+@if (unconfirmed.Count > 0)
+{
+    <p class="mt-1 text-xs text-muted" aria-hidden="true">† @AuBtechReviewAgent.CitationMarkers.UnconfirmedNote</p>
+}
 @if (Editing != null && Editor != null)
 {
     @Editor
@@ -146,13 +154,24 @@
     /// <summary>The page's own address without a fragment, for the "edited" mark's link to the history.</summary>
     [Parameter] public string HistoryHref { get; set; } = "";
 
+    /// <summary>
+    /// Marks each sentence whose citation the check did not confirm with a dagger and a footnote under the text, as
+    /// main.tex does (CitationMarkers). Off by default, so a page that does not ask renders as before.
+    /// </summary>
+    [Parameter] public bool MarkUnconfirmed { get; set; }
+
     private string text = "";
     private IReadOnlyList<string> sentences = Array.Empty<string>();
+    private HashSet<int> unconfirmed = new();
 
     protected override void OnParametersSet()
     {
         text = Text ?? "";
         sentences = AuBtechReviewAgent.CitationSupportChecker.SplitSentences(text);
+        // Only a sentence that still reads as the check read it is marked.
+        unconfirmed = MarkUnconfirmed && AuBtechReviewAgent.CitationMarkers.Unconfirmed(Checks).TryGetValue(Field, out var marked)
+            ? marked.Where(m => m.Key < sentences.Count && sentences[m.Key].Trim() == m.Value.Trim()).Select(m => m.Key).ToHashSet()
+            : new();
     }
 
     private AuBtechReviewAgent.CitationSupportResult? FindCheck(string field, int sentence, int reference) =>
