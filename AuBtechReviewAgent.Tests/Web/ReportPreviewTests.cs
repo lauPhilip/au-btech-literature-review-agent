@@ -63,6 +63,20 @@ public class ReportPreviewTests
     }
 
     [Fact]
+    public void TheBlockFindingIsItsOwnScriptLoadedBeforeThePaginator()
+    {
+        string blocks = Read("wwwroot", "js", "paged-blocks.js");
+        if (blocks.Length == 0) return;
+        Assert.Contains("window.traceablePageBlocks", blocks);
+        string pages = Read("wwwroot", "js", "paged-preview.js");
+        Assert.Contains("traceablePageBlocks", pages);
+        Assert.Contains("[data-citation-panel]", pages); // a card that opened off screen is scrolled to (#671)
+        Assert.True(pages.Split('\n').Length <= 300);
+        string app = Read("Components", "App.razor");
+        Assert.True(app.IndexOf("js/paged-blocks.js", StringComparison.Ordinal) is var at and >= 0 && at < app.IndexOf("js/paged-preview.js", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public void TheCitationCheckBoxIsNotInThePagesAndThePanelBesideThemStays()
     {
         string? page = ReportPageSource.Read();
