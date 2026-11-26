@@ -26,7 +26,10 @@ public static partial class DocumentRAGUtility
     // the citation check both ask for the full text).
     private static readonly ConcurrentDictionary<string, bool> UnpaywallMisses = new(StringComparer.OrdinalIgnoreCase);
 
-    /// <summary>The file name a paper's PDF is saved under in the run folder: its title in letters and digits, at most 50 characters.</summary>
+    /// <summary>
+    /// The file name runs before #587 saved a paper's PDF under: its title in letters and digits, at most 50 characters.
+    /// Still read and still matched in the deposit, never written: new copies are named by <see cref="FullTextFile"/>.
+    /// </summary>
     public static string PdfFileName(string? title)
     {
         string name = Regex.Replace(title ?? "paper", @"[^a-zA-Z0-9]", "_", RegexOptions.None, TimeSpan.FromSeconds(1));
