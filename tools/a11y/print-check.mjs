@@ -4,7 +4,8 @@
 //   cd tools/a11y && npm ci && BASE_URL=http://localhost:5038 node print-check.mjs
 //
 // PRINT_PAGES lists the pages and the least number of A4 pages each must fill, as path=pages
-// (default /design/report=3, the made-up report). PRINT_OUT names a folder for the PDFs; CI uploads it.
+// (default /design/report=3, the made-up report). PRINT_OUT names a folder for the PDFs; CI uploads it. A page with a
+// paged report is also checked on screen: A4 sheets with a footer at 1440 px, one continuous sheet at 390 px.
 import { chromium } from 'playwright';
 import { mkdirSync, writeFileSync } from 'node:fs';
 
@@ -36,6 +37,21 @@ for (const { path, min } of targets) {
     continue;
   }
   await page.waitForTimeout(1500);
+  // On screen a report is A4 sheets with "n of N" at the foot of each (wwwroot/js/paged-preview.js); on a phone it is
+  // one continuous sheet.
+  const sheets = await page.evaluate(() => {
+    const sheet = document.querySelector('[data-paged-sheet]');
+    if (!sheet) return null;
+    const feet = Array.from(document.querySelectorAll('[data-page-overlay] .paged-foot')).map(f => f.textContent);
+    return { paged: sheet.getAttribute('data-paged'), pages: feet.length, first: feet[0] ?? '' };
+  });
+  if (sheets) {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.waitForTimeout(600);
+    sheets.phone = await page.evaluate(() => document.querySelector('[data-paged-sheet]').getAttribute('data-paged'));
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.waitForTimeout(600);
+  }
   await page.emulateMedia({ media: 'print' });
   // On paper the frame drops away: the top bar, the footer and the toolbars are hidden, the report is not.
   const frame = await page.evaluate(() => {
@@ -56,6 +72,8 @@ for (const { path, min } of targets) {
   if (frame.header) problems.push('the top bar is printed');
   if (!frame.title) problems.push('the title is not printed');
   if (frame.clipped > 0) problems.push(`${frame.clipped} element(s) still cut the content off`);
+  if (sheets && (sheets.paged !== 'on' || sheets.pages < 2 || !/^.*1 of \d+/.test(sheets.first))) problems.push(`the screen shows no A4 sheets (${JSON.stringify(sheets)})`);
+  if (sheets && sheets.phone !== 'off') problems.push('a phone does not get one continuous sheet');
   console.log(`${path}: ${pages} page(s)${problems.length ? ' - ' + problems.join('; ') : ', prints in full'}`);
   failed += problems.length;
   await page.close();
