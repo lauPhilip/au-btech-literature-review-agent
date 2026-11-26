@@ -89,7 +89,8 @@ public class ReportFallbackTests : IDisposable
         Assert.Empty(report.SynthesisSections ?? new List<SynthesisSection>());
         Assert.Equal("Agent Loops: A Pilot Systematic Search", report.TitleItem); // the front matter failed, so the draft's title is kept, renamed for a pilot search (issue #554)
         Assert.Equal("We review 3 papers on agent loops.", report.AbstractItem);
-        Assert.Equal("", report.ConclusionItem);
+        // Issue #561: the paper says why the closing parts are missing instead of leaving them out unseen.
+        Assert.Equal(PrismaReviewEngine.ClosingUnwrittenText(attempted: false, hasQuestions: false, answersFromEvidence: false), report.ConclusionItem);
         Assert.Null(state.ThematicSynthesis);
         Assert.Equal(2, state.Stats.StudiesCitedInSynthesis);
         Assert.False(string.IsNullOrWhiteSpace(report.CitationCheckSummary));
