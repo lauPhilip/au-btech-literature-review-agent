@@ -63,6 +63,9 @@ public sealed record GalleryEntry
     public int References { get; init; }
     public CitationShares Citations { get; init; } = new();
     public List<string> Keywords { get; init; } = new();
+
+    /// <summary>The self-check of the version these figures describe; null when its run made none.</summary>
+    public GallerySelfCheck? SelfCheck { get; init; }
     public string Fingerprint { get; init; } = "";
 
     /// <summary>SHA-256 of the run's edit key with a gallery prefix, in an entry made before versions; each version keeps its own.</summary>
@@ -95,6 +98,7 @@ public sealed record GalleryEntry
         Citations = v.Citations,
         CitationsChecked = v.Citations.Checked,
         Keywords = v.Keywords,
+        SelfCheck = v.SelfCheck,
         Version = v.Number,
     };
 

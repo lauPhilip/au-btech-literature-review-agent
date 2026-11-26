@@ -91,7 +91,7 @@ public sealed partial class GalleryStore
             return new(false, "Only the browser that started this run can add it to the gallery.");
         var header = _runs.LoadHeader(runId);
         string source = _runs.FolderOf(runId);
-        var described = header == null ? null : GallerySnapshot.Describe(source, header);
+        var described = header == null ? null : GallerySnapshot.Describe(source, header) is { } d ? d with { SelfCheck = GallerySelfCheck.Read(source) } : null;
         var files = header == null ? Array.Empty<string>() : GallerySnapshot.FilesFor(header.Module);
         if (described == null || files.Count == 0) return new(false, "Only a finished review with a report can be added to the gallery.");
         if (files.Sum(f => File.Exists(Path.Join(source, f)) ? new FileInfo(Path.Join(source, f)).Length : 0) > GallerySnapshot.MaxBytes)
