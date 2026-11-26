@@ -89,14 +89,85 @@ const flows = [
   },
 ];
 
+// The paged report (wwwroot/js/paged-preview.js, issues #671 and #672), at the width where a sidebar and a narrow
+// sheet used to give a scroll bar (809 px) and on a wide screen. SMOKE_OUT names a folder for screenshots.
+const shot = async (page, name) => { if (process.env.SMOKE_OUT) await page.screenshot({ path: `${process.env.SMOKE_OUT}/${name}.png` }); };
+const inView = (page, selector) => page.evaluate(sel => {
+  const r = document.querySelector(sel)?.getBoundingClientRect();
+  return !!r && r.top >= 0 && r.bottom <= window.innerHeight && r.height > 0;
+}, selector);
+for (const width of [809, 1440]) {
+  const viewport = { width, height: 900 };
+  flows.push({
+    name: `Paged report at ${width} px: no sideways scroll`,
+    path: '/design/report',
+    viewport,
+    async run(page) {
+      await page.waitForSelector('[data-paged-sheet][data-paged="on"]', wait);
+      const { sw, cw } = await page.evaluate(() => ({ sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth }));
+      if (sw > cw) throw new Error(`the page is ${sw} px wide in a ${cw} px window`);
+      const boxes = await page.evaluate(() => [...document.querySelectorAll('[data-paged-sheet] *')]
+        .filter(e => e.scrollWidth > e.clientWidth + 1 && ['auto', 'scroll'].includes(getComputedStyle(e).overflowX) && e.clientWidth > 0)
+        .map(e => `${e.tagName}.${String(e.className).slice(0, 40)} ${e.scrollWidth}>${e.clientWidth}`));
+      if (boxes.length) throw new Error(`a box on the sheet scrolls sideways: ${boxes[0]}`);
+    },
+  });
+  flows.push({
+    name: `Paged report at ${width} px: no heading ends a sheet`,
+    path: '/design/report',
+    viewport,
+    async run(page) {
+      await page.waitForSelector('[data-paged-sheet][data-paged="on"]', wait);
+      await page.waitForTimeout(600);
+      const stranded = await page.evaluate(() => {
+        const sheet = document.querySelector('[data-paged-sheet]');
+        const pages = [...document.querySelectorAll('[data-page-overlay] .paged-page')].map(p => p.getBoundingClientRect());
+        const blocks = [...sheet.querySelectorAll('p, h1, h2, h3, h4, h5, li, tr, figure, table, pre, blockquote')].filter(e => e.getClientRects().length > 0);
+        const bad = [];
+        blocks.forEach((el, i) => {
+          if (!/^H[1-4]$/.test(el.tagName) || el.closest('[data-front-page]')) return;
+          const next = blocks.slice(i + 1).find(n => !el.contains(n));
+          const page = pages.find(p => el.getBoundingClientRect().top >= p.top - 1 && el.getBoundingClientRect().top < p.bottom);
+          if (next && page && next.getBoundingClientRect().top >= page.bottom - 1) bad.push(el.textContent.trim().slice(0, 40));
+        });
+        return bad;
+      });
+      if (stranded.length) throw new Error(`heading at the foot of a sheet: ${stranded.join(' | ')}`);
+    },
+  });
+  flows.push({
+    name: `Paged report at ${width} px: a citation's card opens in view`,
+    path: '/design/report',
+    viewport,
+    async run(page) {
+      await page.waitForSelector('[data-paged-sheet][data-paged="on"]', wait);
+      const open = async (what, click) => {
+        await click();
+        await page.locator('[data-citation-panel]').first().waitFor({ state: 'visible', ...wait });
+        await page.waitForTimeout(900); // paging settles (200 ms) and the scroll ends
+        if (!(await inView(page, '[data-citation-panel]'))) throw new Error(`${what}: the card is not in the window`);
+        await shot(page, `paged-card-${width}-${what.replace(/\W+/g, '-')}`);
+        await page.getByRole('button', { name: 'Close', exact: true }).first().click(wait);
+        await page.locator('[data-citation-panel]').first().waitFor({ state: 'hidden', ...wait });
+      };
+      const chips = page.locator('button[id^="cite-"]');
+      for (const n of [0, Math.min(3, (await chips.count()) - 1)]) {
+        await open(`citation ${n + 1}`, async () => { await chips.nth(n).scrollIntoViewIfNeeded(); await chips.nth(n).click(wait); });
+      }
+      const first = page.getByRole('button', { name: 'Show the first', exact: true });
+      if (await first.count()) await open('show the first', () => first.click(wait));
+    },
+  });
+}
+
 // Screens that must fit a 390 x 844 phone without scrolling (issue #244), in light and dark.
 const phoneScreens = ['/', '/review', '/design/run', '/design/run?state=done'];
 
 const browser = await chromium.launch(process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH } : {});
 const failures = [];
 
-async function open(path) {
-  const context = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+async function open(path, viewport = { width: 1280, height: 800 }) {
+  const context = await browser.newContext({ viewport });
   const page = await context.newPage();
   const errors = [];
   page.on('console', m => { if (m.type() === 'error' && !m.text().startsWith('Failed to load resource')) errors.push(m.text()); });
@@ -126,7 +197,7 @@ for (const path of pages) {
 }
 
 for (const flow of flows) {
-  const { context, page, errors } = await open(flow.path);
+  const { context, page, errors } = await open(flow.path, flow.viewport);
   let problem = null;
   try {
     await flow.run(page);

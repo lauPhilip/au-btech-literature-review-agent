@@ -42,6 +42,14 @@ public static class ReviewSteps
         };
     }
 
+    /// <summary>
+    /// The name of the step the progress line shows ("Screening 40%"). It is the run's own label for the step (such as
+    /// "Citation chaining"), except that the last phase of writing is the Artifact step, which the line names too.
+    /// </summary>
+    public static string Label(ReviewStats stats, string fallback) =>
+        stats.ProgressStep == RunProgress.Synthesis && Current(stats, "") == Artifact ? All[Artifact].Title
+        : RunProgress.Steps.TryGetValue(stats.ProgressStep, out var d) ? d.Label : fallback;
+
     /// <summary>"done", "current" or "pending" for step <paramref name="index"/> when the run is in step <paramref name="current"/>.</summary>
     public static string StateOf(int index, int current) =>
         index < current ? "done" : index == current ? "current" : "pending";

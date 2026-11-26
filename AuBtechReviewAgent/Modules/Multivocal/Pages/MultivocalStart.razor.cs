@@ -201,8 +201,11 @@ public partial class MultivocalStart
         Runner.Start(planned.RunId, editKey, PrerenderClientAddress);
     }
 
+    private AuBtechReviewAgent.Components.Layout.TabTitleSync? tabTitle;
+
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
+        await (tabTitle ??= new AuBtechReviewAgent.Components.Layout.TabTitleSync(JS, Logger)).UpdateAsync(TabTitle());
         // The edit key lives only in the browser that planned the run.
         if (!firstRender || planned == null) return;
         try { editKey = await JS.InvokeAsync<string?>("traceableReview.getEditKey", planned.RunId.ToString()); }

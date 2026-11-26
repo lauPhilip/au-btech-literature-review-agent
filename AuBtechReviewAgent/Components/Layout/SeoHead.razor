@@ -78,8 +78,7 @@
 
     private static MarkupString JsonLdBlock(string json) => new($"<script type=\"application/ld+json\">{json}</script>");
 
-    private string FullTitle => Title.StartsWith(AuBtechReviewAgent.SiteSeo.SiteName, StringComparison.Ordinal)
-        ? Title : $"{Title} · {AuBtechReviewAgent.SiteSeo.SiteName}";
+    private string FullTitle => AuBtechReviewAgent.Components.Layout.TabTitleSync.Full(Title);
 
     private string BaseUrl
     {

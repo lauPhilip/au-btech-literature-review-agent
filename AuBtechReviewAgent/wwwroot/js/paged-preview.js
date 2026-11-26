@@ -2,6 +2,8 @@
 // sheets (dark in the dark theme) on a neutral desk, even margins, and a footer with the site, "page of pages" and
 // "AI-generated · machine-marked". Served by the app, so the strict Content-Security-Policy allows it.
 //
+// Which elements count as a block is decided in paged-blocks.js.
+//
 // Blazor owns the report's elements, so this script never moves one. It measures the rendered text, adds space above
 // any block that would cross the foot of a page (so the block starts on the next page), and draws the sheets and their
 // footers in [data-page-overlay], an element Blazor leaves empty, behind the text (and, for a table that runs over
@@ -13,8 +15,9 @@
     const GAP = 24;                  // px between two sheets on the desk
     const A4 = 297 / 210;            // height over width
     const MARGIN = 15 / 210;         // 15 mm of 210 mm, as on paper
-    const BLOCKS = 'p, h1, h2, h3, h4, h5, li, tr, caption, figcaption, pre, blockquote, dt, dd, summary, button';
     const HEADINGS = /^H[1-5]$/;
+    const blocks = function (sheet, body) { return window.traceablePageBlocks.blocks(sheet, body); };
+    const opener = function (el, sheet) { return window.traceablePageBlocks.opener(el, sheet); };
     let timer = 0;
     let printing = false;
 
@@ -45,75 +48,6 @@
         if (overlay) overlay.replaceChildren();
         const above = topOf(sheet);
         if (above) above.replaceChildren();
-    }
-
-    // Units kept whole when they fit on a page: a figure, a diagram, an image, a box marked to stay together, a box with
-    // a border or a background (a panel, a card, a table), and a grid of more than one column (figures side by side),
-    // so no figure or panel is cut across two sheets and no row of a grid is torn apart.
-    const ATOMS = 'svg, figure, img, [data-page-block], .print-keep';
-    function isAtom(el) {
-        if (el.matches('svg, img')) return el.getBoundingClientRect().height >= 48; // not an icon
-        if (el.matches(ATOMS)) return true;
-        const style = getComputedStyle(el);
-        if (style.display.includes('grid') && style.gridTemplateColumns.trim().split(/\s+/).length > 1) return true;
-        if (style.display.startsWith('inline') || style.display.startsWith('table-') || style.display === 'list-item') return false;
-        const framed = parseFloat(style.borderTopWidth) > 0 && parseFloat(style.borderBottomWidth) > 0;
-        const filled = style.backgroundColor !== 'rgba(0, 0, 0, 0)' && style.backgroundColor !== 'transparent';
-        return (framed || filled) && el.getBoundingClientRect().height >= 48;
-    }
-
-    // The outermost unit around an element that fits on a page, or null.
-    function atomOf(el, sheet, body) {
-        let found = null;
-        for (let a = el; a && a !== sheet; a = a.parentElement) {
-            if (a.hasAttribute('data-front-page')) return null;
-            if (isAtom(a) && a.getBoundingClientRect().height <= body) found = a;
-        }
-        return found;
-    }
-
-    // The blocks to place, in reading order: units kept whole, and otherwise the innermost blocks; text in an inline
-    // element counts with its nearest block.
-    function blocks(sheet, body) {
-        const found = [];
-        const seen = new Set();
-        sheet.querySelectorAll(BLOCKS + ', ' + ATOMS).forEach(function (el) {
-            let block = atomOf(el, sheet, body);
-            if (!block) {
-                if (el.matches(ATOMS) || el.closest('svg') || (el.querySelector(BLOCKS) && el.tagName !== 'TR') || (el.closest('tr') && el.tagName !== 'TR')) return;
-                block = el;
-            }
-            while (block !== sheet && block.parentElement && getComputedStyle(block).display.startsWith('inline')) block = block.parentElement;
-            // Items side by side in a row (buttons, chips) move together with their row.
-            const row = block.parentElement;
-            if (row && row !== sheet && !row.hasAttribute('data-front-page')) {
-                const style = getComputedStyle(row);
-                if (style.display.includes('flex') && !style.flexDirection.startsWith('column')) block = row;
-            }
-            if (block === sheet || seen.has(block) || block.getClientRects().length === 0) return;
-            const position = getComputedStyle(block).position;
-            if (position === 'absolute' || position === 'fixed') return;
-            seen.add(block);
-            found.push(block);
-        });
-        return found;
-    }
-
-    // The element to move for a block: the block itself, or the outermost box it opens (a bordered box, a section or a
-    // table whose first thing it is), so a box never leaves its top border behind on the page before.
-    function opener(el, sheet) {
-        // A body row of a table moves alone (its cells grow); the rows above it stay where they are.
-        if (el.tagName === 'TR' && el.parentElement && el.parentElement.tagName === 'TBODY') return el;
-        let target = el;
-        while (target.parentElement && target.parentElement !== sheet && !target.parentElement.hasAttribute('data-front-page')) {
-            let prev = target.previousElementSibling;
-            while (prev && prev.getClientRects().length === 0) prev = prev.previousElementSibling;
-            if (prev) break;
-            const display = getComputedStyle(target.parentElement).display;
-            if (display.includes('grid') || display.includes('flex')) break;
-            target = target.parentElement;
-        }
-        return target;
     }
 
     // Adds space above an element: on a table row its cells grow; on a box with a border or a background its margin,
@@ -208,12 +142,18 @@
                 tablePage.set(table, landing);
             }
             if (to === null) continue;
-            // A heading goes with the block under it; the loop then looks at this block again.
-            const before = i > 0 ? list[i - 1] : null;
-            if (before && HEADINGS.test(before.tagName) && !(front && front.contains(before)) && to === next) {
-                const b = top(before);
-                if (Math.floor(b / step) === page && b > start + 1) {
-                    moveTo(opener(before, sheet), next, top);
+            // Headings go with the block under them: every heading in a row before it (a chapter and its first section)
+            // moves from the first of them, so none is left alone at the foot of the page. The loop then looks at this
+            // block again.
+            if (to === next) {
+                let first = -1;
+                for (let j = i - 1; j >= 0 && HEADINGS.test(list[j].tagName) && !(front && front.contains(list[j])); j--) {
+                    const b = top(list[j]);
+                    if (Math.floor(b / step) !== page || b <= start + 1) break;
+                    first = j;
+                }
+                if (first >= 0) {
+                    moveTo(opener(list[first], sheet), next, top);
                     i -= 1;
                     continue;
                 }
@@ -260,9 +200,28 @@
             { height: height, pad: pad, gap: GAP, step: height + GAP }, headers, splits, function (n) { return footOf(n, pages, pad, site); }));
     }
 
+    // A citation's card opens after its paragraph, and paging can push it to the next sheet, out of view. A card that
+    // is new since the last pass and not fully on screen is scrolled to (issue #671). Blazor may reuse the element for
+    // another citation, so a card counts as new when its label or the element before it is not the one seen last.
+    const shown = new WeakMap();
+    function revealCitationCards() {
+        document.querySelectorAll('[data-citation-panel]').forEach(function (panel) {
+            const seen = shown.get(panel);
+            const label = panel.getAttribute('aria-label');
+            const before = panel.previousElementSibling;
+            if (seen && seen.label === label && seen.before === before) return;
+            shown.set(panel, { label: label, before: before });
+            const r = panel.getBoundingClientRect();
+            if (r.top >= 0 && r.bottom <= window.innerHeight) return;
+            const still = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+            panel.scrollIntoView({ behavior: still ? 'auto' : 'smooth', block: 'nearest' });
+        });
+    }
+
     function run() {
         timer = 0;
         sheets().forEach(paginate);
+        revealCitationCards();
     }
 
     function later(ms) {

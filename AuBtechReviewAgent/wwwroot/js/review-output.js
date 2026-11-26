@@ -1,6 +1,11 @@
 // Page helpers for every page (served by the app itself, so the strict Content-Security-Policy allows it).
-// scrollTo: brings a citation into view when the reader steps through the citations that need attention.
+// setTitle: updates the tab's title as the run goes. scrollTo: brings a citation into view when the reader steps through the citations that need attention.
 window.traceableReview = {
+    // setTitle: the tab's title while a page is open (the head is rendered once, so a page tells the browser itself).
+    setTitle: function (text) {
+        document.title = text;
+        return true;
+    },
     scrollTo: function (id) {
         const el = document.getElementById(id);
         if (!el) return false;
