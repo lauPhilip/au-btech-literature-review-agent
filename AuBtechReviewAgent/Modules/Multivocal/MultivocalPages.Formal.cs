@@ -51,7 +51,9 @@ public sealed partial class MultivocalPages
             FullTextSource = fullText.Source,
             NotKept = text == null ? "Neither an open full text nor an abstract is available, so there is no text to quote." : null,
         };
-        return await SaveAsync(runId, MultivocalSearcher.AddressKey(record.Url), snapshot, text);
+        return full // letters the PDF hides were already taken out of the chunks (#534)
+            ? await SaveAsync(runId, MultivocalSearcher.AddressKey(record.Url), snapshot, text, HiddenTextRemoved.Of(0, fullText.HiddenParts), fullText.Hidden)
+            : await SaveAsync(runId, MultivocalSearcher.AddressKey(record.Url), snapshot, text);
     }
 
     /// <summary>
