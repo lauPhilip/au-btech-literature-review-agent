@@ -154,7 +154,7 @@ public static partial class ReviewWriter
             REQUIREMENTS:
             1. Write about {{paragraphs}} paragraph{{(paragraphs == 1 ? "" : "s")}} of synthesis, not a list of summaries: group {{ss}} that report the same thing, compare and contrast them, and name agreements, tensions and gaps within the theme. Separate paragraphs with a blank line.
             2. {{WhichSourcesRule(profile, theme.Sources)}}
-            3. Every sentence that states a finding, comparison or claim from the literature ends with an inline marker like [3] or [2, 5]. Attribute to a {{s}} only what its findings or excerpts above actually say; prefer the verified findings. Do not invent numbers, statistics or venue names.
+            3. Every sentence that states a finding, comparison or claim from the literature ends with an inline marker like [3] or [2, 5]. Attribute to a {{s}} only what its findings or excerpts above actually say; prefer the verified findings. Do not invent numbers, statistics or venue names. {{VerifiedFigureRule(profile)}}
             4. "heading" is a short subsection title for the theme (at most 10 words, no numbering).
             5. {{ReadingBasisRule(profile)}}
             6. {{ClaimPerCitationRule(profile)}}
@@ -170,7 +170,7 @@ public static partial class ReviewWriter
             using (LlmStage.Begin("theme-sections"))
             {
                 void Note(string message) => (coverage.WritingNotes ??= new()).Add(message);
-                var answer = await LlmJson.GetAsync<SectionAnswer>(chat, prompt, LlmJson.JsonMode(0.3), WithSoftGuard<SectionAnswer>(a =>
+                var answer = await LlmJson.GetAsync<SectionAnswer>(chat, prompt, LlmJson.JsonMode(0.3), WithSoftGuard(WithSoftGuard<SectionAnswer>(a =>
                 {
                     if (string.IsNullOrWhiteSpace(a.Text)) return "text must not be empty.";
                     var cited = ThematicSynthesis.CitedIn(a.Text);
@@ -178,7 +178,8 @@ public static partial class ReviewWriter
                     var outside = cited.Where(r => r < 1 || r > referenceCount).ToList();
                     if (outside.Count > 0) return $"citation numbers {string.Join(", ", outside)} are not in the reference list.";
                     return CitationLoadSendBack(a.Text, "subsection", Note);
-                }, a => ListingProblem(a.Text!, theme.Sources.Count, profile), "subsection", "a list of one-source summaries", Note), repairAttempts: 2);
+                }, a => ListingProblem(a.Text!, theme.Sources.Count, profile), "subsection", "a list of one-source summaries", Note),
+                    a => UnquantifiedFindingProblem(a.Text!, evidence), "subsection", "a result without its figures", Note), repairAttempts: 2);
                 text = MethodsSectionWriter.StripMarkdownEmphasis(answer.Text!.Trim());
                 // The heading is always the theme's name from the codebook, set in code, so the subsection, the overview
                 // and the evidence map name a theme the same way (issue #165). The model's own heading is not used.
