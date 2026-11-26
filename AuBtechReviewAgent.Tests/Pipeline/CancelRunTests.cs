@@ -112,6 +112,33 @@ public class CancelRunTests : IDisposable
     }
 
     [Fact]
+    public async Task ARunCancelledWhileFetchingFullTextsStopsThereInsteadOfFinishingEveryDownload()
+    {
+        _open.Set();
+        var fetching = new ManualResetEventSlim(false);
+        var never = new TaskCompletionSource<FullTextResult>(); // a download that would never end on its own
+        var engine = new PrismaReviewEngine("test-key", "", null, null, null, new RunsOptions { MaxConcurrentRuns = 1 })
+        {
+            WorkspaceRoot = _root,
+            ChatFactory = _ => new FakeChatService().RespondsWith(PipelineTests.Respond),
+            SourceFactory = _ => new PipelineTests.FakeSource(),
+            FullTextFetcher = (_, _) => { fetching.Set(); return never.Task; },
+        };
+        var runId = Guid.NewGuid();
+        string key = engine.ClaimRun(runId);
+        var run = engine.RunReviewAsync(runId, Request());
+        Assert.True(fetching.Wait(TimeSpan.FromSeconds(30)), "the run reached the full-text step");
+
+        Assert.True(engine.CancelRun(runId, key, "Too slow"));
+        await Assert.ThrowsAsync<RunCancelledException>(() => run.WaitAsync(TimeSpan.FromSeconds(20)));
+
+        var state = engine.LoadState(runId)!;
+        Assert.Equal(PrismaReviewEngine.StageCancelled, state.Stats.ProcessingStage);
+        Assert.Empty(state.FullTextSources);
+        Assert.False(File.Exists(Path.Join(_root, runId.ToString("N"), "prisma-report.json")));
+    }
+
+    [Fact]
     public async Task ARunWaitingForTheHumanCheckStopsWaiting()
     {
         _open.Set();
