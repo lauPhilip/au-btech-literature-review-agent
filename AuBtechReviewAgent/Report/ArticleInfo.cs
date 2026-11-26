@@ -50,6 +50,8 @@ public sealed record ArticleInfo
     public IReadOnlyList<string> Keywords { get; init; } = Array.Empty<string>();
     /// <summary>The report page, relative to the site (e.g. "spec-matrix/{id}").</summary>
     public string ReportPath { get; init; } = "";
+    /// <summary>False for a gallery copy, which outlives its run: the page then offers no link into the run's files.</summary>
+    public bool LinksToRun { get; init; } = true;
     public bool HasProtocol { get; init; }
 
     public string ArchivePath => $"api/workspace/{RunId}/archive";
@@ -168,7 +170,7 @@ public sealed record ArticleInfo
 
     /// <summary>The systematic review's front page, from its ledger and report.</summary>
     public static ArticleInfo ForSystematic(Guid runId, ReviewState? state, PrismaReport report, string title, string @abstract, bool hasProtocol,
-        VerdictTally? citations = null)
+        VerdictTally? citations = null, string? galleryPath = null)
     {
         var models = new[] { state?.RunSettings?.Model, state?.RunSettings?.FastModel }
             .Where(m => !string.IsNullOrWhiteSpace(m)).Select(m => m!.Trim()).Distinct(StringComparer.Ordinal).ToList();
@@ -197,7 +199,8 @@ public sealed record ArticleInfo
             Keywords = state == null ? Array.Empty<string>() : ArticleKeywords.From(state.SearchQuery,
                 state.SearchPerspectives.Count > 0 ? state.SearchPerspectives : new List<string> { state.SearchQuery },
                 state.ThematicSynthesis?.Themes.Select(t => t.Name)),
-            ReportPath = $"spec-matrix/{runId}",
+            ReportPath = galleryPath?.TrimStart('/') ?? $"spec-matrix/{runId}",
+            LinksToRun = galleryPath == null,
             HasProtocol = hasProtocol,
         };
     }

@@ -91,7 +91,10 @@ public class ResearchAnswer
 // Applied=false means the rewrite was rejected by a guard (for example it changed the length far
 // beyond a copy-edit) and the original text was kept; Note says why. PromptVersion is the language edit's prompt
 // (StylisticRefinerUtility.PromptVersion); empty for a part not sent to it and in runs made before it was recorded.
-public record StyleDeltaLog(string FieldName, string OriginalText, string RefinedText, bool Applied = true, string Note = "", string PromptVersion = "");
+// Before and After are the plain-English measurements of the text before the edit and of the text kept, and Flags the
+// long noun clusters, long paragraphs and long sentences left in the text kept (issue #599); null in older runs.
+public record StyleDeltaLog(string FieldName, string OriginalText, string RefinedText, bool Applied = true, string Note = "", string PromptVersion = "",
+    PlainEnglishMeasures? Before = null, PlainEnglishMeasures? After = null, List<string>? Flags = null);
 
 // One issue raised by the automated peer reviewer against a generated section.
 public record PeerReviewComment(string Section, string Severity, string Issue, string Suggestion);

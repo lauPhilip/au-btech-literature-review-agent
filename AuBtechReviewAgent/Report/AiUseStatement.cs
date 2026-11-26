@@ -90,11 +90,14 @@ public static class AiUseStatement
     public const string Purpose = "generate search phrasings, screen records, extract and appraise study data, draft the synthesis, check each citation against the cited paper and edit the language of the abstract and introduction";
 
     /// <summary>
-    /// The sentence on the language edit (once called the stylistic pass): the model rewrote the named parts for clear,
-    /// direct academic prose, and code kept a rewrite only when no number or citation changed. Shared with the multivocal paper.
+    /// The sentences on the language edit (once called the stylistic pass): the model rewrote the named parts into plain
+    /// technical English based on ASD-STE100, and code kept a rewrite only when it passed the checks of
+    /// <see cref="StylisticRefinerUtility.CheckRewrite"/> and <see cref="PlainEnglish.MaxSentenceWords"/>. It claims no
+    /// compliance with the standard (issue #599). Shared with the multivocal paper.
     /// </summary>
     public static string LanguageEdit(string parts) =>
-        $"The {parts} were then given a language edit by the model, for clear and direct prose; code kept an edit only when it changed no number and no citation, and the text before and after each edit is on file. ";
+        $"The {parts} were then given a language edit by the model into plain technical English (based on ASD-STE100). " +
+        $"Code kept an edit only when it changed no number, citation, quotation or technical name and left no sentence of more than {PlainEnglish.MaxSentenceWords} words; the text before and after each edit is on file. ";
 
     /// <summary>Who chose the artifact's content and what drew it; empty when the run built none.</summary>
     public static string ArtifactSentence(ReviewArtifact? artifact)

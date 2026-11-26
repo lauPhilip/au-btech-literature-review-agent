@@ -97,6 +97,7 @@ public static partial class PaperSelfCheck
             Id = "readability",
             Title = "Readability",
             Explanation = "The Flesch reading ease of each part: 60 and above is plain English, 30 to 60 is fairly hard, and academic prose mostly scores 10 to 40. " +
+                $"Each part also gives its mean sentence length, the share of its sentences over the {PlainEnglish.TargetSentenceWords}-word target of plain technical English and the share in the passive voice. " +
                 $"A part below {HardToRead.ToString(CultureInfo.InvariantCulture)} and any sentence of more than {LongSentenceWords} words are listed as notes, because they are hard to follow.",
         };
         var scores = new List<double>();
@@ -107,7 +108,8 @@ public static partial class PaperSelfCheck
             scores.Add(score);
             hard |= score < HardToRead;
             check.Evidence.Add(new(part.Name, part.Field, $"Reading ease {score.ToString("0", CultureInfo.InvariantCulture)}",
-                score >= 60 ? "Plain English." : score >= 30 ? "Fairly hard." : score >= HardToRead ? "Hard, as academic prose often is." : "Very hard to read."));
+                (score >= 60 ? "Plain English." : score >= 30 ? "Fairly hard." : score >= HardToRead ? "Hard, as academic prose often is." : "Very hard to read.") +
+                Measured(PlainEnglish.Measure(part.Text))));
         }
         int longOnes = 0;
         foreach (var part in input.Written)
@@ -121,7 +123,13 @@ public static partial class PaperSelfCheck
         check.Outcome = hard || longOnes > 0 ? CheckOutcome.Note : CheckOutcome.Pass;
         check.Summary = scores.Count == 0 ? "No written text to score."
             : $"Reading ease from {scores.Min().ToString("0", CultureInfo.InvariantCulture)} to {scores.Max().ToString("0", CultureInfo.InvariantCulture)} across {Plural(scores.Count, "part", "parts")}" +
+              (PlainEnglish.Measure(string.Join("\n\n", input.Written.Select(p => p.Text))) is { } all ? string.Create(CultureInfo.InvariantCulture,
+                  $"; mean sentence length {all.MeanSentenceWords:0.#} words, {all.ShareOver25Words:0%} of sentences over {PlainEnglish.TargetSentenceWords} words and {all.SharePassive:0%} in the passive voice") : "") +
               (longOnes > 0 ? $"; {Plural(longOnes, "sentence is", "sentences are")} longer than {LongSentenceWords} words." : ".");
         return check;
     }
+
+    /// <summary>The plain-English measurements of a text as one sentence after a space; empty for a text without sentences.</summary>
+    internal static string Measured(PlainEnglishMeasures? m) => m == null ? "" : string.Create(CultureInfo.InvariantCulture,
+        $" Mean sentence length {m.MeanSentenceWords:0.#} words; {m.ShareOver25Words:0%} of sentences over {PlainEnglish.TargetSentenceWords} words; {m.SharePassive:0%} in the passive voice.");
 }
