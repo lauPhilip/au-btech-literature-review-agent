@@ -39,6 +39,29 @@ public class MethodsSectionWriterTests
     }
 
     [Fact]
+    public void TheSearchTextNamesOnlyTheStringsThatRanAsInRun289a0d3e()
+    {
+        // Run 289a0d3e (#562): the text said all four strings ran against every source, but the last two never ran.
+        var strings = new[] { "agentic AI software frameworks", "autonomous multi-agent system frameworks", "agent orchestration error recovery", "evaluating framework fault tolerance" };
+        var yields = new[]
+        {
+            new SearchStringYield(strings[0], 6, 6, 5), new SearchStringYield(strings[1], 6, 6, 6),
+            new SearchStringYield(strings[2], 0, 0, 0), new SearchStringYield(strings[3], 0, 0, 0),
+        };
+        string text = MethodsSectionWriter.SearchStrategy(strings[0], strings, 2, 1, 0, 2020, 2026, 1, yields: yields);
+
+        Assert.DoesNotContain("run against every source", text);
+        Assert.Contains("\"autonomous multi-agent system frameworks\" was run against all 6 sources", text);
+        Assert.Contains("\"agent orchestration error recovery\" and \"evaluating framework fault tolerance\" were not run, because every source had already filled its cap", text);
+        Assert.Contains("the search strings added 5, 6 records not found by an earlier string, so the last string that was run still added new records", text);
+        Assert.Contains("Duplicates and records outside the year range did not count towards this limit", text);
+
+        var partly = new[] { yields[0], yields[1], new SearchStringYield(strings[2], 2, 2, 2), yields[3] };
+        Assert.Contains("\"agent orchestration error recovery\" was run against 2 of the 6 sources, as the others had already filled their cap",
+            MethodsSectionWriter.SearchStrategy(strings[0], strings, 2, 1, 0, yields: partly));
+    }
+
+    [Fact]
     public void SelectionProcessNeverClaimsHumanScreening()
     {
         var stats = new ReviewStats { Screened = 5, Included = 4, Excluded = 1 };

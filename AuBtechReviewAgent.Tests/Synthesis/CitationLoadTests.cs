@@ -113,4 +113,18 @@ public class CitationLoadTests
         Assert.Null(guard("a"));
         Assert.Equal(new[] { "The subsection was sent back for a list (1 of 2): it lists", "The subsection was sent back for a list (2 of 2): it lists", "The subsection was kept after 2 send-backs with a list: it lists" }, notes);
     }
+
+    [Fact]
+    public void SoftChecksShareOneBudgetAndHardOnesAlwaysSendBack()
+    {
+        var notes = new List<string>();
+        var guard = ReviewWriter.WithSoftGuards<string>(a => a == "hard" ? "hard problem" : null, "step", notes.Add, 2,
+            (a => "first problem", "the first"), (a => "second problem", "the second"));
+        Assert.Equal("first problem", guard("x"));
+        Assert.Equal("first problem", guard("x"));
+        Assert.Null(guard("x")); // the budget of two is shared: the second check does not get two more
+        Assert.Equal("hard problem", guard("hard"));
+        Assert.Equal(new[] { "The step was sent back for the first (1 of 2): first problem", "The step was sent back for the first (2 of 2): first problem",
+            "The step was kept after 2 send-backs with the first: first problem", "The step was kept after 2 send-backs with the second: second problem" }, notes);
+    }
 }

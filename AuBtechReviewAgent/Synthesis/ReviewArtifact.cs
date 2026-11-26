@@ -22,6 +22,11 @@ public class ArtifactEdge
     public string From { get; set; } = "";
     public string To { get; set; } = "";
     public string Label { get; set; } = "";
+    /// <summary>
+    /// What the link check found (<see cref="ArtifactLinks"/>): "supported" when a study cited by both boxes states the
+    /// link, "reading" when none does and the link is the review's own reading (drawn dashed); empty on runs from before the check.
+    /// </summary>
+    public string Check { get; set; } = "";
 }
 
 /// <summary>

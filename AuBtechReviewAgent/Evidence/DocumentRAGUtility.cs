@@ -26,34 +26,30 @@ public record FullTextResult(IReadOnlyList<DocumentChunk> Chunks, string Source,
     public string Hidden { get; init; } = "";
 }
 
-public static class DocumentRAGUtility
+public static partial class DocumentRAGUtility
 {
     /// <summary>PDFs larger than this are not downloaded (a download used to have no size limit at all).</summary>
     public const long MaxPdfBytes = 40L * 1024 * 1024;
 
-    private static readonly HttpClient _client = CreateClient();
     private static readonly ILogger _log = AppLog.For("DocumentRAGUtility");
-
-    private static HttpClient CreateClient()
-    {
-        var client = new HttpClient { Timeout = TimeSpan.FromSeconds(45) };
-        client.DefaultRequestHeaders.UserAgent.ParseAdd(OpenSourceHttp.UserAgent);
-        return client;
-    }
 
     /// <summary>
     /// Finds a legal full text for the paper, downloads it and splits it into page-tagged chunks. Tried in
     /// order: arXiv; the open-access PDF link the source reported (OpenAlex, Semantic Scholar, Crossref);
-    /// Unpaywall by DOI. Returns no chunks (and says why) when none is available.
+    /// Unpaywall by DOI. Returns no chunks (and says why) when none is available. The PDF is kept under
+    /// <see cref="FullTextFile.PdfName(AcademicPaper)"/>, with a record of what it is beside it. <paramref name="cancel"/>
+    /// stops the downloads and the reading when the run is cancelled (#588).
     /// </summary>
-    public static async Task<FullTextResult> IngestAndChunkPaperAsync(AcademicPaper paper, string targetDir, string contactEmail = "")
+    public static async Task<FullTextResult> IngestAndChunkPaperAsync(AcademicPaper paper, string targetDir, string contactEmail = "",
+        CancellationToken cancel = default)
     {
         if (string.IsNullOrWhiteSpace(targetDir)) return new FullTextResult(Array.Empty<DocumentChunk>(), "none", null);
         Directory.CreateDirectory(targetDir);
 
-        string sanitizedName = Regex.Replace(paper.Title ?? "paper", @"[^a-zA-Z0-9]", "_");
-        if (sanitizedName.Length > 50) sanitizedName = sanitizedName.Substring(0, 50);
-        string pdfPath = Path.Join(targetDir, $"{sanitizedName}.pdf");
+        // Named by a key of the paper's own (#587); an older run's copy under its title is read, never written.
+        string pdfPath = Path.Join(targetDir, FullTextFile.PdfName(paper));
+        string legacyPath = Path.Join(targetDir, PdfFileName(paper.Title));
+        if (!File.Exists(pdfPath) && File.Exists(legacyPath)) pdfPath = legacyPath;
         string sourceId = ChunkSourceId(paper.Id);
 
         var candidates = new List<(string Label, string Url)>();
@@ -70,26 +66,35 @@ public static class DocumentRAGUtility
         {
             foreach (var (candidateLabel, url) in candidates)
             {
-                if (await TryDownloadPdfAsync(url, pdfPath)) { label = candidateLabel; usedUrl = url; break; }
+                if (await TryDownloadPdfAsync(url, pdfPath, cancel: cancel)) { label = candidateLabel; usedUrl = url; break; }
             }
+            cancel.ThrowIfCancellationRequested();
             if (usedUrl == null && zenodoRecord != null)
             {
                 string? zenodoUrl = await FindZenodoPdfAsync(zenodoRecord);
-                if (zenodoUrl != null && await TryDownloadPdfAsync(zenodoUrl, pdfPath)) { label = "Zenodo"; usedUrl = zenodoUrl; }
+                if (zenodoUrl != null && await TryDownloadPdfAsync(zenodoUrl, pdfPath, cancel: cancel)) { label = "Zenodo"; usedUrl = zenodoUrl; }
             }
+            cancel.ThrowIfCancellationRequested();
             if (usedUrl == null && !string.IsNullOrWhiteSpace(paper.Doi) && !string.IsNullOrWhiteSpace(contactEmail) && UnpaywallKnows(paper.Doi!))
             {
-                string? oaUrl = await FindUnpaywallPdfAsync(paper.Doi!, contactEmail);
-                if (oaUrl != null && await TryDownloadPdfAsync(oaUrl, pdfPath)) { label = "Unpaywall"; usedUrl = oaUrl; }
+                string? answer = await AskUnpaywallAsync(paper.Doi!, contactEmail);
+                string? oaUrl = answer == null ? null : ParseUnpaywallPdfUrl(answer);
+                if (oaUrl != null && await TryDownloadPdfAsync(oaUrl, pdfPath, cancel: cancel))
+                {
+                    label = "Unpaywall";
+                    usedUrl = oaUrl;
+                    SaveUnpaywallAnswer(targetDir, paper.Doi!, answer!);
+                }
             }
         }
         else
         {
             label = "already downloaded";
         }
+        if (usedUrl != null) FullTextFile.WriteRecord(targetDir, paper, usedUrl);
 
         if (!File.Exists(pdfPath)) return new FullTextResult(Array.Empty<DocumentChunk>(), candidates.Count == 0 && string.IsNullOrWhiteSpace(contactEmail) ? "none (no open-access copy known)" : "none (no legal open-access PDF found)", null);
-        var pdf = ReadPdf(pdfPath, sourceId);
+        var pdf = ReadPdf(pdfPath, sourceId, cancel);
         return new FullTextResult(pdf.Chunks, label, usedUrl) { HiddenParts = pdf.HiddenParts, Hidden = pdf.Hidden };
     }
 
@@ -98,41 +103,6 @@ public static class DocumentRAGUtility
     {
         string token = paperId.Contains('/') ? paperId.Split('/').Last() : paperId;
         return Regex.Replace(token, @"[^a-zA-Z0-9\.\-]", "_");
-    }
-
-    // DOI prefixes registered with DataCite rather than Crossref. Unpaywall only covers Crossref DOIs, so it
-    // answers 404 for these every time: Zenodo, figshare, arXiv, OSF, Dryad.
-    private static readonly string[] DataCitePrefixes = { "10.5281/", "10.6084/", "10.48550/", "10.31219/", "10.17605/", "10.5061/" };
-
-    /// <summary>False for DOIs Unpaywall cannot know (DataCite DOIs such as Zenodo's), so they are not looked up.</summary>
-    public static bool UnpaywallKnows(string doi) =>
-        !DataCitePrefixes.Any(p => doi.Trim().StartsWith(p, StringComparison.OrdinalIgnoreCase));
-
-    // DOIs Unpaywall did not know in this process, so the same paper is not looked up again (extraction and
-    // the citation check both ask for the full text).
-    private static readonly ConcurrentDictionary<string, bool> UnpaywallMisses = new(StringComparer.OrdinalIgnoreCase);
-
-    /// <summary>Unpaywall (unpaywall.org) lists legal open-access copies of papers by DOI.</summary>
-    public static async Task<string?> FindUnpaywallPdfAsync(string doi, string contactEmail)
-    {
-        if (UnpaywallMisses.ContainsKey(doi.Trim())) return null;
-        try
-        {
-            string json = await OpenSourceHttp.GetStringAsync($"https://api.unpaywall.org/v2/{Uri.EscapeDataString(doi.Trim())}?email={Uri.EscapeDataString(contactEmail.Trim())}");
-            return ParseUnpaywallPdfUrl(json);
-        }
-        catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
-        {
-            // Normal: Unpaywall does not have every DOI. Not worth a line in the log at the default level.
-            UnpaywallMisses.TryAdd(doi.Trim(), true);
-            _log.LogDebug("Unpaywall does not know {Doi}", doi);
-            return null;
-        }
-        catch (Exception ex)
-        {
-            _log.LogInformation("Unpaywall lookup for {Doi} failed: {Message}", doi, ex.Message);
-            return null;
-        }
     }
 
     /// <summary>The Zenodo record number in a Zenodo DOI ("10.5281/zenodo.18448272" gives "18448272"), or null.</summary>
@@ -180,88 +150,15 @@ public static class DocumentRAGUtility
         return null;
     }
 
-    public static string? ParseUnpaywallPdfUrl(string json)
-    {
-        using var doc = JsonDocument.Parse(json);
-        var root = doc.RootElement;
-        if (root.TryGetProperty("best_oa_location", out var best) && best.ValueKind == JsonValueKind.Object
-            && best.TryGetProperty("url_for_pdf", out var pdf) && pdf.ValueKind == JsonValueKind.String && !string.IsNullOrWhiteSpace(pdf.GetString()))
-            return pdf.GetString();
-        if (root.TryGetProperty("oa_locations", out var locs) && locs.ValueKind == JsonValueKind.Array)
-            foreach (var l in locs.EnumerateArray())
-                if (l.TryGetProperty("url_for_pdf", out var p) && p.ValueKind == JsonValueKind.String && !string.IsNullOrWhiteSpace(p.GetString()))
-                    return p.GetString();
-        return null;
-    }
-
     /// <summary>
-    /// Streams the download with a hard size limit and keeps it only if it really is a PDF ("%PDF" header),
-    /// so an HTML login page or an oversized file never reaches the PDF parser.
+    /// Extracts the visible text page by page and splits it into 600-character chunks with 100 characters of overlap.
+    /// <paramref name="cancel"/> stops it between pages when the run is cancelled.
     /// </summary>
-    public static async Task<bool> TryDownloadPdfAsync(string url, string targetPath, long maxBytes = MaxPdfBytes)
-    {
-        if (!Uri.TryCreate(url, UriKind.Absolute, out var uri) || (uri.Scheme != "https" && uri.Scheme != "http")) return false;
-        string tmp = targetPath + ".part";
-        try
-        {
-            using var response = await _client.GetAsync(uri, HttpCompletionOption.ResponseHeadersRead);
-            if (!response.IsSuccessStatusCode) return false;
-            if (response.Content.Headers.ContentLength is long len && len > maxBytes) return false;
+    public static List<DocumentChunk> ChunkPdf(string pdfPath, string sourceId, CancellationToken cancel = default) =>
+        ReadPdf(pdfPath, sourceId, cancel).Chunks;
 
-            await using (var input = await response.Content.ReadAsStreamAsync())
-            await using (var output = File.Create(tmp))
-            {
-                if (!await CopyWithLimitAsync(input, output, maxBytes)) { output.Close(); File.Delete(tmp); return false; }
-            }
-
-            if (!LooksLikePdf(tmp)) { File.Delete(tmp); return false; }
-            File.Move(tmp, targetPath, overwrite: true);
-            return true;
-        }
-        catch (Exception ex)
-        {
-            _log.LogInformation("PDF download from {Host} failed: {Message}", uri.Host, ex.Message);
-            try { if (File.Exists(tmp)) File.Delete(tmp); }
-            catch (Exception cleanupEx)
-            {
-                // A leftover .tmp file is ignored by the archive and removed with the run folder.
-                _log.LogDebug("Could not delete a partial download: {Message}", cleanupEx.Message.Replace("\r", " ").Replace("\n", " "));
-            }
-            return false;
-        }
-    }
-
-    /// <summary>
-    /// Copies at most <paramref name="maxBytes"/>; false when the input is longer. <paramref name="cancel"/> stops a
-    /// slow body (the web page fetcher's deadline); by default nothing stops it, as the PDF download has always worked.
-    /// </summary>
-    public static async Task<bool> CopyWithLimitAsync(Stream input, Stream output, long maxBytes, CancellationToken cancel = default)
-    {
-        var buffer = new byte[81920];
-        long total = 0;
-        int read;
-        while ((read = await input.ReadAsync(buffer, cancel)) > 0)
-        {
-            total += read;
-            if (total > maxBytes) return false;
-            await output.WriteAsync(buffer.AsMemory(0, read), cancel);
-        }
-        return true;
-    }
-
-    public static bool LooksLikePdf(string path)
-    {
-        using var fs = File.OpenRead(path);
-        var head = new byte[1024];
-        int n = fs.Read(head, 0, head.Length);
-        return Encoding.ASCII.GetString(head, 0, n).Contains("%PDF-");
-    }
-
-    /// <summary>Extracts the visible text page by page and splits it into 600-character chunks with 100 characters of overlap.</summary>
-    public static List<DocumentChunk> ChunkPdf(string pdfPath, string sourceId) => ReadPdf(pdfPath, sourceId).Chunks;
-
-    /// <summary>The chunks of the text a reader sees (<see cref="PdfVisibleText"/>), and the hidden runs taken out of it.</summary>
-    public static (List<DocumentChunk> Chunks, int HiddenParts, string Hidden) ReadPdf(string pdfPath, string sourceId)
+    /// <summary>The chunks of the text a reader sees (<see cref="PdfVisibleText"/>), and the hidden runs taken out of it (#534).</summary>
+    public static (List<DocumentChunk> Chunks, int HiddenParts, string Hidden) ReadPdf(string pdfPath, string sourceId, CancellationToken cancel = default)
     {
         var chunks = new List<DocumentChunk>();
         var hidden = new StringBuilder();
@@ -271,6 +168,7 @@ public static class DocumentRAGUtility
             using PdfDocument document = PdfDocument.Open(pdfPath);
             foreach (var (number, visible) in PdfVisibleText.Pages(document))
             {
+                cancel.ThrowIfCancellationRequested();
                 parts += visible.HiddenParts;
                 if (visible.Hidden.Length > 0) hidden.Append(visible.Hidden).Append('\n');
                 string pageText = Regex.Replace(visible.Text.Trim(), @"\s+", " ");
@@ -289,7 +187,7 @@ public static class DocumentRAGUtility
                 }
             }
         }
-        catch (Exception ex)
+        catch (Exception ex) when (!cancel.IsCancellationRequested)
         {
             _log.LogInformation("Could not read PDF {File}: {Message}", Path.GetFileName(pdfPath), ex.Message);
         }

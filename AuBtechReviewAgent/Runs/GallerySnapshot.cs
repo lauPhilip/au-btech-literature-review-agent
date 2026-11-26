@@ -12,6 +12,8 @@ namespace AuBtechReviewAgent;
 /// again, with the print layout of the day, after the run is gone. The reviewer's notes (reviewer-notes.json), the
 /// edit key's record (owner.json) and the model call log (llm-calls.json, which holds every prompt with the papers'
 /// text) are never copied, and nor are the downloaded papers or the raw database answers, which are in sub-folders.
+/// The gallery is public, so the copy follows the public-copy rules (<see cref="PublicCopy"/>): no abstracts from
+/// licensed databases and short quotes, with public-copy.json saying what was shortened.
 /// </summary>
 public static class GallerySnapshot
 {
@@ -77,6 +79,27 @@ public static class GallerySnapshot
             Keywords = keywords,
             Fingerprint = GalleryFingerprint.Of(string.IsNullOrWhiteSpace(header.Card) ? ReviewMethod.SystematicKey : header.Card, topic, questions),
         };
+    }
+
+    /// <summary>Makes a fresh copy public before it is shown: abstracts and quotes as <see cref="PublicCopy"/> allows.</summary>
+    public static PublicCopyRecord MakePublic(string copyFolder) => PublicCopy.ApplyToFolder(copyFolder, GalleryEntry.FileName);
+
+    /// <summary>
+    /// Copies taken before the public-copy rules hold every abstract and full quotes; each copy without public-copy.json
+    /// is made public once, when the gallery starts. Returns how many copies were changed.
+    /// </summary>
+    public static int MakeOlderCopiesPublic(string galleryRoot)
+    {
+        if (!Directory.Exists(galleryRoot)) return 0;
+        int changed = 0;
+        foreach (var ledger in Directory.EnumerateFiles(galleryRoot, LedgerFile, SearchOption.AllDirectories))
+        {
+            string folder = Path.GetDirectoryName(ledger)!;
+            if (Path.GetFileName(folder).StartsWith('.') || File.Exists(Path.Join(folder, PublicCopy.RecordFile))) continue;
+            MakePublic(folder);
+            changed++;
+        }
+        return changed;
     }
 
     /// <summary>A copied run's ledger, for the report page drawn from the gallery; null when it cannot be read.</summary>

@@ -107,7 +107,7 @@ public class SeedChainingTests : PipelineFeatureRun
         using var archive = new ZipArchive(new MemoryStream(engine.GenerateWorkspaceArchiveFromDisk(runId)));
         using var reader = new StreamReader(archive.GetEntry("main.tex")!.Open());
         string tex = reader.ReadToEnd();
-        Assert.Matches(@"Table A\.\d: Seed studies for citation chaining", tex);
+        Assert.Matches(@"\\caption\{Seed studies for citation chaining\}\\label\{tab:A\.\d\}", tex);
         Assert.Contains("Agent tool use & 2025 & 300 &", tex);
     }
 

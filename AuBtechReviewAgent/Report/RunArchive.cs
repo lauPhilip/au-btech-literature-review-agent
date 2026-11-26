@@ -102,7 +102,9 @@ public static class RunArchive
         {
             string filename = Path.GetFileName(file);
             if (rootFiles.Contains(filename, StringComparer.OrdinalIgnoreCase)) continue;
-            if (filename.EndsWith(".json", StringComparison.OrdinalIgnoreCase) || filename.EndsWith(".tmp", StringComparison.OrdinalIgnoreCase)) continue;
+            // A PDF's record (FullTextFile) says which paper the file is, so it goes in beside it; other JSON is the run's own.
+            if ((filename.EndsWith(".json", StringComparison.OrdinalIgnoreCase) && !FullTextFile.IsRecordFile(filename))
+                || filename.EndsWith(".tmp", StringComparison.OrdinalIgnoreCase)) continue;
             yield return (file, $"{SourceTextsFolder}/{filename}");
         }
         // What each source returned, exactly as received.

@@ -41,16 +41,13 @@ public class ScreeningOutcomeTests : IDisposable
     }
 
     [Fact]
-    public void TheScreeningPromptVersionIsUnchanged() => Assert.Equal("screening-v6", PrismaReviewEngine.ScreeningPromptVersion);
-
-    [Fact]
     public async Task CachedAnswersAreFoundUnderTheExactKeys()
     {
         var cache = new ReviewCache(new CacheOptions { Folder = Path.Join(_root, "cache") }, _root);
         var paper = new AcademicPaper("CACHED_1", "Agent cached paper", "An abstract about agents.", "Published: 2025", new() { "Jane Doe", "Kim Lee" }, "Future Internet");
         cache.Set("search", ReviewCache.Key("search-v1", "Google Scholar Gateway", "agent loops", "3"),
             new { Papers = new List<AcademicPaper> { paper }, Raw = new List<string> { "{\"cached\":true}" } });
-        string ScreeningKey(string screener, string model) => ReviewCache.Key("screening-v6", PrismaReviewEngine.ScreeningTemplateSha256(screener == "second"), screener, model, Inclusion, Exclusion,
+        string ScreeningKey(string screener, string model) => ReviewCache.Key(PrismaReviewEngine.ScreeningPromptVersion, PrismaReviewEngine.ScreeningTemplateSha256(screener == "second"), screener, model, Inclusion, Exclusion,
             paper.Title, paper.Abstract, paper.JournalSource, paper.PublishedDate, "Jane Doe;Kim Lee");
         cache.Set("screening", ScreeningKey("first", "mistral-large-latest"),
             new ScreeningAnswer { Decision = "Included", Reasoning = "cached first", BriefSummary = "cached", Confidence = "high" });

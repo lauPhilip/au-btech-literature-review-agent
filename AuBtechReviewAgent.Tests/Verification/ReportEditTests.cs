@@ -128,11 +128,12 @@ public class ReportEditTests : IDisposable
     {
         var (engine, runId, key) = await OwnedRun();
         string original = MainTex(engine, runId);
-        Assert.Contains("Recovery and audits complement each other [1, 2].", original);
+        // main.tex cites with \cite and the keys of references.bib (issue #537).
+        Assert.Matches(@"Recovery and audits complement each other~\\cite\{[^,}]+,[^,}]+\}\.", original);
 
         await engine.EditReportSentenceAsync(runId, "discussionItem", 0, NewSentence, editKey: key);
         string edited = MainTex(engine, runId);
-        Assert.Contains(NewSentence, edited);
+        Assert.Matches(@"Supervisor checks let agent loops recover from faults~\\cite\{[^,}]+\}\.", edited);
         Assert.DoesNotContain("Recovery and audits complement each other", edited);
         Assert.Contains("After the run, the reviewer edited 1 sentence of the generated text.", edited);
         Assert.Contains("1 supported, 0 partly supported and 0 not supported", edited);

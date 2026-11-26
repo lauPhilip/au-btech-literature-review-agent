@@ -50,7 +50,7 @@ The request pipeline then adds, in order: forwarded headers (for a reverse proxy
 | component | `RunSummaryCard.razor` | The Done state: what a finished run produced (studies, records, themes, studies cited), the citation verdicts as a stacked bar, the way into the report and every file from the run |
 | component | `ScreeningReviewPanel.razor` | The include/exclude list shown while a run waits for review |
 | component | `PrismaFunnel.razor` | The funnel on the dashboard, with "show" links for removed records |
-| `GET /api/workspace/{id}/archive` | `Web/WorkspaceDownloads.cs` | The run archive as a zip; a finished run's archive is kept (`Report/RunArchiveCache.cs`) |
+| `GET /api/workspace/{id}/archive` | `Web/WorkspaceDownloads.cs` | The run archive as a zip; a finished run's archive is kept (`Report/RunArchiveCache.cs`). `/deposit` (`Web/DepositDownload.cs`) gives the archive to share on Zenodo or OSF (page 5) |
 | `GET /api/workspace/{id}/references.bib` / `.ris` | `Web/WorkspaceDownloads.cs` | The included studies for reference managers |
 | `GET /api/workspace/{id}/protocol.md` | `Web/WorkspaceDownloads.cs` | The protocol, linked from Review Output |
 

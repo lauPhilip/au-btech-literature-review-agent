@@ -16,7 +16,7 @@ public class MultivocalWritingTests
     private const string KeptA = "We keep a running summary of the conversation.\n\nOur agents are built with LangGraph, which keeps state between steps.";
     private const string KeptB = "Retrieval brings in only the documents the agent needs. We also summarise old turns.";
 
-    private static string? Kept(PageSnapshot page) => page.TextFile switch { "a.txt" => KeptA, "b.txt" => KeptB, _ => null };
+    internal static string? Kept(PageSnapshot page) => page.TextFile switch { "a.txt" => KeptA, "b.txt" => KeptB, _ => null };
 
     internal static string Respond(string prompt)
     {
@@ -226,8 +226,8 @@ public class MultivocalWritingTests
         Assert.True(tex.IndexOf(@"\section{Conclusion}") > tex.IndexOf(@"\section{Summary for practitioners}"));
         Assert.True(tex.IndexOf(@"\subsection{Answers to the research questions}") < tex.IndexOf(@"\subsection{Interpretation}"));
         Assert.Contains("the answers to the research questions and the discussion", built.Declarations[0].Text);
-        Assert.Contains(@"\item Keep a running summary of the conversation [1, 2].", tex);
-        Assert.Contains(@"\bibitem{ref3}", tex);
+        Assert.Contains(@"\item Keep a running summary of the conversation~\cite{ana2025keeping,acme2026retrieval}.", tex);
+        Assert.Equal(3, CountOf(tex, @"\bibitem{")); // each with the key of the same source in references.bib
         Assert.Equal(CountOf(tex, @"\begin{"), CountOf(tex, @"\end{"));
 
         // The summary is shown one item per paragraph; its sentences are the ones the check numbered.

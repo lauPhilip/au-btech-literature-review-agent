@@ -14,10 +14,12 @@ public class FileLengthTests
 
     private static readonly string[] Binary = { ".png", ".jpg", ".gif", ".ico", ".woff2", ".pdf" };
 
-    // Downloaded SCImago rankings, the generated npm lock file, vendored libraries and the compiled stylesheet.
+    // Downloaded SCImago rankings, the generated npm lock file, vendored libraries, the compiled stylesheet and the
+    // golden files the tests write (UPDATE_GOLDEN=1), such as a whole main.tex.
     private static readonly string[] Exceptions =
     {
         "AuBtechReviewAgent/ScimagoData/", "AuBtechReviewAgent/package-lock.json", "/wwwroot/lib/", "/wwwroot/css/tailwind.css",
+        "AuBtechReviewAgent.Tests/Report/Golden/",
     };
 
     private static string? Root()

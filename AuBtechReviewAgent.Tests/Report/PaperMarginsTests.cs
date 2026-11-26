@@ -34,17 +34,19 @@ public class PaperMarginsTests
         Assert.DoesNotContain("margin=0.8in", tex);
         Assert.Contains(@"\setlength{\emergencystretch}{2em}", tex);
         Assert.Contains(@"\usepackage{adjustbox}", tex);
-        // No space before the abstract's box: the line ends in "%" (it pushed the box 2.5 pt into the margin).
-        Assert.Contains(@"\noindent\colorbox{black!4}{%", tex);
-        Assert.Contains(@"\parbox{\dimexpr\linewidth-2\fboxsep\relax}{%", tex);
+        // The abstract is LaTeX's own environment, inside the margins (issue #537; before, a box pushed into them).
+        Assert.Contains(@"\begin{abstract}", tex);
+        Assert.Contains(@"\usepackage{xurl}", tex);
     }
 
     [Fact]
-    public void ALongAddressMayBreakAtItsSeparators()
+    public void ALongAddressIsALinkThatMayBreakAnywhere()
     {
         string escaped = PaperLatex.Escape("https://github.com/agentscope-ai/agentscope_runtime?tab=readme#start");
 
-        Assert.Equal(@"https://\allowbreak{}github.\allowbreak{}com/\allowbreak{}agentscope-ai/\allowbreak{}agentscope\_\allowbreak{}runtime?\allowbreak{}tab=\allowbreak{}readme\#\allowbreak{}start", escaped);
+        // \url takes the address as it is and xurl may break it anywhere; "#" and "%" carry a backslash, so the link
+        // also works inside a table or a caption.
+        Assert.Equal(@"\url{https://github.com/agentscope-ai/agentscope_runtime?tab=readme\#start}", escaped);
     }
 
     [Fact]
@@ -68,7 +70,7 @@ public class PaperMarginsTests
     {
         string tex = PaperLatex.Build(LongWordsPaper());
 
-        Assert.Contains(@"\bibitem{ref2} Ana (2025). A study. \textit{Journal}. https://\allowbreak{}doi.\allowbreak{}org/\allowbreak{}10.\allowbreak{}1109/\allowbreak{}ASEW67777.\allowbreak{}2025.\allowbreak{}00063", tex);
+        Assert.Contains(@"\bibitem{ref2} Ana (2025). A study.\ \textit{Journal}.\ \url{https://doi.org/10.1109/ASEW67777.2025.00063}", tex);
         Assert.Contains("https://doi.org/10.1109/ASEW67777.2025.00063", tex.Replace(LatexBreaks.Break, ""));
     }
 

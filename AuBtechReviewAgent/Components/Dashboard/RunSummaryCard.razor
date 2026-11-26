@@ -122,6 +122,7 @@
             @(FileRow("References", "The included studies as BibTeX or RIS", ($"{api}/references.bib", "BibTeX", "the references"), ($"{api}/references.ris", "RIS", "the references")))
             @(FileRow("Screened records", "Every record with its decision, as RIS", ($"{api}/screened.ris", "Download", "the screened records")))
             @(FileRow("Verifiable archive", "Every file fingerprinted, with the LaTeX manuscript", ($"{api}/archive", "Download", "the archive")))
+            @(FileRow("Archive to share", "For Zenodo or OSF, without the papers and records that may not be shared", ($"{api}/deposit", "Download", "the archive to share")))
         </ul>
     };
 

@@ -14,7 +14,7 @@ public partial class PrismaReviewEngine
     /// Part of the screening cache key: change it whenever a screening prompt changes, so decisions made
     /// with an older prompt are never reused.
     /// </summary>
-    public const string ScreeningPromptVersion = "screening-v6";
+    public const string ScreeningPromptVersion = "screening-v7";
 
     private sealed record ScreeningOutcome(
         AcademicPaper Paper,
@@ -186,6 +186,8 @@ public partial class PrismaReviewEngine
             Uncertain = uncertain,
             FromCache = o.CacheHits > 0 && o.CacheHits == (second == null ? 1 : 2),
             ExclusionReason = decision == "Excluded" ? first.ExclusionReason ?? second?.ExclusionReason ?? ExclusionReasons.Unspecified : null,
+            CriteriaParts = first.CriteriaParts,
+            SecondCriteriaParts = second?.CriteriaParts,
         });
     }
 

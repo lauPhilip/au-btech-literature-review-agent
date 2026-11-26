@@ -19,6 +19,7 @@ The wiki describes the design as it is in the repository. When you change how so
 | [9. The API and the MCP server](09-api-and-mcp.md) | How another tool starts a review with its own key and follows it, the limits, and why the key is never written |
 | [10. Limits against overload and abuse](10-limits-and-abuse.md) | What one address may do per minute and per hour, how uploads and live connections are capped, the hidden field that stops form bots, and the options for a CAPTCHA |
 | [11. Compliance](11-compliance.md) | How every report says, to a reader and to a machine, that it is AI-generated (EU AI Act Art. 50), and where the privacy and accessibility statements are |
+| [12. Thematic synthesis and the answers](12-thematic-synthesis.md) | How findings become codes and themes, how each theme, the discussion and the closing sections are written and checked, and how every research question gets an answer |
 
 ## The project in one paragraph
 

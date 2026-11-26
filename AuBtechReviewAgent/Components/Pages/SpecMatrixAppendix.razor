@@ -26,6 +26,10 @@
                             <td class="p-2 font-mono text-heading font-bold border-r border-line align-top">[@paperRow.ReferenceNumber]</td>
                             <td class="p-2 border-r border-line align-top break-words">
                                 <span class="font-semibold text-ink">@paperRow.Title</span>
+                                @if (!string.IsNullOrEmpty(paperRow.IntegrityNote))
+                                {
+                                    <span class="block text-xs text-not-supported">@paperRow.IntegrityNote</span>
+                                }
                                 @StudyLinks(paperRow)
                                 @Page.StudyNote(paperRow.ReferenceNumber)
                             </td>
@@ -33,6 +37,7 @@
                             <td class="p-2 text-muted border-r border-line align-top font-light text-xs break-words">@paperRow.InclusionRationale</td>
                             <td class="p-2 border-r border-line align-top text-center font-mono font-medium text-xs">
                                 <span class="px-1.5 py-0.5 @badgeClass">@AuBtechReviewAgent.PrismaReviewEngine.CategoryLabel(paperRow.Category)</span>
+                                <span class="block text-xs text-muted">@AuBtechReviewAgent.PrismaReviewEngine.VenueRank(paperRow)</span>
                             </td>
                             <td class="p-2 font-mono text-xs text-muted bg-soft align-top leading-normal break-all"><ApaReference Text="@paperRow.ApaCitation" /></td>
                         </tr>
@@ -40,6 +45,7 @@
                 </tbody>
             </table>
         </div>
+        <p class="text-xs text-muted">@AuBtechReviewAgent.PrismaReviewEngine.VenueRankNote</p>
     </div>
 
     @if (Page.extractions.Count > 0)
@@ -68,7 +74,14 @@
                                 }
                                 else
                                 {
-                                    <td class="p-2 border-r border-line align-top">@e.StudyType<span class="block text-xs text-muted">@e.EvidenceBasis</span></td>
+                                    <td class="p-2 border-r border-line align-top">
+                                        @e.StudyType
+                                        @if (AuBtechReviewAgent.SecondaryStudy.KindOf(e) is { } secondaryKind)
+                                        {
+                                            <span class="block text-xs font-semibold">Secondary study: @secondaryKind</span>
+                                        }
+                                        <span class="block text-xs text-muted">@e.EvidenceBasis</span>
+                                    </td>
                                     <td class="p-2 border-r border-line align-top">@Evidence(e.Method)</td>
                                     <td class="p-2 border-r border-line align-top">@Evidence(e.Sample)</td>
                                     <td class="p-2 align-top space-y-1">
@@ -84,6 +97,10 @@
                 </table>
             </div>
             <p class="text-xs text-muted">Hover over a value to see the quote it was taken from. <span class="text-partly">†</span> The quote could not be found in the paper's text, so treat the value with caution.</p>
+            @if (Page.extractions.Any(x => AuBtechReviewAgent.SecondaryStudy.KindOf(x) != null))
+            {
+                <p class="text-xs text-muted">@AuBtechReviewAgent.PrismaReviewEngine.SecondaryNote</p>
+            }
         </div>
 
         <div class="space-y-2 pt-2 max-w-full overflow-hidden">

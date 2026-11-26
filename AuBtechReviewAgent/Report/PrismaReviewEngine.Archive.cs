@@ -90,9 +90,8 @@ public partial class PrismaReviewEngine
             resultsLatex.Add(EvidenceMapTable(book));
         if (report.Artifact is { Error: null } artifact)
             resultsLatex.Add(ArtifactLatex(artifact));
-        // The certainty table takes the next number of the results' tables (4.1 the evidence map, 4.2 a table artifact).
-        int resultTables = resultsLatex.Count(b => b.Contains(@"\textbf{Table 4.", StringComparison.Ordinal));
-        if (certainty != null) resultsLatex.Add(CertaintyLatex.Table(certainty, $"4.{resultTables + 1}"));
+        // The certainty table is numbered by LaTeX after the evidence map and a table artifact.
+        if (certainty != null) resultsLatex.Add(CertaintyLatex.Table(certainty));
         if (!string.IsNullOrEmpty(tikzDiagramCode))
             resultsLatex.Add(string.Join("", new[]
             {
@@ -116,7 +115,7 @@ public partial class PrismaReviewEngine
         {
             new("Registration and Protocol", string.IsNullOrWhiteSpace(report.ProtocolItem) ? NoProtocolText : report.ProtocolItem),
             new("Support & Funding", PaperDeclarations.Funding(report.SupportItem)),
-            new("Availability of Data and Code", "", LatexBreaks.Allow((report.AvailabilityItem ?? "").Replace("_", @"\_"))),
+            new("Availability of Data and Code", report.AvailabilityItem ?? ""),
         };
         string aiMethods = "";
         if (state != null)
@@ -128,10 +127,13 @@ public partial class PrismaReviewEngine
         if (state != null)
             appendixLatex += PaperDeclarations.PublisherVariantsLatex(AiUseStatement.Used(state), AiUseStatement.Purpose, AiUseStatement.Short(state), aiMethods);
 
+        string title = (report.TitleItem ?? "Systematic Review Manuscript").Replace("[Source Context Anchor 1]", "").Trim();
+        string bibtex = BibliographyExporter.ToBibTeX(records);
+        bool hasProtocol = File.Exists(Path.Join(GetWorkspaceFolderPath(sessionId), "protocol.md"));
         var paper = new ReviewPaper
         {
-            KindLabel = "AI-GENERATED SYSTEMATIC LITERATURE REVIEW",
-            Title = (report.TitleItem ?? "Systematic Review Manuscript").Replace("[Source Context Anchor 1]", "").Trim(),
+            KindLabel = SearchAdequacy.IsPilot(state) ? "AI-GENERATED PILOT SYSTEMATIC SEARCH" : "AI-GENERATED SYSTEMATIC LITERATURE REVIEW",
+            Title = title,
             ProtocolHash = string.IsNullOrWhiteSpace(report.ProtocolHash) ? "not recorded" : report.ProtocolHash,
             Keywords = state == null ? Array.Empty<string>() : ArticleKeywords.From(state.SearchQuery,
                 state.SearchPerspectives.Count > 0 ? state.SearchPerspectives : new List<string> { state.SearchQuery },
@@ -157,6 +159,8 @@ public partial class PrismaReviewEngine
             Declarations = declarations,
             References = records.Select(r => r.ApaCitation).ToList(),
             AppendixLatex = appendixLatex,
+            ReferenceKeys = PaperLatex.BibKeys(bibtex),
+            Article = ArticleInfo.ForSystematic(sessionId, state, report, title, report.AbstractItem ?? "", hasProtocol),
         };
 
         // The files only a systematic review generates; the core (Report/RunArchive.cs) adds the run folder's
@@ -165,7 +169,7 @@ public partial class PrismaReviewEngine
         void AddText(string name, string content) => generated.Add((name, new UTF8Encoding(false).GetBytes(content)));
 
         AddText("main.tex", PaperLatex.Build(paper));
-        AddText("references.bib", BibliographyExporter.ToBibTeX(records));
+        AddText("references.bib", bibtex);
         if (certainty != null) AddText(CertaintyFile.FileName, JsonSerializer.Serialize(certainty, new JsonSerializerOptions { WriteIndented = true }));
         AddText("references.ris", BibliographyExporter.ToRis(records));
         if (state != null)
@@ -188,6 +192,8 @@ public partial class PrismaReviewEngine
             // The certainty phrase follows the answer, e.g. "(low certainty: 3 studies, two read from the abstract only)".
             string phrase = certainty?.Answers.FirstOrDefault(c => c.Number == a.Number)?.Phrase is { } p ? " " + EscapeLatexText(p) : "";
             latex.AppendLine($"\\noindent\\textbf{{RQ{a.Number}. {EscapeLatexText(a.Question)}}} {EscapeLatexText(a.Answer)}{phrase}\\par\\smallskip");
+            // Written in code when the answer cites a secondary study.
+            if (!string.IsNullOrWhiteSpace(a.Note)) latex.AppendLine($"\\noindent{{\\small\\itshape {EscapeLatexText(a.Note)}}}\\par\\smallskip");
         }
         // Whether the answers hold without the weakest evidence, in plain sentences (the sensitivity check).
         if (certainty != null && EvidenceCertainty.Summary(certainty.Answers, certainty.Rule) is { Length: > 0 } held)

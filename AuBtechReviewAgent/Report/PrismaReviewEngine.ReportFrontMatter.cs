@@ -47,6 +47,8 @@ public partial class PrismaReviewEngine
         string methodsSelection = MethodsSectionWriter.SelectionProcess(finalState.PeerReviewOnlyToggle, finalState.Stats, finalState.HumanScreeningReviewRequested, finalState.HumanScreeningReviewOutcome, Llm.DisplayNameFor("screening"));
         if (ExclusionReasons.Sentence(finalState.Phases.Screening) is { } exclusionSentence)
             methodsSelection += " " + exclusionSentence;
+        if (RetractionCheckText.Sentence(finalState.RetractionCheck) is { Length: > 0 } retractionSentence)
+            methodsSelection += " " + retractionSentence;
         return new SystematicMethods(methodsEligibility, methodsSources, methodsSearch, methodsSelection);
     }
 
@@ -87,7 +89,7 @@ public partial class PrismaReviewEngine
                 },
                 abstractRule: text => AbstractCountsProblem(text, finalState.Stats) ?? AbstractUnplacedProblem(text, finalState.Stats.Included, useThematic ? thematic!.Codebook.Uncoded.Count : 0),
                 questions: finalState.ResearchQuestions,
-                answers: closing?.Answers ?? thematic?.Answers, conclusion: closing?.Conclusion,
+                answers: AnswersFor(finalState, thematic, closing).Answers, conclusion: closing?.Conclusion,
                 weakSources: SystematicEvidence.WeakSources(finalState.Extractions ?? new List<StudyExtraction>()));
             // The first draft is written only now, and only when the front-matter step failed.
             var draft = written == null ? (await run.Fallback.Value).Draft : null;
@@ -136,6 +138,8 @@ public partial class PrismaReviewEngine
         var frontTask = FrontAndStyleAsync(closingTask);
         await Task.WhenAll(frontTask, artifactTask, closingTask); // a failure of any is thrown here, after all have finished
         run.Closing = await closingTask;
+        (run.Answers, run.AnswersFromEvidence) = AnswersFor(finalState, thematic, run.Closing);
+        NoteMissingClosing(run);
         var (front, draft, styledAbstract, styledRationale, styledObjectives) = await frontTask;
         run.Artifact = await artifactTask;
 
@@ -167,6 +171,7 @@ public partial class PrismaReviewEngine
             $"Screening: {screeningFacts}",
             $"Full text was read for {s.FullTextRetrieved} of the {s.Included} included studies; the others were read from their abstracts.",
         };
+        if (SearchAdequacy.AbstractFact(state) is { Length: > 0 } pilot) lines.Add(pilot);
         if (book != null) lines.Add($"Thematic synthesis: {book.Themes.Count} theme{(book.Themes.Count == 1 ? "" : "s")} from {book.Codes.Count} code{(book.Codes.Count == 1 ? "" : "s")}.");
         if (book is { Uncoded.Count: > 0 }) lines.Add(UnplacedFact(book.Uncoded.Count));
         if (RemovalsBeforeScreening(s).Any(r => r.Label != "duplicates"))

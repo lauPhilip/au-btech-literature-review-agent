@@ -74,6 +74,10 @@
                 {
                     @* Filled by wwwroot/js/mermaid-render.js; Blazor leaves the empty element alone. *@
                     <div id="mermaid-preview" class="w-full flex flex-col items-center justify-center text-center bg-soft p-3 overflow-x-auto print:overflow-visible"></div>
+                    @if (AuBtechReviewAgent.ArtifactLinks.DashedNote(art) is { Length: > 0 } dashedNote)
+                    {
+                        <p class="text-xs text-muted">@dashedNote</p>
+                    }
                     @if (art.Nodes.Any(n => AuBtechReviewAgent.CitationSupportChecker.ReferencesIn(n.Label).Count > 0))
                     {
                         <span class="text-xs font-bold text-muted uppercase block pt-1">Cited boxes in the diagram</span>
