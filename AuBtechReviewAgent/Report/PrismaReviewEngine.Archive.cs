@@ -22,38 +22,6 @@ public partial class PrismaReviewEngine
     private static string EscapeLatexText(string input) => PaperLatex.Escape(input);
 
     /// <summary>
-    /// Loads the persisted report + synthesized records for a session straight off disk and builds the
-    /// workspace archive from them. Lets the download be served from a plain HTTP endpoint (Program.cs)
-    /// instead of round-tripping the whole zip through the Blazor Server SignalR connection, which has a
-    /// small default max message size and would silently fail once real source PDFs are included.
-    /// </summary>
-    public byte[] GenerateWorkspaceArchiveFromDisk(Guid sessionId)
-    {
-        var state = LoadState(sessionId);
-        if (state == null) return Array.Empty<byte>();
-
-        var report = new PrismaReport();
-        string reportPath = GetReportFilePath(sessionId);
-        if (File.Exists(reportPath))
-        {
-            try
-            {
-                string content = File.ReadAllText(reportPath);
-                report = JsonSerializer.Deserialize<PrismaReport>(content, new JsonSerializerOptions { PropertyNameCaseInsensitive = true }) ?? new PrismaReport();
-            }
-            catch (Exception ex)
-            {
-                // The archive is still built from the ledger; only the report section is missing.
-                _log.LogWarning("Archive: could not read prisma-report.json: {Message}", SanitizeLogMessage(ex.Message));
-            }
-        }
-
-        // The reviewer's checked edits (report-edits.json) go into main.tex; a run without edits is written as before.
-        report = ReportEdits.Apply(report, LoadReportEdits(sessionId));
-        return GenerateWorkspaceArchive(sessionId, report, state.SynthesizedRecords, state);
-    }
-
-    /// <summary>
     /// references.bib / references.ris (the included studies) or screened.ris (every screened record, tagged with
     /// its decision) for a run, or null if the run does not exist.
     /// </summary>
@@ -70,26 +38,8 @@ public partial class PrismaReviewEngine
         };
     }
 
-    // NOTE: historically named GenerateManuscriptPdf, but it never compiled a PDF - it always returned a
-    // zip bundle (LaTeX source + JSON ledger + source PDFs). Renamed to match what it actually produces.
-    public byte[] GenerateWorkspaceArchive(Guid sessionId, PrismaReport report, List<IncludedPaperMetricRow> records, ReviewState? state = null)
-    {
-        // The LaTeX below interpolates decimals (pie-slice angles, axis limits). On a machine with a Danish
-        // (or any comma-decimal) culture those came out as "51,43", which breaks the TikZ syntax, so the
-        // document is always written with the invariant culture.
-        var previousCulture = System.Globalization.CultureInfo.CurrentCulture;
-        System.Globalization.CultureInfo.CurrentCulture = System.Globalization.CultureInfo.InvariantCulture;
-        try
-        {
-            return BuildWorkspaceArchive(sessionId, report, records, state);
-        }
-        finally
-        {
-            System.Globalization.CultureInfo.CurrentCulture = previousCulture;
-        }
-    }
-
-    private byte[] BuildWorkspaceArchive(Guid sessionId, PrismaReport report, List<IncludedPaperMetricRow> records, ReviewState? state)
+    /// <summary>The files only a systematic review generates for its archive, main.tex first. Called with the invariant culture.</summary>
+    private List<(string Path, byte[] Content)> BuildGeneratedFiles(PrismaReport report, List<IncludedPaperMetricRow> records, ReviewState? state)
     {
         // main.tex is built in memory and written straight into the zip. It used to go through a temporary
         // manuscript_*.tex file in the project folder, and every download first deleted all such files - so
@@ -123,6 +73,9 @@ public partial class PrismaReviewEngine
             new("Data Collection and Quality Appraisal", report.BiasAssessmentItem ?? ""),
         };
         if (!string.IsNullOrWhiteSpace(report.SynthesisMethodsItem)) methods.Add(new("Synthesis Methods", report.SynthesisMethodsItem));
+        // The certainty of each answer is rated in code from the run's files (PRISMA 2020 items 15 and 22).
+        var certainty = SystematicCertainty.Assess(report, state?.ThematicSynthesis, state?.Extractions);
+        if (certainty != null) methods.Add(new("Certainty of the Evidence", certainty.Method));
         // The reviewer's research questions come first in the method, as published reviews list them.
         var questions = state?.ResearchQuestions ?? new List<string>();
         if (questions.Count > 0)
@@ -137,6 +90,9 @@ public partial class PrismaReviewEngine
             resultsLatex.Add(EvidenceMapTable(book));
         if (report.Artifact is { Error: null } artifact)
             resultsLatex.Add(ArtifactLatex(artifact));
+        // The certainty table takes the next number of the results' tables (4.1 the evidence map, 4.2 a table artifact).
+        int resultTables = resultsLatex.Count(b => b.Contains(@"\textbf{Table 4.", StringComparison.Ordinal));
+        if (certainty != null) resultsLatex.Add(CertaintyLatex.Table(certainty, $"4.{resultTables + 1}"));
         if (!string.IsNullOrEmpty(tikzDiagramCode))
             resultsLatex.Add(string.Join("", new[]
             {
@@ -183,7 +139,7 @@ public partial class PrismaReviewEngine
             Discussion = report.DiscussionItem ?? "",
             DiscussionOpeningHeading = "General Interpretation",
             DiscussionNotes = discussionNotes,
-            Summary = ConclusionSection(report),
+            Summary = ConclusionSection(report, certainty),
             Declarations = declarations,
             References = records.Select(r => r.ApaCitation).ToList(),
             AppendixLatex = appendixLatex,
@@ -196,27 +152,32 @@ public partial class PrismaReviewEngine
 
         AddText("main.tex", PaperLatex.Build(paper));
         AddText("references.bib", BibliographyExporter.ToBibTeX(records));
+        if (certainty != null) AddText(CertaintyFile.FileName, JsonSerializer.Serialize(certainty, new JsonSerializerOptions { WriteIndented = true }));
         AddText("references.ris", BibliographyExporter.ToRis(records));
         if (state != null)
             AddText("screened.ris", BibliographyExporter.ToScreenedRis(state.Phases.Screening,
                 records.GroupBy(r => r.PaperId).ToDictionary(g => g.Key, g => g.First().ReferenceNumber)));
-
-        var module = ReviewModules.Find(ReviewMethod.SystematicKey)!;
-        return RunArchive.Build(sessionId, GetWorkspaceFolderPath(sessionId), generated, module.ArchiveFiles,
-            state?.ProtocolHash, state?.RunSettings?.Model);
+        return generated;
     }
 
     /// <summary>
     /// The Conclusion: the answer to each research question ("RQ1. question" then its answer), then the conclusion text.
     /// Null when the run wrote no conclusion.
     /// </summary>
-    private PaperSection? ConclusionSection(PrismaReport report)
+    private PaperSection? ConclusionSection(PrismaReport report, CertaintyFile? certainty = null)
     {
         if (string.IsNullOrWhiteSpace(report.ConclusionItem)) return null;
         if (report.ResearchAnswers is not { Count: > 0 } answers) return new PaperSection("Conclusion", report.ConclusionItem);
         var latex = new StringBuilder();
         foreach (var a in answers)
-            latex.AppendLine($"\\noindent\\textbf{{RQ{a.Number}. {EscapeLatexText(a.Question)}}} {EscapeLatexText(a.Answer)}\\par\\smallskip");
+        {
+            // The certainty phrase follows the answer, e.g. "(low certainty: 3 studies, two read from the abstract only)".
+            string phrase = certainty?.Answers.FirstOrDefault(c => c.Number == a.Number)?.Phrase is { } p ? " " + EscapeLatexText(p) : "";
+            latex.AppendLine($"\\noindent\\textbf{{RQ{a.Number}. {EscapeLatexText(a.Question)}}} {EscapeLatexText(a.Answer)}{phrase}\\par\\smallskip");
+        }
+        // Whether the answers hold without the weakest evidence, in plain sentences (the sensitivity check).
+        if (certainty != null && EvidenceCertainty.Summary(certainty.Answers, certainty.Rule) is { Length: > 0 } held)
+            latex.AppendLine($"\\noindent {EscapeLatexText(held)}\\par\\smallskip");
         latex.AppendLine(EscapeLatexText(report.ConclusionItem));
         return new PaperSection("Conclusion", report.ConclusionItem, latex.ToString());
     }

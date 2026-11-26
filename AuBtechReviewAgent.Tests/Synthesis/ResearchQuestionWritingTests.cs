@@ -15,10 +15,10 @@ public class ResearchQuestionWritingTests : IDisposable
 
     public void Dispose() => TestFolders.TryDelete(_root);
 
-    private static readonly string[] Questions = { "How do agent loops recover from faults?", "How are agent loops certified?" };
+    internal static readonly string[] Questions = { "How do agent loops recover from faults?", "How are agent loops certified?" };
     private const string Answer = "Agent loops recover through supervisor checks [1].";
 
-    private static string Respond(string prompt)
+    internal static string Respond(string prompt)
     {
         if (prompt.Contains("You are building the codebook"))
             return """{"themes":[{"name":"Recovery and oversight","description":"How agent loops recover and are overseen.","codes":["C1","C2"],"questions":["RQ1"]}],"unassigned":[],"unanswered":[{"question":"RQ2","reason":"No study certifies agent loops."}]}""";

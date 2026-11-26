@@ -16,9 +16,9 @@ namespace AuBtechReviewAgent;
 /// ("decision must be Included or Excluded"). Replaces ad-hoc regex rescue of half-broken JSON, which could
 /// silently turn a garbled answer into "Excluded".
 /// </summary>
-public static class LlmJson
+public static partial class LlmJson
 {
-    private static readonly JsonSerializerOptions Options = new() { PropertyNameCaseInsensitive = true };
+    private static readonly JsonSerializerOptions Options = CreateOptions();
 
     /// <summary>Settings for a prompt that must answer with a JSON object.</summary>
     public static MistralAIPromptExecutionSettings JsonMode(double temperature)
@@ -43,12 +43,13 @@ public static class LlmJson
             try
             {
                 value = JsonSerializer.Deserialize<T>(ExtractObject(raw), Options);
-                lastProblem = value == null ? "The answer was empty." : validate(value) ?? "";
+                lastProblem = value == null ? "The answer was empty." : "";
             }
             catch (JsonException ex)
             {
-                lastProblem = $"The answer was not valid JSON ({ex.Message.Split('.')[0]}).";
+                lastProblem = JsonProblem(ex);
             }
+            if (value != null) lastProblem = NullProblem(value) ?? Check(validate, value);
             if (value != null && lastProblem.Length == 0) return value;
 
             currentPrompt = prompt + "\n\nYOUR PREVIOUS ANSWER WAS REJECTED: " + lastProblem +

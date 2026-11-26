@@ -90,7 +90,7 @@ public sealed partial class MultivocalSynthesiser
             Respond ONLY with a valid minified JSON object of this shape:
             {"tensions":[{"groupA":"V1","groupB":"V4","description":"One sentence."}]}
             """;
-        return await LlmJson.GetAsync<ModelTensions>(chat, prompt, LlmJson.JsonMode(0.2), _ => null);
+        return await LlmJson.GetAsync<ModelTensions>(chat, prompt, LlmJson.JsonMode(0.2), ModelTensions.Problem);
     }
 
     /// <summary>", 1 academic, 2 grey": how many of a value's sources are in each pool.</summary>
@@ -173,7 +173,7 @@ public sealed class ModelThemeList
     }
 
     /// <summary>How many sources say something ("the majority of sources", "most practitioners", "12 sources"): counted in code, never by the model.</summary>
-    private static readonly Regex Counts = new(
+    internal static readonly Regex Counts = new(
         @"\b(majority|minority|consensus)\b|\b(most|many|few|several|all|some|\d+)\s+(of\s+the\s+)?(sources|studies|authors|practitioners|papers|posts|repositories|articles)\b",
         RegexOptions.IgnoreCase | RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1));
 }
@@ -213,6 +213,29 @@ public sealed class ModelPlaced
 public sealed class ModelTensions
 {
     public List<ModelTension> Tensions { get; set; } = new();
+
+    /// <summary>The longest description of a tension, in characters: it is one sentence in the report.</summary>
+    public const int MaxDescriptionChars = 300;
+
+    private static readonly Regex SentenceBreak = new(@"[.!?]\s+(?=[A-Z])", RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1));
+
+    /// <summary>
+    /// Null when every tension names two values and says how they disagree in one short sentence that counts no sources
+    /// (the description goes into the report; sources are counted in code, as for the themes).
+    /// </summary>
+    public static string? Problem(ModelTensions a)
+    {
+        foreach (var t in a.Tensions)
+        {
+            if (string.IsNullOrWhiteSpace(t.GroupA) || string.IsNullOrWhiteSpace(t.GroupB)) return "every tension needs the ids of its two values in groupA and groupB.";
+            string description = t.Description.Trim();
+            if (description.Length == 0) return $"the tension between {t.GroupA.Trim()} and {t.GroupB.Trim()} needs a description.";
+            if (description.Length > MaxDescriptionChars) return $"the description of the tension between {t.GroupA.Trim()} and {t.GroupB.Trim()} is too long; use one sentence of at most {MaxDescriptionChars} characters.";
+            if (SentenceBreak.IsMatch(description)) return $"the description of the tension between {t.GroupA.Trim()} and {t.GroupB.Trim()} has more than one sentence; use one.";
+            if (ModelThemeList.Counts.IsMatch(description)) return $"the tension between {t.GroupA.Trim()} and {t.GroupB.Trim()} says how many sources hold a view; say only how they disagree, the sources are counted in code.";
+        }
+        return null;
+    }
 }
 
 public sealed class ModelTension
