@@ -75,7 +75,7 @@ public class LandingTests
         Assert.Contains("@layout LandingLayout", page);
         Assert.Contains("<CitationLoop />", page);
         Assert.Contains("Literature reviews where every citation is checked", page);
-        Assert.Contains("href=\"/review\"", page);
+        Assert.Contains("href=\"/start\"", page);
         Assert.Contains("href=\"/about\"", page);
         // No statistics row and no fixed colours: the page takes the dark theme.
         Assert.DoesNotContain("MetricsStore", page);
