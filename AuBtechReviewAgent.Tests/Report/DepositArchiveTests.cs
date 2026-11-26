@@ -27,8 +27,15 @@ public class DepositArchiveTests : IDisposable
         File.WriteAllText(Path.Join(_folder, "protocol.md"), "# Review protocol");
         foreach (var title in new[] { "Closed paper", "Open paper as Scopus titles it", "Paper Unpaywall knows" })
             File.WriteAllText(Path.Join(_folder, DocumentRAGUtility.PdfFileName(title)), "%PDF-1.4 " + title);
+        // Named by key since #587, with its record beside it: an open paper with a DOI, and a closed one.
+        foreach (var (id, doi) in new[] { ("SCOPUS_ID:3", "10.1/keyed-open"), ("SCOPUS_ID:4", "10.1/keyed-closed") })
+        {
+            File.WriteAllText(Path.Join(_folder, FullTextFile.PdfName(id, doi)), "%PDF-1.4 " + id);
+            File.WriteAllText(Path.Join(_folder, FullTextFile.RecordName(id, doi)), "{}");
+        }
         File.WriteAllText(Path.Join(raw, "01-openalex-q1.json"),
-            "{\"results\":[{\"id\":\"https://openalex.org/W1\",\"doi\":\"https://doi.org/10.1/open\",\"display_name\":\"Open paper\",\"best_oa_location\":{\"license\":\"cc-by\"}}," +
+            "{\"results\":[{\"id\":\"https://openalex.org/W3\",\"doi\":\"https://doi.org/10.1/keyed-open\",\"display_name\":\"Keyed\",\"best_oa_location\":{\"license\":\"cc-by\"}}," +
+            "{\"id\":\"https://openalex.org/W1\",\"doi\":\"https://doi.org/10.1/open\",\"display_name\":\"Open paper\",\"best_oa_location\":{\"license\":\"cc-by\"}}," +
             "{\"id\":\"https://openalex.org/W2\",\"doi\":\"https://doi.org/10.1/closed\",\"display_name\":\"Closed paper\",\"best_oa_location\":{\"license\":\"publisher-specific-oa\"}}]}");
         File.WriteAllText(Path.Join(raw, "unpaywall-0123456789abcdef.json"), "{\"doi\":\"10.1/u\",\"title\":\"Paper Unpaywall knows\",\"best_oa_location\":{\"license\":\"cc-by-nc\",\"url_for_pdf\":\"https://x.org/u.pdf\"}}");
         File.WriteAllText(Path.Join(raw, "02-sciencedirect-api-q1.json"), "{\"search-results\":{}}");
@@ -62,15 +69,18 @@ public class DepositArchiveTests : IDisposable
         Assert.Contains("SourcePapers/" + DocumentRAGUtility.PdfFileName("Open paper as Scopus titles it"), files.Keys); // by its DOI in the ledger
         Assert.Contains("SourcePapers/" + DocumentRAGUtility.PdfFileName("Paper Unpaywall knows"), files.Keys); // by Unpaywall's licence
         Assert.DoesNotContain("SourcePapers/" + DocumentRAGUtility.PdfFileName("Closed paper"), files.Keys);
+        Assert.Contains("SourcePapers/" + FullTextFile.PdfName("SCOPUS_ID:3", "10.1/keyed-open"), files.Keys); // named by its DOI (#587)
+        Assert.Contains("SourcePapers/" + FullTextFile.RecordName("SCOPUS_ID:3", "10.1/keyed-open"), files.Keys);
+        Assert.DoesNotContain(files.Keys, k => k.Contains(FullTextFile.PdfName("SCOPUS_ID:4", "10.1/keyed-closed")[..^4]));
         Assert.Contains("SourceResponses/01-openalex-q1.json", files.Keys);
         Assert.Contains("SourceResponses/unpaywall-0123456789abcdef.json", files.Keys);
         Assert.DoesNotContain(files.Keys, k => k.Contains("sciencedirect") || k.Contains("ieee") || k.Contains("semantic"));
         Assert.DoesNotContain("llm-calls.json", files.Keys);
         Assert.Contains("main.tex", files.Keys);
         Assert.Contains("protocol.md", files.Keys);
-        Assert.Equal(5, record.LeftOut.Count);
+        Assert.Equal(7, record.LeftOut.Count); // with the closed keyed PDF and its record
         Assert.All(record.LeftOut, l => Assert.Matches("^[0-9a-f]{64}$", l.Sha256!));
-        Assert.Equal(2, record.PapersKept.Count);
+        Assert.Equal(4, record.PapersKept.Count);
     }
 
     [Fact]

@@ -89,7 +89,10 @@ public class ArticleInfoTests
 
         var info = ArticleInfo.ForSystematic(runId, state, new PrismaReport(), "A title", "An abstract.", hasProtocol: true);
 
-        Assert.Equal(("Systematic review", "PRISMA 2020"), (info.Kind, info.Guideline));
+        // Six records found make a pilot search, so the kicker says so (issue #554); a full search keeps "Systematic review".
+        Assert.Equal(("Pilot systematic search", "PRISMA 2020"), (info.Kind, info.Guideline));
+        state.Stats.TotalIdentified = 400;
+        Assert.Equal("Systematic review", ArticleInfo.ForSystematic(runId, state, new PrismaReport(), "A title", "An abstract.", hasProtocol: true).Kind);
         Assert.Equal((6, 4, "studies included"), (info.Found, info.Included, info.IncludedLabel));
         Assert.Equal(new[] { "large", "small" }, info.Models);
         Assert.Equal("19 November 2026", ArticleInfo.Date(info.SearchedUtc));
@@ -98,7 +101,7 @@ public class ArticleInfoTests
         Assert.Equal(new string('a', 64), info.ProtocolFingerprint);
         Assert.Equal("TraceableAI v1.0.0 (40b00a0)", info.ToolLine);
         Assert.Equal($"https://example.org/api/workspace/{runId}/archive", ArticleInfo.Absolute("https://example.org/", info.ArchivePath));
-        Assert.Equal($"TraceableAI. (2026). A title [Systematic review, run {runId.ToString("N")[..8]}; not peer reviewed]. Version 1.0.0. https://example.org/spec-matrix/{runId}",
+        Assert.Equal($"TraceableAI. (2026). A title [Pilot systematic search, run {runId.ToString("N")[..8]}; not peer reviewed]. Version 1.0.0. https://example.org/spec-matrix/{runId}",
             info.HowToCite("https://example.org/"));
     }
 

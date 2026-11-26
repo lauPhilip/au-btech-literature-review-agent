@@ -38,14 +38,15 @@ public partial class PrismaReviewEngine
         using var throttle = new SemaphoreSlim(4);
         var downloads = included.Select(async paper =>
         {
-            await throttle.WaitAsync();
+            await throttle.WaitAsync(ctx.Stop);
             try
             {
                 return FullTextFetcher != null
                     ? await FullTextFetcher(paper, ctx.Workspace)
-                    : await DocumentRAGUtility.IngestAndChunkPaperAsync(paper, ctx.Workspace, OpenSources.ContactEmail);
+                    : await DocumentRAGUtility.IngestAndChunkPaperAsync(paper, ctx.Workspace, OpenSources.ContactEmail, ctx.Stop);
             }
-            catch (Exception ex)
+            // A cancelled run stops here (#588) instead of finishing every download first.
+            catch (Exception ex) when (ex is not OperationCanceledException || !ctx.Stop.IsCancellationRequested)
             {
                 return new FullTextResult(Array.Empty<DocumentChunk>(), $"none (download failed: {SanitizeLogMessage(ex.Message)})", null);
             }
@@ -58,7 +59,7 @@ public partial class PrismaReviewEngine
             // The live line names the paper waited for now ("Reading the full text of Doe et al., 2025"), built in code.
             ReportProgress(ctx.RunId, ctx.State, RunProgress.FullText, (double)i / included.Count, Of(i, included.Count, "papers"),
                 LiveActivity.ShortCite(included[i].Authors, included[i].PublishedDate, included[i].Title));
-            var result = await downloads[i];
+            var result = await downloads[i].WaitAsync(ctx.Stop);
             ReportProgress(ctx.RunId, ctx.State, RunProgress.FullText, (double)(i + 1) / included.Count, Of(i + 1, included.Count, "papers"));
             // Text a reader never sees is taken out before anything reads it (#369); what was removed is on file below.
             var (chunks, removed, hidden) = HiddenText.CleanChunks(result.Chunks);
@@ -87,7 +88,7 @@ public partial class PrismaReviewEngine
         var focus = new ExtractionFocus(ctx.State.ResearchQuestions, ctx.Request.Objective, Cache, Llm.ModelFor("extraction"));
         var work = papers.Select(async p =>
         {
-            await throttle.WaitAsync();
+            await throttle.WaitAsync(ctx.Stop);
             try
             {
                 StudyExtraction result;

@@ -77,6 +77,28 @@ public class FigureGuardTests
         Assert.StartsWith("The discussion call was kept after 2 send-backs with a repeated result figure", notes[2]);
     }
 
+    [Fact]
+    public async Task SoftChecksShareOneBudgetSoTheDiscussionAndItsAnswersAreNeverLostToThem()
+    {
+        // Each soft check had its own budget of two send-backs, so a figure and a reading problem together used up all three
+        // tries and the discussion failed, with its answers. Now they share one budget: two send-backs, then kept.
+        const string text = "Agents find 34 % more rare scenarios than manual testing [1]. The absence of conflict between these results points to consistent directional benefits.";
+        var model = new FakeChatService()
+            .Returns(Json(text, "Agents find 34 % more rare scenarios [1]."))
+            .Returns(Json(text, "Agents find 34 % more rare scenarios [1]."))
+            .Returns(Json(text, "Agents find 34 % more rare scenarios [1]."));
+        var notes = new List<string>();
+
+        var result = await ReviewWriter.WriteDiscussionAndAnswersAsync(model, WritingProfile.Systematic, "agent testing", "Map agent testing", Sections, Evidence(), 2,
+            notes.Add, new[] { "What do testing agents find?" }, null);
+
+        Assert.Equal(3, model.Prompts.Count);
+        Assert.Equal("Agents find 34 % more rare scenarios than manual testing [1].", result.Text); // the uncited agreement is left out in code
+        Assert.Equal(new[] { "Agents find 34 % more rare scenarios [1]." }, result.Answers);
+        Assert.Contains(notes, n => n.StartsWith("The discussion call was kept after 2 send-backs with a repeated result figure"));
+        Assert.Contains(notes, n => n.StartsWith("The discussion call was kept after 2 send-backs with a retold result, an agreement"));
+    }
+
     private static string Closing(string conclusion) => System.Text.Json.JsonSerializer.Serialize(new
     {
         limitations = "The evidence rests on two studies.",

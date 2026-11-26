@@ -178,7 +178,7 @@ public sealed record ArticleInfo
             RunId = runId,
             Title = title,
             Abstract = @abstract,
-            Kind = "Systematic review",
+            Kind = SearchAdequacy.Kind(state),
             Series = "Systematic literature review",
             Guideline = "PRISMA 2020",
             ProtocolWrittenUtc = state?.Timestamp,

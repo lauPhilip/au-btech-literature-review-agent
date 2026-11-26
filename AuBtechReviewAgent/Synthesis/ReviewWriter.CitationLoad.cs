@@ -75,20 +75,34 @@ public static partial class ReviewWriter
     /// problem does so at most <paramref name="sendBacks"/> times, each written to <paramref name="note"/> as being for
     /// <paramref name="what"/>, and an answer whose soft problem is left after that is kept, with a note that says so.
     /// </summary>
-    public static Func<T, string?> WithSoftGuard<T>(Func<T, string?> hard, Func<T, string?> soft, string step, string what, Action<string>? note, int sendBacks = 2)
+    public static Func<T, string?> WithSoftGuard<T>(Func<T, string?> hard, Func<T, string?> soft, string step, string what, Action<string>? note, int sendBacks = 2) =>
+        WithSoftGuards(hard, step, note, sendBacks, (soft, what));
+
+    /// <summary>
+    /// Several soft checks on one answer that share one budget of <paramref name="sendBacks"/>. Guards nested one in
+    /// another each had their own budget, so together they could send an answer back more often than the call has tries,
+    /// and a soft problem alone then failed the step: a discussion with figure, retelling and agreement send-backs was
+    /// lost on its third try, with the answers it carries. With one budget no more than <paramref name="sendBacks"/>
+    /// tries go to soft problems, so a call with more tries than that is never lost to them.
+    /// </summary>
+    public static Func<T, string?> WithSoftGuards<T>(Func<T, string?> hard, string step, Action<string>? note, int sendBacks,
+        params (Func<T, string?> Check, string What)[] soft)
     {
         int sentBack = 0;
         return answer =>
         {
             if (hard(answer) is { } problem) return problem;
-            if (soft(answer) is not { } softProblem) return null;
-            if (sentBack < sendBacks)
+            foreach (var (check, what) in soft)
             {
-                sentBack++;
-                note?.Invoke($"The {step} was sent back for {what} ({sentBack} of {sendBacks}): {softProblem}");
-                return softProblem;
+                if (check(answer) is not { } softProblem) continue;
+                if (sentBack < sendBacks)
+                {
+                    sentBack++;
+                    note?.Invoke($"The {step} was sent back for {what} ({sentBack} of {sendBacks}): {softProblem}");
+                    return softProblem;
+                }
+                note?.Invoke($"The {step} was kept after {sendBacks} send-backs with {what}: {softProblem}");
             }
-            note?.Invoke($"The {step} was kept after {sendBacks} send-backs with {what}: {softProblem}");
             return null;
         };
     }

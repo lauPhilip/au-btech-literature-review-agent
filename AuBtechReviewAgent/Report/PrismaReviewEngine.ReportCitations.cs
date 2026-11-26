@@ -60,10 +60,11 @@ public partial class PrismaReviewEngine
             fields.Add(("implicationsItem", Plain(closing.Implications, "implicationsItem")));
             fields.Add(("futureResearchItem", Plain(closing.FutureResearch, "futureResearchItem")));
             fields.Add(("conclusionItem", Plain(closing.Conclusion, "conclusionItem")));
-            // One field per answer to a research question, so each is checked and repaired on its own.
-            for (int i = 0; i < (closing.Answers?.Count ?? 0); i++)
-                fields.Add(($"researchAnswer{i + 1}", Plain(closing.Answers![i], $"researchAnswer{i + 1}")));
         }
+        // One field per answer to a research question, so each is checked and repaired on its own; the answers are kept
+        // when the closing step fails (issue #561).
+        for (int i = 0; i < (run.Answers?.Count ?? 0); i++)
+            fields.Add(($"researchAnswer{i + 1}", Plain(run.Answers![i], $"researchAnswer{i + 1}")));
         if (artifact is { Error: null }) fields.AddRange(artifact.CitableTexts().ToList());
 
         // STORM-style traceability guardrail: every [n] citation marker the model writes must resolve to
@@ -197,12 +198,7 @@ public partial class PrismaReviewEngine
         string fullSynthesisField = textOf["synthesisResultsItem"] + run.DraftIfWritten?.MermaidBlock + run.DraftIfWritten?.TikzBlock;
         string cleanDiscussionValidated = textOf["discussionItem"];
         foreach (var s in sections) s.Text = textOf[s.Field];
-        if (artifact is { Error: null })
-        {
-            foreach (var (field, _) in artifact.CitableTexts().ToList()) artifact.SetText(field, textOf[field]);
-            artifact.Compact();
-            artifact.Mermaid = ArtifactBuilder.ToMermaid(artifact);
-        }
+        await FinishArtifactAsync(run, textOf);
 
         try
         {
@@ -239,7 +235,8 @@ public partial class PrismaReviewEngine
         var reportObj = new PrismaReport
         {
             GeneratedAt = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss UTC"),
-            TitleItem = run.Title,
+            // A pilot search is not called a systematic review in its title (issue #554), decided in code.
+            TitleItem = SearchAdequacy.Title(run.Title, finalState),
             AbstractItem = Plain(run.Abstract, "abstractItem"),
             RationaleItem = textOf["rationaleItem"],
             ObjectivesItem = run.Objectives,
@@ -251,7 +248,7 @@ public partial class PrismaReviewEngine
             SynthesisSections = sections,
             SynthesisMethodsItem = ThematicSynthesis.MethodsText(useThematic ? thematic!.Codebook : thematic?.Codebook is { } fb ? new ThematicCodebook { FallbackReason = fb.FallbackReason } : null, Llm.DisplayName, Synthesis.RepairCitations, Llm.DisplayNameFor("citation-check"))
                 + (artifact == null ? "" : artifact.Error == null
-                    ? $" The {ArtifactKinds.All.First(k => k.Key == artifact.Requested).Label.ToLowerInvariant()} requested by the reviewer was built by the model from the finished results only, and the elements in it that cite a study were checked like the sentences of the report."
+                    ? $" The {ArtifactKinds.All.First(k => k.Key == artifact.Requested).Label.ToLowerInvariant()} requested by the reviewer was built by the model from the finished results only, and the elements in it that cite a study were checked like the sentences of the report." + ArtifactLinks.MethodsSentence(artifact)
                     : $" The requested artifact could not be built: {artifact.Error}"),
             Artifact = artifact,
             CoverageSummary = coverage.Sentence,
@@ -261,8 +258,8 @@ public partial class PrismaReviewEngine
                 SearchAdequacy.LimitationSentence(finalState)).Trim(),
             ImplicationsItem = closing == null ? "" : textOf["implicationsItem"],
             FutureResearchItem = closing == null ? "" : textOf["futureResearchItem"],
-            ConclusionItem = closing == null ? "" : textOf["conclusionItem"],
-            ResearchAnswers = closing?.Answers == null ? new List<ResearchAnswer>() : finalState.ResearchQuestions
+            ConclusionItem = closing == null ? ClosingUnwrittenText(run.UseThematic && thematic?.Evidence != null, run.Answers != null, run.AnswersFromEvidence) : textOf["conclusionItem"],
+            ResearchAnswers = run.Answers == null ? new List<ResearchAnswer>() : finalState.ResearchQuestions
                 .Select((question, i) => new ResearchAnswer { Number = i + 1, Question = question, Answer = textOf[$"researchAnswer{i + 1}"],
                     Note = SecondaryStudy.AnswerNote(textOf[$"researchAnswer{i + 1}"], secondary) })
                 .ToList(),

@@ -84,7 +84,8 @@ public partial class PrismaReviewEngine
             sb.AppendLine(@"\resizebox{\linewidth}{!}{");
             sb.Append(ArtifactBuilder.ToTikz(artifact, EscapeLatexText));
             sb.AppendLine(@"}");
-            sb.AppendLine($"\\caption{{{title}. {EscapeLatexText(artifact.Caption)}}}\\label{{fig:artifact}}");
+            string dashed = ArtifactLinks.DashedNote(artifact);
+            sb.AppendLine($"\\caption{{{title}. {EscapeLatexText(artifact.Caption)}{(dashed.Length == 0 ? "" : " " + EscapeLatexText(dashed))}}}\\label{{fig:artifact}}");
             sb.AppendLine(@"\end{figure}");
         }
         else if (artifact.Kind == ArtifactKinds.Table && artifact.Columns.Count > 0)
