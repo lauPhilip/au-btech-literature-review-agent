@@ -8,10 +8,6 @@
 <div class="space-y-2">
     <h3 class="font-display text-base font-semibold text-heading">5.1 General Interpretation (Item 23a)</h3>
     @Page.CitedText("discussionItem", Page.report.DiscussionItem)
-    @if (!string.IsNullOrWhiteSpace(Page.report.CitationCheckSummary))
-    {
-        <p class="border-l-2 border-heading pl-3 text-[15px] italic text-muted">@Page.report.CitationCheckSummary</p>
-    }
 </div>
 
 @* PRISMA 2020 items 23b to 23d, which published reviews give their own headings. Runs made before they were

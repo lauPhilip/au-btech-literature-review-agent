@@ -111,4 +111,17 @@ public class CitationCheckStepsTests
         Assert.Contains("Of the 3 citations in the final text, 2 were judged supported, 1 partly supported, 0 not supported, and 0 could not be verified.", text);
         Assert.Equal("No inline citations were available for the automated support check.", new CitationCheckSteps().Paragraph(new CitationSupportSummary()));
     }
+
+    [Fact]
+    public void TheCitationCheckIsOnTheReportPageInTheMethodsAndNotInTheInterpretation()
+    {
+        string? repo = AppContext.BaseDirectory;
+        while (repo != null && !File.Exists(Path.Join(repo, "AuBtechReviewAgent.sln"))) repo = Path.GetDirectoryName(repo);
+        if (repo == null) return; // not run from the repository (packaged tests)
+        string root = Path.Join(repo, "AuBtechReviewAgent", "Components", "Pages");
+        Assert.DoesNotContain("CitationCheckSummary", File.ReadAllText(Path.Join(root, "SpecMatrixDiscussion.razor")));
+        string methods = File.ReadAllText(Path.Join(root, "SpecMatrixIntroduction.razor"));
+        Assert.Contains("CitationCheckSummary", methods);
+        Assert.Contains("Automated Citation Check", methods);
+    }
 }

@@ -66,6 +66,15 @@
     </div>
 }
 
+@* The citation check is a method, so it is written here and not in the interpretation (issue #679). *@
+@if (!string.IsNullOrWhiteSpace(Page.report.CitationCheckSummary))
+{
+    <div class="space-y-2">
+        <h3 class="font-display text-base font-semibold text-heading">2.@(string.IsNullOrWhiteSpace(Page.report.SynthesisMethodsItem) ? 6 : 7) Automated Citation Check</h3>
+        <p class="text-ink">@Page.report.CitationCheckSummary</p>
+    </div>
+}
+
 </section>
 
 @code {
