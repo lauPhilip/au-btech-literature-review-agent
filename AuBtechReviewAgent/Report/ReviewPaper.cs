@@ -23,9 +23,13 @@ public sealed class ReviewPaper
     /// <summary>The line above the title, e.g. "AI-GENERATED SYSTEMATIC LITERATURE REVIEW".</summary>
     public string KindLabel { get; init; } = "";
     public string Title { get; init; } = "";
-    public string Affiliation { get; init; } = "Department of Business Development and Technology, Aarhus University";
+    /// <summary>The line under the title. The tool cannot know who ran the review, so it is a placeholder for the authors.</summary>
+    public string Authors { get; init; } = PaperDeclarations.AuthorLine;
+    public IReadOnlyList<string> Keywords { get; init; } = Array.Empty<string>();
     public string ProtocolHash { get; init; } = "not recorded";
     public string GeneratedAt { get; init; } = "";
+    /// <summary>The language models the run used, named in main.tex's AI-generated marks (<see cref="AiMarking"/>).</summary>
+    public IReadOnlyList<string> Models { get; init; } = Array.Empty<string>();
     public string Abstract { get; init; } = "";
     public string Rationale { get; init; } = "";
     public string Objectives { get; init; } = "";

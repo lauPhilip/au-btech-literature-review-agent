@@ -20,6 +20,7 @@ public static partial class PaperLatex
     private static readonly Regex NumberRange = new(@"(?<![\w.\-])(\d{1,4})-(\d{1,4})(?![\w\-]|\.\d)", RegexOptions.CultureInvariant, Timeout);
     // An abbreviation that ends with a full stop inside a sentence: TeX would otherwise leave a sentence's space after it.
     private static readonly Regex Abbreviation = new(@"\b(e\.g|i\.e|cf|vs|approx)\. ", RegexOptions.CultureInvariant, Timeout);
+    private static readonly Regex Orcid = new(@"\b(\d{4})-(\d{4})-(\d{4})-(\d{3}[\dX])\b", RegexOptions.CultureInvariant, Timeout);
     private static readonly Regex EtAl = new(@"\bet al\. ", RegexOptions.CultureInvariant, Timeout);
     // An acronym or name that ends a sentence ("an LLM. The", "TraceableAI. It"): TeX takes a capital before a full
     // stop for an initial. A lone capital after a space ("J. Smith") is an initial and is left alone.
@@ -156,6 +157,8 @@ public static partial class PaperLatex
     {
         // An en dash in a range; a word with "/" or ":" is an address, a DOI or a time and keeps its hyphens.
         escaped = Regex.Replace(escaped, @"\S+", m => m.Value.Contains('/') || m.Value.Contains(':') ? m.Value : NumberRange.Replace(m.Value, "$1--$2"));
+        // An ORCID iD is a name, not a range: "-{}" keeps its hyphens and tells chktex so.
+        escaped = Orcid.Replace(escaped, "$1-{}$2-{}$3-{}$4");
         escaped = EtAl.Replace(escaped, @"et~al.\ ");
         escaped = Abbreviation.Replace(escaped, @"$1.\ ");
         escaped = AcronymStop.Replace(escaped, @"$1\@.");

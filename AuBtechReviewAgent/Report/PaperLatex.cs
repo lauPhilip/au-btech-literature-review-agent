@@ -64,6 +64,7 @@ public static partial class PaperLatex
         sb.Append(paper.DataLatex);
         sb.AppendLine();
 
+        int lastColumns = sb.Length;
         sb.AppendLine(@"\begin{multicols}{2}");
         sb.AppendLine();
         Heading("section", paper.ResultsHeading);
@@ -80,6 +81,7 @@ public static partial class PaperLatex
             sb.AppendLine();
             sb.Append(block);
             sb.AppendLine();
+            lastColumns = sb.Length;
             sb.AppendLine(@"\begin{multicols}{2}");
             sb.AppendLine();
         }
@@ -97,7 +99,10 @@ public static partial class PaperLatex
         }
         Heading("section", "Declarations");
         foreach (var declaration in paper.Declarations) Section(declaration);
-        sb.AppendLine(@"\end{multicols}");
+        // The last two-column part is not balanced (multicols*): a new page follows it, and balancing columns that
+        // end near the foot of a page pushed them a few points past it (an overfull \vbox).
+        sb.Replace(@"\begin{multicols}{2}", @"\begin{multicols*}{2}", lastColumns, @"\begin{multicols}{2}".Length);
+        sb.AppendLine(@"\end{multicols*}");
         sb.AppendLine();
 
         sb.AppendLine(@"\clearpage");
@@ -131,7 +136,7 @@ public static partial class PaperLatex
         sb.AppendLine(@"  \vspace{8pt}");
         sb.AppendLine(@"  {\large " + Escape(ArticleInfo.Author) + @"\textsuperscript{*}\par}");
         sb.AppendLine(@"  \vspace{4pt}");
-        sb.AppendLine(@"  {\sffamily\small\color{greyText} " + Escape(paper.Affiliation) + @"\par}");
+        sb.AppendLine(@"  {\sffamily\small\color{greyText} " + Escape(paper.Authors) + @"\par}");
         sb.AppendLine(@"  \vspace{4pt}");
         sb.AppendLine(@"  {\ttfamily\scriptsize\color{gray} Protocol fingerprint: " + Escape(paper.ProtocolHash) + @" \textbar{} Generated: " + Escape(paper.GeneratedAt) + @"\par}");
         sb.AppendLine(@"\end{center}");
@@ -141,8 +146,8 @@ public static partial class PaperLatex
         sb.AppendLine(@"\begin{abstract}");
         sb.AppendLine(Prose(paper.Abstract));
         sb.AppendLine(@"\end{abstract}");
-        if (paper.Article is { Keywords.Count: > 0 } a)
-            sb.AppendLine(@"\noindent{\small\textbf{Keywords:} " + string.Join("; ", a.Keywords.Select(Escape)) + @"\par}");
+        if (paper.Keywords.Count > 0)
+            sb.AppendLine(@"\noindent{\small\textbf{Keywords:} " + string.Join("; ", paper.Keywords.Select(Escape)) + @"\par}");
         sb.AppendLine(@"\vspace{12pt}");
         sb.AppendLine();
     }

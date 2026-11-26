@@ -7,8 +7,15 @@ using Microsoft.SemanticKernel.ChatCompletion;
 
 namespace AuBtechReviewAgent;
 
+/// <summary>
+/// The language edit (once called the stylistic pass): the model rewrites a written part for clear, direct academic
+/// prose, and code keeps the rewrite only when it changes no number and no citation. The statement on AI use names it.
+/// </summary>
 public static class StylisticRefinerUtility
 {
+    /// <summary>Raised whenever the prompt changes; every entry of the ledger records the version that wrote it.</summary>
+    public const string PromptVersion = "language-edit-v2";
+
     public static async Task<(string RefinedText, StyleDeltaLog Delta)> RefineAcademicProseAsync(
         IChatCompletionService chatService, 
         string fieldName, 
@@ -18,9 +25,9 @@ public static class StylisticRefinerUtility
             return (string.Empty, new StyleDeltaLog(fieldName, string.Empty, string.Empty));
 
         var prompt = $$"""
-            You are a rigorous academic copyeditor enforcing strict human stylistic variation guidelines on a draft manuscript.
+            You are a rigorous academic copyeditor doing a language edit of a draft manuscript.
 
-            CRITICAL STYLISTIC SANITIZATION CONSTRAINTS:
+            LANGUAGE EDIT RULES:
             1. Ban Empty Parallelisms: Eliminate structural clichés like "not only..., but also..." or "not X, but Y". Replace them with direct, simple connections.
             2. Remove Artificial Signposting: Delete canned transitional phrases (e.g., "Crucially," "Importantly," "It is worth noting that," "Moreover," "Furthermore").
             3. Restore Basic Copulatives: Do not avoid simple verbs like "is" or "are" in favor of elegant variation or passive filler loops.
@@ -30,7 +37,7 @@ public static class StylisticRefinerUtility
             ORIGINAL DRAFT:
             {{rawText}}
 
-            TASK: Reword the draft above to read as if written by a clear, direct human researcher. Retain all factual source references, citations, and specific data points exactly.
+            TASK: Edit the draft above into clear, direct academic prose. Retain all factual source references, citations, and specific data points exactly.
 
             Respond ONLY with the clean, refined academic text paragraph. Do not add introductions, conversational remarks, or markdown code blocks.
             """;
@@ -43,17 +50,17 @@ public static class StylisticRefinerUtility
         }
         catch (Exception ex)
         {
-            return (rawText, new StyleDeltaLog(fieldName, rawText, rawText, Applied: false, Note: $"Refiner call failed: {ex.GetType().Name}"));
+            return (rawText, new StyleDeltaLog(fieldName, rawText, rawText, Applied: false, Note: $"Language edit call failed: {ex.GetType().Name}", PromptVersion: PromptVersion));
         }
 
         string? rejection = CheckRewrite(rawText, refinedText);
         if (rejection != null)
         {
             // Keep the original and record why, so the ledger shows the rewrite was attempted and refused.
-            return (rawText, new StyleDeltaLog(fieldName, rawText, refinedText, Applied: false, Note: rejection));
+            return (rawText, new StyleDeltaLog(fieldName, rawText, refinedText, Applied: false, Note: rejection, PromptVersion: PromptVersion));
         }
 
-        return (refinedText, new StyleDeltaLog(fieldName, rawText, refinedText));
+        return (refinedText, new StyleDeltaLog(fieldName, rawText, refinedText, PromptVersion: PromptVersion));
     }
 
     /// <summary>

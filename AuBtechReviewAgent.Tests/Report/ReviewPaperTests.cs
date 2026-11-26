@@ -40,10 +40,12 @@ public class ReviewPaperTests : IDisposable
         tex = Regex.Replace(tex, @"\d{4}-\d{2}-\d{2}( \d{2}:\d{2}(:\d{2})?)?", "DATE");
         tex = Regex.Replace(tex, @"Protocol fingerprint: \S+", "Protocol fingerprint: HASH");
         tex = Regex.Replace(tex, @"% Run: [^;]+; tool: .*", "% Run: RUN; tool: TOOL.");
-        tex = Regex.Replace(tex, @"pdfcreator=\{.*\},", "pdfcreator={TOOL},");
         tex = Regex.Replace(tex, @"fingerprint (?:[0-9a-f]|\\allowbreak\{\}){16,}", "fingerprint FINGERPRINT"); // with its break points
         tex = Regex.Replace(tex, @"version [^ ]+\)", "version VERSION)");
         tex = Regex.Replace(tex, @"This run used version .*?(?=\s+The run archive)", "This run used a version of the tool.");
+        // The statement on AI use names the day and the run (the publisher audit, batch A).
+        tex = Regex.Replace(tex, @"\b\d{1,2} (?:January|February|March|April|May|June|July|August|September|October|November|December) \d{4}\b", "DAY");
+        tex = Regex.Replace(tex, @"\(run [^)]*\)", "(run RUNID)");
         return tex;
     }
 
@@ -100,7 +102,7 @@ public class ReviewPaperTests : IDisposable
         Assert.Contains("\\subsection{Quality (G11)}\\label{sec:quality-g11}\n\n\\textbf{Table 7} checklist".Replace("\n", Environment.NewLine), tex); // LaTeX built in code is kept as it is
         Assert.Contains(@"\section{Data}", tex);
         Assert.Contains(@"\subsection{RQ1: Retrieval \& memory}", tex); // plain text is escaped
-        Assert.Contains("\\end{multicols}\n\nMAP\n\n\\begin{multicols}{2}".Replace("\n", Environment.NewLine), tex); // a wide block leaves the columns
+        Assert.Contains("\\end{multicols}\n\nMAP\n\n\\begin{multicols*}{2}".Replace("\n", Environment.NewLine), tex); // a wide block leaves the columns
         Assert.Contains(@"\bibitem{ref1} Ana (2025). \textit{Keeping context short}. blog.example.org", tex); // no keys given: ref1, ref2, ...
         Assert.Contains(@"\bibitem{ref2} Bo (2026). Retrieval first\_v2", tex);
         Assert.DoesNotContain("PRISMA", tex);

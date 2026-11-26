@@ -159,6 +159,6 @@ public class ReportEditTests : IDisposable
         string withEdits = AiUseStatement.Methods(state, runId, ReportEditLog.Load(folder));
         Assert.Contains("the reviewer edited 1 sentence of the generated text", withEdits);
         Assert.Contains("checked again against the source text kept from the run", withEdits);
-        Assert.EndsWith("take full responsibility for the content.", withEdits);
+        Assert.EndsWith(PaperDeclarations.Responsibility, withEdits);
     }
 }

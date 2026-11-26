@@ -71,6 +71,7 @@ public static partial class MultivocalPaper
             Title = paper.Title,
             ProtocolHash = string.IsNullOrWhiteSpace(input.Planned.ProtocolSha256) ? "not recorded" : input.Planned.ProtocolSha256,
             GeneratedAt = paper.WrittenUtc.ToString("yyyy-MM-dd HH:mm:ss 'UTC'", CultureInfo.InvariantCulture),
+            Models = MultivocalArticleInfo.ModelsOf(input, paper),
             Abstract = paper.Abstract,
             Rationale = paper.Rationale,
             Objectives = Objectives(plan, paper.Objectives),
@@ -87,6 +88,8 @@ public static partial class MultivocalPaper
             Summary = summary,
             Conclusion = ConclusionSection(paper),
             Declarations = Declarations(input, paper),
+            Keywords = MultivocalArticleInfo.For(input, paper, hasProtocol: false).Keywords,
+            AppendixLatex = PaperDeclarations.PublisherVariantsLatex(AiUseTool(input, paper), AiUsePurpose, AiUseShort(input, paper), AiUse(input, paper)),
             References = references.Select(GreyReferences.Line).ToList(),
             ReferenceKeys = PaperLatex.BibKeys(GreyReferences.ToBibTeX(references)),
             Article = article,
@@ -143,8 +146,19 @@ public static partial class MultivocalPaper
         return text.ToString();
     }
 
-    /// <summary>The declarations, in code: the use of AI, the protocol, and where the code and the archive are.</summary>
-    public static List<PaperSection> Declarations(MultivocalReportInput input, MultivocalPaperFile paper) => new()
+    /// <summary>
+    /// The declarations, in code: the use of AI, the protocol, where the code and the archive are, then funding and the
+    /// declarations only the authors can make (<see cref="PaperDeclarations"/>).
+    /// </summary>
+    public static List<PaperSection> Declarations(MultivocalReportInput input, MultivocalPaperFile paper)
+    {
+        var declarations = CoreDeclarations(input, paper);
+        declarations.Add(new PaperSection("Support and funding", PaperDeclarations.ToComplete));
+        declarations.AddRange(PaperDeclarations.Placeholders());
+        return declarations;
+    }
+
+    private static List<PaperSection> CoreDeclarations(MultivocalReportInput input, MultivocalPaperFile paper) => new()
     {
         new PaperSection("Use of artificial intelligence", AiUse(input, paper)),
         new PaperSection("Registration and protocol",
@@ -194,9 +208,26 @@ public static partial class MultivocalPaper
         int flagged = withHits.Where(p => PromptSafety.AnyStrong(p.InjectionFlags)).Select(p => MultivocalSearcher.AddressKey(p.Url)).Distinct().Count();
         int mentioned = withHits.Select(p => MultivocalSearcher.AddressKey(p.Url)).Distinct().Count() - flagged;
         text.Append(AiUseStatement.FlaggedSources(flagged, kept.Select(p => MultivocalSearcher.AddressKey(p.Url)).Distinct().Count(), "kept text", "source", "sources", mentioned));
-        text.Append("The authors reviewed the output and take full responsibility for the content.");
+        text.Append(AiUseStatement.LanguageEdit("abstract and rationale"));
+        text.Append(PaperDeclarations.Responsibility);
         return text.ToString();
     }
+
+    /// <summary>What the model did, for Elsevier's declaration ("the authors used ... in order to ...").</summary>
+    private const string AiUsePurpose = "screen sources, score their quality, propose the systematic map, extract and check values, group the findings into themes, write the paper's sections, check each citation against its source and edit the language of the abstract and rationale";
+
+    private static string AiUseModels(MultivocalReportInput input, MultivocalPaperFile paper)
+    {
+        var names = new[] { paper.Model }.Concat(OtherModels(input, paper).Select(o => o.Model)).Where(m => !string.IsNullOrWhiteSpace(m)).ToList();
+        return names.Count == 0 ? "a large language model" : JoinList(names);
+    }
+
+    private static string AiUseTool(MultivocalReportInput input, MultivocalPaperFile paper) =>
+        $"TraceableAI (version {VersionNumber(paper.AppVersion)}), an open-source review tool, with {AiUseModels(input, paper)}";
+
+    /// <summary>The short statement for acknowledgements (IEEE, ACM).</summary>
+    private static string AiUseShort(MultivocalReportInput input, MultivocalPaperFile paper) =>
+        $"The search, screening, quality scoring, data extraction, a first draft of the paper and a language edit of the abstract and rationale were carried out with TraceableAI using {AiUseModels(input, paper)}; every citation was automatically checked against the kept text of the source it cites. {PaperDeclarations.Responsibility}";
 
     /// <summary>
     /// The models other than the paper's that answered a step (Llm:FastModel), each with what it did, from the run's

@@ -1,4 +1,3 @@
-using System.Linq;
 using System.Text;
 
 namespace AuBtechReviewAgent;
@@ -14,6 +13,8 @@ public static partial class PaperLatex
     {
         var a = paper.Article;
         static string Comment(string text) => Metadata(text);
+        // The AI-generated mark comes first, so a reader of the source sees it at once (AiMarking).
+        sb.Append(AiMarking.LatexComment(paper.Models));
         sb.AppendLine("% " + new string('-', 76));
         sb.AppendLine("% main.tex: " + (a == null ? "a literature review" : $"{Comment(a.Kind)} ({Comment(a.Guideline)})") + " written by TraceableAI.");
         sb.AppendLine("% Title: " + Comment(paper.Title));
@@ -91,18 +92,9 @@ public static partial class PaperLatex
         sb.AppendLine("%% Citations, links and the PDF's metadata (hyperref comes last)");
         sb.AppendLine(@"\usepackage{cite} % sorts and ranges the numbers: [1--4]");
         sb.AppendLine(@"\usepackage{xurl} % a web address may break anywhere");
-        sb.AppendLine(@"\usepackage[hidelinks]{hyperref}");
+        // hyperref with the PDF's document info that marks it as AI-generated (EU AI Act Art. 50(2), AiMarking).
+        sb.Append(AiMarking.LatexMetadata(Metadata(paper.Title), paper.Models));
         sb.AppendLine(@"\urlstyle{same} % links in the text face, as APA sets them");
-        sb.AppendLine(@"\hypersetup{");
-        sb.AppendLine("  pdftitle={" + Metadata(paper.Title) + "},");
-        sb.AppendLine("  pdfauthor={" + Metadata(ArticleInfo.Author) + "},");
-        if (paper.Article is { } a)
-        {
-            sb.AppendLine("  pdfsubject={" + Metadata($"{a.Kind}, reported following {a.Guideline}; not peer reviewed") + "},");
-            if (a.Keywords.Count > 0) sb.AppendLine("  pdfkeywords={" + string.Join(", ", a.Keywords.Select(Metadata)) + "},");
-            sb.AppendLine("  pdfcreator={" + Metadata(a.ToolLine) + "},");
-        }
-        sb.AppendLine("}");
         sb.AppendLine();
     }
 }
