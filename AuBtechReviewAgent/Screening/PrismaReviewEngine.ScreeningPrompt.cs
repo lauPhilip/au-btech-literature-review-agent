@@ -12,7 +12,7 @@ public partial class PrismaReviewEngine
     /// Part of the screening cache key: change it whenever a screening prompt changes, so decisions made
     /// with an older prompt are never reused. It sits beside the prompt it versions, so both change in one commit.
     /// </summary>
-    public const string ScreeningPromptVersion = "screening-v7";
+    public const string ScreeningPromptVersion = "screening-v8";
 
     /// <summary>
     /// The screening prompt for one record, used by the review run and by the screening evaluation tool so
@@ -78,6 +78,7 @@ public partial class PrismaReviewEngine
             {{noAbstractNotice}}
             {{procedure}}
             {{CriterionParts.Procedure}}
+            {{CriterionParts.AlternativesRule}}
             (The reference string is built separately from the source metadata - do not write one.)
 
             {{ScreeningAnswerFormat}}
