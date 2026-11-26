@@ -177,8 +177,12 @@ public partial class Home
         monitorCts?.Dispose();
     }
 
+    private AuBtechReviewAgent.Components.Layout.TabTitleSync? tabTitle;
+
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
+        // The tab's title follows the progress (the page's head is not re-rendered; see TabTitleSync).
+        await (tabTitle ??= new AuBtechReviewAgent.Components.Layout.TabTitleSync(JS, Logger)).UpdateAsync(TabTitle());
         await SaveDraftAsync();
         await RefreshEditAccessAsync();
         if (pendingFocus is { } fieldId)
