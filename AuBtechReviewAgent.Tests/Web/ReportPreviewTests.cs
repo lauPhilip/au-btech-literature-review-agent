@@ -17,6 +17,30 @@ public class ReportPreviewTests
     }
 
     [Fact]
+    public void AnOpenCitationClosesOnAClickOutsideItAndOnEscape()
+    {
+        string prose = Read("Components", "Paper", "CitedProse.razor");
+        if (prose.Length == 0) return; // packaged tests
+        Assert.Contains("data-citation-panel", prose);
+        Assert.Contains("data-citation-close", prose);
+
+        string script = Read("wwwroot", "js", "review-output.js");
+        Assert.Contains("[data-citation-close]", script);
+        Assert.Contains("e.key !== 'Escape'", script);
+        // A button, link or field keeps its own click, so the click that opens a citation (a button) can never close it.
+        Assert.Contains("closest('[data-citation-panel], button, a, input, textarea, select, summary, label", script);
+        Assert.DoesNotContain("innerHTML", script);
+    }
+
+    [Fact]
+    public void TheRouterSettingParametersAgainDoesNotCloseTheOpenCitation()
+    {
+        string code = Read("Components", "Pages", "SpecMatrix.razor.cs");
+        if (code.Length == 0) return;
+        Assert.Contains("if (openedFor != State.CurrentSessionId || InGallery) openCitation = null;", code);
+    }
+
+    [Fact]
     public void TheCitationCheckBoxIsNotInThePagesAndThePanelBesideThemStays()
     {
         string? page = ReportPageSource.Read();
@@ -25,12 +49,5 @@ public class ReportPreviewTests
         Assert.DoesNotContain("<VerdictBar", page);
         Assert.Contains("<CitationCheckPanel ", page);
         Assert.Contains("<CitationAttentionBar ", page);
-    }
-    [Fact]
-    public void TheRouterSettingParametersAgainDoesNotCloseTheOpenCitation()
-    {
-        string code = Read("Components", "Pages", "SpecMatrix.razor.cs");
-        if (code.Length == 0) return;
-        Assert.Contains("if (openedFor != State.CurrentSessionId || InGallery) openCitation = null;", code);
     }
 }
