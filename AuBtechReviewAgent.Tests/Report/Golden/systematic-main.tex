@@ -87,7 +87,7 @@
 \begin{document}
 
 \begin{center}
-  {\sffamily\bfseries\scriptsize\color{gray} AI-GENERATED SYSTEMATIC LITERATURE REVIEW\par}
+  {\sffamily\bfseries\scriptsize\color{gray} AI-GENERATED PILOT SYSTEMATIC SEARCH\par}
   \vspace{4pt}
   {\rmfamily\LARGE\bfseries Recovery and oversight in agent loops: a systematic review\par}
   \vspace{8pt}
@@ -145,6 +145,8 @@ No date, language or document-type limits were applied.
 
 Each remaining record was screened twice by a language model (mistral-large-latest, Mistral API, temperature 0) with two independent prompts that work through the criteria in a different order, using its title, authors, date, venue and abstract as returned by the source.
 The two screenings agreed on 3 of 3 records (Cohen's kappa = 1.00); there were no disagreements to resolve.
+Raw agreement was 100\% (3 of 3), PABAK = 1.00, n = 3.
+The two screenings are two prompts of the same model, so their agreement measures how robust the decisions are to the prompt, not inter-rater reliability between independent reviewers.
 Text taken from the records was passed to the model inside marked data blocks with the instruction to treat it as data, never as instructions.
 Full texts were retrieved only for included records and were not used for the screening decision.
 Of 3 records screened, 2 were included and 1 excluded.
@@ -161,10 +163,12 @@ The appraisal was done by a language model without a second human appraiser, so 
 
 \subsection{Synthesis Methods}\label{sec:synthesis-methods}
 
-The findings were synthesised thematically, following the thematic synthesis method of Thomas and Harden (2008), with the language model (mistral-large-latest, Mistral API) performing each step.
+The findings were synthesised thematically, following the thematic synthesis method of Thomas and Harden (2008), with the language model (mistral-large-latest, Mistral API) performing each step (descriptive themes only; no analytical themes were developed).
 First, the key findings extracted from each study (whose supporting quotes had been found in the paper's text) were coded; each code names the findings it comes from, and for studies without verified findings the code had to quote the abstract verbatim, which was checked in code (2 of 2 codes were anchored this way).
 Second, the codes were grouped into 1 descriptive themes; a study belongs to a theme when one of its codes does, and the model's answer was rejected until every coded study was either placed in a theme or explicitly left out with a reason.
 A second, independent coding assigned the studies to the same themes; agreement over 2 study-theme decisions was Cohen's kappa = 1.00 (0 disagreements, listed in thematic-codebook.\allowbreak{}json).
+Raw agreement was 100\% (2 of 2), PABAK = 1.00, n = 2.
+The two codings are two prompts of the same model, so their agreement measures how robust the decisions are to the prompt, not inter-rater reliability between independent reviewers.
 Third, each theme was written up as a subsection from its own studies only, with no sentence citing more than 3 studies; in a theme of up to 5 studies every study was to be cited, and studies still uncited were given to one further revision pass, while a larger theme was synthesised from the studies that report its claims most directly, and its uncited studies are listed with the citation coverage.
 Finally, the part of every cited sentence attributed to a paper was checked against that paper; sentences judged not supported or only partly supported were rewritten once from the paper's evidence and checked again.
 The requested artifact could not be built: The artifact could not be built from the results (LlmOutputException).
@@ -271,7 +275,7 @@ Agent loops recover from faults through supervisor checks~\cite{doe2025agent}, w
 Recovery and oversight & How agent loops recover and are overseen. & {\cite{doe2025agent,lee2026agent}} \\ \addlinespace
 \bottomrule
 \end{tabularx}
-\vspace{2pt}\noindent{\scriptsize Second, independent coding: Cohen's kappa = 1.00 over 2 study-theme decisions.\par}
+\vspace{2pt}\noindent{\scriptsize Second coding by a second prompt of the same model: raw agreement 100\% (2 of 2); Cohen's kappa = 1.00; PABAK = 1.00; n = 2 study-theme decisions; this measures robustness to the prompt, not inter-rater reliability.\par}
 \normalsize
 \vspace{10pt}
 
@@ -290,6 +294,7 @@ The records were screened by the language model mistral-large-latest (Mistral AP
 No open-access full text was found for any of the 2 included studies, so all were read from their abstracts only.
 The search took at most 3 records per source.
 The extraction, the synthesis and the text were written by the language model mistral-large-latest (Mistral API); every cited sentence was checked against its source, but the review should be read by a person before it is relied on.
+This was a pilot run, not a comprehensive search: the search took at most 3 records per source and identified 3 records, so relevant studies are likely to be missing and the findings show what a small sample of the literature says, not the state of the field.
 
 \subsection{Automated Citation Check}\label{sec:automated-citation-check}
 
@@ -314,6 +319,7 @@ To be completed by the authors.
 The code of the tool is openly available at \url{https://github.com/lauPhilip/au-btech-literature-review-agent}.
 This run used a version of the tool.
 The run archive contains the protocol, the raw source responses, the screening ledger, the extraction and appraisal data, the thematic codebook, every model call's fingerprint and a manifest.json with the SHA-256 fingerprint of every file.
+The run archive to share, made for a public repository such as Zenodo or OSF, leaves out the downloaded papers without an open licence, the raw answers of licensed databases and the model call log, holds no abstracts from licensed databases and shortens long quotes; its deposit.json lists every file left out or changed with its SHA-256 in the full archive, which the review's owner keeps.
 Journal quartiles are taken from the SCImago Journal Rank (SJR) data (\url{https://www.scimagojr.com}).
 
 \subsection{Use of Artificial Intelligence}\label{sec:use-of-artificial-intelligence}
@@ -367,11 +373,12 @@ Give each author's roles in the CRediT taxonomy, for example Conceptualization, 
 \textbf{Paper Name} & \textbf{Executive Summary} & \textbf{Inclusion Rationale} & \textbf{Source} & \textbf{Citation (APA 7th)} \\
 \midrule
 \endhead%
-Agent loops for safe orchestration & An agent paper. & About agent architecture. & Google Scholar & Doe, J. (2025). Agent loops for safe orchestration.\ \textit{Future Internet}.\ \url{https://doi.org/10.3390/fi1234567}\\ \addlinespace
-Agent governance layers & An agent paper. & About agent architecture. & Google Scholar & Lee, K. (2026). Agent governance layers. In \textit{Proceedings of the Conference on Agents}.\\ \addlinespace
+Agent loops for safe orchestration & An agent paper. & About agent architecture. & Google Scholar; SJR Q1 & Doe, J. (2025). Agent loops for safe orchestration.\ \textit{Future Internet}.\ \url{https://doi.org/10.3390/fi1234567}\\ \addlinespace
+Agent governance layers & An agent paper. & About agent architecture. & Google Scholar; not in SJR & Lee, K. (2026). Agent governance layers. In \textit{Proceedings of the Conference on Agents}.\\ \addlinespace
 \bottomrule
 \end{tabularx}
-\vspace{4pt}\noindent Table~\ref{tab:A.1} lists each included study with a short summary, the reason it was included, the database it came from and its reference.\par
+\vspace{4pt}\noindent Table~\ref{tab:A.1} lists each included study with a short summary, the reason it was included, the database it came from with its venue's rank, and its reference.\par
+\noindent{\small The rank is the venue's SCImago Journal Rank (SJR) quartile, matched on the exact title. A venue marked not in SJR was not found in the SJR data: it may be a conference, a preprint server or an unlisted journal, and its standing was not checked. The Directory of Open Access Journals (DOAJ) was not checked.\par}
 \vspace{10pt}
 \begin{tabularx}{\textwidth}{>{\hsize=0.25\hsize}Y >{\hsize=0.8\hsize}Y >{\hsize=1.1\hsize}Y >{\hsize=0.9\hsize}Y >{\hsize=1.95\hsize}Y}
 \caption{Extracted Study Data}\label{tab:A.2}\\

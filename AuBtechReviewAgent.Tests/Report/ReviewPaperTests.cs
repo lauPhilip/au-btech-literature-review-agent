@@ -59,7 +59,7 @@ public class ReviewPaperTests : IDisposable
         Assert.Contains("PRISMA 2020 flow diagram", tex);
         // Issue #133: Table 3.1 names the database as the paper page does.
         Assert.Contains(@"& \textbf{Source} & \textbf{Citation (APA 7th)}", tex);
-        Assert.Contains("& Google Scholar &", tex);
+        Assert.Contains("& Google Scholar; ", tex);
 
         string path = GoldenPath();
         if (Environment.GetEnvironmentVariable("UPDATE_GOLDEN") == "1" || !File.Exists(path))
