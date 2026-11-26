@@ -21,17 +21,17 @@ public partial class PrismaReviewEngine
         string? Parts(ScreeningAnswer a) => CriterionParts.Problem(a, inclusionCriteria);
 
         if (!noAbstract)
-            return CriterionParts.Apply((await LlmJson.GetAsync<ScreeningAnswer>(chatService, prompt, JsonMode(0.0), a => ScreeningAnswer.Validate(a) ?? Parts(a))).Normalized(), paper);
+            return CriterionParts.Apply((await LlmJson.GetAsync<ScreeningAnswer>(chatService, prompt, JsonMode(0.0), a => ScreeningAnswer.Validate(a) ?? Parts(a))).Normalized(), paper, inclusionCriteria);
 
         // A record without an abstract: an answer that still describes one is sent back. If the model keeps doing
         // it, the decision is kept but its reason is flagged, so a reader knows not to trust that part (issue #132).
         try
         {
-            return CriterionParts.Apply((await LlmJson.GetAsync<ScreeningAnswer>(chatService, prompt, JsonMode(0.0), a => ScreeningAnswer.ValidateWithoutAbstract(a) ?? Parts(a))).Normalized(), paper);
+            return CriterionParts.Apply((await LlmJson.GetAsync<ScreeningAnswer>(chatService, prompt, JsonMode(0.0), a => ScreeningAnswer.ValidateWithoutAbstract(a) ?? Parts(a))).Normalized(), paper, inclusionCriteria);
         }
         catch (LlmOutputException)
         {
-            var answer = CriterionParts.Apply((await LlmJson.GetAsync<ScreeningAnswer>(chatService, prompt, JsonMode(0.0), a => ScreeningAnswer.Validate(a) ?? Parts(a))).Normalized(), paper);
+            var answer = CriterionParts.Apply((await LlmJson.GetAsync<ScreeningAnswer>(chatService, prompt, JsonMode(0.0), a => ScreeningAnswer.Validate(a) ?? Parts(a))).Normalized(), paper, inclusionCriteria);
             if (ScreeningAnswer.ClaimsAnAbstract(answer.Reasoning) || ScreeningAnswer.ClaimsAnAbstract(answer.BriefSummary))
                 answer.Reasoning = AbstractClaimWarning + " " + answer.Reasoning;
             return answer;
