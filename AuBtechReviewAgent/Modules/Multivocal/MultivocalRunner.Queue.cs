@@ -19,14 +19,22 @@ public sealed partial class MultivocalRunner
     /// <summary>The line every review shares; null runs the steps without waiting.</summary>
     public RunCoordinator? Coordinator { get; init; }
 
-    /// <summary>Joins the line; when it is refused, the status says why and the run is not started.</summary>
+    /// <summary>
+    /// Joins the line; when it is refused, the status says why and the run is not started. An admitted run is held as
+    /// active (<see cref="RunCoordinator.Hold"/>) from here until its steps end, so it cannot be deleted, noted or
+    /// cleaned up while it waits or runs.
+    /// </summary>
     private bool Admit(Guid runId, string? client)
     {
         if (Coordinator == null) return true;
         var admission = Coordinator.TryAdmit(runId, client);
-        if (admission.Admitted) return true;
-        Set(runId, new MultivocalRunStatus(false, "Not started", null, admission.Refusal));
-        return false;
+        if (!admission.Admitted)
+        {
+            Set(runId, new MultivocalRunStatus(false, "Not started", null, admission.Refusal));
+            return false;
+        }
+        Coordinator.Hold(runId);
+        return true;
     }
 
     private async Task RunInLineAsync(Guid runId, string? editKey)
@@ -36,6 +44,7 @@ public sealed partial class MultivocalRunner
             await RunStepsAsync(runId, editKey);
             return;
         }
+        Coordinator.Hold(runId); // RunAsync comes here without Admit
         try
         {
             using var slot = await WaitForSlotAsync(Coordinator, runId);
@@ -44,6 +53,7 @@ public sealed partial class MultivocalRunner
         finally
         {
             Coordinator.Withdraw(runId);
+            Coordinator.Release(runId);
         }
     }
 

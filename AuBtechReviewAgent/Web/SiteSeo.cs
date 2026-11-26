@@ -41,6 +41,7 @@ public static class SiteSeo
         ("/model-card", "monthly", "0.5"),
         ("/privacy", "yearly", "0.3"),
         ("/verify", "yearly", "0.3"),
+        ("/accessibility", "yearly", "0.3"),
     };
 
     public const string RepositoryUrl = "https://github.com/lauPhilip/au-btech-literature-review-agent";

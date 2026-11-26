@@ -9,7 +9,7 @@ namespace AuBtechReviewAgent;
 /// the live connection, which the HTTP rate limiter never sees: starting a review, proposing search strings,
 /// re-checking a citation, the editor's check of a changed sentence, checking an uploaded archive, and adding a report to the gallery. A page's own
 /// count (five proposals a page) starts again with every reload; this one does not. Counts are kept in memory per
-/// address for an hour and are lost on a restart. A refusal is logged as the HTTP limiter logs it (SiteRateLimits).
+/// address for an hour and are lost on a restart. Circuits without a known address share one count. A refusal is logged as the HTTP limiter logs it (SiteRateLimits).
 /// </summary>
 public sealed class ActionLimiter
 {
@@ -27,6 +27,9 @@ public sealed class ActionLimiter
         // Adding a report copies its files to the gallery; a few an hour is plenty for an owner.
         [GallerySubmit] = 5,
     };
+
+    /// <summary>The one bucket for every circuit whose address is not known.</summary>
+    public const string UnknownAddress = "unknown";
 
     private readonly Dictionary<string, int> _perHour;
     private readonly PartitionedRateLimiter<string> _limiter;
@@ -51,12 +54,15 @@ public sealed class ActionLimiter
 
     /// <summary>
     /// Counts one more use of the action for this address, or refuses it with a sentence for the page. The server
-    /// itself (loopback, or no address in tests) is not limited, as for the HTTP limiter.
+    /// itself (loopback) is not limited, as for the HTTP limiter. A page that could not learn the address passes
+    /// "unknown" (or nothing); every such circuit shares one count, as in the run quota, so a lost address is never
+    /// a way around the limit.
     /// </summary>
-    public bool TryTake(string action, string clientAddress, out string refusal)
+    public bool TryTake(string action, string? clientAddress, out string refusal)
     {
         refusal = "";
-        if (clientAddress is "unknown" or "127.0.0.1" or "::1") return true;
+        if (string.IsNullOrWhiteSpace(clientAddress)) clientAddress = UnknownAddress;
+        if (clientAddress is "127.0.0.1" or "::1") return true;
         using var lease = _limiter.AttemptAcquire(action + "|" + clientAddress);
         if (lease.IsAcquired) return true;
         var wait = lease.TryGetMetadata(MetadataName.RetryAfter, out var retry) ? retry : TimeSpan.FromHours(1);

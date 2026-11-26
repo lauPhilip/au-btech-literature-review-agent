@@ -196,9 +196,10 @@ public partial class Home
                 }
                 catch (Exception ex)
                 {
-                    // The run failed or was cancelled: give the quota slot back (a cancelled one once a day). The
-                    // reason is stored in the run's ledger, and the engine has logged it with the run ID.
-                    if (lease != null) Quota.GiveBackAfter(lease, ex);
+                    // The run failed or was cancelled: give the quota slot back (a cancelled one once a day, a failed
+                    // one only when it made no model call; the count is in the ledger the engine saved before it threw).
+                    // The reason is stored in the run's ledger, and the engine has logged it with the run ID.
+                    if (lease != null) Quota.GiveBackAfter(lease, ex, ReviewEngine.LoadState(runId)?.RunSettings?.LlmCalls ?? 0);
                     Logger.LogDebug("Run {RunId} ended with {Error}", runId, ex.GetType().Name);
                 }
                 finally
