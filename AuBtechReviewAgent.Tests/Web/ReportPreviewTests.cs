@@ -41,6 +41,28 @@ public class ReportPreviewTests
     }
 
     [Fact]
+    public void ATableThatRunsOverAPageRepeatsItsHeaderRow()
+    {
+        string tables = Read("wwwroot", "js", "paged-tables.js");
+        if (tables.Length == 0) return;
+        Assert.Contains("repeatedHead", tables);
+        Assert.Contains("':scope > thead'", tables);
+        Assert.DoesNotContain("innerHTML", tables);
+
+        string pages = Read("wwwroot", "js", "paged-preview.js");
+        Assert.Contains("traceablePageTables", pages);
+        Assert.Contains("el.parentElement.tagName === 'TBODY'", pages); // a body row moves alone
+        Assert.Contains("<div data-page-top aria-hidden=\"true\"></div>", ReportPageSource.Read());
+
+        string app = Read("Components", "App.razor");
+        Assert.True(app.IndexOf("js/paged-tables.js", StringComparison.Ordinal) is var at and >= 0 && at < app.IndexOf("js/paged-preview.js", StringComparison.Ordinal));
+
+        string css = Read("wwwroot", "css", "report-paper.css");
+        Assert.Contains("[data-page-top] { position: absolute; inset: 0; z-index: 2; pointer-events: none; }", css);
+        Assert.DoesNotContain("border-radius", css);
+    }
+
+    [Fact]
     public void TheCitationCheckBoxIsNotInThePagesAndThePanelBesideThemStays()
     {
         string? page = ReportPageSource.Read();
