@@ -10,12 +10,6 @@ namespace AuBtechReviewAgent;
 /// <summary>Screening stage: peer-review filter, (dual) screening of each record and the human review step.</summary>
 public partial class PrismaReviewEngine
 {
-    /// <summary>
-    /// Part of the screening cache key: change it whenever a screening prompt changes, so decisions made
-    /// with an older prompt are never reused.
-    /// </summary>
-    public const string ScreeningPromptVersion = "screening-v7";
-
     private sealed record ScreeningOutcome(
         AcademicPaper Paper,
         string SourceName,
