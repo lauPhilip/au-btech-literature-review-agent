@@ -28,6 +28,8 @@ public sealed class ReviewPaper
     public IReadOnlyList<string> Keywords { get; init; } = Array.Empty<string>();
     public string ProtocolHash { get; init; } = "not recorded";
     public string GeneratedAt { get; init; } = "";
+    /// <summary>The language models the run used, named in main.tex's AI-generated marks (<see cref="AiMarking"/>).</summary>
+    public IReadOnlyList<string> Models { get; init; } = Array.Empty<string>();
     public string Abstract { get; init; } = "";
     public string Rationale { get; init; } = "";
     public string Objectives { get; init; } = "";
@@ -150,7 +152,7 @@ public static class PaperLatex
 
     public static string Build(ReviewPaper paper)
     {
-        var sb = new StringBuilder();
+        var sb = new StringBuilder(AiMarking.LatexComment(paper.Models));
         sb.AppendLine(@"\documentclass[10pt,a4paper]{article}");
         // T1, the encoding the TeX Gyre fonts below are made for: in the default OT1 encoding "<", ">" and "|" print
         // as "¡", "¿" and "—" in running text (#482).
@@ -186,6 +188,7 @@ public static class PaperLatex
         sb.AppendLine(@"\fancyhf{}");
         sb.AppendLine(@"\renewcommand{\headrulewidth}{0pt}");
         sb.AppendLine(@"\fancyfoot[C]{\sffamily\scriptsize\color{greyText} Page \thepage}");
+        sb.Append(AiMarking.LatexMetadata(Escape(paper.Title), paper.Models));
 
         sb.AppendLine(@"\begin{document}");
 
