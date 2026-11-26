@@ -17,6 +17,8 @@ public class RunArchiveTests : IDisposable
             File.WriteAllText(Path.Join(_folder, name), "{}");
         File.WriteAllText(Path.Join(_folder, "vendor-page.html"), "<p>source text</p>");
         File.WriteAllText(Path.Join(_folder, "half-written.tmp"), "x");
+        File.WriteAllText(Path.Join(_folder, "fulltext-0123456789abcdef0123.pdf"), "%PDF-1.4");
+        File.WriteAllText(Path.Join(_folder, "fulltext-0123456789abcdef0123.json"), "{}"); // which paper the PDF is (#587)
         File.WriteAllText(Path.Join(_folder, RunArchive.RawResponsesFolder, "search-1.json"), "[]");
     }
 
@@ -50,6 +52,7 @@ public class RunArchiveTests : IDisposable
         Assert.Equal(new[]
         {
             "report.md", "run.json", "protocol.md", "llm-calls.json", "reviewer-notes.json",
+            "SourcePapers/fulltext-0123456789abcdef0123.json", "SourcePapers/fulltext-0123456789abcdef0123.pdf",
             "SourcePapers/vendor-page.html", "SourceResponses/search-1.json", "manifest.json",
         }, names);
     }
