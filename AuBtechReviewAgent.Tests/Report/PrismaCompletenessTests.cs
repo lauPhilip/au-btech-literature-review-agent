@@ -33,7 +33,6 @@ public class PrismaCompletenessTests : IDisposable
         Assert.Contains("Table A.4: Search Strategy per Source", tex);
         Assert.Contains("Table A.5: PRISMA 2020 Checklist", tex);
         Assert.Contains(@"\subsection{Competing Interests}", tex);
-        Assert.Contains(PrismaReviewEngine.NoCompetingInterestsText, tex);
         Assert.Contains(@"\subsection{Effect Measures and Reporting Bias}\label{sec:effect-measures-and-reporting-bias}" + "\n" + PaperLatex.Escape(PrismaChecklist.NotAssessedText(false)), tex);
         Assert.Contains(@"\textbf{Text read}", tex);
         // One checklist row per PRISMA 2020 item and sub-item (27 items, 42 rows).
@@ -42,7 +41,7 @@ public class PrismaCompletenessTests : IDisposable
         Assert.Equal(42, Regex.Matches(checklist, @"^\d+[a-f]? & ", RegexOptions.Multiline).Count);
         // Each place is named, with its number.
         Assert.Contains("7 & Search strategy & Search Execution (Sec.~\\ref{sec:search-execution}); Table A.4 (Search Strategy per Source) & Reported", checklist);
-        Assert.Contains("26 & Competing interests & Competing Interests (Sec.~\\ref{sec:competing-interests}) & Partly: not reported by the reviewer", checklist);
+        Assert.Contains("26 & Competing interests & Competing Interests (Sec.~\\ref{sec:competing-interests}) & Partly: a placeholder for the authors to complete", checklist);
         Assert.Contains("16a & Results of the search & Characteristics of the Included Studies (Sec.~\\ref{sec:characteristics-of-the-included-studies}); PRISMA flow diagram (Fig.~\\ref{fig:prisma-flow})", checklist);
         // The golden run has no research questions, so certainty is not rated and the checklist says why.
         Assert.Contains("15 & Certainty assessment & Effect Measures and Reporting Bias (Sec.~\\ref{sec:effect-measures-and-reporting-bias}) & Not done: the review has no research questions to rate", checklist);
@@ -104,7 +103,7 @@ public class PrismaCompletenessTests : IDisposable
             Headings = new[] { "Rationale", "Selection Automation", "Competing Interests", PrismaChecklist.NotAssessedHeading, "Certainty of the Evidence", "Conclusion" },
             CertaintyTable = "4.2",
             HumanScreeningReview = true,
-            CompetingInterestsDeclared = true,
+            FundingDeclared = true,
             TitleSaysSystematicReview = true,
         });
 
@@ -113,7 +112,7 @@ public class PrismaCompletenessTests : IDisposable
         Assert.Equal("Reported", full.Single(r => r.Item == "3").Status);
         Assert.Equal("Reported", full.Single(r => r.Item == "1").Status);
         Assert.Contains("human check", full.Single(r => r.Item == "8").Status);
-        Assert.Equal("Reported", full.Single(r => r.Item == "26").Status);
+        Assert.Equal("Partly: a placeholder for the authors to complete", full.Single(r => r.Item == "26").Status);
         Assert.StartsWith("Reported: a rule in code inspired by GRADE-CERQual", full.Single(r => r.Item == "15").Status);
         Assert.Equal(@"Certainty of the Evidence (Sec.~\ref{sec:certainty-of-the-evidence})", full.Single(r => r.Item == "15").Where);
         Assert.Equal(@"Table 4.2 (Certainty of the Evidence for Each Answer); Conclusion (Sec.~\ref{sec:conclusion})", full.Single(r => r.Item == "22").Where);
