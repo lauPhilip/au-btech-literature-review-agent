@@ -137,6 +137,7 @@ public partial class PrismaReviewEngine
                 state.SearchPerspectives.Count > 0 ? state.SearchPerspectives : new List<string> { state.SearchQuery },
                 state.ThematicSynthesis?.Themes.Select(t => t.Name)),
             GeneratedAt = report.GeneratedAt ?? DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss UTC"),
+            Models = AiMarking.Clean(new[] { state?.RunSettings?.Model, state?.RunSettings?.FastModel }),
             Abstract = report.AbstractItem ?? "",
             Rationale = report.RationaleItem ?? "",
             Objectives = report.ObjectivesItem ?? "",

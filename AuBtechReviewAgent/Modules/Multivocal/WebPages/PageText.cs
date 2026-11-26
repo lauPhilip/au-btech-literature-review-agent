@@ -41,7 +41,7 @@ public static class PageText
         // Never part of the text: comments, scripts, styles and embedded things; then what the page hides.
         string page = Regex.Replace(html, @"<!--.*?-->", " ", Options, Timeout);
         page = Regex.Replace(page, @"<(script|style|noscript|template|svg|iframe|object|canvas)\b[^>]*>.*?</\1\s*>", " ", Options, Timeout);
-        var dropped = HiddenText.DropHiddenHtml(page);
+        var dropped = HiddenText.DropHiddenHtml(page, PageStyleSheet.Of(html)); // the style blocks were taken out of page above
         page = dropped.Text;
         hidden.Append(dropped.Hidden);
 

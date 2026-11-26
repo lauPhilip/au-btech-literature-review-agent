@@ -3,12 +3,15 @@ namespace AuBtechReviewAgent;
 /// <summary>The front page of a printed multivocal paper (<see cref="ArticleInfo"/>), from the run's files.</summary>
 public static class MultivocalArticleInfo
 {
+    /// <summary>The models that wrote, screened, synthesised and checked the run, each named once; the paper's when there is one.</summary>
+    public static IReadOnlyList<string> ModelsOf(MultivocalReportInput? input, MultivocalPaperFile? paper) =>
+        AiMarking.Clean(new[] { paper?.Model, input?.Screening.Model, paper?.CheckModel, input?.Synthesis.Model });
+
     public static ArticleInfo For(MultivocalReportInput input, MultivocalPaperFile paper, bool hasProtocol)
     {
         var plan = input.Planned.Plan;
         var flow = MultivocalPaperParts.Flow(input);
-        var models = new[] { paper.Model, input.Screening.Model, paper.CheckModel, input.Synthesis.Model }
-            .Where(m => !string.IsNullOrWhiteSpace(m)).Select(m => m!.Trim()).Distinct(StringComparer.Ordinal).ToList();
+        var models = ModelsOf(input, paper);
         var strings = plan.EffectiveGreySearchStrings.Concat(input.Ledger.HasFormalPool ? plan.EffectiveFormalSearchStrings : Array.Empty<string>());
         return new ArticleInfo
         {
