@@ -34,7 +34,7 @@ public partial class PrismaReviewEngine
     {
         var state = LoadState(sessionId);
         if (state == null) return false;
-        var generated = GeneratedFiles(LoadArchiveReport(sessionId), state.SynthesizedRecords, state);
+        var generated = GeneratedFiles(sessionId, LoadArchiveReport(sessionId), state.SynthesizedRecords, state);
         var module = ReviewModules.Find(ReviewMethod.SystematicKey)!;
         RunArchive.Write(output, sessionId, GetWorkspaceFolderPath(sessionId), generated, module.ArchiveFiles,
             state.ProtocolHash, state.RunSettings?.Model);
@@ -49,7 +49,7 @@ public partial class PrismaReviewEngine
     {
         var state = LoadState(sessionId);
         if (state == null) return null;
-        var mainTex = GeneratedFiles(LoadArchiveReport(sessionId), state.SynthesizedRecords, state).First(f => f.Path == "main.tex");
+        var mainTex = GeneratedFiles(sessionId, LoadArchiveReport(sessionId), state.SynthesizedRecords, state).First(f => f.Path == "main.tex");
         return new UTF8Encoding(false).GetString(mainTex.Content);
     }
 
@@ -57,20 +57,20 @@ public partial class PrismaReviewEngine
     // zip bundle (LaTeX source + JSON ledger + source PDFs). Renamed to match what it actually produces.
     public byte[] GenerateWorkspaceArchive(Guid sessionId, PrismaReport report, List<IncludedPaperMetricRow> records, ReviewState? state = null)
     {
-        var generated = GeneratedFiles(report, records, state);
+        var generated = GeneratedFiles(sessionId, report, records, state);
         var module = ReviewModules.Find(ReviewMethod.SystematicKey)!;
         return RunArchive.Build(sessionId, GetWorkspaceFolderPath(sessionId), generated, module.ArchiveFiles,
             state?.ProtocolHash, state?.RunSettings?.Model);
     }
 
-    private List<(string Path, byte[] Content)> GeneratedFiles(PrismaReport report, List<IncludedPaperMetricRow> records, ReviewState? state)
+    private List<(string Path, byte[] Content)> GeneratedFiles(Guid sessionId, PrismaReport report, List<IncludedPaperMetricRow> records, ReviewState? state)
     {
         // The LaTeX interpolates decimals (pie-slice angles, axis limits). On a machine with a Danish (or any
         // comma-decimal) culture those came out as "51,43", which breaks the TikZ syntax, so the document is
         // always written with the invariant culture.
         var previousCulture = System.Globalization.CultureInfo.CurrentCulture;
         System.Globalization.CultureInfo.CurrentCulture = System.Globalization.CultureInfo.InvariantCulture;
-        try { return BuildGeneratedFiles(report, records, state); }
+        try { return BuildGeneratedFiles(sessionId, report, records, state); }
         finally { System.Globalization.CultureInfo.CurrentCulture = previousCulture; }
     }
 
