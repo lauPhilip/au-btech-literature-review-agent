@@ -42,6 +42,9 @@ public class ReviewPaperTests : IDisposable
         tex = Regex.Replace(tex, @"fingerprint (?:[0-9a-f]|\\allowbreak\{\}){16,}", "fingerprint FINGERPRINT"); // with its break points
         tex = Regex.Replace(tex, @"version [^ ]+\)", "version VERSION)");
         tex = Regex.Replace(tex, @"This run used version .*?(?= The run archive)", "This run used VERSION.");
+        // The statement on AI use names the day and the run (the publisher audit, batch A).
+        tex = Regex.Replace(tex, @"\b\d{1,2} (?:January|February|March|April|May|June|July|August|September|October|November|December) \d{4}\b", "DAY");
+        tex = Regex.Replace(tex, @"\(run [^)]*\)", "(run RUNID)");
         return tex;
     }
 

@@ -23,7 +23,9 @@ public sealed class ReviewPaper
     /// <summary>The line above the title, e.g. "AI-GENERATED SYSTEMATIC LITERATURE REVIEW".</summary>
     public string KindLabel { get; init; } = "";
     public string Title { get; init; } = "";
-    public string Affiliation { get; init; } = "Department of Business Development and Technology, Aarhus University";
+    /// <summary>The line under the title. The tool cannot know who ran the review, so it is a placeholder for the authors.</summary>
+    public string Authors { get; init; } = PaperDeclarations.AuthorLine;
+    public IReadOnlyList<string> Keywords { get; init; } = Array.Empty<string>();
     public string ProtocolHash { get; init; } = "not recorded";
     public string GeneratedAt { get; init; } = "";
     public string Abstract { get; init; } = "";
@@ -190,7 +192,7 @@ public static class PaperLatex
         sb.AppendLine(@"\begin{center}");
         sb.AppendLine(@"    {\sffamily\bfseries\scriptsize\color{gray} " + paper.KindLabel + @"  \\ \vspace{4pt}}");
         sb.AppendLine("    {\\rmfamily\\LARGE\\bfseries " + Escape(paper.Title) + " \\\\ \\vspace{10pt}}");
-        sb.AppendLine(@"    {\sffamily\small\color{greyText} " + paper.Affiliation + @" \\ \vspace{4pt}}");
+        sb.AppendLine(@"    {\sffamily\small\color{greyText} " + Escape(paper.Authors) + @" \\ \vspace{4pt}}");
         sb.AppendLine("    {\\ttfamily\\scriptsize\\color{gray} Protocol Hash: " + paper.ProtocolHash + " | Generated: " + paper.GeneratedAt + " \\\\ \\vspace{15pt}}");
         sb.AppendLine(@"    \color{lightgray}\hrule\vspace{15pt}");
         sb.AppendLine(@"    \color{black}");
@@ -201,6 +203,8 @@ public static class PaperLatex
         sb.AppendLine(@"\parbox{\dimexpr\linewidth-2\fboxsep\relax}{%");
         sb.AppendLine(@"    \small\sffamily\bfseries\color{auBlue} ABSTRACT \\ \vspace{4pt}");
         sb.AppendLine("    \\itshape\\rmfamily\\color{black} " + Escape(paper.Abstract));
+        if (paper.Keywords.Count > 0)
+            sb.AppendLine(@"    \par\vspace{6pt}\upshape\sffamily\small\textbf{Keywords:} " + Escape(string.Join("; ", paper.Keywords)));
         sb.AppendLine(@"}}");
         sb.AppendLine(@"\vspace{15pt}");
 

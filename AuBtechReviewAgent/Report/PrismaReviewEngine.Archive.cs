@@ -39,7 +39,7 @@ public partial class PrismaReviewEngine
     }
 
     /// <summary>The files only a systematic review generates for its archive, main.tex first. Called with the invariant culture.</summary>
-    private List<(string Path, byte[] Content)> BuildGeneratedFiles(PrismaReport report, List<IncludedPaperMetricRow> records, ReviewState? state)
+    private List<(string Path, byte[] Content)> BuildGeneratedFiles(Guid sessionId, PrismaReport report, List<IncludedPaperMetricRow> records, ReviewState? state)
     {
         // main.tex is built in memory and written straight into the zip. It used to go through a temporary
         // manuscript_*.tex file in the project folder, and every download first deleted all such files - so
@@ -110,19 +110,32 @@ public partial class PrismaReviewEngine
         if (!string.IsNullOrWhiteSpace(report.CitationCheckSummary)) discussionNotes.Add(new("Automated Citation Check", report.CitationCheckSummary));
         if (!string.IsNullOrWhiteSpace(state?.HumanScreeningReviewOutcome)) discussionNotes.Add(new("Human Screening Review", state!.HumanScreeningReviewOutcome!));
 
-        // The declarations in the order and with the headings of the report page (issue #169).
+        // The declarations in the order and with the headings of the report page (issue #169), then the statement on AI
+        // use (7.4 on the page) and the declarations only the authors can make (the publisher audit, batch A).
         var declarations = new List<PaperSection>
         {
             new("Registration and Protocol", string.IsNullOrWhiteSpace(report.ProtocolItem) ? NoProtocolText : report.ProtocolItem),
-            new("Support & Funding", report.SupportItem ?? ""),
+            new("Support & Funding", PaperDeclarations.Funding(report.SupportItem)),
             new("Availability of Data and Code", "", LatexBreaks.Allow((report.AvailabilityItem ?? "").Replace("_", @"\_"))),
         };
+        string aiMethods = "";
+        if (state != null)
+        {
+            aiMethods = AiUseStatement.Methods(state, sessionId, LoadReportEdits(sessionId), report.Artifact);
+            declarations.Add(new("Use of Artificial Intelligence", aiMethods));
+        }
+        declarations.AddRange(PaperDeclarations.Placeholders());
+        if (state != null)
+            appendixLatex += PaperDeclarations.PublisherVariantsLatex(AiUseStatement.Used(state), AiUseStatement.Purpose, AiUseStatement.Short(state), aiMethods);
 
         var paper = new ReviewPaper
         {
             KindLabel = "AI-GENERATED SYSTEMATIC LITERATURE REVIEW",
             Title = (report.TitleItem ?? "Systematic Review Manuscript").Replace("[Source Context Anchor 1]", "").Trim(),
             ProtocolHash = string.IsNullOrWhiteSpace(report.ProtocolHash) ? "not recorded" : report.ProtocolHash,
+            Keywords = state == null ? Array.Empty<string>() : ArticleKeywords.From(state.SearchQuery,
+                state.SearchPerspectives.Count > 0 ? state.SearchPerspectives : new List<string> { state.SearchQuery },
+                state.ThematicSynthesis?.Themes.Select(t => t.Name)),
             GeneratedAt = report.GeneratedAt ?? DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss UTC"),
             Abstract = report.AbstractItem ?? "",
             Rationale = report.RationaleItem ?? "",
