@@ -20,12 +20,14 @@ public class MultivocalPdfHiddenTextTests : IDisposable
     /// <summary>Serves one PDF at its address; every other address, robots.txt included, is not found.</summary>
     private sealed class PdfWeb(string url, byte[] pdf) : HttpMessageHandler
     {
-        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        // Returned straight from an async method, so the caller owns and disposes each response.
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
-            if (request.RequestUri!.ToString() != url) return Task.FromResult(new HttpResponseMessage(HttpStatusCode.NotFound) { Content = new StringContent("") });
+            await Task.Yield();
+            if (request.RequestUri!.ToString() != url) return new HttpResponseMessage(HttpStatusCode.NotFound) { Content = new StringContent("") };
             var content = new ByteArrayContent(pdf);
             content.Headers.ContentType = new MediaTypeHeaderValue("application/pdf");
-            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = content });
+            return new HttpResponseMessage(HttpStatusCode.OK) { Content = content };
         }
     }
 
