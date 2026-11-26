@@ -12,7 +12,7 @@
    opened. In the browser that planned the run it is also saved to the run folder (multivocal-report.md), so the
    archive holds the report as it was last read. *@
 
-<SeoHead Title="Grey literature review report" Path="/mlr-report" NoIndex="true"
+<SeoHead Title="Grey literature review report" Path="/mlr-report" NoIndex="true" AiGeneratedBy="@models"
          Description="The report of a multivocal literature review, following the Garousi et al. (2019) guidelines." />
 
 <div class="mx-auto w-full max-w-[1600px] px-[clamp(16px,3vw,40px)] py-4 sm:py-8 print:max-w-none print:p-0">
@@ -138,6 +138,7 @@
 
     private AuBtechReviewAgent.MultivocalReport? report;
     private bool saved;
+    private IReadOnlyList<string>? models;
 
     protected override void OnParametersSet()
     {
@@ -149,6 +150,7 @@
             return;
         }
         report = Reporter.Build(RunId);
+        models = report == null ? null : AuBtechReviewAgent.MultivocalArticleInfo.ModelsOf(Reporter.LoadInput(RunId), null);
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)

@@ -4,6 +4,7 @@
 @inject AuBtechReviewAgent.GalleryStore Store
 @inject AuBtechReviewAgent.ReviewModulesOptions ModuleOptions
 @inject NavigationManager Nav
+@inject Microsoft.Extensions.Configuration.IConfiguration Configuration
 
 @* One report in the gallery, shown only as it prints: the report page draws a version's copy (SpecMatrix with
    GalleryId and GalleryVersion) inside "ui-print-view", which applies the print layout on screen
@@ -12,7 +13,7 @@
 
 @if (entry != null && newest != null)
 {
-    <SeoHead Title="@entry.Title" Path="@CanonicalPath" BreadcrumbName="Gallery"
+    <SeoHead Title="@entry.Title" Path="@CanonicalPath" BreadcrumbName="Gallery" AiGeneratedBy="@(Array.Empty<string>())"
              Description="@($"An example {AuBtechReviewAgent.GalleryCard.TypeLabel(entry.Card).ToLowerInvariant()} made with TraceableAI, shown as it prints, with every citation checked against its source.")" />
 
     <div class="mx-auto w-full max-w-[960px] px-[clamp(16px,3vw,40px)] py-6 sm:py-10">
@@ -29,11 +30,20 @@
         <section class="mt-4 border border-line bg-soft p-4 text-sm sm:p-5" aria-labelledby="how-made">
             <h2 id="how-made" class="font-display text-base font-semibold text-heading">How this was made</h2>
             <p class="mt-1 text-ink">@AuBtechReviewAgent.GalleryCard.HowMade(entry)</p>
+            @if (AuBtechReviewAgent.GalleryCard.CitationSupport(entry.Citations) is string support)
+            {
+                <p class="mt-2 text-ink" data-citation-support>@support.</p>
+            }
+            @if (AuBtechReviewAgent.GalleryCard.SelfCheckLine(entry.SelfCheck) is string selfCheck)
+            {
+                <p class="mt-1 text-ink" data-self-check>@selfCheck. The report checked its own paper in code once it was finished, as an editor would; a note is worth a look and a fault is something a reader would notice.</p>
+            }
             <p class="mt-2 text-muted">
                 @AuBtechReviewAgent.GalleryCard.Provenance(entry). Shown as it prints, drawn from a copy of the run's files with today's layout.
                 <a href="/model-card" class="text-heading underline underline-offset-2">How the tool works</a> ·
                 <a href="/privacy#gallery" class="text-heading underline underline-offset-2">What the gallery keeps</a>
             </p>
+            <AuBtechReviewAgent.Components.Gallery.GalleryCite Entry="entry" BaseUrl="@BaseUrl" />
             <AuBtechReviewAgent.Components.Gallery.GalleryWithdraw EntryId="@entry.Id" RunIds="@RunIds" @rendermode="InteractiveServer" />
         </section>
 
@@ -51,6 +61,10 @@
 @code {
     [Parameter] public string Id { get; set; } = "";
     [Parameter] public int? Version { get; set; }
+    [CascadingParameter] private Microsoft.AspNetCore.Http.HttpContext? HttpContext { get; set; }
+
+    private string BaseUrl => AuBtechReviewAgent.SiteSeo.BaseUrl(Configuration, HttpContext?.Request) is { Length: > 0 } url
+        ? url : Nav.BaseUri.TrimEnd('/');
 
     private AuBtechReviewAgent.GalleryEntry? entry, newest;
 

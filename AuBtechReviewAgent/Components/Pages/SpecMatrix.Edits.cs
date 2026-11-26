@@ -130,7 +130,7 @@ public partial class SpecMatrix
         }
         await LoadAuditAsync(folder, reloadReport: false);
         if (ReviewEngine.LoadState(State.CurrentSessionId) is { } state)
-            aiStatement = AuBtechReviewAgent.AiUseStatement.Methods(state, State.CurrentSessionId, editLog);
+            aiStatement = AuBtechReviewAgent.AiUseStatement.Methods(state, State.CurrentSessionId, editLog, report.Artifact);
     }
 
     /// <summary>The edit box for the sentence that is open, if it is in this text.</summary>
