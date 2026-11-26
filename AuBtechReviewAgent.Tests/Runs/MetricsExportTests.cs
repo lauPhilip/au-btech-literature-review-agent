@@ -20,7 +20,7 @@ public class MetricsExportTests
         "thematic_synthesis_used,themes,codes,anchored_code_share,studies_coded,studies_uncoded,coding_kappa,studies_cited,coverage_share," +
         "citations_initial,initial_supported,initial_partly_supported,initial_not_supported,initial_insufficient_evidence,initial_unverifiable," +
         "citations,supported,partly_supported,not_supported,insufficient_evidence,unverifiable,supported_share," +
-        "second_checked,second_check_agreed,upgraded_by_second_check,repaired,removed,outside_theme,invalid_markers_stripped," +
+        "second_checked,second_check_agreed,upgraded_by_second_check,repaired,removed,outside_theme,invalid_markers_stripped,self_check_passed,self_check_notes,self_check_faults," +
         "synthesis_words,discussion_words,sentences,cited_sentence_share,citations_per_100_words,multi_paper_sentence_share," +
         "duration_minutes,llm_minutes,llm_calls,llm_retries,llm_failures,calls_without_usage,tokens,input_tokens,cached_input_tokens,output_tokens,reasoning_tokens," +
         "estimated_cost,cost_currency," + Pool("grey", "table7_scored,mean_table7_points") + "," + Pool("formal", "mmat_appraised,mmat_empirical");
@@ -74,6 +74,30 @@ public class MetricsExportTests
         Assert.Equal("", Value(2, "formal_identified"));
         Assert.Equal("", Value(2, "input_tokens")); // not counted then: empty, not 0
         Assert.All(rows, r => Assert.Equal(header.Length, Cells(r).Length));
+    }
+
+    [Fact]
+    public void TheSelfCheckIsCountedPerRunAndEmptyForARunBeforeIt()
+    {
+        var checkedRun = Systematic();
+        checkedRun.SelfCheckPassed = 8; checkedRun.SelfCheckNotes = 2; checkedRun.SelfCheckFaults = 1;
+        var rows = Lines(MetricsExport.RunsCsv(new[] { checkedRun, Multivocal() }));
+        var header = rows[0].Split(',');
+        string Value(int row, string column) => Cells(rows[row])[Array.IndexOf(header, column)];
+
+        Assert.Equal(("8", "2", "1"), (Value(1, "self_check_passed"), Value(1, "self_check_notes"), Value(1, "self_check_faults")));
+        // A run made before the self-check shows dashes (empty cells), never 0 faults.
+        Assert.Equal(("", "", ""), (Value(2, "self_check_passed"), Value(2, "self_check_notes"), Value(2, "self_check_faults")));
+    }
+
+    [Fact]
+    public void TheMetricsOfARunCarryTheSelfCheckFromItsLedger()
+    {
+        var state = new ReviewState { Stats = new ReviewStats { SelfCheckPassed = 9, SelfCheckNotes = 0, SelfCheckFaults = 1 } };
+        var metrics = RunMetrics.Build(Guid.NewGuid(), state, null, new List<CitationSupportResult>(), null, 0, new List<LlmCallRecord>(), new Dictionary<string, string>());
+
+        Assert.Equal((9, 0, 1), (metrics.SelfCheckPassed, metrics.SelfCheckNotes, metrics.SelfCheckFaults));
+        Assert.Null(RunMetrics.Build(Guid.NewGuid(), new ReviewState(), null, new List<CitationSupportResult>(), null, 0, new List<LlmCallRecord>(), new Dictionary<string, string>()).SelfCheckFaults);
     }
 
     [Fact]
