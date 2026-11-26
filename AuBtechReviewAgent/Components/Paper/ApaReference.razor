@@ -1,7 +1,8 @@
 @* An APA reference as text, with the journal, its volume and a book's title in italics (issue #128). The reference
    is built with Markdown asterisks for main.tex and the exports; this shows them as italics instead of printing them.
+   Its web addresses, such as the DOI, are links (LinkedText).
    The spans are written on one line so no space is added around them. *@
-@foreach (var span in AuBtechReviewAgent.ApaCitationBuilder.ItalicSpans(Text)){if (span.Italic){<em>@span.Text</em>}else{@span.Text}}
+@foreach (var span in AuBtechReviewAgent.ApaCitationBuilder.ItalicSpans(Text)){if (span.Italic){<em>@span.Text</em>}else{<LinkedText Text="@span.Text" />}}
 
 @code {
     /// <summary>The reference as ApaCitationBuilder built it, with asterisk pairs around the italic parts.</summary>
