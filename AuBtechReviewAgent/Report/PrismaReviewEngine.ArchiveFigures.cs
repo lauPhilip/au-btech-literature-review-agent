@@ -17,6 +17,7 @@ public partial class PrismaReviewEngine
         int transactionsCount = records.Count(r => r.VenueType.Equals("Transactions", StringComparison.OrdinalIgnoreCase));
         int proceedingsCount = records.Count(r => r.VenueType.Equals("Proceedings", StringComparison.OrdinalIgnoreCase));
         int preprintCount = records.Count(r => r.VenueType.Equals("Preprints", StringComparison.OrdinalIgnoreCase) || r.VenueType.Equals("Other", StringComparison.OrdinalIgnoreCase));
+        int bookCount = records.Count(r => r.VenueType.Equals(ApaCitationBuilder.BookChapters, StringComparison.OrdinalIgnoreCase));
 
         // One slice per source that actually contributed papers (any source, including ones added later).
         var platformSlices = records
@@ -83,7 +84,7 @@ public partial class PrismaReviewEngine
             ("Journals", journalCount, "blue!50"), ("Conferences", conferenceCount, "customIndigo!50"),
             ("Transactions", transactionsCount, "teal!50"), ("Proceedings", proceedingsCount, "orange!50"),
             ("Preprints", preprintCount, "red!50"),
-        }));
+        }.Concat(bookCount > 0 ? new[] { ("Book chapters", bookCount, "green!40") } : Array.Empty<(string, int, string)>()).ToList()));
         sb.AppendLine(@"\end{tikzpicture}");
         sb.AppendLine(@"\caption{Venue Share}\label{fig:venues}");
         sb.AppendLine(@"\end{minipage}");
