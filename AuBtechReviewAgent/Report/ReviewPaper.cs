@@ -135,7 +135,8 @@ public static class PaperLatex
         escaped = Regex.Replace(escaped, "\"([^\"\n]*)\"", "``$1''");
         // Characters pdflatex cannot set from UTF-8 with this preamble: Cohen's κ in a multivocal method, a Greek letter
         // in a source's name ("α-UMi", #475), an emoji in a repository's title.
-        escaped = LatexText.Map(escaped);
+        // The marks of unconfirmed citations (CitationMarkers) become a dagger, the first with its footnote.
+        escaped = LatexText.Map(CitationMarkers.MarksToLatex(escaped));
         // Two maths spans side by side ("2×10^6") become one, since "$$" would start display maths.
         escaped = Regex.Replace(escaped, @"(?<!\\)\$\$", "");
         // Markdown-style *italics* (used for venues in the APA references) -> real LaTeX italics.
