@@ -38,7 +38,7 @@ public class DepositDownloadTests
         // The temporary copy is gone once the download has been sent.
         Assert.Empty(Directory.GetFiles(host.Engine.Store.FolderOf(id), "deposit-*"));
 
-        var again = new HttpRequestMessage(HttpMethod.Get, $"/api/workspace/{id}/deposit");
+        using var again = new HttpRequestMessage(HttpMethod.Get, $"/api/workspace/{id}/deposit");
         again.Headers.IfNoneMatch.Add(response.Headers.ETag!);
         using var unchanged = await client.SendAsync(again);
         Assert.Equal(HttpStatusCode.NotModified, unchanged.StatusCode);
