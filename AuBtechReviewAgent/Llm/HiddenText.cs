@@ -10,7 +10,7 @@ namespace AuBtechReviewAgent;
 /// What was taken out of a source's text because a reader never sees it (#369), on file beside the injection flags.
 /// </summary>
 /// <param name="InvisibleCharacters">Invisible characters removed (zero-width, bidirectional controls, tag characters).</param>
-/// <param name="HiddenElements">Parts of a web page hidden by their attributes or inline style; always 0 for a PDF.</param>
+/// <param name="HiddenElements">Parts of a web page hidden by their attributes or style, or runs of letters a PDF hides (#534).</param>
 public sealed record HiddenTextRemoved(int InvisibleCharacters, int HiddenElements)
 {
     /// <summary>A record of what was removed, or null when nothing was, so a clean source leaves no field on file.</summary>

@@ -51,7 +51,7 @@ public class ApaCitationBuilderTests
     {
         var paper = Paper(
             id: "http://arxiv.org/abs/2607.02703v1",
-            title: "LLMoxie: Exploring Agentic AI for Scientific Software Development",
+            title: "LLMoxie: Exploring agentic AI for scientific software development",
             date: "Published: 2026",
             authors: new List<string> { "Lucas Setiawan", "Anshul Mittal" },
             venue: "arXiv Preprint Repository (arXiv:2607.02703v1)",
@@ -60,7 +60,7 @@ public class ApaCitationBuilderTests
         var result = ApaCitationBuilder.Build(paper);
 
         // APA 7 (10.8): a preprint stands alone, so its title is in italics, followed by its arXiv number.
-        Assert.Equal("Setiawan, L., & Mittal, A. (2026). *LLMoxie: Exploring Agentic AI for Scientific Software Development* (arXiv:2607.02703). arXiv. https://doi.org/10.48550/arXiv.2607.02703", result.Citation);
+        Assert.Equal("Setiawan, L., & Mittal, A. (2026). *LLMoxie: Exploring agentic AI for scientific software development* (arXiv:2607.02703). arXiv. https://doi.org/10.48550/arXiv.2607.02703", result.Citation);
         Assert.Equal("Preprints", result.VenueType);
         Assert.Equal("", result.VenueName);
     }

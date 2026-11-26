@@ -35,7 +35,7 @@ public class ExportAndEvaluationTests
         Assert.Contains("@misc{setiawan2026llmoxie,", bib);
         Assert.Contains("@article{setiawan2026llmoxiea,", bib);
         Assert.Contains("author = {Setiawan, Lucas and Mittal, Anshul}", bib);
-        Assert.Contains(@"title = {{LLMoxie: Exploring Agentic AI \& Science}}", bib);
+        Assert.Contains(@"title = {{LLMoxie: Exploring agentic AI \& science}}", bib);
         Assert.Contains("journal = {Future Internet}", bib);
         Assert.Contains("doi = {10.48550/arXiv.2607.02703}", bib);
         Assert.True(bib.IndexOf("@misc") < bib.IndexOf("@article")); // reference-number order

@@ -63,6 +63,8 @@ public partial class PrismaReviewEngine
             ReportProgress(ctx.RunId, ctx.State, RunProgress.FullText, (double)(i + 1) / included.Count, Of(i + 1, included.Count, "papers"));
             // Text a reader never sees is taken out before anything reads it (#369); what was removed is on file below.
             var (chunks, removed, hidden) = HiddenText.CleanChunks(result.Chunks);
+            if (result.HiddenParts > 0) // letters the PDF hides were already taken out of the chunks (#534)
+                (removed, hidden) = (HiddenTextRemoved.Of(removed?.InvisibleCharacters ?? 0, result.HiddenParts), hidden + result.Hidden);
             ctx.Chunks[included[i].Id] = chunks;
             ctx.State.FullTextSources[included[i].Id] = result.Source;
             if (IsWebAddress(result.Url)) ctx.State.FullTextUrls[included[i].Id] = result.Url!;

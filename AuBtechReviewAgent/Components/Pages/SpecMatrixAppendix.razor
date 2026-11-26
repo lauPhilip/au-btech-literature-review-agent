@@ -25,7 +25,7 @@
                         <tr class="hover:bg-soft" id="@($"ref-{paperRow.ReferenceNumber}")">
                             <td class="p-2 font-mono text-heading font-bold border-r border-line align-top">[@paperRow.ReferenceNumber]</td>
                             <td class="p-2 border-r border-line align-top break-words">
-                                <span class="font-semibold text-ink">@paperRow.Title</span>
+                                <span class="font-semibold text-ink">@ApaCitationBuilder.TitleAsGiven(paperRow.Title)</span>
                                 @if (!string.IsNullOrEmpty(paperRow.IntegrityNote))
                                 {
                                     <span class="block text-xs text-not-supported">@paperRow.IntegrityNote</span>
