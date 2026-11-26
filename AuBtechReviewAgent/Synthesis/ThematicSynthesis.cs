@@ -241,14 +241,15 @@ public static partial class ThematicSynthesis
             return $"The findings were synthesised narratively by {model} from the abstracts and selected full-text passages of the included studies, organised by themes proposed in a preceding outline step.{why} Every cited sentence was then checked against the cited paper{checkedBy} (see the automated citation check).";
         }
         var sb = new StringBuilder();
-        sb.Append($"The findings were synthesised thematically, following the thematic synthesis method of Thomas and Harden (2008), with {model} performing each step. ");
+        sb.Append($"The findings were synthesised thematically, following the thematic synthesis method of Thomas and Harden (2008), with {model} performing each step (descriptive themes only; no analytical themes were developed). ");
         sb.Append($"First, the key findings extracted from each study (whose supporting quotes had been found in the paper's text) were coded; each code names the findings it comes from, and for studies without verified findings the code had to quote the abstract verbatim, which was checked in code ({book.Codes.Count(c => c.Anchor != "unanchored")} of {book.Codes.Count} codes were anchored this way). ");
         sb.Append($"Second, the codes were grouped into {book.Themes.Count} descriptive themes; a study belongs to a theme when one of its codes does, and the model's answer was rejected until every coded study was either placed in a theme or explicitly left out with a reason. ");
         if (ReuseSentence(book.Reuse) is { Length: > 0 } reused) sb.Append(reused).Append(' ');
         if (book.SecondCoding is { } second)
         {
             sb.Append(second.Kappa is double k
-                ? $"A second, independent coding assigned the studies to the same themes; agreement over {second.CellsCompared} study-theme decisions was Cohen's kappa = {k.ToString("0.00", CultureInfo.InvariantCulture)} ({second.Disagreements.Count} disagreement{(second.Disagreements.Count == 1 ? "" : "s")}, listed in thematic-codebook.json). "
+                ? $"A second, independent coding assigned the studies to the same themes; agreement over {second.CellsCompared} study-theme decisions was Cohen's kappa = {k.ToString("0.00", CultureInfo.InvariantCulture)} ({second.Disagreements.Count} disagreement{(second.Disagreements.Count == 1 ? "" : "s")}, listed in thematic-codebook.json). " +
+                  Agreement.Sentence(second.Agreements, second.CellsCompared) + Agreement.SameModelSentence("codings")
                 : $"A second, independent coding was attempted but could not be completed ({second.Error}). ");
         }
         sb.Append($"Third, each theme was written up as a subsection from its own studies only, with no sentence citing more than {ReviewWriter.MaxReferencesPerSentence} studies; " +
