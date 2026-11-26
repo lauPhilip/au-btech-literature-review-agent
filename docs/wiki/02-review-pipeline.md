@@ -65,7 +65,7 @@ The `LlmStage` names below are what `llm-calls.json` records for each call, and 
 | `outline` | `ReviewWriter.WriteOutlineAsync` | `ReviewWriter.Themes.cs` | `grounded-outline.txt`: themes, claims, reference numbers |
 | `report-draft` | inside `GeneratePrismaChecklistReportWithRAGAsync` | Report | Draft PRISMA items as JSON; its title, abstract, rationale and objectives are a fallback |
 | `front-matter` | `ReviewWriter.WriteFrontMatterAsync` | `ReviewWriter.cs` | Title, abstract, rationale and objectives, written last from the checked sections; numbers from code |
-| `style` | `StylisticRefinerUtility.RefineAcademicProseAsync` | `StylisticRefinerUtility.cs` | Abstract, rationale and objectives rewritten; `stylistic-transformation-ledger.json` |
+| `style` | `StylisticRefinerUtility.RefineAcademicProseAsync` (the language edit; its prompt version is pinned in `Golden/prompt-versions.txt`) | `StylisticRefinerUtility.cs` | Abstract, rationale and objectives rewritten; `stylistic-transformation-ledger.json` |
 | `thematic-coding` | `ThematicSynthesis.CodeStudiesAsync` | `ThematicSynthesis.cs` | Codes per study, anchored to verified findings |
 | `thematic-codebook` | `ThematicSynthesis.BuildCodebookAsync` | `ThematicSynthesis.Codebook.cs` | Themes built from the codes |
 | `thematic-coding-second` | `ThematicSynthesis.SecondCodingAsync` | `ThematicSynthesis.Codebook.cs` | Independent theme assignment, kappa (with `Synthesis:DualCoding`) |
