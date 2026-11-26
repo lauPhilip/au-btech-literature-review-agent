@@ -105,6 +105,8 @@ public class EngineHelpersTests : IDisposable
         // The fingerprint is of protocol.md as written before the search; the search strings are appended after it.
         Assert.Matches("^[0-9a-f]{64}$", state.ProtocolSha256);
         Assert.NotEqual(RunManifest.Sha256(File.ReadAllBytes(Path.Join(folder, "protocol.md"))), state.ProtocolSha256);
+        // One fingerprint on the title page and in the methods (#573: run 289a0d3e showed 8e780591 and 51d8241be6ae82c5).
+        Assert.Equal(state.ProtocolSha256![..16], state.ProtocolHash);
         Assert.NotNull(state.CompletedUtc);
         Assert.NotNull(state.RunSettings);
         Assert.True(File.Exists(Path.Join(folder, "llm-calls.json")));

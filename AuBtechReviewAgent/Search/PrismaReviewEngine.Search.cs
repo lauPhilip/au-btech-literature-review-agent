@@ -51,9 +51,12 @@ public partial class PrismaReviewEngine
                 searchPerspectives = await GenerateSearchPerspectivesAsync(ctx.Chat, request.Query, request.Objective, request.Inclusion);
         }
         reviewState.SearchPerspectives = searchPerspectives;
-        reviewState.ProtocolHash = MethodsSectionWriter.ComputeProtocolHash(
-            request.Query, request.Objective, request.Inclusion, request.Exclusion,
-            searchPerspectives, reviewState.SelectedSources, maxResults, request.PeerReviewOnly);
+        // One fingerprint for the run (issue #573): the start of protocol.md's SHA-256, the value the methods give and a
+        // reader can check. The hash of the settings is used only when protocol.md could not be written.
+        reviewState.ProtocolHash = reviewState.ProtocolSha256 is { Length: >= 16 } sha
+            ? sha[..16]
+            : MethodsSectionWriter.ComputeProtocolHash(request.Query, request.Objective, request.Inclusion, request.Exclusion,
+                searchPerspectives, reviewState.SelectedSources, maxResults, request.PeerReviewOnly);
         try
         {
             // The extra search strings are only known now, so they are added to the protocol as a dated amendment.
