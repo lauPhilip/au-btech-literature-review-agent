@@ -7,7 +7,8 @@ namespace AuBtechReviewAgent.Tests;
 
 /// <summary>
 /// The quote check against a text made canonical once must answer exactly as the check that normalised the text for
-/// every quote. <see cref="Reference"/> is that check as it was before, kept here word for word, and both are run on
+/// every quote. <see cref="Reference"/> is the canonical match as it was before #606, kept here word for word: the
+/// check may now refuse a match it found (one that is not a run of text), never find one it missed. Both are run on
 /// every attack-set text and on generated quotes with ellipses, glue words, ligatures, hyphens, smart quotes, accents
 /// and CJK text.
 /// </summary>
@@ -96,9 +97,11 @@ public class CanonicalTextTests
         foreach (var quote in quotes)
         {
             // A slice can split a surrogate pair, which normalisation refuses: both must then refuse alike.
-            string expected = Outcome(() => Reference(quote, text));
-            Assert.True(expected == Outcome(() => CitationSupportChecker.QuoteOccursIn(quote, canonical)), $"canonical form, quote: {quote}");
-            Assert.True(expected == Outcome(() => CitationSupportChecker.QuoteOccursIn(quote, text)), $"string form, quote: {quote}");
+            string reference = Outcome(() => Reference(quote, text));
+            string once = Outcome(() => CitationSupportChecker.QuoteOccursIn(quote, canonical));
+            Assert.True(once == Outcome(() => CitationSupportChecker.QuoteOccursIn(quote, text)), $"string form, quote: {quote}");
+            // The run-of-text check (#606) only takes matches away: it never finds what the canonical match missed.
+            Assert.True(once == reference || (once == "not found" && reference == "found"), $"canonical form, quote: {quote}");
         }
     }
 
