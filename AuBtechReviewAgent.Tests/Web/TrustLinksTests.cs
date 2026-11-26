@@ -36,4 +36,29 @@ public class TrustLinksTests
         foreach (var href in new[] { "/about", "/privacy", "/accessibility" })
             Assert.DoesNotContain("hidden", Item(app, href));
     }
+
+    [Fact]
+    public void TheComposerHasATrustLineBesideTheDecision()
+    {
+        string? composer = Read("Components", "Dashboard", "ReviewComposer.razor");
+        if (composer == null) return;
+        string line = composer[composer.IndexOf("data-trust-line", StringComparison.Ordinal)..];
+        line = line[..line.IndexOf("</p>", StringComparison.Ordinal)];
+
+        // After the Start button, in the same panel; links to the three existing pages.
+        Assert.True(composer.IndexOf("Start review</button>", StringComparison.Ordinal) < composer.IndexOf("data-trust-line", StringComparison.Ordinal));
+        foreach (var href in new[] { "/about", "/model-card", "/privacy" }) Assert.Contains($"href=\"{href}\"", line);
+        // What it says is what the privacy page says: the model and the databases receive the question; runs are deleted; no accounts.
+        Assert.Contains("language model", line);
+        Assert.Contains("scholarly databases", line);
+        Assert.Contains("deleted with your run", line);
+        Assert.Contains("no accounts", line);
+        // No rounded corners, and a phone keeps only the links so the form still fits 390 x 844.
+        Assert.DoesNotContain("rounded", line);
+        Assert.Contains("max-sm:hidden", line);
+        string? privacy = Read("Web", "PrivacyText.cs") + Read("Components", "Pages", "Privacy.razor") + Read("Components", "Pages", "Privacy.razor.cs");
+        Assert.Contains("There are no accounts", privacy);
+        Assert.Contains("Mistral AI", privacy);
+        Assert.Contains("deleted automatically", privacy);
+    }
 }
