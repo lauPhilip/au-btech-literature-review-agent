@@ -16,6 +16,29 @@ public static class StylisticRefinerUtility
     /// <summary>Raised whenever the prompt changes; every entry of the ledger records the version that wrote it.</summary>
     public const string PromptVersion = "language-edit-v2";
 
+    private static readonly Lazy<string> Template = new(() => PromptTemplate.Hash(Prompt(PromptTemplate.Slot("text"))));
+
+    /// <summary>The fingerprint of the prompt's fixed text, pinned to <see cref="PromptVersion"/> in a test.</summary>
+    public static string TemplateSha256 => Template.Value;
+
+    private static string Prompt(string rawText) => $$"""
+        You are a rigorous academic copyeditor doing a language edit of a draft manuscript.
+
+        LANGUAGE EDIT RULES:
+        1. Ban Empty Parallelisms: Eliminate structural clichés like "not only..., but also..." or "not X, but Y". Replace them with direct, simple connections.
+        2. Remove Artificial Signposting: Delete canned transitional phrases (e.g., "Crucially," "Importantly," "It is worth noting that," "Moreover," "Furthermore").
+        3. Restore Basic Copulatives: Do not avoid simple verbs like "is" or "are" in favor of elegant variation or passive filler loops.
+        4. Lower Lexical Density: Replace bloated, repetitive model buzzwords (e.g., "landscape," "testament," "pivotal," "beacon," "delve," "orchestration") with exact, understated domain language.
+        5. Vary Sentence Cadence: Break up monotone, perfectly symmetrical structures. Mix short, direct assertions with complex academic clauses.
+
+        ORIGINAL DRAFT:
+        {{rawText}}
+
+        TASK: Edit the draft above into clear, direct academic prose. Retain all factual source references, citations, and specific data points exactly.
+
+        Respond ONLY with the clean, refined academic text paragraph. Do not add introductions, conversational remarks, or markdown code blocks.
+        """;
+
     public static async Task<(string RefinedText, StyleDeltaLog Delta)> RefineAcademicProseAsync(
         IChatCompletionService chatService, 
         string fieldName, 
@@ -24,23 +47,7 @@ public static class StylisticRefinerUtility
         if (string.IsNullOrWhiteSpace(rawText)) 
             return (string.Empty, new StyleDeltaLog(fieldName, string.Empty, string.Empty));
 
-        var prompt = $$"""
-            You are a rigorous academic copyeditor doing a language edit of a draft manuscript.
-
-            LANGUAGE EDIT RULES:
-            1. Ban Empty Parallelisms: Eliminate structural clichés like "not only..., but also..." or "not X, but Y". Replace them with direct, simple connections.
-            2. Remove Artificial Signposting: Delete canned transitional phrases (e.g., "Crucially," "Importantly," "It is worth noting that," "Moreover," "Furthermore").
-            3. Restore Basic Copulatives: Do not avoid simple verbs like "is" or "are" in favor of elegant variation or passive filler loops.
-            4. Lower Lexical Density: Replace bloated, repetitive model buzzwords (e.g., "landscape," "testament," "pivotal," "beacon," "delve," "orchestration") with exact, understated domain language.
-            5. Vary Sentence Cadence: Break up monotone, perfectly symmetrical structures. Mix short, direct assertions with complex academic clauses.
-
-            ORIGINAL DRAFT:
-            {{rawText}}
-
-            TASK: Edit the draft above into clear, direct academic prose. Retain all factual source references, citations, and specific data points exactly.
-
-            Respond ONLY with the clean, refined academic text paragraph. Do not add introductions, conversational remarks, or markdown code blocks.
-            """;
+        string prompt = Prompt(rawText);
 
         string refinedText;
         try
