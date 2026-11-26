@@ -58,6 +58,17 @@ public class ArtifactAndProseTests : IDisposable
     }
 
     [Fact]
+    public void AClauseThatNamesAStudyDoesNotCiteItAgainBeforeTheNextClause()
+    {
+        // Issue #568, from run 289a0d3e.
+        Assert.Equal("[1] describing secure pipelines for trusted delivery and [5] detailing a control plane.",
+            ProseCleaner.DropRepeatedCitations("[1] describing secure pipelines for trusted delivery [1] and [5] detailing a control plane."));
+        Assert.Equal("Loops help: [4] identifies scenario generation and ReAct loops, while [1] highlights audits.",
+            ProseCleaner.DropRepeatedCitations("Loops help: [4] identifies scenario generation and ReAct loops [4], while [1] highlights audits [1]."));
+        Assert.Equal("Loops recover [3], and audits help [3].", ProseCleaner.DropRepeatedCitations("Loops recover [3], and audits help [3]."));
+    }
+
+    [Fact]
     public void ASentenceThatNamesAStudyDoesNotCiteItAgainAtTheEnd()
     {
         // Issue #125, from run 959b875d: "[5] warns ... [5]" and "Study [6] reports ... [6]".

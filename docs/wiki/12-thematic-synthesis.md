@@ -60,3 +60,5 @@ Steps that do not read each other's output run at the same time, which shortens 
 | The copy-edits of the abstract, rationale and objectives | Three separate calls |
 
 The codebook, coverage, second coding and the list of studies not cited (with the reason) are saved as `thematic-codebook.json` and as `ReviewState.ThematicSynthesis`. The Review Output page and `main.tex` show them as an evidence map (themes × studies).
+
+**One form per citation** (issue #568). A sentence names a study by its marker or cites it after the claim, never both in one clause: "[4] identifies X" or "X [4]", not "[4] identifies X [4]". The writing prompt says so (`ReviewWriter.ClaimPerCitationRule`), and `ProseCleaner.DropRepeatedCitations` removes a marker that ends a clause, before a comma, a semicolon or a conjunction, for a study that clause already names. A semicolon starts a new clause, so a marker there carries its own claim and stays. When the citation repair changes nothing, the audit records "not applied" with the reason and the methods count leaves the sentence out (issue #569).

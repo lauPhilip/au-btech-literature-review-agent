@@ -129,6 +129,7 @@ public static class ProseCleaner
     /// </summary>
     public static string DropRepeatedCitations(string sentence)
     {
+        sentence = DropRepeatedInClause(sentence);
         var markers = Marker.Matches(sentence).Cast<Match>().ToList();
         if (markers.Count < 2) return sentence;
         var last = markers[^1];
@@ -148,6 +149,41 @@ public static class ProseCleaner
         var keep = lastRefs.Where(r => !named.Contains(r)).ToList();
         string replacement = keep.Count == 0 ? "" : $" [{string.Join(", ", keep)}]";
         return sentence[..last.Index] + replacement + sentence[(last.Index + last.Length)..];
+    }
+
+    private static readonly Regex ClauseEnd = new(@"^\s*(?:[,.;:)]|$|(?:and|or|while|whereas|but)\b)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+
+    /// <summary>
+    /// Removes a marker that ends a clause in the middle of a sentence for a study that clause already names, so
+    /// "[4] identifies X [4], while [1] highlights Y" becomes "[4] identifies X, while [1] highlights Y" (issue #568).
+    /// A clause runs to the next semicolon. Only a marker followed by punctuation or a conjunction counts as ending a
+    /// clause, so "[5] warns [5] that" stays, and a marker that names a study (a word follows it) is never removed.
+    /// </summary>
+    private static string DropRepeatedInClause(string sentence)
+    {
+        var markers = Marker.Matches(sentence).Cast<Match>().ToList();
+        if (markers.Count < 2) return sentence;
+        var named = new HashSet<int>();
+        var edits = new List<(Match Marker, List<int> Keep)>();
+        for (int i = 0; i < markers.Count; i++)
+        {
+            var m = markers[i];
+            if (i > 0 && sentence[(markers[i - 1].Index + markers[i - 1].Length)..m.Index].Contains(';')) named.Clear();
+            string after = sentence[(m.Index + m.Length)..];
+            var refs = CitationSupportChecker.ReferencesIn(m.Value);
+            string trimmed = after.TrimStart();
+            bool names = trimmed.Length > 0 && char.IsLetter(trimmed[0]) && !Regex.IsMatch(trimmed, @"^(and|or|nor|while|whereas|but)\b", RegexOptions.IgnoreCase);
+            if (names) { named.UnionWith(refs); continue; }
+            if (i < markers.Count - 1 && ClauseEnd.IsMatch(after) && refs.Any(named.Contains))
+                edits.Add((m, refs.Where(r => !named.Contains(r)).ToList()));
+        }
+        for (int e = edits.Count - 1; e >= 0; e--)
+        {
+            var (m, keep) = edits[e];
+            string replacement = keep.Count == 0 ? "" : $" [{string.Join(", ", keep)}]";
+            sentence = sentence[..m.Index] + replacement + sentence[(m.Index + m.Length)..];
+        }
+        return sentence;
     }
 
     private static string EndAsSentence(string s)
