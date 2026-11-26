@@ -211,3 +211,22 @@ document.addEventListener('click', function (e) {
     e.preventDefault();
     window.print();
 });
+
+// An open citation (Components/Paper/CitedProse.razor) closes with a click anywhere outside it and with Escape. Both
+// press the panel's own Close button, so the page keeps one way of closing and returns focus as before. A click on a
+// button, link or field is left to that control (another citation then opens in its place, and Next or a filter in
+// the side panel opens its own), so the click that opens a citation can never also close it.
+document.addEventListener('click', function (e) {
+    const close = document.querySelector('[data-citation-close]');
+    if (!close || e.button !== 0 || !e.target.closest) return;
+    if (e.target.closest('[data-citation-panel], button, a, input, textarea, select, summary, label, [role="button"], [contenteditable]')) return;
+    if (!document.contains(e.target)) return;
+    close.click();
+});
+
+document.addEventListener('keydown', function (e) {
+    if (e.key !== 'Escape' || e.defaultPrevented) return;
+    const close = document.querySelector('[data-citation-close]');
+    if (!close || (e.target.closest && e.target.closest('[data-citation-panel]'))) return; // the panel handles its own Escape
+    close.click();
+});
