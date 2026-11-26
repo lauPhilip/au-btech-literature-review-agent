@@ -146,8 +146,27 @@ public sealed class ReferenceEnricher
     {
         var lookup = new ReferenceLookupLog { Service = service, Url = url };
         entry.Lookups.Add(lookup);
-        string ext = service == ReferenceAnswers.Arxiv ? ".xml" : ".json";
-        string name = $"reference-{service.ToLowerInvariant()}-{RunManifest.Sha256(Encoding.UTF8.GetBytes(url))[..16]}{ext}";
+        string? body = await FetchSavedAsync(_get, runFolder, "reference", lookup, withCredentials);
+        if (body == null) return null;
+        try { return parse(body); }
+        catch (Exception ex) when (ex is System.Text.Json.JsonException or System.Xml.XmlException)
+        {
+            lookup.Status += "; the answer could not be read";
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Fetches <paramref name="lookup"/>'s address once per run: the answer is saved in SourceResponses/ under a name made
+    /// from <paramref name="prefix"/>, the service and the address, and read from there when the run asks again, so the
+    /// retraction check and the enrichment share one answer for the same Crossref record. Sets the lookup's status, file
+    /// and SHA-256; returns null when the work is unknown or the request failed.
+    /// </summary>
+    internal static async Task<string?> FetchSavedAsync(Func<string, Task<string>> get, string runFolder, string prefix,
+        ReferenceLookupLog lookup, Func<string, string> withCredentials)
+    {
+        string ext = lookup.Service == ReferenceAnswers.Arxiv ? ".xml" : ".json";
+        string name = $"{prefix}-{lookup.Service.ToLowerInvariant()}-{RunManifest.Sha256(Encoding.UTF8.GetBytes(lookup.Url))[..16]}{ext}";
         string path = Path.Join(runFolder, RunArchive.RawResponsesFolder, name);
         string body;
         try
@@ -159,7 +178,7 @@ public sealed class ReferenceEnricher
             }
             else
             {
-                body = await _get(withCredentials(url));
+                body = await get(withCredentials(lookup.Url));
                 Directory.CreateDirectory(Path.GetDirectoryName(path)!);
                 await File.WriteAllBytesAsync(path, new UTF8Encoding(false).GetBytes(body));
                 lookup.Status = "fetched";
@@ -177,12 +196,7 @@ public sealed class ReferenceEnricher
         }
         lookup.RawFile = $"{RunArchive.RawResponsesFolder}/{name}";
         lookup.Sha256 = RunManifest.Sha256(new UTF8Encoding(false).GetBytes(body));
-        try { return parse(body); }
-        catch (Exception ex) when (ex is System.Text.Json.JsonException or System.Xml.XmlException)
-        {
-            lookup.Status += "; the answer could not be read";
-            return null;
-        }
+        return body;
     }
 
     private string WithOpenAlexKey(string url) =>
@@ -191,7 +205,7 @@ public sealed class ReferenceEnricher
             : OpenSourceHttp.WithMailto(url, _contactEmail) + (url.Contains('?') || !string.IsNullOrWhiteSpace(_contactEmail) ? "&" : "?") + "api_key=" + Uri.EscapeDataString(_openAlexKey.Trim());
 
     // A DOI keeps its slash in the path, as both APIs expect; everything else is escaped.
-    private static string EscapeDoi(string doi) => Uri.EscapeDataString(doi).Replace("%2F", "/", StringComparison.OrdinalIgnoreCase);
+    internal static string EscapeDoi(string doi) => Uri.EscapeDataString(doi).Replace("%2F", "/", StringComparison.OrdinalIgnoreCase);
 
     /// <summary>"https://doi.org/10.1/x", "doi:10.1/x" or "10.1/x" -> "10.1/x"; anything that is not a DOI -> null.</summary>
     public static string? BareDoi(string? doi)

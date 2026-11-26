@@ -47,6 +47,8 @@ public partial class PrismaReviewEngine
         string methodsSelection = MethodsSectionWriter.SelectionProcess(finalState.PeerReviewOnlyToggle, finalState.Stats, finalState.HumanScreeningReviewRequested, finalState.HumanScreeningReviewOutcome, Llm.DisplayNameFor("screening"));
         if (ExclusionReasons.Sentence(finalState.Phases.Screening) is { } exclusionSentence)
             methodsSelection += " " + exclusionSentence;
+        if (RetractionCheckText.Sentence(finalState.RetractionCheck) is { Length: > 0 } retractionSentence)
+            methodsSelection += " " + retractionSentence;
         return new SystematicMethods(methodsEligibility, methodsSources, methodsSearch, methodsSelection);
     }
 

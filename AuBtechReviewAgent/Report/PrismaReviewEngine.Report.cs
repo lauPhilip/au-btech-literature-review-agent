@@ -130,7 +130,9 @@ public partial class PrismaReviewEngine
         for (int i = 0; i < includedPapers.Count; i++)
         {
             var log = includedPapers[i];
-            reviewState.SynthesizedRecords.Add(BuildRecord(log, i + 1));
+            var row = BuildRecord(log, i + 1);
+            row.IntegrityNote = RetractionCheckText.Note(reviewState.RetractionCheck, log.PaperId);
+            reviewState.SynthesizedRecords.Add(row);
 
             ctx.Papers.TryGetValue(log.PaperId, out var paper);
             ctx.Chunks.TryGetValue(log.PaperId, out var chunks);
