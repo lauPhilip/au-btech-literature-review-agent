@@ -61,8 +61,8 @@ public static class PdfVisibleText
             hiddenAt[i] = inOffLayer.Contains(Key(l))
                 || (l.RenderingMode is TextRenderingMode.Neither or TextRenderingMode.NeitherClip && !scan)
                 || l.PointSize < MinPointSize
-                || Outside(l.GlyphRectangle, crop)
-                || (IsWhite(Drawn(l)) && !backdrops.Any(b => Inside(Centre(l.GlyphRectangle), b)));
+                || Outside(l.BoundingBox, crop)
+                || (IsWhite(Drawn(l)) && !backdrops.Any(b => Inside(Centre(l.BoundingBox), b)));
             any |= hiddenAt[i];
         }
         if (!any) return new PdfPageText(page.Text ?? "", 0, "");
@@ -177,7 +177,7 @@ public static class PdfVisibleText
         {
             foreach (var path in page.Paths)
                 if (path.IsFilled && !path.IsClipping && !IsWhite(path.FillColor) && path.GetBoundingRectangle() is { } r) list.Add(r);
-            list.AddRange(page.GetImages().Select(i => i.Bounds));
+            list.AddRange(page.GetImages().Select(i => i.BoundingBox));
         }
         catch (Exception ex) when (ex is not OutOfMemoryException)
         {
@@ -192,7 +192,7 @@ public static class PdfVisibleText
         if (area <= 0) return 0;
         try
         {
-            return page.GetImages().Sum(i => Overlap(i.Bounds, crop)) / area;
+            return page.GetImages().Sum(i => Overlap(i.BoundingBox, crop)) / area;
         }
         catch (Exception ex) when (ex is not OutOfMemoryException)
         {
