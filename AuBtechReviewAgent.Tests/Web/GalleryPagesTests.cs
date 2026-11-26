@@ -6,7 +6,7 @@ using Xunit;
 
 namespace AuBtechReviewAgent.Tests;
 
-/// <summary>The gallery pages served by the whole app: the catalogue, one report as it prints, hidden entries, and the print view's styles.</summary>
+/// <summary>The gallery pages served by the whole app: the catalogue, one report as it prints, hidden entries.</summary>
 [Collection(ApiCollection.Name)]
 public sealed class GalleryPagesTests : IDisposable
 {
@@ -67,7 +67,16 @@ public sealed class GalleryPagesTests : IDisposable
         page.EnsureSuccessStatusCode();
         string html = await page.Content.ReadAsStringAsync();
         Assert.Contains("How this was made", html);
-        Assert.Contains("ui-print-view", html);
+        // The same layout as the review output page: A4 sheets on a desk, the front page, the contents and the check panel.
+        Assert.Contains("paper-desk", html);
+        Assert.Contains("data-paged-sheet", html);
+        Assert.Contains("data-front-page", html);
+        Assert.Contains("data-report-contents", html);
+        Assert.Contains("Citation check", html);
+        Assert.DoesNotContain("ui-print-view", html);
+        Assert.DoesNotContain("id=\"download-panel-title\"", html);
+        Assert.DoesNotContain("Edit the text", html);
+        Assert.Contains($"/gallery/{entry.Id}/v/1#", html);
         Assert.Contains("AI &lt;script&gt;alert(1)&lt;/script&gt; in schools", html);
         Assert.DoesNotContain("<script>alert(1)", html);
         // The run's own actions and its links into the run folder are not part of the gallery's view.
@@ -133,24 +142,6 @@ public sealed class GalleryPagesTests : IDisposable
 
         Assert.DoesNotContain(entry.Id, await client.GetStringAsync("/gallery"));
         Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync($"/gallery/{entry.Id}")).StatusCode);
-    }
-
-    [Fact]
-    public void ThePrintViewCoversEveryPrintUtilityThePagesUse()
-    {
-        string? dir = AppContext.BaseDirectory;
-        while (dir != null && !File.Exists(Path.Join(dir, "AuBtechReviewAgent.sln"))) dir = Path.GetDirectoryName(dir);
-        if (dir == null) return; // not run from the repository (packaged tests)
-        string app = Path.Join(dir, "AuBtechReviewAgent");
-        string css = File.ReadAllText(Path.Join(app, "Styles", "tailwind.input.css"));
-        var used = new[] { "Components", "Modules" }
-            .SelectMany(d => Directory.EnumerateFiles(Path.Join(app, d), "*.*", SearchOption.AllDirectories))
-            .Where(f => f.EndsWith(".razor") || f.EndsWith(".cs"))
-            .SelectMany(f => Regex.Matches(File.ReadAllText(f), @"(?<![\w-])print:([\w\[\]\.\-]+)").Select(m => m.Groups[1].Value))
-            .ToHashSet();
-        Assert.NotEmpty(used);
-        var missing = used.Where(u => !css.Contains(".ui-print-view .print\\:" + u.Replace("[", "\\[").Replace("]", "\\]").Replace(".", "\\.") + " ")).ToList();
-        Assert.True(missing.Count == 0, "Add these to the print view in Styles/tailwind.input.css: " + string.Join(", ", missing));
     }
 
     [Fact]

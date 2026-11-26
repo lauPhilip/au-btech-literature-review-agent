@@ -122,4 +122,16 @@ public class ArticleInfoTests
         Assert.False(info.HasProtocol);
         Assert.DoesNotContain("doi", info.HowToCite("https://example.org/"), StringComparison.OrdinalIgnoreCase);
     }
+
+    [Fact]
+    public void AGalleryCopyNamesItsOwnAddressAndLinksNowhereIntoTheRun()
+    {
+        var runId = Guid.NewGuid();
+        var own = ArticleInfo.ForSystematic(runId, null, new PrismaReport(), "T", "A.", hasProtocol: false);
+        var copy = ArticleInfo.ForSystematic(runId, null, new PrismaReport(), "T", "A.", hasProtocol: false, galleryPath: "/gallery/abc/v/2");
+        Assert.True(own.LinksToRun);
+        Assert.Equal($"spec-matrix/{runId}", own.ReportPath);
+        Assert.False(copy.LinksToRun);
+        Assert.Equal("gallery/abc/v/2", copy.ReportPath);
+    }
 }

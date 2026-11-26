@@ -234,10 +234,10 @@ public partial class SpecMatrix
         await LoadAuditAsync(folder, reloadReport: false);
 
         var state = LoadLedger();
-        // The gallery shows a copy whose run may be gone, so its printout keeps the screen header instead of links to the run.
-        if (HasReport && !InGallery)
+        // A gallery copy outlives its run, so its front page names the gallery address and links nowhere into the run.
+        if (HasReport)
             articleInfo = AuBtechReviewAgent.ArticleInfo.ForSystematic(ReportRunId, state, report, ScrubAnchors(report.TitleItem), ScrubAnchors(report.AbstractItem), hasProtocol,
-                AuBtechReviewAgent.VerdictTally.From(auditChecks, auditRemoved));
+                AuBtechReviewAgent.VerdictTally.From(auditChecks, auditRemoved), InGallery ? ReportHref : null);
         if (state == null) return;
 
         peerReviewOnlyToggle = state.PeerReviewOnlyToggle;
