@@ -69,6 +69,17 @@ public static class SecondaryStudy
         return result;
     }
 
+    /// <summary>
+    /// How many included studies are reviews, for the article info. It counts every secondary study decided by <see cref="Classify"/>
+    /// and also a study whose extracted study type names a review design ("systematic literature review"), since the reader
+    /// is told only how many of the included studies are reviews. A bare "survey" is not counted (it names questionnaires too).
+    /// </summary>
+    public static int ReviewCount(IEnumerable<StudyExtraction>? extractions)
+    {
+        var all = (extractions ?? Enumerable.Empty<StudyExtraction>()).Where(e => e.Error == null).ToList();
+        return all.Where(e => KindOf(e) != null || KindIn(e.StudyType) != null).Select(e => e.ReferenceNumber).Distinct().Count();
+    }
+
     /// <summary>The methods sentence on the secondary studies; empty when the run included none.</summary>
     public static string MethodsSentence(IReadOnlyDictionary<int, string> secondary)
     {

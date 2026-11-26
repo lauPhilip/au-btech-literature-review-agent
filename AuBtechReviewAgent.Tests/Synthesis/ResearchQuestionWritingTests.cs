@@ -62,7 +62,11 @@ public class ResearchQuestionWritingTests : IDisposable
         // It is written after the closing sections, from the answers and the conclusion as given text (issue #446).
         Assert.Contains($"\nRQ1: {Answer}\nRQ2: {ReviewWriter.UnansweredText(WritingProfile.Systematic)}\n\nCONCLUSION (written and checked before this step; the abstract ends on the same reading, in its own words):\nSafe agent loops need recovery and oversight, while certification is still open.\n", front);
         var report = System.Text.Json.JsonSerializer.Deserialize<PrismaReport>(File.ReadAllText(Path.Join(_root, runId.ToString("N"), "prisma-report.json")))!;
-        Assert.Equal("The review set out to answer two research questions: (RQ1) How do agent loops recover from faults?; (RQ2) How are agent loops certified?", report.ObjectivesItem);
+        Assert.Equal("The review set out to answer two research questions.", report.ObjectivesItem);
+        // Only the systematic review's paper drops them from its objectives, because the list under them names them.
+        var two = new[] { "Which mechanisms?", "How are they evaluated?" };
+        Assert.Equal("The review set out to answer two research questions.", ReviewWriter.ObjectivesFromQuestions(two, null, namesQuestions: false));
+        Assert.Contains("(RQ1) Which mechanisms?", ReviewWriter.ObjectivesFromQuestions(two));
 
         // The discussion call answers RQ1 first (issue #446); RQ2, which no code bears on, is answered in code.
         string discussion = Prompt("You are writing the Discussion section");

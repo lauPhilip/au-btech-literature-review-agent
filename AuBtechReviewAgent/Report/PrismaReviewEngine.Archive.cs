@@ -135,6 +135,7 @@ public partial class PrismaReviewEngine
         appendixLatex += PrismaChecklist.Latex(PrismaChecklist.Rows(new PrismaChecklistFacts
         {
             Title = title,
+            IsPilot = SearchAdequacy.IsPilot(state),
             HasResearchQuestions = questions.Count > 0,
             HasSynthesisMethods = !string.IsNullOrWhiteSpace(report.SynthesisMethodsItem),
             HasCertainty = certainty != null,

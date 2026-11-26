@@ -50,15 +50,17 @@ public static class RetractionCheckText
     public static string Sentence(RetractionCheckFile? check)
     {
         if (check == null) return "";
-        int asked = check.Studies.Count, others = Math.Max(0, check.IncludedAtCheck - asked);
+        // A DOI that Crossref does not know (DataCite's, for one) counts as having no DOI registered at Crossref.
+        var studies_ = check.Studies.Where(e => !e.NotAtCrossref).ToList();
+        int asked = studies_.Count, others = Math.Max(0, check.IncludedAtCheck - asked);
         string notAsked = others == 0 ? "" : others == 1 ? " The other included study had no DOI registered at Crossref and was not checked."
             : $" The other {others} included studies had no DOI registered at Crossref and were not checked.";
         if (asked == 0)
             return "No included study had a DOI registered at Crossref, so none could be checked for retractions.";
 
-        int retracted = Count(check, RetractionStatus.Retracted), concern = Count(check, RetractionStatus.Concern),
-            corrected = Count(check, RetractionStatus.Corrected), failed = Count(check, RetractionStatus.NotChecked);
-        int preprints = check.Studies.Count(e => e.PublishedVersionDoi != null && e.Status != RetractionStatus.Retracted);
+        int retracted = Count(studies_, RetractionStatus.Retracted), concern = Count(studies_, RetractionStatus.Concern),
+            corrected = Count(studies_, RetractionStatus.Corrected), failed = Count(studies_, RetractionStatus.NotChecked);
+        int preprints = studies_.Count(e => e.PublishedVersionDoi != null && e.Status != RetractionStatus.Retracted);
         var found = new List<string>();
         if (retracted > 0) found.Add($"{retracted} had been retracted and {(retracted == 1 ? "was" : "were")} excluded, with the notice as the reason in the screening ledger");
         if (corrected > 0) found.Add($"{corrected} had a correction");
@@ -83,7 +85,7 @@ public static class RetractionCheckText
             $"{result}{unchecked_}{notAsked}".TrimStart() + $" No language model was involved, and every lookup is listed in {RetractionCheckFile.FileName}.";
     }
 
-    private static int Count(RetractionCheckFile check, string status) => check.Studies.Count(e => e.Status == status);
+    private static int Count(List<RetractionCheckEntry> studies, string status) => studies.Count(e => e.Status == status);
 
     private static string Join(IReadOnlyList<string> items) => items.Count switch
     {

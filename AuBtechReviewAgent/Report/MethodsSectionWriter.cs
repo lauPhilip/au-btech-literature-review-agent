@@ -188,7 +188,7 @@ public static partial class MethodsSectionWriter
         var groups = new List<string>();
         var everywhere = extra.Where(y => y.Searches == sources).ToList();
         if (everywhere.Count > 0)
-            groups.Add($"{JoinNatural(everywhere.Select(Quoted).ToList())} {(everywhere.Count == 1 ? "was" : "were")} run against all {Sources(sources)}");
+            groups.Add($"{JoinNatural(everywhere.Select(Quoted).ToList())} {(everywhere.Count == 1 ? "was" : "were")} run against {(sources == 2 ? "both sources" : $"all {Sources(sources)}")}");
         foreach (var y in extra.Where(y => y.Searches > 0 && y.Searches < sources))
             groups.Add($"{Quoted(y)} was run against {y.Searches} of the {Sources(sources)}, as the others had already filled their cap");
         var skipped = extra.Where(y => y.Searches == 0).ToList();
@@ -266,7 +266,7 @@ public static partial class MethodsSectionWriter
             sb.Append($"{stats.CacheHits} screening decision{(stats.CacheHits == 1 ? "" : "s")} or search response{(stats.CacheHits == 1 ? " was" : "s were")} reused from an earlier identical run (same record, criteria, model and prompt version); reuse is marked per record in the ledger. ");
         sb.Append("Full texts were retrieved only for included records and were not used for the screening decision. ");
         if (stats.ScreeningErrors > 0)
-            sb.Append($"{stats.ScreeningErrors} record{(stats.ScreeningErrors == 1 ? "" : "s")} could not be screened because the model call failed; they are listed in the run ledger. ");
+            sb.Append($"{stats.ScreeningErrors} record{(stats.ScreeningErrors == 1 ? "" : "s")} could not be screened because the model call failed; {(stats.ScreeningErrors == 1 ? "it is" : "they are")} listed in the run ledger. ");
 
         if (humanReviewRequested && stats.HumanReviewed > 0)
         {

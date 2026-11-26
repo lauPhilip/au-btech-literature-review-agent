@@ -33,6 +33,13 @@ public sealed class RetractionCheckEntry
     /// <summary>Why the check could not be completed, when <see cref="Status"/> is "not checked".</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? NotCheckedReason { get; set; }
+    /// <summary>
+    /// True when Crossref has no record of the DOI (answer "not found"): a DOI registered elsewhere, such as DataCite's
+    /// Zenodo DOIs. The study then has no DOI registered at Crossref; it is not a check that failed.
+    /// </summary>
+    [JsonIgnore]
+    public bool NotAtCrossref => Status == RetractionStatus.NotChecked && Lookups.Count > 0 && Lookups[0].Status == "not found";
+
     /// <summary>For a preprint: the DOI of the published version that Crossref names (relation is-preprint-of).</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? PublishedVersionDoi { get; set; }

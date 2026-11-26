@@ -98,7 +98,7 @@ public partial class PrismaReviewEngine
                 // Three separate language edits, sent together. Objectives written in code from the research questions are not edited.
                 var abstractTask = StylisticRefinerUtility.RefineAcademicProseAsync(chat, "Abstract", written?.Abstract ?? draft!.Abstract);
                 var rationaleTask = StylisticRefinerUtility.RefineAcademicProseAsync(chat, "Rationale", written?.Rationale ?? draft!.Rationale);
-                var objectivesTask = ReviewWriter.ObjectivesFromQuestions(finalState.ResearchQuestions) is { } codeObjectives
+                var objectivesTask = ReviewWriter.ObjectivesFromQuestions(finalState.ResearchQuestions, null, namesQuestions: false) is { } codeObjectives
                     ? Task.FromResult((codeObjectives, new StyleDeltaLog("Objectives", codeObjectives, codeObjectives, Applied: false, Note: "Written in code from the research questions in the protocol; not sent through the language edit.")))
                     : StylisticRefinerUtility.RefineAcademicProseAsync(chat, "Objectives", written?.Objectives ?? draft!.Objectives);
                 await Task.WhenAll(abstractTask, rationaleTask, objectivesTask);

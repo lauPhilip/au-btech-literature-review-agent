@@ -36,11 +36,14 @@ public static partial class ReviewWriter
     /// The objectives written in code from the protocol's research questions (AGENTS.md rule 2: what the review set out
     /// to do is part of its method, not the model's to write), or null when there are none. In a real run the model wrote
     /// the objectives from the results ("It compares quantitative performance metrics with ..."), not from the questions.
+    /// With <paramref name="namesQuestions"/> false the sentence says only how many there are, for a paper that lists the questions itself.
     /// </summary>
-    public static string? ObjectivesFromQuestions(IReadOnlyList<string>? questions, WritingProfile? profile = null)
+    public static string? ObjectivesFromQuestions(IReadOnlyList<string>? questions, WritingProfile? profile = null, bool namesQuestions = true)
     {
         if (questions == null || questions.Count == 0) return null;
         string count = questions.Count < SmallNumbers.Length ? SmallNumbers[questions.Count] : questions.Count.ToString();
+        // The systematic review lists the questions right under its objectives, so the sentence only counts them.
+        if (!namesQuestions) return $"The review set out to answer {count} research question{(questions.Count == 1 ? "" : "s")}.";
         string list = string.Join("; ", questions.Select((q, i) => $"({QuestionId(i, profile)}) {q.Trim()}"));
         string end = list.EndsWith('?') || list.EndsWith('.') || list.EndsWith('!') ? "" : ".";
         return $"The review set out to answer {count} research question{(questions.Count == 1 ? "" : "s")}: {list}{end}";

@@ -86,4 +86,41 @@ public class RetractionCheckTextTests
         Assert.Null(RetractionCheckText.Note(check, "unknown"));
         Assert.Null(RetractionCheckText.Note(null, "c"));
     }
+
+    // Run 8942b961 (issue #677): 9 included, 6 with a Crossref DOI (all checked), 2 from arXiv and one Zenodo deposit.
+    [Fact]
+    public void ADoiNotRegisteredAtCrossrefCountsAmongTheStudiesWithoutOne()
+    {
+        RetractionCheckEntry Done(string id) => new() { PaperId = id, Doi = "10.1234/" + id, Status = RetractionStatus.None,
+            Lookups = { new ReferenceLookupLog { Status = "fetched" } } };
+        var check = new RetractionCheckFile { IncludedAtCheck = 9 };
+        for (int i = 0; i < 6; i++) check.Studies.Add(Done("s" + i));
+        check.Studies.Add(new RetractionCheckEntry
+        {
+            PaperId = "z", Doi = "10.5281/zenodo.20096249", Status = RetractionStatus.NotChecked,
+            NotCheckedReason = "Crossref's record of the DOI could not be read (not found)",
+            Lookups = { new ReferenceLookupLog { Status = "not found" } },
+        });
+
+        string text = RetractionCheckText.Sentence(check);
+        Assert.Contains("the 6 included studies with a DOI registered at Crossref were checked", text);
+        Assert.Contains("None of them had a retraction, correction or expression of concern on record.", text);
+        Assert.Contains("The other 3 included studies had no DOI registered at Crossref and were not checked.", text);
+        Assert.DoesNotContain("could not be completed", text);
+    }
+
+    [Fact]
+    public void ACheckThatFailedForAnotherReasonIsStillReportedAsFailed()
+    {
+        var check = new RetractionCheckFile
+        {
+            IncludedAtCheck = 2,
+            Studies =
+            {
+                new RetractionCheckEntry { PaperId = "a", Doi = "10.1/a", Status = RetractionStatus.None, Lookups = { new ReferenceLookupLog { Status = "fetched" } } },
+                new RetractionCheckEntry { PaperId = "b", Doi = "10.1/b", Status = RetractionStatus.NotChecked, Lookups = { new ReferenceLookupLog { Status = "failed: timeout" } } },
+            },
+        };
+        Assert.Contains("For one study the check could not be completed", RetractionCheckText.Sentence(check));
+    }
 }

@@ -80,8 +80,18 @@ public static class ReferenceEnrichmentText
             $", and every lookup and filled field is listed in {ReferenceEnrichmentFile.FileName}.";
     }
 
+    /// <summary>The reason an arXiv reference is not looked up further, as stored in reference-enrichment.json (singular); the same words as in <c>ReferenceEnricher</c>.</summary>
+    public const string ArxivNoVenue = "it came from arXiv, which gives the full author list, and its arXiv entry names no journal or proceedings to complete it from";
+
+    private const string ArxivNoVenuePlural = "they came from arXiv, which gives the full author list, and their arXiv entries name no journal or proceedings to complete them from";
+
     private static string SkippedReasons(IEnumerable<ReferenceEnrichmentEntry> skipped) =>
-        string.Join("; ", skipped.GroupBy(r => r.Skipped!).Select(g => $"{g.Count()} because {g.Key}"));
+        string.Join("; ", skipped.GroupBy(r => r.Skipped!).Select(g => $"{g.Count()} because {(g.Count() == 1 ? g.Key : Plural(g.Key))}"));
+
+    // The stored reason speaks of one reference; more than one needs "they came", not "it came".
+    private static string Plural(string reason) =>
+        reason == ArxivNoVenue ? ArxivNoVenuePlural
+        : reason.StartsWith("it ", StringComparison.Ordinal) ? "they " + reason[3..] : reason;
 
     private static string Join(IReadOnlyList<string> items) => items.Count switch
     {

@@ -24,6 +24,7 @@ public static class BibliographyExporter
             {
                 "Journals" or "Transactions" => "article",
                 "Conferences" => "inproceedings",
+                ApaCitationBuilder.BookChapters => "incollection",
                 _ => "misc",
             };
             string key = UniqueKey(CitationKey(r), usedKeys);
@@ -33,7 +34,7 @@ public static class BibliographyExporter
             if (r.Authors.Count > 0) fields.Add(("author", string.Join(" and ", r.Authors.Select(a => IsEtAl(a) ? "others" : BibAuthor(a)))));
             fields.Add(("title", "{" + Bib(ApaCitationBuilder.TitleAsGiven(r.Title)) + "}")); // double braces keep capitalisation; capitals only as in the reference list
             if (!string.IsNullOrWhiteSpace(r.VenueName))
-                fields.Add((type == "article" ? "journal" : type == "inproceedings" ? "booktitle" : "howpublished", Bib(r.VenueName)));
+                fields.Add((type == "article" ? "journal" : type is "inproceedings" or "incollection" ? "booktitle" : "howpublished", Bib(r.VenueName)));
             else if (type == "misc" && r.Category == "Arxiv")
                 fields.Add(("howpublished", "arXiv"));
             if (r.Year > 0) fields.Add(("year", r.Year.ToString(CultureInfo.InvariantCulture)));

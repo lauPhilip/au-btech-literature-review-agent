@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using AuBtechReviewAgent;
 using Xunit;
 
@@ -88,5 +89,21 @@ public class SecondaryStudyTests
             SecondaryStudy.AnswerNote("Agents fail on context [2] and on tools [5].", secondary));
         Assert.Null(SecondaryStudy.AnswerNote("Agents fail on tools [5].", secondary));
         Assert.Null(SecondaryStudy.AnswerNote("Agents fail on tools [2].", null));
+    }
+
+    [Fact]
+    public void A_study_whose_extracted_type_is_a_review_counts_as_a_review_in_the_article_info()
+    {
+        var all = new[]
+        {
+            Study("A framework", "system description", number: 1),
+            Study("Guardrails for agents", "case study", number: 2),
+            Study("Agent safety on Zenodo", "systematic literature review", number: 3),
+        };
+        Assert.Equal(1, SecondaryStudy.ReviewCount(all));
+        // A bare "survey" names questionnaires too, so it is not counted; a title that names a review is.
+        Assert.Equal(1, SecondaryStudy.ReviewCount(all.Append(Study("Questionnaire on tools", "survey", number: 4))));
+        Assert.Equal(2, SecondaryStudy.ReviewCount(all.Append(Study("Agent memory: a scoping review", "position paper", number: 4))));
+        Assert.Equal(0, SecondaryStudy.ReviewCount(null));
     }
 }
