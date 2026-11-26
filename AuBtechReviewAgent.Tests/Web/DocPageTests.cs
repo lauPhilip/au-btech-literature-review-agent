@@ -66,7 +66,7 @@ public class DocPageTests
         string? root = Root();
         if (root == null) return; // not run from the repository (packaged tests)
 
-        foreach (var (file, href) in new[] { ("About.razor", "/about"), ("ModelCard.razor", "/model-card"), ("Privacy.razor", "/privacy"), ("GlossaryPage.razor", "/glossary"), ("Verify.razor", "/verify") })
+        foreach (var (file, href) in new[] { ("About.razor", "/about"), ("ModelCard.razor", "/model-card"), ("Privacy.razor", "/privacy"), ("GlossaryPage.razor", "/glossary"), ("Verify.razor", "/verify"), ("Accessibility.razor", "/accessibility") })
         {
             string page = Page(root, "Pages", file);
             Assert.Contains($"@page \"{href}\"", page);

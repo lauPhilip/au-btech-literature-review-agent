@@ -32,22 +32,15 @@ public static class WorkspaceDownloads
 
             var header = runs.LoadHeader(sessionId);
             bool multivocal = header?.Module == "multivocal";
-            var zip = RunArchiveCache.GetOrBuild(folder, stamp, RunArchiveCache.IsFinished(header, runs.IsActive(sessionId)), () =>
+            // Written to a file in the run folder, one source file at a time, and sent from there (#306, audit C4).
+            var zip = RunArchiveCache.GetOrBuild(folder, stamp, RunArchiveCache.IsFinished(header, runs.IsActive(sessionId)), output =>
             {
-                byte[] built = engine.GenerateWorkspaceArchiveFromDisk(sessionId);
                 multivocal = false;
-                if (built.Length == 0)
-                {
-                    built = writer.Archive(sessionId); // a multivocal run has no systematic review state
-                    multivocal = built.Length > 0;
-                }
-                return built;
+                if (engine.WriteWorkspaceArchive(sessionId, output)) return true;
+                multivocal = writer.WriteArchive(sessionId, output); // a multivocal run has no systematic review state
+                return multivocal;
             });
-            if (zip.Length == 0)
-            {
-                zip.Dispose();
-                return Results.NotFound();
-            }
+            if (zip == null) return Results.NotFound();
             string fileName = multivocal ? $"MLR_Run_Archive_{DateTime.UtcNow:yyyyMMdd}.zip" : $"PRISMA_Evaluation_Footprint_{DateTime.UtcNow:yyyyMMdd}.zip";
             return Results.File(zip, contentType: "application/zip", fileDownloadName: fileName,
                 lastModified: stamp.LastModified, entityTag: new EntityTagHeaderValue(stamp.ETag));

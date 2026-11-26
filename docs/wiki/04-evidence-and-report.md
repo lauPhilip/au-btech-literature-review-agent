@@ -170,6 +170,24 @@ Steps that do not read each other's output run at the same time, which shortens 
 
 The codebook, coverage, second coding and the list of studies not cited (with the reason) are saved as `thematic-codebook.json` and as `ReviewState.ThematicSynthesis`. The Review Output page and `main.tex` show them as an evidence map (themes × studies).
 
+## Certainty of the evidence
+
+Each answer to a research question gets a certainty rating of high, moderate, low or very low, inspired by GRADE-CERQual and GRADE (`Synthesis/EvidenceCertainty.cs` and its partial files). It is computed in code from the run's files, with no model call, every time the report page is shown or the archive is built, so it follows the reviewer's checked edits and older runs get it too (`Modules/Systematic/SystematicCertainty.cs`). It is an automated approximation, and the method says so.
+
+The evidence behind an answer is the studies it cites and the studies of the themes the codebook maps to its question. The rating starts at high when all of them are empirical, at moderate when at least half are, and at low otherwise. It then drops one level for each serious concern, down to very low, as the table shows. A concern is serious when more than half of the studies behind the answer are affected; the thresholds live in `CertaintyRule` and are written to `certainty.json`.
+
+| Domain | Lowers the rating when | Not assessed when |
+|---|---|---|
+| Methodological limitations | more than half of the studies fail more than half of their MMAT criteria ("can't tell" is not a failure) | never |
+| Read from the abstract only | more than half of the studies were read from the abstract only, or had no text | never |
+| Coherence | more than half of the studies were placed in a theme of the question by only one of the two independent codings of their quotes (the second coding's disagreements) | the run has no second coding |
+| Adequacy of data | the answer rests on fewer than two studies, so a single study is never enough | never |
+| Relevance | more than half of the studies have no code that names the question | no code names its question |
+
+A sensitivity check counts what each answer still rests on without the studies read from the abstract only, and without those that fail more than half of their MMAT criteria, and names any theme of the question that would then keep no study. An answer that would rest on fewer than two studies does not hold without them, and the summary sentence names it. A question with no evidence is not rated, with the reason.
+
+The report shows this in four places. The method gains a subsection "Certainty of the Evidence" (PRISMA 2020 item 15). The results gain a short summary in plain sentences and a table with each answer's concerns per domain and its reasons (item 22), numbered after the evidence map and a table artifact. In the conclusion, each answer is followed by its phrase, such as "(low certainty: three studies, two read from the abstract only)", and the summary closes the answers. The archive holds `certainty.json` with the method, the rule and every rating. The Review Output page shows the phrase under each answer and the same table after the answers.
+
 ## The artifact
 
 On the dashboard the reviewer chooses what the review should produce besides the text: a concept map of the themes, a flowchart of a process or framework, a comparison table, a bullet-point list, a custom request, or nothing, plus an optional instruction ("a flowchart of how the studies evaluate agent safety, from threat to mitigation"). `ArtifactBuilder.BuildAsync` (stage `artifact`) builds it after the theme subsections and the discussion are final, from those texts only, so it can only contain what the review found. The reviewer's instruction goes into the prompt with `PromptSafety.ReviewerInputNotice`, after the same input check as the other fields.

@@ -1,6 +1,4 @@
 using System;
-using System.IO;
-using System.IO.Compression;
 using System.Linq;
 
 namespace AuBtechReviewAgent;
@@ -39,15 +37,6 @@ public sealed partial class ReviewApi
     private static ApiReviewFile? Text(Guid runId, string kind, string name, string mediaType, string address, string? content) =>
         content == null ? null : new ApiReviewFile(runId, kind, name, mediaType, address, content);
 
-    /// <summary>A systematic review's main.tex is built in code into its archive; this reads it from there.</summary>
-    private string? MainTexOf(Guid runId)
-    {
-        byte[] zip = _engine.GenerateWorkspaceArchiveFromDisk(runId);
-        if (zip.Length == 0) return null;
-        using var archive = new ZipArchive(new MemoryStream(zip), ZipArchiveMode.Read);
-        var entry = archive.GetEntry("main.tex") ?? archive.Entries.FirstOrDefault(e => e.Name == "main.tex");
-        if (entry == null) return null;
-        using var reader = new StreamReader(entry.Open());
-        return reader.ReadToEnd();
-    }
+    /// <summary>A systematic review's main.tex, built in code as its archive holds it, without building the archive.</summary>
+    private string? MainTexOf(Guid runId) => _engine.MainTexFromDisk(runId);
 }
