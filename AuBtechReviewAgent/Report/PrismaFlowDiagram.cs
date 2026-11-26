@@ -30,6 +30,30 @@ public class PrismaFlowCounts
     public int FullTextRetrieved { get; set; }
     public int AbstractOnly => Math.Max(0, Included - FullTextRetrieved);
 
+    /// <summary>
+    /// Why the full texts of included studies could not be read, from the run's FullTextSources ("none (reason)"), grouped
+    /// and counted. Those studies are kept and read from the abstract only.
+    /// </summary>
+    public List<(string Reason, int Count)> NotRetrievedByReason { get; set; } = new();
+
+    /// <summary>The reasons in FullTextSources values such as "none (download failed: 403)", grouped and counted, the most frequent first.</summary>
+    public static List<(string Reason, int Count)> NotRetrievedReasons(IEnumerable<string> sources) =>
+        sources.Where(v => v.StartsWith("none", StringComparison.Ordinal))
+            .Select(v =>
+            {
+                int open = v.IndexOf('(');
+                string inner = open < 0 ? "" : v[(open + 1)..].TrimEnd(')').Trim();
+                int colon = inner.IndexOf(':');
+                if (colon >= 0) inner = inner[..colon].Trim();
+                return inner.Length == 0 ? "No reason recorded" : char.ToUpperInvariant(inner[0]) + inner[1..];
+            })
+            .GroupBy(r => r).OrderByDescending(g => g.Count()).ThenBy(g => g.Key, StringComparer.Ordinal)
+            .Select(g => (g.Key, g.Count())).ToList();
+
+    /// <summary>The lines under "Reports not retrieved": each reason with its count, only when they add up to the count.</summary>
+    public List<string> NotRetrievedLines() =>
+        NotRetrievedByReason.Sum(r => r.Count) == AbstractOnly ? NotRetrievedByReason.Select(r => $"{r.Reason} (n = {r.Count})").ToList() : new();
+
     /// <summary>Every identified record must end up in exactly one box. False means the counters disagree.</summary>
     public bool IsConsistent =>
         Identified == DuplicatesRemoved + OutsideDateRange + CappedBeyondMax + Screened + ScreeningErrors
@@ -64,6 +88,7 @@ public class PrismaFlowCounts
             HumanReviewed = s.HumanReviewed > 0,
             Included = s.Included,
             FullTextRetrieved = s.FullTextRetrieved,
+            NotRetrievedByReason = NotRetrievedReasons(state.FullTextSources.Values),
         };
     }
 }
@@ -107,7 +132,8 @@ public static class PrismaFlowDiagram
         // abstract, so a study whose full text was not found is kept and read from its abstract, and none is excluded on
         // its full text; the boxes say so rather than show an assessment that did not happen.
         sb.AppendLine(Box("sought", ", below=of screened", $"Reports sought for retrieval (n = {c.Included})"));
-        sb.AppendLine($"\\node[sidebox, right=of sought] (notretrieved) {{Reports not retrieved (n = {c.AbstractOnly}):\\\\ no full text could be read; kept and read from the abstract}};");
+        var notRetrieved = c.NotRetrievedLines().Select(Escape).Append("Kept and read from the abstract only");
+        sb.AppendLine($"\\node[sidebox, right=of sought] (notretrieved) {{Reports not retrieved (n = {c.AbstractOnly}):\\\\ {string.Join("\\\\ ", notRetrieved)}}};");
         sb.AppendLine(Box("assessed", ", below=of sought", $"Reports assessed for eligibility (n = {c.Included})\\\\ on title and abstract at screening; full text used (n = {c.FullTextRetrieved}); abstract only (n = {c.AbstractOnly})"));
         sb.AppendLine($"\\node[sidebox, right=of assessed] (reportsexcluded) {{Reports excluded (n = 0):\\\\ the tool does not exclude a study on its full text}};");
         sb.AppendLine(Box("included", ", below=of assessed", $"Studies included in review (n = {c.Included})\\\\ Reports of included studies (n = {c.Included})"));
