@@ -54,6 +54,41 @@ public static class ReferenceMerge
         };
     }
 
+    /// <summary>
+    /// Cites the published version of an arXiv preprint (issue #566): its DOI, year, journal or proceedings and details
+    /// replace the preprint's, as APA 7 cites the version of record. The arXiv number is kept in the details, and every
+    /// replaced field is named in <paramref name="filled"/>.
+    /// </summary>
+    public static ScreeningLog Published(ScreeningLog log, ReferenceAnswer published, string doi, int year, IDictionary<string, string> filled)
+    {
+        var authors = log.Authors ?? new List<string>();
+        if (published.Authors.Count > 0 && BetterAuthors(authors, published)) { authors = published.Authors.ToList(); filled["authors"] = published.Service; }
+        foreach (var field in new[] { "doi", "venue" }) filled[field] = published.Service;
+        if (year > 0) filled["year"] = published.Service;
+        var details = new ReferenceDetails
+        {
+            Volume = published.Details.Volume, Issue = published.Details.Issue, Pages = published.Details.Pages,
+            ArticleNumber = published.Details.ArticleNumber, Publisher = published.Details.Publisher,
+            ArxivId = log.Details?.ArxivId ?? ReferenceDetails.ArxivIdOf(log.Doi, log.PaperId, log.Url),
+        };
+        foreach (var (field, value) in new[] { ("volume", details.Volume), ("issue", details.Issue), ("pages", details.Pages), ("articleNumber", details.ArticleNumber), ("publisher", details.Publisher) })
+            if (value != null) filled[field] = published.Service;
+        details.EnrichedFrom = new Dictionary<string, string>(filled);
+        int citedYear = year > 0 ? year : log.Year;
+        var paper = new AcademicPaper(log.PaperId, log.Title, "", citedYear > 0 ? $"Published: {citedYear}" : "Published: ", authors, published.Venue, doi, $"https://doi.org/{doi}");
+        var apa = ApaCitationBuilder.Build(paper, details);
+        return log with
+        {
+            Authors = authors,
+            Doi = doi,
+            Year = apa.Year,
+            VenueName = apa.VenueName,
+            VenueType = apa.VenueType,
+            ApaCitation = apa.Citation,
+            Details = apa.Details ?? details,
+        };
+    }
+
     // A list a source gave in part ("et al.") or not at all is replaced; otherwise only by one with at least as many names
     // whose parts are known, or by a longer one.
     private static bool BetterAuthors(IReadOnlyList<string> current, ReferenceAnswer candidate)

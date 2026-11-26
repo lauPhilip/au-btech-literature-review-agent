@@ -22,11 +22,19 @@ public class ApaReferenceRulesTests
         Assert.Contains("(2025). Agentic AI frameworks for autonomous automotive software validation. *International", result.Citation);
     }
 
+    // Issue #567: run 289a0d3e mixed title case and sentence case in its reference list.
     [Theory]
-    [InlineData("Agentic AI Frameworks for Autonomous Enterprise Software Development Workflows")]
-    [InlineData("LLMoxie: exploring agentic AI with Python")]
-    public void AnyOtherTitleKeepsTheCapitalisationTheSourceGave(string title) =>
-        Assert.Equal(title, ApaCitationBuilder.TitleAsGiven(title + "."));
+    [InlineData("Agentic AI Frameworks for Autonomous Enterprise Software Development Workflows", "Agentic AI frameworks for autonomous enterprise software development workflows")]
+    [InlineData("Towards Multi-Agentic AI for automated software design and modelling: challenges and opportunities", "Towards multi-agentic AI for automated software design and modelling: Challenges and opportunities")]
+    [InlineData("LLMoxie: exploring agentic AI with Python", "LLMoxie: Exploring agentic AI with Python")]
+    [InlineData("ReAct Loops in GitHub Agents for 3D Scenes", "ReAct loops in GitHub agents for 3D scenes")]
+    [InlineData("Multi-Agent Systems: A Survey", "Multi-agent systems: A survey")]
+    public void ATitleIsSetInSentenceCase(string title, string expected) =>
+        Assert.Equal(expected, ApaCitationBuilder.TitleAsGiven(title + "."));
+
+    [Fact]
+    public void ATitleInSentenceCaseAlreadyIsLeftAsItIs() =>
+        Assert.Equal("Agent loops for safe orchestration", ApaCitationBuilder.TitleAsGiven("Agent loops for safe orchestration"));
 
     [Fact]
     public void ACapitalTitleStartsAgainAfterAColon() =>
@@ -76,7 +84,7 @@ public class ApaReferenceRulesTests
         string title = "Building AI Agents for Finance";
         var result = ApaCitationBuilder.Build(Paper(title, title));
 
-        Assert.Equal("Devgan, A. (2025). *Building AI Agents for Finance*.", result.Citation);
+        Assert.Equal("Devgan, A. (2025). *Building AI agents for finance*.", result.Citation);
     }
 
     [Fact]
