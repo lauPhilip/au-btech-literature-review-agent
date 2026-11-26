@@ -48,7 +48,21 @@ public class RetractionCheckTextTests
         Assert.Contains("the 5 included studies with a DOI registered at Crossref were checked", sentence);
         Assert.Contains("Of them, 1 had been retracted and was excluded, with the notice as the reason in the screening ledger, 1 had a correction, " +
             "1 had an expression of concern and 1 was a preprint whose published version is registered; Table A.1 marks those studies. " +
-            "For one study the check could not be completed, and it was kept. No language model", sentence);
+            "For one study the check could not be completed, so whether it was retracted is not known, and it was kept. No language model", sentence);
+    }
+
+    [Fact]
+    public void AStudyWhoseCheckFailedIsNeverCountedAsHavingNoNotice()
+    {
+        var some = new RetractionCheckFile { IncludedAtCheck = 3, Studies = { Entry("a", RetractionStatus.None), Entry("b", RetractionStatus.None), Entry("f", RetractionStatus.NotChecked) } };
+        string sentence = RetractionCheckText.Sentence(some);
+        Assert.DoesNotContain("None of them had", sentence);
+        Assert.Contains("Retraction Watch database. None of the 2 studies whose check was completed had a retraction, correction or expression of concern on record. " +
+            "For one study the check could not be completed, so whether it was retracted is not known, and it was kept. No language model", sentence);
+
+        var none = new RetractionCheckFile { IncludedAtCheck = 1, Studies = { Entry("f", RetractionStatus.NotChecked) } };
+        Assert.Contains("Retraction Watch database. For this study the check could not be completed, so whether it was retracted is not known, and it was kept. No language model",
+            RetractionCheckText.Sentence(none));
     }
 
     [Fact]
