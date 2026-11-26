@@ -142,12 +142,18 @@
                 tablePage.set(table, landing);
             }
             if (to === null) continue;
-            // A heading goes with the block under it; the loop then looks at this block again.
-            const before = i > 0 ? list[i - 1] : null;
-            if (before && HEADINGS.test(before.tagName) && !(front && front.contains(before)) && to === next) {
-                const b = top(before);
-                if (Math.floor(b / step) === page && b > start + 1) {
-                    moveTo(opener(before, sheet), next, top);
+            // Headings go with the block under them: every heading in a row before it (a chapter and its first section)
+            // moves from the first of them, so none is left alone at the foot of the page. The loop then looks at this
+            // block again.
+            if (to === next) {
+                let first = -1;
+                for (let j = i - 1; j >= 0 && HEADINGS.test(list[j].tagName) && !(front && front.contains(list[j])); j--) {
+                    const b = top(list[j]);
+                    if (Math.floor(b / step) !== page || b <= start + 1) break;
+                    first = j;
+                }
+                if (first >= 0) {
+                    moveTo(opener(list[first], sheet), next, top);
                     i -= 1;
                     continue;
                 }
@@ -194,9 +200,28 @@
             { height: height, pad: pad, gap: GAP, step: height + GAP }, headers, splits, function (n) { return footOf(n, pages, pad, site); }));
     }
 
+    // A citation's card opens after its paragraph, and paging can push it to the next sheet, out of view. A card that
+    // is new since the last pass and not fully on screen is scrolled to (issue #671). Blazor may reuse the element for
+    // another citation, so a card counts as new when its label or the element before it is not the one seen last.
+    const shown = new WeakMap();
+    function revealCitationCards() {
+        document.querySelectorAll('[data-citation-panel]').forEach(function (panel) {
+            const seen = shown.get(panel);
+            const label = panel.getAttribute('aria-label');
+            const before = panel.previousElementSibling;
+            if (seen && seen.label === label && seen.before === before) return;
+            shown.set(panel, { label: label, before: before });
+            const r = panel.getBoundingClientRect();
+            if (r.top >= 0 && r.bottom <= window.innerHeight) return;
+            const still = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+            panel.scrollIntoView({ behavior: still ? 'auto' : 'smooth', block: 'nearest' });
+        });
+    }
+
     function run() {
         timer = 0;
         sheets().forEach(paginate);
+        revealCitationCards();
     }
 
     function later(ms) {
