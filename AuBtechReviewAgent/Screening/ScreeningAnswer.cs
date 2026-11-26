@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Text.RegularExpressions;
 
@@ -14,6 +15,8 @@ public class ScreeningAnswer
     public string? Confidence { get; set; }
     /// <summary>Only for Excluded: one of ExclusionReasons.ModelKeys (optional, so older answers stay valid).</summary>
     public string? ExclusionReason { get; set; }
+    /// <summary>Each part of the inclusion criterion and whether the record shows it (systematic screening, issue #564).</summary>
+    public List<CriterionCheck>? CriteriaParts { get; set; }
 
     public bool IsIncluded => Decision.Equals("Included", StringComparison.OrdinalIgnoreCase);
 
@@ -56,5 +59,6 @@ public class ScreeningAnswer
         BriefSummary = string.IsNullOrWhiteSpace(BriefSummary) ? "N/A" : BriefSummary.Trim(),
         Confidence = string.IsNullOrWhiteSpace(Confidence) ? null : Confidence.Trim().ToLowerInvariant(),
         ExclusionReason = IsIncluded || string.IsNullOrWhiteSpace(ExclusionReason) ? null : ExclusionReason.Trim().ToLowerInvariant(),
+        CriteriaParts = CriteriaParts is { Count: > 0 } ? CriteriaParts : null,
     };
 }

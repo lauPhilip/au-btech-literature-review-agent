@@ -134,7 +134,9 @@ No other databases, registers, websites or reference lists were consulted.
 \subsection{Search Execution}\label{sec:search-execution}
 
 The primary search string was ``agent loops''.
-To improve recall, the language model proposed 2 additional search strings, each of which was also run against every source: ``agent orchestration safety''; ``agent fault recovery''.
+To improve recall, the language model proposed 2 additional search strings: ``agent orchestration safety''; ``agent fault recovery''.
+The search strings were run in order, and a source stopped taking further strings once its cap was filled.
+``agent orchestration safety'' and ``agent fault recovery'' were not run, because every source had already filled its cap.
 At most 3 records from each source went on to screening, across all search strings.
 Duplicates did not count towards this limit, so a source can show more records identified in the flow diagram.
 Duplicates were removed across all sources by identifier, DOI and normalised title (0 removed).
