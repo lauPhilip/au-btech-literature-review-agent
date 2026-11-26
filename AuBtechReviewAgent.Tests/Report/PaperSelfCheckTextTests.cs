@@ -47,6 +47,17 @@ public class PaperSelfCheckTextTests
     }
 
     [Fact]
+    public void TheReadabilityCheckGivesThePlainEnglishMeasurements()
+    {
+        var check = SelfCheckPaper.Check(SelfCheckPaper.Input(discussion: "Records were screened twice [1]. We kept the studies on agents [2]."), "readability");
+
+        var part = Assert.Single(check.Evidence, e => e.Field == "discussionItem");
+        Assert.EndsWith(" Mean sentence length 5 words; 0% of sentences over 25 words; 50% in the passive voice.", part.Detail);
+        Assert.Contains("; mean sentence length ", check.Summary);
+        Assert.Contains("% in the passive voice", check.Summary);
+    }
+
+    [Fact]
     public void TheWholeCheckRunsTenChecksInOrderAndCountsThem()
     {
         var file = PaperSelfCheck.Run(SelfCheckPaper.Input(), new DateTime(2026, 11, 25, 17, 18, 0, DateTimeKind.Utc));
