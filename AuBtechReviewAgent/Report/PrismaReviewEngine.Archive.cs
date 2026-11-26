@@ -76,6 +76,8 @@ public partial class PrismaReviewEngine
         // The certainty of each answer is rated in code from the run's files (PRISMA 2020 items 15 and 22).
         var certainty = SystematicCertainty.Assess(report, state?.ThematicSynthesis, state?.Extractions);
         if (certainty != null) methods.Add(new("Certainty of the Evidence", certainty.Method));
+        // PRISMA 2020 items 12 to 14: what the tool does not do, said plainly in code.
+        methods.Add(new(MethodsSectionWriter.NotAssessedHeading, MethodsSectionWriter.NotAssessed(certainty != null)));
         // The reviewer's research questions come first in the method, as published reviews list them.
         var questions = state?.ResearchQuestions ?? new List<string>();
         if (questions.Count > 0)
@@ -83,7 +85,7 @@ public partial class PrismaReviewEngine
                 $"\\noindent\\textbf{{RQ{i + 1}.}} {EscapeLatexText(q)}\\par{Environment.NewLine}"))));
 
         string dataLatex = DataFiguresLatex(records, state);
-        string appendixLatex = AppendixLatex(records, state);
+        string appendixLatex = AppendixLatex(records, state, out var appendixTables);
 
         var resultsLatex = new List<string>();
         if (state?.ThematicSynthesis is { Themes.Count: > 0 } book && (report.SynthesisSections?.Count ?? 0) > 0)
@@ -128,6 +130,25 @@ public partial class PrismaReviewEngine
             appendixLatex += PaperDeclarations.PublisherVariantsLatex(AiUseStatement.Used(state), AiUseStatement.Purpose, AiUseStatement.Short(state), aiMethods);
 
         string title = (report.TitleItem ?? "Systematic Review Manuscript").Replace("[Source Context Anchor 1]", "").Trim();
+        // The paper ends with the PRISMA 2020 checklist, written in code from what this paper holds.
+        appendixLatex += PrismaChecklist.Latex(PrismaChecklist.Rows(new PrismaChecklistFacts
+        {
+            Title = title,
+            HasResearchQuestions = questions.Count > 0,
+            HasSynthesisMethods = !string.IsNullOrWhiteSpace(report.SynthesisMethodsItem),
+            HasCertainty = certainty != null,
+            IncludedStudies = records.Count,
+            HasEvidenceMap = state?.ThematicSynthesis is { Themes.Count: > 0 } && (report.SynthesisSections?.Count ?? 0) > 0,
+            ExtractionTable = appendixTables.Extraction,
+            AppraisalTable = appendixTables.Appraisal,
+            SearchTable = appendixTables.Search,
+            HasProtocol = !string.IsNullOrWhiteSpace(report.ProtocolItem),
+            FundingDeclared = PaperDeclarations.Funding(report.SupportItem) != PaperDeclarations.ToComplete,
+            HasEvidenceLimitations = !string.IsNullOrWhiteSpace(report.EvidenceLimitationsItem),
+            HasReviewLimitations = !string.IsNullOrWhiteSpace(report.ReviewLimitationsItem),
+            HasImplications = !string.IsNullOrWhiteSpace(report.ImplicationsItem),
+            HasFutureResearch = !string.IsNullOrWhiteSpace(report.FutureResearchItem),
+        }), $"tab:{appendixTables.Next}", EscapeLatexText);
         string bibtex = BibliographyExporter.ToBibTeX(records);
         bool hasProtocol = File.Exists(Path.Join(GetWorkspaceFolderPath(sessionId), "protocol.md"));
         var paper = new ReviewPaper

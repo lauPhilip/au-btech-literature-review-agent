@@ -199,6 +199,15 @@ public static partial class CitationRepairer
                     }
                 }
 
+                // A "rewrite" that gives back the same sentence changed nothing, so it is not recorded as one (issue #569).
+                if (replacement == item.Sentence)
+                {
+                    repairs.Add(new CitationRepair(field, item.Sentence, item.Sentence, "not applied", flaggedRefs, verdicts,
+                        $"The proposed {action.Replace('_', ' ')} left the sentence unchanged; the sentence keeps its verdict." +
+                        (string.IsNullOrWhiteSpace(answer.Reason) ? "" : $" The model's reason was: {answer.Reason.Trim()}")));
+                    continue;
+                }
+
                 string current = texts[field];
                 int at = current.IndexOf(item.Sentence, StringComparison.Ordinal);
                 if (at < 0)

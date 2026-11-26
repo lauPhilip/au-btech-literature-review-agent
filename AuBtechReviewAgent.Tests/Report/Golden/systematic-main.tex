@@ -175,6 +175,14 @@ Third, each theme was written up as a subsection from its own studies only, with
 Finally, the part of every cited sentence attributed to a paper was checked against that paper; sentences judged not supported or only partly supported were rewritten once from the paper's evidence and checked again.
 The requested artifact could not be built: The artifact could not be built from the results (LlmOutputException).
 
+\subsection{What This Review Did Not Assess}\label{sec:what-this-review-did-not-assess}
+
+This review did not compute effect measures (PRISMA 2020 item 12).
+The findings were synthesised in words, as themes, without a meta-analysis, so no effect sizes were pooled, no statistical heterogeneity was explored and no subgroup analysis or meta-regression was run (items 13d and 13e).
+No sensitivity analysis was run (item 13f).
+The risk of bias due to missing results, such as unpublished studies or selectively reported outcomes, was not assessed (item 14), so reporting bias cannot be ruled out.
+The authors should add these assessments if their question needs them.
+
 \end{multicols}
 
 \section{Characteristics of the Included Studies}\label{sec:characteristics-of-the-included-studies}
@@ -197,11 +205,19 @@ Figure~\ref{fig:flow} shows the flow of records through the review, and Figure~\
 \node[sidebox, right=of id] (removed) {Records removed before screening:\\ Duplicates (n = 0)};
 \node[flowbox, below=of id] (screened) {Records screened (n = 3)};
 \node[sidebox, right=of screened] (excluded) {Records excluded:\\ Did not meet criteria (n = 1)};
-\node[flowbox, below=of screened] (included) {Studies included in review (n = 2)\\ Full text used (n = 0); abstract only (n = 2)};
+\node[flowbox, below=of screened] (sought) {Reports sought for retrieval (n = 2)};
+\node[sidebox, right=of sought] (notretrieved) {Reports not retrieved (n = 2):\\ Test (n = 2)\\ Kept and read from the abstract only};
+\node[flowbox, below=of sought] (assessed) {Reports assessed for eligibility (n = 2)\\ on title and abstract at screening; full text used (n = 0); abstract only (n = 2)};
+\node[sidebox, right=of assessed] (reportsexcluded) {Reports excluded (n = 0):\\ the tool does not exclude a study on its full text};
+\node[flowbox, below=of assessed] (included) {Studies included in review (n = 2)\\ Reports of included studies (n = 2)};
 \draw[arrow] (id) -- (screened);
-\draw[arrow] (screened) -- (included);
+\draw[arrow] (screened) -- (sought);
+\draw[arrow] (sought) -- (assessed);
+\draw[arrow] (assessed) -- (included);
 \draw[arrow] (id) -- (removed);
 \draw[arrow] (screened) -- (excluded);
+\draw[arrow] (sought) -- (notretrieved);
+\draw[arrow] (assessed) -- (reportsexcluded);
 \end{tikzpicture}
 
 \caption{PRISMA 2020 flow diagram of this run}\label{fig:flow}
@@ -419,6 +435,21 @@ Agent governance layers & An agent paper. & About agent architecture. & Google S
 \end{tabularx}
 \vspace{2pt}\noindent{\scriptsize Columns 1 to 5 are the five MMAT 2018 criteria for the study's category, answered Yes, No or {?} (can't tell). Met is the number answered Yes; it is not an overall score.\par}
 \vspace{10pt}
+\begin{tabularx}{\textwidth}{>{\hsize=0.6\hsize}Y >{\hsize=1.9\hsize}Y c r >{\hsize=0.5\hsize}Y}
+\caption{Search strategy per source}\label{tab:A.4}\\
+\toprule
+\textbf{Source} & \textbf{Search string as sent} & \textbf{Searched} & \textbf{Records} & \textbf{Status} \\
+\midrule
+\endfirsthead%
+\toprule
+\textbf{Source} & \textbf{Search string as sent} & \textbf{Searched} & \textbf{Records} & \textbf{Status} \\
+\midrule
+\endhead%
+Google Scholar Gateway & agent loops & DATE & 3 & Completed\\ \addlinespace
+\bottomrule
+\end{tabularx}
+\vspace{2pt}\noindent{\scriptsize Google Scholar Gateway received the string as it is. Each search asked for at most 1 record, and a source was not searched again once it had returned 3 distinct records. No date, language or document-type filter was sent to the databases. The raw answer of every search is in SourceResponses/ in the run archive, with its SHA-256 fingerprint in the run ledger.\par}
+\vspace{10pt}
 \subsection*{Statements on the Use of AI for Submission}
 Publishers ask for the use of AI to be disclosed in different places. Each statement below is written in code from the run's record; copy the one your venue asks for, check it and edit it to fit.
 \paragraph{Declaration of generative AI and AI-assisted technologies in the manuscript preparation process}
@@ -427,5 +458,60 @@ Publishers ask for the use of AI to be disclosed in different places. Each state
 \textit{IEEE and ACM ask for the disclosure in the acknowledgements.} The literature search, screening, data extraction, a first draft of the synthesis and a language edit of the abstract and introduction were carried out with TraceableAI using mistral-large-latest; every citation was automatically checked against the cited paper. The person who ran this review is responsible for checking this output and for how it is used.\par
 \paragraph{Methods}
 \textit{Springer Nature and Wiley ask for the disclosure in the methods section.} This review was conducted with TraceableAI (version VERSION), an open-source tool that runs PRISMA 2020 systematic reviews with the large language model mistral-large-latest, on DAY (run RUNID). The review protocol (question, eligibility criteria and sources) was written by the authors and fingerprinted before the search. The model was used for generating additional search phrasings, screening titles and abstracts against the eligibility criteria, extracting study data and appraising quality with the Mixed Methods Appraisal Tool, coding findings into themes and drafting the synthesis and checking each citation against the cited paper. The abstract and introduction were then given a language edit by the model, for clear and direct prose; code kept an edit only when it changed no number and no citation, and the text before and after each edit is on file. Every record was screened twice by independent prompts; disagreements were kept and flagged (Cohen's kappa = 1.00). Screening decisions were not checked by a human reviewer within the tool. Of 5 citations in the generated text, 5 were judged supported by the cited paper, 0 partly supported and 0 not supported; a supporting verdict counted only when its quote was found verbatim in the paper. The complete record of the run (protocol, search responses, every screening decision and model call, and the citation audit) is available as a fingerprinted archive. The person who ran this review is responsible for checking this output and for how it is used.\par
+\begin{tabularx}{\textwidth}{l >{\hsize=0.9\hsize}Y >{\hsize=1.0\hsize}Y >{\hsize=1.1\hsize}Y}
+\caption{PRISMA 2020 checklist}\label{tab:A.5}\\
+\toprule
+\textbf{Item} & \textbf{Topic} & \textbf{Where reported} & \textbf{Status} \\
+\midrule
+\endfirsthead%
+\toprule
+\textbf{Item} & \textbf{Topic} & \textbf{Where reported} & \textbf{Status} \\
+\midrule
+\endhead%
+1 & Title & Line above the title & In part: the line above the title names the report a systematic review; the title itself does not\\ \addlinespace
+2 & Abstract & Abstract & In part: the abstract does not yet follow the PRISMA 2020 for Abstracts checklist\\ \addlinespace
+3 & Rationale & Rationale (Introduction) & Reported\\ \addlinespace
+4 & Objectives & Objectives (Introduction) & Reported\\ \addlinespace
+5 & Eligibility criteria & Eligibility Criteria (Methodology) & Reported\\ \addlinespace
+6 & Information sources & Information Sources (Methodology) & Reported\\ \addlinespace
+7 & Search strategy & Search Execution (Methodology), Table~\ref{tab:A.4} & Reported\\ \addlinespace
+8 & Selection process & Selection Automation (Methodology) & Reported\\ \addlinespace
+9 & Data collection process & Data Collection and Quality Appraisal (Methodology) & Reported\\ \addlinespace
+10a & Data items: outcomes & Data Collection and Quality Appraisal (Methodology) & In part: up to three key findings per study are extracted with quotes; no outcomes were defined in advance\\ \addlinespace
+10b & Data items: other variables & Data Collection and Quality Appraisal (Methodology) & Reported\\ \addlinespace
+11 & Study risk of bias assessment & Data Collection and Quality Appraisal (Methodology) & Reported\\ \addlinespace
+12 & Effect measures & What This Review Did Not Assess (Methodology) & Not done by the tool: the findings were synthesised in words, without a meta-analysis\\ \addlinespace
+13a & Synthesis: which studies in each synthesis & Synthesis Methods (Methodology) & Reported\\ \addlinespace
+13b & Synthesis: preparing the data & What This Review Did Not Assess (Methodology) & Not applicable: no statistics were prepared, so no data were converted or imputed\\ \addlinespace
+13c & Synthesis: tabulating the results & Evidence Map of the Thematic Synthesis (Table~\ref{tab:evidence-map}) & Reported\\ \addlinespace
+13d & Synthesis: methods & Synthesis Methods (Methodology), What This Review Did Not Assess (Methodology) & Reported\\ \addlinespace
+13e & Synthesis: heterogeneity & What This Review Did Not Assess (Methodology) & Not done by the tool: the findings were synthesised in words, without a meta-analysis\\ \addlinespace
+13f & Synthesis: sensitivity analyses & What This Review Did Not Assess (Methodology) & Not done by the tool: no certainty rating, so no sensitivity check\\ \addlinespace
+14 & Reporting bias assessment & What This Review Did Not Assess (Methodology) & Not done by the tool: the risk of bias due to missing results is not assessed\\ \addlinespace
+15 & Certainty assessment & -- & Not done by the tool: the run rated no answers\\ \addlinespace
+16a & Study selection & PRISMA 2020 flow diagram (Figure~\ref{fig:flow}) in Characteristics of the Included Studies & Reported\\ \addlinespace
+16b & Excluded studies that seemed eligible & screened.ris in the run archive & In part: these studies are not singled out; screened.ris lists every screened record with its decision and reason\\ \addlinespace
+17 & Study characteristics & Characteristics of the Included Studies, Table~\ref{tab:A.1}, Table~\ref{tab:A.2} & Reported\\ \addlinespace
+18 & Risk of bias in studies & Table~\ref{tab:A.3} & Reported\\ \addlinespace
+19 & Results of individual studies & Table~\ref{tab:A.2} & In part: key findings with quotes; no summary statistics or effect estimates\\ \addlinespace
+20a & Results of syntheses: contributing studies & Results \& Synthesis; Evidence Map of the Thematic Synthesis (Table~\ref{tab:evidence-map}) & Reported\\ \addlinespace
+20b & Results of statistical syntheses & What This Review Did Not Assess (Methodology) & Not done by the tool: the findings were synthesised in words, without a meta-analysis\\ \addlinespace
+20c & Results: heterogeneity & What This Review Did Not Assess (Methodology) & Not done by the tool: the findings were synthesised in words, without a meta-analysis\\ \addlinespace
+20d & Results: sensitivity analyses & What This Review Did Not Assess (Methodology) & Not done by the tool: no certainty rating, so no sensitivity check\\ \addlinespace
+21 & Reporting biases & What This Review Did Not Assess (Methodology) & Not done by the tool: the risk of bias due to missing results is not assessed\\ \addlinespace
+22 & Certainty of evidence & -- & Not done by the tool: the run rated no answers\\ \addlinespace
+23a & Discussion: interpretation & General Interpretation (Discussion) & Reported\\ \addlinespace
+23b & Discussion: limitations of the evidence & -- & Not done by the tool: the run wrote no such section\\ \addlinespace
+23c & Discussion: limitations of the review & Limitations of the Review Process (Discussion) & Reported\\ \addlinespace
+23d & Discussion: implications & -- & Not done by the tool: the run wrote no such section\\ \addlinespace
+24a & Registration & Registration and Protocol (Declarations) & For the authors: the tool does not register a review\\ \addlinespace
+24b & Protocol & Registration and Protocol (Declarations), protocol.md in the run archive & Reported\\ \addlinespace
+24c & Amendments to the protocol & Registration and Protocol (Declarations) & Reported\\ \addlinespace
+25 & Support & Support \& Funding (Declarations) & For the authors: the run recorded no funding statement\\ \addlinespace
+26 & Competing interests & Competing Interests (Declarations) & For the authors: only the authors can declare them\\ \addlinespace
+27 & Availability of data, code and other materials & Availability of Data and Code (Declarations) & Reported\\ \addlinespace
+\bottomrule
+\end{tabularx}
+\vspace{2pt}\noindent{\scriptsize The checklist is written in code from what this paper holds. An item the tool does not carry out is marked as not done with the reason; an item only the authors can give is left to them. Item numbers follow Page et~al.\ (2021), The PRISMA 2020 statement, BMJ 372:n71.\par}
 
 \end{document}
