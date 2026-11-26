@@ -24,6 +24,8 @@ public static class ReportOutline
     public const string DeclarationsId = "declarations";
     public const string ReferencesId = "references";
     public const string AppendixId = "appendix";
+    /// <summary>The self-check table under the citation summary (SelfCheckTable); the Done card links to it.</summary>
+    public const string SelfCheckId = "self-check";
 
     /// <summary>The id of theme subsection <paramref name="index"/> (0-based), numbered 4.2, 4.3, … on the page.</summary>
     public static string ThemeId(int index) => $"s4-{index + 2}";

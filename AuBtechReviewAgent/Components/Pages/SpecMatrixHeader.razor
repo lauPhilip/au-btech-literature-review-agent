@@ -35,6 +35,11 @@
     </div>
 }
 
+@if (Page.selfCheck != null && Page.selfCheck.Checks.Count > 0)
+{
+    <SelfCheckTable Result="Page.selfCheck" />
+}
+
 @code {
     [Parameter, EditorRequired] public SpecMatrix Page { get; set; } = default!;
 }
