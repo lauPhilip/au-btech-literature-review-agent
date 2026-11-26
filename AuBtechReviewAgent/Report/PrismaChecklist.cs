@@ -18,6 +18,8 @@ public sealed record ChecklistRow(string Item, string Topic, string Where, Check
 public sealed record PrismaChecklistFacts
 {
     public string Title { get; init; } = "";
+    /// <summary>True for a pilot run, whose line above the title reads "AI-GENERATED PILOT SYSTEMATIC SEARCH".</summary>
+    public bool IsPilot { get; init; }
     public bool HasResearchQuestions { get; init; }
     public bool HasSynthesisMethods { get; init; }
     public bool HasCertainty { get; init; }
@@ -73,7 +75,9 @@ public static class PrismaChecklist
         {
             f.Title.Contains("systematic review", StringComparison.OrdinalIgnoreCase)
                 ? new("1", "Title", "Title", R)
-                : new("1", "Title", "Line above the title", ChecklistStatus.InPart, "the line above the title names the report a systematic review; the title itself does not"),
+                : f.IsPilot
+                    ? new("1", "Title", "Line above the title", ChecklistStatus.InPart, "the line above the title names the report a pilot systematic search, not a systematic review, because the search was too small; the title names it so too")
+                    : new("1", "Title", "Line above the title", ChecklistStatus.InPart, "the line above the title names the report a systematic review; the title itself does not"),
             new("2", "Abstract", "Abstract", ChecklistStatus.InPart, "the abstract does not yet follow the PRISMA 2020 for Abstracts checklist"),
             new("3", "Rationale", "Rationale (Introduction)", R),
             new("4", "Objectives", f.HasResearchQuestions ? "Objectives (Introduction); Research Questions (Methodology)" : "Objectives (Introduction)", R),
