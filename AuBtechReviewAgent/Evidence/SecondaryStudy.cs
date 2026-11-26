@@ -8,8 +8,10 @@ namespace AuBtechReviewAgent;
 /// <summary>
 /// Included studies that are themselves reviews (a systematic review, a meta-analysis, a scoping review, a literature
 /// survey) are secondary studies: they summarise other studies and add no new evidence of their own. In a real run a
-/// systematic review alone carried the answer to RQ1. The class is decided in code, from the study type the extraction
-/// gave and the title, so Table A.2 can label them, the methods can name them and an answer that rests on them is marked.
+/// systematic review alone carried the answer to RQ1. The class is decided in code and only from the paper's own words:
+/// its title, or the verbatim quote behind its method when that quote was found in the paper's text and the model's
+/// study type also names a review design. The model's study type alone never makes a study secondary (AGENTS.md rule 1).
+/// Table A.2 labels them, the methods name them and an answer that rests on them is marked.
 /// </summary>
 public static class SecondaryStudy
 {
@@ -29,16 +31,34 @@ public static class SecondaryStudy
     private static readonly Regex SurveyTitle = new(@"^\s*(?:an?\s+)?(?:\w+\s+){0,2}survey\s+(?:of|on)\b(?!.{0,40}\b(?:practitioners|respondents|participants|users|developers|employees|students|engineers|managers)\b)",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
-    /// <summary>The kind of secondary study ("systematic review", "meta-analysis", ...), or null for a primary study.</summary>
-    public static string? KindOf(string? studyType, string? title)
+    /// <summary>The kind of review design one text names ("systematic review", "meta-analysis", ...), or null.</summary>
+    public static string? KindIn(string? text)
     {
         foreach (var (pattern, kind) in Kinds)
-            if (pattern.IsMatch(studyType ?? "") || pattern.IsMatch(title ?? "")) return kind;
-        return SurveyTitle.IsMatch(title ?? "") ? "survey" : null;
+            if (pattern.IsMatch(text ?? "")) return kind;
+        return null;
+    }
+
+    /// <summary>The kind of review design a title names, including a literature survey ("A survey of agent memory").</summary>
+    public static string? KindInTitle(string? title) => KindIn(title) ?? (SurveyTitle.IsMatch(title ?? "") ? "survey" : null);
+
+    /// <summary>
+    /// The kind of secondary study and the verbatim text it rests on, or null for a primary study or a failed extraction.
+    /// A verified method quote counts only when the model's study type names a review design too, so a primary study
+    /// whose method mentions an earlier review ("following a systematic review, we interviewed ...") is not counted
+    /// unless the model also called it a review.
+    /// </summary>
+    public static (string Kind, string Basis, string Text)? Classify(StudyExtraction e)
+    {
+        if (e.Error != null) return null;
+        if (KindInTitle(e.Title) is { } fromTitle) return (fromTitle, "title", e.Title);
+        if (e.Method is { QuoteVerified: true } method && KindIn(method.Quote) is { } fromQuote && KindIn(e.StudyType) != null)
+            return (fromQuote, "method quote", method.Quote);
+        return null;
     }
 
     /// <summary>The kind for one extraction, or null when it is primary or nothing was extracted from it.</summary>
-    public static string? KindOf(StudyExtraction e) => e.Error != null ? null : KindOf(e.StudyType, e.Title);
+    public static string? KindOf(StudyExtraction e) => Classify(e)?.Kind;
 
     /// <summary>The run's secondary studies by reference number, with their kind.</summary>
     public static SortedDictionary<int, string> In(IEnumerable<StudyExtraction>? extractions)
@@ -55,7 +75,7 @@ public static class SecondaryStudy
         if (secondary.Count == 0) return "";
         string list = string.Join(", ", secondary.Select(s => $"{Article(s.Value)} {s.Value} [{s.Key}]"));
         bool one = secondary.Count == 1;
-        return $"{(one ? "One included study is a secondary study, a review of other studies" : $"{Words(secondary.Count)} included studies are secondary studies, reviews of other studies")} ({list}). " +
+        return $"{(one ? "One included study is a secondary study, a review of other studies" : $"{Words(secondary.Count)} included studies are secondary studies, reviews of other studies")} ({list}), decided in code from {(one ? "its" : "each")} title or from a quote of {(one ? "its" : "the")} method found word for word in {(one ? "its" : "the study's")} text. " +
                $"{(one ? "It summarises" : "They summarise")} the work of others and add{(one ? "s" : "")} no new evidence, so {(one ? "it is" : "they are")} labelled as secondary in Table A.2, and an answer to a research question that cites {(one ? "it" : "them")} is marked as resting on a secondary study.";
     }
 

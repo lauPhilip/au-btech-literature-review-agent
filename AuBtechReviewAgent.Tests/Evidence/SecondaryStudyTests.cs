@@ -5,46 +5,75 @@ using Xunit;
 namespace AuBtechReviewAgent.Tests;
 
 /// <summary>
-/// Secondary studies (reviews of other studies) are their own class, decided in code from the study type and the title,
-/// so Table A.2, the methods and the answers to the research questions can say that they add no new evidence.
+/// Secondary studies (reviews of other studies) are their own class, decided in code from the paper's own words (its
+/// title, or a verified quote of its method), so Table A.2, the methods and the answers to the research questions can say
+/// that they add no new evidence. The model's study type alone never decides it (AGENTS.md rule 1).
 /// </summary>
 public class SecondaryStudyTests
 {
-    [Theory]
-    [InlineData("systematic literature review", "Agents in software engineering", "systematic review")]
-    [InlineData("meta-analysis of 31 trials", "", "meta-analysis")]
-    [InlineData("scoping review", "", "scoping review")]
-    [InlineData("literature review", "", "literature review")]
-    [InlineData("position paper", "A systematic mapping study of LLM testing", "systematic review")]
-    [InlineData("overview", "A Survey on Large Language Model based Autonomous Agents", "survey")]
-    [InlineData("overview", "A comprehensive survey of retrieval-augmented generation", "survey")]
-    public void Reviews_are_secondary(string studyType, string title, string expected) =>
-        Assert.Equal(expected, SecondaryStudy.KindOf(studyType, title));
+    private static StudyExtraction Study(string title, string studyType = "", string methodQuote = "", bool verified = true, int number = 1) => new()
+    {
+        ReferenceNumber = number,
+        Title = title,
+        StudyType = studyType,
+        Method = new EvidencedValue { Value = "method", Quote = methodQuote, QuoteVerified = verified },
+    };
 
     [Theory]
-    [InlineData("survey", "Developers' use of AI assistants")]
-    [InlineData("questionnaire survey", "A survey of 200 practitioners on code review")]
-    [InlineData("controlled experiment", "Prompt engineering for test generation")]
-    [InlineData("case study", "Peer review in open source")]
-    public void Primary_studies_are_not(string studyType, string title) =>
-        Assert.Null(SecondaryStudy.KindOf(studyType, title));
+    [InlineData("A systematic mapping study of LLM testing", "systematic review")]
+    [InlineData("A Survey on Large Language Model based Autonomous Agents", "survey")]
+    [InlineData("A comprehensive survey of retrieval-augmented generation", "survey")]
+    [InlineData("Agent memory: a scoping review", "scoping review")]
+    [InlineData("Prompting for code: a meta-analysis", "meta-analysis")]
+    public void A_title_that_names_a_review_makes_it_secondary(string title, string expected)
+    {
+        var found = SecondaryStudy.Classify(Study(title, studyType: "position paper"));
+        Assert.Equal(expected, found?.Kind);
+        Assert.Equal("title", found?.Basis);
+        Assert.Equal(title, found?.Text);
+    }
+
+    [Theory]
+    [InlineData("Developers' use of AI assistants")]
+    [InlineData("A survey of 200 practitioners on code review")]
+    [InlineData("Peer review in open source")]
+    public void A_primary_title_is_not_secondary(string title) => Assert.Null(SecondaryStudy.KindInTitle(title));
+
+    [Fact]
+    public void A_verified_method_quote_counts_when_the_model_also_calls_it_a_review()
+    {
+        const string quote = "We conducted a systematic literature review of 45 papers.";
+        var found = SecondaryStudy.Classify(Study("Agents in software engineering", "systematic literature review", quote));
+        Assert.Equal(("systematic review", "method quote", quote), found);
+    }
+
+    [Fact]
+    public void The_study_type_alone_never_makes_a_study_secondary()
+    {
+        // No quote names a review: the model's label is not evidence from the paper.
+        Assert.Null(SecondaryStudy.Classify(Study("Agents in software engineering", "systematic review", "We ran 12 interviews.")));
+        // The quote names a review but was not found in the paper's text.
+        Assert.Null(SecondaryStudy.Classify(Study("Agents in software engineering", "systematic review", "We conducted a systematic review.", verified: false)));
+        // The quote mentions an earlier review, but the model called the study primary.
+        Assert.Null(SecondaryStudy.Classify(Study("Agents in software engineering", "interview study", "Following a systematic review, we interviewed 12 engineers.")));
+    }
 
     [Fact]
     public void A_failed_extraction_is_not_judged() =>
-        Assert.Null(SecondaryStudy.KindOf(new StudyExtraction { StudyType = "systematic review", Error = "failed" }));
+        Assert.Null(SecondaryStudy.KindOf(new StudyExtraction { Title = "A systematic review of agents", Error = "failed" }));
 
     [Fact]
     public void The_methods_sentence_names_each_secondary_study()
     {
         var secondary = SecondaryStudy.In(new[]
         {
-            new StudyExtraction { ReferenceNumber = 4, StudyType = "meta-analysis" },
-            new StudyExtraction { ReferenceNumber = 2, StudyType = "systematic review" },
-            new StudyExtraction { ReferenceNumber = 3, StudyType = "case study" },
+            Study("Prompting for code: a meta-analysis", number: 4),
+            Study("Agents", "systematic review", "We conducted a systematic review of 30 studies.", number: 2),
+            Study("Agents in practice", "case study", "We studied one firm.", number: 3),
         });
         Assert.Equal(new[] { 2, 4 }, secondary.Keys);
         string text = SecondaryStudy.MethodsSentence(secondary);
-        Assert.StartsWith("Two included studies are secondary studies, reviews of other studies (a systematic review [2], a meta-analysis [4]).", text);
+        Assert.StartsWith("Two included studies are secondary studies, reviews of other studies (a systematic review [2], a meta-analysis [4]), decided in code from each title or from a quote of the method found word for word in the study's text.", text);
         Assert.Contains("labelled as secondary in Table A.2", text);
         Assert.Equal("", SecondaryStudy.MethodsSentence(new SortedDictionary<int, string>()));
     }
