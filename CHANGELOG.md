@@ -6,7 +6,9 @@ Each version's section becomes the notes of its GitHub release, so write it for 
 
 ## [Unreleased]
 
-The systematic review now answers its research questions first and cites what the studies found, not its own readings. Many prompts changed, from extraction to the peer review, so a run can differ from 0.5.0, most of all a run with research questions. The multivocal review, still in preview, learned a lot from its first real run. And the site now puts every review in one fair line and keeps bots at the door.
+## [0.6.0] - 2026-11-26
+
+The systematic review now answers its research questions first, cites what the studies found, and checks its own paper, so it is honest about how good its evidence is. It tells you when a cited study was retracted, marks a citation it could not confirm with a dagger, and rates how sure each answer is. The paper covers the whole PRISMA 2020 checklist, is written in plain technical English (based on ASD-STE100) and has APA 7 references completed from Crossref, OpenAlex and arXiv. It reads like a journal article on A4 pages. Many prompts and checks changed, so a run can differ from 0.5.0, most of all a run with research questions, and a rerun now gives the same themes. The multivocal review, still in preview, learned a lot from its first real run. And the site now puts every review in one fair line, keeps bots at the door and has a gallery of example reports.
 
 ### Added
 
@@ -30,6 +32,28 @@ Every kind of review now waits in one fair line. One address can have two review
 
 The Metrics page now shows how much work each run took: minutes, model calls, retries, tokens and call time. Researchers can download every run's figures as CSV or JSON, with a page that explains each column. The files hold no question, no paper text and no user data. A multivocal run now keeps its figures for the grey and the academic sources apart.
 
+The report now checks itself. When a run ends, ten checks in code read the paper as an editor would. They look for numbers in the abstract that are not the run's counts, a research question without a cited answer, sentences with more than three references and a list of references that does not match the text. The result is kept in self-check.json, and the run page and the report must give the same counts of checked citations.
+
+Every answer now says how sure it is. Each answer to a research question gets a certainty of high, moderate, low or very low, worked out in code from the studies behind it. The rule is inspired by GRADE and GRADE-CERQual, and the method says it is an automated estimate, not a rating made by people. A second check asks whether the answer still holds without its weakest studies. Reviews among the included studies are now treated as secondary studies, and a small search is called a pilot in the title and on the front page.
+
+The review now looks for retractions. Before a study is read, Crossref is asked for any retraction, correction or expression of concern about it. The report says what was found. If the lookup fails, the report says the study was not checked, never that it was clear. A flagged study is named, so you can decide what to do with it.
+
+A citation the check could not confirm now carries a dagger. The sentence stays, so you can see the gap, and a footnote says that the automated check could not confirm it. An edited sentence follows its own new verdict. Each link in a concept map or flow chart is checked as well. A link that no study makes is drawn as the review's own reading.
+
+The paper now covers the whole PRISMA 2020 checklist. The flow figure goes on to the reports sought and not retrieved, and a new part, "What This Review Did Not Assess", says plainly what the tool does not do, such as effect measures and bias across studies. It also has the declarations a journal asks for, with places for the authors to fill in, and an honest statement on the use of AI. The paper no longer claims BTECH's support for anyone's review. main.tex is now proper LaTeX, with labels, cross references and a commented preamble, so it opens cleanly in Overleaf.
+
+References are now in APA 7 form, in the text, the list, BibTeX and RIS. Before the references are numbered, each study with a DOI is looked up at Crossref, then at OpenAlex and arXiv, to fill in authors, volume, issue and pages. A preprint that was later published is cited as the published article. The methods say how many references were completed and which fields were added. No model takes part. The multivocal review completes its academic references the same way.
+
+The report now reads like a journal article. The Review output page shows A4 pages with a front page in journal style, and printing gives the same layout, with even margins. The first page names the type of review, the title and the author line, with a note that an AI system wrote it. Every report page also carries a machine-readable mark that it is AI-generated, as the EU AI Act asks from 2 December 2026. The same mark is in main.tex.
+
+Owners can now add a finished report to a gallery of example reports. A short consent text comes first, and only the browser that started the run sees the button. Every version of a review is kept at its own lasting address, so a citation never points to a changed report. Each card says how the citations held up, shows the self-check, and has a search box and a Cite button. The public copy leaves out publishers' abstracts and long quotes. A review whose card is switched off stays out of the gallery.
+
+The Metrics page now shows what each run cost, worked out from its token counts and Mistral's list prices. The site also has a privacy page that names who is responsible, and an accessibility statement, both linked from every footer.
+
+The report page now shows what the paper found out about itself. A closed line reads, for example, "The paper checked itself: 8 checks passed, 2 notes, 1 fault", and opens a table of the ten checks with the evidence for each. The same line is on the Done card of a finished run and on the printed front page. The front page also gives the result of the retraction check and how many included studies are secondary studies. A run made before the self-check is checked from its files when you open the report. Web addresses in a reference are now links, in the page and in a saved PDF.
+
+An example report now looks like the review output page. It has the same A4 pages, front page, contents list, citation cards and citation panel. It keeps its own address and leaves out the buttons for the run archive and the decision log.
+
 ### Changed
 
 The review now cites findings, not its own readings. A sentence that reports what a study found ends with its citation. The review's own reading is a separate sentence with no citation, and code checks that it names no study, number or design. A recommendation or a proposal for future research takes no citation. The rationale ends with one sentence on what is not yet known. When the repair fixes a citation, it knows what the section is for, so it no longer turns a proposal into a finding. In the runs we checked, most flagged citations came from these sections, so expect fewer flags and fewer citations there.
@@ -50,6 +74,26 @@ Checking quotes is faster. Each source's text is made ready once, not again for 
 
 The site now guards itself against bots. Pages, downloads and the actions that cost a model call have limits per address, generous enough for a class on one campus network. Uploads to the archive check are capped and handled one at a time. The start forms carry a hidden field that only bots fill in. The privacy page says what is counted and for how long.
 
+The language edit now writes plain technical English (based on ASD-STE100). Sentences aim at 25 words or fewer, a paragraph holds one topic and at most six sentences, and the active voice is the default. It is not a full ASD-STE100 check, and the text is kept at about 80 per cent so that it still reads as natural academic English.
+
+The review now writes in a red thread. A sentence cites at most three references, so the results no longer turn into lists of sources. Large themes are synthesised, and the rationale does not open on a weak source as if it were a fact. A source is weak when it is not empirical, had no text, or fails more than half of its quality criteria. The writer of the fallback text gets the facts, too. The first draft of a section is written only when it is needed, which saves model calls.
+
+Every research question now gets an answer in the paper, even when the closing step fails. Before, a conflict between two rules could send the closing step back until it gave up, and the answers were lost with it. The conclusion may now name kinds of study without a citation.
+
+A rerun on the same studies now gives the same themes. The coding and the codebook are kept in the cache, as the extraction is, and a cached decision is tied to a fingerprint of its prompt. An edit to a prompt can no longer bring back an old decision by mistake. The search and screening are described as they ran. Each search string runs in rounds, and a source counts towards its cap only the records that go on to screening. The paper shows one fingerprint of the protocol.
+
+A quote must now be one run of the paper's own text. Before, a quote could join the end of one sentence to the start of the next, or two parts of a paper joined by an ellipsis, and still count as word for word. Now such a quote is refused. Expect a few more flags, and fewer false comforts.
+
+The report is safer to read and to share. Text that a PDF hides from its reader, such as white text, tiny text or text in a layer that is off, is left out of what the model reads. So is text that a web page hides with a style block, a class or the page background. A PDF is downloaded only from a public address, and each paper is read from its own file. The archive of a run is streamed, so a big run no longer fills the server's memory.
+
+The site holds back when it is not sure. A visitor whose address is unknown now shares one limit with all others. A multivocal run counts as active, so an update waits for it. The app refuses to start on a placeholder key. A null in the model's answer is read as missing, not as a crash, and the code decides what to do.
+
+The multivocal review is more careful. It no longer plans backlink snowballing, which is not built yet, and the form greys that search out. It counts tools one name at a time, and leaves models, languages and methods out of the tool counts. The multivocal paper has even margins and the journal layout.
+
+The review output page has fixes for the citation card, which now closes with a click outside, with Escape or with its button. A table taller than a page now splits across pages.
+
+The header now has four places: New review, Review output, Example reports and Metrics. Example reports needs no run, so a visitor can see a finished report before typing a question. The Review output page with no run behind it says what it will show and offers "Start a review" and "See example reports". The landing page's button opens the chooser, which lets you start only the reviews that are open. The form now has a short line on trust under the Start button, and a phone keeps Example reports in the footer.
+
 ### Fixed
 
 Scopus authors are now named the right way round, and a Scopus paper is cited "Liu, J., et al." with the year it went online, not a year in the future. The raw answers of Scopus and IEEE Xplore are now kept with the other databases' answers. A grey source is credited to its real producer, such as the GitHub account or the company behind a blog, and a web address is never an author.
@@ -59,6 +103,14 @@ The paper's PDF now prints "<", ">" and "|" as typed, not as "¡", "¿" and "—
 The token count of a run was always 0, because the model's usage was read the wrong way. It is now right, for both kinds of review.
 
 The multivocal paper now counts its own steps right. Its flow figure adds up, each reason for a paper that could not be rated is given once, a theme with only academic sources no longer claims a grey score of 0, and the paper names the run's own version. The abstract keeps the grey and academic numbers apart. The data appendix names both models, and the call log keeps the reasoning effort when a run is started more than once.
+
+Reference lists are better. A reference no longer cites the journal note of arXiv as an italic venue next to the wrong year. Titles are set in sentence case, and the list is in alphabetical order, as APA asks. A double citation of one study in one sentence is removed, and a repair that changes nothing is no longer counted.
+
+A retraction sentence no longer speaks for studies that were not checked. If some lookups failed, the sentence speaks only for the finished checks and says that the rest are not known.
+
+The cost column in the Metrics downloads was always empty, because no price was set. It is now filled.
+
+The protocol of a multivocal plan no longer promises a search that does not run, so the paper no longer has to explain the gap with a note about software.
 
 ## [0.5.0] - 2026-11-23
 
@@ -185,107 +237,10 @@ The paper of a multivocal review with academic sources now says in its statement
 Hidden text in your own answers on the planning form is now taken out too. Invisible tag characters could slip into the prompts. Now they are removed, and if they spelled out an instruction, the warning shows you the hidden words.
 
 
-## [0.4.0] - 2026-11-20
+Versions 0.4.0 and earlier are in [docs/changelog-archive.md](docs/changelog-archive.md), so that this file stays under 300 lines.
 
-The model writes about the studies from facts, not from its own guesses. This changes what the model is asked, so runs can differ from 0.3.0.
-
-### Fixed
-
-The model now gets each study's design as a fact. Before, it could call two studies one trial, or say two studies were read from the abstract when three were. Each theme now also gets its own counts. 🧮
-
-The limits of the evidence group the designs by type. "Mixed methods case study" and "case study with mixed methods" are no longer two designs. The list is short and right.
-
-## [0.3.0] - 2026-11-20
-
-The data taken from each study is shorter and better backed. This changes what the model is asked, so runs can differ from 0.2.3.
-
-### Fixed
-
-The method and sample of a study are now short, like "24 students", not a whole sentence copied from the paper. A finding keeps its % sign.
-
-A study read in full gets a fair quality check. The model now sees the parts of the paper on how data were collected and studied, and it must answer all five questions. Before, such studies got "can't tell" on every one. 🔍
-
-A study with no abstract and no full text is no longer called "non-empirical". It is marked as not checked, since there was nothing to read.
-
-When a record has no abstract, the screening reason may no longer talk about its abstract.
-
-## [0.2.3] - 2026-11-20
-
-The paper page looks tidier. The method and main.tex are the same as in 0.2.2.
-
-### Fixed
-
-Journal names and volumes on the paper page are now in italics. Before, they showed the stars that mark italics in the source text.
-
-The site now writes numbers with a point, as the paper does. The run page used to say "kappa 0,63" because the server is Danish. ✨
-
-The summary at the top of the run page now lists what rules a study out. It says "None" if you left that field empty.
-
-## [0.2.2] - 2026-11-20
-
-The paper reads better in a few small places. The method is the same as in 0.2.1.
-
-### Fixed
-
-The tables in the appendix of main.tex fit the page again. Table A.3 has a short title, and its key moved to the note below it. Table A.1 lost the empty row under its title.
-
-The methods now say that the limit per source counts the records sent to screening. Before, it read as if it did not match the flow diagram.
-
-A reference that names a journal now gives its volume and issue the APA way. If arXiv knows the journal's DOI, the reference uses it. If the only link is the arXiv one, the reference says it is the preprint. 📐
-
-## [0.2.1] - 2026-11-20
-
-This is a small fix. The paper and the method are the same as in 0.2.0.
-
-### Fixed
-
-The live site now runs the version you see on the Releases page. Before, it was built a moment before the tag, so its papers called a real release "not a published release". Now the site is built again from the tag once the release is out. 🏷️
-
-## [0.2.0] - 2026-11-20
-
-This version makes the paper easier to read and harder to get wrong. We fixed the faults we found in two real runs. 🧹
-
-### Changed
-
-The big tables of the included studies now sit in an appendix after the references. They are Tables A.1, A.2 and A.3, and each keeps its note. Section 3 keeps its text, the flow diagram and the charts, and it tells the reader where to find the tables. This holds for the paper page and for main.tex.
-
-The model now gets the full list of study designs before it writes the discussion. So the discussion uses the same designs as the data table. It also gets every record that was removed before screening, so the counts in the abstract add up to the flow diagram.
-
-The review's own statements no longer carry citations. Counts, the conclusion and the limits are the review's own words, so they do not point to a paper. If a repair makes a citation worse, it is now undone.
-
-### Fixed
-
-Sentences in main.tex end with a full stop again. The funding statement names the right department. The conclusion no longer repeats the answers to the research questions.
-
-A few small slips are gone. The text now says "1 disagreement", not "1 disagreements". A number such as 10^6 is printed as a real power. The list of studies that were not rated ends with "and" in the right place. The source column in the first table uses the same names as the paper page.
-
-The repository now shows its Zenodo DOI, so the software is easy to cite.
-
-## [0.1.0] - 2026-11-19
-
-This is the first version of TraceableAI. It runs a full systematic review, from your question to a paper you can check line by line. 🎉
-
-### Added
-
-You write down your plan before the search starts, so nobody can quietly move the goalposts later. The tool then searches open databases and screens each record twice. It reads the full texts, rates their quality and groups what it finds into themes.
-
-Every claim in the paper points to a source. Each citation is checked against the paper it cites, and it only passes when its quote is found there word for word. If the quote is not there, the claim does not get through.
-
-You can add your own research questions on the start form. The plan lists them, and the conclusion answers them first. The paper also ends with the limits of the evidence, what it means in practice, ideas for future work and a short conclusion.
-
-Each run is saved as an archive with a fingerprint for every file, so you can show that nothing was changed later. You also get the paper in LaTeX, and the references as BibTeX and RIS files for your reference manager.
-
-A new Metrics page puts your runs side by side. It shows how well they cite, how much they cover and what they cost.
-
-Each release now has a clear title and notes like these. A check stops the release if the notes are hard to read, or if the citation file names the wrong version.
-
-### Changed
-
-The version now comes from the release tag. You can see it on the Metrics page, and the paper cites it, so a reader knows which version made the review. Runs from before this show "before versioning".
-
-Screening and citation checks now use a smaller, faster model. The writing still uses the large one, where it counts.
-
-[Unreleased]: https://github.com/lauPhilip/au-btech-literature-review-agent/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/lauPhilip/au-btech-literature-review-agent/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/lauPhilip/au-btech-literature-review-agent/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/lauPhilip/au-btech-literature-review-agent/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/lauPhilip/au-btech-literature-review-agent/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/lauPhilip/au-btech-literature-review-agent/compare/v0.2.3...v0.3.0
