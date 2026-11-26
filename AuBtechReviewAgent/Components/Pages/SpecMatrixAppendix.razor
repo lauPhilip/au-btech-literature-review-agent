@@ -190,14 +190,14 @@
         }
     };
 
-    /// <summary>DOI and open-access PDF links under a study's title (only http(s) addresses are linked).</summary>
+    /// <summary>DOI and open-access PDF links under a study's title (only http(s) addresses are linked); they print, and stay links in a PDF.</summary>
     private RenderFragment StudyLinks(IncludedPaperMetricRow row) => __builder =>
     {
         string? doi = SpecMatrix.DoiUrl(row.Doi);
         string? sourcePage = doi == null && AuBtechReviewAgent.PrismaReviewEngine.IsWebAddress(row.Url) ? row.Url : null;
         string? pdf = Page.fullTextUrls.TryGetValue(row.PaperId, out var u) ? u : null;
         if (doi == null && sourcePage == null && pdf == null) return;
-        <span class="mt-1 flex flex-wrap gap-x-2 text-xs print:hidden">
+        <span class="mt-1 flex flex-wrap gap-x-2 text-xs">
             @if (doi != null)
             {
                 <a href="@doi" target="_blank" rel="noopener" class="text-heading underline underline-offset-2">DOI</a>
