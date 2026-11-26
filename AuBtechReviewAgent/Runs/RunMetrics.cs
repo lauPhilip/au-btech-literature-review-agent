@@ -109,6 +109,12 @@ public partial class RunMetrics
     public int OutsideTheme { get; set; }
     public int InvalidMarkersStripped { get; set; }
 
+    // The self-check of the finished paper (Report/PaperSelfCheck.cs): how many of its ten checks passed, and the notes and
+    // faults it found. Null for a run made before the self-check, so a file never reads it as 0 faults.
+    public int? SelfCheckPassed { get; set; }
+    public int? SelfCheckNotes { get; set; }
+    public int? SelfCheckFaults { get; set; }
+
     // Text
     public int SynthesisWords { get; set; }
     public int DiscussionWords { get; set; }
