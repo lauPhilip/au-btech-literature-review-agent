@@ -26,6 +26,7 @@ public class PromptTemplateVersionTests
         ["grey-extraction"] = () => (MultivocalExtractor.PromptVersion, MultivocalExtractor.TemplateSha256(false)),
         ["formal-extraction"] = () => (MultivocalExtractor.FormalPromptVersion, MultivocalExtractor.TemplateSha256(true)),
         ["formal-appraisal"] = () => (MultivocalQualityAssessor.FormalAppraisalVersion, StudyExtractor.MmatTemplateSha256),
+        ["language-edit"] = () => (StylisticRefinerUtility.PromptVersion, StylisticRefinerUtility.TemplateSha256),
     };
 
     public static TheoryData<string> Names => new(Prompts.Keys);

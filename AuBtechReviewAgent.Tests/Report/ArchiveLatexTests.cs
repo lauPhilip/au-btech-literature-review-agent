@@ -63,8 +63,8 @@ public class ArchiveLatexTests : IDisposable
         Assert.Contains(@"\addplot[fill=blue!50] coordinates {(1,1) (2,1)};", tex);
         Assert.Contains(@"\draw[fill=blue!50] (0,0) circle (1.2cm); \node at (0,0) {\scriptsize 2};", tex);
         Assert.Contains("\\resizebox{\\linewidth}{!}{\n\\draw (a) -> (b);\n}\n\\caption{Grounded Architectural Synthesis System Model Diagram}", tex);
-        Assert.Contains("\\begin{tabularx}{\\textwidth}{X X}\n\\multicolumn{2}{l}{\\textbf{Table 4.2: Design \\& Rules}} \\\\\n\\toprule\n\\textbf{Rule} & \\textbf{Source} \\\\", tex);
-        Assert.Contains("Check & Supervisor \\\\ \\hline\n\\end{tabularx}\n\\vspace{2pt}\\noindent\\small From the studies.\\normalsize\n\\vspace{10pt}", tex);
+        Assert.Contains("\\begin{tabularx}{\\textwidth}{Y Y}\n\\caption{Design \\& Rules}\\label{tab:artifact}\\\\\n\\toprule\n\\textbf{Rule} & \\textbf{Source} \\\\", tex);
+        Assert.Contains("Check & Supervisor \\\\ \\addlinespace\n\\bottomrule\n\\end{tabularx}\n\\vspace{2pt}\\noindent\\small From the studies.\\normalsize\n\\vspace{10pt}", tex);
         // An answer that cites no study is not rated, and the certainty summary closes the answers (issue #551).
         Assert.Contains("\\noindent\\textbf{RQ1. How do loops recover?} Through checks. (certainty not rated: no evidence bears on this question)\\par\\smallskip\n" +
                         "\\noindent The answer to the research question is not rated, because no evidence bears on it.\\par\\smallskip\nLoops recover.", tex);

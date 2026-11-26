@@ -7,8 +7,8 @@ namespace AuBtechReviewAgent.Tests;
 
 /// <summary>
 /// The support statement printed under Support and Funding comes from Report:SupportStatement in appsettings.json
-/// (issue #114). It once named the wrong department; this keeps the right one in place while it is set. Without it,
-/// the paper asks the authors for their funding and never prints advice on configuration (the publisher audit, batch A).
+/// (issue #114). The site no longer sets one: the paper asks the authors for their funding and never prints advice on
+/// configuration, and an old run that recorded a site-wide statement shows the placeholder (the publisher audit, batch A).
 /// </summary>
 public class SupportStatementTests
 {
@@ -29,12 +29,19 @@ public class SupportStatementTests
     }
 
     [Fact]
-    public void TheSupportStatementNamesTheRightDepartment()
+    public void TheSiteSetsNoSupportStatementForEveryonesPaper()
     {
-        string statement = Statement();
-        if (statement.Length == 0) return; // not set: every paper gets the placeholder above
-        Assert.Contains("Department of Business Development and Technology (BTECH), Aarhus University", statement);
-        Assert.DoesNotContain("Engineering and Technology", statement);
-        Assert.DoesNotContain("live stream", statement);
+        // Lau removed the site-wide statement: whoever runs a review declares their own funding (the publisher audit).
+        Assert.Equal("", Statement());
+    }
+
+    [Fact]
+    public void AnOldRunsSiteWideStatementIsShownAsThePlaceholder()
+    {
+        foreach (string old in PaperDeclarations.OldSiteStatements)
+            Assert.Equal(PaperDeclarations.ToComplete, PaperDeclarations.Funding(old));
+        // Only the exact old text is replaced; a statement the authors wrote themselves is kept, even if it names BTECH.
+        string own = "This review was carried out at the Department of Business Development and Technology (BTECH), Aarhus University, which supported the work.";
+        Assert.Equal(own, PaperDeclarations.Funding(own));
     }
 }

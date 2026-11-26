@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text;
 
 namespace AuBtechReviewAgent;
@@ -22,8 +23,20 @@ public static class PaperDeclarations
     public const string Responsibility = "The person who ran this review is responsible for checking this output and for how it is used.";
 
     /// <summary>
-    /// The funding text for the paper: what the run recorded, or the placeholder when it recorded none or recorded the
-    /// old fallback, which told the reader how to set a configuration value.
+    /// The site-wide support statements older versions wrote into every run's report, word for word. They claimed the
+    /// department's support for whoever ran the review, so a run that recorded one shows the placeholder instead; the
+    /// run's own files are not changed.
+    /// </summary>
+    public static readonly IReadOnlyList<string> OldSiteStatements = new[]
+    {
+        "This review was carried out at the Department of Business Development and Technology (BTECH), Aarhus University, which supported the work. The department had no role in choosing the studies, extracting their data or writing up the findings.",
+        "This review was supported and conducted within the Department of Engineering & Technology at Aarhus University. The funders played no active role in specific automated screening study designs, live stream extraction cycles, or pipeline synthesis determinations.",
+        "This review was supported and conducted within the Department of Engineering & Technology at Aarhus University, funded as part of the IT Vest institutional collaboration framework. The funders played no active role in specific automated screening study designs, live stream extraction cycles, or pipeline synthesis determinations.",
+    };
+
+    /// <summary>
+    /// The funding text for the paper: what the run recorded, or the placeholder when it recorded none, the old fallback
+    /// that told the reader how to set a configuration value, or one of the <see cref="OldSiteStatements"/>.
     /// </summary>
     public static string Funding(string? recorded)
     {
@@ -31,7 +44,8 @@ public static class PaperDeclarations
         bool empty = text.Length == 0 || text == "Pending...";
         bool configHint = text.Contains("Report:SupportStatement", StringComparison.Ordinal)
             || text.StartsWith("No funding statement has been declared", StringComparison.Ordinal);
-        return empty || configHint ? ToComplete : text;
+        bool siteWide = OldSiteStatements.Contains(text, StringComparer.Ordinal);
+        return empty || configHint || siteWide ? ToComplete : text;
     }
 
     /// <summary>Competing interests, ethics and author contributions, in that order.</summary>

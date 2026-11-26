@@ -97,7 +97,7 @@ public class MultivocalReferenceEnrichmentTests : IDisposable
         var audit = System.Text.Json.JsonSerializer.Deserialize<ReferenceEnrichmentFile>(Read(ReferenceEnrichmentFile.FileName))!;
         Assert.NotNull(zip.GetEntry(Assert.Single(Assert.Single(audit.References).Lookups).RawFile!));
         string tex = Read(MultivocalPaper.MainTexFile);
-        Assert.Contains(@"Doe, J., Lee, K., \& Park, A. (2025). Context summaries for LLM agents. \textit{Journal of Agents}, \textit{7}(2), 10–20.", tex);
+        Assert.Contains(@"Doe, J., Lee, K., \& Park, A. (2025). Context summaries for LLM agents.\ \textit{Journal of Agents}, \textit{7}(2), 10–20.", tex);
         Assert.Contains("the reference of the one extracted academic source with a DOI or arXiv number was looked up in code at Crossref by that identifier, and it gained the full author list, the volume, the issue and the pages.", tex);
         Assert.Contains("volume = {7}", Read(GreyReferences.BibFile));
         // The ledger keeps the database's record.

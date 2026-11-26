@@ -32,6 +32,9 @@ public partial class Home
         }
     }
 
+    /// <summary>The finished run's citation counts, from the same audit the report reads; null while the run is going.</summary>
+    internal AuBtechReviewAgent.VerdictTally? citationTally;
+
     internal string StatePath(Guid id) =>
         Path.Join(Runs.FolderOf(id), "transparent-process.json");
 
@@ -66,6 +69,9 @@ public partial class Home
         State.PassedPeerReviewCount = s.PassedPeerReviewCheck;
         State.FailedPeerReviewCount = s.FailedPeerReviewCheck;
         stage = s.ProcessingStage;
+        // A finished run counts its citations from the audit, as its report does, so both pages give the same numbers.
+        citationTally = stage == AuBtechReviewAgent.PrismaReviewEngine.StageComplete
+            ? AuBtechReviewAgent.VerdictTally.ForRun(Runs.FolderOf(currentSessionId), s) : null;
         queuePosition = s.QueuePosition;
         failureMessage = state.FailureMessage;
         completedUtc = state.CompletedUtc;
@@ -155,6 +161,8 @@ public partial class Home
             {
                 if (isSearching) OnRunFinished();
                 isSearching = false;
+                if (stage == AuBtechReviewAgent.PrismaReviewEngine.StageComplete)
+                    citationTally = AuBtechReviewAgent.VerdictTally.ForRun(Runs.FolderOf(currentSessionId), updatedStats);
             }
             
             StateHasChanged();

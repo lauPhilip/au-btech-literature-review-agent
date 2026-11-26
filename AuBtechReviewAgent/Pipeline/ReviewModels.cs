@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Text.Json.Serialization;
 
 namespace AuBtechReviewAgent;
 
@@ -42,6 +43,10 @@ public class IncludedPaperMetricRow
 
     /// <summary>Volume, issue, pages, publisher and arXiv number, and which of them the reference enrichment filled.</summary>
     public ReferenceDetails? Details { get; set; }
+
+    /// <summary>A correction, an expression of concern or a registered published version, for Table A.1 (RetractionCheckText.Note); null when none.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? IntegrityNote { get; set; }
 }
 
 public record ScreeningLog(

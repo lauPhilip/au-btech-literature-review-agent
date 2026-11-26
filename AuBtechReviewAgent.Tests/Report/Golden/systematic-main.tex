@@ -2,33 +2,77 @@
 % The method, counts, figures and references are written in code from the run's files; the prose is model
 % text whose citations were checked against their sources. It has not been peer reviewed.
 % Source code: https://github.com/lauPhilip/au-btech-literature-review-agent
+% ----------------------------------------------------------------------------
+% main.tex: Systematic review (PRISMA 2020) written by TraceableAI.
+% Title: Recovery and oversight in agent loops: a systematic review
+% Run: RUN; tool: TOOL.
+% Generated: DATE UTC. This file is generated; it is not written by hand.
+%
+% How it was made: the method, the counts, the figures, the tables and the reference list were
+% written in code from the run's files. A language model wrote the prose (title, abstract,
+% introduction, results and discussion), and every citation in it was checked against the source
+% it cites (citation-audit.json in the run's archive). All text from sources and from the model is
+% escaped, so none of it can run a LaTeX command.
+%
+% Compile with pdflatex, twice for the cross-references (Overleaf does this for you). Every
+% package is in TeX Live. Text has one sentence per line; LaTeX reads a line break as a space.
+% The references are typeset at the end in the tool's APA 7 form. references.bib in the archive
+% holds the same works under the same keys, so every \cite keeps working if you replace the
+% thebibliography environment with \bibliographystyle{...} and \bibliography{references}.
+%
+% Fonts: TeX Gyre Termes for text, TeX Gyre Heros for sans serif and TeX Gyre Cursor for code. Where
+% Aarhus University's AU Passata package (AUPassata.sty) is installed, it sets the sans serif text
+% instead. AU Passata belongs to Aarhus University and is not shipped with this file; staff and
+% students can install it from https://math.medarbejdere.au.dk/latex/au-fonts-for-latex
+% ----------------------------------------------------------------------------
+
 \documentclass[10pt,a4paper]{article}
+
+%% Encoding and fonts
 \usepackage[T1]{fontenc}
 \usepackage[utf8]{inputenc}
-\usepackage[a4paper,margin=20mm,includefoot]{geometry}
-\usepackage{amsmath,amsfonts,amssymb}
-\usepackage{booktabs}
-\usepackage{ltablex}
-\usepackage{xcolor}
-\usepackage{fancyhdr}
-\usepackage{float}
-\usepackage{pgfplots}
-\usepgfplotslibrary{statistics}
-\pgfplotsset{compat=1.18}
-\usetikzlibrary{matrix,arrows.meta,positioning}
 \usepackage{tgtermes}
-\usepackage{tgheros}
+\IfFileExists{AUPassata.sty}{\usepackage{AUPassata}}{\usepackage{tgheros}} % AU Passata only where installed
 \usepackage{tgcursor}
+\usepackage{microtype} % fewer badly spaced lines in the narrow columns
+
+%% Page layout: 20 mm on every side, the page number inside the bottom margin
+\usepackage[a4paper,margin=20mm,includefoot]{geometry}
 \usepackage{multicol}
-\usepackage{adjustbox}
-\setlength{\emergencystretch}{2em}
-\definecolor{auBlue}{HTML}{003B5C}
-\definecolor{greyText}{HTML}{4B5563}
-\definecolor{customIndigo}{HTML}{312E81}
+\usepackage{fancyhdr}
 \pagestyle{fancy}
 \fancyhf{}
 \renewcommand{\headrulewidth}{0pt}
 \fancyfoot[C]{\sffamily\scriptsize\color{greyText} Page \thepage}
+\setlength{\emergencystretch}{2em} % last resort for a line that cannot be filled
+
+%% Maths
+\usepackage{amsmath,amssymb}
+
+%% Tables: booktabs rules; tabularx tables that may run over pages (ltablex)
+\usepackage{booktabs}
+\usepackage{ltablex}
+\usepackage{capt-of} % a caption for a table set inside the two columns
+\newcolumntype{Y}{>{\raggedright\arraybackslash}X}
+\newcolumntype{L}[1]{>{\raggedright\arraybackslash}p{\dimexpr#1\linewidth-6pt\relax}}
+\setlength{\LTcapwidth}{\textwidth}
+\counterwithin{table}{section} % Table 4.1 is the first table of section 4
+
+%% Figures, drawn with TikZ and pgfplots
+\usepackage{xcolor}
+\usepackage{float}
+\usepackage{adjustbox}
+\usepackage{pgfplots}
+\usepgfplotslibrary{statistics}
+\pgfplotsset{compat=1.18}
+\usetikzlibrary{matrix,arrows.meta,positioning}
+\definecolor{auBlue}{HTML}{003B5C}
+\definecolor{greyText}{HTML}{4B5563}
+\definecolor{customIndigo}{HTML}{312E81}
+
+%% Citations, links and the PDF's metadata (hyperref comes last)
+\usepackage{cite} % sorts and ranges the numbers: [1--4]
+\usepackage{xurl} % a web address may break anywhere
 \usepackage[hidelinks]{hyperref}
 \hypersetup{
     pdftitle={Recovery and oversight in agent loops: a systematic review},
@@ -38,45 +82,111 @@
     pdfcreator={TraceableAI (Department of Business Development and Technology, Aarhus University) with the language model mistral-large-latest},
     pdfproducer={TraceableAI (AI-generated) with pdfLaTeX}
 }
+\urlstyle{same} % links in the text face, as APA sets them
+
 \begin{document}
+
 \begin{center}
-    {\sffamily\bfseries\scriptsize\color{gray} AI-GENERATED SYSTEMATIC LITERATURE REVIEW  \\ \vspace{4pt}}
-    {\rmfamily\LARGE\bfseries Recovery and oversight in agent loops: a systematic review \\ \vspace{10pt}}
-    {\sffamily\small\color{greyText} Author names, affiliations and ORCID iDs (0000-0000-0000-0000): to be completed by the authors \\ \vspace{4pt}}
-    {\ttfamily\scriptsize\color{gray} Protocol Hash: HASH | Generated: DATE UTC \\ \vspace{15pt}}
-    \color{lightgray}\hrule\vspace{15pt}
-    \color{black}
+  {\sffamily\bfseries\scriptsize\color{gray} AI-GENERATED PILOT SYSTEMATIC SEARCH\par}
+  \vspace{4pt}
+  {\rmfamily\LARGE\bfseries Recovery and oversight in agent loops: a systematic review\par}
+  \vspace{8pt}
+  {\large TraceableAI – artificial researcher\textsuperscript{*}\par}
+  \vspace{4pt}
+  {\sffamily\small\color{greyText} Author names, affiliations and ORCID iDs (0000-{}0000-{}0000-{}0000): to be completed by the authors\par}
+  \vspace{4pt}
+  {\ttfamily\scriptsize\color{gray} Protocol fingerprint: HASH \textbar{} Generated: DATE UTC\par}
 \end{center}
-\noindent\colorbox{black!4}{%
-\parbox{\dimexpr\linewidth-2\fboxsep\relax}{%
-    \small\sffamily\bfseries\color{auBlue} ABSTRACT \\ \vspace{4pt}
-    \itshape\rmfamily\color{black} We screened the records and included 2 studies, grouped into 1 theme: agent loops recover from faults through supervisor checks, while governance layers audit agent actions.
-    \par\vspace{6pt}\upshape\sffamily\small\textbf{Keywords:} agent loops; recovery and oversight; agent orchestration safety; agent fault recovery
-}}
-\vspace{15pt}
+{\footnotesize\noindent\textsuperscript{*}An AI system; the person who planned the review is responsible for its use. A literature review written and checked by TraceableAI\@. It has not been peer reviewed.\par}
+{\color{lightgray}\hrule}
+
+\begin{abstract}
+We screened the records and included 2 studies, grouped into 1 theme: agent loops recover from faults through supervisor checks, while governance layers audit agent actions.
+\end{abstract}
+\noindent{\small\textbf{Keywords:} agent loops; recovery and oversight; agent orchestration safety; agent fault recovery\par}
+\vspace{12pt}
+
 \begin{multicols}{2}
-\section{Introduction}
-\subsection{Rationale}
-Agent loops recover from faults through supervisor checks [1].
-\subsection{Objectives}
+
+\section{Introduction}\label{sec:introduction}
+
+\subsection{Rationale}\label{sec:rationale}
+
+Agent loops recover from faults through supervisor checks~\cite{doe2025agent}.
+
+\subsection{Objectives}\label{sec:objectives}
+
 To map how agent loops are kept safe.
-\section{Methodology}
-\subsection{Eligibility Criteria}
-Records were eligible if they met the inclusion criterion: ``Agent architecture''. Records were excluded if they met the exclusion criterion: ``Agronomy''. The peer-reviewed-only filter was disabled, so preprints and other non-peer-reviewed records were eligible.
-\subsection{Information Sources}
-The following sources were searched on DATE (UTC): arXiv. No other databases, registers, websites or reference lists were consulted.
-\subsection{Search Execution}
-The primary search string was ``agent loops''. To improve recall, the language model proposed 2 additional search strings: ``agent orchestration safety''; ``agent fault recovery''. The search strings were run in order, and a source stopped taking further strings once its cap was filled. ``agent orchestration safety'' and ``agent fault recovery'' were not run, because every source had already filled its cap. At most 3 records from each source went on to screening, across all search strings. Duplicates did not count towards this limit, so a source can show more records identified in the flow diagram. Duplicates were removed across all sources by identifier, DOI and normalised title (0 removed). Every record removed at this stage is listed with its reason in the run ledger. No date, language or document-type limits were applied.
-\subsection{Selection Automation}
-Each remaining record was screened twice by a language model (mistral-large-latest, Mistral API, temperature 0) with two independent prompts that work through the criteria in a different order, using its title, authors, date, venue and abstract as returned by the source. The two screenings agreed on 3 of 3 records (Cohen's kappa = 1.00); there were no disagreements to resolve. Text taken from the records was passed to the model inside marked data blocks with the instruction to treat it as data, never as instructions. Full texts were retrieved only for included records and were not used for the screening decision. Of 3 records screened, 2 were included and 1 excluded. No human reviewer took part in screening during the run. Every decision and its rationale is recorded in the run ledger (transparent-process.\allowbreak{}json) so that a human reviewer can verify it.
-\subsection{Data Collection and Quality Appraisal}
-For each included study, a language model (mistral-large-latest, Mistral API, temperature 0) extracted the study type, method, sample, up to three key findings and the stated limitations from the full text where it could be retrieved (0 of 2 studies) and otherwise from the abstract. Every extracted value had to come with a verbatim quote, which was checked against the paper's text in code; 2 of 4 quotes were found. Study quality was appraised with the Mixed Methods Appraisal Tool (MMAT, 2018): the model chose the study category and answered its five criteria with yes, no or can't tell, each backed by a quote; an answer whose quote could not be found in the text was changed to can't tell. 2 studies were appraised (9 of 10 answers were can't tell). MMAT is not used to compute an overall score. The appraisal was done by a language model without a second human appraiser, so it should be checked before use (see extraction.json).
-\subsection{Synthesis Methods}
-The findings were synthesised thematically, following the thematic synthesis method of Thomas and Harden (2008), with the language model (mistral-large-latest, Mistral API) performing each step. First, the key findings extracted from each study (whose supporting quotes had been found in the paper's text) were coded; each code names the findings it comes from, and for studies without verified findings the code had to quote the abstract verbatim, which was checked in code (2 of 2 codes were anchored this way). Second, the codes were grouped into 1 descriptive themes; a study belongs to a theme when one of its codes does, and the model's answer was rejected until every coded study was either placed in a theme or explicitly left out with a reason. A second, independent coding assigned the studies to the same themes; agreement over 2 study-theme decisions was Cohen's kappa = 1.00 (0 disagreements, listed in thematic-codebook.\allowbreak{}json). Third, each theme was written up as a subsection from its own studies only, with no sentence citing more than 3 studies; in a theme of up to 5 studies every study was to be cited, and studies still uncited were given to one further revision pass, while a larger theme was synthesised from the studies that report its claims most directly, and its uncited studies are listed with the citation coverage. Finally, the part of every cited sentence attributed to a paper was checked against that paper; sentences judged not supported or only partly supported were rewritten once from the paper's evidence and checked again. The requested artifact could not be built: The artifact could not be built from the results (LlmOutputException).
+
+\section{Methodology}\label{sec:methodology}
+
+\subsection{Eligibility Criteria}\label{sec:eligibility-criteria}
+
+Records were eligible if they met the inclusion criterion: ``Agent architecture''.
+Records were excluded if they met the exclusion criterion: ``Agronomy''.
+The peer-reviewed-only filter was disabled, so preprints and other non-peer-reviewed records were eligible.
+
+\subsection{Information Sources}\label{sec:information-sources}
+
+The following sources were searched on DATE (UTC): arXiv.
+No other databases, registers, websites or reference lists were consulted.
+
+\subsection{Search Execution}\label{sec:search-execution}
+
+The primary search string was ``agent loops''.
+To improve recall, the language model proposed 2 additional search strings: ``agent orchestration safety''; ``agent fault recovery''.
+The search strings were run in order, and a source stopped taking further strings once its cap was filled.
+``agent orchestration safety'' and ``agent fault recovery'' were not run, because every source had already filled its cap.
+At most 3 records from each source went on to screening, across all search strings.
+Duplicates did not count towards this limit, so a source can show more records identified in the flow diagram.
+Duplicates were removed across all sources by identifier, DOI and normalised title (0 removed).
+Every record removed at this stage is listed with its reason in the run ledger.
+No date, language or document-type limits were applied.
+
+\subsection{Selection Automation}\label{sec:selection-automation}
+
+Each remaining record was screened twice by a language model (mistral-large-latest, Mistral API, temperature 0) with two independent prompts that work through the criteria in a different order, using its title, authors, date, venue and abstract as returned by the source.
+The two screenings agreed on 3 of 3 records (Cohen's kappa = 1.00); there were no disagreements to resolve.
+Raw agreement was 100\% (3 of 3), PABAK = 1.00, n = 3.
+The two screenings are two prompts of the same model, so their agreement measures how robust the decisions are to the prompt, not inter-rater reliability between independent reviewers.
+Text taken from the records was passed to the model inside marked data blocks with the instruction to treat it as data, never as instructions.
+Full texts were retrieved only for included records and were not used for the screening decision.
+Of 3 records screened, 2 were included and 1 excluded.
+No human reviewer took part in screening during the run.
+Every decision and its rationale is recorded in the run ledger (transparent-process.\allowbreak{}json) so that a human reviewer can verify it.
+
+\subsection{Data Collection and Quality Appraisal}\label{sec:data-collection-and-quality-appraisal}
+
+For each included study, a language model (mistral-large-latest, Mistral API, temperature 0) extracted the study type, method, sample, up to three key findings and the stated limitations from the full text where it could be retrieved (0 of 2 studies) and otherwise from the abstract.
+Every extracted value had to come with a verbatim quote, which was checked against the paper's text in code; 2 of 4 quotes were found.
+Study quality was appraised with the Mixed Methods Appraisal Tool (MMAT, 2018): the model chose the study category and answered its five criteria with yes, no or can't tell, each backed by a quote; an answer whose quote could not be found in the text was changed to can't tell. 2 studies were appraised (9 of 10 answers were can't tell).
+MMAT is not used to compute an overall score.
+The appraisal was done by a language model without a second human appraiser, so it should be checked before use (see extraction.json).
+
+\subsection{Synthesis Methods}\label{sec:synthesis-methods}
+
+The findings were synthesised thematically, following the thematic synthesis method of Thomas and Harden (2008), with the language model (mistral-large-latest, Mistral API) performing each step (descriptive themes only; no analytical themes were developed).
+First, the key findings extracted from each study (whose supporting quotes had been found in the paper's text) were coded; each code names the findings it comes from, and for studies without verified findings the code had to quote the abstract verbatim, which was checked in code (2 of 2 codes were anchored this way).
+Second, the codes were grouped into 1 descriptive themes; a study belongs to a theme when one of its codes does, and the model's answer was rejected until every coded study was either placed in a theme or explicitly left out with a reason.
+A second, independent coding assigned the studies to the same themes; agreement over 2 study-theme decisions was Cohen's kappa = 1.00 (0 disagreements, listed in thematic-codebook.\allowbreak{}json).
+Raw agreement was 100\% (2 of 2), PABAK = 1.00, n = 2.
+The two codings are two prompts of the same model, so their agreement measures how robust the decisions are to the prompt, not inter-rater reliability between independent reviewers.
+Third, each theme was written up as a subsection from its own studies only, with no sentence citing more than 3 studies; in a theme of up to 5 studies every study was to be cited, and studies still uncited were given to one further revision pass, while a larger theme was synthesised from the studies that report its claims most directly, and its uncited studies are listed with the citation coverage.
+Finally, the part of every cited sentence attributed to a paper was checked against that paper; sentences judged not supported or only partly supported were rewritten once from the paper's evidence and checked again.
+The requested artifact could not be built: The artifact could not be built from the results (LlmOutputException).
+
 \end{multicols}
-\section{Characteristics of the Included Studies}
-The 2 included papers were published between 2025 and 2026, most of them in 2026. By the source that first returned them: 2 from Google Scholar. By venue type: 1 journal, 0 transactions, 1 conference and 0 preprint or unknown. Table A.1 in the appendix lists each included study. Table A.2 gives the data extracted from each study, and Table A.3 the quality appraisal of each study with MMAT 2018.
-\vspace{10pt}
+
+\section{Characteristics of the Included Studies}\label{sec:characteristics-of-the-included-studies}
+
+The 2 included papers were published between 2025 and 2026, most of them in 2026.
+By the source that first returned them: 2 from Google Scholar.
+By venue type: 1 journal, 0 transactions, 1 conference and 0 preprint or unknown.
+Table~\ref{tab:A.1} in the appendix lists each included study.
+Table~\ref{tab:A.2} gives the data extracted from each study, and Table~\ref{tab:A.3} the quality appraisal of each study with MMAT 2018.
+
+Figure~\ref{fig:flow} shows the flow of records through the review, and Figure~\ref{fig:years} shows the included papers by year, Figure~\ref{fig:platforms} by the database that returned them and Figure~\ref{fig:venues} by venue.
+
 \begin{figure}[H]
 \centering
 \begin{tikzpicture}[node distance=0.55cm and 0.9cm, font=\scriptsize,
@@ -94,7 +204,7 @@ The 2 included papers were published between 2025 and 2026, most of them in 2026
 \draw[arrow] (screened) -- (excluded);
 \end{tikzpicture}
 
-\caption{PRISMA 2020 flow diagram of this run}
+\caption{PRISMA 2020 flow diagram of this run}\label{fig:flow}
 \end{figure}
 \vspace{6pt}
 \begin{figure}[H]
@@ -106,7 +216,7 @@ The 2 included papers were published between 2025 and 2026, most of them in 2026
 \addplot[fill=blue!50] coordinates {(1,1) (2,1)};
 \end{axis}
 \end{tikzpicture}
-\caption{Papers per Year}
+\caption{Papers per Year}\label{fig:years}
 \end{minipage}\hfill
 \begin{minipage}{0.32\textwidth}
 \centering
@@ -116,7 +226,7 @@ The 2 included papers were published between 2025 and 2026, most of them in 2026
 \node[fill=teal!40,label=right:(2) Google Scholar] {}; & \\
 };
 \end{tikzpicture}
-\caption{Platform Distribution}
+\caption{Platform Distribution}\label{fig:platforms}
 \end{minipage}\hfill
 \begin{minipage}{0.32\textwidth}
 \centering
@@ -129,93 +239,180 @@ The 2 included papers were published between 2025 and 2026, most of them in 2026
 \node[fill=red!50,label=right:(0) Preprints] {}; & \\
 };
 \end{tikzpicture}
-\caption{Venue Share}
+\caption{Venue Share}\label{fig:venues}
 \end{minipage}
 \end{figure}
 \vspace{10pt}
 \small
 \vspace{10pt}
+
 \begin{multicols}{2}
-\section{Results \& Synthesis}
-\subsection{Overview of the Synthesis}
-The findings of the 2 included studies were synthesised thematically. 2 studies yielded 2 codes, grouped into 1 theme: Recovery and oversight (2 studies). Each theme is reported in its own subsection below, and the evidence map shows which studies contribute to which theme.
-\subsection{Recovery and oversight}
-Agent loops recover from faults through supervisor checks [1], while governance layers audit agent actions [2].
+
+\section{Results \& Synthesis}\label{sec:results-synthesis}
+
+\subsection{Overview of the Synthesis}\label{sec:overview-of-the-synthesis}
+
+The findings of the 2 included studies were synthesised thematically. 2 studies yielded 2 codes, grouped into 1 theme: Recovery and oversight (2 studies).
+Each theme is reported in its own subsection below, and the evidence map shows which studies contribute to which theme.
+
+\subsection{Recovery and oversight}\label{sec:recovery-and-oversight}
+
+Agent loops recover from faults through supervisor checks~\cite{doe2025agent}, while governance layers audit agent actions~\cite{lee2026agent}.
+
 \par\smallskip\noindent\textit{The synthesis and discussion cite 2 of the 2 included studies.}
+
 \end{multicols}
+
 \vspace{6pt}
-\begin{tabularx}{\textwidth}{>{\hsize=0.9\hsize}X >{\hsize=1.4\hsize}X >{\hsize=0.7\hsize}X}
-\multicolumn{3}{l}{\textbf{Table 4.1: Evidence Map of the Thematic Synthesis}} \\
+\begin{tabularx}{\textwidth}{>{\hsize=0.9\hsize}Y >{\hsize=1.4\hsize}Y >{\hsize=0.7\hsize}Y}
+\caption{Evidence Map of the Thematic Synthesis}\label{tab:evidence-map}\\
 \toprule
 \textbf{Theme} & \textbf{Description} & \textbf{Studies} \\
 \midrule
-Recovery and oversight & How agent loops recover and are overseen. & {[}1{]}, {[}2{]} \\ \hline
+\endfirsthead%
+\toprule
+\textbf{Theme} & \textbf{Description} & \textbf{Studies} \\
+\midrule
+\endhead%
+Recovery and oversight & How agent loops recover and are overseen. & {\cite{doe2025agent,lee2026agent}} \\ \addlinespace
+\bottomrule
 \end{tabularx}
-\vspace{2pt}\noindent\scriptsize Second, independent coding: Cohen's kappa = 1.00 over 2 study-theme decisions.\normalsize
+\vspace{2pt}\noindent{\scriptsize Second coding by a second prompt of the same model: raw agreement 100\% (2 of 2); Cohen's kappa = 1.00; PABAK = 1.00; n = 2 study-theme decisions; this measures robustness to the prompt, not inter-rater reliability.\par}
+\normalsize
 \vspace{10pt}
-\begin{multicols}{2}
-\section{Discussion}
-\subsection{General Interpretation}
-Recovery and audits complement each other [1, 2].
-\subsection{Limitations of the Review Process}
-This review has limits of its own. The records were screened by the language model mistral-large-latest (Mistral API), twice with independent prompts, and no human reviewer checked the decisions within the tool. No open-access full text was found for any of the 2 included studies, so all were read from their abstracts only. The search took at most 3 records per source. The extraction, the synthesis and the text were written by the language model mistral-large-latest (Mistral API); every cited sentence was checked against its source, but the review should be read by a person before it is relied on.
-\subsection{Automated Citation Check}
-An automated check compared the part of each cited sentence attributed to a paper with the text of that paper. Of 5 citations checked, 5 were judged supported, 0 partially supported, 0 not supported, and 0 could not be verified. Every verdict, with the quoted evidence, is listed in citation-audit.\allowbreak{}json; these are model judgements and should be spot-checked by a human reviewer.
-\section{Declarations}
-\subsection{Registration and Protocol}
-The review was not registered. Its protocol (search query, objective, eligibility criteria, sources, limits and screening set-up) was written to protocol.md on DATE (UTC) before any search was run, with SHA-256 fingerprint FINGERPRINT...; the extra search strings are appended to it as a dated amendment. The file is part of the run archive.
-\subsection{Support \& Funding}
+
+\begin{multicols*}{2}
+
+\section{Discussion}\label{sec:discussion}
+
+\subsection{General Interpretation}\label{sec:general-interpretation}
+
+Recovery and audits complement each other~\cite{doe2025agent,lee2026agent}.
+
+\subsection{Limitations of the Review Process}\label{sec:limitations-of-the-review-process}
+
+This review has limits of its own.
+The records were screened by the language model mistral-large-latest (Mistral API), twice with independent prompts, and no human reviewer checked the decisions within the tool.
+No open-access full text was found for any of the 2 included studies, so all were read from their abstracts only.
+The search took at most 3 records per source.
+The extraction, the synthesis and the text were written by the language model mistral-large-latest (Mistral API); every cited sentence was checked against its source, but the review should be read by a person before it is relied on.
+This was a pilot run, not a comprehensive search: the search took at most 3 records per source and identified 3 records, so relevant studies are likely to be missing and the findings show what a small sample of the literature says, not the state of the field.
+
+\subsection{Automated Citation Check}\label{sec:automated-citation-check}
+
+An automated check compared the part of each cited sentence attributed to a paper with the text of that paper.
+Of 5 citations checked, 5 were judged supported, 0 partially supported, 0 not supported, and 0 could not be verified.
+Every verdict, with the quoted evidence, is listed in citation-audit.\allowbreak{}json; these are model judgements and should be spot-checked by a human reviewer.
+
+\section{Declarations}\label{sec:declarations}
+
+\subsection{Registration and Protocol}\label{sec:registration-and-protocol}
+
+The review was not registered.
+Its protocol (search query, objective, eligibility criteria, sources, limits and screening set-up) was written to protocol.md on DATE (UTC) before any search was run, with SHA-256 fingerprint FINGERPRINT\ldots{}; the extra search strings are appended to it as a dated amendment.
+The file is part of the run archive.
+
+\subsection{Support \& Funding}\label{sec:support-funding}
+
 To be completed by the authors.
-\subsection{Availability of Data and Code}
-The code of the tool is openly available at https://\allowbreak{}github.\allowbreak{}com/\allowbreak{}lauPhilip/\allowbreak{}au-btech-literature-review-agent. This run used VERSION. The run archive contains the protocol, the raw source responses, the screening ledger, the extraction and appraisal data, the thematic codebook, every model call's fingerprint and a manifest.json with the SHA-256 fingerprint of every file. Journal quartiles are taken from the SCImago Journal Rank (SJR) data (https://\allowbreak{}www.\allowbreak{}scimagojr.\allowbreak{}com).
-\subsection{Use of Artificial Intelligence}
-This review was conducted with TraceableAI (version VERSION), an open-source tool that runs PRISMA 2020 systematic reviews with the large language model mistral-large-latest, on DAY (run RUNID). The review protocol (question, eligibility criteria and sources) was written by the authors and fingerprinted before the search. The model was used for generating additional search phrasings, screening titles and abstracts against the eligibility criteria, extracting study data and appraising quality with the Mixed Methods Appraisal Tool, coding findings into themes and drafting the synthesis and checking each citation against the cited paper. The abstract and introduction were then given a language edit by the model, for clear and direct prose; code kept an edit only when it changed no number and no citation, and the text before and after each edit is on file. Every record was screened twice by independent prompts; disagreements were kept and flagged (Cohen's kappa = 1.00). Screening decisions were not checked by a human reviewer within the tool. Of 5 citations in the generated text, 5 were judged supported by the cited paper, 0 partly supported and 0 not supported; a supporting verdict counted only when its quote was found verbatim in the paper. The complete record of the run (protocol, search responses, every screening decision and model call, and the citation audit) is available as a fingerprinted archive. The person who ran this review is responsible for checking this output and for how it is used.
-\subsection{Competing Interests}
-To be completed by the authors. Declare any financial or personal relationship that could be seen to influence the work, or state that there is none.
-\subsection{Ethics Approval}
+
+\subsection{Availability of Data and Code}\label{sec:availability-of-data-and-code}
+
+The code of the tool is openly available at \url{https://github.com/lauPhilip/au-btech-literature-review-agent}.
+This run used a version of the tool.
+The run archive contains the protocol, the raw source responses, the screening ledger, the extraction and appraisal data, the thematic codebook, every model call's fingerprint and a manifest.json with the SHA-256 fingerprint of every file.
+The run archive to share, made for a public repository such as Zenodo or OSF, leaves out the downloaded papers without an open licence, the raw answers of licensed databases and the model call log, holds no abstracts from licensed databases and shortens long quotes; its deposit.json lists every file left out or changed with its SHA-256 in the full archive, which the review's owner keeps.
+Journal quartiles are taken from the SCImago Journal Rank (SJR) data (\url{https://www.scimagojr.com}).
+
+\subsection{Use of Artificial Intelligence}\label{sec:use-of-artificial-intelligence}
+
+This review was conducted with TraceableAI (version VERSION), an open-source tool that runs PRISMA 2020 systematic reviews with the large language model mistral-large-latest, on DAY (run RUNID).
+The review protocol (question, eligibility criteria and sources) was written by the authors and fingerprinted before the search.
+The model was used for generating additional search phrasings, screening titles and abstracts against the eligibility criteria, extracting study data and appraising quality with the Mixed Methods Appraisal Tool, coding findings into themes and drafting the synthesis and checking each citation against the cited paper.
+The abstract and introduction were then given a language edit by the model, for clear and direct prose; code kept an edit only when it changed no number and no citation, and the text before and after each edit is on file.
+Every record was screened twice by independent prompts; disagreements were kept and flagged (Cohen's kappa = 1.00).
+Screening decisions were not checked by a human reviewer within the tool.
+Of 5 citations in the generated text, 5 were judged supported by the cited paper, 0 partly supported and 0 not supported; a supporting verdict counted only when its quote was found verbatim in the paper.
+The complete record of the run (protocol, search responses, every screening decision and model call, and the citation audit) is available as a fingerprinted archive.
+The person who ran this review is responsible for checking this output and for how it is used.
+
+\subsection{Competing Interests}\label{sec:competing-interests}
+
+To be completed by the authors.
+Declare any financial or personal relationship that could be seen to influence the work, or state that there is none.
+
+\subsection{Ethics Approval}\label{sec:ethics-approval}
+
 Not required; the review involved no human participants and used only published or publicly available sources.
-\subsection{Author Contributions}
-To be completed by the authors. Give each author's roles in the CRediT taxonomy, for example Conceptualization, Methodology, Investigation, Writing – original draft and Writing – review \& editing.
-\end{multicols}
+
+\subsection{Author Contributions}\label{sec:author-contributions}
+
+To be completed by the authors.
+Give each author's roles in the CRediT taxonomy, for example Conceptualization, Methodology, Investigation, Writing – original draft and Writing – review \& editing.
+
+\end{multicols*}
+
 \clearpage
 \begin{thebibliography}{99}
-\bibitem{ref1} Doe, J. (2025). Agent loops for safe orchestration. \textit{Future Internet}. https://\allowbreak{}doi.\allowbreak{}org/\allowbreak{}10.\allowbreak{}3390/\allowbreak{}fi1234567
-\bibitem{ref2} Lee, K. (2026). Agent governance layers. In \textit{Proceedings of the Conference on Agents}.
+\bibitem{doe2025agent} Doe, J. (2025). Agent loops for safe orchestration.\ \textit{Future Internet}.\ \url{https://doi.org/10.3390/fi1234567}
+\bibitem{lee2026agent} Lee, K. (2026). Agent governance layers. In \textit{Proceedings of the Conference on Agents}.
 \end{thebibliography}
+
 \clearpage
-\section*{Appendix}
+\section*{Appendix}\label{sec:appendix}
+\setcounter{table}{0}
+\renewcommand{\thetable}{A.\arabic{table}}
+\renewcommand{\theHtable}{A.\arabic{table}} % hyperref's own name, so A.1 is not the same link as 0.1
+
 \small
-\begin{tabularx}{\textwidth}{>{\hsize=0.6\hsize}X >{\hsize=1.2\hsize}X >{\hsize=1.0\hsize}X >{\hsize=0.5\hsize}X >{\hsize=1.7\hsize}X}
-\multicolumn{5}{l}{\textbf{Table A.1: Included studies}} \\
+\begin{tabularx}{\textwidth}{>{\hsize=0.6\hsize}Y >{\hsize=1.2\hsize}Y >{\hsize=1.0\hsize}Y >{\hsize=0.5\hsize}Y >{\hsize=1.7\hsize}Y}
+\caption{Included studies}\label{tab:A.1}\\
 \toprule
 \textbf{Paper Name} & \textbf{Executive Summary} & \textbf{Inclusion Rationale} & \textbf{Source} & \textbf{Citation (APA 7th)} \\
 \midrule
-Agent loops for safe orchestration & An agent paper. & About agent architecture. & Google Scholar & Doe, J. (2025). Agent loops for safe orchestration. \textit{Future Internet}. https://\allowbreak{}doi.\allowbreak{}org/\allowbreak{}10.\allowbreak{}3390/\allowbreak{}fi1234567 \\ \hline
-Agent governance layers & An agent paper. & About agent architecture. & Google Scholar & Lee, K. (2026). Agent governance layers. In \textit{Proceedings of the Conference on Agents}. \\ \hline
+\endfirsthead%
+\toprule
+\textbf{Paper Name} & \textbf{Executive Summary} & \textbf{Inclusion Rationale} & \textbf{Source} & \textbf{Citation (APA 7th)} \\
+\midrule
+\endhead%
+Agent loops for safe orchestration & An agent paper. & About agent architecture. & Google Scholar; SJR Q1 & Doe, J. (2025). Agent loops for safe orchestration.\ \textit{Future Internet}.\ \url{https://doi.org/10.3390/fi1234567}\\ \addlinespace
+Agent governance layers & An agent paper. & About agent architecture. & Google Scholar; not in SJR & Lee, K. (2026). Agent governance layers. In \textit{Proceedings of the Conference on Agents}.\\ \addlinespace
+\bottomrule
 \end{tabularx}
-\vspace{4pt}\noindent\small 
-Table A.1 lists each included study with a short summary, the reason it was included, the database it came from and its reference.
+\vspace{4pt}\noindent Table~\ref{tab:A.1} lists each included study with a short summary, the reason it was included, the database it came from with its venue's rank, and its reference.\par
+\noindent{\small The rank is the venue's SCImago Journal Rank (SJR) quartile, matched on the exact title. A venue marked not in SJR was not found in the SJR data: it may be a conference, a preprint server or an unlisted journal, and its standing was not checked. The Directory of Open Access Journals (DOAJ) was not checked.\par}
 \vspace{10pt}
-\begin{tabularx}{\textwidth}{>{\hsize=0.25\hsize}X >{\hsize=0.8\hsize}X >{\hsize=1.1\hsize}X >{\hsize=0.9\hsize}X >{\hsize=1.95\hsize}X}
-\multicolumn{5}{l}{\textbf{Table A.2: Extracted Study Data}} \\
+\begin{tabularx}{\textwidth}{>{\hsize=0.25\hsize}Y >{\hsize=0.8\hsize}Y >{\hsize=1.1\hsize}Y >{\hsize=0.9\hsize}Y >{\hsize=1.95\hsize}Y}
+\caption{Extracted Study Data}\label{tab:A.2}\\
 \toprule
 \textbf{Ref.} & \textbf{Study type} & \textbf{Method} & \textbf{Sample} & \textbf{Key findings} \\
 \midrule
-{[}1{]} & design science artefact with evaluation & Supervisor checks & not reported & (1) Loops recover from faults \\ \hline
-{[}2{]} & design science artefact with evaluation & Supervisor checks$^{\dagger}$ & not reported & (1) Loops recover from faults$^{\dagger}$ \\ \hline
+\endfirsthead%
+\toprule
+\textbf{Ref.} & \textbf{Study type} & \textbf{Method} & \textbf{Sample} & \textbf{Key findings} \\
+\midrule
+\endhead%
+{\cite{doe2025agent}} & design science artefact with evaluation & Supervisor checks & not reported & (1) Loops recover from faults \\ \addlinespace
+{\cite{lee2026agent}} & design science artefact with evaluation & Supervisor checks$^{\dagger}$ & not reported & (1) Loops recover from faults$^{\dagger}$ \\ \addlinespace
+\bottomrule
 \end{tabularx}
-\vspace{2pt}\noindent\scriptsize $^{\dagger}$ The supporting quote given by the model was not found in the paper's text; treat the value with caution.\small
+\vspace{2pt}\noindent{\scriptsize $^{\dagger}$ The supporting quote given by the model was not found in the paper's text; treat the value with caution.\par}
 \vspace{10pt}
-\begin{tabularx}{\textwidth}{>{\hsize=0.4\hsize}X >{\hsize=1.6\hsize}X c c c c c c}
-\multicolumn{8}{l}{\textbf{Table A.3: Quality Appraisal (MMAT 2018)}} \\
+\begin{tabularx}{\textwidth}{>{\hsize=0.4\hsize}Y >{\hsize=1.6\hsize}Y c c c c c c}
+\caption{Quality Appraisal (MMAT 2018)}\label{tab:A.3}\\
 \toprule
 \textbf{Ref.} & \textbf{Category} & \textbf{1} & \textbf{2} & \textbf{3} & \textbf{4} & \textbf{5} & \textbf{Met} \\
 \midrule
-{[}1{]} & quantitative descriptive & Yes & ? & ? & ? & ? & 1/5 \\
-{[}2{]} & quantitative descriptive & ? & ? & ? & ? & ? & 0/5 \\
+\endfirsthead%
+\toprule
+\textbf{Ref.} & \textbf{Category} & \textbf{1} & \textbf{2} & \textbf{3} & \textbf{4} & \textbf{5} & \textbf{Met} \\
+\midrule
+\endhead%
+{\cite{doe2025agent}} & quantitative descriptive & Yes & {?} & {?} & {?} & {?} & 1/5 \\
+{\cite{lee2026agent}} & quantitative descriptive & {?} & {?} & {?} & {?} & {?} & 0/5 \\
 \bottomrule
 \end{tabularx}
-\vspace{2pt}\noindent\scriptsize Columns 1 to 5 are the five MMAT 2018 criteria for the study's category, answered Yes, No or ? (can't tell). Met is the number answered Yes; it is not an overall score.\small
+\vspace{2pt}\noindent{\scriptsize Columns 1 to 5 are the five MMAT 2018 criteria for the study's category, answered Yes, No or {?} (can't tell). Met is the number answered Yes; it is not an overall score.\par}
 \vspace{10pt}
 \subsection*{Statements on the Use of AI for Submission}
 Publishers ask for the use of AI to be disclosed in different places. Each statement below is written in code from the run's record; copy the one your venue asks for, check it and edit it to fit.
@@ -225,4 +422,5 @@ Publishers ask for the use of AI to be disclosed in different places. Each state
 \textit{IEEE and ACM ask for the disclosure in the acknowledgements.} The literature search, screening, data extraction, a first draft of the synthesis and a language edit of the abstract and introduction were carried out with TraceableAI using mistral-large-latest; every citation was automatically checked against the cited paper. The person who ran this review is responsible for checking this output and for how it is used.\par
 \paragraph{Methods}
 \textit{Springer Nature and Wiley ask for the disclosure in the methods section.} This review was conducted with TraceableAI (version VERSION), an open-source tool that runs PRISMA 2020 systematic reviews with the large language model mistral-large-latest, on DAY (run RUNID). The review protocol (question, eligibility criteria and sources) was written by the authors and fingerprinted before the search. The model was used for generating additional search phrasings, screening titles and abstracts against the eligibility criteria, extracting study data and appraising quality with the Mixed Methods Appraisal Tool, coding findings into themes and drafting the synthesis and checking each citation against the cited paper. The abstract and introduction were then given a language edit by the model, for clear and direct prose; code kept an edit only when it changed no number and no citation, and the text before and after each edit is on file. Every record was screened twice by independent prompts; disagreements were kept and flagged (Cohen's kappa = 1.00). Screening decisions were not checked by a human reviewer within the tool. Of 5 citations in the generated text, 5 were judged supported by the cited paper, 0 partly supported and 0 not supported; a supporting verdict counted only when its quote was found verbatim in the paper. The complete record of the run (protocol, search responses, every screening decision and model call, and the citation audit) is available as a fingerprinted archive. The person who ran this review is responsible for checking this output and for how it is used.\par
+
 \end{document}

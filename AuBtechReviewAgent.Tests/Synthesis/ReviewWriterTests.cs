@@ -111,7 +111,10 @@ public class ReviewWriterTests : IDisposable
 
         // The title, abstract and introduction come from the shared front-matter step, written last, and the
         // rationale's citation is checked like every other sentence.
-        Assert.Equal("Recovery and oversight in agent loops: a systematic review", report.TitleItem);
+        // Three records identified make a pilot search: the facts tell the abstract, and the title is renamed in code
+        // (SearchAdequacy, pinned in ReportFallbackTests and the golden main.tex).
+        Assert.StartsWith("Recovery and oversight in agent loops: a ", report.TitleItem);
+        Assert.Contains("Search scope: this was a pilot run, not a comprehensive search", prompts);
         Assert.Contains("included 2 studies, grouped into 1 theme", report.AbstractItem);
         Assert.Equal("Agent loops recover from faults through supervisor checks [1].", report.RationaleItem);
         Assert.Contains("You are writing the title, abstract, rationale and objectives", prompts);
