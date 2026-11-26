@@ -34,7 +34,8 @@ public class SearchStrategyTableTests
 
         Assert.Contains("arXiv searched all fields for the string", note);
         Assert.Contains("limited to journal articles, proceedings articles and posted content", note);
-        Assert.Contains("Each search asked for at most 5 records", note);
+        Assert.Contains("Each search asked a source for the records it still needed to reach 10", note);
+        Assert.Contains("searched again, string by string, with larger limits", note);
         Assert.Contains("10 distinct records", note);
         Assert.Contains("records published outside 2020-2026 were removed after retrieval", note);
         Assert.Contains("not peer reviewed were removed before screening", note);

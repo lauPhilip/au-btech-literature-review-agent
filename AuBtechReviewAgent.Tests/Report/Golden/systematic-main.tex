@@ -450,7 +450,7 @@ Give each author's roles in the CRediT taxonomy, for example Conceptualization, 
 Google Scholar Gateway & agent loops & DATE & 3 & Completed\\ \addlinespace
 \bottomrule
 \end{tabularx}
-\vspace{2pt}\noindent{\scriptsize Google Scholar Gateway received the string as it is. Each search asked for at most 1 record, and a source was not searched again once it had returned 3 distinct records. No date, language or document-type filter was sent to the databases. The raw answer of every search is in SourceResponses/ in the run archive, with its SHA-256 fingerprint in the run ledger.\par}
+\vspace{2pt}\noindent{\scriptsize Google Scholar Gateway received the string as it is. Each search asked a source for the records it still needed to reach 3, shared over the strings left. A source still short after the last string was searched again, string by string, with larger limits, and a record a source had already returned for a string was not counted again. A source was not searched once it had returned 3 distinct records that went on to screening. No date, language or document-type filter was sent to the databases. The raw answer of every search is in SourceResponses/ in the run archive, with its SHA-256 fingerprint in the run ledger.\par}
 \vspace{10pt}
 \subsection*{Statements on the Use of AI for Submission}
 Publishers ask for the use of AI to be disclosed in different places. Each statement below is written in code from the run's record; copy the one your venue asks for, check it and edit it to fit.
