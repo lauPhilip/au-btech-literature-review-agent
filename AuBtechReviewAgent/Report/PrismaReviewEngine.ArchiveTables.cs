@@ -33,14 +33,15 @@ public partial class PrismaReviewEngine
             string summary = EscapeLatexText(row.Summary);
             string rationale = EscapeLatexText(row.InclusionRationale);
             // The database by its display name, as on the paper page (issue #133).
-            string source = EscapeLatexText(CategoryLabel(row.Category));
+            string source = EscapeLatexText(CategoryLabel(row.Category) + "; " + VenueRank(row));
             string citation = EscapeLatexText(row.ApaCitation);
             // No space before the row's end: chktex reads "Agents}. \\" as a full stop inside a sentence.
             ab.AppendLine($"{title} & {summary} & {rationale} & {source} & {citation}\\\\ \\addlinespace");
         }
         ab.AppendLine(@"\bottomrule");
         ab.AppendLine(@"\end{tabularx}");
-        ab.AppendLine(@"\vspace{4pt}\noindent Table~\ref{tab:A.1} lists each included study with a short summary, the reason it was included, the database it came from and its reference.\par");
+        ab.AppendLine(@"\vspace{4pt}\noindent Table~\ref{tab:A.1} lists each included study with a short summary, the reason it was included, the database it came from with its venue's rank, and its reference.\par");
+        ab.AppendLine(@"\noindent{\small " + EscapeLatexText(VenueRankNote) + @"\par}");
         int nextTable = 2;
         if (state?.Extractions is { Count: > 0 } extractions)
         {
@@ -55,6 +56,19 @@ public partial class PrismaReviewEngine
         }
         return ab.ToString();
     }
+
+    /// <summary>The note under Table A.2 when it lists a secondary study.</summary>
+    public const string SecondaryNote =
+        "A secondary study is a review of other studies (a systematic, scoping or literature review, a meta-analysis or a literature survey). It summarises the work of others and adds no new evidence, so an answer that rests on it is marked.";
+
+    /// <summary>The note under Table A.1 on the venue ranks.</summary>
+    public const string VenueRankNote =
+        "The rank is the venue's SCImago Journal Rank (SJR) quartile, matched on the exact title. A venue marked not in SJR was not found in the SJR data: it may be a conference, a preprint server or an unlisted journal, and its standing was not checked. The Directory of Open Access Journals (DOAJ) was not checked.";
+
+    /// <summary>The venue's SJR quartile as Table A.1 prints it ("SJR Q1"), or "not in SJR" (a preprint says so).</summary>
+    public static string VenueRank(IncludedPaperMetricRow row) =>
+        System.Text.RegularExpressions.Regex.IsMatch(row.Quartile ?? "", "^Q[1-4]$") ? $"SJR {row.Quartile}"
+            : row.VenueType == "Preprints" ? "preprint, not in SJR" : "not in SJR";
 
     /// <summary>The artifact as a TikZ figure, a table or a list, outside the two-column layout.</summary>
     private string ArtifactLatex(ReviewArtifact artifact)
@@ -113,7 +127,7 @@ public partial class PrismaReviewEngine
         sb.AppendLine(@"\end{tabularx}");
         var notes = new List<string>();
         if (book.SecondCoding?.Kappa is double k)
-            notes.Add($"Second, independent coding: Cohen's kappa = {k.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture)} over {book.SecondCoding.CellsCompared} study-theme decisions.");
+            notes.Add($"Second coding by a second prompt of the same model: {Agreement.Figures(book.SecondCoding.Agreements, book.SecondCoding.CellsCompared, k)} study-theme decisions; this measures robustness to the prompt, not inter-rater reliability.");
         if (book.Uncoded.Count > 0)
             notes.Add("Not placed in a theme: " + string.Join("; ", book.Uncoded.Select(u => $"[{u.Reference}] {u.Reason.TrimEnd('.')}")) + ".");
         if (notes.Count > 0)
@@ -142,13 +156,16 @@ public partial class PrismaReviewEngine
                 continue;
             }
             string findings = string.Join(" ", e.KeyFindings.Select((f, i) => $"({i + 1}) {V(f)}"));
-            sb.AppendLine($"{Cite(new[] { e.ReferenceNumber })} & {EscapeLatexText(e.StudyType)} & {V(e.Method)} & {V(e.Sample)} & {findings} \\\\ \\addlinespace");
+            string type = SecondaryStudy.KindOf(e) is { } kind ? $"{e.StudyType} (secondary study: {kind})" : e.StudyType;
+            sb.AppendLine($"{Cite(new[] { e.ReferenceNumber })} & {EscapeLatexText(type)} & {V(e.Method)} & {V(e.Sample)} & {findings} \\\\ \\addlinespace");
         }
         sb.AppendLine(@"\bottomrule");
         sb.AppendLine(@"\end{tabularx}");
         // The note explains the dagger only when a value in the table carries one (issue #168).
         if (extractions.Any(HasUnverifiedValue))
             sb.AppendLine(@"\vspace{2pt}\noindent{\scriptsize $^{\dagger}$ The supporting quote given by the model was not found in the paper's text; treat the value with caution.\par}");
+        if (extractions.Any(e => SecondaryStudy.KindOf(e) != null))
+            sb.AppendLine(@"\vspace{2pt}\noindent{\scriptsize " + EscapeLatexText(SecondaryNote) + @"\par}");
         sb.AppendLine(@"\vspace{10pt}");
 
         string A(string answer) => answer switch { "yes" => "Yes", "no" => "No", _ => "{?}" };
