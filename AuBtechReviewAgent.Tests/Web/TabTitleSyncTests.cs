@@ -40,14 +40,4 @@ public class TabTitleSyncTests
             js.Calls.Select(c => (string)c.Args[0]!));
         Assert.All(js.Calls, c => Assert.Equal("traceableReview.setTitle", c.Id));
     }
-
-    [Fact]
-    public void ThePageScriptSetsTheDocumentTitle()
-    {
-        string path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "AuBtechReviewAgent", "wwwroot", "js", "review-output.js");
-        if (!File.Exists(path)) return; // packaged tests
-        string script = File.ReadAllText(path);
-        Assert.Contains("setTitle: function (text)", script);
-        Assert.Contains("document.title = text;", script);
-    }
 }

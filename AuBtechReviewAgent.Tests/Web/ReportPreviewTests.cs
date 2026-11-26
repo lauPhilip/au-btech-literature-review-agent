@@ -72,6 +72,9 @@ public class ReportPreviewTests
         Assert.Contains("traceablePageBlocks", pages);
         Assert.Contains("[data-citation-panel]", pages); // a card that opened off screen is scrolled to (#671)
         Assert.True(pages.Split('\n').Length <= 300);
+        string script = Read("wwwroot", "js", "review-output.js"); // the tab's title (#682)
+        Assert.Contains("setTitle: function (text)", script);
+        Assert.Contains("document.title = text;", script);
         string app = Read("Components", "App.razor");
         Assert.True(app.IndexOf("js/paged-blocks.js", StringComparison.Ordinal) is var at and >= 0 && at < app.IndexOf("js/paged-preview.js", StringComparison.Ordinal));
     }
