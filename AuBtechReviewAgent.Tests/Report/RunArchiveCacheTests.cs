@@ -35,11 +35,11 @@ public class RunArchiveCacheTests : IDisposable
 
     private byte[] Download(PrismaReviewEngine engine, Guid runId, string folder, bool finished = true)
     {
-        using var zip = RunArchiveCache.GetOrBuild(folder, RunFolderStamp.Of(folder)!, finished, () =>
+        using var zip = RunArchiveCache.GetOrBuild(folder, RunFolderStamp.Of(folder)!, finished, output =>
         {
             _builds++;
-            return engine.GenerateWorkspaceArchiveFromDisk(runId);
-        });
+            return engine.WriteWorkspaceArchive(runId, output);
+        })!;
         using var copy = new MemoryStream();
         zip.CopyTo(copy);
         return copy.ToArray();
@@ -116,6 +116,23 @@ public class RunArchiveCacheTests : IDisposable
 
         Assert.Empty(Kept(folder));
         Assert.Equal(2, _builds);
+    }
+
+    [Fact]
+    public async Task AnArchiveThatIsNotKeptIsWrittenToAFileThatGoesWhenItHasBeenSent()
+    {
+        var (engine, runId, folder) = await FinishedRunAsync();
+        var before = Directory.GetFiles(folder).Length;
+
+        using (var zip = RunArchiveCache.GetOrBuild(folder, RunFolderStamp.Of(folder)!, false, output => engine.WriteWorkspaceArchive(runId, output))!)
+        {
+            Assert.IsType<FileStream>(zip);
+            Assert.Equal(before + 1, Directory.GetFiles(folder).Length);
+        }
+
+        Assert.Equal(before, Directory.GetFiles(folder).Length);
+        Assert.Null(RunArchiveCache.GetOrBuild(folder, RunFolderStamp.Of(folder)!, true, _ => false));
+        Assert.Equal(before, Directory.GetFiles(folder).Length);
     }
 
     [Fact]

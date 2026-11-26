@@ -48,6 +48,7 @@ public sealed partial class MultivocalWriter
     private readonly ReviewCache _cache;
     private readonly RunMetricsStore _metrics;
 
+    /// <summary>Sets up the writer with the run store, the model and the cache it writes and checks with.</summary>
     /// <param name="checkModel">The model that answers the citation checks when a fast model takes them (Llm:FastModel); empty: <paramref name="model"/>.</param>
     public MultivocalWriter(RunStore runs, MultivocalReporter reporter, MultivocalPages pages, Func<IChatCompletionService> chat, string model = "", int parallelism = 4,
         ReviewCache? cache = null, RunMetricsStore? metrics = null, string? checkModel = null)
@@ -165,7 +166,11 @@ public sealed partial class MultivocalWriter
         if (input == null || paper?.CheckedUtc == null) return null;
         var previous = System.Globalization.CultureInfo.CurrentCulture;
         System.Globalization.CultureInfo.CurrentCulture = System.Globalization.CultureInfo.InvariantCulture;
-        try { return PaperLatex.Build(MultivocalPaper.Build(input, paper, LoadAudit(runId))); }
+        try
+        {
+            var article = MultivocalArticleInfo.For(input, paper, File.Exists(Path.Join(_runs.FolderOf(runId), "protocol.md")));
+            return PaperLatex.Build(MultivocalPaper.Build(input, paper, LoadAudit(runId), article));
+        }
         finally { System.Globalization.CultureInfo.CurrentCulture = previous; }
     }
 
@@ -176,13 +181,21 @@ public sealed partial class MultivocalWriter
     /// </summary>
     public byte[] Archive(Guid runId)
     {
+        using var memory = new MemoryStream();
+        return WriteArchive(runId, memory) ? memory.ToArray() : Array.Empty<byte>();
+    }
+
+    /// <summary>Writes the archive to <paramref name="output"/> one file at a time; false, writing nothing, when the run is not a multivocal run.</summary>
+    public bool WriteArchive(Guid runId, Stream output)
+    {
         var header = _runs.LoadHeader(runId);
         var module = ReviewModules.Find("multivocal");
-        if (header == null || module == null || ReviewModules.ElsewhereFor(header, module.Key) != null) return Array.Empty<byte>();
+        if (header == null || module == null || ReviewModules.ElsewhereFor(header, module.Key) != null) return false;
         var generated = new List<(string Path, byte[] Content)>();
         if (MainTex(runId) is { } tex) generated.Add((MultivocalPaper.MainTexFile, new System.Text.UTF8Encoding(false).GetBytes(tex)));
         var planned = _reporter.LoadInput(runId)?.Planned;
-        return RunArchive.Build(runId, _runs.FolderOf(runId), generated, module.ArchiveFiles, planned?.ProtocolSha256, Load(runId)?.Model);
+        RunArchive.Write(output, runId, _runs.FolderOf(runId), generated, module.ArchiveFiles, planned?.ProtocolSha256, Load(runId)?.Model);
+        return true;
     }
 
     // ---------- Writing ----------

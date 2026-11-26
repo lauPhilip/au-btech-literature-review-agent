@@ -1,77 +1,114 @@
-@* The front page of a printed report, laid out like a journal article (wiki page 06): title, author line, the
-   article-info box beside the abstract, keywords, links and how to cite, then a rule under which the body starts. It
-   has a journal's layout but no journal's identity: no publisher, journal name, volume, issue, page range or DOI. The
-   author is the tool, marked as an AI system. It renders on paper only, unless OnScreen is set (a print preview). It
-   needs no interactivity, so a page that renders reports without a live connection can use it as it is. *@
+@* The front page of a report, laid out like a journal article but with TraceableAI's own identity and no journal's
+   (wiki page 06): the masthead with the run, the banner that says an AI system wrote it, the title, the byline with
+   its note, the Article info box beside the abstract, and the buttons for the PDF, the citation, the source archive
+   and the decision log. On paper the buttons become links. No publisher, journal, volume, page range, DOI, university
+   or funder is named. Every value comes from ArticleInfo, which reads the run's files in code. It renders on paper
+   only unless OnScreen is set; the buttons need no live connection (wwwroot/js/review-output.js handles them). *@
 @inject NavigationManager Nav
 
 @* The running header (CSS margin boxes); every character of the title is escaped in ArticleInfo.RunningHeaderCss. *@
 <style>@((MarkupString)Info.RunningHeaderCss())</style>
-<header class="journal-front @(OnScreen ? "" : "hidden print:block")" aria-label="Article information">
-    <p class="journal-kind">@Info.Kind · @Info.Guideline</p>
-    <h1 class="journal-title">@Info.Title</h1>
-    <p class="journal-author">@ArticleInfo.Author<sup>*</sup></p>
-    <p class="journal-note"><sup>*</sup> @ArticleInfo.AuthorNote</p>
-    <p class="journal-note">@ArticleInfo.NotPeerReviewed</p>
-
-    <div class="journal-frontgrid">
-        <aside class="journal-info" aria-label="Article info">
-            <h2 class="journal-label">Article info</h2>
-            <dl>
-                <dt>Run</dt><dd class="journal-mono">@Info.RunId</dd>
-                <dt>Review</dt><dd>@Info.Kind, reported following @Info.Guideline</dd>
-                <dt>Protocol written</dt><dd>@ArticleInfo.Date(Info.ProtocolWrittenUtc)</dd>
-                <dt>Searched</dt><dd>@ArticleInfo.Date(Info.SearchedUtc)</dd>
-                <dt>Completed</dt><dd>@ArticleInfo.Date(Info.CompletedUtc)</dd>
-                <dt>Counts</dt><dd>@Info.Found @Info.FoundLabel; @Info.Included @Info.IncludedLabel</dd>
-                <dt>Tool</dt>
-                <dd>
-                    @Info.ToolLine
-                    @if (AuBtechReviewAgent.ToolVersion.Commit(Info.AppVersion) is { } commit)
-                    {
-                        <br /><span>commit </span><a class="journal-mono" href="@AuBtechReviewAgent.ToolVersion.CodeUrl(Info.AppVersion)">@(commit.Length > 12 ? commit[..12] : commit)</a>
-                    }
-                </dd>
-                <dt>@(Info.Models.Count == 1 ? "Model" : "Models")</dt><dd>@(Info.Models.Count == 0 ? "not recorded" : string.Join(", ", Info.Models))</dd>
-                <dt>Protocol fingerprint</dt><dd class="journal-mono">@(Info.ProtocolFingerprint.Length == 0 ? "not recorded" : $"SHA-256 {Info.ProtocolFingerprint}")</dd>
-            </dl>
-            @if (Info.Keywords.Count > 0)
+<header class="article-front @(OnScreen ? "" : "hidden print:block")" aria-label="Front page" data-front-page>
+    <div class="af-masthead">
+        <div>
+            <p class="af-wordmark">TraceableAI</p>
+            <p class="af-series">@Info.MastheadKind · @Info.Guideline</p>
+        </div>
+        <div class="af-run">
+            @if (Info.GeneratedUtc != null)
             {
-                <h2 class="journal-label">Keywords<sup>†</sup></h2>
-                <ul class="journal-keywords">
-                    @foreach (var keyword in Info.Keywords)
-                    {
-                        <li>@keyword</li>
-                    }
-                </ul>
+                <p>Generated @ArticleInfo.Date(Info.GeneratedUtc)</p>
             }
-            <h2 class="journal-label">Links</h2>
-            <ul class="journal-links">
-                <li>Report: <a href="@Link(Info.ReportPath)">@Link(Info.ReportPath)</a></li>
-                <li>Archive (all files, fingerprinted): <a href="@Link(Info.ArchivePath)">@Link(Info.ArchivePath)</a></li>
-                @if (Info.HasProtocol)
-                {
-                    <li>Protocol: <a href="@Link(Info.ProtocolPath)">@Link(Info.ProtocolPath)</a></li>
-                }
-            </ul>
-        </aside>
-        <div class="journal-abstract">
-            <h2 class="journal-label">Abstract</h2>
-            <p>@Info.Abstract</p>
+            <p>@Info.RunLabel</p>
         </div>
     </div>
-    <p class="journal-cite"><span class="journal-label">How to cite</span> @Info.HowToCite(Nav.BaseUri)</p>
+    <p class="af-disclosure" role="note">@ArticleInfo.Disclosure</p>
+
+    <h1 class="af-title">@Info.Title</h1>
+    <p class="af-author">@ArticleInfo.Author<sup>*</sup></p>
+    <p class="af-note"><sup>*</sup> @Info.BylineNote</p>
+
+    <div class="af-grid">
+        <aside class="af-info" aria-labelledby="af-info-label">
+            <h2 class="af-label" id="af-info-label">Article info</h2>
+            <dl>
+                @foreach (var group in Info.InfoGroups())
+                {
+                    var g = group;
+                    <div class="af-group">
+                        <dt>@g.Label</dt>
+                        @foreach (var line in g.Lines)
+                        {
+                            <dd>@line</dd>
+                        }
+                    </div>
+                }
+            </dl>
+        </aside>
+        <section class="af-abstract" id="@AbstractId" data-report-section="@(AbstractId == null ? null : "")" aria-labelledby="af-abstract-label">
+            <h2 class="af-label" id="af-abstract-label">Abstract</h2>
+            @foreach (var part in Info.AbstractParagraphs)
+            {
+                var p = part;
+                @if (p.Heading != null)
+                {
+                    <p><strong>@(p.Heading).</strong> @p.Text</p>
+                }
+                else
+                {
+                    <p>@p.Text</p>
+                }
+            }
+        </section>
+    </div>
+
+    <div class="af-actions print:hidden">
+        <button type="button" class="ui-btn-secondary min-h-[44px]" data-print title="Print the report, or choose Save as PDF in the print window">
+            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 3h7l5 5v13H7zM14 3v5h5M10 13h6M10 17h6"></path></svg>
+            PDF
+        </button>
+        <button type="button" class="ui-btn-secondary min-h-[44px]" data-copy="@CiteId" data-copy-label="Cite" title="Copy a reference to this report">
+            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h4v4H8v3H6v-4zM15 7h4v4h-3v3h-2v-4z"></path></svg>
+            <span data-copy-text>Cite</span>
+        </button>
+        <a href="@Link(Info.ArchivePath)" class="ui-btn-secondary min-h-[44px]" title="Every file of the run, fingerprinted, with the source papers and the LaTeX manuscript">
+            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+            Source archive
+        </a>
+        <a href="@Link(Info.DecisionLogPath)" class="ui-btn-secondary min-h-[44px]" title="Every screened record with its decision and the reason, as RIS">
+            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5h11M9 12h11M9 19h11M4 5h.01M4 12h.01M4 19h.01"></path></svg>
+            Decision log
+        </a>
+        <span class="sr-only" role="status" data-copy-status="@CiteId"></span>
+    </div>
+
+    @* On paper the buttons are links with full addresses, so a printed or saved copy still leads back to the run. *@
+    <ul class="af-links hidden print:block">
+        <li>Online: <a href="@Link(Info.ReportPath)">@Link(Info.ReportPath)</a></li>
+        <li>Source archive: <a href="@Link(Info.ArchivePath)">@Link(Info.ArchivePath)</a></li>
+        <li>Decision log: <a href="@Link(Info.DecisionLogPath)">@Link(Info.DecisionLogPath)</a></li>
+        @if (Info.HasProtocol)
+        {
+            <li>Protocol: <a href="@Link(Info.ProtocolPath)">@Link(Info.ProtocolPath)</a></li>
+        }
+    </ul>
+    <p class="af-cite hidden print:block"><span class="af-cite-label">How to cite</span> <span id="@CiteId">@Info.HowToCite(Nav.BaseUri)</span></p>
     @if (Info.Keywords.Count > 0)
     {
-        <p class="journal-footnote"><sup>†</sup> Keywords are taken in code from the protocol's topic, the search strings and the names of the themes; no language model chose them.</p>
+        <p class="af-footnote hidden print:block">Keywords are taken in code from the protocol's topic, the search strings and the names of the themes; no language model chose them.</p>
     }
 </header>
 
 @code {
     [Parameter, EditorRequired] public AuBtechReviewAgent.ArticleInfo Info { get; set; } = default!;
 
-    /// <summary>Show the front page on screen as well, for a print preview; by default it is on paper only.</summary>
+    /// <summary>Show the front page on screen as well; by default it is on paper only.</summary>
     [Parameter] public bool OnScreen { get; set; }
+
+    /// <summary>The id the contents list jumps to for the abstract; null when the page has its own abstract section.</summary>
+    [Parameter] public string? AbstractId { get; set; }
+
+    private string CiteId => $"cite-text-{Info.ShortRunId}";
 
     private string Link(string path) => AuBtechReviewAgent.ArticleInfo.Absolute(Nav.BaseUri, path);
 }

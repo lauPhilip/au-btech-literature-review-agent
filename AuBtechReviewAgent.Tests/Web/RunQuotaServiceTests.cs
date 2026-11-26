@@ -90,19 +90,35 @@ public class RunQuotaServiceTests : IDisposable
         var cancelled = new RunCancelledException(new OperationCanceledException(), CancellationToken.None);
 
         quota.TryReserve("1.2.3.4", QuotaTier.Free, out _, out var first);
-        Assert.True(quota.GiveBackAfter(first!, cancelled));
+        Assert.True(quota.GiveBackAfter(first!, cancelled, 12));
         Assert.Equal(1, quota.GetStatus("1.2.3.4", QuotaTier.Free).Remaining);
 
         // Cancelling again the same day does not give a second free run.
         quota.TryReserve("1.2.3.4", QuotaTier.Free, out _, out var second);
-        Assert.False(quota.GiveBackAfter(second!, cancelled));
+        Assert.False(quota.GiveBackAfter(second!, cancelled, 12));
         Assert.Equal(0, quota.GetStatus("1.2.3.4", QuotaTier.Free).Remaining);
 
-        // A run that failed is still always given back, and the next day a cancelled one is again.
-        Assert.True(quota.GiveBackAfter(second!, new TaskCanceledException("A timeout")));
+        // A run that failed before any model call is still given back, and the next day a cancelled one is again.
+        Assert.True(quota.GiveBackAfter(second!, new TaskCanceledException("A timeout"), 0));
         _now = _now.AddDays(1);
         quota.TryReserve("1.2.3.4", QuotaTier.Free, out _, out var third);
-        Assert.True(quota.GiveBackAfter(third!, cancelled));
+        Assert.True(quota.GiveBackAfter(third!, cancelled, 12));
+        Assert.Equal(1, quota.GetStatus("1.2.3.4", QuotaTier.Free).Remaining);
+    }
+
+    [Fact]
+    public void AFailedRunIsGivenBackOnlyWhenItMadeNoModelCall()
+    {
+        var quota = Create(new QuotaOptions { FreeRunsPerDay = 2, GlobalFreeRunsPerDay = 50 });
+        var failed = new InvalidOperationException("The search failed");
+
+        quota.TryReserve("1.2.3.4", QuotaTier.Free, out _, out var early);
+        Assert.True(quota.GiveBackAfter(early!, failed, modelCalls: 0));
+        Assert.Equal(2, quota.GetStatus("1.2.3.4", QuotaTier.Free).Remaining);
+
+        // Once the model was called the run cost something: it stays counted, however it failed.
+        quota.TryReserve("1.2.3.4", QuotaTier.Free, out _, out var late);
+        Assert.False(quota.GiveBackAfter(late!, failed, modelCalls: 3));
         Assert.Equal(1, quota.GetStatus("1.2.3.4", QuotaTier.Free).Remaining);
     }
 

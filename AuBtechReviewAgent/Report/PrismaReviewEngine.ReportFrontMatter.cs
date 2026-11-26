@@ -95,11 +95,11 @@ public partial class PrismaReviewEngine
             var draft = written == null ? (await run.Fallback.Value).Draft : null;
             using (LlmStage.Begin("style"))
             {
-                // Three separate copy-edits, sent together. Objectives written in code from the research questions are not copy-edited.
+                // Three separate language edits, sent together. Objectives written in code from the research questions are not edited.
                 var abstractTask = StylisticRefinerUtility.RefineAcademicProseAsync(chat, "Abstract", written?.Abstract ?? draft!.Abstract);
                 var rationaleTask = StylisticRefinerUtility.RefineAcademicProseAsync(chat, "Rationale", written?.Rationale ?? draft!.Rationale);
                 var objectivesTask = ReviewWriter.ObjectivesFromQuestions(finalState.ResearchQuestions) is { } codeObjectives
-                    ? Task.FromResult((codeObjectives, new StyleDeltaLog("Objectives", codeObjectives, codeObjectives, Applied: false, Note: "Written in code from the research questions in the protocol; not sent through the stylistic pass.")))
+                    ? Task.FromResult((codeObjectives, new StyleDeltaLog("Objectives", codeObjectives, codeObjectives, Applied: false, Note: "Written in code from the research questions in the protocol; not sent through the language edit.")))
                     : StylisticRefinerUtility.RefineAcademicProseAsync(chat, "Objectives", written?.Objectives ?? draft!.Objectives);
                 await Task.WhenAll(abstractTask, rationaleTask, objectivesTask);
                 return (written, draft, await abstractTask, await rationaleTask, await objectivesTask);
@@ -144,7 +144,7 @@ public partial class PrismaReviewEngine
         string frontNote = front == null ? "The front-matter step failed; the first draft's text was used." : "";
         string titleText = front?.Title ?? draft!.Title;
         run.Title = CleanTitle(titleText, query);
-        run.Deltas.Add(new StyleDeltaLog("Title", titleText, run.Title, Applied: false, Note: "Title is not sent through the stylistic pass." + (frontNote.Length > 0 ? " " + frontNote : "")));
+        run.Deltas.Add(new StyleDeltaLog("Title", titleText, run.Title, Applied: false, Note: "Title is not sent through the language edit." + (frontNote.Length > 0 ? " " + frontNote : "")));
         run.Deltas.Add(styledAbstract.Delta);
         run.Deltas.Add(styledRationale.Delta);
         run.Deltas.Add(styledObjectives.Delta);
