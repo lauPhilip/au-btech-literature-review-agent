@@ -45,25 +45,43 @@ public static class ReferenceEnrichmentText
     public static string Sentence(ReferenceEnrichmentFile? audit, string one, string many)
     {
         var looked = audit?.References.Where(r => r.Lookups.Count > 0).ToList() ?? new();
-        if (looked.Count == 0) return "";
+        // Studies with an identifier that were not looked up, with the reason in code (issue #566).
+        var skipped = audit?.References.Where(r => r.Lookups.Count == 0 && r.Skipped != null).ToList() ?? new();
+        int total = looked.Count + skipped.Count;
+        if (total == 0) return "";
+        string Works(int n) => n == 1 ? one : many;
+        if (looked.Count == 0)
+            return $"None of the {(total == 1 ? $"one {one}" : $"{total} {many}")} with a DOI or arXiv number was looked up for its reference: {SkippedReasons(skipped)}.";
+
         var asked = Services.Where(s => looked.Any(r => r.Lookups.Any(l => l.Service == s))).ToList();
         int gained = looked.Count(r => r.Filled.Count > 0);
         var named = Fields
             .Select(f => (f.Words, Count: looked.Count(r => r.Filled.ContainsKey(f.Key))))
             .Where(f => f.Count > 0)
             .ToList();
+        int searched = looked.Count(r => r.Lookups.Any(l => l.Url.Contains("query.bibliographic=", StringComparison.Ordinal)));
+        int published = looked.Count(r => r.Filled.ContainsKey("doi"));
 
-        string works = looked.Count == 1 ? $"the reference of the one {one}" : $"the references of the {looked.Count} {many}";
+        string works = skipped.Count > 0
+            ? $"the reference{(looked.Count == 1 ? "" : "s")} of {looked.Count} of the {total} {many}"
+            : looked.Count == 1 ? $"the reference of the one {one}" : $"the references of the {looked.Count} {many}";
         string result = looked.Count == 1
             ? gained == 0 ? "it gained no field" : $"it gained {Join(named.Select(f => f.Words).ToList())}"
             : gained == 0 ? "none of them gained a field"
             : $"{gained} of them gained at least one field ({string.Join(", ", named.Select(f => $"{f.Count} {f.Words}"))})";
+        string byTitle = searched == 0 ? "" :
+            $"; Crossref was also searched by title for the published version of {searched} {Works(searched)} from arXiv whose arXiv entry names a journal or proceedings, " +
+            (published == 0 ? "and none was found" : $"and {published} {(published == 1 ? "is" : "are")} cited as that published version, with its DOI, year and venue");
+        string notLooked = skipped.Count == 0 ? "" : $" The other {(skipped.Count == 1 ? "one was" : $"{skipped.Count} were")} not looked up: {SkippedReasons(skipped)}.";
         return $"Before the references were numbered, {works} with a DOI or arXiv number {(looked.Count == 1 ? "was" : "were")} " +
-            $"looked up in code at {Join(asked)} by that identifier, and {result}. " +
+            $"looked up in code at {Join(asked)} by that identifier{byTitle}, and {result}.{notLooked} " +
             "No language model was involved: an answer was used only when its title named the same work, it filled gaps without " +
-            "changing the year, title or venue the source gave, and every lookup and filled field is listed in " +
-            $"{ReferenceEnrichmentFile.FileName}.";
+            "changing the year, title or venue the source gave" + (published > 0 ? " (except for a published version, which replaces the preprint)" : "") +
+            $", and every lookup and filled field is listed in {ReferenceEnrichmentFile.FileName}.";
     }
+
+    private static string SkippedReasons(IEnumerable<ReferenceEnrichmentEntry> skipped) =>
+        string.Join("; ", skipped.GroupBy(r => r.Skipped!).Select(g => $"{g.Count()} because {g.Key}"));
 
     private static string Join(IReadOnlyList<string> items) => items.Count switch
     {
