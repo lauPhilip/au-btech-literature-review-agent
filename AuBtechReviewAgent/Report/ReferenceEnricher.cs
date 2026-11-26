@@ -65,9 +65,10 @@ public sealed class ReferenceEnrichmentFile
 /// answer names the first author alone), names split into given and family parts rather than guessed from a string,
 /// and the venue, volume, issue, pages and publisher. It asks Crossref once per DOI, OpenAlex when Crossref does not know
 /// the DOI or lacks the authors or venue, and the arXiv API by arXiv number for a record from another database with an
-/// arXiv DOI. Each answer is saved in SourceResponses/ with its SHA-256 and reused when the same run asks again; no model
+/// arXiv DOI. For a preprint whose arXiv entry names a journal it searches Crossref by title for the published version,
+/// which is then cited instead (issue #566). Each answer is saved in SourceResponses/ with its SHA-256 and reused when the same run asks again; no model
 /// is called. An answer is used only when its title names the same work, and it fills gaps: it never replaces the year,
-/// the title or a venue the source gave.
+/// the title or a venue the source gave, except with the published version of a preprint.
 /// </summary>
 public sealed class ReferenceEnricher
 {
@@ -128,6 +129,17 @@ public sealed class ReferenceEnricher
             if (arxiv != null) answers.Add(arxiv);
         }
 
+        // A preprint whose arXiv entry names a journal or proceedings: cite the published version when Crossref has one
+        // under the same title and first author (issue #566); otherwise the journal reference is read as it is.
+        if (doi == null || arxivDoi)
+            if (arxivId != null && !string.IsNullOrWhiteSpace(log.VenueName) && await PublishedVersionAsync(entry, log, runFolder) is { } published)
+            {
+                var cited = ReferenceMerge.Published(log, published.Answer, published.Doi, published.Year, entry.Filled);
+                entry.After = cited.ApaCitation;
+                entry.Completed = new CompletedReference { Authors = cited.Authors?.ToList() ?? new(), Venue = cited.VenueName ?? "", Details = cited.Details };
+                return (cited, entry);
+            }
+
         var usable = new List<ReferenceAnswer>();
         foreach (var a in answers)
         {
@@ -139,6 +151,56 @@ public sealed class ReferenceEnricher
         if (entry.Filled.Count > 0)
             entry.Completed = new CompletedReference { Authors = merged.Authors?.ToList() ?? new(), Venue = merged.VenueName ?? "", Details = merged.Details };
         return (merged, entry);
+    }
+
+    private async Task<(ReferenceAnswer Answer, string Doi, int Year)?> PublishedVersionAsync(ReferenceEnrichmentEntry entry, ScreeningLog log, string runFolder)
+    {
+        var lookup = new ReferenceLookupLog { Service = ReferenceAnswers.Crossref, Url = $"https://api.crossref.org/works?query.bibliographic={Uri.EscapeDataString(log.Title)}&rows=5" };
+        entry.Lookups.Add(lookup);
+        string? body = await FetchSavedAsync(_get, runFolder, "reference", lookup, url => OpenSourceHttp.WithMailto(url, _contactEmail));
+        if (body == null) return null;
+        try
+        {
+            var found = PublishedVersionIn(body, log.Title, log.Authors?.FirstOrDefault());
+            if (found == null) entry.NotUsed.Add("Crossref names no journal or proceedings version with the same title and first author, so the arXiv journal reference was used.");
+            return found;
+        }
+        catch (System.Text.Json.JsonException)
+        {
+            lookup.Status += "; the answer could not be read";
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// The published version of a preprint in a Crossref search answer: a journal or proceedings article (not a posted
+    /// preprint, not an arXiv DOI) with the same title and, when the record names one, the same first author's family name.
+    /// </summary>
+    internal static (ReferenceAnswer Answer, string Doi, int Year)? PublishedVersionIn(string json, string title, string? firstAuthor)
+    {
+        using var doc = System.Text.Json.JsonDocument.Parse(json);
+        if (!doc.RootElement.TryGetProperty("message", out var m) || !m.TryGetProperty("items", out var items) || items.ValueKind != System.Text.Json.JsonValueKind.Array) return null;
+        foreach (var item in items.EnumerateArray())
+        {
+            string type = item.TryGetProperty("type", out var t) ? t.GetString() ?? "" : "";
+            string? doi = BareDoi(item.TryGetProperty("DOI", out var d) ? d.GetString() : null);
+            if (type is not ("journal-article" or "proceedings-article") || doi == null || doi.StartsWith("10.48550/", StringComparison.OrdinalIgnoreCase)) continue;
+            var answer = ReferenceAnswers.FromCrossref($"{{\"message\":{item.GetRawText()}}}");
+            if (answer == null || !ReferenceAnswers.SameTitle(answer.Title, title) || answer.Venue.Length == 0) continue;
+            string family = answer.Authors.FirstOrDefault()?.Split(',')[0].Trim() ?? "";
+            if (!string.IsNullOrWhiteSpace(firstAuthor) && family.Length > 0 && !firstAuthor.Contains(family, StringComparison.OrdinalIgnoreCase)) continue;
+            return (answer, doi, YearOf(item));
+        }
+        return null;
+    }
+
+    private static int YearOf(System.Text.Json.JsonElement item)
+    {
+        foreach (var key in new[] { "published-print", "published", "issued" })
+            if (item.TryGetProperty(key, out var date) && date.TryGetProperty("date-parts", out var parts) && parts.GetArrayLength() > 0
+                && parts[0].GetArrayLength() > 0 && parts[0][0].TryGetInt32(out int year))
+                return year;
+        return 0;
     }
 
     private async Task<ReferenceAnswer?> AskAsync(ReferenceEnrichmentEntry entry, string runFolder, string service, string url,
