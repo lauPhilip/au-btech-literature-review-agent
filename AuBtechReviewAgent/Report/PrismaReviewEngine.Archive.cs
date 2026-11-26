@@ -144,6 +144,7 @@ public partial class PrismaReviewEngine
             EvidenceMapTable = state?.ThematicSynthesis is { Themes.Count: > 0 } && (report.SynthesisSections?.Count ?? 0) > 0 ? "4.1" : null,
             HumanScreeningReview = !string.IsNullOrWhiteSpace(state?.HumanScreeningReviewOutcome),
             HasProtocol = !string.IsNullOrWhiteSpace(report.ProtocolItem),
+            FundingDeclared = PaperDeclarations.Funding(report.SupportItem) != PaperDeclarations.ToComplete,
             CertaintyTable = certaintyTable,
         }) + publisherVariants;
 
