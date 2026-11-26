@@ -56,7 +56,11 @@ public sealed class DepositLicences
             string? licence = LicenceOf(work);
             if (!IsOpenLicence(licence)) continue;
             string evidence = $"{licence} (SourceResponses/{fileName})";
-            if (BareDoi(Str(work, "doi")) is { } doi) _dois.Add(doi);
+            if (BareDoi(Str(work, "doi")) is { } doi)
+            {
+                _dois.Add(doi);
+                AddKeyed("", doi, evidence);
+            }
             if (Str(work, "id") is { } id && id.Contains("openalex.org/", StringComparison.OrdinalIgnoreCase)) _ids.Add("OPENALEX_" + id.Split('/').Last());
             foreach (var title in new[] { Str(work, "display_name"), Str(work, "title") })
                 if (!string.IsNullOrWhiteSpace(title)) _papers.TryAdd(DocumentRAGUtility.PdfFileName(title), evidence);
@@ -92,10 +96,23 @@ public sealed class DepositLicences
         string? title = Str(obj, "Title");
         if (!string.IsNullOrWhiteSpace(title))
         {
-            bool open = (BareDoi(Str(obj, "Doi")) is { } doi && _dois.Contains(doi)) || (Str(obj, "PaperId") is { } id && _ids.Contains(id));
-            if (open) _papers.TryAdd(DocumentRAGUtility.PdfFileName(title), "open licence of its DOI on file (SourceResponses/)");
+            string? paperId = Str(obj, "PaperId");
+            bool open = (BareDoi(Str(obj, "Doi")) is { } doi && _dois.Contains(doi)) || (paperId != null && _ids.Contains(paperId));
+            if (open)
+            {
+                const string why = "open licence of its DOI on file (SourceResponses/)";
+                _papers.TryAdd(DocumentRAGUtility.PdfFileName(title), why);
+                if (paperId != null) AddKeyed(paperId, Str(obj, "Doi"), why);
+            }
         }
         foreach (var (_, value) in obj) if (value != null) Walk(value);
+    }
+
+    /// <summary>A PDF named by its paper's key (#587), and the record beside it that says which paper it is.</summary>
+    private void AddKeyed(string id, string? doi, string evidence)
+    {
+        _papers.TryAdd(FullTextFile.PdfName(id, doi), evidence);
+        _papers.TryAdd(FullTextFile.RecordName(id, doi), evidence);
     }
 
     // OpenAlex gives the licence of each location; Unpaywall of its best open-access location.
