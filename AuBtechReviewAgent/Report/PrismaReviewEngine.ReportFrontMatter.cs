@@ -87,7 +87,7 @@ public partial class PrismaReviewEngine
                 },
                 abstractRule: text => AbstractCountsProblem(text, finalState.Stats) ?? AbstractUnplacedProblem(text, finalState.Stats.Included, useThematic ? thematic!.Codebook.Uncoded.Count : 0),
                 questions: finalState.ResearchQuestions,
-                answers: closing?.Answers ?? thematic?.Answers, conclusion: closing?.Conclusion,
+                answers: AnswersFor(finalState, thematic, closing).Answers, conclusion: closing?.Conclusion,
                 weakSources: SystematicEvidence.WeakSources(finalState.Extractions ?? new List<StudyExtraction>()));
             // The first draft is written only now, and only when the front-matter step failed.
             var draft = written == null ? (await run.Fallback.Value).Draft : null;
@@ -136,6 +136,8 @@ public partial class PrismaReviewEngine
         var frontTask = FrontAndStyleAsync(closingTask);
         await Task.WhenAll(frontTask, artifactTask, closingTask); // a failure of any is thrown here, after all have finished
         run.Closing = await closingTask;
+        (run.Answers, run.AnswersFromEvidence) = AnswersFor(finalState, thematic, run.Closing);
+        NoteMissingClosing(run);
         var (front, draft, styledAbstract, styledRationale, styledObjectives) = await frontTask;
         run.Artifact = await artifactTask;
 
