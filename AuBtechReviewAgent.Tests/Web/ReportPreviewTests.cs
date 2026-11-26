@@ -26,4 +26,11 @@ public class ReportPreviewTests
         Assert.Contains("<CitationCheckPanel ", page);
         Assert.Contains("<CitationAttentionBar ", page);
     }
+    [Fact]
+    public void TheRouterSettingParametersAgainDoesNotCloseTheOpenCitation()
+    {
+        string code = Read("Components", "Pages", "SpecMatrix.razor.cs");
+        if (code.Length == 0) return;
+        Assert.Contains("if (openedFor != State.CurrentSessionId || InGallery) openCitation = null;", code);
+    }
 }
