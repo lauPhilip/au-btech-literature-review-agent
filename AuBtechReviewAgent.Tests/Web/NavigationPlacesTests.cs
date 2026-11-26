@@ -75,6 +75,36 @@ public class NavigationPlacesTests
         Assert.Contains("Start a review", empty);
     }
 
+    [Fact]
+    public void TheLandingCallToActionGoesThroughTheChooser()
+    {
+        string? app = AppRoot();
+        if (app == null) return;
+        string landing = File.ReadAllText(Path.Join(app, "Components", "Pages", "Landing.razor"));
+        Assert.Contains("<a href=\"/start\" class=\"ui-btn min-h-[52px] bg-primary", landing);
+        Assert.DoesNotContain("href=\"/review\"", landing);
+    }
+
+    [Fact]
+    public void OnlyAvailableCardsOfTheSystematicModuleStartTheReviewForm()
+    {
+        foreach (var method in ReviewMethods.All)
+        {
+            var found = ReviewMethods.AvailableOrDefault(method.Key);
+            if (ReviewMethods.RunsHere(method)) Assert.Equal(method.Key, found.Key);
+            else Assert.NotEqual(method.Key, found.Key); // /review?method=... falls back to the default card
+        }
+
+        string? app = AppRoot();
+        if (app == null) return;
+        string start = File.ReadAllText(Path.Join(app, "Components", "Pages", "Start.razor"));
+        int preview = start.IndexOf("bool preview = !m.Available;", StringComparison.Ordinal);
+        int startButton = start.IndexOf("Start this review", StringComparison.Ordinal);
+        int guard = start.IndexOf("@if (!preview)", StringComparison.Ordinal);
+        Assert.True(preview > 0 && guard > preview && startButton > guard, "Start this review must sit behind the available check");
+        Assert.Contains("/review?method={m.Key}", start);
+    }
+
     private static string? AppRoot()
     {
         string? root = AppContext.BaseDirectory;
