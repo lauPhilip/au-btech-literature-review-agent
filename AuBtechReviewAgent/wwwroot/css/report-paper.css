@@ -42,6 +42,13 @@
     .paper-desk { background: rgb(var(--panel)); }
     .paged-holder { position: relative; }
     [data-page-overlay] { position: absolute; inset: 0; z-index: 0; pointer-events: none; }
+    /* In front of the text, for a table that runs over a page (paged-tables.js): clear strips and the repeated header row. */
+    [data-page-top] { position: absolute; inset: 0; z-index: 2; pointer-events: none; }
+    [data-page-top] > .paged-mask { position: absolute; background: rgb(var(--page)); }
+    [data-page-top] > .paged-mask-desk { background: rgb(var(--panel)); }
+    [data-page-top] > .paged-mask-end { border-top: 1px solid rgb(var(--field-border)); }
+    [data-page-top] > .paged-head { position: absolute; }
+    [data-page-top] > .paged-page-top { position: absolute; left: 0; right: 0; }
     [data-paged-sheet] { position: relative; z-index: 1; background: rgb(var(--page)); border: 1px solid rgb(var(--field-border)); }
     [data-theme="dark"] [data-paged-sheet] { border-color: rgb(var(--muted) / 0.55); }
 
@@ -58,7 +65,7 @@
     /* This file loads after Tailwind, so its display: flex would beat print:hidden; on paper the links below stand in. */
     .af-actions { display: none !important; }
     .paper-desk { background: none !important; padding: 0 !important; }
-    [data-page-overlay] { display: none !important; }
+    [data-page-overlay], [data-page-top] { display: none !important; }
     [data-paged-sheet] { background: #fff !important; border: 0 !important; padding: 0 !important; min-height: 0 !important; }
     /* Space added for the screen's pages, should the print window open without a beforeprint event. */
     [data-page-pushed] { padding-top: 0 !important; }
