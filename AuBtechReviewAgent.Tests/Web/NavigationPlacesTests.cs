@@ -60,6 +60,21 @@ public class NavigationPlacesTests
         Assert.DoesNotContain("Example reports", landing);
     }
 
+    [Fact]
+    public void TheEmptyOutputPageExplainsItself_LinksToExamplesAndStartsAReview()
+    {
+        string? page = PageSource.Read("SpecMatrix");
+        if (page == null) return; // not run from the repository
+        string empty = page[page.IndexOf("@if (!HasReport)", StringComparison.Ordinal)..page.IndexOf("string runHref", StringComparison.Ordinal)];
+
+        Assert.Contains("No report yet", empty);
+        Assert.Contains("This page shows the finished report of your review", empty);
+        Assert.Contains("href=\"/gallery\"", empty);
+        Assert.Contains("See example reports", empty);
+        Assert.Contains("href=\"/start\" class=\"ui-btn-primary", empty);
+        Assert.Contains("Start a review", empty);
+    }
+
     private static string? AppRoot()
     {
         string? root = AppContext.BaseDirectory;

@@ -23,9 +23,12 @@
             <h1 class="font-display text-lg font-semibold text-heading">@(deleted ? "The run was deleted" : "No report yet")</h1>
             <p class="mt-1 text-sm text-muted">
                 @(deleted ? "Its ledger, report and downloaded papers have been removed from the server."
-                          : "Start a review on New review. The report appears here when the run is done.")
+                          : "This page shows the finished report of your review: the findings, the studies behind them and the citation check. Nothing is here until you have run a review.")
             </p>
-            <a href="/review" class="ui-btn-primary mt-4 min-h-[44px]">New review</a>
+            <div class="mt-4 flex flex-col items-stretch justify-center gap-2 sm:flex-row">
+                <a href="/start" class="ui-btn-primary min-h-[44px]" data-empty-start>Start a review</a>
+                <a href="/gallery" class="ui-btn-secondary min-h-[44px]" data-empty-examples>See example reports</a>
+            </div>
         </div>
     </div>
 }
