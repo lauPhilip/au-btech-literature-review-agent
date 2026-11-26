@@ -77,7 +77,17 @@ public sealed class DepositLicences
 
     private void Walk(JsonNode node)
     {
-        if (node is JsonArray array) { foreach (var item in array) if (item != null) Walk(item); return; }
+        if (node is JsonArray array)
+        {
+            foreach (var item in array)
+            {
+                if (item != null)
+                {
+                    Walk(item);
+                }
+            }
+            return;
+        }
         if (node is not JsonObject obj) return;
         string? title = Str(obj, "Title");
         if (!string.IsNullOrWhiteSpace(title))
