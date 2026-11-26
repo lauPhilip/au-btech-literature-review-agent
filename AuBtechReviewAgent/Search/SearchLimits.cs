@@ -11,4 +11,7 @@ public static class SearchLimits
     /// <summary>A round's request: what the source still needs to fill its cap, shared over the strings left (this one included); at least 1.</summary>
     public static int Round(int cap, int kept, int stringsLeft) =>
         Math.Max(1, (int)Math.Ceiling(Math.Max(0, cap - kept) / (double)Math.Max(1, stringsLeft)));
+
+    /// <summary>A top-up's request for a string asked before with <paramref name="before"/>: that many, and as many more as the source still needs.</summary>
+    public static int TopUp(int before, int cap, int kept) => before + Math.Max(1, cap - kept);
 }

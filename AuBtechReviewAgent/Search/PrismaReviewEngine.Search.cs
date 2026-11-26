@@ -73,7 +73,8 @@ public partial class PrismaReviewEngine
         // duplicate decisions and the ledger do not depend on which source happened to answer first. A source stops
         // taking strings once its cap is filled by records that go on to screening; duplicates and records outside
         // the year range do not use up the cap (issue #562). What a round asks for is what the source still needs,
-        // shared over the strings left, so a short round is made up in a later one (issue #681).
+        // shared over the strings left, so a short round is made up in a later one; after the last string a source
+        // still short of its cap gets one top-up pass with larger limits (issue #681).
         var kept = new int[ctx.Sources.Count];
         var passesBySource = ctx.Sources.Select(_ => new List<SearchPass>()).ToArray();
         var candidatesBySource = ctx.Sources.Select(_ => new List<(AcademicPaper Paper, string SourceName)>()).ToArray();
@@ -118,6 +119,18 @@ public partial class PrismaReviewEngine
             if (open.Count == 0) break; // every source has filled its cap: the remaining strings are not run at all
             int stringsLeft = searchPerspectives.Count - p;
             await RunRoundAsync(p, open, s => SearchLimits.Round(maxResults, kept[s], stringsLeft));
+        }
+
+        // A string a source refused is not asked again: the top-up is for a search that worked and fell short.
+        bool Completed(int s, int p) => passesBySource[s].Any(x => x.StringIndex == p && x.Log.Status.StartsWith("Completed", StringComparison.Ordinal));
+
+        // Top-up: one more pass, strings in order, for each source still below its cap. The limit grows by what the source still needs.
+        for (int p = 0; p < searchPerspectives.Count; p++)
+        {
+            var open = Enumerable.Range(0, ctx.Sources.Count).Where(s => kept[s] < maxResults && Completed(s, p)).ToList();
+            if (open.Count == 0) continue;
+            Interlocked.Add(ref ctx.SearchPassesTotal, open.Count);
+            await RunRoundAsync(p, open, s => SearchLimits.TopUp(asked[s][p], maxResults, kept[s]));
         }
 
         // The ledger lists the searches and the candidates by source, then by search string, as before.
