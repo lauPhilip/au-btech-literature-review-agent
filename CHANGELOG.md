@@ -48,6 +48,10 @@ Owners can now add a finished report to a gallery of example reports. A short co
 
 The Metrics page now shows what each run cost, worked out from its token counts and Mistral's list prices. The site also has a privacy page that names who is responsible, and an accessibility statement, both linked from every footer.
 
+The report page now shows what the paper found out about itself. A closed line reads, for example, "The paper checked itself: 8 checks passed, 2 notes, 1 fault", and opens a table of the ten checks with the evidence for each. The same line is on the Done card of a finished run and on the printed front page. The front page also gives the result of the retraction check and how many included studies are secondary studies. A run made before the self-check is checked from its files when you open the report. Web addresses in a reference are now links, in the page and in a saved PDF.
+
+An example report now looks like the review output page. It has the same A4 pages, front page, contents list, citation cards and citation panel. It keeps its own address and leaves out the buttons for the run archive and the decision log.
+
 ### Changed
 
 The review now cites findings, not its own readings. A sentence that reports what a study found ends with its citation. The review's own reading is a separate sentence with no citation, and code checks that it names no study, number or design. A recommendation or a proposal for future research takes no citation. The rationale ends with one sentence on what is not yet known. When the repair fixes a citation, it knows what the section is for, so it no longer turns a proposal into a finding. In the runs we checked, most flagged citations came from these sections, so expect fewer flags and fewer citations there.
@@ -85,6 +89,8 @@ The site holds back when it is not sure. A visitor whose address is unknown now 
 The multivocal review is more careful. It no longer plans backlink snowballing, which is not built yet, and the form greys that search out. It counts tools one name at a time, and leaves models, languages and methods out of the tool counts. The multivocal paper has even margins and the journal layout.
 
 The review output page has fixes for the citation card, which now closes with a click outside, with Escape or with its button. A table taller than a page now splits across pages.
+
+The header now has four places: New review, Review output, Example reports and Metrics. Example reports needs no run, so a visitor can see a finished report before typing a question. The Review output page with no run behind it says what it will show and offers "Start a review" and "See example reports". The landing page's button opens the chooser, which lets you start only the reviews that are open. The form now has a short line on trust under the Start button, and a phone keeps Example reports in the footer.
 
 ### Fixed
 
