@@ -13,7 +13,7 @@ public class PaperLatexTests
     [InlineData("The studies agree.", "The studies agree.")]
     [InlineData("The studies agree.  ", "The studies agree.")]
     [InlineData("Ends with a comma,", "Ends with a comma,")]
-    [InlineData("See https://example.org/", "See https://example.org/")]
+    [InlineData("See https://example.org/", @"See \url{https://example.org/}")] // a web address is a link
     public void Escape_keeps_the_closing_punctuation(string input, string expected)
     {
         Assert.Equal(expected, PaperLatex.Escape(input).Replace(LatexBreaks.Break, ""));
@@ -21,10 +21,10 @@ public class PaperLatexTests
 
     [Theory]
     // APA 7: a reference ends with a full stop, except after its DOI or address.
-    [InlineData("Smith, J. (2024). A study. *Journal*.", @"Smith, J. (2024). A study. \textit{Journal}.")]
+    [InlineData("Smith, J. (2024). A study. *Journal*.", @"Smith, J. (2024). A study.\ \textit{Journal}.")] // a word space: not a sentence's end
     [InlineData("Smith, J. (2024). A study, ", "Smith, J. (2024). A study")]
-    [InlineData("https://doi.org/10.1/abc/", "https://doi.org/10.1/abc/")]
-    [InlineData("Smith, J. (2024). A study. https://doi.org/10.1/abc.", "Smith, J. (2024). A study. https://doi.org/10.1/abc")]
+    [InlineData("https://doi.org/10.1/abc/", @"\url{https://doi.org/10.1/abc/}")]
+    [InlineData("Smith, J. (2024). A study. https://doi.org/10.1/abc.", @"Smith, J. (2024). A study.\ \url{https://doi.org/10.1/abc}")]
     public void EscapeReference_keeps_the_full_stop_except_after_a_link(string input, string expected)
     {
         Assert.Equal(expected, PaperLatex.EscapeReference(input).Replace(LatexBreaks.Break, ""));
@@ -58,7 +58,7 @@ public class PaperLatexTests
     }
 
     [Theory]
-    [InlineData("α-UMi [97]", @"$\alpha$-UMi [97]")]
+    [InlineData("α-UMi [97]", @"$\alpha$-UMi~\cite{ref97}")]
     [InlineData("Cohen's κ ≥ 0.6", @"Cohen's $\kappa$ $\geq$ 0.6")]
     [InlineData("λ-calculus and Δt", @"$\lambda$-calculus and $\Delta$t")]
     [InlineData("Mäkinen, Öner, Preuß, Jiménez", "Mäkinen, Öner, Preuß, Jiménez")]

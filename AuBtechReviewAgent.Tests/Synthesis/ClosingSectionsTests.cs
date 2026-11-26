@@ -63,7 +63,9 @@ public class ClosingSectionsTests : IDisposable
         using var archive = new ZipArchive(new MemoryStream(engine.GenerateWorkspaceArchiveFromDisk(runId)));
         using var reader = new StreamReader(archive.GetEntry("main.tex")!.Open());
         string tex = reader.ReadToEnd().Replace("\r\n", "\n");
-        Assert.Contains("\\noindent\\textbf{RQ1. How do agent loops recover?} " + Answer + "\\par\\smallskip\n" + Conclusion, tex);
+        // The answer's "[1]" is a \cite of the reference's key in main.tex (issue #537).
+        Assert.Matches(System.Text.RegularExpressions.Regex.Escape("\\noindent\\textbf{RQ1. How do agent loops recover?} " + Answer.Replace(" [1].", "~\\cite{"))
+            + "[^}]+" + System.Text.RegularExpressions.Regex.Escape("}.\\par\\smallskip\n" + Conclusion), tex);
         Assert.Contains("\\noindent\\textbf{RQ1.} How do agent loops recover?\\par", tex);
     }
 }

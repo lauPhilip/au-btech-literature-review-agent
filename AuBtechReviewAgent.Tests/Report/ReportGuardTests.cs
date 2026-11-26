@@ -116,9 +116,10 @@ public class ReportGuardTests
         using var texReader = new StreamReader(archive.GetEntry("main.tex")!.Open());
         string tex = texReader.ReadToEnd();
 
-        int b = tex.IndexOf(@"\bibitem{ref1} Bandi");
-        int p = tex.IndexOf(@"\bibitem{ref2} Pajo");
-        int s = tex.IndexOf(@"\bibitem{ref3} Setiawan");
+        // Each \bibitem has the key of the same work in references.bib.
+        int b = tex.IndexOf("} Bandi, A.");
+        int p = tex.IndexOf("} Pajo, P.");
+        int s = tex.IndexOf("} Setiawan, L.");
         Assert.True(b > 0 && b < p && p < s);
     }
 }

@@ -159,13 +159,16 @@ public partial class PrismaReviewEngine
         {
             new("Registration and Protocol", string.IsNullOrWhiteSpace(report.ProtocolItem) ? NoProtocolText : report.ProtocolItem),
             new("Support & Funding", report.SupportItem ?? ""),
-            new("Availability of Data and Code", "", LatexBreaks.Allow((report.AvailabilityItem ?? "").Replace("_", @"\_"))),
+            new("Availability of Data and Code", report.AvailabilityItem ?? ""),
         };
 
+        string title = (report.TitleItem ?? "Systematic Review Manuscript").Replace("[Source Context Anchor 1]", "").Trim();
+        string bibtex = BibliographyExporter.ToBibTeX(records);
+        bool hasProtocol = File.Exists(Path.Join(GetWorkspaceFolderPath(sessionId), "protocol.md"));
         var paper = new ReviewPaper
         {
             KindLabel = "AI-GENERATED SYSTEMATIC LITERATURE REVIEW",
-            Title = (report.TitleItem ?? "Systematic Review Manuscript").Replace("[Source Context Anchor 1]", "").Trim(),
+            Title = title,
             ProtocolHash = string.IsNullOrWhiteSpace(report.ProtocolHash) ? "not recorded" : report.ProtocolHash,
             GeneratedAt = report.GeneratedAt ?? DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss UTC"),
             Abstract = report.AbstractItem ?? "",
@@ -187,6 +190,8 @@ public partial class PrismaReviewEngine
             Declarations = declarations,
             References = records.Select(r => r.ApaCitation).ToList(),
             AppendixLatex = appendixLatex,
+            ReferenceKeys = PaperLatex.BibKeys(bibtex),
+            Article = ArticleInfo.ForSystematic(sessionId, state, report, title, report.AbstractItem ?? "", hasProtocol),
         };
 
         // The files only a systematic review generates; the core (Report/RunArchive.cs) adds the run folder's
@@ -195,7 +200,7 @@ public partial class PrismaReviewEngine
         void AddText(string name, string content) => generated.Add((name, new UTF8Encoding(false).GetBytes(content)));
 
         AddText("main.tex", PaperLatex.Build(paper));
-        AddText("references.bib", BibliographyExporter.ToBibTeX(records));
+        AddText("references.bib", bibtex);
         AddText("references.ris", BibliographyExporter.ToRis(records));
         if (state != null)
             AddText("screened.ris", BibliographyExporter.ToScreenedRis(state.Phases.Screening,

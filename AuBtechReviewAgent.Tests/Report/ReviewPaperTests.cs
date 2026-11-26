@@ -38,10 +38,12 @@ public class ReviewPaperTests : IDisposable
         using var reader = new StreamReader(archive.GetEntry("main.tex")!.Open());
         string tex = reader.ReadToEnd().Replace("\r\n", "\n");
         tex = Regex.Replace(tex, @"\d{4}-\d{2}-\d{2}( \d{2}:\d{2}(:\d{2})?)?", "DATE");
-        tex = Regex.Replace(tex, @"Protocol Hash: \S+", "Protocol Hash: HASH");
+        tex = Regex.Replace(tex, @"Protocol fingerprint: \S+", "Protocol fingerprint: HASH");
+        tex = Regex.Replace(tex, @"% Run: [^;]+; tool: .*", "% Run: RUN; tool: TOOL.");
+        tex = Regex.Replace(tex, @"pdfcreator=\{.*\},", "pdfcreator={TOOL},");
         tex = Regex.Replace(tex, @"fingerprint (?:[0-9a-f]|\\allowbreak\{\}){16,}", "fingerprint FINGERPRINT"); // with its break points
         tex = Regex.Replace(tex, @"version [^ ]+\)", "version VERSION)");
-        tex = Regex.Replace(tex, @"This run used version .*?(?= The run archive)", "This run used VERSION.");
+        tex = Regex.Replace(tex, @"This run used version .*?(?=\s+The run archive)", "This run used a version of the tool.");
         return tex;
     }
 
@@ -95,11 +97,11 @@ public class ReviewPaperTests : IDisposable
 
         Assert.Contains("AI-GENERATED GREY LITERATURE REVIEW", tex);
         Assert.Contains(@"\subsection{Planning (G1–G5)}", tex);
-        Assert.Contains("\\subsection{Quality (G11)}\n\\textbf{Table 7} checklist".Replace("\n", Environment.NewLine), tex); // LaTeX built in code is kept as it is
+        Assert.Contains("\\subsection{Quality (G11)}\\label{sec:quality-g11}\n\n\\textbf{Table 7} checklist".Replace("\n", Environment.NewLine), tex); // LaTeX built in code is kept as it is
         Assert.Contains(@"\section{Data}", tex);
         Assert.Contains(@"\subsection{RQ1: Retrieval \& memory}", tex); // plain text is escaped
-        Assert.Contains($"\\end{{multicols}}{Environment.NewLine}MAP\n\\begin{{multicols}}{{2}}", tex); // a wide block leaves the columns
-        Assert.Contains(@"\bibitem{ref1} Ana (2025). \textit{Keeping context short}. blog.example.org", tex);
+        Assert.Contains("\\end{multicols}\n\nMAP\n\n\\begin{multicols}{2}".Replace("\n", Environment.NewLine), tex); // a wide block leaves the columns
+        Assert.Contains(@"\bibitem{ref1} Ana (2025). \textit{Keeping context short}. blog.example.org", tex); // no keys given: ref1, ref2, ...
         Assert.Contains(@"\bibitem{ref2} Bo (2026). Retrieval first\_v2", tex);
         Assert.DoesNotContain("PRISMA", tex);
     }
@@ -115,7 +117,7 @@ public class ReviewPaperTests : IDisposable
         int appendix = tex.IndexOf(@"\section*{Appendix}", StringComparison.Ordinal);
         Assert.True(references > 0 && appendix > references, "the appendix comes after the references");
         Assert.True(tex.IndexOf("APPENDIX TABLES", StringComparison.Ordinal) > appendix);
-        Assert.EndsWith("APPENDIX TABLES\n\\end{document}\n", tex); // the appendix's LaTeX is kept as it is
+        Assert.EndsWith("APPENDIX TABLES\n\n\\end{document}\n", tex); // the appendix's LaTeX is kept as it is
 
         string without = PaperLatex.Build(new ReviewPaper { Title = "T" });
         Assert.DoesNotContain("Appendix", without);
