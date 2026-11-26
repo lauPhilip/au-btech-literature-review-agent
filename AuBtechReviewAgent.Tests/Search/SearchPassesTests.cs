@@ -78,8 +78,9 @@ public class SearchPassesTests : IDisposable
 
         Assert.Equal(new[] { "agents", "Agent Safety", "tools", "memory", "planning" }, state.SearchPerspectives);
         Assert.True(state.SearchStringsReviewed);
-        // The cap of 10 is split over five strings (2 each); after four strings 12 distinct records are in, so the fifth is not run.
-        Assert.Equal(new[] { ("agents", 2), ("Agent Safety", 2), ("tools", 2), ("memory", 2) }, source.Calls);
+        // A round asks for what the source still needs shared over the strings left (10 over 5, 7 over 4, 4 over 3, 1 over 2);
+        // after four strings 12 distinct records are in, so the fifth is not run.
+        Assert.Equal(new[] { ("agents", 2), ("Agent Safety", 2), ("tools", 2), ("memory", 1) }, source.Calls);
 
         Assert.Equal(new[] { "agents", "Agent Safety", "tools", "memory" }, state.SearchLogs.Select(l => l.QueryUsed));
         Assert.All(state.SearchLogs, l => Assert.Equal("Completed Successfully", l.Status));
