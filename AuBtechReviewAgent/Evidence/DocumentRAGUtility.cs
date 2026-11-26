@@ -19,20 +19,12 @@ public record DocumentChunk(string SourceId, int PageNumber, string Text);
 /// <summary>Where a paper's full text came from (or why there is none), for the ledger.</summary>
 public record FullTextResult(IReadOnlyList<DocumentChunk> Chunks, string Source, string? Url);
 
-public static class DocumentRAGUtility
+public static partial class DocumentRAGUtility
 {
     /// <summary>PDFs larger than this are not downloaded (a download used to have no size limit at all).</summary>
     public const long MaxPdfBytes = 40L * 1024 * 1024;
 
-    private static readonly HttpClient _client = CreateClient();
     private static readonly ILogger _log = AppLog.For("DocumentRAGUtility");
-
-    private static HttpClient CreateClient()
-    {
-        var client = new HttpClient { Timeout = TimeSpan.FromSeconds(45) };
-        client.DefaultRequestHeaders.UserAgent.ParseAdd(OpenSourceHttp.UserAgent);
-        return client;
-    }
 
     /// <summary>
     /// Finds a legal full text for the paper, downloads it and splits it into page-tagged chunks. Tried in
@@ -184,69 +176,6 @@ public static class DocumentRAGUtility
                 if (l.TryGetProperty("url_for_pdf", out var p) && p.ValueKind == JsonValueKind.String && !string.IsNullOrWhiteSpace(p.GetString()))
                     return p.GetString();
         return null;
-    }
-
-    /// <summary>
-    /// Streams the download with a hard size limit and keeps it only if it really is a PDF ("%PDF" header),
-    /// so an HTML login page or an oversized file never reaches the PDF parser.
-    /// </summary>
-    public static async Task<bool> TryDownloadPdfAsync(string url, string targetPath, long maxBytes = MaxPdfBytes)
-    {
-        if (!Uri.TryCreate(url, UriKind.Absolute, out var uri) || (uri.Scheme != "https" && uri.Scheme != "http")) return false;
-        string tmp = targetPath + ".part";
-        try
-        {
-            using var response = await _client.GetAsync(uri, HttpCompletionOption.ResponseHeadersRead);
-            if (!response.IsSuccessStatusCode) return false;
-            if (response.Content.Headers.ContentLength is long len && len > maxBytes) return false;
-
-            await using (var input = await response.Content.ReadAsStreamAsync())
-            await using (var output = File.Create(tmp))
-            {
-                if (!await CopyWithLimitAsync(input, output, maxBytes)) { output.Close(); File.Delete(tmp); return false; }
-            }
-
-            if (!LooksLikePdf(tmp)) { File.Delete(tmp); return false; }
-            File.Move(tmp, targetPath, overwrite: true);
-            return true;
-        }
-        catch (Exception ex)
-        {
-            _log.LogInformation("PDF download from {Host} failed: {Message}", uri.Host, ex.Message);
-            try { if (File.Exists(tmp)) File.Delete(tmp); }
-            catch (Exception cleanupEx)
-            {
-                // A leftover .tmp file is ignored by the archive and removed with the run folder.
-                _log.LogDebug("Could not delete a partial download: {Message}", cleanupEx.Message.Replace("\r", " ").Replace("\n", " "));
-            }
-            return false;
-        }
-    }
-
-    /// <summary>
-    /// Copies at most <paramref name="maxBytes"/>; false when the input is longer. <paramref name="cancel"/> stops a
-    /// slow body (the web page fetcher's deadline); by default nothing stops it, as the PDF download has always worked.
-    /// </summary>
-    public static async Task<bool> CopyWithLimitAsync(Stream input, Stream output, long maxBytes, CancellationToken cancel = default)
-    {
-        var buffer = new byte[81920];
-        long total = 0;
-        int read;
-        while ((read = await input.ReadAsync(buffer, cancel)) > 0)
-        {
-            total += read;
-            if (total > maxBytes) return false;
-            await output.WriteAsync(buffer.AsMemory(0, read), cancel);
-        }
-        return true;
-    }
-
-    public static bool LooksLikePdf(string path)
-    {
-        using var fs = File.OpenRead(path);
-        var head = new byte[1024];
-        int n = fs.Read(head, 0, head.Length);
-        return Encoding.ASCII.GetString(head, 0, n).Contains("%PDF-");
     }
 
     /// <summary>Extracts the text page by page and splits it into 600-character chunks with 100 characters of overlap.</summary>
