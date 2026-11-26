@@ -80,6 +80,42 @@ public class GroundingAndFlowTests
     }
 
     [Fact]
+    public void FlowDiagramHasTheRetrievalAndEligibilityBoxesAndSaysNoneIsExcludedOnFullText()
+    {
+        string tikz = PrismaFlowDiagram.ToTikz(PrismaFlowCounts.From(ConsistentState()));
+
+        // PRISMA 2020 item 16a: every included study's report is sought, one had no readable full text and was kept.
+        Assert.Contains("Reports sought for retrieval (n = 3)", tikz);
+        Assert.Contains("Reports not retrieved (n = 1)", tikz);
+        Assert.Contains("Kept and read from the abstract only", tikz);
+        Assert.Contains("Reports assessed for eligibility (n = 3)", tikz);
+        Assert.Contains("on title and abstract at screening", tikz);
+        Assert.Contains("Reports excluded (n = 0)", tikz);
+        Assert.Contains("Reports of included studies (n = 3)", tikz);
+        // The boxes run in PRISMA's order, one arrow into each.
+        Assert.True(tikz.IndexOf("(screened) -- (sought)", StringComparison.Ordinal) > 0);
+        Assert.True(tikz.IndexOf("(sought) -- (assessed)", StringComparison.Ordinal) > 0);
+        Assert.True(tikz.IndexOf("(assessed) -- (included)", StringComparison.Ordinal) > 0);
+    }
+
+    [Fact]
+    public void ReportsNotRetrievedGiveTheirReasonsOnlyWhenTheReasonsAddUp()
+    {
+        var state = ConsistentState();
+        state.FullTextSources["p1"] = "none (download failed: 403 Forbidden)";
+        state.FullTextSources["p2"] = "unpaywall";
+        var flow = PrismaFlowCounts.From(state);
+
+        Assert.Equal(new[] { ("Download failed", 1) }, flow.NotRetrievedByReason);
+        Assert.Contains(@"Reports not retrieved (n = 1):\\ Download failed (n = 1)\\ Kept", PrismaFlowDiagram.ToTikz(flow));
+
+        // A run that recorded a reason for more studies than were read from the abstract shows the count alone.
+        state.FullTextSources["p3"] = "none (no open-access copy known)";
+        Assert.Empty(PrismaFlowCounts.From(state).NotRetrievedLines());
+        Assert.Equal(new[] { ("Download failed", 1), ("No open-access copy known", 1) }, PrismaFlowCounts.NotRetrievedReasons(state.FullTextSources.Values));
+    }
+
+    [Fact]
     public void ExpiredRunFoldersAreDeletedButRecentAndActiveOnesAreKept()
     {
         string store = Path.Join(Path.GetTempPath(), "store-" + Guid.NewGuid().ToString("N"));

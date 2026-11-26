@@ -17,9 +17,10 @@ public partial class PrismaReviewEngine
 
     /// <summary>
     /// The tables of the included studies, in the appendix after the references as Tables A.1 to A.3 (issue #139).
-    /// Section 3 keeps its text, flow diagram and charts and points to them (AppendixPointer).
+    /// Section 3 keeps its text, flow diagram and charts and points to them (AppendixPointer). The seed studies and the
+    /// search strategy per source follow; <paramref name="names"/> gives their names to the PRISMA 2020 checklist.
     /// </summary>
-    private string AppendixLatex(List<IncludedPaperMetricRow> records, ReviewState? state)
+    private string AppendixLatex(List<IncludedPaperMetricRow> records, ReviewState? state, out AppendixTableNames names)
     {
         var ab = new StringBuilder();
         ab.AppendLine(@"\small");
@@ -43,17 +44,26 @@ public partial class PrismaReviewEngine
         ab.AppendLine(@"\vspace{4pt}\noindent Table~\ref{tab:A.1} lists each included study with a short summary, the reason it was included, the database it came from with its venue's rank, and its reference.\par");
         ab.AppendLine(@"\noindent{\small " + EscapeLatexText(VenueRankNote) + @"\par}");
         int nextTable = 2;
+        string? extraction = null, appraisal = null, search = null;
         if (state?.Extractions is { Count: > 0 } extractions)
         {
             ab.AppendLine(@"\vspace{10pt}");
             ab.Append(ExtractionTables(extractions));
-            nextTable += extractions.Any(MethodsSectionWriter.ShowInAppraisalTable) ? 2 : 1;
+            extraction = "Table A.2";
+            if (extractions.Any(MethodsSectionWriter.ShowInAppraisalTable)) appraisal = "Table A.3";
+            nextTable += appraisal != null ? 2 : 1;
         }
+        if (nextTable == 2) ab.AppendLine(@"\vspace{10pt}"); // the extraction tables end with this space already
         if (state?.SeedChaining is { Seeds.Count: > 0 } seeds)
+            ab.Append(SeedStudiesTable.Latex(seeds, $"tab:A.{nextTable++}", EscapeLatexText));
+        // The full search strategy per source (PRISMA 2020 item 7), written from the search log.
+        if (state != null && SearchStrategyTable.Latex(state.SearchLogs, $"tab:A.{nextTable}", EscapeLatexText, state.MaxResultsPerSource,
+                Math.Max(1, state.SearchPerspectives.Count), state.YearFrom, state.YearTo, state.PeerReviewOnlyToggle) is { Length: > 0 } strategy)
         {
-            if (nextTable == 2) ab.AppendLine(@"\vspace{10pt}"); // the extraction tables end with this space already
-            ab.Append(SeedStudiesTable.Latex(seeds, $"tab:A.{nextTable}", EscapeLatexText));
+            ab.Append(strategy);
+            search = $"Table A.{nextTable++}";
         }
+        names = new AppendixTableNames(extraction, appraisal, search, $"A.{nextTable}");
         return ab.ToString();
     }
 
@@ -193,4 +203,7 @@ public partial class PrismaReviewEngine
         sb.AppendLine(@"\vspace{10pt}");
         return sb.ToString();
     }
+
+    /// <summary>The names of the appendix tables a paper has ("Table A.2"), null for one it has not, and the next free number.</summary>
+    private sealed record AppendixTableNames(string? Extraction, string? Appraisal, string? Search, string Next);
 }
