@@ -20,6 +20,8 @@ public class PrismaFlowCounts
     public int ScreeningErrors { get; set; }
     public int ExcludedPeerReview { get; set; }
     public int ExcludedAtScreening { get; set; }
+    /// <summary>Of <see cref="ExcludedAtScreening"/>: studies included at screening, then excluded because they were retracted.</summary>
+    public int ExcludedRetracted { get; set; }
     /// <summary>The screening exclusions (not the peer-review filter) by reason, when the run recorded reasons.</summary>
     public List<(string Reason, int Count)> ExcludedByReason { get; set; } = new();
     public int HumanOverrides { get; set; }
@@ -54,9 +56,10 @@ public class PrismaFlowCounts
             ExcludedPeerReview = s.FailedPeerReviewCheck,
             ExcludedAtScreening = s.Excluded,
             ExcludedByReason = ExclusionReasons.Count(state.Phases.Screening)
-                .Where(g => g.Key != ExclusionReasons.NotPeerReviewed && g.Key != ExclusionReasons.Unspecified)
+                .Where(g => g.Key != ExclusionReasons.NotPeerReviewed && g.Key != ExclusionReasons.Unspecified && g.Key != ExclusionReasons.Retracted)
                 .Select(g => (g.Label, g.Count))
                 .ToList(),
+            ExcludedRetracted = state.Phases.Screening.Count(l => l.Decision == "Excluded" && l.ExclusionReason == ExclusionReasons.Retracted),
             HumanOverrides = s.HumanOverrides,
             HumanReviewed = s.HumanReviewed > 0,
             Included = s.Included,
@@ -85,9 +88,10 @@ public static class PrismaFlowDiagram
 
         var excluded = new List<string>();
         if (c.ExcludedPeerReview > 0) excluded.Add($"Not peer reviewed (n = {c.ExcludedPeerReview})");
-        excluded.Add($"Did not meet criteria (n = {c.ExcludedAtScreening})");
+        excluded.Add($"Did not meet criteria (n = {c.ExcludedAtScreening - c.ExcludedRetracted})");
         foreach (var (reason, count) in c.ExcludedByReason)
             excluded.Add($"\\quad {Escape(reason)} (n = {count})");
+        if (c.ExcludedRetracted > 0) excluded.Add($"Retracted (n = {c.ExcludedRetracted})");
         if (c.HumanReviewed) excluded.Add($"Decisions changed by reviewer: {c.HumanOverrides}");
 
         var sb = new StringBuilder();

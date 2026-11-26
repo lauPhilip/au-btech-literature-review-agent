@@ -65,7 +65,7 @@ public sealed partial class ReviewApi
                 r.ImplicationsItem, r.FutureResearchItem),
             ReportOutline.ConclusionId => Join(new[] { r.ConclusionItem }
                 .Concat(r.ResearchAnswers.Select(a => $"RQ{a.Number}. {a.Question}\n{a.Answer}")).ToArray()),
-            ReportOutline.DeclarationsId => Join(r.SupportItem, r.AvailabilityItem, r.ProtocolItem, r.CitationCheckSummary),
+            ReportOutline.DeclarationsId => Join(PaperDeclarations.Funding(SpecMatrix.ScrubAnchors(r.SupportItem ?? "")), r.AvailabilityItem, r.ProtocolItem, r.CitationCheckSummary),
             ReportOutline.ReferencesId => string.Join("\n", references.Select(x => $"[{x.Number}] {x.Citation}")),
             // The included studies and the appendix are tables on the page: their data is in references and prisma.
             _ => "",

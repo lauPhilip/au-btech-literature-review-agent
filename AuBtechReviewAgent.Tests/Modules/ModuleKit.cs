@@ -185,7 +185,7 @@ public static class ModuleKit
         try
         {
             written = MultivocalPaperParts.Methods(input).Select(m => InTex("method: " + m.Heading, m.Latex ?? PaperLatex.Escape(m.Text))).ToList();
-            written.Add(InTex("data", PaperLatex.Escape(MultivocalPaperParts.DataText(input))));
+            written.Add(InTex("data", PaperLatex.Prose(MultivocalPaper.MainTexDataText(input))));
         }
         finally { System.Globalization.CultureInfo.CurrentCulture = culture; }
 

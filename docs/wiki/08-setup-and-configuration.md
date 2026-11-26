@@ -59,7 +59,7 @@ All of these can be set in `appsettings.json` (non-secret values only), user sec
 | `Quota:AdminToken` | empty | Developer access token (secret); removes limits and opens the Metrics page |
 | `Quota:UnlimitedInDevelopment` | true | No limit, and Metrics page open, in the Development environment |
 | `ReverseProxy:KnownProxies` | empty | Only needed when a separate proxy sends `X-Forwarded-For` |
-| `Report:SupportStatement` | empty | Funding and support text printed in every systematic report; empty gives "To be completed by the authors." |
+| `Report:SupportStatement` | not set | Funding text printed in every systematic report; leave it unset on a public site, so each paper says "To be completed by the authors." |
 | `Runs:MaxConcurrentRuns` | 3 | Runs allowed to call the model at the same time; the rest wait in line |
 | `Runs:MaxRunningPerClient` | 2 | Slots one network address may hold at once; its next run lets others pass |
 | `Runs:MaxQueuedPerClient` | 3 | Runs one address may have waiting on top of those running; more are refused |

@@ -42,7 +42,7 @@ public class SectionNumbersTests
 
         Assert.DoesNotContain(@"\subsection{Overview", tex);
         Assert.DoesNotContain(@"\subsection{General", tex);
-        Assert.Contains("\\section{Discussion}\nDiscussion text.".Replace("\n", Environment.NewLine), tex);
+        Assert.Contains("\\section{Discussion}\\label{sec:discussion}\n\nDiscussion text.".Replace("\n", Environment.NewLine), tex);
     }
 
     [Fact]

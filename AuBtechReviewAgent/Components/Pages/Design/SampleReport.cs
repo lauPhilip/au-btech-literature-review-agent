@@ -95,7 +95,7 @@ public static class SampleReport
             DiscussionItem = Discussion,
             ReviewLimitationsItem = "The review searched open databases only, and the screening was done by a language model.",
             ConclusionItem = Conclusion,
-            SupportItem = "No funding. Department of Business Development and Technology, Aarhus University.",
+            SupportItem = "To be completed by the authors.",
             AvailabilityItem = "The run archive holds every file of the review, fingerprinted with SHA-256.",
             ProtocolItem = "The protocol was written and fingerprinted before the search.",
             CoverageSummary = "The synthesis cites all six included studies.",

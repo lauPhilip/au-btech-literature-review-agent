@@ -218,6 +218,8 @@ public static partial class MethodsSectionWriter
                 ? "there were no disagreements to resolve. "
                 : $"the {stats.ScreeningDisagreements} disagreement{(stats.ScreeningDisagreements == 1 ? " was" : "s were")} resolved by inclusion and flagged for human attention. ");
             sb.Append(KappaNote(agreed, stats.DualScreened, stats.ScreeningKappa));
+            sb.Append(Agreement.Sentence(agreed, stats.DualScreened));
+            sb.Append(Agreement.SameModelSentence("screenings"));
         }
         else
         {

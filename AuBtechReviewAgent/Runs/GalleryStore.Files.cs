@@ -24,6 +24,7 @@ public sealed partial class GalleryStore
             string from = Path.Join(source, Path.GetFileName(file));
             if (File.Exists(from)) File.Copy(from, Path.Join(temp, Path.GetFileName(file)));
         }
+        GallerySnapshot.MakePublic(temp);
         Swap(temp, target);
     }
 
@@ -145,6 +146,21 @@ public sealed partial class GalleryStore
                 _log.LogWarning("Gallery entry {Folder} not moved into versions: {Message}",
                     PrismaReviewEngine.SanitizeLogMessage(Path.GetFileName(folder)), PrismaReviewEngine.SanitizeLogMessage(ex.Message));
             }
+        }
+        MakeOlderCopiesPublic();
+    }
+
+    // Copies taken before the public-copy rules (Report/PublicCopy.cs) are made public once, when the gallery starts.
+    private void MakeOlderCopiesPublic()
+    {
+        try
+        {
+            int changed = GallerySnapshot.MakeOlderCopiesPublic(Root);
+            if (changed > 0) _log.LogInformation("Gallery: {Count} older copies now follow the public-copy rules.", changed);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            _log.LogWarning("Gallery: older copies not made public: {Message}", PrismaReviewEngine.SanitizeLogMessage(ex.Message));
         }
     }
 

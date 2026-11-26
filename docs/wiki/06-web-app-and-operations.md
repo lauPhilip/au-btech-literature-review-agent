@@ -50,7 +50,7 @@ The request pipeline then adds, in order: forwarded headers (for a reverse proxy
 | component | `RunSummaryCard.razor` | The Done state: what a finished run produced (studies, records, themes, studies cited), the citation verdicts as a stacked bar, the way into the report and every file from the run |
 | component | `ScreeningReviewPanel.razor` | The include/exclude list shown while a run waits for review |
 | component | `PrismaFunnel.razor` | The funnel on the dashboard, with "show" links for removed records |
-| `GET /api/workspace/{id}/archive` | `Web/WorkspaceDownloads.cs` | The run archive as a zip; a finished run's archive is kept (`Report/RunArchiveCache.cs`) |
+| `GET /api/workspace/{id}/archive` | `Web/WorkspaceDownloads.cs` | The run archive as a zip; a finished run's archive is kept (`Report/RunArchiveCache.cs`). `/deposit` (`Web/DepositDownload.cs`) gives the archive to share on Zenodo or OSF (page 5) |
 | `GET /api/workspace/{id}/references.bib` / `.ris` | `Web/WorkspaceDownloads.cs` | The included studies for reference managers |
 | `GET /api/workspace/{id}/protocol.md` | `Web/WorkspaceDownloads.cs` | The protocol, linked from Review Output |
 
@@ -221,7 +221,7 @@ Separately, every plain HTTP address is rate-limited per client address, and the
 
 Secrets are never committed. `appsettings.json` holds only placeholders, and the server's `web.config` is excluded from every deploy so the keys on the server are never overwritten.
 
-`Report:SupportStatement` is the text under Support and Funding in every systematic paper. Whoever runs a review writes their own funding, so it should be left empty on a public site: without it the paper says "To be completed by the authors." and never prints advice on configuration (`PrismaReviewEngine.DefaultSupportStatement`; a run that recorded the old fallback text gets the placeholder too, through `PaperDeclarations.Funding`). While it is set, `SupportStatementTests` fails if it names another department than BTECH. An environment variable `Report__SupportStatement` in the server's `web.config` overrides the file, and no test sees it, so check it there after changing the text.
+`Report:SupportStatement` is the text under Support and Funding in every systematic paper. Whoever runs a review writes their own funding, so `appsettings.json` no longer sets it: the paper says "To be completed by the authors." and never prints advice on configuration (`PrismaReviewEngine.DefaultSupportStatement`). An old run that recorded the old fallback or one of the site-wide statements earlier versions wrote (`PaperDeclarations.OldSiteStatements`, matched word for word) shows the placeholder on the page, in the API and in main.tex; the run's own prisma-report.json is not changed. `SupportStatementTests` fails if the file sets the value again. An environment variable `Report__SupportStatement` in the server's `web.config`, outside the repository, still overrides the file, so check there that it is not set.
 
 ## Security measures
 

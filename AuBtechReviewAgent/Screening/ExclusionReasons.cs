@@ -19,6 +19,8 @@ public static class ExclusionReasons
     public const string NotPeerReviewed = "not-peer-reviewed";
     public const string ByReviewer = "reviewer-decision";
     public const string Unspecified = "unspecified";
+    /// <summary>Included at screening, then excluded because Crossref lists a retraction (Report/RetractionCheck.cs).</summary>
+    public const string Retracted = "retracted";
 
     /// <summary>The groups the screening model may choose from.</summary>
     public static readonly IReadOnlyList<string> ModelKeys = new[] { OffTopic, InclusionNotMet, ExclusionMatched, TooLittleInformation };
@@ -31,6 +33,7 @@ public static class ExclusionReasons
         TooLittleInformation => "Too little information to include",
         NotPeerReviewed => "Not peer reviewed",
         ByReviewer => "Excluded by the reviewer",
+        Retracted => "Retracted",
         _ => "Reason not recorded",
     };
 
@@ -39,7 +42,7 @@ public static class ExclusionReasons
     /// <summary>The excluded records grouped by reason, largest group first (ties in the order of the keys above).</summary>
     public static List<Group> Count(IEnumerable<ScreeningLog> screening)
     {
-        var order = ModelKeys.Concat(new[] { NotPeerReviewed, ByReviewer, Unspecified }).ToList();
+        var order = ModelKeys.Concat(new[] { NotPeerReviewed, ByReviewer, Retracted, Unspecified }).ToList();
         return screening
             .Where(l => l.Decision == "Excluded")
             .GroupBy(l => string.IsNullOrWhiteSpace(l.ExclusionReason) ? Unspecified : l.ExclusionReason!)
@@ -49,10 +52,14 @@ public static class ExclusionReasons
             .ToList();
     }
 
-    /// <summary>One sentence for the report, or null when nothing was excluded.</summary>
+    /// <summary>
+    /// One sentence for the report, or null when nothing was excluded. A retracted study was excluded after screening, and
+    /// the retraction check's own sentence names it.
+    /// </summary>
     public static string? Sentence(IEnumerable<ScreeningLog> screening)
     {
-        var groups = Count(screening);
+        var groups = Count(screening).Where(g => g.Key != Retracted).ToList();
+        if (groups.Count == 0) return null;
         if (groups.All(g => g.Key == Unspecified)) return null; // a run from before reasons were recorded
         int total = groups.Sum(g => g.Count);
         return $"Reasons for exclusion at screening ({total} record{(total == 1 ? "" : "s")}): " +

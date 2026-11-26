@@ -30,7 +30,7 @@ public class MultivocalPaperMarginsTests
 
         // The header, each row and the closing rule: 32 tables of the same three columns.
         Assert.Equal(32, Regex.Matches(latex, @"\\begin\{tabular\}").Count);
-        Assert.Equal(32, Regex.Matches(latex, Regex.Escape(@"\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr0.333\linewidth-6pt\relax}")).Count);
+        Assert.Equal(32, Regex.Matches(latex, Regex.Escape(@"\begin{tabular}{@{}L{0.333}L{0.333}L{0.333}@{}}")).Count);
         Assert.Contains(@"\noindent\begin{tabular}", latex);
         Assert.Contains(@"Value 7 & 3 & 1, 2, 3", latex);
         Assert.Single(Regex.Matches(latex, @"\\toprule"));

@@ -146,7 +146,7 @@ public class PipelineTests : IDisposable
         var appraisal = state.Extractions[0].Appraisal;
         Assert.Equal("yes", appraisal[0].Answer);
         Assert.Equal("cant_tell", appraisal[1].Answer); // "no" with a quote that is not in the paper
-        Assert.Contains("Table A.2", tex);
+        Assert.Contains(@"\label{tab:A.2}", tex);
         Assert.Contains("Registration and Protocol", tex);
         Assert.Contains("screened twice", File.ReadAllText(Path.Join(_root, runId.ToString("N"), "prisma-report.json")));
     }
@@ -164,31 +164,30 @@ public class PipelineTests : IDisposable
         int references = At(@"\end{thebibliography}");
         int appendix = At(@"\section*{Appendix}");
 
-        Assert.InRange(At("Table A.1 in the appendix lists each included study."), section3, results);
-        Assert.InRange(At("Table A.3 the quality appraisal of each study with MMAT 2018."), section3, results);
+        Assert.InRange(At(@"Table~\ref{tab:A.1} in the appendix lists each included study."), section3, results);
+        Assert.InRange(At(@"Table~\ref{tab:A.3} the quality appraisal of each study with MMAT 2018."), section3, results);
         Assert.InRange(At("PRISMA 2020 flow diagram"), section3, results);
         Assert.InRange(At(@"\caption{Papers per Year}"), section3, results);
         Assert.InRange(At(@"\caption{Venue Share}"), section3, results);
 
         Assert.True(appendix > references, "the appendix comes after the references");
-        int a1 = At(@"\textbf{Table A.1: Included studies}");
-        int a1Note = At("Table A.1 lists each included study with a short summary");
-        int a2 = At(@"\textbf{Table A.2: Extracted Study Data}");
+        int a1 = At(@"\caption{Included studies}\label{tab:A.1}");
+        int a1Note = At(@"Table~\ref{tab:A.1} lists each included study with a short summary");
+        int a2 = At(@"\caption{Extracted Study Data}\label{tab:A.2}");
         // The dagger is explained only when a value in Table A.2 carries one (issue #168).
         int a2End = tex.IndexOf(@"\end{tabularx}", a2, StringComparison.Ordinal);
         bool daggers = tex[a2..a2End].Contains(@"$^{\dagger}$", StringComparison.Ordinal);
         int a2Note = daggers ? At(@"$^{\dagger}$ The supporting quote given by the model was not found") : a2End;
-        int a3 = At(@"\textbf{Table A.3: Quality Appraisal");
+        int a3 = At(@"\caption{Quality Appraisal (MMAT 2018)}\label{tab:A.3}");
         Assert.True(appendix < a1 && a1 < a1Note && a1Note < a2 && a2 < a2Note && a2Note < a3, "the tables keep their order, each with its note");
         Assert.True(a3 < At(@"\end{document}"));
         Assert.DoesNotMatch(@"Table 3\.[123]", tex);
 
-        // Issue #145: A.3's title fits on the page and its key is in the note under the table; A.1's title row
-        // ends with one line break, as A.2's does, so there is no empty row under it.
-        Assert.Contains(@"\textbf{Table A.3: Quality Appraisal (MMAT 2018)}} \\" + "\n", tex);
-        Assert.True(At(PrismaReviewEngine.AppraisalTableKey) > a3, "the key to Table A.3 is in the note under it");
-        Assert.Contains(@"\textbf{Table A.1: Included studies}} \\" + "\n", tex);
-        Assert.DoesNotContain(@"\textbf{Table A.1: Included studies}} \\\\", tex);
+        // Issue #145: A.3's title fits on the page and its key is in the note under the table. Since #537 a table's
+        // number comes from its \caption, not from a bold row, and the appendix numbers them A.1, A.2, ...
+        Assert.True(At(PrismaReviewEngine.AppraisalTableKey.Replace(" ? ", " {?} ")) > a3, "the key to Table A.3 is in the note under it");
+        Assert.Contains(@"\renewcommand{\thetable}{A.\arabic{table}}", tex);
+        Assert.DoesNotContain(@"\textbf{Table A.", tex);
     }
 
     [Fact]
