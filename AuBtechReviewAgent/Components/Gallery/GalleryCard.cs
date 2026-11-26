@@ -43,6 +43,22 @@ public static class GalleryCard
     }
 
     /// <summary>
+    /// "Citations 118 of 121 supported, 2 partly", from the citation check's verdicts; null for an entry added before
+    /// the verdicts were recorded, whose card says only how many were checked.
+    /// </summary>
+    public static string? CitationSupport(CitationShares c)
+    {
+        if (!c.HasVerdicts || c.Checked <= 0) return null;
+        string line = $"Citations {c.Supported} of {c.Checked} supported";
+        if (c.Partly > 0) line += $", {c.Partly} partly";
+        if (c.NotSupported > 0) line += $", {c.NotSupported} not supported";
+        return line;
+    }
+
+    /// <summary>"Self-check: 8 checks passed, 2 notes, 1 fault"; null when the run made no self-check.</summary>
+    public static string? SelfCheckLine(GallerySelfCheck? s) => s == null ? null : $"Self-check: {s.Summary}";
+
+    /// <summary>
     /// "How this was made", in two plain sentences from the stored figures; the report's own methods section has the
     /// full account, and the model card and the About page say how the tool works.
     /// </summary>
