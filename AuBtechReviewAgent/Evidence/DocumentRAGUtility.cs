@@ -30,9 +30,11 @@ public static partial class DocumentRAGUtility
     /// Finds a legal full text for the paper, downloads it and splits it into page-tagged chunks. Tried in
     /// order: arXiv; the open-access PDF link the source reported (OpenAlex, Semantic Scholar, Crossref);
     /// Unpaywall by DOI. Returns no chunks (and says why) when none is available. The PDF is kept under
-    /// <see cref="FullTextFile.PdfName(AcademicPaper)"/>, with a record of what it is beside it.
+    /// <see cref="FullTextFile.PdfName(AcademicPaper)"/>, with a record of what it is beside it. <paramref name="cancel"/>
+    /// stops the downloads and the reading when the run is cancelled (#588).
     /// </summary>
-    public static async Task<FullTextResult> IngestAndChunkPaperAsync(AcademicPaper paper, string targetDir, string contactEmail = "")
+    public static async Task<FullTextResult> IngestAndChunkPaperAsync(AcademicPaper paper, string targetDir, string contactEmail = "",
+        CancellationToken cancel = default)
     {
         if (string.IsNullOrWhiteSpace(targetDir)) return new FullTextResult(Array.Empty<DocumentChunk>(), "none", null);
         Directory.CreateDirectory(targetDir);
@@ -57,18 +59,20 @@ public static partial class DocumentRAGUtility
         {
             foreach (var (candidateLabel, url) in candidates)
             {
-                if (await TryDownloadPdfAsync(url, pdfPath)) { label = candidateLabel; usedUrl = url; break; }
+                if (await TryDownloadPdfAsync(url, pdfPath, cancel: cancel)) { label = candidateLabel; usedUrl = url; break; }
             }
+            cancel.ThrowIfCancellationRequested();
             if (usedUrl == null && zenodoRecord != null)
             {
                 string? zenodoUrl = await FindZenodoPdfAsync(zenodoRecord);
-                if (zenodoUrl != null && await TryDownloadPdfAsync(zenodoUrl, pdfPath)) { label = "Zenodo"; usedUrl = zenodoUrl; }
+                if (zenodoUrl != null && await TryDownloadPdfAsync(zenodoUrl, pdfPath, cancel: cancel)) { label = "Zenodo"; usedUrl = zenodoUrl; }
             }
+            cancel.ThrowIfCancellationRequested();
             if (usedUrl == null && !string.IsNullOrWhiteSpace(paper.Doi) && !string.IsNullOrWhiteSpace(contactEmail) && UnpaywallKnows(paper.Doi!))
             {
                 string? answer = await AskUnpaywallAsync(paper.Doi!, contactEmail);
                 string? oaUrl = answer == null ? null : ParseUnpaywallPdfUrl(answer);
-                if (oaUrl != null && await TryDownloadPdfAsync(oaUrl, pdfPath))
+                if (oaUrl != null && await TryDownloadPdfAsync(oaUrl, pdfPath, cancel: cancel))
                 {
                     label = "Unpaywall";
                     usedUrl = oaUrl;
@@ -83,7 +87,7 @@ public static partial class DocumentRAGUtility
         if (usedUrl != null) FullTextFile.WriteRecord(targetDir, paper, usedUrl);
 
         if (!File.Exists(pdfPath)) return new FullTextResult(Array.Empty<DocumentChunk>(), candidates.Count == 0 && string.IsNullOrWhiteSpace(contactEmail) ? "none (no open-access copy known)" : "none (no legal open-access PDF found)", null);
-        return new FullTextResult(ChunkPdf(pdfPath, sourceId), label, usedUrl);
+        return new FullTextResult(ChunkPdf(pdfPath, sourceId, cancel), label, usedUrl);
     }
 
     /// <summary>The id the chunks are tagged with (the last path segment of the paper id).</summary>
@@ -138,8 +142,11 @@ public static partial class DocumentRAGUtility
         return null;
     }
 
-    /// <summary>Extracts the text page by page and splits it into 600-character chunks with 100 characters of overlap.</summary>
-    public static List<DocumentChunk> ChunkPdf(string pdfPath, string sourceId)
+    /// <summary>
+    /// Extracts the text page by page and splits it into 600-character chunks with 100 characters of overlap.
+    /// <paramref name="cancel"/> stops it between pages when the run is cancelled.
+    /// </summary>
+    public static List<DocumentChunk> ChunkPdf(string pdfPath, string sourceId, CancellationToken cancel = default)
     {
         var chunks = new List<DocumentChunk>();
         try
@@ -147,6 +154,7 @@ public static partial class DocumentRAGUtility
             using PdfDocument document = PdfDocument.Open(pdfPath);
             foreach (var page in document.GetPages())
             {
+                cancel.ThrowIfCancellationRequested();
                 string pageText = Regex.Replace(page.Text?.Trim() ?? "", @"\s+", " ");
                 if (string.IsNullOrWhiteSpace(pageText)) continue;
 
@@ -163,7 +171,7 @@ public static partial class DocumentRAGUtility
                 }
             }
         }
-        catch (Exception ex)
+        catch (Exception ex) when (!cancel.IsCancellationRequested)
         {
             _log.LogInformation("Could not read PDF {File}: {Message}", Path.GetFileName(pdfPath), ex.Message);
         }
