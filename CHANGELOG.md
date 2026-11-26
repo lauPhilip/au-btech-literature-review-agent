@@ -6,6 +6,8 @@ Each version's section becomes the notes of its GitHub release, so write it for 
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-11-26
+
 The systematic review now answers its research questions first, cites what the studies found, and checks its own paper, so it is honest about how good its evidence is. It tells you when a cited study was retracted, marks a citation it could not confirm with a dagger, and rates how sure each answer is. The paper covers the whole PRISMA 2020 checklist, is written in plain technical English (based on ASD-STE100) and has APA 7 references completed from Crossref, OpenAlex and arXiv. It reads like a journal article on A4 pages. Many prompts and checks changed, so a run can differ from 0.5.0, most of all a run with research questions, and a rerun now gives the same themes. The multivocal review, still in preview, learned a lot from its first real run. And the site now puts every review in one fair line, keeps bots at the door and has a gallery of example reports.
 
 ### Added
@@ -335,7 +337,8 @@ The version now comes from the release tag. You can see it on the Metrics page, 
 
 Screening and citation checks now use a smaller, faster model. The writing still uses the large one, where it counts.
 
-[Unreleased]: https://github.com/lauPhilip/au-btech-literature-review-agent/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/lauPhilip/au-btech-literature-review-agent/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/lauPhilip/au-btech-literature-review-agent/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/lauPhilip/au-btech-literature-review-agent/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/lauPhilip/au-btech-literature-review-agent/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/lauPhilip/au-btech-literature-review-agent/compare/v0.2.3...v0.3.0
