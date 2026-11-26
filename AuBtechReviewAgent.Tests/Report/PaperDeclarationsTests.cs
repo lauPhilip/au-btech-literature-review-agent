@@ -72,7 +72,8 @@ public class PaperDeclarationsTests
     {
         var state = new ReviewState { Stats = new ReviewStats() };
         string plain = AiUseStatement.Methods(state, Guid.Empty);
-        Assert.Contains("language edit by the model, for clear and direct prose", plain);
+        Assert.Contains("language edit by the model into plain technical English (based on ASD-STE100).", plain);
+        Assert.DoesNotContain("compliant", plain, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("concept map", plain);
         string withMap = AiUseStatement.Methods(state, Guid.Empty, artifact: new ReviewArtifact { Kind = ArtifactKinds.ConceptMap });
         Assert.Contains("The content of the concept map", withMap);
