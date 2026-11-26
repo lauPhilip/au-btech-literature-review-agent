@@ -9,6 +9,12 @@ namespace AuBtechReviewAgent;
 public partial class PrismaReviewEngine
 {
     /// <summary>
+    /// Part of the screening cache key: change it whenever a screening prompt changes, so decisions made
+    /// with an older prompt are never reused. It sits beside the prompt it versions, so both change in one commit.
+    /// </summary>
+    public const string ScreeningPromptVersion = "screening-v8";
+
+    /// <summary>
     /// The screening prompt for one record, used by the review run and by the screening evaluation tool so
     /// both measure exactly the same thing. Temperature 0 so repeated runs give the same decisions. The
     /// second screener works through the criteria in a different order (exclusion first, then positive
@@ -21,17 +27,17 @@ public partial class PrismaReviewEngine
         string? Parts(ScreeningAnswer a) => CriterionParts.Problem(a, inclusionCriteria);
 
         if (!noAbstract)
-            return CriterionParts.Apply((await LlmJson.GetAsync<ScreeningAnswer>(chatService, prompt, JsonMode(0.0), a => ScreeningAnswer.Validate(a) ?? Parts(a))).Normalized(), paper);
+            return CriterionParts.Apply((await LlmJson.GetAsync<ScreeningAnswer>(chatService, prompt, JsonMode(0.0), a => ScreeningAnswer.Validate(a) ?? Parts(a))).Normalized(), paper, inclusionCriteria);
 
         // A record without an abstract: an answer that still describes one is sent back. If the model keeps doing
         // it, the decision is kept but its reason is flagged, so a reader knows not to trust that part (issue #132).
         try
         {
-            return CriterionParts.Apply((await LlmJson.GetAsync<ScreeningAnswer>(chatService, prompt, JsonMode(0.0), a => ScreeningAnswer.ValidateWithoutAbstract(a) ?? Parts(a))).Normalized(), paper);
+            return CriterionParts.Apply((await LlmJson.GetAsync<ScreeningAnswer>(chatService, prompt, JsonMode(0.0), a => ScreeningAnswer.ValidateWithoutAbstract(a) ?? Parts(a))).Normalized(), paper, inclusionCriteria);
         }
         catch (LlmOutputException)
         {
-            var answer = CriterionParts.Apply((await LlmJson.GetAsync<ScreeningAnswer>(chatService, prompt, JsonMode(0.0), a => ScreeningAnswer.Validate(a) ?? Parts(a))).Normalized(), paper);
+            var answer = CriterionParts.Apply((await LlmJson.GetAsync<ScreeningAnswer>(chatService, prompt, JsonMode(0.0), a => ScreeningAnswer.Validate(a) ?? Parts(a))).Normalized(), paper, inclusionCriteria);
             if (ScreeningAnswer.ClaimsAnAbstract(answer.Reasoning) || ScreeningAnswer.ClaimsAnAbstract(answer.BriefSummary))
                 answer.Reasoning = AbstractClaimWarning + " " + answer.Reasoning;
             return answer;
@@ -72,6 +78,7 @@ public partial class PrismaReviewEngine
             {{noAbstractNotice}}
             {{procedure}}
             {{CriterionParts.Procedure}}
+            {{CriterionParts.AlternativesRule}}
             (The reference string is built separately from the source metadata - do not write one.)
 
             {{ScreeningAnswerFormat}}

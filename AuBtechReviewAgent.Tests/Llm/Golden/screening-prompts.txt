@@ -29,6 +29,7 @@ Split the inclusion thresholds into their separate requirements, for example "de
 - "no" when the record shows that it does not meet the part;
 - "unclear" when the record does not say.
 A proposal, a design or a plan is not an evaluation, and a record that only "suggests" a part does not show it. Decide Included only when every part is "yes".
+Alternatives joined by "or" are one requirement, for example "an agent framework or orchestration loop": either alternative is enough. Keep them in one part, or give each alternative as its own part right after the other. An alternative may be "no" or "unclear" when another alternative of the same requirement is "yes"; that requirement is then shown.
 (The reference string is built separately from the source metadata - do not write one.)
 
 Respond ONLY with a valid minified JSON object matching this structure exactly:
@@ -68,6 +69,7 @@ Split the inclusion thresholds into their separate requirements, for example "de
 - "no" when the record shows that it does not meet the part;
 - "unclear" when the record does not say.
 A proposal, a design or a plan is not an evaluation, and a record that only "suggests" a part does not show it. Decide Included only when every part is "yes".
+Alternatives joined by "or" are one requirement, for example "an agent framework or orchestration loop": either alternative is enough. Keep them in one part, or give each alternative as its own part right after the other. An alternative may be "no" or "unclear" when another alternative of the same requirement is "yes"; that requirement is then shown.
 (The reference string is built separately from the source metadata - do not write one.)
 
 Respond ONLY with a valid minified JSON object matching this structure exactly:
@@ -171,6 +173,7 @@ Split the inclusion thresholds into their separate requirements, for example "de
 - "no" when the record shows that it does not meet the part;
 - "unclear" when the record does not say.
 A proposal, a design or a plan is not an evaluation, and a record that only "suggests" a part does not show it. Decide Included only when every part is "yes".
+Alternatives joined by "or" are one requirement, for example "an agent framework or orchestration loop": either alternative is enough. Keep them in one part, or give each alternative as its own part right after the other. An alternative may be "no" or "unclear" when another alternative of the same requirement is "yes"; that requirement is then shown.
 (The reference string is built separately from the source metadata - do not write one.)
 
 Respond ONLY with a valid minified JSON object matching this structure exactly:
@@ -210,6 +213,7 @@ Split the inclusion thresholds into their separate requirements, for example "de
 - "no" when the record shows that it does not meet the part;
 - "unclear" when the record does not say.
 A proposal, a design or a plan is not an evaluation, and a record that only "suggests" a part does not show it. Decide Included only when every part is "yes".
+Alternatives joined by "or" are one requirement, for example "an agent framework or orchestration loop": either alternative is enough. Keep them in one part, or give each alternative as its own part right after the other. An alternative may be "no" or "unclear" when another alternative of the same requirement is "yes"; that requirement is then shown.
 (The reference string is built separately from the source metadata - do not write one.)
 
 Respond ONLY with a valid minified JSON object matching this structure exactly:
