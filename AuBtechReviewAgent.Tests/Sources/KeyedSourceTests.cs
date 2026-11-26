@@ -33,7 +33,7 @@ public class KeyedSourceTests
     {
         const string json = """
         {"search-results":{"opensearch:totalResults":"2","entry":[
-          {"dc:identifier":"SCOPUS_ID:105055666438","dc:title":"SMARF: a semantic memory compression framework","dc:creator":"Liu J.",
+          {"dc:identifier":"SCOPUS_ID:105055666438","dc:title":"SMARF: A semantic memory compression framework","dc:creator":"Liu J.",
            "prism:publicationName":"Reliability Engineering and System Safety","prism:coverDate":"2027-03-01",
            "prism:coverDisplayDate":"March 2027","prism:doi":"10.1016/j.ress.2026.113770","subtypeDescription":"Article"},
           {"dc:identifier":"SCOPUS_ID:2","dc:title":"Older work","dc:creator":"Ab C.","prism:coverDate":"2024-05-01",
@@ -44,7 +44,7 @@ public class KeyedSourceTests
 
         Assert.Equal(new[] { "Liu J.", ApaCitationBuilder.EtAl }, papers[0].Authors);
         Assert.Equal("Published: 2026", papers[0].PublishedDate);
-        Assert.Equal("Liu, J., et al. (2026). SMARF: a semantic memory compression framework. *Reliability Engineering and System Safety*. https://doi.org/10.1016/j.ress.2026.113770",
+        Assert.Equal("Liu, J., et al. (2026). SMARF: A semantic memory compression framework. *Reliability Engineering and System Safety*. https://doi.org/10.1016/j.ress.2026.113770",
             ApaCitationBuilder.Build(papers[0]).Citation);
         Assert.Equal(new[] { "Ab, Carla", "De, Finn" }, papers[1].Authors);
         Assert.Equal("Published: 2024", papers[1].PublishedDate);
