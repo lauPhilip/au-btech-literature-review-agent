@@ -240,7 +240,8 @@ public partial class PrismaReviewEngine
         var reportObj = new PrismaReport
         {
             GeneratedAt = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss UTC"),
-            TitleItem = run.Title,
+            // A pilot search is not called a systematic review in its title (issue #554), decided in code.
+            TitleItem = SearchAdequacy.Title(run.Title, finalState),
             AbstractItem = Plain(run.Abstract, "abstractItem"),
             RationaleItem = textOf["rationaleItem"],
             ObjectivesItem = run.Objectives,
