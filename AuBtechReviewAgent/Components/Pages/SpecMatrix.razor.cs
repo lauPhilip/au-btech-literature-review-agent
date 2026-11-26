@@ -41,6 +41,7 @@ public partial class SpecMatrix
 
     // The citation marker the reader clicked: (field, sentence index, reference number).
     internal (string Field, int Sentence, int Reference)? openCitation;
+    private Guid openedFor;
 
     // The run's figures and its PRISMA flow, for the run line and Figure 2.1; null for a run without a ledger.
     internal AuBtechReviewAgent.ReviewStats? stats;
@@ -202,7 +203,9 @@ public partial class SpecMatrix
         copyNotice = null;
         passedPeerReviewCheck = failedPeerReviewCheck = 0;
         mermaidDiagramCode = "";
-        openCitation = null;
+        // A second call for the same run (the router sets the parameters again) must not close what the reader opened.
+        if (openedFor != State.CurrentSessionId || InGallery) openCitation = null;
+        openedFor = State.CurrentSessionId;
         deleted = false;
         stats = null;
         flow = null;

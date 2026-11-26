@@ -4,7 +4,8 @@
 //
 // Blazor owns the report's elements, so this script never moves one. It measures the rendered text, adds space above
 // any block that would cross the foot of a page (so the block starts on the next page), and draws the sheets and their
-// footers in [data-page-overlay], an element Blazor leaves empty, behind the text. It runs again when the report
+// footers in [data-page-overlay], an element Blazor leaves empty, behind the text (and, for a table that runs over
+// a page, the repeated header row and the hidden gap in [data-page-top], in front of it; see paged-tables.js). It runs again when the report
 // changes (an open citation, an edit), when the window is resized and after printing. Below 768 px, and on paper,
 // the report is one continuous sheet: print has its own pages (wwwroot/css/journal-print.css).
 (function () {
@@ -24,6 +25,11 @@
         return holder ? holder.querySelector(':scope > [data-page-overlay]') : null;
     }
 
+    function topOf(sheet) {
+        const holder = sheet.parentElement;
+        return holder ? holder.querySelector(':scope > [data-page-top]') : null;
+    }
+
     // Takes back every space this script added, so the report flows as Blazor drew it.
     function reset(sheet) {
         sheet.querySelectorAll('[data-page-pushed]').forEach(function (el) {
@@ -37,6 +43,8 @@
         sheet.style.removeProperty('min-height');
         const overlay = overlayOf(sheet);
         if (overlay) overlay.replaceChildren();
+        const above = topOf(sheet);
+        if (above) above.replaceChildren();
     }
 
     // Units kept whole when they fit on a page: a figure, a diagram, an image, a box marked to stay together, a box with
@@ -94,6 +102,8 @@
     // The element to move for a block: the block itself, or the outermost box it opens (a bordered box, a section or a
     // table whose first thing it is), so a box never leaves its top border behind on the page before.
     function opener(el, sheet) {
+        // A body row of a table moves alone (its cells grow); the rows above it stay where they are.
+        if (el.tagName === 'TR' && el.parentElement && el.parentElement.tagName === 'TBODY') return el;
         let target = el;
         while (target.parentElement && target.parentElement !== sheet && !target.parentElement.hasAttribute('data-front-page')) {
             let prev = target.previousElementSibling;
@@ -162,6 +172,8 @@
         let frontDone = !front;
         const top = function (el) { return el.getBoundingClientRect().top - sheet.getBoundingClientRect().top; };
         let guard = list.length * 3;
+        // A table that runs on to another page shows its header row again at the top of that page (issue #628).
+        const headers = new Map(), tablePage = new Map(), splits = [];
         for (let i = 0; i < list.length && guard-- > 0; i++) {
             const el = list[i];
             const y = top(el);
@@ -181,6 +193,20 @@
                 else if (y > end) to = next;                                 // in the bottom margin or the gap
                 else if (y + h > end + 1 && h <= body) to = next;            // crosses the foot of the page
             }
+            // The first body row of a table on a new page makes room for the repeated header row above it.
+            const table = el.tagName === 'TR' ? el.closest('table') : null;
+            const head = table && el.parentElement.tagName === 'TBODY' ? table.querySelector(':scope > thead') : null;
+            if (table) {
+                const landing = Math.floor((to === null ? y : to) / step);
+                const seen = tablePage.get(table);
+                if (head && seen !== undefined && seen !== landing) {
+                    const need = landing * step + pad + head.getBoundingClientRect().height;
+                    if ((to === null ? y : to) < need) to = need;
+                    headers.set(landing, (headers.get(landing) || []).concat(table));
+                }
+                if (el.parentElement.tagName === 'TBODY' && to !== null && landing > page) splits.push({ table: table, y: y, from: page, to: landing });
+                tablePage.set(table, landing);
+            }
             if (to === null) continue;
             // A heading goes with the block under it; the loop then looks at this block again.
             const before = i > 0 ? list[i - 1] : null;
@@ -199,10 +225,22 @@
         const content = sheet.scrollHeight - pad;
         const pages = Math.max(1, Math.floor((content - 1) / step) + 1);
         sheet.style.setProperty('min-height', (pages * step - GAP) + 'px');
-        draw(sheet, pages, height, pad);
+        draw(sheet, pages, height, pad, headers, splits);
     }
 
-    function draw(sheet, pages, height, pad) {
+    function footOf(n, pages, pad, site) {
+        const foot = document.createElement('div');
+        foot.className = 'paged-foot';
+        foot.style.cssText = 'left:' + pad + 'px;right:' + pad + 'px;bottom:' + Math.round(pad * 0.45) + 'px';
+        [site, (n + 1) + ' of ' + pages, 'AI-generated · machine-marked'].forEach(function (text) {
+            const span = document.createElement('span');
+            span.textContent = text;
+            foot.appendChild(span);
+        });
+        return foot;
+    }
+
+    function draw(sheet, pages, height, pad, headers, splits) {
         const overlay = overlayOf(sheet);
         if (!overlay) return;
         const site = window.location.hostname;
@@ -212,20 +250,14 @@
             page.className = 'paged-page';
             page.style.setProperty('top', (n * (height + GAP)) + 'px');
             page.style.setProperty('height', height + 'px');
-            const foot = document.createElement('div');
-            foot.className = 'paged-foot';
-            foot.style.setProperty('left', pad + 'px');
-            foot.style.setProperty('right', pad + 'px');
-            foot.style.setProperty('bottom', Math.round(pad * 0.45) + 'px');
-            [site, (n + 1) + ' of ' + pages, 'AI-generated · machine-marked'].forEach(function (text) {
-                const span = document.createElement('span');
-                span.textContent = text;
-                foot.appendChild(span);
-            });
-            page.appendChild(foot);
+            page.appendChild(footOf(n, pages, pad, site));
             parts.push(page);
         }
         overlay.replaceChildren.apply(overlay, parts);
+        // Tables that run over a page: the rows' gap is hidden and the header row is drawn again (paged-tables.js).
+        const above = topOf(sheet);
+        if (above && window.traceablePageTables) above.replaceChildren.apply(above, window.traceablePageTables.parts(above,
+            { height: height, pad: pad, gap: GAP, step: height + GAP }, headers, splits, function (n) { return footOf(n, pages, pad, site); }));
     }
 
     function run() {
@@ -243,7 +275,7 @@
     new MutationObserver(function (records) {
         for (const r of records) {
             const node = r.target.nodeType === 1 ? r.target : r.target.parentElement;
-            if (!node || node.closest('[data-page-overlay]')) continue;
+            if (!node || node.closest('[data-page-overlay], [data-page-top]')) continue;
             if (node.closest('[data-paged-sheet]') || (r.addedNodes.length > 0 && document.querySelector('[data-paged-sheet]:not([data-paged])'))) {
                 later(200);
                 return;

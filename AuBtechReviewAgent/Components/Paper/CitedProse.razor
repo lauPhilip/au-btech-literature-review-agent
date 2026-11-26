@@ -1,7 +1,8 @@
 @* Text of a paper with every [n] as a button (module design M9, shared by every kind of review). Clicking a number
    opens what the citation check found for that sentence and source: its verdict, the quote and where it was found.
    Sentences are split exactly as the check split them. The page owns which citation is open; this component shows
-   it, and the page adds its own extras to the open panel (notes, a re-check) through PanelExtras. With the checked
+   it, and the page adds its own extras to the open panel (notes, a re-check) through PanelExtras. A click outside the
+   open panel, or Escape anywhere, presses its Close button (wwwroot/js/review-output.js, found by data-citation-close). With the checked
    editor on (Editable), each sentence can be clicked, or its Edit button pressed, to open the page's edit box. *@
 
 @{
@@ -55,7 +56,7 @@
 {
     var check = FindCheck(open.Field, open.Sentence, open.Reference);
     @* Opening a citation moves focus here; Escape or Close returns it to the citation number (WCAG 2.4.3). *@
-    <div id="@($"verdict-{Field}")" tabindex="-1" role="region" aria-label="@($"What the check found for reference {open.Reference}")"
+    <div id="@($"verdict-{Field}")" data-citation-panel tabindex="-1" role="region" aria-label="@($"What the check found for reference {open.Reference}")"
          class="mt-3 space-y-2 rounded-card border border-line bg-page p-4 font-sans text-[15px] leading-relaxed text-ink shadow-card focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand print:hidden" @onkeydown="KeyDown">
         <div class="flex items-start justify-between gap-3">
             <div class="min-w-0">
@@ -65,7 +66,7 @@
                 }
                 <p class="mt-1.5 font-semibold text-heading">[@open.Reference] @(SourceTitle(open.Reference) ?? "Unknown reference")</p>
             </div>
-            <button type="button" class="ui-btn-secondary ui-btn-sm min-h-[44px] shrink-0" @onclick="() => OnClose.InvokeAsync()">Close</button>
+            <button type="button" data-citation-close class="ui-btn-secondary ui-btn-sm min-h-[44px] shrink-0" @onclick="() => OnClose.InvokeAsync()">Close</button>
         </div>
         @if (check == null)
         {
