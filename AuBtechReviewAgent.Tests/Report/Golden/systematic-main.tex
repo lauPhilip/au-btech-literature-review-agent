@@ -175,6 +175,13 @@ Third, each theme was written up as a subsection from its own studies only, with
 Finally, the part of every cited sentence attributed to a paper was checked against that paper; sentences judged not supported or only partly supported were rewritten once from the paper's evidence and checked again.
 The requested artifact could not be built: The artifact could not be built from the results (LlmOutputException).
 
+\subsection{Automated Citation Check}\label{sec:automated-citation-check}
+
+An automated check compared the part of each cited sentence attributed to a paper with the text of that paper.
+The first check judged 5 citations: 5 were supported, 0 partly supported, 0 not supported, and 0 could not be verified.
+Of the 5 citations in the final text, 5 were judged supported, 0 partly supported, 0 not supported, and 0 could not be verified.
+Every verdict, with the quoted evidence, every repair and every removed citation is listed in citation-audit.\allowbreak{}json; these are model judgements and should be spot-checked by a human reviewer.
+
 \subsection{What This Review Did Not Assess}\label{sec:what-this-review-did-not-assess}
 
 This review did not compute effect measures (PRISMA 2020 item 12).
@@ -314,12 +321,6 @@ The search took at most 3 records per source.
 The extraction, the synthesis and the text were written by the language model mistral-large-latest (Mistral API); every cited sentence was checked against its source, but the review should be read by a person before it is relied on.
 This was a pilot run, not a comprehensive search: the search took at most 3 records per source and identified 3 records, so relevant studies are likely to be missing and the findings show what a small sample of the literature says, not the state of the field.
 
-\subsection{Automated Citation Check}\label{sec:automated-citation-check}
-
-An automated check compared the part of each cited sentence attributed to a paper with the text of that paper.
-Of 5 citations checked, 5 were judged supported, 0 partially supported, 0 not supported, and 0 could not be verified.
-Every verdict, with the quoted evidence, is listed in citation-audit.\allowbreak{}json; these are model judgements and should be spot-checked by a human reviewer.
-
 \section{Conclusion}\label{sec:conclusion}
 
 The conclusion, the limitations of the evidence, the implications and the directions for future research could not be written: the language model's answer failed the checks in code on every try.
@@ -387,18 +388,18 @@ Give each author's roles in the CRediT taxonomy, for example Conceptualization, 
 \renewcommand{\theHtable}{A.\arabic{table}} % hyperref's own name, so A.1 is not the same link as 0.1
 
 \small
-\begin{tabularx}{\textwidth}{>{\hsize=0.6\hsize}Y >{\hsize=1.2\hsize}Y >{\hsize=1.0\hsize}Y >{\hsize=0.5\hsize}Y >{\hsize=1.7\hsize}Y}
+\begin{tabularx}{\textwidth}{>{\hsize=0.3\hsize}Y >{\hsize=0.7\hsize}Y >{\hsize=1.5\hsize}Y >{\hsize=1.2\hsize}Y >{\hsize=0.6\hsize}Y >{\hsize=1.7\hsize}Y}
 \caption{Included studies}\label{tab:A.1}\\
 \toprule
-\textbf{Paper Name} & \textbf{Executive Summary} & \textbf{Inclusion Rationale} & \textbf{Source} & \textbf{Citation (APA 7th)} \\
+\textbf{Ref.} & \textbf{Paper Name} & \textbf{Executive Summary} & \textbf{Inclusion Rationale} & \textbf{Source} & \textbf{Citation (APA 7th)} \\
 \midrule
 \endfirsthead%
 \toprule
-\textbf{Paper Name} & \textbf{Executive Summary} & \textbf{Inclusion Rationale} & \textbf{Source} & \textbf{Citation (APA 7th)} \\
+\textbf{Ref.} & \textbf{Paper Name} & \textbf{Executive Summary} & \textbf{Inclusion Rationale} & \textbf{Source} & \textbf{Citation (APA 7th)} \\
 \midrule
 \endhead%
-Agent loops for safe orchestration & An agent paper. & About agent architecture. & Google Scholar; SJR Q1 & Doe, J. (2025). Agent loops for safe orchestration.\ \textit{Future Internet}.\ \url{https://doi.org/10.3390/fi1234567}\\ \addlinespace
-Agent governance layers & An agent paper. & About agent architecture. & Google Scholar; not in SJR & Lee, K. (2026). Agent governance layers. In \textit{Proceedings of the Conference on Agents}.\\ \addlinespace
+{\cite{doe2025agent}} & Agent loops for safe orchestration & An agent paper. & About agent architecture. & Google Scholar; SJR Q1 & Doe, J. (2025). Agent loops for safe orchestration.\ \textit{Future Internet}.\ \url{https://doi.org/10.3390/fi1234567}\\ \addlinespace
+{\cite{lee2026agent}} & Agent governance layers & An agent paper. & About agent architecture. & Google Scholar; not in SJR & Lee, K. (2026). Agent governance layers. In \textit{Proceedings of the Conference on Agents}.\\ \addlinespace
 \bottomrule
 \end{tabularx}
 \vspace{4pt}\noindent Table~\ref{tab:A.1} lists each included study with a short summary, the reason it was included, the database it came from with its venue's rank, and its reference.\par

@@ -81,6 +81,15 @@ public class CitationSupportSummary
         };
     }
 
+    /// <summary>
+    /// The count of the final text as one sentence: "Of the 80 citations in the final text, 60 were judged supported, ...".
+    /// <see cref="CitationCheckSteps.Paragraph"/> puts it last, after the steps that led to it.
+    /// </summary>
+    public string FinalSentence() =>
+        $"Of the {Checked} citation{(Checked == 1 ? "" : "s")} in the final text, {Supported} {(Supported == 1 ? "was" : "were")} judged supported, {PartiallySupported} partly supported, {NotSupported} not supported, " +
+        (InsufficientEvidence > 0 ? $"{InsufficientEvidence} could not be judged because only the abstract was available and it does not mention the claim, " : "") +
+        $"and {Unverifiable} could not be verified.";
+
     /// <summary>One sentence for the report, e.g. "Of 14 citations checked, 11 were supported, ...".</summary>
     public string ToSentence()
     {

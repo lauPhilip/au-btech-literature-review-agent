@@ -16,8 +16,8 @@ public static class SystematicSelfCheck
     private static readonly JsonSerializerOptions Read = new() { PropertyNameCaseInsensitive = true };
     private static readonly JsonSerializerOptions Write = new() { WriteIndented = true };
 
-    /// <summary>What citation-audit.json says about the check: after and before repair, the removed citations and the studies not cited.</summary>
-    public sealed record Audit(CitationSupportSummary? Final, CitationSupportSummary? Initial, int Removed, IReadOnlyList<UncodedStudy> NotCited);
+    /// <summary>What citation-audit.json says about the check: after and before repair, the steps of the check, the removed citations and the studies not cited.</summary>
+    public sealed record Audit(CitationSupportSummary? Final, CitationSupportSummary? Initial, int Removed, IReadOnlyList<UncodedStudy> NotCited, CitationCheckSteps? Steps = null);
 
     /// <summary>The paper, counts and checks of a finished systematic review, in the self-check's shape.</summary>
     public static PaperCheckInput Input(PrismaReport report, ReviewState state, Audit audit)
@@ -59,6 +59,7 @@ public static class SystematicSelfCheck
             CitationsFinal = audit.Final,
             CitationsInitial = audit.Initial,
             CitationsRemoved = audit.Removed,
+            CitationSteps = audit.Steps,
             CitationsShown = new CitationSupportSummary
             {
                 Checked = state.Stats.CitationsChecked, Supported = state.Stats.CitationsSupported, PartiallySupported = state.Stats.CitationsPartiallySupported,
@@ -124,7 +125,7 @@ public static class SystematicSelfCheck
             var root = doc.RootElement;
             T? Get<T>(string name) where T : class => root.TryGetProperty(name, out var v) && v.ValueKind != JsonValueKind.Null ? v.Deserialize<T>(Read) : null;
             int removed = root.TryGetProperty("RemovedCitations", out var r) && r.ValueKind == JsonValueKind.Array ? r.GetArrayLength() : 0;
-            return new(Get<CitationSupportSummary>("SupportSummary"), Get<CitationSupportSummary>("InitialSupportSummary"), removed, Get<List<UncodedStudy>>("NotCited") ?? new());
+            return new(Get<CitationSupportSummary>("SupportSummary"), Get<CitationSupportSummary>("InitialSupportSummary"), removed, Get<List<UncodedStudy>>("NotCited") ?? new(), Get<CitationCheckSteps>("CheckSteps"));
         }
         catch (Exception ex) when (ex is JsonException or IOException)
         {

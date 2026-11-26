@@ -73,7 +73,10 @@ public static partial class PaperSelfCheck
             check.Evidence.Add(new("Citation check", "", $"{s.InsufficientEvidence + s.Unverifiable} not checkable", "The source's text did not let the check judge the claim (abstract only or no text)."));
         if (input.CitationsRemoved > 0)
             check.Evidence.Add(new("Citation check", "", $"{input.CitationsRemoved} removed", "Still not supported after the repair, so taken out of the paper."));
-        if (input.CitationsInitial is { } before)
+        if (input.CitationSteps is { FirstChecked: > 0 } steps)
+            check.Evidence.Add(new("Citation check", "", $"First check: {steps.FirstNotSupported} not supported, {steps.FirstPartiallySupported} partly",
+                $"Of {steps.FirstChecked} citations first checked; {steps.FinalChecked} are in the final text."));
+        else if (input.CitationsInitial is { } before)
             check.Evidence.Add(new("Citation check", "", $"Before repair: {before.NotSupported} not supported, {before.PartiallySupported} partly", $"Of {before.Checked} citations first checked."));
         check.Evidence.AddRange(shown);
         check.Outcome = s.NotSupported > 0 || shown.Count > 0 ? CheckOutcome.Fault

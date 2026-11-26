@@ -21,7 +21,7 @@ public partial class PrismaReviewEngine
 
     private sealed record CitationCheck(List<(string Field, string Text)> Fields, List<StrippedCitation> Strips, List<CitationSupportResult> Checks,
         CitationSupportSummary Initial, CitationSupportSummary Summary, List<CitationRepair> Repairs, List<RemovedCitation> Removed,
-        List<RepairSenseCheck> Sense);
+        List<RepairSenseCheck> Sense, CitationCheckSteps? Steps);
 
     private sealed record CoverageResult(Dictionary<string, string> TextOf, SortedSet<int> Cited, List<UncodedStudy> NotCited, string Sentence);
 
@@ -123,7 +123,7 @@ public partial class PrismaReviewEngine
         finalState.Stats.CitationsInsufficientEvidence = supportSummary.InsufficientEvidence;
         finalState.Stats.CitationsSecondChecked = supportSummary.SecondChecked;
         finalState.Stats.CitationsUpgradedBySecondCheck = supportSummary.UpgradedBySecondCheck;
-        return new CitationCheck(fields, citationStrips, supportChecks, initialSummary, supportSummary, repairs, grounding.Removed, grounding.Sense ?? new());
+        return new CitationCheck(fields, citationStrips, supportChecks, initialSummary, supportSummary, repairs, grounding.Removed, grounding.Sense ?? new(), grounding.Steps);
     }
 
     /// <summary>Which included studies the synthesis and discussion cite, and why the others are not cited; saved with the codebook.</summary>
@@ -209,6 +209,7 @@ public partial class PrismaReviewEngine
                 InvalidMarkersStripped = citationStrips.Count,
                 Details = citationStrips,
                 InitialSupportSummary = initialSummary,
+                CheckSteps = check.Steps,
                 SupportSummary = supportSummary,
                 Repairs = repairs,
                 RemovedCitations = check.Removed,
@@ -225,9 +226,8 @@ public partial class PrismaReviewEngine
             _log.LogWarning("Could not save citation-audit.json: {Message}", SanitizeLogMessage(ex.Message));
         }
 
-        string checkSentence = supportSummary.ToSentence();
-        if (repairs.Count > 0)
-            checkSentence += $" Before this final count, {initialSummary.NotSupported} citation{(initialSummary.NotSupported == 1 ? " was" : "s were")} judged not supported and {initialSummary.PartiallySupported} partially supported; {finalState.Stats.CitationsRepaired} cited sentence{(finalState.Stats.CitationsRepaired == 1 ? " was" : "s were")} rewritten or had the citation removed once and checked again (listed under Repairs in citation-audit.json).";
+        // One paragraph for the methods, in the order the steps ran, with counts that add up (issue #679).
+        string checkSentence = check.Steps?.Paragraph(supportSummary) ?? supportSummary.ToSentence();
         if (finalState.Stats.CitationsOutsideTheme > 0)
             checkSentence += " " + OutsideThemeSentence(finalState.Stats.CitationsOutsideTheme);
 

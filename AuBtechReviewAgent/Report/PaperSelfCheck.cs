@@ -70,6 +70,9 @@ public sealed class PaperCheckInput
     public CitationSupportSummary? CitationsInitial { get; init; }
     public int CitationsRemoved { get; init; }
 
+    /// <summary>The check as one sequence of counts (the paragraph of the methods says the same); null for a run made before they were recorded.</summary>
+    public CitationCheckSteps? CitationSteps { get; init; }
+
     /// <summary>
     /// The citation check's counts as the run page shows them (from the ledger, with <c>Removed</c> set); null when the
     /// module keeps none. They should equal the report's (<see cref="CitationsFinal"/>); run 596541db showed 109 and 113.

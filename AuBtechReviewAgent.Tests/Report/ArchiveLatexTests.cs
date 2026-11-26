@@ -74,6 +74,43 @@ public class ArchiveLatexTests : IDisposable
     }
 
     [Fact]
+    public void TableA1StartsWithTheReferenceNumberAndStillFitsThePage()
+    {
+        string tex = MainTex(new PrismaReport { TitleItem = "Agent loops" }, TwoJournalPapers());
+        int caption = tex.IndexOf(@"\caption{Included studies}\label{tab:A.1}", StringComparison.Ordinal);
+        Assert.True(caption > 0);
+        string begin = tex[..caption][tex[..caption].LastIndexOf(@"\begin{tabularx}", StringComparison.Ordinal)..].Trim();
+        string table = tex[caption..tex.IndexOf(@"\end{tabularx}", caption, StringComparison.Ordinal)];
+
+        Assert.Contains(@"\textbf{Ref.} & \textbf{Paper Name} & \textbf{Executive Summary} & \textbf{Inclusion Rationale} & \textbf{Source} & \textbf{Citation (APA 7th)}", table);
+        // The row of reference 1 starts with its number, as in Tables A.2 and A.3, and the numbers follow the reference order.
+        Assert.Matches(@"\{\\cite\{[^}]+\}\} & Loops & ", table);
+        Assert.True(table.IndexOf("& Loops &", StringComparison.Ordinal) < table.IndexOf("& Undated &", StringComparison.Ordinal));
+        // Six columns whose widths add up to six, so the table is as wide as the text and no wider.
+        var widths = System.Text.RegularExpressions.Regex.Matches(begin, @"hsize=([0-9.]+)\\hsize").Select(m => double.Parse(m.Groups[1].Value, CultureInfo.InvariantCulture)).ToList();
+        Assert.Equal(6, widths.Count);
+        Assert.Equal(6.0, widths.Sum(), 6);
+    }
+
+    [Fact]
+    public void TheCitationCheckIsWrittenInTheMethodsAndNotInTheDiscussion()
+    {
+        var report = new PrismaReport
+        {
+            TitleItem = "Agent loops", DiscussionItem = "Loops matter.", SynthesisMethodsItem = "Findings were coded into themes.",
+            CitationCheckSummary = "The first check judged 4 citations.",
+        };
+        string tex = MainTex(report, TwoJournalPapers());
+
+        int check = tex.IndexOf(@"\subsection{Automated Citation Check}", StringComparison.Ordinal);
+        int synthesis = tex.IndexOf(@"\subsection{Synthesis Methods}", StringComparison.Ordinal);
+        Assert.True(synthesis > 0 && check > synthesis, "the check follows the synthesis methods");
+        Assert.True(check < tex.IndexOf(@"\section{Characteristics of the Included Studies}", StringComparison.Ordinal), "and it is part of the methodology");
+        Assert.True(check < tex.IndexOf(@"\section{Discussion}", StringComparison.Ordinal));
+        Assert.Single(System.Text.RegularExpressions.Regex.Matches(tex, "The first check judged 4 citations"));
+    }
+
+    [Fact]
     public void AListArtifactIsABulletListAndAFailedOneIsLeftOut()
     {
         var bullets = new PrismaReport

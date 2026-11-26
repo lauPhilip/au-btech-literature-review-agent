@@ -23,7 +23,8 @@ public sealed record GroundingOptions(
 
 /// <summary>
 /// The checked (and possibly repaired) text, every verdict, the counts before the repair, the repair log, and the
-/// citations the second pass removed (no longer in <see cref="Checks"/>, so they are counted on their own).
+/// citations the second pass removed (no longer in <see cref="Checks"/>, so they are counted on their own), and the
+/// counts after each step as one sequence (<see cref="CitationCheckSteps"/>).
 /// </summary>
 public sealed record GroundingResult(
     List<(string Field, string Text)> Fields,
@@ -31,7 +32,8 @@ public sealed record GroundingResult(
     CitationSupportSummary BeforeRepair,
     List<CitationRepair> Repairs,
     List<RemovedCitation> Removed,
-    List<RepairSenseCheck>? Sense = null);
+    List<RepairSenseCheck>? Sense = null,
+    CitationCheckSteps? Steps = null);
 
 /// <summary>
 /// The grounding check, the heart of TraceableAI, shared by every kind of review. Every cited sentence of a text is
@@ -69,15 +71,20 @@ public static class Grounding
             checks = await CitationSupportChecker.CheckAsync(chat, cited, sources, verifiedFindings: verifiedQuotes,
                 parallelism: options.Parallelism, secondCheck: options.SecondCheck, progress: checkProgress, review: options.Review, cache: options.Cache);
         var beforeRepair = CitationSupportSummary.From(checks);
+        var steps = CitationCheckSteps.AfterChecks(checks);
+        int afterFirstRepair = checks.Count, afterSecondPass = checks.Count;
+        bool repaired = false;
 
         var repairs = new List<CitationRepair>();
         var removed = new List<RemovedCitation>();
         if (options.Repair && checks.Any(CitationRepairer.NeedsRepair))
         {
+            repaired = true;
             repairing?.Invoke(checks.Count(CitationRepairer.NeedsRepair));
             using (LlmStage.Begin("citation-repair"))
                 (fields, checks, repairs) = await CitationRepairer.RepairAsync(chat, fields, checks, sources, verifiedQuotes, referenceCount,
                     options.Parallelism, options.SecondCheck, options.Review, cache: options.Cache);
+            afterFirstRepair = afterSecondPass = checks.Count;
             if (checks.Any(CitationRepairer.NeedsRepair))
             {
                 repairing?.Invoke(checks.Count(CitationRepairer.NeedsRepair));
@@ -87,12 +94,14 @@ public static class Grounding
                         options.Parallelism, options.SecondCheck, options.Review, options.Cache);
                 (fields, checks, removed) = (second.Fields, second.Results, second.Removed);
                 repairs.AddRange(second.Repairs);
+                afterSecondPass = checks.Count;
             }
         }
         var sense = new List<RepairSenseCheck>();
         if (options.Repair && options.SenseCheck && repairs.Count > 0)
             (fields, checks, sense) = await RepairSense.CheckAsync(chat, original, fields, checks, repairs, sources, verifiedQuotes, options);
-        return new GroundingResult(fields, checks, beforeRepair, repairs, removed, sense);
+        return new GroundingResult(fields, checks, beforeRepair, repairs, removed, sense,
+            steps.WithRepair(repaired, afterFirstRepair, afterSecondPass, checks.Count, repairs));
     }
 
     /// <summary>
