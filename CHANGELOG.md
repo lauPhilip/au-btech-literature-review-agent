@@ -10,7 +10,7 @@ Each version's section becomes the notes of its GitHub release, so write it for 
 
 A pilot run's title no longer says "Pilot Pilot", and the PRISMA checklist now tells the truth about a pilot run's title. The methods count reviews by their study type, give book chapters their own count instead of calling them journals, and count a study whose DOI is not at Crossref as not checked for retractions, not as a failed check. Some small grammar slips are gone, and the cap on records per source and the research questions are each said once.
 
-The citation check is now told as one story that adds up: what the first check found, what the second check changed, what the repair rewrote or dropped, and how many citations are left. It now sits in the methods, not in the discussion. Table A.1 in main.tex starts with the reference number, so you can match a row to its [n].
+The citation check is now told as one story that adds up: what the first check found, what the second check changed, what the repair rewrote or dropped, and how many citations are left. It now sits in the methods, not in the discussion. 🧮 Table A.1 in main.tex starts with the reference number, so you can match a row to its [n].
 
 ## [0.6.0] - 2026-11-26
 
