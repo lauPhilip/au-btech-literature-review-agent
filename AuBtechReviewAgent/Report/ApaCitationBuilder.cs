@@ -69,7 +69,6 @@ public static partial class ApaCitationBuilder
     {
         string authors = FormatAuthorList(paper.Authors ?? new List<string>());
         int year = ExtractYear(paper.PublishedDate);
-        string yearText = year > 0 ? year.ToString() : "n.d.";
         string title = TitleAsGiven(paper.Title);
         string venue = CleanVenue(paper.JournalSource);
         // A book's record often repeats its title as the venue; the work then stands alone.
@@ -83,6 +82,15 @@ public static partial class ApaCitationBuilder
             if (volumeIssue.Groups["iss"].Success) parsed.Issue = volumeIssue.Groups["iss"].Value;
             if (volumeIssue.Groups["pages"].Success) parsed.Pages = ReferenceDetails.PageRange(volumeIssue.Groups["pages"].Value);
         }
+        else if (JournalRef.Parse(venue) is { } journalRef)
+        {
+            // arXiv's journal reference ("Auton. Agents Multi Agent Syst. 38(1): 4 (2024)"): a preprint's own year is not
+            // the year of the version it names, so that version's year is cited with it (issue #566).
+            venue = journalRef.Name;
+            (parsed.Volume, parsed.Issue, parsed.Pages, parsed.ArticleNumber) = (journalRef.Volume, journalRef.Issue, journalRef.Pages, journalRef.ArticleNumber);
+            if (parsed.ArxivId != null) year = journalRef.Year;
+        }
+        string yearText = year > 0 ? year.ToString() : "n.d.";
         var details = (known ?? new ReferenceDetails()).Or(parsed);
         string link = BuildLink(paper);
 
