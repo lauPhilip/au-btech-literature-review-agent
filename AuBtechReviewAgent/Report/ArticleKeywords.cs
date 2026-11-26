@@ -7,7 +7,7 @@ namespace AuBtechReviewAgent;
 /// The rule, also on wiki page 06: the protocol's topic comes first; then a theme name and a search-string phrase take
 /// turns, so the keywords say both what was looked for and what was found. A search string is split into phrases at its
 /// Boolean operators, brackets, commas and semicolons, and loses its quotes, wildcards and field tags. A phrase is kept
-/// when it has one to five words and is not only stop words. A phrase is dropped when it repeats one already kept, word
+/// when it has one to five words and is not only stop words; a phrase from a search string is kept only when it has at most three words, because a longer one is a whole sentence of search terms ("LLM agent development frameworks"), not a keyword. A phrase is dropped when it repeats one already kept, word
 /// for word or inside it (ignoring case and a plural "s"). At most <see cref="Max"/> are kept; a run with few themes and
 /// one search string has fewer than <see cref="Min"/>, and the front page shows what there is rather than inventing more.
 /// </summary>
@@ -16,6 +16,7 @@ public static class ArticleKeywords
     public const int Min = 4;
     public const int Max = 7;
     private const int MaxWords = 5;
+    private const int MaxSearchWords = 3;
 
     private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(1);
     private static readonly Regex Separators = new(@"(?:^|\s+)(?:AND\s+NOT|AND|OR|NOT)\s+|[()\[\]{};,|]", RegexOptions.CultureInvariant, Timeout);
@@ -36,10 +37,10 @@ public static class ArticleKeywords
     {
         var kept = new List<string>();
         var keys = new List<string>();
-        void Offer(string phrase)
+        void Offer(string phrase, int maxWords = MaxWords)
         {
             if (kept.Count >= Max) return;
-            string shown = Shown(phrase);
+            string shown = Shown(phrase, maxWords);
             if (shown.Length == 0) return;
             string key = " " + Key(shown) + " ";
             if (keys.Any(k => k.Contains(key, StringComparison.Ordinal))) return;
@@ -53,7 +54,7 @@ public static class ArticleKeywords
         for (int i = 0; i < Math.Max(themeList.Count, stringPhrases.Count) && kept.Count < Max; i++)
         {
             if (i < themeList.Count) Offer(themeList[i]);
-            if (i < stringPhrases.Count) Offer(stringPhrases[i]);
+            if (i < stringPhrases.Count) Offer(stringPhrases[i], MaxSearchWords);
         }
         return kept;
     }
@@ -71,10 +72,10 @@ public static class ArticleKeywords
     }
 
     // A word keeps its capitals when it is an acronym or a name with a digit (AI, LLMs, GPT-4); every other word is lower case.
-    private static string Shown(string phrase)
+    private static string Shown(string phrase, int maxWords)
     {
         var words = Space.Split(Junk.Replace(phrase, " ").Trim()).Where(w => w.Length > 0).ToList();
-        if (words.Count == 0 || words.Count > MaxWords || words.All(StopWords.Contains)) return "";
+        if (words.Count == 0 || words.Count > maxWords || words.All(StopWords.Contains)) return "";
         if (words.Sum(w => w.Length) < 3) return "";
         return string.Join(' ', words.Select(w => w.Count(char.IsUpper) > 1 || w.Any(char.IsDigit) ? w : w.ToLowerInvariant()));
     }
