@@ -82,6 +82,12 @@ public static partial class CitationRepairer
                 continue;
             }
             string replacement = others ? badRefs.Aggregate(text, RemoveReference) : "";
+            if (replacement == text)
+            {
+                repairs.Add(new CitationRepair(field, text, text, "not applied", badRefs, verdicts,
+                    "Still not supported after the repair, but removing the citation left the sentence unchanged; the sentence keeps its verdict.", 2));
+                continue;
+            }
             if (!Replace(texts, field, text, replacement))
             {
                 repairs.Add(new CitationRepair(field, text, text, "not applied", badRefs, verdicts, "The sentence was not found in the section text.", 2));
