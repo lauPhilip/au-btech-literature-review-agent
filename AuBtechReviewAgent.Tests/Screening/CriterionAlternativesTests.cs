@@ -95,4 +95,29 @@ public class CriterionAlternativesTests
         Assert.Equal("A record that does not meet a part of the inclusion thresholds cannot be Included.",
             CriterionParts.Problem(Included(Framework, Part("with some form of evaluation", "no")), Inclusion));
     }
+
+    [Fact]
+    public async Task TheScreenerIsToldThatOneAlternativeIsEnough()
+    {
+        var prompts = new List<string>();
+        var chat = new FakeChatService().RespondsWith(p => { prompts.Add(p); return """{"decision":"Included","reasoning":"r","briefSummary":"s"}"""; });
+        await PrismaReviewEngine.ScreenPaperAsync(chat, Paper, Inclusion, "none");
+
+        Assert.Contains(CriterionParts.AlternativesRule.Trim(), prompts[0]);
+    }
+
+    [Fact]
+    public async Task TheScreeningUsesTheCriterionToFindTheTwoSidesOfAnOr()
+    {
+        var chat = new FakeChatService().RespondsWith(_ => """
+            {"decision":"Included","reasoning":"r","briefSummary":"s","confidence":"high",
+             "criteriaParts":[{"part":"agent framework","met":"yes","quote":"We describe a multi-agent framework"},
+                              {"part":"orchestration loop","met":"unclear"},
+                              {"part":"with some form of evaluation","met":"yes","quote":"An evaluation on 40 repositories measures detection rates"}]}
+            """);
+        var answer = await PrismaReviewEngine.ScreenPaperAsync(chat, Paper, Inclusion, "none");
+
+        Assert.Equal("Included", answer.Decision);
+        Assert.Equal("Checked as an alternative to \"agent framework\"; one alternative is enough.", answer.CriteriaParts![1].Note);
+    }
 }
