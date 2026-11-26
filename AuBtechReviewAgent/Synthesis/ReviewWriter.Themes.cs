@@ -170,7 +170,7 @@ public static partial class ReviewWriter
             using (LlmStage.Begin("theme-sections"))
             {
                 void Note(string message) => (coverage.WritingNotes ??= new()).Add(message);
-                var answer = await LlmJson.GetAsync<SectionAnswer>(chat, prompt, LlmJson.JsonMode(0.3), WithSoftGuard(WithSoftGuard<SectionAnswer>(a =>
+                var answer = await LlmJson.GetAsync<SectionAnswer>(chat, prompt, LlmJson.JsonMode(0.3), WithSoftGuards<SectionAnswer>(a =>
                 {
                     if (string.IsNullOrWhiteSpace(a.Text)) return "text must not be empty.";
                     var cited = ThematicSynthesis.CitedIn(a.Text);
@@ -178,8 +178,8 @@ public static partial class ReviewWriter
                     var outside = cited.Where(r => r < 1 || r > referenceCount).ToList();
                     if (outside.Count > 0) return $"citation numbers {string.Join(", ", outside)} are not in the reference list.";
                     return CitationLoadSendBack(a.Text, "subsection", Note);
-                }, a => ListingProblem(a.Text!, theme.Sources.Count, profile), "subsection", "a list of one-source summaries", Note),
-                    a => UnquantifiedFindingProblem(a.Text!, evidence), "subsection", "a result without its figures", Note), repairAttempts: 2);
+                }, "subsection", Note, 2, (a => ListingProblem(a.Text!, theme.Sources.Count, profile), "a list of one-source summaries"),
+                    (a => UnquantifiedFindingProblem(a.Text!, evidence), "a result without its figures")), repairAttempts: 2);
                 text = MethodsSectionWriter.StripMarkdownEmphasis(answer.Text!.Trim());
                 // The heading is always the theme's name from the codebook, set in code, so the subsection, the overview
                 // and the evidence map name a theme the same way (issue #165). The model's own heading is not used.
