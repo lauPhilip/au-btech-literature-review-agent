@@ -25,13 +25,19 @@ public static class SearchAdequacy
                           || state.Stats.TotalIdentified < MinRecordsIdentified);
 
     /// <summary>Why the run is a pilot, counted from the ledger; empty when it is not.</summary>
-    public static string Reason(ReviewState? state)
+    public static string Reason(ReviewState? state) => ReasonText(state, false);
+
+    // The limitations paragraph already says "The search took at most N records per source" (MethodsSectionWriter), so
+    // its pilot sentence names the cap in other words instead of saying it twice.
+    private static string ReasonText(ReviewState? state, bool capAlreadySaid)
     {
         if (!IsPilot(state)) return "";
         var s = state!;
         var parts = new System.Collections.Generic.List<string>();
         if (s.MaxResultsPerSource > 0 && s.MaxResultsPerSource < MinRecordsPerSource)
-            parts.Add($"took at most {s.MaxResultsPerSource} record{(s.MaxResultsPerSource == 1 ? "" : "s")} per source");
+            parts.Add(capAlreadySaid
+                ? $"was capped below the {MinRecordsPerSource} records per source that a full search needs"
+                : $"took at most {s.MaxResultsPerSource} record{(s.MaxResultsPerSource == 1 ? "" : "s")} per source");
         if (s.Stats.TotalIdentified < MinRecordsIdentified)
             parts.Add($"identified {s.Stats.TotalIdentified} record{(s.Stats.TotalIdentified == 1 ? "" : "s")}");
         return string.Join(" and ", parts);
@@ -39,7 +45,7 @@ public static class SearchAdequacy
 
     /// <summary>The limitations sentence of a pilot run; empty otherwise.</summary>
     public static string LimitationSentence(ReviewState? state) => IsPilot(state)
-        ? $"This was a pilot run, not a comprehensive search: the search {Reason(state)}, so relevant studies are likely to be missing and the findings show what a small sample of the literature says, not the state of the field. "
+        ? $"This was a pilot run, not a comprehensive search: the search {ReasonText(state, true)}, so relevant studies are likely to be missing and the findings show what a small sample of the literature says, not the state of the field. "
         : "";
 
     /// <summary>The fact line for the abstract of a pilot run; empty otherwise.</summary>
@@ -48,7 +54,7 @@ public static class SearchAdequacy
         : "";
 
     // "A Systematic Literature Review", "a systematic review", "Systematic Mapping Review".
-    private static readonly Regex ReviewClaim = new(@"\b(?:an?\s+)?systematic\s+(?:literature\s+|mapping\s+)?review\b",
+    private static readonly Regex ReviewClaim = new(@"\b(?:(?:an?\s+)?pilot\s+|an?\s+)?systematic\s+(?:literature\s+|mapping\s+)?review\b",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     /// <summary>
@@ -60,6 +66,7 @@ public static class SearchAdequacy
         if (!IsPilot(state) || string.IsNullOrWhiteSpace(title)) return title;
         return ReviewClaim.Replace(title, m =>
         {
+            // A "pilot" the model already wrote in front of the claim is taken in, so it is not said twice.
             bool article = Regex.IsMatch(m.Value, @"^an?\s", RegexOptions.IgnoreCase);
             bool titleCase = Regex.IsMatch(m.Value, @"\bSystematic\b");
             string phrase = titleCase ? "Pilot Systematic Search" : "pilot systematic search";
