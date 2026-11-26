@@ -214,6 +214,12 @@ public class ArtifactAndProseTests : IDisposable
             Assert.Contains("artifact-n2", fields);
         }
 
+        // The box "Safe orchestration" cites nothing, so no study can state either link: both are the review's reading (#571).
+        Assert.All(art.Edges, e => Assert.Equal(ArtifactLinks.Reading, e.Check));
+        Assert.Contains("-.->", art.Mermaid);
+        Assert.Contains("Each of its 2 links was checked", report.SynthesisMethodsItem);
+        Assert.Contains("No study is cited by both boxes", File.ReadAllText(Path.Join(folder, ArtifactLinks.FileName)));
+
         var state = engine.LoadState(runId)!;
         Assert.Equal(ArtifactKinds.ConceptMap, state.ArtifactKind);
         Assert.Equal("Map agent loop safety", state.ReviewObjective);
@@ -226,6 +232,8 @@ public class ArtifactAndProseTests : IDisposable
         using var tex = new StreamReader(archive.GetEntry("main.tex")!.Open());
         string latex = tex.ReadToEnd();
         Assert.Contains(@"\node[box] (n1)", latex);
+        Assert.Contains(@"\draw[->, thick, dashed]", latex);
+        Assert.NotNull(archive.GetEntry(ArtifactLinks.FileName));
         Assert.Contains("How safety mechanisms relate", latex);
     }
 
