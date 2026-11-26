@@ -81,6 +81,9 @@ public partial class RunMetrics
         m.Repaired = s.CitationsRepaired;
         m.Removed = s.CitationsRemoved;
         m.OutsideTheme = s.CitationsOutsideTheme;
+        m.SelfCheckPassed = s.SelfCheckPassed;
+        m.SelfCheckNotes = s.SelfCheckNotes;
+        m.SelfCheckFaults = s.SelfCheckFaults;
         m.InvalidMarkersStripped = strippedMarkers;
 
         if (report != null)

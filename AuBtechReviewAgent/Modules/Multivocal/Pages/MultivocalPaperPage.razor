@@ -207,7 +207,7 @@ else
                             @foreach (var reference in references)
                             {
                                 var current = reference;
-                                <li id="@($"ref-{current.Number}")" class="break-words">[@current.Number] @ReferenceLine(current)</li>
+                                <li id="@($"ref-{current.Number}")" class="break-words">[@current.Number] <LinkedText Text="@ReferenceLine(current)" /></li>
                             }
                         </ol>
                     </section>
