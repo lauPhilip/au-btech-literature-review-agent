@@ -186,7 +186,7 @@ else
     /// </summary>
     internal RenderFragment CitedText(string field, string text) => __builder =>
     {
-        <CitedProse Field="@field" Text="@text" Checks="auditChecks" Open="openCitation"
+        <CitedProse Field="@field" Text="@text" Checks="auditChecks" Open="openCitation" MarkUnconfirmed="true"
                     OnToggle="@(c => ToggleCitation(c.Field, c.Sentence, c.Reference))" OnClose="CloseCitation"
                     SourceTitle="SourceTitleOf"
                     SourceLink="SourceLink" PanelExtras="CitationExtras"

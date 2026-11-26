@@ -94,6 +94,28 @@ public partial class PrismaReviewEngine
         }
 
         // The reviewer's checked edits (report-edits.json) go into main.tex; a run without edits is written as before.
-        return ReportEdits.Apply(report, LoadReportEdits(sessionId));
+        // Then each sentence whose citation the check did not confirm gets a dagger and a footnote, from the verdicts of
+        // the text as it reads now.
+        var edits = LoadReportEdits(sessionId);
+        return CitationMarkers.MarkUnconfirmed(ReportEdits.Apply(report, edits), ReportEdits.Checks(LoadSupportChecks(sessionId), edits));
+    }
+
+    /// <summary>The final verdicts of citation-audit.json; none when the file is missing or cannot be read.</summary>
+    private List<CitationSupportResult> LoadSupportChecks(Guid sessionId)
+    {
+        string path = Path.Join(GetWorkspaceFolderPath(sessionId), "citation-audit.json");
+        if (!File.Exists(path)) return new();
+        try
+        {
+            using var doc = JsonDocument.Parse(File.ReadAllText(path));
+            return doc.RootElement.TryGetProperty("SupportChecks", out var checks)
+                ? JsonSerializer.Deserialize<List<CitationSupportResult>>(checks.GetRawText()) ?? new()
+                : new();
+        }
+        catch (Exception ex) when (ex is JsonException or IOException)
+        {
+            _log.LogWarning("Archive: could not read citation-audit.json: {Message}", SanitizeLogMessage(ex.Message));
+            return new();
+        }
     }
 }

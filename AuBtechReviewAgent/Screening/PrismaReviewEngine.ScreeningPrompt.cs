@@ -18,19 +18,20 @@ public partial class PrismaReviewEngine
     {
         bool noAbstract = string.IsNullOrWhiteSpace(paper.Abstract);
         string prompt = ScreeningPrompt(paper, inclusionCriteria, exclusionCriteria, secondScreener);
+        string? Parts(ScreeningAnswer a) => CriterionParts.Problem(a, inclusionCriteria);
 
         if (!noAbstract)
-            return (await LlmJson.GetAsync<ScreeningAnswer>(chatService, prompt, JsonMode(0.0), ScreeningAnswer.Validate)).Normalized();
+            return CriterionParts.Apply((await LlmJson.GetAsync<ScreeningAnswer>(chatService, prompt, JsonMode(0.0), a => ScreeningAnswer.Validate(a) ?? Parts(a))).Normalized(), paper);
 
         // A record without an abstract: an answer that still describes one is sent back. If the model keeps doing
         // it, the decision is kept but its reason is flagged, so a reader knows not to trust that part (issue #132).
         try
         {
-            return (await LlmJson.GetAsync<ScreeningAnswer>(chatService, prompt, JsonMode(0.0), ScreeningAnswer.ValidateWithoutAbstract)).Normalized();
+            return CriterionParts.Apply((await LlmJson.GetAsync<ScreeningAnswer>(chatService, prompt, JsonMode(0.0), a => ScreeningAnswer.ValidateWithoutAbstract(a) ?? Parts(a))).Normalized(), paper);
         }
         catch (LlmOutputException)
         {
-            var answer = (await LlmJson.GetAsync<ScreeningAnswer>(chatService, prompt, JsonMode(0.0), ScreeningAnswer.Validate)).Normalized();
+            var answer = CriterionParts.Apply((await LlmJson.GetAsync<ScreeningAnswer>(chatService, prompt, JsonMode(0.0), a => ScreeningAnswer.Validate(a) ?? Parts(a))).Normalized(), paper);
             if (ScreeningAnswer.ClaimsAnAbstract(answer.Reasoning) || ScreeningAnswer.ClaimsAnAbstract(answer.BriefSummary))
                 answer.Reasoning = AbstractClaimWarning + " " + answer.Reasoning;
             return answer;
@@ -70,9 +71,11 @@ public partial class PrismaReviewEngine
             {{PromptSafety.Wrap(record, "paper metadata and abstract")}}
             {{noAbstractNotice}}
             {{procedure}}
+            {{CriterionParts.Procedure}}
             (The reference string is built separately from the source metadata - do not write one.)
 
             {{ScreeningAnswerFormat}}
+            {{CriterionParts.AnswerField}}
             """;
     }
 

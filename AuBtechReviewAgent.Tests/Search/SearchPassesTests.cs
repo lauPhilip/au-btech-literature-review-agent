@@ -38,12 +38,29 @@ public class SearchPassesTests : IDisposable
         public Task<List<AcademicPaper>> FetchPapersAsync(string query, int maxResults = 5) => throw new HttpRequestException("connection refused");
     }
 
-    private PrismaReviewEngine Engine(IAcademicSource source) => new("test-key", "", null, null, null, new RunsOptions())
+    /// <summary>A source that answers each search string with the records listed for it.</summary>
+    private sealed class ScriptedSource(string name, Dictionary<string, AcademicPaper[]> answers) : IAcademicSource
+    {
+        public List<string> Calls { get; } = new();
+        public string SourceName => name;
+        public Task<List<AcademicPaper>> FetchPapersAsync(string query, int maxResults = 5)
+        {
+            lock (Calls) Calls.Add(query);
+            return Task.FromResult(answers.TryGetValue(query, out var papers) ? papers.ToList() : new List<AcademicPaper>());
+        }
+    }
+
+    private static AcademicPaper Paper(string id, string title, int year, string? doi = null) =>
+        new(id, title, "An abstract about agent frameworks.", $"Published: {year}", new() { "Jane Doe" }, "Journal") { Doi = doi };
+
+    private PrismaReviewEngine Engine(IAcademicSource source) => Engine(_ => source);
+
+    private PrismaReviewEngine Engine(Func<string, IAcademicSource> sources) => new("test-key", "", null, null, null, new RunsOptions())
     {
         WorkspaceRoot = _root,
         ChatFactory = _ => new FakeChatService().RespondsWith(prompt =>
             prompt.Contains("Evaluate the following academic paper") ? """{"decision":"Included","reasoning":"ok","briefSummary":"s"}""" : "{}"),
-        SourceFactory = _ => source,
+        SourceFactory = sources,
         FullTextFetcher = (_, _) => Task.FromResult(new FullTextResult(Array.Empty<DocumentChunk>(), "none (test)", null)),
     };
 
@@ -108,5 +125,40 @@ public class SearchPassesTests : IDisposable
             Assert.Null(l.RawResponseFile);
         });
         Assert.Equal(0, state.Stats.TotalIdentified);
+    }
+
+    [Fact]
+    public async Task ADuplicateAndARecordOutsideTheYearsDoNotUseUpTheCapOfRun289a0d3e()
+    {
+        // Run 289a0d3e: Crossref's two records for the first two strings were a duplicate of a Semantic Scholar record
+        // and a record from 2006, so Crossref sent nothing to screening and the last two strings were never run (#562).
+        var shared = Paper("S2_1817", "Agentic AI Frameworks for Autonomous Enterprise Software Development Workflows", 2025, "10.63282/3050-9416.ijaibdcms-v6i1p122");
+        var s2 = new ScriptedSource("Semantic Scholar", new()
+        {
+            ["agentic AI software frameworks"] = new[] { shared },
+            ["autonomous multi-agent system frameworks"] = new[] { Paper("S2_ba27", "Large Language Model Based Multi-Agent System Augmented Complex Event Processing Pipeline", 2024) },
+        });
+        var crossref = new ScriptedSource("Crossref", new()
+        {
+            ["agentic AI software frameworks"] = new[] { shared with { Id = "CROSSREF_10.63282/3050-9416.ijaibdcms-v6i1p122" } },
+            ["autonomous multi-agent system frameworks"] = new[] { Paper("CROSSREF_10.1007/s10458-006-0009-8", "Adaptive decision-making frameworks for dynamic multi-agent organizational change", 2006, "10.1007/s10458-006-0009-8") },
+            ["agent orchestration error recovery"] = new[] { Paper("CROSSREF_a", "Error recovery in agent orchestration", 2024) },
+            ["evaluating framework fault tolerance"] = new[] { Paper("CROSSREF_b", "Evaluating the fault tolerance of agent frameworks", 2025) },
+        });
+        var engine = Engine(key => key == "crossref" ? crossref : s2);
+        var runId = Guid.NewGuid();
+        await engine.RunReviewAsync(runId, new ReviewRequest("agentic AI software frameworks", "o", "i", "e", 2,
+            SelectedSources: new[] { "semanticscholar", "crossref" }, DualScreening: false, YearFrom: 2020, YearTo: 2026,
+            SearchStrings: new[] { "autonomous multi-agent system frameworks", "agent orchestration error recovery", "evaluating framework fault tolerance" }));
+        var state = engine.LoadState(runId)!;
+
+        // Semantic Scholar filled its cap of 2 after two strings and stopped; Crossref went on until it had 2 kept records.
+        Assert.Equal(new[] { "agentic AI software frameworks", "autonomous multi-agent system frameworks" }, s2.Calls);
+        Assert.Equal(4, crossref.Calls.Count);
+        Assert.Equal(1, state.Stats.DuplicatesRemoved);
+        Assert.Equal(1, state.Stats.OutsideDateRange);
+        Assert.Equal(0, state.Stats.CappedBeyondMaxResults);
+        Assert.Equal(new[] { "S2_1817", "S2_ba27", "CROSSREF_a", "CROSSREF_b" }, state.Phases.Screening.Select(l => l.PaperId));
+        Assert.Equal(new[] { 2, 2, 1, 1 }, state.SearchStringYields.Select(y => y.Searches));
     }
 }

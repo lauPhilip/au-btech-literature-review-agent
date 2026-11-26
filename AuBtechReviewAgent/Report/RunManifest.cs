@@ -219,13 +219,16 @@ public static class ProtocolWriter
     {
         var sb = new StringBuilder();
         sb.AppendLine();
-        sb.AppendLine($"## Amendment {utc:yyyy-MM-dd HH:mm:ss} UTC: search strings used");
+        sb.AppendLine($"## Amendment {utc:yyyy-MM-dd HH:mm:ss} UTC: search strings planned");
         sb.AppendLine();
         sb.AppendLine(reviewedByReviewer
             ? "The person running the review saw the extra search strings before the run and approved or edited them."
             : "The extra search strings were proposed by the language model during the run.");
         sb.AppendLine();
         foreach (var s in searchStrings) sb.AppendLine($"- \"{s}\"");
+        sb.AppendLine();
+        // Written before the search, so it cannot say which strings ran; the search log does (issue #562).
+        sb.AppendLine("The strings are run in this order. A source stops taking further strings once its cap is filled, so a later string may not be run against every source; the search log in the run ledger lists every search that was made.");
         return sb.ToString();
     }
 }
