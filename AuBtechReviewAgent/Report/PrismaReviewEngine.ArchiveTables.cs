@@ -11,17 +11,6 @@ public partial class PrismaReviewEngine
     /// <summary>What the declarations say for a run made before protocols were written, on the report page and in main.tex.</summary>
     public const string NoProtocolText = "No protocol was recorded for this run (it was made before protocols were written).";
 
-    /// <summary>What main.tex says under Competing Interests (PRISMA 2020 item 26) when the server sets no statement.</summary>
-    public const string NoCompetingInterestsText =
-        "Not reported by the reviewer. The tool does not ask for a statement on competing interests; it can be set in the Report:CompetingInterestsStatement configuration value.";
-
-    /// <summary>The competing-interests statement from Report:CompetingInterestsStatement; null or empty means none was given.</summary>
-    public string? CompetingInterestsStatement { get; init; }
-
-    /// <summary>The statement under Competing Interests, in main.tex and on the report page.</summary>
-    public string CompetingInterestsText =>
-        string.IsNullOrWhiteSpace(CompetingInterestsStatement) ? NoCompetingInterestsText : CompetingInterestsStatement.Trim();
-
     /// <summary>The key to Table A.3, printed in the note under the table.</summary>
     public const string AppraisalTableKey =
         "Columns 1 to 5 are the five MMAT 2018 criteria for the study's category, answered Yes, No or ? (can't tell). Met is the number answered Yes; it is not an overall score.";
