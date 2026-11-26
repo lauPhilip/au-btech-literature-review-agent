@@ -1,6 +1,6 @@
 @* The top bar of every page: a "Skip to content" link for keyboard users (it jumps to the element with id="main"),
-   the bare mark and the name linking to the landing page, and the three places of the app with the current one
-   marked. Under 640 px the places fold into a menu button. The landing page shows the bar without the places
+   the bare mark and the name linking to the landing page, and the four places of the app with the current one
+   marked (New review, Review output, Example reports and Metrics; the trust pages stay in the footer). Under 768 px the places fold into a menu button. The landing page shows the bar without the places
    (ShowNav="false"). The theme toggle is shown where the layout asks for it (ShowThemeToggle):
    always on the landing page, and on the app pages while ThemeToggle.OfferedOnAppPages is on (since step 12).
 
@@ -22,7 +22,7 @@
             @if (ShowNav)
             {
                 <nav aria-label="Main">
-                    <ul class="hidden items-center gap-1 sm:flex">
+                    <ul class="hidden items-center gap-1 md:flex">
                         @foreach (var item in Items)
                         {
                             var place = item;
@@ -30,7 +30,7 @@
                         }
                     </ul>
                     @* A <details> menu opens without a script, so it works on pages that are not interactive. *@
-                    <details class="group relative sm:hidden">
+                    <details class="group relative md:hidden">
                         <summary class="inline-flex h-11 cursor-pointer list-none items-center gap-2 rounded-btn px-3 font-display text-sm font-semibold text-heading hover:bg-active [&::-webkit-details-marker]:hidden">
                             <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true" focusable="false">
                                 <path class="group-open:hidden" d="M4 7h16M4 12h16M4 17h16" />
@@ -57,7 +57,7 @@
 </header>
 
 @code {
-    /// <summary>Which item is the current page: "overview", "dashboard", "output" or "metrics". Empty: follow the address.</summary>
+    /// <summary>Which item is the current page: "overview", "dashboard", "output", "gallery" or "metrics". Empty: follow the address.</summary>
     [Parameter] public string Active { get; set; } = "";
 
     /// <summary>Where New review links to (the run this tab shows, when there is one). Empty: follow the address.</summary>
@@ -66,7 +66,7 @@
     /// <summary>Where Review output links to. Empty: follow the address.</summary>
     [Parameter] public string OutputHref { get; set; } = "";
 
-    /// <summary>Whether the three places are shown; the landing page has only the mark and the theme toggle.</summary>
+    /// <summary>Whether the four places are shown; the landing page has only the mark and the theme toggle.</summary>
     [Parameter] public bool ShowNav { get; set; } = true;
 
     /// <summary>Whether the theme toggle is shown. LandingLayout always asks for it; AppLayout once ThemeToggle.OfferedOnAppPages is on.</summary>
@@ -104,6 +104,7 @@
             "start" => new("dashboard", "/review", "/spec-matrix"),
             "spec-matrix" => new("output", run != null ? $"/review/{run}" : "/review", run != null ? $"/spec-matrix/{run}" : "/spec-matrix"),
             "mlr" or "mlr-paper" or "mlr-report" => new("dashboard", run != null ? $"/mlr/{run}" : "/mlr", "/spec-matrix"),
+            "gallery" => new("gallery", "/review", "/spec-matrix"),
             "metrics" => new("metrics", "/review", "/spec-matrix"),
             _ => new("", "/review", "/spec-matrix"),
         };
@@ -113,6 +114,7 @@
     {
         ("dashboard", "New review", current.DashboardHref),
         ("output", "Review output", current.OutputHref),
+        ("gallery", "Example reports", "/gallery"),
         ("metrics", "Metrics", "/metrics"),
     };
 
