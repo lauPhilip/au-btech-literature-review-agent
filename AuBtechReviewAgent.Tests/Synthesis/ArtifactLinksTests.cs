@@ -110,10 +110,12 @@ public class ArtifactLinksTests
         Assert.Equal("", ArtifactLinks.MethodsSentence(old));
         Assert.Equal("", ArtifactLinks.DashedNote(old));
         Assert.Contains("n1 -->|\"secures\"| n2", ArtifactBuilder.ToMermaid(old));
+        Assert.Contains("every cited box was checked like a sentence of the report. ", AiUseStatement.ArtifactSentence(old));
         Assert.Equal("", ArtifactLinks.MethodsSentence(new ReviewArtifact { Kind = ArtifactKinds.Table }));
 
         old.Edges[0].Check = ArtifactLinks.Supported;
         Assert.Equal(" Its one link was checked as a sentence against the studies that both of its boxes cite, without repair; it is supported. The verdicts are in artifact-links.json.",
             ArtifactLinks.MethodsSentence(old));
+        Assert.Contains("every link was checked against the studies that both of its boxes cite", AiUseStatement.ArtifactSentence(old));
     }
 }
