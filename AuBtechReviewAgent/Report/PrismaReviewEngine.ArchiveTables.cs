@@ -28,7 +28,8 @@ public partial class PrismaReviewEngine
         ab.Append(PaperLatex.TableHead("Included studies", "tab:A.1", @"\textbf{Paper Name} & \textbf{Executive Summary} & \textbf{Inclusion Rationale} & \textbf{Source} & \textbf{Citation (APA 7th)}"));
         foreach (var row in records)
         {
-            string title = EscapeLatexText(row.Title)
+            // In sentence case, as in the reference list (issue #567).
+            string title = EscapeLatexText(ApaCitationBuilder.TitleAsGiven(row.Title))
                 + (string.IsNullOrEmpty(row.IntegrityNote) ? "" : $"\\newline\\textit{{{EscapeLatexText(row.IntegrityNote)}}}");
             string summary = EscapeLatexText(row.Summary);
             string rationale = EscapeLatexText(row.InclusionRationale);
