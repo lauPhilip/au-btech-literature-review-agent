@@ -81,6 +81,9 @@ public sealed class ReviewPaper
     /// review's tables of the included studies (Tables A.1 to A.3, issue #139). Empty means no appendix.
     /// </summary>
     public string AppendixLatex { get; init; } = "";
+
+    /// <summary>Gives every numbered heading a \label (LatexLabels), so the appendix can \ref the section that reports a PRISMA item.</summary>
+    public bool LabelSections { get; init; }
 }
 
 /// <summary>
@@ -153,6 +156,7 @@ public static class PaperLatex
     public static string Build(ReviewPaper paper)
     {
         var sb = new StringBuilder(AiMarking.LatexComment(paper.Models));
+        var labels = paper.LabelSections ? new HashSet<string>() : null;
         sb.AppendLine(@"\documentclass[10pt,a4paper]{article}");
         // T1, the encoding the TeX Gyre fonts below are made for: in the default OT1 encoding "<", ">" and "|" print
         // as "¡", "¿" and "—" in running text (#482).
@@ -213,33 +217,33 @@ public static class PaperLatex
 
         sb.AppendLine(@"\begin{multicols}{2}");
 
-        sb.AppendLine(@"\section{Introduction}");
-        sb.AppendLine(@"\subsection{Rationale}");
+        sb.AppendLine(@"\section{Introduction}" + LatexLabels.Tag("Introduction", labels));
+        sb.AppendLine(@"\subsection{Rationale}" + LatexLabels.Tag("Rationale", labels));
         sb.AppendLine(Escape(paper.Rationale));
-        sb.AppendLine(@"\subsection{Objectives}");
+        sb.AppendLine(@"\subsection{Objectives}" + LatexLabels.Tag("Objectives", labels));
         sb.AppendLine(Escape(paper.Objectives));
 
-        sb.AppendLine(@"\section{Methodology}");
+        sb.AppendLine(@"\section{Methodology}" + LatexLabels.Tag("Methodology", labels));
         foreach (var section in paper.Methods)
         {
-            sb.AppendLine($"\\subsection{{{Escape(section.Heading)}}}");
+            sb.AppendLine($"\\subsection{{{Escape(section.Heading)}}}" + LatexLabels.Tag(section.Heading, labels));
             sb.AppendLine(Body(section));
         }
 
         sb.AppendLine(@"\end{multicols}");
-        sb.AppendLine($"\\section{{{Escape(paper.DataHeading)}}}");
+        sb.AppendLine($"\\section{{{Escape(paper.DataHeading)}}}" + LatexLabels.Tag(paper.DataHeading, labels));
         sb.AppendLine(Escape(paper.DataText));
         sb.AppendLine(@"\vspace{10pt}");
         sb.Append(paper.DataLatex);
 
         sb.AppendLine(@"\begin{multicols}{2}");
-        sb.AppendLine($"\\section{{{Escape(paper.ResultsHeading)}}}");
+        sb.AppendLine($"\\section{{{Escape(paper.ResultsHeading)}}}" + LatexLabels.Tag(paper.ResultsHeading, labels));
         if (!string.IsNullOrWhiteSpace(paper.ResultsOverviewHeading) && !string.IsNullOrWhiteSpace(paper.ResultsText))
-            sb.AppendLine($"\\subsection{{{Escape(paper.ResultsOverviewHeading)}}}");
+            sb.AppendLine($"\\subsection{{{Escape(paper.ResultsOverviewHeading)}}}" + LatexLabels.Tag(paper.ResultsOverviewHeading, labels));
         sb.AppendLine(Escape(paper.ResultsText));
         foreach (var theme in paper.Themes)
         {
-            sb.AppendLine($"\\subsection{{{Escape(theme.Heading)}}}");
+            sb.AppendLine($"\\subsection{{{Escape(theme.Heading)}}}" + LatexLabels.Tag(theme.Heading, labels));
             sb.AppendLine(Body(theme));
         }
         if (!string.IsNullOrWhiteSpace(paper.CoverageNote))
@@ -252,31 +256,31 @@ public static class PaperLatex
             sb.AppendLine(@"\begin{multicols}{2}");
         }
 
-        sb.AppendLine(@"\section{Discussion}");
+        sb.AppendLine(@"\section{Discussion}" + LatexLabels.Tag("Discussion", labels));
         if (!string.IsNullOrWhiteSpace(paper.DiscussionOpeningHeading) && !string.IsNullOrWhiteSpace(paper.Discussion))
-            sb.AppendLine($"\\subsection{{{Escape(paper.DiscussionOpeningHeading)}}}");
+            sb.AppendLine($"\\subsection{{{Escape(paper.DiscussionOpeningHeading)}}}" + LatexLabels.Tag(paper.DiscussionOpeningHeading, labels));
         sb.AppendLine(Escape(paper.Discussion));
         foreach (var note in paper.DiscussionNotes)
         {
-            sb.AppendLine($"\\subsection{{{Escape(note.Heading)}}}");
+            sb.AppendLine($"\\subsection{{{Escape(note.Heading)}}}" + LatexLabels.Tag(note.Heading, labels));
             sb.AppendLine(Body(note));
         }
 
         if (paper.Summary != null)
         {
-            sb.AppendLine($"\\section{{{Escape(paper.Summary.Heading)}}}");
+            sb.AppendLine($"\\section{{{Escape(paper.Summary.Heading)}}}" + LatexLabels.Tag(paper.Summary.Heading, labels));
             sb.AppendLine(Body(paper.Summary));
         }
         if (paper.Conclusion != null)
         {
-            sb.AppendLine($"\\section{{{Escape(paper.Conclusion.Heading)}}}");
+            sb.AppendLine($"\\section{{{Escape(paper.Conclusion.Heading)}}}" + LatexLabels.Tag(paper.Conclusion.Heading, labels));
             sb.AppendLine(Body(paper.Conclusion));
         }
 
-        sb.AppendLine(@"\section{Declarations}");
+        sb.AppendLine(@"\section{Declarations}" + LatexLabels.Tag("Declarations", labels));
         foreach (var declaration in paper.Declarations)
         {
-            sb.AppendLine($"\\subsection{{{Escape(declaration.Heading)}}}");
+            sb.AppendLine($"\\subsection{{{Escape(declaration.Heading)}}}" + LatexLabels.Tag(declaration.Heading, labels));
             sb.AppendLine(Body(declaration));
         }
         sb.AppendLine(@"\end{multicols}");
