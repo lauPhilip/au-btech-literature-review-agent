@@ -87,7 +87,7 @@ public class ReportFallbackTests : IDisposable
         Assert.Equal(Revised, report.SynthesisResultsItem);
         Assert.Equal("Loops and audits complement each other [1, 2].", report.DiscussionItem);
         Assert.Empty(report.SynthesisSections ?? new List<SynthesisSection>());
-        Assert.Equal("Agent Loops: A Systematic Review", report.TitleItem); // the front matter failed, so the draft's title is kept
+        Assert.Equal("Agent Loops: A Pilot Systematic Search", report.TitleItem); // the front matter failed, so the draft's title is kept, renamed for a pilot search (issue #554)
         Assert.Equal("We review 3 papers on agent loops.", report.AbstractItem);
         Assert.Equal("", report.ConclusionItem);
         Assert.Null(state.ThematicSynthesis);
@@ -130,7 +130,7 @@ public class ReportFallbackTests : IDisposable
 
         Assert.Single(prompts, p => p.Contains("elite academic meta-analyst"));
         Assert.True(File.Exists(Path.Join(folder, "grounded-outline.txt")));
-        Assert.Equal("Agent Loops: A Systematic Review", report.TitleItem);
+        Assert.Equal("Agent Loops: A Pilot Systematic Search", report.TitleItem); // three records make a pilot search (issue #554)
         Assert.NotEmpty(report.SynthesisSections!);
     }
 }
