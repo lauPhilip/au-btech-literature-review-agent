@@ -46,7 +46,11 @@ public class DepositArchiveTests : IDisposable
         var record = DepositArchive.Write(new MemoryStream(owner), output);
         output.Position = 0;
         using var zip = new ZipArchive(new MemoryStream(output.ToArray()));
-        var files = zip.Entries.ToDictionary(e => e.FullName, e => new StreamReader(e.Open()).ReadToEnd());
+        var files = zip.Entries.ToDictionary(e => e.FullName, e =>
+        {
+            using var reader = new StreamReader(e.Open());
+            return reader.ReadToEnd();
+        });
         return (files, record, output);
     }
 
