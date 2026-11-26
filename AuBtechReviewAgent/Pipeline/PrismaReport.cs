@@ -83,6 +83,9 @@ public class ResearchAnswer
     public int Number { get; set; }
     public string Question { get; set; } = "";
     public string Answer { get; set; } = "";
+
+    /// <summary>Written in code when the answer cites a secondary study (<see cref="SecondaryStudy.AnswerNote"/>); null otherwise.</summary>
+    public string? Note { get; set; }
 }
 
 // Applied=false means the rewrite was rejected by a guard (for example it changed the length far

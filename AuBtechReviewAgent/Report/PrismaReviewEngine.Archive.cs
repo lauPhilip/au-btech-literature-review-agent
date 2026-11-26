@@ -132,7 +132,7 @@ public partial class PrismaReviewEngine
         bool hasProtocol = File.Exists(Path.Join(GetWorkspaceFolderPath(sessionId), "protocol.md"));
         var paper = new ReviewPaper
         {
-            KindLabel = "AI-GENERATED SYSTEMATIC LITERATURE REVIEW",
+            KindLabel = SearchAdequacy.IsPilot(state) ? "AI-GENERATED PILOT SYSTEMATIC SEARCH" : "AI-GENERATED SYSTEMATIC LITERATURE REVIEW",
             Title = title,
             ProtocolHash = string.IsNullOrWhiteSpace(report.ProtocolHash) ? "not recorded" : report.ProtocolHash,
             Keywords = state == null ? Array.Empty<string>() : ArticleKeywords.From(state.SearchQuery,
@@ -192,6 +192,8 @@ public partial class PrismaReviewEngine
             // The certainty phrase follows the answer, e.g. "(low certainty: 3 studies, two read from the abstract only)".
             string phrase = certainty?.Answers.FirstOrDefault(c => c.Number == a.Number)?.Phrase is { } p ? " " + EscapeLatexText(p) : "";
             latex.AppendLine($"\\noindent\\textbf{{RQ{a.Number}. {EscapeLatexText(a.Question)}}} {EscapeLatexText(a.Answer)}{phrase}\\par\\smallskip");
+            // Written in code when the answer cites a secondary study.
+            if (!string.IsNullOrWhiteSpace(a.Note)) latex.AppendLine($"\\noindent{{\\small\\itshape {EscapeLatexText(a.Note)}}}\\par\\smallskip");
         }
         // Whether the answers hold without the weakest evidence, in plain sentences (the sensitivity check).
         if (certainty != null && EvidenceCertainty.Summary(certainty.Answers, certainty.Rule) is { Length: > 0 } held)

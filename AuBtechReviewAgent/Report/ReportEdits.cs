@@ -141,7 +141,8 @@ public static class ReportEdits
         return copy;
     }
 
-    private static void SetField(PrismaReport report, string field, string text)
+    /// <summary>Puts a field's text back in place; a field FieldText does not know is left as it is.</summary>
+    internal static void SetField(PrismaReport report, string field, string text)
     {
         if (field.StartsWith("synthesis-", StringComparison.Ordinal))
         {

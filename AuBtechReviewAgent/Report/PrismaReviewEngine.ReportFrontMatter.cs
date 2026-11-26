@@ -171,6 +171,7 @@ public partial class PrismaReviewEngine
             $"Screening: {screeningFacts}",
             $"Full text was read for {s.FullTextRetrieved} of the {s.Included} included studies; the others were read from their abstracts.",
         };
+        if (SearchAdequacy.AbstractFact(state) is { Length: > 0 } pilot) lines.Add(pilot);
         if (book != null) lines.Add($"Thematic synthesis: {book.Themes.Count} theme{(book.Themes.Count == 1 ? "" : "s")} from {book.Codes.Count} code{(book.Codes.Count == 1 ? "" : "s")}.");
         if (book is { Uncoded.Count: > 0 }) lines.Add(UnplacedFact(book.Uncoded.Count));
         if (RemovalsBeforeScreening(s).Any(r => r.Label != "duplicates"))
