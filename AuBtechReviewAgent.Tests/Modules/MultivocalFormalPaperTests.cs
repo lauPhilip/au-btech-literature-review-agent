@@ -51,7 +51,7 @@ public class MultivocalFormalPaperTests
     {
         var (_, tex) = await Paper();
 
-        Assert.Contains("What this theme rests on: 3 sources [1–3] (1 grey and 2 academic)", tex);
+        Assert.Matches(@"What this theme rests on: 3 sources~\\cite\{[^,}]+,[^,}]+,[^,}]+\} \(1 grey and 2 academic\)", tex);
         Assert.Contains("with a mean quality of the grey sources of", tex);
     }
 
@@ -60,7 +60,7 @@ public class MultivocalFormalPaperTests
     {
         var (run, tex) = await Paper();
 
-        Assert.Contains(@"\bibitem{ref2} Doe, J., \& Lee, K. (2025). Context summaries for LLM agents.", tex);
+        Assert.Contains(@"} Doe, J., \& Lee, K. (2025). Context summaries for LLM agents.", tex); // its key is that of references.bib
         Assert.Contains($"(abstract only: no open full text was found, so the review read the abstract)", tex);
         string bib = ModuleKit.Text(run.Archive[GreyReferences.BibFile]);
         Assert.Contains("@article{doe2025context,", bib);

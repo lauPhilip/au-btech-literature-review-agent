@@ -272,7 +272,7 @@ public partial class PrismaReviewEngine
             SupportItem = _supportStatement,
             ProtocolHash = finalState.ProtocolHash,
             CitationCheckSummary = checkSentence,
-            AvailabilityItem = $"The code of the tool is openly available at {ToolVersion.RepositoryUrl}. {ToolVersion.PaperSentence(ToolVersion.Current)} The run archive contains the protocol, the raw source responses, the screening ledger, the extraction and appraisal data, the thematic codebook, every model call's fingerprint and a manifest.json with the SHA-256 fingerprint of every file. Journal quartiles are taken from the SCImago Journal Rank (SJR) data (https://www.scimagojr.com)."
+            AvailabilityItem = $"The code of the tool is openly available at {ToolVersion.RepositoryUrl}. {ToolVersion.PaperSentence(ToolVersion.Current)} The run archive contains the protocol, the raw source responses, the screening ledger, the extraction and appraisal data, the thematic codebook, every model call's fingerprint and a manifest.json with the SHA-256 fingerprint of every file. The run archive to share, made for a public repository such as Zenodo or OSF, leaves out the downloaded papers without an open licence, the raw answers of licensed databases and the model call log, holds no abstracts from licensed databases and shortens long quotes; its deposit.json lists every file left out or changed with its SHA-256 in the full archive, which the review's owner keeps. Journal quartiles are taken from the SCImago Journal Rank (SJR) data (https://www.scimagojr.com)."
         };
 
         string ledgerPath = Path.Join(GetWorkspaceFolderPath(sessionId), "stylistic-transformation-ledger.json");

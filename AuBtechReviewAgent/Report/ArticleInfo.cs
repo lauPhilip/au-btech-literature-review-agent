@@ -3,8 +3,8 @@ using System.Globalization;
 namespace AuBtechReviewAgent;
 
 /// <summary>
-/// The front page of a printed report (Components/Paper/ArticleFront.razor): the facts of the article-info box, the
-/// abstract and the keywords, all taken from the run's files in code. It gives the printout a journal article's layout
+/// The front page of a report, on screen and on paper (Components/Paper/ArticleFront.razor): the masthead, the facts of
+/// the article-info box, the abstract and the keywords, all taken from the run's files in code, with no model call. It gives the printout a journal article's layout
 /// but no journal's identity: no publisher, journal, volume, issue or page range, and no DOI, because a run has none
 /// (the Zenodo DOI belongs to the tool, not to a paper it writes). The author is the tool, marked as an AI system.
 /// Each kind of review builds one (<see cref="ForSystematic"/>, MultivocalArticleInfo.For).
@@ -15,12 +15,18 @@ public sealed record ArticleInfo
     public const string Author = "TraceableAI – artificial researcher";
     public const string AuthorNote = "An AI system; the person who planned the review is responsible for its use.";
     public const string NotPeerReviewed = "A literature review written and checked by TraceableAI. It has not been peer reviewed.";
+    /// <summary>The banner under the masthead.</summary>
+    public const string Disclosure = "Preprint written by an AI system. Not peer reviewed. Every claim links to a verbatim quote in the source archive.";
+    /// <summary>What a reader learns about the review's registration; no run is registered.</summary>
+    public const string Registration = "Not registered";
 
     public Guid RunId { get; init; }
     public string Title { get; init; } = "";
     public string Abstract { get; init; } = "";
     /// <summary>"Systematic review", "Multivocal literature review", ...</summary>
     public string Kind { get; init; } = "";
+    /// <summary>The kind of review as the masthead names it; <see cref="Kind"/> when not set.</summary>
+    public string? Series { get; init; }
     /// <summary>The reporting guideline: "PRISMA 2020" or "Garousi et al. (2019)".</summary>
     public string Guideline { get; init; } = "";
     public DateTime? ProtocolWrittenUtc { get; init; }
@@ -33,6 +39,12 @@ public sealed record ArticleInfo
     public string FoundLabel { get; init; } = "records found";
     public int Included { get; init; }
     public string IncludedLabel { get; init; } = "studies included";
+    /// <summary>Records screened on title and abstract, as in the flow diagram; null when the kind of review has no such count.</summary>
+    public int? Screened { get; init; }
+    /// <summary>Included studies whose full text was read, as in the flow diagram; null when not known.</summary>
+    public int? ReadInFull { get; init; }
+    /// <summary>The citation verdicts as the report shows them (<see cref="VerdictTally.ForRun"/>); null when the run has none.</summary>
+    public VerdictTally? Citations { get; init; }
     /// <summary>The SHA-256 fingerprint of protocol.md, or the short hash older runs recorded; empty when none.</summary>
     public string ProtocolFingerprint { get; init; } = "";
     public IReadOnlyList<string> Keywords { get; init; } = Array.Empty<string>();
@@ -42,6 +54,8 @@ public sealed record ArticleInfo
 
     public string ArchivePath => $"api/workspace/{RunId}/archive";
     public string ProtocolPath => $"api/workspace/{RunId}/protocol.md";
+    /// <summary>The decision log: every screened record with its decision and the reason, as RIS.</summary>
+    public string DecisionLogPath => $"api/workspace/{RunId}/screened.ris";
 
     /// <summary>The title for the running header: the part before a colon when it is long enough, cut at a word near 60 characters.</summary>
     public string ShortTitle
@@ -59,6 +73,60 @@ public sealed record ArticleInfo
 
     /// <summary>The run id's first eight characters, as the run is named on the site.</summary>
     public string ShortRunId => RunId.ToString("N")[..8];
+
+    public string MastheadKind => string.IsNullOrWhiteSpace(Series) ? Kind : Series!;
+
+    /// <summary>The tool's version number for the masthead and the byline note ("0.6.0"), or empty when not recorded.</summary>
+    public string Version => ToolVersion.Number(AppVersion) is { Length: > 0 } v && v != "unknown" ? v : "";
+
+    /// <summary>"Run 596541db · v0.6.0", the run as the masthead names it.</summary>
+    public string RunLabel => $"Run {ShortRunId}" + (Version.Length > 0 ? $" · v{Version}" : "");
+
+    /// <summary>The day the report was written, for "Generated ..." in the masthead.</summary>
+    public DateTime? GeneratedUtc => CompletedUtc ?? SearchedUtc ?? ProtocolWrittenUtc;
+
+    /// <summary>The note under the byline: the tool is software, the person who ran it is responsible, the model and how to cite the tool.</summary>
+    public string BylineNote =>
+        "Software, not an author. The person who ran this review is responsible for its use. " +
+        $"Model: {(Models.Count == 0 ? "not recorded" : string.Join(", ", Models))}. " +
+        $"Cite as software: TraceableAI{(Version.Length > 0 ? " v" + Version : "")}.";
+
+    /// <summary>The abstract's paragraphs, with headings when it is structured.</summary>
+    public IReadOnlyList<AbstractPart> AbstractParagraphs => AbstractParts.Split(Abstract);
+
+    /// <summary>
+    /// The groups of the Article info box, each with its label and its lines. A line whose data the run does not have is
+    /// left out, and so is a group with no lines; every number is the one the flow diagram and the citation check give.
+    /// </summary>
+    public IReadOnlyList<(string Label, IReadOnlyList<string> Lines)> InfoGroups()
+    {
+        var groups = new List<(string, IReadOnlyList<string>)>();
+        void Add(string label, params string?[] lines)
+        {
+            var kept = lines.Where(l => !string.IsNullOrWhiteSpace(l)).Select(l => l!).ToList();
+            if (kept.Count > 0) groups.Add((label, kept));
+        }
+        Add("Article history",
+            ProtocolWrittenUtc == null ? null : "Protocol fixed " + ShortDate(ProtocolWrittenUtc),
+            SearchedUtc == null ? null : "Search run " + ShortDate(SearchedUtc),
+            CompletedUtc == null ? null : "Report written " + ShortDate(CompletedUtc));
+        Add("Records",
+            $"{Count(Found)} identified",
+            Screened is int screened ? $"{Count(screened)} screened" : null,
+            $"{Count(Included)} included",
+            ReadInFull is int full && Included > 0 ? $"{Count(full)} of {Count(Included)} read in full" : null);
+        Add("Checks",
+            Citations is { Checked: > 0 } c ? $"Citations {Count(c.Supported)} of {Count(c.Checked)} supported" : null);
+        Add("Keywords", Keywords.ToArray());
+        Add("Registration", Registration);
+        return groups;
+    }
+
+    private static string Count(int n) => n.ToString("N0", CultureInfo.InvariantCulture);
+
+    /// <summary>"25 Nov 2026", the short date of the article history.</summary>
+    public static string ShortDate(DateTime? utc) =>
+        utc is DateTime d ? d.ToString("d MMM yyyy", CultureInfo.InvariantCulture) : "not recorded";
 
     public static string Date(DateTime? utc) =>
         utc is DateTime d ? d.ToString("d MMMM yyyy", CultureInfo.InvariantCulture) : "not recorded";
@@ -99,7 +167,8 @@ public sealed record ArticleInfo
     public static string Absolute(string baseUri, string path) => baseUri.TrimEnd('/') + "/" + path.TrimStart('/');
 
     /// <summary>The systematic review's front page, from its ledger and report.</summary>
-    public static ArticleInfo ForSystematic(Guid runId, ReviewState? state, PrismaReport report, string title, string @abstract, bool hasProtocol)
+    public static ArticleInfo ForSystematic(Guid runId, ReviewState? state, PrismaReport report, string title, string @abstract, bool hasProtocol,
+        VerdictTally? citations = null)
     {
         var models = new[] { state?.RunSettings?.Model, state?.RunSettings?.FastModel }
             .Where(m => !string.IsNullOrWhiteSpace(m)).Select(m => m!.Trim()).Distinct(StringComparer.Ordinal).ToList();
@@ -110,6 +179,7 @@ public sealed record ArticleInfo
             Title = title,
             Abstract = @abstract,
             Kind = "Systematic review",
+            Series = "Systematic literature review",
             Guideline = "PRISMA 2020",
             ProtocolWrittenUtc = state?.Timestamp,
             SearchedUtc = FirstSearch(state),
@@ -120,6 +190,9 @@ public sealed record ArticleInfo
             FoundLabel = "records found",
             Included = state?.Stats.Included ?? 0,
             IncludedLabel = state?.Stats.Included == 1 ? "study included" : "studies included",
+            Screened = state?.Stats.Screened,
+            ReadInFull = state?.Stats.FullTextRetrieved,
+            Citations = citations,
             ProtocolFingerprint = fingerprint == "not recorded" ? "" : fingerprint,
             Keywords = state == null ? Array.Empty<string>() : ArticleKeywords.From(state.SearchQuery,
                 state.SearchPerspectives.Count > 0 ? state.SearchPerspectives : new List<string> { state.SearchQuery },

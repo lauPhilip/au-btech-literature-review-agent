@@ -6,6 +6,18 @@ namespace AuBtechReviewAgent.Tests;
 public class ReportGuardTests
 {
     [Fact]
+    public async Task TheLanguageEditAsksForAcademicProseAndRecordsItsPromptVersion()
+    {
+        var chat = new FakeChatService().Returns("Layers are kept apart [5].");
+        var (text, delta) = await StylisticRefinerUtility.RefineAcademicProseAsync(chat, "Abstract", "Layers are separated [5].");
+
+        Assert.Equal("Layers are kept apart [5].", text);
+        Assert.Equal(StylisticRefinerUtility.PromptVersion, delta.PromptVersion);
+        Assert.Contains("clear, direct academic prose", chat.Prompts[0]);
+        Assert.DoesNotContain("human", chat.Prompts[0]); // it does not ask the model to pass as a person
+    }
+
+    [Fact]
     public void StylisticRewriteThatTurnsATitleIntoAParagraphIsRejected()
     {
         string original = "Agentic AI Software Frameworks: A Systematic Review";
@@ -116,9 +128,10 @@ public class ReportGuardTests
         using var texReader = new StreamReader(archive.GetEntry("main.tex")!.Open());
         string tex = texReader.ReadToEnd();
 
-        int b = tex.IndexOf(@"\bibitem{ref1} Bandi");
-        int p = tex.IndexOf(@"\bibitem{ref2} Pajo");
-        int s = tex.IndexOf(@"\bibitem{ref3} Setiawan");
+        // Each \bibitem has the key of the same work in references.bib.
+        int b = tex.IndexOf("} Bandi, A.");
+        int p = tex.IndexOf("} Pajo, P.");
+        int s = tex.IndexOf("} Setiawan, L.");
         Assert.True(b > 0 && b < p && p < s);
     }
 }

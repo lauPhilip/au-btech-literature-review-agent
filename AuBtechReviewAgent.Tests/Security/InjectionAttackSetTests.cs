@@ -76,14 +76,14 @@ public class InjectionAttackSetTests
     }
 
     /// <summary>
-    /// The known gaps are pinned down as they are: the hidden text is kept and reaches the model inside the markers, and
-    /// the phrase scan flags it. When a gap is closed this test fails; move the case's expectation in the manifest then.
+    /// The known gaps, if any, are pinned down as they are: the hidden text is kept and reaches the model inside the
+    /// markers, and the phrase scan flags it. When a gap is closed, the case's row of the first test above fails; move its
+    /// expectation in the manifest then. The stylesheet (#535) and page-background (#536) gaps are closed.
     /// </summary>
     [Fact]
     public void TheKnownGapsAreKeptButFlagged()
     {
         var gaps = AttackSet.All.Where(c => c.Gap != null).ToList();
-        Assert.Equal(new[] { "page-class-hidden", "page-white-on-page" }, gaps.Select(c => c.Id));
         Assert.All(gaps, c =>
         {
             var (cleaned, flags) = Keep(c);

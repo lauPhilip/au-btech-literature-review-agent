@@ -211,7 +211,7 @@ public class VerificationAndMetricsTests : IDisposable
         // The paper names the same version and says where its code is.
         using var tex = new StreamReader(archive.GetEntry("main.tex")!.Open());
         string mainTex = tex.ReadToEnd().Replace(LatexBreaks.Break, ""); // the text without its line-break points
-        Assert.Contains(ToolVersion.PaperSentence(ToolVersion.Current), mainTex);
+        Assert.Contains(PaperLatex.Prose(ToolVersion.PaperSentence(ToolVersion.Current)).Replace(LatexBreaks.Break, ""), mainTex);
         Assert.Contains(ToolVersion.CodeUrl(ToolVersion.Current), mainTex);
         Assert.DoesNotContain("version " + ToolVersion.Current, mainTex); // no raw build string with the full commit
     }

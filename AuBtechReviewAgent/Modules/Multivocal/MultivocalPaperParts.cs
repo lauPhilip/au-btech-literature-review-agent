@@ -127,7 +127,7 @@ public static partial class MultivocalPaperParts
         sb.AppendLine(@"\begin{adjustbox}{max width=\linewidth}");
         sb.Append(input.Ledger.HasFormalPool ? MultivocalFormalText.FlowTikz(input) : FlowTikz(Flow(input)));
         sb.AppendLine(@"\end{adjustbox}");
-        sb.AppendLine(@"\caption{Flow of sources from the searches to the synthesis}");
+        sb.AppendLine(@"\caption{Flow of sources from the searches to the synthesis}\label{fig:flow}");
         sb.AppendLine(@"\end{figure}");
         sb.AppendLine(@"\vspace{6pt}");
 
@@ -136,17 +136,17 @@ public static partial class MultivocalPaperParts
         sb.AppendLine(@"\begin{minipage}{0.48\textwidth}");
         sb.AppendLine(@"\centering");
         sb.Append(KindChart(input));
-        sb.AppendLine(@"\caption{Extracted sources by kind (bar colour: outlet tier)}");
+        sb.AppendLine(@"\caption{Extracted sources by kind (bar colour: outlet tier)}\label{fig:kinds}");
         sb.AppendLine(@"\end{minipage}\hfill");
         sb.AppendLine(@"\begin{minipage}{0.48\textwidth}");
         sb.AppendLine(@"\centering");
         sb.Append(QualityChart(input));
-        sb.AppendLine(@"\caption{Quality scores of the assessed sources (Table 7 checklist)}");
+        sb.AppendLine(@"\caption{Quality scores of the assessed sources (Table 7 checklist)}\label{fig:quality}");
         sb.AppendLine(@"\end{minipage}");
         sb.AppendLine(@"\end{figure}");
         sb.AppendLine(@"\vspace{6pt}");
 
-        sb.Append(WideTable(MapCounts(input)));
+        sb.Append(WideTable(MapCounts(input), "tab:map-counts"));
         sb.AppendLine(@"\vspace{10pt}");
         return sb.ToString();
     }
@@ -174,9 +174,10 @@ public static partial class MultivocalPaperParts
     // ---------- LaTeX tables ----------
 
     /// <summary>
-    /// A table that fits one of the paper's two columns: equal paragraph columns, small type. Each row is its own
-    /// tabular of the same column widths, stacked without a gap, so the columns can break between rows: a table of
-    /// one block cannot, and a long table ran off the foot of the page (a "Cited" column of 100 sources).
+    /// A table that fits one of the paper's two columns: equal ragged-right columns (the preamble's L type), small type,
+    /// a caption and a label. Each row is its own tabular of the same column widths, stacked without a gap, so the
+    /// columns can break between rows: a table of one block cannot, and a long table ran off the foot of the page (a
+    /// "Cited" column of 100 sources).
     /// </summary>
     public static string ColumnTable(PaperTable table)
     {
@@ -184,44 +185,45 @@ public static partial class MultivocalPaperParts
         var sb = new StringBuilder();
         // Each column gets an equal share of the line less its padding (3pt a side), so the table never runs into the next column.
         string width = (1.0 / table.Headers.Count).ToString("0.###", CultureInfo.InvariantCulture);
-        string columns = @"{@{}" + string.Concat(table.Headers.Select(_ => $@">{{\raggedright\arraybackslash}}p{{\dimexpr{width}\linewidth-6pt\relax}}")) + "@{}}";
-        sb.AppendLine(@"\par\smallskip\noindent{\scriptsize\setlength{\tabcolsep}{3pt}");
-        if (table.Caption.Length > 0) sb.AppendLine(@"\textbf{" + PaperLatex.Escape(table.Caption) + @"}\par\nobreak\vspace{2pt}");
+        string columns = "{@{}" + string.Concat(table.Headers.Select(_ => $"L{{{width}}}")) + "@{}}";
+        sb.AppendLine(@"\par\smallskip\noindent{\scriptsize\setlength{\tabcolsep}{3pt}%");
+        if (table.Caption.Length > 0) sb.AppendLine(@"\captionof{table}{" + PaperLatex.Escape(table.Caption) + @"}\label{tab:" + PaperLatex.Slug(table.Caption) + "}%");
         sb.AppendLine(@"\noindent\begin{tabular}" + columns);
-        sb.AppendLine(@"\toprule");
-        sb.AppendLine(string.Join(" & ", table.Headers.Select(h => @"\textbf{" + PaperLatex.Escape(h) + "}")) + @" \\");
-        sb.AppendLine(@"\midrule");
-        sb.AppendLine(@"\end{tabular}\par\nointerlineskip\nobreak");
+        sb.AppendLine(@"  \toprule");
+        sb.AppendLine("  " + string.Join(" & ", table.Headers.Select(h => @"\textbf{" + PaperLatex.Escape(h) + "}")) + @" \\");
+        sb.AppendLine(@"  \midrule");
+        sb.AppendLine(@"\end{tabular}\par\nointerlineskip\nobreak%");
         foreach (var row in table.Rows)
-            sb.AppendLine(@"\noindent\begin{tabular}" + columns + " " + string.Join(" & ", row.Select(c => PaperLatex.Escape(c))) + @" \\ \end{tabular}\par\nointerlineskip");
+        {
+            sb.AppendLine(@"\noindent\begin{tabular}" + columns);
+            sb.AppendLine("  " + string.Join(" & ", row.Select(c => PaperLatex.Escape(c))) + @" \\");
+            sb.AppendLine(@"\end{tabular}\par\nointerlineskip%");
+        }
         sb.AppendLine(@"\noindent\begin{tabular}" + columns + @" \bottomrule \end{tabular}\par");
-        if (!string.IsNullOrWhiteSpace(table.Note)) sb.AppendLine(@"\vspace{2pt}\noindent\textit{" + Prose(table.Note!) + "}");
+        if (!string.IsNullOrWhiteSpace(table.Note)) sb.AppendLine(@"\vspace{2pt}\noindent\textit{" + PaperLatex.Escape(table.Note!) + "}");
         sb.AppendLine(@"}\par\smallskip");
         return sb.ToString();
     }
 
     /// <summary>A full-width table that can run over pages (ltablex), for the data section between the two-column parts.</summary>
-    public static string WideTable(PaperTable table)
+    public static string WideTable(PaperTable table, string? label = null)
     {
         if (table.Headers.Count == 0) return "";
         var sb = new StringBuilder();
         sb.AppendLine(@"\small");
-        sb.AppendLine(@"\begin{tabularx}{\textwidth}{" + string.Concat(table.Headers.Select(_ => "X")) + "}");
-        sb.AppendLine($@"\multicolumn{{{table.Headers.Count}}}{{l}}{{\textbf{{" + PaperLatex.Escape(table.Caption) + @"}} \\");
-        sb.AppendLine(@"\toprule");
-        sb.AppendLine(string.Join(" & ", table.Headers.Select(h => @"\textbf{" + PaperLatex.Escape(h) + "}")) + @" \\");
-        sb.AppendLine(@"\midrule");
-        sb.AppendLine(@"\endhead");
+        sb.AppendLine(@"\begin{tabularx}{\textwidth}{" + string.Concat(table.Headers.Select(_ => "Y")) + "}");
+        sb.Append(PaperLatex.TableHead(PaperLatex.Escape(table.Caption), label ?? "tab:" + PaperLatex.Slug(table.Caption),
+            string.Join(" & ", table.Headers.Select(h => @"\textbf{" + PaperLatex.Escape(h) + "}"))));
         foreach (var row in table.Rows) sb.AppendLine(string.Join(" & ", row.Select(c => PaperLatex.Escape(c))) + @" \\");
         sb.AppendLine(@"\bottomrule");
         sb.AppendLine(@"\end{tabularx}");
-        if (!string.IsNullOrWhiteSpace(table.Note)) sb.AppendLine(@"\vspace{4pt}\noindent\small\textit{" + Prose(table.Note!) + "}");
+        if (!string.IsNullOrWhiteSpace(table.Note)) sb.AppendLine(@"\vspace{4pt}\noindent\textit{" + PaperLatex.Escape(table.Note!) + @"}\par");
         sb.AppendLine(@"\normalsize");
         return sb.ToString();
     }
 
-    /// <summary>Prose for LaTeX: <see cref="PaperLatex.Escape"/>, which keeps the closing full stop.</summary>
-    public static string Prose(string text) => PaperLatex.Escape(text);
+    /// <summary>Prose for LaTeX: <see cref="PaperLatex.Prose"/>, one sentence per line, which keeps the closing full stop.</summary>
+    public static string Prose(string text) => PaperLatex.Prose(text);
 
     private static MapVersion FixedMap(MultivocalReportInput input) =>
         input.Map.Versions.FirstOrDefault(v => v.Number == input.Map.FixedVersion) ?? input.Map.Latest;

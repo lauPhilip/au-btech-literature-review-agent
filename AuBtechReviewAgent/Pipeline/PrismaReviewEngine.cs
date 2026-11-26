@@ -35,8 +35,8 @@ public partial class PrismaReviewEngine
     // whichever run fired last).
     public event Action<Guid, ReviewStats>? OnProgressUpdated;
 
-    public const string DefaultSupportStatement =
-        "No funding statement has been declared for this review. The funding and support text can be set in the Report:SupportStatement configuration value.";
+    // Without Report:SupportStatement the paper asks the authors for their funding; it never prints configuration advice.
+    public const string DefaultSupportStatement = PaperDeclarations.ToComplete;
 
     private string GetWorkspaceFolderPath(Guid sessionId) => Store.FolderOf(sessionId);
 
@@ -234,6 +234,8 @@ public partial class PrismaReviewEngine
                 stop.ThrowIfCancellationRequested();
                 ctx.State.Stats.ProcessingStage = StageSynthesizing;
                 await PublishAsync(ctx);
+                // A retracted study is excluded before its full text is read (Report/PrismaReviewEngine.Retractions.cs).
+                await CheckRetractionsAsync(ctx);
                 await RetrieveFullTextsAsync(ctx);
                 stop.ThrowIfCancellationRequested();
                 await SynthesizeAsync(ctx);
