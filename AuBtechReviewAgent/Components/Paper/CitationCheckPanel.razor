@@ -43,6 +43,8 @@
         }
     </section>
 
+    @if (ShowDownloads)
+    {
     <section class="ui-card p-5" aria-labelledby="download-panel-title">
         <h2 id="download-panel-title" class="font-display text-base font-semibold text-heading">Download</h2>
         @{ string api = $"/api/workspace/{RunId}"; }
@@ -67,6 +69,7 @@
             }
         </ul>
     </section>
+    }
 </aside>
 
 @code {
@@ -83,6 +86,9 @@
 
     [Parameter, EditorRequired] public Guid RunId { get; set; }
     [Parameter] public bool HasProtocol { get; set; }
+
+    /// <summary>False in the gallery, whose copy outlives the run: the downloads are the run's own files.</summary>
+    [Parameter] public bool ShowDownloads { get; set; } = true;
 
     /// <summary>A grey literature review's paper: its downloads are the manuscript, references, screened sources and data appendix.</summary>
     [Parameter] public bool Multivocal { get; set; }

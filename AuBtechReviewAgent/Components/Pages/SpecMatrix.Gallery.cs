@@ -31,6 +31,9 @@ public partial class SpecMatrix
     internal string ReportFolder() =>
         galleryEntry is { } entry ? Gallery.VersionFolderOf(entry.Id, entry.Version) : Runs.FolderOf(State.CurrentSessionId);
 
+    /// <summary>The report's own address: the version's page in the gallery, the run's page otherwise; the contents list links into it.</summary>
+    internal string ReportHref => galleryEntry is { } entry ? AuBtechReviewAgent.GalleryCard.VersionPath(entry.Id, entry.Version) : $"/spec-matrix/{State.CurrentSessionId}";
+
     /// <summary>The run's ledger, from the same folder as the report.</summary>
     internal AuBtechReviewAgent.ReviewState? LoadLedger() =>
         galleryEntry != null ? AuBtechReviewAgent.GallerySnapshot.LoadLedger(ReportFolder()) : ReviewEngine.LoadState(State.CurrentSessionId);
