@@ -1,0 +1,56 @@
+@* The certainty of the evidence behind each answer, rated in code (AuBtechReviewAgent.EvidenceCertainty): the method and
+   one row per answer with its concerns and reasons. The same table is in main.tex and certainty.json. *@
+
+<div class="space-y-2 max-w-full overflow-hidden">
+    <h3 class="font-display text-base font-semibold text-heading">Certainty of the Evidence</h3>
+    <p class="text-ink">@Certainty.Method</p>
+    <p class="text-ink">@AuBtechReviewAgent.EvidenceCertainty.Summary(Certainty.Answers, Certainty.Rule)</p>
+    <div class="border border-line bg-page overflow-x-auto print:overflow-visible" tabindex="0" role="region" aria-label="Scrolls sideways">
+        <table class="w-full text-left border-collapse text-xs leading-relaxed table-fixed min-w-[700px] print:min-w-0">
+            <thead>
+                <tr class="bg-soft border-b border-line text-ink font-bold font-mono text-xs uppercase">
+                    <th class="p-2 border-r border-line w-[5%]">RQ</th>
+                    <th class="p-2 border-r border-line w-[22%]">Answer in brief</th>
+                    <th class="p-2 border-r border-line w-[12%]">Studies</th>
+                    <th class="p-2 border-r border-line w-[17%]">Concerns</th>
+                    <th class="p-2 border-r border-line w-[12%]">Certainty</th>
+                    <th class="p-2">Reasons</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-line text-ink">
+                @foreach (var a in Certainty.Answers)
+                {
+                    <tr>
+                        <td class="p-2 font-mono text-heading font-bold border-r border-line align-top">RQ@(a.Number)</td>
+                        <td class="p-2 border-r border-line align-top break-words">@a.AnswerInBrief</td>
+                        <td class="p-2 border-r border-line align-top font-mono">@a.Sources.Count @(a.Sources.Count == 0 ? "" : $"({string.Join(", ", a.Sources.Select(r => $"[{r}]"))})")</td>
+                        <td class="p-2 border-r border-line align-top">
+                            @if (a.NotRated == null)
+                            {
+                                @foreach (var line in AuBtechReviewAgent.CertaintyLatex.ConcernLines(a))
+                                {
+                                    <div>@line</div>
+                                }
+                            }
+                            else
+                            {
+                                <span class="text-muted">–</span>
+                            }
+                        </td>
+                        <td class="p-2 border-r border-line align-top font-semibold">@(a.Overall ?? "not rated")</td>
+                        <td class="p-2 align-top space-y-1 break-words">
+                            @foreach (var line in AuBtechReviewAgent.CertaintyLatex.ReasonLines(a))
+                            {
+                                <div>@line</div>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public AuBtechReviewAgent.CertaintyFile Certainty { get; set; } = default!;
+}

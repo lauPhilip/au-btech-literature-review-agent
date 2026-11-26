@@ -11,7 +11,7 @@
 }
 @if (Page.stage == AuBtechReviewAgent.PrismaReviewEngine.StageComplete)
 {
-    <RunSummaryCard Stats="Page.State.Stats" RunId="Page.currentSessionId" Objective="@Page.ObjectiveShown()">
+    <RunSummaryCard Stats="Page.State.Stats" RunId="Page.currentSessionId" Tally="Page.citationTally" Objective="@Page.ObjectiveShown()">
         <Main><FullTextFlagsNote Flags="Page.runInfo?.FullTextFlags" />@Page.LogPanel()</Main>
         <Side>@Page.RunCard()</Side>
     </RunSummaryCard>

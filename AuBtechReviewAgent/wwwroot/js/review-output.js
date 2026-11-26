@@ -183,18 +183,31 @@ document.addEventListener('click', function (e) {
     window.addEventListener('load', function () { setTimeout(mark, 300); });
 })();
 
-// Copy buttons on code blocks (Components/Layout/CodeBlock.razor): data-copy names the element whose text is copied.
-// Delegated from the document, so it works on pages without a live connection and needs no inline script.
+// Copy buttons on code blocks (Components/Layout/CodeBlock.razor) and the report's Cite button
+// (Components/Paper/ArticleFront.razor): data-copy names the element whose text is copied. A button with
+// data-copy-label keeps its icon and changes only its [data-copy-text] part. Delegated from the document, so it works
+// on pages without a live connection and needs no inline script.
 document.addEventListener('click', async function (e) {
     const button = e.target.closest && e.target.closest('[data-copy]');
     if (!button) return;
     const id = button.getAttribute('data-copy');
     const source = document.getElementById(id);
     if (!source) return;
-    const copied = await window.traceableReview.copyText(source.textContent);
+    const copied = await window.traceableReview.copyText(source.textContent.trim());
     const status = document.querySelector('[data-copy-status="' + CSS.escape(id) + '"]');
-    button.textContent = copied ? 'Copied' : 'Copy failed';
+    const label = button.getAttribute('data-copy-label');
+    const part = label !== null ? button.querySelector('[data-copy-text]') : null;
+    const target = part || button;
+    target.textContent = copied ? 'Copied' : 'Copy failed';
     if (status) status.textContent = copied ? 'Copied to the clipboard.' : 'Copying is not allowed here. Select the text and copy it by hand.';
     clearTimeout(button._copyReset);
-    button._copyReset = setTimeout(function () { button.textContent = 'Copy'; if (status) status.textContent = ''; }, 2500);
+    button._copyReset = setTimeout(function () { target.textContent = label !== null ? label : 'Copy'; if (status) status.textContent = ''; }, 2500);
+});
+
+// The report's PDF button (data-print): opens the print window, where "Save as PDF" gives the PDF.
+document.addEventListener('click', function (e) {
+    const button = e.target.closest && e.target.closest('[data-print]');
+    if (!button) return;
+    e.preventDefault();
+    window.print();
 });

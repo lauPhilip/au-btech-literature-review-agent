@@ -58,7 +58,15 @@
             <div class="space-y-2">
                 <h3 class="font-display text-base font-semibold text-heading">RQ@(answer.Number). @answer.Question</h3>
                 @Page.CitedText($"researchAnswer{answer.Number}", answer.Answer)
+                @if (Page.certainty?.Answers.FirstOrDefault(c => c.Number == answer.Number) is { } rated)
+                {
+                    <p class="text-sm text-muted">@rated.Phrase</p>
+                }
             </div>
+        }
+        @if (Page.certainty is { } certainty)
+        {
+            <SpecMatrixCertainty Certainty="certainty" />
         }
         <div class="space-y-2">
             @Page.CitedText("conclusionItem", Page.report.ConclusionItem)
@@ -82,7 +90,7 @@
 
 <div class="space-y-2">
     <h3 class="font-display text-base font-semibold text-heading">@(declarationsNumber).2 Support & Funding (Item 25)</h3>
-    <p class="text-ink">@SpecMatrix.ScrubAnchors(Page.report.SupportItem)</p>
+    <p class="text-ink">@AuBtechReviewAgent.PaperDeclarations.Funding(SpecMatrix.ScrubAnchors(Page.report.SupportItem))</p>
 </div>
 
 <div class="space-y-2">
@@ -103,6 +111,18 @@
         </div>
         <p class="text-ink">@Page.aiStatement</p>
         <p class="text-xs text-muted print:hidden" role="status">@(Page.copyNotice ?? "Edit it to fit your venue's policy on AI use before you submit.")</p>
+    </div>
+}
+
+@* The declarations only the authors can make, as in main.tex (PaperDeclarations). *@
+@{ int placeholderNumber = Page.aiStatement.Length > 0 ? 5 : 4; }
+@foreach (var declaration in AuBtechReviewAgent.PaperDeclarations.Placeholders())
+{
+    var current = declaration;
+    int number = placeholderNumber++;
+    <div class="space-y-2">
+        <h3 class="font-display text-base font-semibold text-heading">@(declarationsNumber).@number @current.Heading</h3>
+        <p class="text-ink">@current.Text</p>
     </div>
 }
 </section>

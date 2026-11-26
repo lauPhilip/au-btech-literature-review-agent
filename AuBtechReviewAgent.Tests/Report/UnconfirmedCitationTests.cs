@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using AuBtechReviewAgent;
@@ -43,7 +44,7 @@ public class UnconfirmedCitationTests : IDisposable
         string marked = CitationMarkers.MarkSentences(text, CitationMarkers.Unconfirmed(checks)["discussionItem"]);
 
         Assert.Equal("Loops recover [1]. Audits help [2]. Both matter [1, 2].", marked);
-        Assert.Equal(@"Loops recover [1].{\renewcommand{\thefootnote}{\dag}\footnote{The automated check could not confirm this citation.}} Audits help [2]. Both matter [1, 2].{\textsuperscript{\dag}}",
+        Assert.Equal(@"Loops recover~\cite{ref1}.{\renewcommand{\thefootnote}{\dag}\footnote{The automated check could not confirm this citation.}} Audits help~\cite{ref2}. Both matter~\cite{ref1,ref2}.{\textsuperscript{\dag}}",
             PaperLatex.Escape(marked));
     }
 
@@ -108,8 +109,10 @@ public class UnconfirmedCitationTests : IDisposable
         File.WriteAllText(auditPath, audit.ToJsonString());
 
         string after = engine.MainTexFromDisk(runId)!.Replace(LatexBreaks.Break, "");
+        // main.tex cites by the keys of references.bib, so the sentence is compared up to its citation.
         string sentence = PaperLatex.Escape(check["Sentence"]!.GetValue<string>());
-        Assert.Contains(sentence + @"{\renewcommand{\thefootnote}{\dag}\footnote{The automated check could not confirm this citation.}}", after);
+        string words = sentence[..sentence.IndexOf(@"~\cite{", StringComparison.Ordinal)];
+        Assert.Matches(Regex.Escape(words) + @"~\\cite\{[^}]+\}\." + Regex.Escape(@"{\renewcommand{\thefootnote}{\dag}\footnote{The automated check could not confirm this citation.}}"), after);
         Assert.Contains("One sentence whose citation the check did not confirm", after);
     }
 }

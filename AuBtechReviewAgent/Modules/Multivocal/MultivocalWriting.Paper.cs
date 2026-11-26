@@ -123,13 +123,13 @@ public sealed partial class MultivocalWriter
         file.SummaryItems = summary?.Items.ToList() ?? new List<string>();
 
         // 6. Last, the title, abstract, rationale and objectives, with the numbers counted in code, the answers and the
-        // conclusion as given text, and the objectives written in code from the questions; then the style pass.
+        // conclusion as given text, and the objectives written in code from the questions; then the language edit.
         Step(6, "the title, abstract and introduction");
         var front = await ReviewWriter.WriteFrontMatterAsync(chat, profile, plan.Topic, goal, FrontMatterFacts(input, sections.Count), forDiscussion, discussion,
             referenceLines, referenceCount, Warn, abstractRule: text => MultivocalFrontMatter.AbstractProblem(text, input) ?? MultivocalRelationship.AbstractProblem(text, input),
             questions: questions, answers: answerTexts, conclusion: file.Conclusion, weakSources: evidence.WeakSources());
         file.Title = front?.Title ?? $"{plan.Topic}: a {plan.ReviewKind}";
-        file.Style.Add(new StyleDeltaLog("Title", file.Title, file.Title, Applied: false, Note: "The title is not sent through the style pass." + (front == null ? " The front-matter step failed; the title is the topic and the kind of review." : "")));
+        file.Style.Add(new StyleDeltaLog("Title", file.Title, file.Title, Applied: false, Note: "The title is not sent through the language edit." + (front == null ? " The front-matter step failed; the title is the topic and the kind of review." : "")));
         using (LlmStage.Begin("style"))
         {
             async Task<string> Refine(string field, string? text)
@@ -144,7 +144,7 @@ public sealed partial class MultivocalWriter
             if (uncited != null) file.Style.Add(uncited);
         }
         file.Objectives = ReviewWriter.ObjectivesFromQuestions(questions, profile) ?? front?.Objectives ?? $"The review set out to {LowerFirst(goal.TrimEnd('.'))}.";
-        file.Style.Add(new StyleDeltaLog("Objectives", file.Objectives, file.Objectives, Applied: false, Note: "Written in code from the research questions in the protocol; not sent through the style pass."));
+        file.Style.Add(new StyleDeltaLog("Objectives", file.Objectives, file.Objectives, Applied: false, Note: "Written in code from the research questions in the protocol; not sent through the language edit."));
         return (file, outline);
     }
 

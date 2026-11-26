@@ -23,6 +23,7 @@ public partial class SpecMatrix
     /// <summary>How many citations the second repair pass removed (RemovedCitations in citation-audit.json).</summary>
     internal int auditRemoved;
     internal AuBtechReviewAgent.ThematicCodebook? codebook;
+    internal AuBtechReviewAgent.CertaintyFile? certainty;
     internal int journalCount, conferenceCount, transactionsCount, proceedingsCount, preprintCount;
 
     internal sealed record PlatformShare(string Category, string Label, int Count, string Color, string Badge);
@@ -65,13 +66,14 @@ public partial class SpecMatrix
 
     internal static string Deg(double d) => d.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
 
-    /// <summary>One line under the title: studies and records, themes, citations checked and the app version.</summary>
-    internal static string RunLine(AuBtechReviewAgent.ReviewState state)
+    /// <summary>One line under the title: studies and records, themes, citations checked (as the report counts them) and the app version.</summary>
+    public static string RunLine(AuBtechReviewAgent.ReviewState state, AuBtechReviewAgent.VerdictTally citations)
     {
         var s = state.Stats;
+        int cited = citations.Checked;
         var parts = new List<string> { $"{s.Included} {(s.Included == 1 ? "study" : "studies")} from {s.TotalIdentified} {(s.TotalIdentified == 1 ? "record" : "records")}" };
         if (s.ThemesIdentified > 0) parts.Add($"{s.ThemesIdentified} {(s.ThemesIdentified == 1 ? "theme" : "themes")}");
-        if (s.CitationsChecked > 0) parts.Add($"{s.CitationsChecked} {(s.CitationsChecked == 1 ? "citation" : "citations")} checked");
+        if (cited > 0) parts.Add($"{cited} {(cited == 1 ? "citation" : "citations")} checked");
         string? version = state.RunSettings?.AppVersion;
         if (!string.IsNullOrWhiteSpace(version)) parts.Add("TraceableAI " + AuBtechReviewAgent.ToolVersion.Display(version));
         return string.Join(" · ", parts);
@@ -117,6 +119,8 @@ public partial class SpecMatrix
             catch (Exception ex) when (ex is JsonException or IOException) { auditChecks.Clear(); rechecks = new(); }
         }
         rechecksLeft = auditChecks.Count == 0 ? 0 : Math.Max(0, AuBtechReviewAgent.PrismaReviewEngine.MaxRechecksPerRun - rechecks.Count);
+        // The front page's count follows a re-check or an edit, as the rest of the page does.
+        if (articleInfo != null) articleInfo = articleInfo with { Citations = AuBtechReviewAgent.VerdictTally.From(auditChecks, auditRemoved) };
 
         string reportPath = Path.Join(folder, "prisma-report.json");
         if (reloadReport && File.Exists(reportPath))
@@ -168,7 +172,7 @@ public partial class SpecMatrix
         galleryEntry = null;
         if (InGallery)
         {
-            galleryEntry = Gallery.Find(GalleryId);
+            galleryEntry = FindGalleryEntry();
             if (galleryEntry == null) { report = new PrismaReport(); return; }
         }
         else if (RunId is Guid id && id != Guid.Empty)
@@ -188,6 +192,7 @@ public partial class SpecMatrix
         extractions.Clear();
         auditChecks.Clear();
         codebook = null;
+        certainty = null;
         publicationsByYear = new();
         platformShares = new();
         journalCount = conferenceCount = transactionsCount = proceedingsCount = preprintCount = 0;
@@ -228,21 +233,23 @@ public partial class SpecMatrix
         var state = LoadLedger();
         // The gallery shows a copy whose run may be gone, so its printout keeps the screen header instead of links to the run.
         if (HasReport && !InGallery)
-            articleInfo = AuBtechReviewAgent.ArticleInfo.ForSystematic(ReportRunId, state, report, ScrubAnchors(report.TitleItem), ScrubAnchors(report.AbstractItem), hasProtocol);
+            articleInfo = AuBtechReviewAgent.ArticleInfo.ForSystematic(ReportRunId, state, report, ScrubAnchors(report.TitleItem), ScrubAnchors(report.AbstractItem), hasProtocol,
+                AuBtechReviewAgent.VerdictTally.From(auditChecks, auditRemoved));
         if (state == null) return;
 
         peerReviewOnlyToggle = state.PeerReviewOnlyToggle;
         stats = state.Stats;
         flow = AuBtechReviewAgent.PrismaFlowCounts.From(state);
-        runLine = RunLine(state);
+        runLine = RunLine(state, AuBtechReviewAgent.VerdictTally.From(auditChecks, auditRemoved));
         dateLine = state.CompletedUtc is DateTime done ? done.ToString("d MMMM yyyy", System.Globalization.CultureInfo.InvariantCulture) : "";
-        aiStatement = AuBtechReviewAgent.AiUseStatement.Methods(state, ReportRunId, editLog);
+        aiStatement = AuBtechReviewAgent.AiUseStatement.Methods(state, ReportRunId, editLog, report.Artifact);
         aiShort = AuBtechReviewAgent.AiUseStatement.Short(state);
         researchQuestions = state.ResearchQuestions?.ToList() ?? new List<string>();
         passedPeerReviewCheck = state.Stats.PassedPeerReviewCheck;
         failedPeerReviewCheck = state.Stats.FailedPeerReviewCheck;
         if (state.Extractions != null) extractions.AddRange(state.Extractions);
         codebook = state.ThematicSynthesis;
+        certainty = AuBtechReviewAgent.SystematicCertainty.Assess(report, codebook, extractions);
 
         // Older runs have ReferenceNumber = 0 everywhere; OrderBy is stable, so they keep their order.
         tableRecords.AddRange(state.SynthesizedRecords.OrderBy(r => r.ReferenceNumber));

@@ -106,13 +106,15 @@ public class FrameTests
     public async Task TheFooterHasTheTrustPagesOrTheLandingLinks()
     {
         string app = await RenderAsync<SiteFooter>("review");
-        foreach (var href in new[] { "/about", "/model-card", "/privacy", "/verify", "/glossary", SiteSeo.RepositoryUrl })
+        foreach (var href in new[] { "/about", "/model-card", "/privacy", "/verify", "/glossary", "/accessibility", SiteSeo.RepositoryUrl })
             Assert.Contains($"href=\"{href}\"", app);
 
         string landing = await RenderAsync<SiteFooter>("", new() { ["Landing"] = true });
         Assert.Contains("OSSYM 2026", landing);
         Assert.Contains("href=\"/metrics\"", landing);
-        Assert.DoesNotContain("href=\"/privacy\"", landing);
+        // Privacy and the accessibility statement are on every page, the landing page too (issues #543, #544).
+        Assert.Contains("href=\"/privacy\"", landing);
+        Assert.Contains("href=\"/accessibility\"", landing);
     }
 
     [Fact]

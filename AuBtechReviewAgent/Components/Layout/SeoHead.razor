@@ -43,6 +43,10 @@
     {
         @JsonLdBlock(ExtraJsonLd(BaseUrl))
     }
+    @if (AiGeneratedBy != null)
+    {
+        <AiGeneratedMeta Models="AiGeneratedBy" />
+    }
 </HeadContent>
 
 @code {
@@ -62,6 +66,12 @@
 
     /// <summary>More schema.org data for this page, built from the site's address (e.g. SiteSeo.DatasetJsonLd).</summary>
     [Parameter] public Func<string, string>? ExtraJsonLd { get; set; }
+
+    /// <summary>
+    /// Set on a page that shows a report: marks the page as AI-generated, in meta tags and schema.org data, naming these
+    /// models (empty when none is recorded). Null on every other page.
+    /// </summary>
+    [Parameter] public IReadOnlyList<string>? AiGeneratedBy { get; set; }
 
     /// <summary>The page's name in the breadcrumb trail; the title when not set.</summary>
     [Parameter] public string? BreadcrumbName { get; set; }

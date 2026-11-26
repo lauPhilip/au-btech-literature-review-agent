@@ -32,9 +32,10 @@ public static partial class MultivocalPaper
     }
 
     /// <summary>The paper, ready for <see cref="PaperLatex.Build"/>. The LaTeX slots need the invariant culture, which the caller sets.</summary>
-    public static ReviewPaper Build(MultivocalReportInput input, MultivocalPaperFile paper, MultivocalCitationAudit? audit)
+    public static ReviewPaper Build(MultivocalReportInput input, MultivocalPaperFile paper, MultivocalCitationAudit? audit, ArticleInfo? article = null)
     {
         var plan = input.Planned.Plan;
+        var references = GreyReferences.Build(input.Ledger, input.Pages, input.Extraction).OrderBy(r => r.Number).ToList();
         var themes = new List<PaperSection>();
         var shown = ShownResults(input, paper);
         foreach (var result in shown)
@@ -42,7 +43,7 @@ public static partial class MultivocalPaper
             if (result.Kind == "theme")
             {
                 string latex = MultivocalPaperParts.Prose(result.Text) + "\n\n";
-                if (!string.IsNullOrWhiteSpace(result.Note)) latex += @"\par\smallskip\noindent{\small\textit{" + MultivocalPaperParts.Prose(result.Note) + "}}\n";
+                if (!string.IsNullOrWhiteSpace(result.Note)) latex += @"\par\smallskip\noindent{\small\textit{" + MultivocalPaperParts.Prose(result.Note) + "}\\par}\n";
                 themes.Add(new PaperSection($"{result.Question}: {result.Heading}", result.Text + (result.Note == null ? "" : "\n\n" + result.Note), latex));
                 continue;
             }
@@ -70,13 +71,14 @@ public static partial class MultivocalPaper
             Title = paper.Title,
             ProtocolHash = string.IsNullOrWhiteSpace(input.Planned.ProtocolSha256) ? "not recorded" : input.Planned.ProtocolSha256,
             GeneratedAt = paper.WrittenUtc.ToString("yyyy-MM-dd HH:mm:ss 'UTC'", CultureInfo.InvariantCulture),
+            Models = MultivocalArticleInfo.ModelsOf(input, paper),
             Abstract = paper.Abstract,
             Rationale = paper.Rationale,
             Objectives = Objectives(plan, paper.Objectives),
             Methods = MultivocalPaperParts.Methods(input),
             DataHeading = "Data and the flow of sources",
-            DataText = MultivocalPaperParts.DataText(input),
-            DataLatex = MultivocalPaperParts.DataLatex(input),
+            DataText = MainTexDataText(input),
+            DataLatex = DataPointer(input) + MultivocalPaperParts.DataLatex(input),
             ResultsHeading = "Results",
             ResultsText = ResultsText(new MultivocalPaperFile { Results = shown }),
             Themes = themes,
@@ -86,9 +88,25 @@ public static partial class MultivocalPaper
             Summary = summary,
             Conclusion = ConclusionSection(paper),
             Declarations = Declarations(input, paper),
-            References = GreyReferences.Build(input.Ledger, input.Pages, input.Extraction).Select(GreyReferences.Line).ToList(),
+            Keywords = MultivocalArticleInfo.For(input, paper, hasProtocol: false).Keywords,
+            AppendixLatex = PaperDeclarations.PublisherVariantsLatex(AiUseTool(input, paper), AiUsePurpose, AiUseShort(input, paper), AiUse(input, paper)),
+            References = references.Select(GreyReferences.Line).ToList(),
+            ReferenceKeys = PaperLatex.BibKeys(GreyReferences.ToBibTeX(references)),
+            Article = article,
         };
     }
+
+    // The data text's last sentence points at the figures in words, for the page; main.tex points at them by number.
+    private const string PointerStart = "The figures below show";
+
+    /// <summary>The data text of main.tex: the page's, without its last sentence, since main.tex names the figures by number.</summary>
+    public static string MainTexDataText(MultivocalReportInput input) =>
+        MultivocalPaperParts.DataText(input) is var text && text.IndexOf(PointerStart, StringComparison.Ordinal) is var at and > 0 ? text[..at].TrimEnd() : text;
+
+    private static string DataPointer(MultivocalReportInput input) =>
+        @"Figure~\ref{fig:flow} shows the flow of sources" + (input.Ledger.HasFormalPool ? " in each pool" : "") +
+        @", Figures~\ref{fig:kinds} and~\ref{fig:quality} the extracted sources by kind and outlet tier and the " +
+        (input.Ledger.HasFormalPool ? "grey sources' " : "") + @"quality scores, and Table~\ref{tab:map-counts} how many sources state each value of the map." + "\n\n";
 
     /// <summary>The opening of the results, in code: how each kind of answer was made.</summary>
     public static string ResultsText(MultivocalPaperFile paper)
@@ -128,8 +146,19 @@ public static partial class MultivocalPaper
         return text.ToString();
     }
 
-    /// <summary>The declarations, in code: the use of AI, the protocol, and where the code and the archive are.</summary>
-    public static List<PaperSection> Declarations(MultivocalReportInput input, MultivocalPaperFile paper) => new()
+    /// <summary>
+    /// The declarations, in code: the use of AI, the protocol, where the code and the archive are, then funding and the
+    /// declarations only the authors can make (<see cref="PaperDeclarations"/>).
+    /// </summary>
+    public static List<PaperSection> Declarations(MultivocalReportInput input, MultivocalPaperFile paper)
+    {
+        var declarations = CoreDeclarations(input, paper);
+        declarations.Add(new PaperSection("Support and funding", PaperDeclarations.ToComplete));
+        declarations.AddRange(PaperDeclarations.Placeholders());
+        return declarations;
+    }
+
+    private static List<PaperSection> CoreDeclarations(MultivocalReportInput input, MultivocalPaperFile paper) => new()
     {
         new PaperSection("Use of artificial intelligence", AiUse(input, paper)),
         new PaperSection("Registration and protocol",
@@ -179,9 +208,26 @@ public static partial class MultivocalPaper
         int flagged = withHits.Where(p => PromptSafety.AnyStrong(p.InjectionFlags)).Select(p => MultivocalSearcher.AddressKey(p.Url)).Distinct().Count();
         int mentioned = withHits.Select(p => MultivocalSearcher.AddressKey(p.Url)).Distinct().Count() - flagged;
         text.Append(AiUseStatement.FlaggedSources(flagged, kept.Select(p => MultivocalSearcher.AddressKey(p.Url)).Distinct().Count(), "kept text", "source", "sources", mentioned));
-        text.Append("The authors reviewed the output and take full responsibility for the content.");
+        text.Append(AiUseStatement.LanguageEdit("abstract and rationale"));
+        text.Append(PaperDeclarations.Responsibility);
         return text.ToString();
     }
+
+    /// <summary>What the model did, for Elsevier's declaration ("the authors used ... in order to ...").</summary>
+    private const string AiUsePurpose = "screen sources, score their quality, propose the systematic map, extract and check values, group the findings into themes, write the paper's sections, check each citation against its source and edit the language of the abstract and rationale";
+
+    private static string AiUseModels(MultivocalReportInput input, MultivocalPaperFile paper)
+    {
+        var names = new[] { paper.Model }.Concat(OtherModels(input, paper).Select(o => o.Model)).Where(m => !string.IsNullOrWhiteSpace(m)).ToList();
+        return names.Count == 0 ? "a large language model" : JoinList(names);
+    }
+
+    private static string AiUseTool(MultivocalReportInput input, MultivocalPaperFile paper) =>
+        $"TraceableAI (version {VersionNumber(paper.AppVersion)}), an open-source review tool, with {AiUseModels(input, paper)}";
+
+    /// <summary>The short statement for acknowledgements (IEEE, ACM).</summary>
+    private static string AiUseShort(MultivocalReportInput input, MultivocalPaperFile paper) =>
+        $"The search, screening, quality scoring, data extraction, a first draft of the paper and a language edit of the abstract and rationale were carried out with TraceableAI using {AiUseModels(input, paper)}; every citation was automatically checked against the kept text of the source it cites. {PaperDeclarations.Responsibility}";
 
     /// <summary>
     /// The models other than the paper's that answered a step (Llm:FastModel), each with what it did, from the run's
