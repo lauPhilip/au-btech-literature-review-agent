@@ -175,6 +175,13 @@ Third, each theme was written up as a subsection from its own studies only, with
 Finally, the part of every cited sentence attributed to a paper was checked against that paper; sentences judged not supported or only partly supported were rewritten once from the paper's evidence and checked again.
 The requested artifact could not be built: The artifact could not be built from the results (LlmOutputException).
 
+\subsection{Automated Citation Check}\label{sec:automated-citation-check}
+
+An automated check compared the part of each cited sentence attributed to a paper with the text of that paper.
+The first check judged 5 citations: 5 were supported, 0 partly supported, 0 not supported, and 0 could not be verified.
+Of the 5 citations in the final text, 5 were judged supported, 0 partly supported, 0 not supported, and 0 could not be verified.
+Every verdict, with the quoted evidence, every repair and every removed citation is listed in citation-audit.\allowbreak{}json; these are model judgements and should be spot-checked by a human reviewer.
+
 \subsection{What This Review Did Not Assess}\label{sec:what-this-review-did-not-assess}
 
 This review did not compute effect measures (PRISMA 2020 item 12).
@@ -313,12 +320,6 @@ No open-access full text was found for any of the 2 included studies, so all wer
 The search took at most 3 records per source.
 The extraction, the synthesis and the text were written by the language model mistral-large-latest (Mistral API); every cited sentence was checked against its source, but the review should be read by a person before it is relied on.
 This was a pilot run, not a comprehensive search: the search took at most 3 records per source and identified 3 records, so relevant studies are likely to be missing and the findings show what a small sample of the literature says, not the state of the field.
-
-\subsection{Automated Citation Check}\label{sec:automated-citation-check}
-
-An automated check compared the part of each cited sentence attributed to a paper with the text of that paper.
-Of 5 citations checked, 5 were judged supported, 0 partially supported, 0 not supported, and 0 could not be verified.
-Every verdict, with the quoted evidence, is listed in citation-audit.\allowbreak{}json; these are model judgements and should be spot-checked by a human reviewer.
 
 \section{Conclusion}\label{sec:conclusion}
 

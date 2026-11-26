@@ -73,6 +73,8 @@ public partial class PrismaReviewEngine
             new("Data Collection and Quality Appraisal", report.BiasAssessmentItem ?? ""),
         };
         if (!string.IsNullOrWhiteSpace(report.SynthesisMethodsItem)) methods.Add(new("Synthesis Methods", report.SynthesisMethodsItem));
+        // The citation check is a method, so it sits with the other methods and not in the discussion (issue #679).
+        if (!string.IsNullOrWhiteSpace(report.CitationCheckSummary)) methods.Add(new("Automated Citation Check", report.CitationCheckSummary));
         // The certainty of each answer is rated in code from the run's files (PRISMA 2020 items 15 and 22).
         var certainty = SystematicCertainty.Assess(report, state?.ThematicSynthesis, state?.Extractions);
         if (certainty != null) methods.Add(new("Certainty of the Evidence", certainty.Method));
@@ -108,7 +110,6 @@ public partial class PrismaReviewEngine
         Note("Limitations of the Review Process", report.ReviewLimitationsItem);
         Note("Implications for Practice and Policy", report.ImplicationsItem);
         Note("Directions for Future Research", report.FutureResearchItem);
-        if (!string.IsNullOrWhiteSpace(report.CitationCheckSummary)) discussionNotes.Add(new("Automated Citation Check", report.CitationCheckSummary));
         if (!string.IsNullOrWhiteSpace(state?.HumanScreeningReviewOutcome)) discussionNotes.Add(new("Human Screening Review", state!.HumanScreeningReviewOutcome!));
 
         // The declarations in the order and with the headings of the report page (issue #169), then the statement on AI
