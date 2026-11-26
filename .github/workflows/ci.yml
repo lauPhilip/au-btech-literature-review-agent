@@ -182,6 +182,14 @@ jobs:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}
 
+      # A finished fake run of each kind of review (the module kit's), with an edit key, in the folder the app reads, so
+      # the report pages can be checked as the owner and as a reader (CtaSeedTests; the check is the last step below).
+      - name: Seed a finished run of each kind of review
+        env:
+          CTA_SEED_DIR: ${{ github.workspace }}/AuBtechReviewAgent/WorkspaceStore
+          CTA_SEED_KEYS: ${{ github.workspace }}/cta-keys.json
+        run: dotnet test AuBtechReviewAgent.Tests/AuBtechReviewAgent.Tests.csproj --filter "FullyQualifiedName~CtaSeedTests" -nologo -v q
+
       # The app runs without real keys: the checked pages never call the model or the sources.
       - name: Start the app
         env:
@@ -227,6 +235,17 @@ jobs:
         env:
           BASE_URL: http://localhost:5038
         run: node smoke.mjs
+
+      # Every link and button on the seeded report pages, as owner and as reader: same-origin links answer 2xx, external
+      # ones are well formed, buttons do what they say with no console error, and the printed PDF's links are absolute,
+      # with the front page's links to the report, archive and protocol (tools/a11y/cta-check.mjs, wiki page 07).
+      - name: Check every link and button on the report pages
+        working-directory: tools/a11y
+        env:
+          BASE_URL: http://localhost:5038
+          CTA_KEYS: ${{ github.workspace }}/cta-keys.json
+          CTA_OUT: ${{ github.workspace }}/a11y-screenshots
+        run: node cta-check.mjs
 
       # Screenshots of every checked page at 390, 1440 and 1920 px, so a pull request that changes markup can be
       # looked at without running the app.
