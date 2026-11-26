@@ -12,6 +12,12 @@ A pilot run's title no longer says "Pilot Pilot", and the PRISMA checklist now t
 
 The citation check is now told as one story that adds up: what the first check found, what the second check changed, what the repair rewrote or dropped, and how many citations are left. It now sits in the methods, not in the discussion. 🧮 Table A.1 in main.tex starts with the reference number, so you can match a row to its [n].
 
+Screening now reads "or" in your inclusion criterion as a choice. A record needs to show one of the options, not all of them, so fewer good records are dropped in code. The screening prompt has a new version, so old cached decisions are not used again.
+
+On the report page, a citation's card now comes into view when you open it, also from "Show the first". A heading no longer sits alone at the foot of a page, and the page no longer scrolls sideways at 809 px. The browser tab shows the run's progress and says when the review is ready. The progress line names the artifact step.
+
+The self-check now knows the count of records that could not be screened. It also flags a figure given in two themes, and it no longer skips a figure such as "F1 0.97". A source now gets more records when some drop out for their year or as duplicates, so it can fill its cap. Keywords are short terms now, not whole search strings.
+
 ## [0.6.0] - 2026-11-26
 
 The systematic review now answers its research questions first, cites what the studies found, and checks its own paper, so it is honest about how good its evidence is. It tells you when a cited study was retracted, marks a citation it could not confirm with a dagger, and rates how sure each answer is. The paper covers the whole PRISMA 2020 checklist, is written in plain technical English (based on ASD-STE100) and has APA 7 references completed from Crossref, OpenAlex and arXiv. It reads like a journal article on A4 pages. Many prompts and checks changed, so a run can differ from 0.5.0, most of all a run with research questions, and a rerun now gives the same themes. The multivocal review, still in preview, learned a lot from its first real run. And the site now puts every review in one fair line, keeps bots at the door and has a gallery of example reports.
