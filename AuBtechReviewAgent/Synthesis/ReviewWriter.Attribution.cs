@@ -62,8 +62,8 @@ public static partial class ReviewWriter
     /// own counts), a word that attributes something to the sources (report, found, show, demonstrate, observe,
     /// "studies", "the literature", "according to"), or a study-design word. "Studies" after a count ("four
     /// studies") is the review's own count, not an attribution. <paramref name="designsAllowed"/> lets the
-    /// limitations and the directions for future research name kinds of study (what the evidence rests on, what study is
-    /// missing) without a citation. Public for unit tests.
+    /// limitations, the directions for future research and the conclusion name kinds of study (what the evidence rests on,
+    /// how it was studied, what study is missing) without a citation (issue #561). Public for unit tests.
     /// </summary>
     public static string? UncitedAttribution(string text, string facts = "", bool designsAllowed = false)
     {

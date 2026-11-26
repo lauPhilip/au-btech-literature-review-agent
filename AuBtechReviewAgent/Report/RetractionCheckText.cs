@@ -65,15 +65,22 @@ public static class RetractionCheckText
         if (concern > 0) found.Add($"{concern} had an expression of concern");
         if (preprints > 0) found.Add($"{preprints} {(preprints == 1 ? "was a preprint whose" : "were preprints whose")} published version is registered");
         bool marked = corrected + concern + preprints > 0;
-        string result = found.Count == 0
-            ? (asked == 1 ? "It had" : "None of them had") + " a retraction, correction or expression of concern on record."
-            : $"Of {(asked == 1 ? "it" : "them")}, {Join(found)}{(marked ? "; Table A.1 marks " + (corrected + concern + preprints == 1 ? "that study" : "those studies") : "")}.";
-        string unchecked_ = failed == 0 ? "" : failed == 1 ? " For one study the check could not be completed, and it was kept."
-            : $" For {failed} studies the check could not be completed, and they were kept.";
+        // A study whose check failed is never counted as having no notice (issue #583): "none" speaks only for the completed.
+        int completed = asked - failed;
+        string result = found.Count > 0
+            ? $"Of {(asked == 1 ? "it" : "them")}, {Join(found)}{(marked ? "; Table A.1 marks " + (corrected + concern + preprints == 1 ? "that study" : "those studies") : "")}."
+            : completed == 0 ? ""
+            : completed == asked ? (asked == 1 ? "It had" : "None of them had") + " a retraction, correction or expression of concern on record."
+            : (completed == 1 ? "The one study whose check was completed had no" : $"None of the {completed} studies whose check was completed had a") +
+              " retraction, correction or expression of concern on record.";
+        string unchecked_ = failed == 0 ? ""
+            : failed == asked ? $" For {(asked == 1 ? "this study" : $"all {asked}")} the check could not be completed, so whether {(asked == 1 ? "it was" : "they were")} retracted is not known, and {(asked == 1 ? "it was" : "they were")} kept."
+            : failed == 1 ? " For one study the check could not be completed, so whether it was retracted is not known, and it was kept."
+            : $" For {failed} studies the check could not be completed, so whether they were retracted is not known, and they were kept.";
         string studies = asked == 1 ? "the one included study with a DOI registered at Crossref was" : $"the {asked} included studies with a DOI registered at Crossref were";
         return $"Before the full texts were read, {studies} checked in code for retractions, corrections and expressions of concern, " +
             "in Crossref's record of editorial updates, which includes the Retraction Watch database. " +
-            $"{result}{unchecked_}{notAsked} No language model was involved, and every lookup is listed in {RetractionCheckFile.FileName}.";
+            $"{result}{unchecked_}{notAsked}".TrimStart() + $" No language model was involved, and every lookup is listed in {RetractionCheckFile.FileName}.";
     }
 
     private static int Count(RetractionCheckFile check, string status) => check.Studies.Count(e => e.Status == status);

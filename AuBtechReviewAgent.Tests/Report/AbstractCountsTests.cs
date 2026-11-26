@@ -80,9 +80,10 @@ public class AbstractCountsTests : IDisposable
         };
         var runId = Guid.NewGuid();
 
-        // The fake source returns papers from 2024, 2025 and 2026; the 2024 one is outside the range.
+        // The fake source returns papers from 2024, 2025 and 2026; the 2024 one is outside the range. The query alone is
+        // searched: with extra strings the source, short of its cap, would be asked again and return only duplicates (#562).
         await engine.RunReviewAsync(runId, new ReviewRequest("agent loops", "Map agent loop safety", "Agent architecture", "Agronomy", 3,
-            SelectedSources: new[] { "arxiv" }, YearFrom: 2025, YearTo: 2026));
+            SelectedSources: new[] { "arxiv" }, YearFrom: 2025, YearTo: 2026, SearchStrings: Array.Empty<string>()));
 
         var state = engine.LoadState(runId)!;
         Assert.Equal(1, state.Stats.OutsideDateRange);

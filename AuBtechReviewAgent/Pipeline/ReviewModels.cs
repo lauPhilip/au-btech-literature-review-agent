@@ -87,7 +87,10 @@ public record ScreeningLog(
     // Times cited, from the source's metadata on the day of the search; null when the source gave none.
     int? CitedByCount = null,
     // Volume, issue, pages, publisher and arXiv number, from the venue string or the reference enrichment.
-    ReferenceDetails? Details = null
+    ReferenceDetails? Details = null,
+    // Each part of the inclusion criterion and whether the record shows it, from each screener (issue #564).
+    List<CriterionCheck>? CriteriaParts = null,
+    List<CriterionCheck>? SecondCriteriaParts = null
 );
 
 public class PlatformSearchLog

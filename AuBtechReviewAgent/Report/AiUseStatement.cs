@@ -110,7 +110,9 @@ public static class AiUseStatement
         };
         if (name.Length == 0) return "";
         return artifact.IsDiagram
-            ? $"The content of the {name} (its boxes and the labelled links between them) was chosen by the model from the findings and drawn in code; every cited box was checked like a sentence of the report. "
+            ? $"The content of the {name} (its boxes and the labelled links between them) was chosen by the model from the findings and drawn in code; every cited box was checked like a sentence of the report" +
+              (ArtifactLinks.MethodsSentence(artifact).Length == 0 ? ". "
+                  : ", and every link was checked against the studies that both of its boxes cite; a link none of them states is drawn dashed as the review's own reading. ")
             : $"The content of the {name} was chosen by the model from the findings and laid out in code; every cited entry was checked like a sentence of the report. ";
     }
 
