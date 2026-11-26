@@ -48,6 +48,7 @@ public sealed partial class MultivocalWriter
     private readonly ReviewCache _cache;
     private readonly RunMetricsStore _metrics;
 
+    /// <summary>Sets up the writer with the run store, the model and the cache it writes and checks with.</summary>
     /// <param name="checkModel">The model that answers the citation checks when a fast model takes them (Llm:FastModel); empty: <paramref name="model"/>.</param>
     public MultivocalWriter(RunStore runs, MultivocalReporter reporter, MultivocalPages pages, Func<IChatCompletionService> chat, string model = "", int parallelism = 4,
         ReviewCache? cache = null, RunMetricsStore? metrics = null, string? checkModel = null)
