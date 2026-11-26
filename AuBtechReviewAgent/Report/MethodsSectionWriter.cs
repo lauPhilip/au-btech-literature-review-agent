@@ -139,15 +139,11 @@ public static partial class MethodsSectionWriter
         if (extra.Count > 0)
         {
             sb.Append(reviewedByReviewer
-                ? $"To improve recall, {extra.Count} additional search string{(extra.Count == 1 ? " was" : "s were")} proposed by the language model and checked and approved (or edited) by the reviewer before the search, each run against every source: "
-                : $"To improve recall, the language model proposed {extra.Count} additional search string{(extra.Count == 1 ? "" : "s")}, each of which was also run against every source: ");
+                ? $"To improve recall, {extra.Count} additional search string{(extra.Count == 1 ? " was" : "s were")} proposed by the language model and checked and approved (or edited) by the reviewer before the search: "
+                : $"To improve recall, the language model proposed {extra.Count} additional search string{(extra.Count == 1 ? "" : "s")}: ");
             sb.Append(string.Join("; ", extra.Select(p => $"\"{p.Trim()}\"")));
             sb.Append(". ");
-            if (yields != null && SearchSaturation.Hint(yields) is { } hint)
-                sb.Append("Taken in order, the search strings added " + string.Join(", ", yields.Where(y => y.Searches > 0).Select(y => y.New)) +
-                          " records not found by an earlier string" + (hint.Contains("close to saturation", StringComparison.Ordinal)
-                              ? ", so the search was close to saturation for these phrasings. "
-                              : ", so the last phrasing still added new records. "));
+            sb.Append(SearchStringsRun(extra.Count, yields));
         }
         else
         {
@@ -173,6 +169,41 @@ public static partial class MethodsSectionWriter
         {
             sb.Append("No date, language or document-type limits were applied.");
         }
+        return sb.ToString();
+    }
+
+    /// <summary>
+    /// Which of the extra search strings were run, against how many sources, and what each one added, written from the
+    /// searches the run actually made (issue #562): a source stops taking strings once its cap is filled, so a later
+    /// string can run against some sources or none. Without yields (older runs) only the rule is stated.
+    /// </summary>
+    private static string SearchStringsRun(int extraCount, IReadOnlyList<SearchStringYield>? yields)
+    {
+        const string rule = "The search strings were run in order, and a source stopped taking further strings once its cap was filled. ";
+        if (yields == null || yields.Count < 2) return rule;
+        int sources = yields.Max(y => y.Searches);
+        string Quoted(SearchStringYield y) => $"\"{y.SearchString.Trim()}\"";
+        string Sources(int n) => n == 1 ? "1 source" : $"{n} sources";
+        var extra = yields.Skip(1).ToList();
+        var groups = new List<string>();
+        var everywhere = extra.Where(y => y.Searches == sources).ToList();
+        if (everywhere.Count > 0)
+            groups.Add($"{JoinNatural(everywhere.Select(Quoted).ToList())} {(everywhere.Count == 1 ? "was" : "were")} run against all {Sources(sources)}");
+        foreach (var y in extra.Where(y => y.Searches > 0 && y.Searches < sources))
+            groups.Add($"{Quoted(y)} was run against {y.Searches} of the {Sources(sources)}, as the others had already filled their cap");
+        var skipped = extra.Where(y => y.Searches == 0).ToList();
+        if (skipped.Count > 0)
+            groups.Add($"{JoinNatural(skipped.Select(Quoted).ToList())} {(skipped.Count == 1 ? "was" : "were")} not run, because every source had already filled its cap");
+        var sb = new StringBuilder(rule);
+        sb.Append(char.ToUpperInvariant(groups[0][0]) + groups[0][1..]);
+        for (int i = 1; i < groups.Count; i++) sb.Append(i == groups.Count - 1 ? "; and " : "; ").Append(groups[i]);
+        sb.Append(". ");
+        var ran = yields.Where(y => y.Searches > 0).ToList();
+        if (ran.Count >= 2 && SearchSaturation.Hint(yields) is { } hint)
+            sb.Append("Taken in the order they were run, the search strings added " + string.Join(", ", ran.Select(y => y.New)) +
+                      " records not found by an earlier string" + (hint.Contains("close to saturation", StringComparison.Ordinal)
+                          ? ", so the search was close to saturation for these phrasings. "
+                          : ", so the last string that was run still added new records. "));
         return sb.ToString();
     }
 
