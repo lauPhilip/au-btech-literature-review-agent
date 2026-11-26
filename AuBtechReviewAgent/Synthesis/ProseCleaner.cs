@@ -129,6 +129,7 @@ public static class ProseCleaner
     /// </summary>
     public static string DropRepeatedCitations(string sentence)
     {
+        sentence = DropRepeatedInClause(sentence);
         var markers = Marker.Matches(sentence).Cast<Match>().ToList();
         if (markers.Count < 2) return sentence;
         var last = markers[^1];
@@ -148,6 +149,28 @@ public static class ProseCleaner
         var keep = lastRefs.Where(r => !named.Contains(r)).ToList();
         string replacement = keep.Count == 0 ? "" : $" [{string.Join(", ", keep)}]";
         return sentence[..last.Index] + replacement + sentence[(last.Index + last.Length)..];
+    }
+
+    /// <summary>
+    /// The same inside a sentence (issue #568): "[4] identifies A and B [4], while [1] highlights C" becomes "[4] identifies
+    /// A and B, while [1] highlights C". A marker goes when the marker just before it names the same study and it closes
+    /// that clause: punctuation, "and", "or", "but", "while" or "whereas" follows it.
+    /// </summary>
+    private static string DropRepeatedInClause(string sentence)
+    {
+        var markers = Marker.Matches(sentence).Cast<Match>().ToList();
+        for (int i = markers.Count - 2; i >= 1; i--)
+        {
+            Match previous = markers[i - 1], m = markers[i];
+            string afterPrevious = sentence[(previous.Index + previous.Length)..].TrimStart();
+            bool names = afterPrevious.Length > 0 && char.IsLetter(afterPrevious[0]) && !Regex.IsMatch(afterPrevious, @"^(and|or|nor)\b", RegexOptions.IgnoreCase);
+            string after = sentence[(m.Index + m.Length)..].TrimStart();
+            bool closes = after.Length == 0 || ",;:)".Contains(after[0]) || Regex.IsMatch(after, @"^(and|or|but|while|whereas)\b", RegexOptions.IgnoreCase);
+            var refs = CitationSupportChecker.ReferencesIn(m.Value);
+            if (!names || !closes || !refs.All(CitationSupportChecker.ReferencesIn(previous.Value).Contains)) continue;
+            sentence = sentence[..m.Index] + sentence[(m.Index + m.Length)..];
+        }
+        return sentence;
     }
 
     private static string EndAsSentence(string s)

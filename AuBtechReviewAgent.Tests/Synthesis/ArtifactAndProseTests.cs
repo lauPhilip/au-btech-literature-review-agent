@@ -80,6 +80,20 @@ public class ArtifactAndProseTests : IDisposable
         Assert.Equal("[5] warns that governance can fail [5].", change.Text);
     }
 
+    [Fact]
+    public void ASentenceThatNamesAStudyDoesNotCiteItAgainAtTheEndOfTheClause()
+    {
+        // Issue #568, from run 289a0d3e: "[4] identifies ... [4], while [1] highlights ..." and "with [1] describing ... [1] and [5] detailing ...".
+        Assert.Equal("Reasoning loops support fault tolerance: [4] identifies scenario generation and ReAct-style loops, while [1] highlights secure pipelines [2].",
+            ProseCleaner.DropRepeatedCitations("Reasoning loops support fault tolerance: [4] identifies scenario generation and ReAct-style loops [4], while [1] highlights secure pipelines [2]."));
+        Assert.Equal("Governance is a layer, with [1] describing secure pipelines and [5] detailing a control plane.",
+            ProseCleaner.DropRepeatedCitations("Governance is a layer, with [1] describing secure pipelines [1] and [5] detailing a control plane [5]."));
+
+        // A repeat that does not close the clause, or that follows another study's marker, stays.
+        Assert.Equal("[4] finds that loops [4] recover, while [1] logs [2].", ProseCleaner.DropRepeatedCitations("[4] finds that loops [4] recover, while [1] logs [2]."));
+        Assert.Equal("[4] and [1] find loops [4], while [2] logs [3].", ProseCleaner.DropRepeatedCitations("[4] and [1] find loops [4], while [2] logs [3]."));
+    }
+
     private static string DiagramJson(string extraNodeRef = "1") => $$"""
         {"format":"concept-map","title":"How safety mechanisms relate","caption":"Concepts from the themes.",
          "nodes":[{"id":"A","label":"Supervisor checks recover from faults [{{extraNodeRef}}]"},{"id":"B","label":"Governance layers audit actions [2]"},{"id":"C","label":"Safe orchestration"}],
