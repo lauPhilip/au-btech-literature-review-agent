@@ -93,6 +93,24 @@ public class ArchiveLatexTests : IDisposable
     }
 
     [Fact]
+    public void TheCitationCheckIsWrittenInTheMethodsAndNotInTheDiscussion()
+    {
+        var report = new PrismaReport
+        {
+            TitleItem = "Agent loops", DiscussionItem = "Loops matter.", SynthesisMethodsItem = "Findings were coded into themes.",
+            CitationCheckSummary = "The first check judged 4 citations.",
+        };
+        string tex = MainTex(report, TwoJournalPapers());
+
+        int check = tex.IndexOf(@"\subsection{Automated Citation Check}", StringComparison.Ordinal);
+        int synthesis = tex.IndexOf(@"\subsection{Synthesis Methods}", StringComparison.Ordinal);
+        Assert.True(synthesis > 0 && check > synthesis, "the check follows the synthesis methods");
+        Assert.True(check < tex.IndexOf(@"\section{Characteristics of the Included Studies}", StringComparison.Ordinal), "and it is part of the methodology");
+        Assert.True(check < tex.IndexOf(@"\section{Discussion}", StringComparison.Ordinal));
+        Assert.Single(System.Text.RegularExpressions.Regex.Matches(tex, "The first check judged 4 citations"));
+    }
+
+    [Fact]
     public void AListArtifactIsABulletListAndAFailedOneIsLeftOut()
     {
         var bullets = new PrismaReport

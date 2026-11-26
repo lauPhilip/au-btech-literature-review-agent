@@ -59,13 +59,13 @@ public sealed partial class ReviewApi
             ReportOutline.IntroductionId => Join(new[] { r.RationaleItem, r.ObjectivesItem }
                 .Concat(questions.Select((q, i) => $"RQ{i + 1}. {q}")).ToArray()),
             ReportOutline.MethodologyId => Join(r.EligibilityItem, r.SourcesItem, r.SearchStrategyItem, r.SelectionProcessItem,
-                r.BiasAssessmentItem, r.SynthesisMethodsItem),
+                r.BiasAssessmentItem, r.SynthesisMethodsItem, r.CitationCheckSummary),
             ReportOutline.ResultsId => Join(r.SynthesisResultsItem, r.CoverageSummary),
             ReportOutline.DiscussionId => Join(r.DiscussionItem, r.EvidenceLimitationsItem, r.ReviewLimitationsItem,
                 r.ImplicationsItem, r.FutureResearchItem),
             ReportOutline.ConclusionId => Join(new[] { r.ConclusionItem }
                 .Concat(r.ResearchAnswers.Select(a => $"RQ{a.Number}. {a.Question}\n{a.Answer}")).ToArray()),
-            ReportOutline.DeclarationsId => Join(PaperDeclarations.Funding(SpecMatrix.ScrubAnchors(r.SupportItem ?? "")), r.AvailabilityItem, r.ProtocolItem, r.CitationCheckSummary),
+            ReportOutline.DeclarationsId => Join(PaperDeclarations.Funding(SpecMatrix.ScrubAnchors(r.SupportItem ?? "")), r.AvailabilityItem, r.ProtocolItem),
             ReportOutline.ReferencesId => string.Join("\n", references.Select(x => $"[{x.Number}] {x.Citation}")),
             // The included studies and the appendix are tables on the page: their data is in references and prisma.
             _ => "",

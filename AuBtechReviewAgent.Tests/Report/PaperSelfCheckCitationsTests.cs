@@ -65,6 +65,21 @@ public class PaperSelfCheckCitationsTests
     }
 
     [Fact]
+    public void TheSelfCheckGivesTheFirstCheckAndTheFinalCountOfTheMethodsParagraph()
+    {
+        var parts = SelfCheckPaper.Input().Parts;
+        var steps = new CitationCheckSteps { FirstChecked = 82, FirstPartiallySupported = 9, FirstNotSupported = 3, Dropped = 1, Removed = 1, FinalChecked = 80 };
+        var check = SelfCheckPaper.Check(new PaperCheckInput { Parts = parts, CitationSteps = steps, CitationsRemoved = 1,
+            CitationsFinal = new CitationSupportSummary { Checked = 80, Supported = 79, PartiallySupported = 1 },
+            CitationsInitial = new CitationSupportSummary { Checked = 82, NotSupported = 1, PartiallySupported = 6 } }, "citation-check");
+
+        var evidence = Assert.Single(check.Evidence, e => e.Text.StartsWith("First check:"));
+        Assert.Equal("First check: 3 not supported, 9 partly", evidence.Text);
+        Assert.Equal("Of 82 citations first checked; 80 are in the final text.", evidence.Detail);
+        Assert.DoesNotContain(check.Evidence, e => e.Text.StartsWith("Before repair"));
+    }
+
+    [Fact]
     public void CitationsThatWereNeverCheckedAreAFault()
     {
         Assert.Equal(CheckOutcome.Fault, SelfCheckPaper.Check(SelfCheckPaper.Input(), "citation-check").Outcome);
