@@ -96,7 +96,7 @@ public static partial class ReviewWriter
             3. "futureResearch": one paragraph on {{profile.FutureResearchPart}}: the open questions and missing kinds of study the results show, each tied by name to the theme it comes from. A proposal is the review's own reading and takes no citation: say what study is missing, not again what the {{profile.Sources}} found.
             4. "conclusion": three to five sentences that answer the review objective in plain words, at most {{MaxConclusionWords}} words, with no new claims.{{conclusionRule}}
             {{FigureRule}}
-            5. {{EvidenceThenReadingRule(profile)}} In the limitations and the directions for future research, an uncited sentence may name kinds of {{profile.Sources}} (what the evidence rests on, what study is missing). {{ClaimPerCitationRule(profile)}} {{OwnCountRule}} Do not invent numbers, statistics or {{profile.Sources}}.{{leftOutRule}} {{ReadingBasisRule(profile)}} This holds for the limitations too: how this review was done, including what it read, is written separately.{{answerRule}}
+            5. {{EvidenceThenReadingRule(profile)}} In the limitations, the directions for future research and the conclusion, an uncited sentence may name kinds of {{profile.Sources}} (what the evidence rests on, how it was studied, what study is missing). {{ClaimPerCitationRule(profile)}} {{OwnCountRule}} Do not invent numbers, statistics or {{profile.Sources}}.{{leftOutRule}} {{ReadingBasisRule(profile)}} This holds for the limitations too: how this review was done, including what it read, is written separately.{{answerRule}}
             {{ProseCleaner.PlainProseRule}}
             Respond ONLY with a valid minified JSON object:
             {"limitations":"...","implications":"...","futureResearch":"...","conclusion":"..."{{answerField}}}
@@ -162,10 +162,12 @@ public static partial class ReviewWriter
         foreach (var (name, text) in parts)
             if (OwnCountCited(text!, ownFacts, results) is { } own)
                 return $"{name}: \"{own}\" states this review's own count and carries a citation; the review's own counts take no citation.";
-        // An uncited sentence is the review's own reading: it may not report a finding (the limitations and the future
-        // research may name kinds of study). Without the review's own facts, the numbers allowed are those of known.
+        // An uncited sentence is the review's own reading: it may not report a finding. The limitations, the future research
+        // and the conclusion may name kinds of study: the conclusion takes no citation when there are research questions,
+        // so it must be able to say how the evidence was studied (issue #561, run 289a0d3e: "experiments" was sent back
+        // three times). Without the review's own facts, the numbers allowed are those of known.
         foreach (var (name, text) in parts)
-            if (UncitedAttribution(text!, ownFacts.Length > 0 ? ownFacts : known, designsAllowed: name is "limitations" or "futureResearch") is { } reported)
+            if (UncitedAttribution(text!, ownFacts.Length > 0 ? ownFacts : known, designsAllowed: name is "limitations" or "futureResearch" or "conclusion") is { } reported)
                 return $"{name}: {reported}";
         foreach (var (name, text) in parts)
             if (ReadingBasisSentence(text!) is { } basis) return $"{name}: {ReadingBasisProblem(basis, profile ?? WritingProfile.Systematic)}";

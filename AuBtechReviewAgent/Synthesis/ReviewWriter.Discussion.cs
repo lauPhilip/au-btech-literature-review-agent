@@ -58,7 +58,7 @@ public static partial class ReviewWriter
 
             REQUIREMENTS:
             1. Write about {{paragraphs}} paragraphs, separated by a blank line: {{profile.DiscussionParts}} {{EachPartOnceRule}}
-            2. Interpret, do not repeat the results. Ground every claim in the results above. {{EvidenceThenReadingRule(profile)}} {{ClaimPerCitationRule(profile)}} {{OwnCountRule}}
+            2. Interpret, do not repeat the results. {{ReadingNotRetellingRule(profile)}} Ground every claim in the results above. {{VerifiedFigureRule(profile)}} {{EvidenceThenReadingRule(profile)}} {{ClaimPerCitationRule(profile)}} {{OwnCountRule}}
             3. Do not invent numbers, statistics or {{profile.Sources}}.
             4. {{ReadingBasisRule(profile)}}{{AnswersRule(all, asked, profile)}}
             {{ProseCleaner.PlainProseRule}}
@@ -67,7 +67,7 @@ public static partial class ReviewWriter
             """;
         try
         {
-            var reply = await LlmJson.GetAsync<DiscussionAnswer>(chat, prompt, LlmJson.JsonMode(0.3), WithFigureGuard<DiscussionAnswer>(a =>
+            var reply = await LlmJson.GetAsync<DiscussionAnswer>(chat, prompt, LlmJson.JsonMode(0.3), WithSoftGuards<DiscussionAnswer>(a =>
             {
                 if (string.IsNullOrWhiteSpace(a.Text)) return "text must not be empty.";
                 var outside = ThematicSynthesis.CitedIn(a.Text).Where(r => r < 1 || r > referenceCount).ToList();
@@ -79,10 +79,17 @@ public static partial class ReviewWriter
                 if (OwnCountCited(a.Text, evidence.BaseFacts, synthesis) is { } own)
                     return $"\"{own}\" states this review's own count and carries a citation; the review's own counts take no citation.";
                 return asked.Count == 0 ? null : AnswersProblem(a.Answers, asked.Count, evidence, synthesis, referenceCount, profile);
-            }, a => FigurePlacementProblem(synthesis, evidence.BaseFacts,
-                (a.Answers ?? new()).Select((t, i) => ($"answer {i + 1}", t ?? "")).Append(("the discussion", a.Text!)).ToList()), "discussion call", warn), repairAttempts: 2);
+            }, "discussion call", warn, FigureSendBacks,
+                (a => FigurePlacementProblem(synthesis, evidence.BaseFacts,
+                    (a.Answers ?? new()).Select((t, i) => ($"answer {i + 1}", t ?? "")).Append(("the discussion", a.Text!)).ToList()), "a repeated result figure"),
+                // Issue #572: soft, sharing the figure guard's budget, so a discussion is never lost to it; an uncited claim
+                // of agreement that is left is taken out in code below.
+                (a => DiscussionReadingProblem(a.Text!, sections.Select(x => x.Text), evidence) ?? (a.Answers ?? new()).Select(t => UnquantifiedFindingProblem(t, evidence)).FirstOrDefault(p => p != null),
+                    "a retold result, an agreement the results do not show or a result without its figures")), repairAttempts: 2);
             string text = OneLimitationsParagraph(MethodsSectionWriter.StripMarkdownEmphasis(reply.Text!.Trim()), out string? merged);
             if (merged != null) warn?.Invoke(merged);
+            text = WithoutUncitedAgreement(text, out string? agreement);
+            if (agreement != null) warn?.Invoke(agreement);
             return new DiscussionWithAnswers(text, answer && all.Count > 0 ? AllAnswers(all, asked, reply.Answers ?? new(), profile) : null);
         }
         catch (Exception ex)
