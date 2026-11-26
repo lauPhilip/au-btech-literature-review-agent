@@ -197,12 +197,7 @@ public partial class PrismaReviewEngine
         string fullSynthesisField = textOf["synthesisResultsItem"] + run.DraftIfWritten?.MermaidBlock + run.DraftIfWritten?.TikzBlock;
         string cleanDiscussionValidated = textOf["discussionItem"];
         foreach (var s in sections) s.Text = textOf[s.Field];
-        if (artifact is { Error: null })
-        {
-            foreach (var (field, _) in artifact.CitableTexts().ToList()) artifact.SetText(field, textOf[field]);
-            artifact.Compact();
-            artifact.Mermaid = ArtifactBuilder.ToMermaid(artifact);
-        }
+        await FinishArtifactAsync(run, textOf);
 
         try
         {
@@ -250,7 +245,7 @@ public partial class PrismaReviewEngine
             SynthesisSections = sections,
             SynthesisMethodsItem = ThematicSynthesis.MethodsText(useThematic ? thematic!.Codebook : thematic?.Codebook is { } fb ? new ThematicCodebook { FallbackReason = fb.FallbackReason } : null, Llm.DisplayName, Synthesis.RepairCitations, Llm.DisplayNameFor("citation-check"))
                 + (artifact == null ? "" : artifact.Error == null
-                    ? $" The {ArtifactKinds.All.First(k => k.Key == artifact.Requested).Label.ToLowerInvariant()} requested by the reviewer was built by the model from the finished results only, and the elements in it that cite a study were checked like the sentences of the report."
+                    ? $" The {ArtifactKinds.All.First(k => k.Key == artifact.Requested).Label.ToLowerInvariant()} requested by the reviewer was built by the model from the finished results only, and the elements in it that cite a study were checked like the sentences of the report." + ArtifactLinks.MethodsSentence(artifact)
                     : $" The requested artifact could not be built: {artifact.Error}"),
             Artifact = artifact,
             CoverageSummary = coverage.Sentence,
