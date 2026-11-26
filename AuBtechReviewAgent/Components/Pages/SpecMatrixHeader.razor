@@ -22,6 +22,13 @@
         <p class="mt-2">@SpecMatrix.ScrubAnchors(Page.report.AbstractItem)</p>
     </section>
 }
+
+@* The paper's check of itself (issue #532): a closed table of the ten checks, on screen only, after the front page. *@
+@if (Page.selfCheck != null && Page.selfCheck.Checks.Count > 0)
+{
+    <SelfCheckTable Result="Page.selfCheck" />
+}
+
 @code {
     [Parameter, EditorRequired] public SpecMatrix Page { get; set; } = default!;
 }
