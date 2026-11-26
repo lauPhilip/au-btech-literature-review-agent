@@ -14,8 +14,9 @@ public static partial class PaperSelfCheck
 {
     private static readonly Regex Number = new(@"(?<![\p{L}\d.,])(?<!\p{L}-)\d+(?:[.,]\d+)?", RegexOptions.Compiled);
 
-    // A standard or a model named by letters and a number ("ISO 26262", "GPT 4") is a name, not a figure.
-    private static readonly Regex AcronymNumber = new(@"\b[A-Z][A-Z0-9]+[- ]\d+(?:[.,]\d+)?\b", RegexOptions.Compiled);
+    // A standard or a model named by letters and a number ("ISO 26262", "GPT-4.1", "GPT 4") is a name, not a figure. A decimal
+    // after a space ("F1 0.9718", "R1 29.353 s") is a figure: only a hyphen joins a decimal to a name (issue #673).
+    private static readonly Regex AcronymNumber = new(@"\b[A-Z][A-Z0-9]+(?:-\d+(?:[.,]\d+)?|\s\d+(?![.,]\d))\b", RegexOptions.Compiled);
 
     // "One study found" is ordinary prose, not a count, so counts in words start at two.
     private const string WordNumbers = "one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty";
@@ -106,9 +107,10 @@ public static partial class PaperSelfCheck
         CitationSupportChecker.SplitSentences(text).FirstOrDefault(s => ReviewWriter.ResultFigures(Plain(s), facts).Contains(figure)) ?? "";
 
     /// <summary>
-    /// Check 5: a result figure appears in its theme, in the abstract and in one place after the results (one answer, the
-    /// discussion or one closing part), and never in the directions for future research or the conclusion (the figure
-    /// guard's rule, issue #452). The guard sends an answer back twice and then keeps it; this says what was kept.
+    /// Check 5: a result figure appears in one theme, in the abstract and in one place after the results (one answer, the
+    /// discussion or one closing part), and never in a second theme or in the directions for future research or the
+    /// conclusion (the figure guard's rule, issue #452; the second theme, issue #673). The guard sends an answer back twice
+    /// and then keeps it; this says what was kept.
     /// </summary>
     internal static PaperCheck FiguresCheck(PaperCheckInput input)
     {
@@ -116,32 +118,40 @@ public static partial class PaperSelfCheck
         {
             Id = "figures",
             Title = "Result figures not repeated",
-            Explanation = "A figure from the results (a percentage, an effect size, a count a study reports) belongs in its theme, the abstract and at most one place after the results. " +
-                "The directions for future research and the conclusion say what the results mean, so they repeat no figure.",
+            Explanation = "A figure from the results (a percentage, an effect size, a count a study reports) belongs in one theme, the abstract and at most one place after the results. " +
+                "A second theme does not repeat it. The directions for future research and the conclusion say what the results mean, so they repeat no figure.",
         };
-        var results = input.Of(PaperPartKind.Theme).ToList();
-        if (results.Count == 0) results = input.Of(PaperPartKind.Overview).ToList();
+        var themes = input.Of(PaperPartKind.Theme).ToList();
+        var results = themes.Count > 0 ? themes : input.Of(PaperPartKind.Overview).ToList();
         string facts = string.Join(" ", input.Facts.Select(f => f.Value)) + "\n" + input.FactsText + $"\n{input.Questions.Count}";
         var figures = ReviewWriter.ResultFigures(Plain(string.Join("\n", results.Select(p => p.Text))), facts);
         var after = input.Of(PaperPartKind.Discussion, PaperPartKind.Answer, PaperPartKind.Limitations, PaperPartKind.Implications).ToList();
         var none = input.Of(PaperPartKind.FutureResearch, PaperPartKind.Conclusion).ToList();
-        int repeated = 0;
+        var repeated = new HashSet<string>();
+        static string Names(IReadOnlyList<string> names) => names.Count == 1 ? names[0] : string.Join(", ", names.Take(names.Count - 1)) + " and " + names[^1];
         foreach (var figure in figures.OrderBy(f => f, StringComparer.Ordinal))
         {
-            var used = after.Where(p => ReviewWriter.ResultFigures(Plain(p.Text), facts).Contains(figure)).ToList();
-            var barred = none.Where(p => ReviewWriter.ResultFigures(Plain(p.Text), facts).Contains(figure)).ToList();
+            bool Has(PaperPart p) => ReviewWriter.ResultFigures(Plain(p.Text), facts).Contains(figure);
+            var inThemes = themes.Where(Has).ToList();
+            if (inThemes.Count > 1)
+            {
+                repeated.Add(figure);
+                check.Evidence.Add(new(string.Join(", ", inThemes.Skip(1).Select(p => p.Name)), inThemes[1].Field, Short(SentenceWith(inThemes[1].Text, figure, facts)),
+                    $"{figure} from the results is given in more than one theme: {Names(inThemes.Select(p => p.Name).ToList())}. A figure belongs in one theme."));
+            }
+            var used = after.Where(Has).ToList();
+            var barred = none.Where(Has).ToList();
             var extra = used.Skip(1).Concat(barred).ToList();
             if (extra.Count == 0) continue;
-            repeated++;
-            var places = used.Concat(barred).Select(p => p.Name).ToList();
-            string where = places.Count == 1 ? places[0] : string.Join(", ", places.Take(places.Count - 1)) + " and " + places[^1];
+            repeated.Add(figure);
+            string where = Names(used.Concat(barred).Select(p => p.Name).ToList());
             check.Evidence.Add(new(string.Join(", ", extra.Select(p => p.Name)), extra[0].Field, Short(SentenceWith(extra[0].Text, figure, facts)),
                 $"{figure} from the results appears again in: {where}." + (barred.Count > 0 ? $" {string.Join(" and ", barred.Select(p => p.Name))} should use none." : "")));
         }
         check.Outcome = check.Evidence.Count == 0 ? CheckOutcome.Pass : CheckOutcome.Fault;
         check.Summary = figures.Count == 0 ? "The results give no figures to repeat."
             : check.Evidence.Count == 0 ? $"None of the {Plural(figures.Count, "result figure", "result figures")} is repeated beyond its place."
-            : $"{Plural(repeated, "result figure is", "result figures are")} repeated where the rule does not allow it.";
+            : $"{Plural(repeated.Count, "result figure is", "result figures are")} repeated where the rule does not allow it.";
         return check;
     }
 }

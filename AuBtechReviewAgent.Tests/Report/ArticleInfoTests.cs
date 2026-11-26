@@ -19,8 +19,21 @@ public class ArticleInfoTests
         Assert.Equal(new[]
         {
             "agentic AI software frameworks", "defect reduction and compliance", "scenario handling and evaluation",
-            "autonomous agent orchestration platforms", "fault-tolerant multi-agent architectures",
+            "fault-tolerant multi-agent architectures",
         }, keywords);
+    }
+
+    [Fact]
+    public void ASearchStringIsKeptAsAKeywordOnlyWhenItHasAtMostThreeWords()
+    {
+        // The four strings of run 8942b961 (issue #681): whole sentences of search terms are not keywords.
+        var keywords = ArticleKeywords.From("agentic AI software frameworks",
+            new[] { "agentic AI software frameworks", "LLM agent development frameworks", "evaluating autonomous agent fault tolerance", "multi-agent orchestration" },
+            new[] { "Plan reuse", "Latency", "Compliance" });
+
+        Assert.Equal(new[] { "agentic AI software frameworks", "plan reuse", "latency", "compliance", "multi-agent orchestration" }, keywords);
+        Assert.DoesNotContain("LLM agent development frameworks", keywords);
+        Assert.DoesNotContain("evaluating autonomous agent fault tolerance", keywords);
     }
 
     [Fact]

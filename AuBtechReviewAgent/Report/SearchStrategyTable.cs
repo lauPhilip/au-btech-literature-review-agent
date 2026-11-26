@@ -66,9 +66,7 @@ public static class SearchStrategyTable
             parts.Add((HowSent.TryGetValue(source, out var how) ? how : $"{source} received the string as it is") + ". ");
         if (maxResultsPerSource > 0)
         {
-            int strings = Math.Max(1, searchStrings);
-            int perString = Math.Max(1, (int)Math.Ceiling(maxResultsPerSource / (double)strings));
-            parts.Add(string.Create(inv, $"Each search asked for at most {perString} record{(perString == 1 ? "" : "s")}, and a source was not searched again once it had returned {maxResultsPerSource} distinct records. "));
+            parts.Add(string.Create(inv, $"Each search asked a source for the records it still needed to reach {maxResultsPerSource}, shared over the strings left. A source still short after the last string was searched again, string by string, with larger limits, and a record a source had already returned for a string was not counted again. A source was not searched once it had returned {maxResultsPerSource} distinct records that went on to screening. "));
         }
         parts.Add(yearFrom > 0 && yearTo > 0
             ? string.Create(inv, $"No filter was sent to the databases; records published outside {yearFrom}-{yearTo} were removed after retrieval. ")

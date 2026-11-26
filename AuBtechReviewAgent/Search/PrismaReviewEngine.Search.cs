@@ -29,6 +29,7 @@ public partial class PrismaReviewEngine
 
     private sealed record SearchPass(PlatformSearchLog Log, List<AcademicPaper> Papers, int StringIndex);
 
+
     private async Task SearchAndScreenAsync(RunContext ctx, int yearFrom, int yearTo)
     {
         var request = ctx.Request;
@@ -71,28 +72,39 @@ public partial class PrismaReviewEngine
         // same string, all sources at the same time. The answers of a round are processed in source order, so the
         // duplicate decisions and the ledger do not depend on which source happened to answer first. A source stops
         // taking strings once its cap is filled by records that go on to screening; duplicates and records outside
-        // the year range do not use up the cap (issue #562).
-        int perPerspectiveCap = Math.Max(1, (int)Math.Ceiling(maxResults / (double)searchPerspectives.Count));
+        // the year range do not use up the cap (issue #562). What a round asks for is what the source still needs,
+        // shared over the strings left, so a short round is made up in a later one; after the last string a source
+        // still short of its cap gets one top-up pass with larger limits (issue #681).
         var kept = new int[ctx.Sources.Count];
         var passesBySource = ctx.Sources.Select(_ => new List<SearchPass>()).ToArray();
         var candidatesBySource = ctx.Sources.Select(_ => new List<(AcademicPaper Paper, string SourceName)>()).ToArray();
-        for (int p = 0; p < searchPerspectives.Count; p++)
+        // What each source returned for each string so far, and the limit it was asked with, so a top-up never counts a hit twice.
+        var returned = ctx.Sources.Select(_ => new Dictionary<int, HashSet<string>>()).ToArray();
+        var asked = ctx.Sources.Select(_ => new Dictionary<int, int>()).ToArray();
+
+        async Task RunRoundAsync(int p, List<int> open, Func<int, int> limitOf)
         {
-            var open = Enumerable.Range(0, ctx.Sources.Count).Where(s => kept[s] < maxResults).ToList();
-            if (open.Count == 0) break; // every source has filled its cap: the remaining strings are not run at all
             string query = searchPerspectives[p];
-            int round = p;
-            var answers = await Task.WhenAll(open.Select(s => FetchPassAsync(ctx, ctx.Sources[s], s, query, round, perPerspectiveCap)));
+            var limits = open.ToDictionary(s => s, limitOf);
+            var answers = await Task.WhenAll(open.Select(s => FetchPassAsync(ctx, ctx.Sources[s], s, query, p, limits[s])));
             for (int i = 0; i < open.Count; i++)
             {
                 int s = open[i];
                 var pass = answers[i];
+                asked[s][p] = limits[s];
+                if (!returned[s].TryGetValue(p, out var already)) returned[s][p] = already = new HashSet<string>(StringComparer.Ordinal);
+                // The same hits again are not new records: they are neither identified nor written to the ledger a second time.
+                string KeyOf(AcademicPaper paper) => string.IsNullOrEmpty(paper.Id) ? "title:" + paper.Title : paper.Id;
+                var fresh = pass.Papers.Where(paper => !already.Contains(KeyOf(paper))).ToList();
+                already.UnionWith(pass.Papers.Select(KeyOf));
+                pass = pass with { Papers = fresh };
+                pass.Log.PapersFound = fresh.Count; // the table counts the records the search added
                 passesBySource[s].Add(pass);
-                reviewState.Stats.TotalIdentified += pass.Papers.Count;
+                reviewState.Stats.TotalIdentified += fresh.Count;
 
                 // Every identified record lands in exactly one bucket (duplicate, outside years, over cap, or
                 // candidate), so the PRISMA flow diagram adds up, and every removal is written to the ledger.
-                foreach (var candidate in pass.Papers)
+                foreach (var candidate in fresh)
                 {
                     if (!Admit(ctx, candidate, ctx.Sources[s].SourceName, query, yearFrom, yearTo, capReached: kept[s] >= maxResults)) continue;
                     kept[s]++;
@@ -100,6 +112,27 @@ public partial class PrismaReviewEngine
                 }
             }
         }
+
+        for (int p = 0; p < searchPerspectives.Count; p++)
+        {
+            var open = Enumerable.Range(0, ctx.Sources.Count).Where(s => kept[s] < maxResults).ToList();
+            if (open.Count == 0) break; // every source has filled its cap: the remaining strings are not run at all
+            int stringsLeft = searchPerspectives.Count - p;
+            await RunRoundAsync(p, open, s => SearchLimits.Round(maxResults, kept[s], stringsLeft));
+        }
+
+        // A string a source refused is not asked again: the top-up is for a search that worked and fell short.
+        bool Completed(int s, int p) => passesBySource[s].Any(x => x.StringIndex == p && x.Log.Status.StartsWith("Completed", StringComparison.Ordinal));
+
+        // Top-up: one more pass, strings in order, for each source still below its cap. The limit grows by what the source still needs.
+        for (int p = 0; p < searchPerspectives.Count; p++)
+        {
+            var open = Enumerable.Range(0, ctx.Sources.Count).Where(s => kept[s] < maxResults && Completed(s, p)).ToList();
+            if (open.Count == 0) continue;
+            Interlocked.Add(ref ctx.SearchPassesTotal, open.Count);
+            await RunRoundAsync(p, open, s => SearchLimits.TopUp(asked[s][p], maxResults, kept[s]));
+        }
+
         // The ledger lists the searches and the candidates by source, then by search string, as before.
         var fetches = passesBySource;
         foreach (var pass in fetches.SelectMany(f => f))
@@ -108,8 +141,10 @@ public partial class PrismaReviewEngine
             if (pass.Log.FromCache) reviewState.Stats.CacheHits++;
         }
         var candidates = candidatesBySource.SelectMany(c => c).ToList();
+        // A top-up of a string is the same search again with a larger limit, so it counts with the first one, not as another search.
         reviewState.SearchStringYields = SearchSaturation.Compute(searchPerspectives,
-            fetches.SelectMany(f => f).Select<SearchPass, (int, IReadOnlyList<AcademicPaper>)>(pass => (pass.StringIndex, pass.Papers)));
+            fetches.SelectMany(f => f.GroupBy(pass => pass.StringIndex))
+                .Select<IGrouping<int, SearchPass>, (int, IReadOnlyList<AcademicPaper>)>(g => (g.Key, g.SelectMany(pass => pass.Papers).ToList())));
         OnProgressUpdated?.Invoke(ctx.RunId, reviewState.Stats);
         await SaveStateAsync(ctx.RunId, reviewState);
 

@@ -93,6 +93,8 @@ public static class SystematicSelfCheck
             new("records outside the year range", s.OutsideDateRange, "outside", "year range"),
             new("records over the per-source cap", s.CappedBeyondMaxResults, @"cap\b", "per-source"),
             new("records screened", s.Screened, "screen"),
+            // "We could not screen 1 record" gives this count, not the screened one (issue #673); the methods say "could not be screened".
+            new("records that could not be screened", s.ScreeningErrors, "could not (?:be )?screen", "not screened", "unscreened"),
             new("studies included", s.Included, "includ", "retain"),
             new("records excluded", s.Excluded, "exclud"),
             new("full texts read", s.FullTextRetrieved, "full[- ]?texts?"),

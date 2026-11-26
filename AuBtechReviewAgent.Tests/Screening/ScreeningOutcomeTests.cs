@@ -27,7 +27,7 @@ public class ScreeningOutcomeTests : IDisposable
             FullTextFetcher = (_, _) => Task.FromResult(new FullTextResult(Array.Empty<DocumentChunk>(), "none (test)", null)),
         };
 
-    private static ReviewRequest Request(bool peerReviewOnly = false) => new("agent loops", "Map agent loop safety", Inclusion, Exclusion, 3,
+    private static ReviewRequest Request(bool peerReviewOnly = false, int cap = 3) => new("agent loops", "Map agent loop safety", Inclusion, Exclusion, cap,
         PeerReviewOnly: peerReviewOnly, SelectedSources: new[] { "arxiv" }, SearchStrings: Array.Empty<string>());
 
     private static string Title(string prompt) => Regex.Match(prompt, @"- Title: (.*)").Groups[1].Value.Trim();
@@ -45,7 +45,7 @@ public class ScreeningOutcomeTests : IDisposable
     {
         var cache = new ReviewCache(new CacheOptions { Folder = Path.Join(_root, "cache") }, _root);
         var paper = new AcademicPaper("CACHED_1", "Agent cached paper", "An abstract about agents.", "Published: 2025", new() { "Jane Doe", "Kim Lee" }, "Future Internet");
-        cache.Set("search", ReviewCache.Key("search-v1", "Google Scholar Gateway", "agent loops", "3"),
+        cache.Set("search", ReviewCache.Key("search-v1", "Google Scholar Gateway", "agent loops", "1"),
             new { Papers = new List<AcademicPaper> { paper }, Raw = new List<string> { "{\"cached\":true}" } });
         string ScreeningKey(string screener, string model) => ReviewCache.Key(PrismaReviewEngine.ScreeningPromptVersion, PrismaReviewEngine.ScreeningTemplateSha256(screener == "second"), screener, model, Inclusion, Exclusion,
             paper.Title, paper.Abstract, paper.JournalSource, paper.PublishedDate, "Jane Doe;Kim Lee");
@@ -55,7 +55,8 @@ public class ScreeningOutcomeTests : IDisposable
             new ScreeningAnswer { Decision = "Included", Reasoning = "cached second", BriefSummary = "cached 2", Confidence = "medium" });
 
         var source = new PipelineTests.FakeSource();
-        var state = await Run(Engine(PipelineTests.Respond, source, cache), Request());
+        // A cap of 1: the one cached record fills it, so there is no top-up search that would go to the source.
+        var state = await Run(Engine(PipelineTests.Respond, source, cache), Request(cap: 1));
 
         Assert.Equal(0, source.Calls);
         Assert.True(state.SearchLogs.Single().FromCache);
