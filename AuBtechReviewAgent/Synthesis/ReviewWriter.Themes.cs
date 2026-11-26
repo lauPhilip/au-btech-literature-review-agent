@@ -79,7 +79,8 @@ public static partial class ReviewWriter
         $"Write so that each citation backs exactly what it is attached to: put a marker right after the claim it supports, one finding per citation, and cite several {profile.Sources} together only when each of them states the whole claim. " +
         $"When {profile.Sources} differ, give each its own claim and marker (\"one reports X [1], while another reports Y [2]\"); never attribute a comparison, ranking or trend across {profile.Sources} to a {profile.Source} that does not make it itself. " +
         $"Use no number, count or proportion (\"three approaches\", \"most {profile.Sources}\", \"four of six\") unless it is in the evidence or the facts above; a count of this review's own {profile.Sources} comes from those facts and takes no citation. " +
-        $"Do not add a qualifier (\"always\", \"all\", \"widely\"), a scope or a causal link that the {profile.Source} does not state." +
+        $"Do not add a qualifier (\"always\", \"all\", \"widely\"), a scope or a causal link that the {profile.Source} does not state. " +
+        $"Name a {profile.Source} by its marker or cite it after the claim, never both in one clause: write \"[4] identifies X\" or \"X [4]\", not \"[4] identifies X [4]\"." +
         " " + CitationLoadRule(profile);
 
     /// <summary>
