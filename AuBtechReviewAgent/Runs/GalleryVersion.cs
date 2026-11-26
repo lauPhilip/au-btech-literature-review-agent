@@ -27,6 +27,9 @@ public sealed record GalleryVersion
     public CitationShares Citations { get; init; } = new();
     public List<string> Keywords { get; init; } = new();
 
+    /// <summary>The run's self-check of its paper (self-check.json), or null for a run made before it.</summary>
+    public GallerySelfCheck? SelfCheck { get; init; }
+
     /// <summary>SHA-256 of the edit key of this version's run, with a gallery prefix (GalleryFingerprint.OwnerToken).</summary>
     public string OwnerTokenSha256 { get; init; } = "";
 
@@ -47,6 +50,7 @@ public sealed record GalleryVersion
         References = described.References,
         Citations = described.Citations,
         Keywords = described.Keywords.ToList(),
+        SelfCheck = described.SelfCheck,
         OwnerTokenSha256 = ownerToken,
     };
 }
@@ -74,4 +78,32 @@ public sealed record CitationShares
 
     /// <summary>True when the verdicts were recorded (entries added before this record only have the number checked).</summary>
     public bool HasVerdicts => Supported + Partly + NotSupported + Unverifiable > 0;
+}
+
+/// <summary>The counts of a run's self-check of its paper (Report/PaperSelfCheck.cs), as its self-check.json records them.</summary>
+public sealed record GallerySelfCheck(int Passed, int Notes, int Faults)
+{
+    private static readonly System.Text.Json.JsonSerializerOptions ReadOptions = new() { PropertyNameCaseInsensitive = true };
+
+    /// <summary>"8 checks passed, 2 notes, 1 fault".</summary>
+    [System.Text.Json.Serialization.JsonIgnore] public string Summary => PaperSelfCheck.SummaryLine(Passed, Notes, Faults);
+
+    /// <summary>
+    /// The self-check the run wrote, read from its folder; null when the run has none. A run made before the self-check
+    /// gets none here, so the gallery never shows a check the run did not make itself.
+    /// </summary>
+    public static GallerySelfCheck? Read(string folder)
+    {
+        string path = System.IO.Path.Join(folder, PaperSelfCheckFile.FileName);
+        if (!System.IO.File.Exists(path)) return null;
+        try
+        {
+            var file = System.Text.Json.JsonSerializer.Deserialize<PaperSelfCheckFile>(System.IO.File.ReadAllText(path), ReadOptions);
+            return file == null || file.Passed + file.Notes + file.Faults == 0 ? null : new(file.Passed, file.Notes, file.Faults);
+        }
+        catch (Exception ex) when (ex is System.Text.Json.JsonException or System.IO.IOException or UnauthorizedAccessException)
+        {
+            return null;
+        }
+    }
 }

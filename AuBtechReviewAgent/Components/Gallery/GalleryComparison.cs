@@ -86,7 +86,7 @@ public static class GalleryComparison
     {
         string Show(CitationShares s, int n) => s.HasVerdicts ? $"{N(n)} ({s.Percent(n)}%)" : NotRecorded;
         string change = fa.HasVerdicts && fb.HasVerdicts
-            ? (fb.Percent(b) - fa.Percent(a)) is var points && points == 0 ? "same share" : $"{(points > 0 ? "+" : "−")}{Math.Abs(points)} points"
+            ? (fb.Percent(b) - fa.Percent(a)) is var points && points == 0 ? "same share" : $"{(points > 0 ? "+" : "−")}{Math.Abs(points)} {(Math.Abs(points) == 1 ? "point" : "points")}"
             : "–";
         return new(label, Show(fa, a), Show(fb, b), change);
     }
