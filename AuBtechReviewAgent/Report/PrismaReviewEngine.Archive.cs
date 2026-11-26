@@ -76,6 +76,8 @@ public partial class PrismaReviewEngine
         // The certainty of each answer is rated in code from the run's files (PRISMA 2020 items 15 and 22).
         var certainty = SystematicCertainty.Assess(report, state?.ThematicSynthesis, state?.Extractions);
         if (certainty != null) methods.Add(new("Certainty of the Evidence", certainty.Method));
+        // PRISMA 2020 items 12, 13b, 13e and 14: what the tool does not do, said plainly in code.
+        methods.Add(new(PrismaChecklist.NotAssessedHeading, PrismaChecklist.NotAssessedText(certainty != null)));
         // The reviewer's research questions come first in the method, as published reviews list them.
         var questions = state?.ResearchQuestions ?? new List<string>();
         if (questions.Count > 0)
@@ -83,7 +85,6 @@ public partial class PrismaReviewEngine
                 $"\\noindent\\textbf{{RQ{i + 1}.}} {EscapeLatexText(q)}\\par{Environment.NewLine}"))));
 
         string dataLatex = DataFiguresLatex(records, state);
-        string appendixLatex = AppendixLatex(records, state);
 
         var resultsLatex = new List<string>();
         if (state?.ThematicSynthesis is { Themes.Count: > 0 } book && (report.SynthesisSections?.Count ?? 0) > 0)
@@ -92,7 +93,8 @@ public partial class PrismaReviewEngine
             resultsLatex.Add(ArtifactLatex(artifact));
         // The certainty table takes the next number of the results' tables (4.1 the evidence map, 4.2 a table artifact).
         int resultTables = resultsLatex.Count(b => b.Contains(@"\textbf{Table 4.", StringComparison.Ordinal));
-        if (certainty != null) resultsLatex.Add(CertaintyLatex.Table(certainty, $"4.{resultTables + 1}"));
+        string? certaintyTable = certainty != null ? $"4.{resultTables + 1}" : null;
+        if (certainty != null) resultsLatex.Add(CertaintyLatex.Table(certainty, certaintyTable!));
         if (!string.IsNullOrEmpty(tikzDiagramCode))
             resultsLatex.Add(string.Join("", new[]
             {
@@ -118,7 +120,7 @@ public partial class PrismaReviewEngine
             new("Support & Funding", PaperDeclarations.Funding(report.SupportItem)),
             new("Availability of Data and Code", "", LatexBreaks.Allow((report.AvailabilityItem ?? "").Replace("_", @"\_"))),
         };
-        string aiMethods = "";
+        string aiMethods = "", publisherVariants = "";
         if (state != null)
         {
             aiMethods = AiUseStatement.Methods(state, sessionId, LoadReportEdits(sessionId), report.Artifact);
@@ -126,12 +128,30 @@ public partial class PrismaReviewEngine
         }
         declarations.AddRange(PaperDeclarations.Placeholders());
         if (state != null)
-            appendixLatex += PaperDeclarations.PublisherVariantsLatex(AiUseStatement.Used(state), AiUseStatement.Purpose, AiUseStatement.Short(state), aiMethods);
+            publisherVariants = PaperDeclarations.PublisherVariantsLatex(AiUseStatement.Used(state), AiUseStatement.Purpose, AiUseStatement.Short(state), aiMethods);
+
+        string title = (report.TitleItem ?? "Systematic Review Manuscript").Replace("[Source Context Anchor 1]", "").Trim();
+        // The headings main.tex will have, so the checklist refers only to sections that exist (LatexLabels).
+        var headings = new[] { "Rationale", "Objectives", "Characteristics of the Included Studies", "Results & Synthesis" }
+            .Concat(string.IsNullOrWhiteSpace(report.DiscussionItem) ? Array.Empty<string>() : new[] { "General Interpretation" })
+            .Concat(string.IsNullOrWhiteSpace(report.ConclusionItem) ? Array.Empty<string>() : new[] { "Conclusion" })
+            .Concat(methods.Concat(discussionNotes).Concat(declarations).Select(x => x.Heading)).ToList();
+        // The checklist ends the appendix's tables; the statements on AI use for submission follow it.
+        string appendixLatex = AppendixLatex(records, state, new PrismaChecklistContext
+        {
+            Headings = headings,
+            TitleSaysSystematicReview = title.Contains("systematic", StringComparison.OrdinalIgnoreCase),
+            EvidenceMapTable = state?.ThematicSynthesis is { Themes.Count: > 0 } && (report.SynthesisSections?.Count ?? 0) > 0 ? "4.1" : null,
+            HumanScreeningReview = !string.IsNullOrWhiteSpace(state?.HumanScreeningReviewOutcome),
+            HasProtocol = !string.IsNullOrWhiteSpace(report.ProtocolItem),
+            CertaintyTable = certaintyTable,
+        }) + publisherVariants;
 
         var paper = new ReviewPaper
         {
+            LabelSections = true,
             KindLabel = "AI-GENERATED SYSTEMATIC LITERATURE REVIEW",
-            Title = (report.TitleItem ?? "Systematic Review Manuscript").Replace("[Source Context Anchor 1]", "").Trim(),
+            Title = title,
             ProtocolHash = string.IsNullOrWhiteSpace(report.ProtocolHash) ? "not recorded" : report.ProtocolHash,
             Keywords = state == null ? Array.Empty<string>() : ArticleKeywords.From(state.SearchQuery,
                 state.SearchPerspectives.Count > 0 ? state.SearchPerspectives : new List<string> { state.SearchQuery },

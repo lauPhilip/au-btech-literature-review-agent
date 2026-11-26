@@ -109,7 +109,7 @@ public class SystematicCertaintyTests : IDisposable
         Assert.NotNull(file.Answers[0].Overall);
         Assert.NotNull(file.Answers[1].NotRated);
         Assert.Equal(0.5, file.Rule.ConcernShare);
-        Assert.Contains("\\subsection{Certainty of the Evidence}\n" + PaperLatex.Escape(EvidenceCertainty.Method()), tex);
+        Assert.Contains("\\subsection{Certainty of the Evidence}\\label{sec:certainty-of-the-evidence}\n" + PaperLatex.Escape(EvidenceCertainty.Method()), tex);
         Assert.Contains(": Certainty of the Evidence for Each Answer}", tex);
         Assert.Contains(PaperLatex.Escape(file.Answers[0].Phrase) + "\\par", tex);
         Assert.Contains("(certainty not rated: no evidence bears on this question)\\par", tex);
