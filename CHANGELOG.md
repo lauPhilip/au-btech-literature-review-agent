@@ -6,6 +6,12 @@ Each version's section becomes the notes of its GitHub release, so write it for 
 
 ## [Unreleased]
 
+### Fixed
+
+A pilot run's title no longer says "Pilot Pilot", and the PRISMA checklist now tells the truth about a pilot run's title. The methods count reviews by their study type, give book chapters their own count instead of calling them journals, and count a study whose DOI is not at Crossref as not checked for retractions, not as a failed check. Some small grammar slips are gone, and the cap on records per source and the research questions are each said once.
+
+The citation check is now told as one story that adds up: what the first check found, what the second check changed, what the repair rewrote or dropped, and how many citations are left. It now sits in the methods, not in the discussion. 🧮 Table A.1 in main.tex starts with the reference number, so you can match a row to its [n].
+
 ## [0.6.0] - 2026-11-26
 
 The systematic review now answers its research questions first, cites what the studies found, and checks its own paper, so it is honest about how good its evidence is. It tells you when a cited study was retracted, marks a citation it could not confirm with a dagger, and rates how sure each answer is. The paper covers the whole PRISMA 2020 checklist, is written in plain technical English (based on ASD-STE100) and has APA 7 references completed from Crossref, OpenAlex and arXiv. It reads like a journal article on A4 pages. Many prompts and checks changed, so a run can differ from 0.5.0, most of all a run with research questions, and a rerun now gives the same themes. The multivocal review, still in preview, learned a lot from its first real run. And the site now puts every review in one fair line, keeps bots at the door and has a gallery of example reports.
