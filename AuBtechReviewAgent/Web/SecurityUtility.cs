@@ -20,35 +20,17 @@ public static class SecurityUtility
     }
 
     /// <summary>
-    /// Strips HTML tags and a few known prompt-injection phrases. No longer used for the review form: it
-    /// rewrote the reviewer's criteria silently (and "&lt; 5 years" lost its text), so the form now goes
-    /// through <see cref="ReviewInputGuard"/>, which flags instead of rewriting. Kept for other callers.
+    /// True for the values appsettings.json ships with ("YOUR_MISTRAL_API_KEY_PLACEHOLDER" and the like).
+    /// Matches only that pattern, so a real key that happens to contain the word is not rejected.
     /// </summary>
-    public static string SanitizeInput(string? input)
-    {
-        if (string.IsNullOrWhiteSpace(input)) return string.Empty;
+    public static bool IsPlaceholderKey(string? value) =>
+        value != null && Regex.IsMatch(value.Trim(), @"^YOUR_.*_PLACEHOLDER$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
 
-        string clean = input;
-
-        // 1. Script Injection Countermeasure: Strip out all HTML tags and script elements
-        clean = Regex.Replace(clean, @"<[^>]*>", string.Empty);
-
-        // 2. Prompt Injection Countermeasure: Neutralize adversarial directive overrides
-        string[] maliciousPhrases = new[] 
-        {
-            "ignore previous instructions",
-            "ignore above instructions",
-            "system override",
-            "you are now an adversarial",
-            "forget your goals",
-            "stop executing the systematic review"
-        };
-
-        foreach (var phrase in maliciousPhrases)
-        {
-            clean = Regex.Replace(clean, phrase, "[DIRECTIVE_REMOVED_FOR_COMPLIANCE]", RegexOptions.IgnoreCase);
-        }
-
-        return clean.Trim();
-    }
+    /// <summary>
+    /// The key the server was configured with, cleaned, or empty when none is usable: nothing set, the
+    /// shipped placeholder, or a value that is empty after <see cref="SanitizeApiKey"/>. Program.cs refuses to
+    /// start on an empty Mistral key and treats an empty optional key as "source not configured".
+    /// </summary>
+    public static string ConfiguredServerKey(string? configured) =>
+        IsPlaceholderKey(configured) ? string.Empty : SanitizeApiKey(configured);
 }

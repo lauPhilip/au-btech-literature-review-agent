@@ -62,11 +62,13 @@ builder.Services.AddScoped<AuBtechReviewAgent.UiStateContainer>();
 
 // Language model: Mistral (default) or any OpenAI-compatible server, e.g. a local Ollama (see the Llm section).
 var llmOptions = builder.Configuration.GetSection("Llm").Get<AuBtechReviewAgent.LlmOptions>() ?? new AuBtechReviewAgent.LlmOptions();
-string mistralApiKey = builder.Configuration["MISTRAL_API_KEY"] ?? "";
+// The shipped placeholder (YOUR_MISTRAL_API_KEY_PLACEHOLDER) and a value with nothing usable left after cleaning count as missing.
+string mistralApiKey = AuBtechReviewAgent.SecurityUtility.ConfiguredServerKey(builder.Configuration["MISTRAL_API_KEY"]);
 if (!llmOptions.IsOpenAICompatible && string.IsNullOrWhiteSpace(mistralApiKey))
     throw new InvalidOperationException("MISTRAL_API_KEY is missing. Set it with dotnet user-secrets, or set Llm:Provider to OpenAICompatible.");
-string elsevierApiKey = builder.Configuration["ELSEVIER_API_KEY"] ?? "";
-string ieeeApiKey = builder.Configuration["IEEE_API_KEY"] ?? "";
+// Optional keys: a placeholder means "not configured", so the source is skipped as when the key is missing.
+string elsevierApiKey = AuBtechReviewAgent.SecurityUtility.ConfiguredServerKey(builder.Configuration["ELSEVIER_API_KEY"]);
+string ieeeApiKey = AuBtechReviewAgent.SecurityUtility.ConfiguredServerKey(builder.Configuration["IEEE_API_KEY"]);
 // Optional Semantic Scholar key (the open sources OpenAlex, Semantic Scholar and Crossref need no key).
 var openSources = builder.Configuration.GetSection("OpenSources").Get<AuBtechReviewAgent.OpenSourcesOptions>() ?? new AuBtechReviewAgent.OpenSourcesOptions();
 string scholarApiKey = openSources.SemanticScholarApiKey;
