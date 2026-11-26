@@ -135,14 +135,14 @@ public sealed class ReferenceEnricher
 
         // A preprint whose arXiv entry names a journal or proceedings: cite the published version when Crossref has one
         // under the same title and first author (issue #566); otherwise the journal reference is read as it is.
-        if (doi == null || arxivDoi)
-            if (arxivId != null && !string.IsNullOrWhiteSpace(log.VenueName) && await PublishedVersionAsync(entry, log, runFolder) is { } published)
-            {
-                var cited = ReferenceMerge.Published(log, published.Answer, published.Doi, published.Year, entry.Filled);
-                entry.After = cited.ApaCitation;
-                entry.Completed = new CompletedReference { Authors = cited.Authors?.ToList() ?? new(), Venue = cited.VenueName ?? "", Details = cited.Details };
-                return (cited, entry);
-            }
+        if ((doi == null || arxivDoi) && arxivId != null && !string.IsNullOrWhiteSpace(log.VenueName)
+            && await PublishedVersionAsync(entry, log, runFolder) is { } published)
+        {
+            var cited = ReferenceMerge.Published(log, published.Answer, published.Doi, published.Year, entry.Filled);
+            entry.After = cited.ApaCitation;
+            entry.Completed = new CompletedReference { Authors = cited.Authors?.ToList() ?? new(), Venue = cited.VenueName ?? "", Details = cited.Details };
+            return (cited, entry);
+        }
 
         if (arxivId != null && entry.Lookups.Count == 0)
             entry.Skipped = "it came from arXiv, which gives the full author list, and its arXiv entry names no journal or proceedings to complete it from";

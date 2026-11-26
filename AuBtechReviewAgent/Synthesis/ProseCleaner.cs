@@ -159,6 +159,7 @@ public static class ProseCleaner
     private static string DropRepeatedInClause(string sentence)
     {
         var markers = Marker.Matches(sentence).Cast<Match>().ToList();
+        var kept = new StringBuilder(sentence);
         for (int i = markers.Count - 2; i >= 1; i--)
         {
             Match previous = markers[i - 1], m = markers[i];
@@ -168,9 +169,9 @@ public static class ProseCleaner
             bool closes = after.Length == 0 || ",;:)".Contains(after[0]) || Regex.IsMatch(after, @"^(and|or|but|while|whereas)\b", RegexOptions.IgnoreCase);
             var refs = CitationSupportChecker.ReferencesIn(m.Value);
             if (!names || !closes || !refs.All(CitationSupportChecker.ReferencesIn(previous.Value).Contains)) continue;
-            sentence = sentence[..m.Index] + sentence[(m.Index + m.Length)..];
+            kept.Remove(m.Index, m.Length); // from the end backwards, so the earlier markers keep their positions
         }
-        return sentence;
+        return kept.ToString();
     }
 
     private static string EndAsSentence(string s)
