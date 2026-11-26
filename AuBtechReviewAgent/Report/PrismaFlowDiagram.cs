@@ -28,6 +28,22 @@ public class PrismaFlowCounts
     public int FullTextRetrieved { get; set; }
     public int AbstractOnly => Math.Max(0, Included - FullTextRetrieved);
 
+    /// <summary>
+    /// Why the full texts of included studies could not be retrieved, from FullTextSources ("none (reason)"); empty for
+    /// a run that recorded no reasons. Those studies are kept and read from the abstract only.
+    /// </summary>
+    public List<(string Reason, int Count)> NotRetrievedByReason { get; set; } = new();
+
+    /// <summary>
+    /// PRISMA 2020's boxes after screening. Every record that passes screening is sought in full text, so the reports
+    /// sought are the included studies. Those not retrieved are kept and read from the abstract only, so every report
+    /// sought is assessed, in full text or on its abstract. Eligibility is decided at screening, so none is excluded here.
+    /// </summary>
+    public int ReportsSought => Included;
+    public int ReportsNotRetrieved => AbstractOnly;
+    public int ReportsAssessed => Included;
+    public const int ReportsExcluded = 0;
+
     /// <summary>Every identified record must end up in exactly one box. False means the counters disagree.</summary>
     public bool IsConsistent =>
         Identified == DuplicatesRemoved + OutsideDateRange + CappedBeyondMax + Screened + ScreeningErrors
@@ -61,8 +77,27 @@ public class PrismaFlowCounts
             HumanReviewed = s.HumanReviewed > 0,
             Included = s.Included,
             FullTextRetrieved = s.FullTextRetrieved,
+            NotRetrievedByReason = NotRetrievedReasons(state.FullTextSources.Values),
         };
     }
+
+    /// <summary>The reasons in FullTextSources values such as "none (download failed: 403)", grouped and counted.</summary>
+    public static List<(string Reason, int Count)> NotRetrievedReasons(IEnumerable<string> sources) =>
+        sources.Where(v => v.StartsWith("none", StringComparison.Ordinal))
+            .Select(v =>
+            {
+                int open = v.IndexOf('(');
+                string inner = open < 0 ? "" : v[(open + 1)..].TrimEnd(')').Trim();
+                int colon = inner.IndexOf(':');
+                if (colon >= 0) inner = inner[..colon].Trim();
+                return inner.Length == 0 ? "No reason recorded" : char.ToUpperInvariant(inner[0]) + inner[1..];
+            })
+            .GroupBy(r => r).OrderByDescending(g => g.Count()).ThenBy(g => g.Key, StringComparer.Ordinal)
+            .Select(g => (g.Key, g.Count())).ToList();
+
+    /// <summary>The lines under "Reports not retrieved": each reason with its count, when they add up to the count.</summary>
+    public List<string> NotRetrievedLines() =>
+        NotRetrievedByReason.Sum(r => r.Count) == ReportsNotRetrieved ? NotRetrievedByReason.Select(r => $"{r.Reason} (n = {r.Count})").ToList() : new();
 }
 
 /// <summary>Renders the PRISMA 2020 flow diagram (identification, screening, included) as TikZ for main.tex.</summary>
@@ -99,9 +134,18 @@ public static class PrismaFlowDiagram
         sb.AppendLine($"\\node[sidebox, right=of id] (removed) {{Records removed before screening:\\\\ {string.Join("\\\\ ", removed)}}};");
         sb.AppendLine(Box("screened", ", below=of id", $"Records screened (n = {c.Screened})"));
         sb.AppendLine($"\\node[sidebox, right=of screened] (excluded) {{Records excluded:\\\\ {string.Join("\\\\ ", excluded)}}};");
-        sb.AppendLine(Box("included", ", below=of screened", $"Studies included in review (n = {c.Included})\\\\ Full text used (n = {c.FullTextRetrieved}); abstract only (n = {c.AbstractOnly})"));
+        sb.AppendLine(Box("sought", ", below=of screened", $"Reports sought for retrieval (n = {c.ReportsSought})"));
+        var notRetrieved = c.NotRetrievedLines().Select(Escape).Append("Kept and read from the abstract only");
+        sb.AppendLine($"\\node[sidebox, right=of sought] (notretrieved) {{Reports not retrieved (n = {c.ReportsNotRetrieved}):\\\\ {string.Join("\\\\ ", notRetrieved)}}};");
+        sb.AppendLine(Box("assessed", ", below=of sought", $"Reports assessed for eligibility (n = {c.ReportsAssessed})\\\\ in full text (n = {c.Included - c.AbstractOnly}); on the abstract (n = {c.AbstractOnly})"));
+        sb.AppendLine($"\\node[sidebox, right=of assessed] (reportsexcluded) {{Reports excluded (n = {PrismaFlowCounts.ReportsExcluded}):\\\\ eligibility was decided at screening}};");
+        sb.AppendLine(Box("included", ", below=of assessed", $"Studies included in review (n = {c.Included})\\\\ Full text used (n = {c.FullTextRetrieved}); abstract only (n = {c.AbstractOnly})"));
         sb.AppendLine(@"\draw[arrow] (id) -- (screened);");
-        sb.AppendLine(@"\draw[arrow] (screened) -- (included);");
+        sb.AppendLine(@"\draw[arrow] (screened) -- (sought);");
+        sb.AppendLine(@"\draw[arrow] (sought) -- (assessed);");
+        sb.AppendLine(@"\draw[arrow] (assessed) -- (included);");
+        sb.AppendLine(@"\draw[arrow] (sought) -- (notretrieved);");
+        sb.AppendLine(@"\draw[arrow] (assessed) -- (reportsexcluded);");
         sb.AppendLine(@"\draw[arrow] (id) -- (removed);");
         sb.AppendLine(@"\draw[arrow] (screened) -- (excluded);");
         sb.AppendLine(@"\end{tikzpicture}");

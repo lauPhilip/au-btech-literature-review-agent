@@ -87,9 +87,17 @@ The 2 included papers were published between 2025 and 2026, most of them in 2026
 \node[sidebox, right=of id] (removed) {Records removed before screening:\\ Duplicates (n = 0)};
 \node[flowbox, below=of id] (screened) {Records screened (n = 3)};
 \node[sidebox, right=of screened] (excluded) {Records excluded:\\ Did not meet criteria (n = 1)};
-\node[flowbox, below=of screened] (included) {Studies included in review (n = 2)\\ Full text used (n = 0); abstract only (n = 2)};
+\node[flowbox, below=of screened] (sought) {Reports sought for retrieval (n = 2)};
+\node[sidebox, right=of sought] (notretrieved) {Reports not retrieved (n = 2):\\ Test (n = 2)\\ Kept and read from the abstract only};
+\node[flowbox, below=of sought] (assessed) {Reports assessed for eligibility (n = 2)\\ in full text (n = 0); on the abstract (n = 2)};
+\node[sidebox, right=of assessed] (reportsexcluded) {Reports excluded (n = 0):\\ eligibility was decided at screening};
+\node[flowbox, below=of assessed] (included) {Studies included in review (n = 2)\\ Full text used (n = 0); abstract only (n = 2)};
 \draw[arrow] (id) -- (screened);
-\draw[arrow] (screened) -- (included);
+\draw[arrow] (screened) -- (sought);
+\draw[arrow] (sought) -- (assessed);
+\draw[arrow] (assessed) -- (included);
+\draw[arrow] (sought) -- (notretrieved);
+\draw[arrow] (assessed) -- (reportsexcluded);
 \draw[arrow] (id) -- (removed);
 \draw[arrow] (screened) -- (excluded);
 \end{tikzpicture}

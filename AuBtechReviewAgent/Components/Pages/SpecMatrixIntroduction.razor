@@ -66,6 +66,11 @@
     </div>
 }
 
+<div class="space-y-2">
+    <h3 class="font-display text-base font-semibold text-heading">@(string.IsNullOrWhiteSpace(Page.report.SynthesisMethodsItem) ? "2.6" : "2.7") @AuBtechReviewAgent.PrismaChecklist.NotAssessedHeading (Items 12-14)</h3>
+    <p class="text-ink">@AuBtechReviewAgent.PrismaChecklist.NotAssessedText(Page.certainty != null)</p>
+</div>
+
 </section>
 
 @code {
@@ -98,6 +103,8 @@
             <ol class="mt-3 space-y-2 text-[15px] leading-snug">
                 @(FlowRow("Identified", c.Identified, identifiedDetail, "Removed before screening", removed, removedDetail))
                 @(FlowRow(screenedLabel, c.Screened, "Title and abstract", "Excluded", excluded, excludedDetail))
+                @(FlowRow("Sought in full text", c.ReportsSought, "Reports of the records kept", "Not retrieved", c.ReportsNotRetrieved, string.Join(" · ", c.NotRetrievedLines().Append("read from the abstract only"))))
+                @(FlowRow("Assessed for eligibility", c.ReportsAssessed, $"in full text {c.Included - c.AbstractOnly} · on the abstract {c.AbstractOnly}", "Excluded", AuBtechReviewAgent.PrismaFlowCounts.ReportsExcluded, "eligibility was decided at screening"))
                 @(FlowRow("Included", c.Included, $"full text read {c.FullTextRetrieved} · abstract only {c.AbstractOnly}", null, 0, ""))
             </ol>
             @if (Page.stats is { DualScreened: > 0 } st)
