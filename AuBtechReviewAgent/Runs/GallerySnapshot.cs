@@ -72,6 +72,8 @@ public static class GallerySnapshot
             Identified = state.Stats.TotalIdentified,
             Themes = state.Stats.ThemesIdentified,
             CitationsChecked = state.Stats.CitationsChecked,
+            Citations = CitationShares.Of(state.Stats),
+            References = state.SynthesizedRecords?.Count ?? 0,
             Keywords = keywords,
             Fingerprint = GalleryFingerprint.Of(string.IsNullOrWhiteSpace(header.Card) ? ReviewMethod.SystematicKey : header.Card, topic, questions),
         };

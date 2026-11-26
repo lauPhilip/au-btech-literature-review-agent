@@ -58,7 +58,15 @@
             <div class="space-y-2">
                 <h3 class="font-display text-base font-semibold text-heading">RQ@(answer.Number). @answer.Question</h3>
                 @Page.CitedText($"researchAnswer{answer.Number}", answer.Answer)
+                @if (Page.certainty?.Answers.FirstOrDefault(c => c.Number == answer.Number) is { } rated)
+                {
+                    <p class="text-sm text-muted">@rated.Phrase</p>
+                }
             </div>
+        }
+        @if (Page.certainty is { } certainty)
+        {
+            <SpecMatrixCertainty Certainty="certainty" />
         }
         <div class="space-y-2">
             @Page.CitedText("conclusionItem", Page.report.ConclusionItem)

@@ -32,10 +32,12 @@ public static class RunArchiveCache
         (header.Module == "multivocal" ? header.Stage == MultivocalWriter.StageChecked : PrismaReviewEngine.IsFinishedStage(header.Stage));
 
     /// <summary>
-    /// The kept archive when its stamp matches, else the one <paramref name="build"/> makes, kept for next time
-    /// when the run is finished and nothing in the folder changed while it was built.
+    /// The kept archive when its stamp matches, else the one <paramref name="write"/> writes, kept for next time
+    /// when the run is finished and nothing in the folder changed while it was built. The archive is written to a
+    /// file in the run folder, never to memory, and a copy that is not kept is deleted when the stream is closed.
+    /// Null when <paramref name="write"/> returns false: there is no archive to send.
     /// </summary>
-    public static Stream GetOrBuild(string folder, RunFolderStamp stamp, bool finished, Func<byte[]> build)
+    public static Stream? GetOrBuild(string folder, RunFolderStamp stamp, bool finished, Func<Stream, bool> write)
     {
         string path = Path.Join(folder, FileName(stamp));
         if (finished)
@@ -45,30 +47,51 @@ public static class RunArchiveCache
             catch (IOException ex) { _log.LogWarning("Archive cache: could not read the kept archive: {Message}", ex.GetType().Name); }
         }
 
-        byte[] zip = build();
-        if (finished && zip.Length > 0 && RunFolderStamp.Of(folder)?.ETag == stamp.ETag) Keep(folder, path, zip);
-        return new MemoryStream(zip, writable: false);
-    }
-
-    private static void Keep(string folder, string path, byte[] zip)
-    {
         string part = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
+        bool written;
         try
         {
-            File.WriteAllBytes(part, zip);
+            using var file = new FileStream(part, FileMode.CreateNew, FileAccess.ReadWrite, FileShare.Read | FileShare.Delete, 81920);
+            written = write(file) && file.Length > 0;
+        }
+        catch
+        {
+            TryDelete(part);
+            throw;
+        }
+        if (!written)
+        {
+            TryDelete(part);
+            return null;
+        }
+        if (finished && RunFolderStamp.Of(folder)?.ETag == stamp.ETag && Keep(folder, part, path))
+            return new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+        return new FileStream(part, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete, 81920, FileOptions.DeleteOnClose);
+    }
+
+    private static bool Keep(string folder, string part, string path)
+    {
+        try
+        {
             File.Move(part, path, overwrite: true);
             foreach (var old in Directory.EnumerateFiles(folder, Prefix + "*" + Suffix).Where(f => !string.Equals(Path.GetFileName(f), Path.GetFileName(path), StringComparison.Ordinal)))
                 File.Delete(old);
+            return true;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
             // Keeping the archive only saves time; the download goes on without it.
             _log.LogWarning("Archive cache: could not keep the archive: {Message}", ex.GetType().Name);
-            try { File.Delete(part); }
-            catch (Exception cleanup) when (cleanup is IOException or UnauthorizedAccessException)
-            {
-                _log.LogDebug("Archive cache: a part file stays until the run folder goes: {Message}", cleanup.GetType().Name);
-            }
+            return File.Exists(path) && !File.Exists(part);
+        }
+    }
+
+    private static void TryDelete(string part)
+    {
+        try { File.Delete(part); }
+        catch (Exception cleanup) when (cleanup is IOException or UnauthorizedAccessException)
+        {
+            _log.LogDebug("Archive cache: a part file stays until the run folder goes: {Message}", cleanup.GetType().Name);
         }
     }
 }

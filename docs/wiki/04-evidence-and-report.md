@@ -172,6 +172,24 @@ Steps that do not read each other's output run at the same time, which shortens 
 
 The codebook, coverage, second coding and the list of studies not cited (with the reason) are saved as `thematic-codebook.json` and as `ReviewState.ThematicSynthesis`. The Review Output page and `main.tex` show them as an evidence map (themes × studies).
 
+## Certainty of the evidence
+
+Each answer to a research question gets a certainty rating of high, moderate, low or very low, inspired by GRADE-CERQual and GRADE (`Synthesis/EvidenceCertainty.cs` and its partial files). It is computed in code from the run's files, with no model call, every time the report page is shown or the archive is built, so it follows the reviewer's checked edits and older runs get it too (`Modules/Systematic/SystematicCertainty.cs`). It is an automated approximation, and the method says so.
+
+The evidence behind an answer is the studies it cites and the studies of the themes the codebook maps to its question. The rating starts at high when all of them are empirical, at moderate when at least half are, and at low otherwise. It then drops one level for each serious concern, down to very low, as the table shows. A concern is serious when more than half of the studies behind the answer are affected; the thresholds live in `CertaintyRule` and are written to `certainty.json`.
+
+| Domain | Lowers the rating when | Not assessed when |
+|---|---|---|
+| Methodological limitations | more than half of the studies fail more than half of their MMAT criteria ("can't tell" is not a failure) | never |
+| Read from the abstract only | more than half of the studies were read from the abstract only, or had no text | never |
+| Coherence | more than half of the studies were placed in a theme of the question by only one of the two independent codings of their quotes (the second coding's disagreements) | the run has no second coding |
+| Adequacy of data | the answer rests on fewer than two studies, so a single study is never enough | never |
+| Relevance | more than half of the studies have no code that names the question | no code names its question |
+
+A sensitivity check counts what each answer still rests on without the studies read from the abstract only, and without those that fail more than half of their MMAT criteria, and names any theme of the question that would then keep no study. An answer that would rest on fewer than two studies does not hold without them, and the summary sentence names it. A question with no evidence is not rated, with the reason.
+
+The report shows this in four places. The method gains a subsection "Certainty of the Evidence" (PRISMA 2020 item 15). The results gain a short summary in plain sentences and a table with each answer's concerns per domain and its reasons (item 22), numbered after the evidence map and a table artifact. In the conclusion, each answer is followed by its phrase, such as "(low certainty: three studies, two read from the abstract only)", and the summary closes the answers. The archive holds `certainty.json` with the method, the rule and every rating. The Review Output page shows the phrase under each answer and the same table after the answers.
+
 ## The artifact
 
 On the dashboard the reviewer chooses what the review should produce besides the text: a concept map of the themes, a flowchart of a process or framework, a comparison table, a bullet-point list, a custom request, or nothing, plus an optional instruction ("a flowchart of how the studies evaluate agent safety, from threat to mitigation"). `ArtifactBuilder.BuildAsync` (stage `artifact`) builds it after the theme subsections and the discussion are final, from those texts only, so it can only contain what the review found. The reviewer's instruction goes into the prompt with `PromptSafety.ReviewerInputNotice`, after the same input check as the other fields.
@@ -228,6 +246,29 @@ The visible unevenness was text running into the right margin. TeX breaks a line
 | Multivocal run 50e9a8e3 | 15 (and 2 overfull pages) | 0 | 57.0 mm (archived addresses) | 0.0 mm |
 
 `PaperMarginsTests` pins the preamble and the break points, and compiles a paper full of long addresses with pdflatex where it is installed (CI has none, so there it checks the markup only); `MultivocalPaperMarginsTests` pins the flow diagram's box and the one-row tables. The printed web report has even margins too: `@page { size: A4; margin: 15mm; }` in `Styles/tailwind.input.css` (see page 6, "Printing a report").
+
+## The self-check of a finished paper
+
+Every finished systematic run checks its own paper in code, without a model call, once the report files are written (Lau, 25 November 2026). The checks look for what an editor notices first, the faults the hand review of run 50e9a8e3 found: numbers attached to the wrong count, a question without an answer, a missing discussion nobody mentions, the same figure in every section. Each check gives a pass, a note or a fault, the evidence (the part of the paper, its field, the sentence or the value) and a plain-English line on what it looks for. A fault changes nothing in the paper, which is already written; it is shown to the reader and the owner as it is.
+
+| # | Check | Fault when | Note when |
+|---|---|---|---|
+| 1 | Numbers in the abstract and conclusion | a number is neither a run count nor in the results, or a count names the wrong thing ("34 included" when 34 were screened) | |
+| 2 | Every research question answered | an answer is missing, or cites nothing and does not say why | the evidence cannot answer a question and the answer says so |
+| 3 | Discussion and closing parts present | the discussion, limitations, implications, future research or conclusion is empty and the paper does not say so | a part is missing and the paper says so, or a part has under 15 words |
+| 4 | At most 3 references per sentence | a written sentence cites more than three | |
+| 5 | Result figures not repeated | a result figure appears in more than one place after the results, or in the future research or conclusion | |
+| 6 | Included studies cited | a study is not cited in the results or discussion with no reason on file, or a theme rests on one study with no reason | the same, with a reason on file |
+| 7 | Citations backed by their sources | a citation is still not supported after repair, none was checked, or the run page gives other counts of the check than the report | partly supported, not checkable or removed citations |
+| 8 | References complete and consistent | a cited number is not in the list, or a work is listed twice | an entry is cited nowhere, or lacks a year, venue or DOI |
+| 9 | Key terms used consistently | never | a theme is not named in the discussion, answers or conclusion, or a question's words are not in the answers |
+| 10 | Readability | never | a part's Flesch reading ease is below 10, or a sentence has more than 40 words |
+
+Check 7 also compares the citation check as the run page shows it with the report. The run page reads its counts from the ledger (`ReviewStats.CitationsChecked`, `CitationsSupported`, `CitationsPartiallySupported`, `CitationsNotSupported` and `CitationsRemoved`); the report's sentence on the check comes from `citation-audit.json`. Both are written from the same summary, so any difference is a fault, with both numbers as evidence. Run 596541db showed 109 citations checked on the run page and 113 in the report.
+
+The checks are in `Report/PaperSelfCheck*.cs` and read one shape, `PaperCheckInput`: the paper's parts with their kind (abstract, theme, answer, conclusion, or text written in code, which is read for references but not judged), the run's counts with the words that name each one, the themes, the questions and answers, the reference list, the citation check and the reasons a source is not cited. The checks never read a run folder, so the multivocal module can fill the same shape from `mlr-paper.json` later; only the systematic review is wired now. `Modules/Systematic/SystematicSelfCheck.cs` fills it from `prisma-report.json`, the ledger and `citation-audit.json` (a study placed in no theme gets the codebook's reason), writes `self-check.json`, which is in the archive, and puts the counts in `ReviewStats.SelfCheckPassed`, `SelfCheckNotes` and `SelfCheckFaults`. A failure is logged and never fails the run. A run made before the self-check is checked from its files when its report is opened, and nothing is saved. The self-check is of the paper as the run finished it; an edit made later on the report page is not checked again. It is not part of main.tex: the paper is the review, and its quality notes belong beside it, not in it, so the golden files are unchanged.
+
+On the two real systematic runs of 19 November the self-check finds what a careful reader would. Run c5ff8a41 gets 4 passes, 2 notes and 4 faults: the limitations cite all four studies in one sentence; four result figures (34, 35, 40 and 90) come back in the answers, implications, future research and conclusion; study [4] is cited only in the limitations, although the paper's own coverage line, written under the older rule, says all four are cited, and the theme "Scenario Handling and Evaluation" rests on study [3] alone with no reason; and 4 of 59 citations are still not supported. Run cce1c6e4 gets 7 passes, 2 notes and 1 fault: 4 of 65 citations are still not supported. Both have one reference without a venue, and every part scores below 10 for reading ease, because the answers and closing parts are long single sentences.
 
 ## Where to look when a report looks wrong
 

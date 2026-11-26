@@ -149,6 +149,12 @@ public class ReviewStats
     public int CitationsSecondChecked { get; set; } // Citations given the independent second check
     public int CitationsUpgradedBySecondCheck { get; set; } // ...whose verdict the second check raised with a verified quote
 
+    // The self-check of the finished paper (self-check.json): checks passed, notes and faults. Left out of the ledger of
+    // a run made before it, which reads them as unknown.
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public int? SelfCheckPassed { get; set; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public int? SelfCheckNotes { get; set; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public int? SelfCheckFaults { get; set; }
+
     // Live progress for the dashboard (see RunProgress): the steps of this run, the current one, how far it
     // is (0 to 1) and a short detail such as "12 of 40 records".
     public List<string> ProgressPlan { get; set; } = new();

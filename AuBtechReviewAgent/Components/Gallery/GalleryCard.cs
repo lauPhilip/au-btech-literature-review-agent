@@ -25,11 +25,21 @@ public static class GalleryCard
         return string.Join(" · ", parts);
     }
 
-    /// <summary>"TraceableAI 1.4.0 · run 1a2b3c4d · added 20 November 2026 · updated 24 November 2026".</summary>
+    /// <summary>"TraceableAI 1.4.0 · run 1a2b3c4d · added 20 November 2026 · 3 versions, newest 24 November 2026".</summary>
     public static string Provenance(GalleryEntry e)
     {
         string line = $"TraceableAI {ToolVersion.Display(e.ToolVersion)} · run {e.ShortRunId} · added {Date(e.AddedUtc)}";
-        return e.UpdatedUtc is DateTime updated ? $"{line} · updated {Date(updated)}" : line;
+        return e.Versions.Count > 1 && e.UpdatedUtc is DateTime updated ? $"{line} · {e.Versions.Count} versions, newest {Date(updated)}" : line;
+    }
+
+    /// <summary>The address of one version: "/gallery/{entry}/v/{n}", which stays the same while newer versions are added.</summary>
+    public static string VersionPath(string entryId, int number) => $"/gallery/{entryId}/v/{number}";
+
+    /// <summary>"7 studies · 30 citations checked, 80% supported" for the versions list.</summary>
+    public static string VersionCounts(GalleryVersion v)
+    {
+        string line = $"{v.Included} {(v.Included == 1 ? "study" : "studies")} from {v.Identified} · {v.Citations.Checked} {(v.Citations.Checked == 1 ? "citation" : "citations")} checked";
+        return v.Citations.HasVerdicts ? $"{line}, {v.Citations.Percent(v.Citations.Supported)}% supported" : line;
     }
 
     /// <summary>

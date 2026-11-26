@@ -61,6 +61,10 @@ public class MultivocalQueueTests : IDisposable
         await WaitUntil(() => runner.StatusOf(runId)?.Progress?.StartsWith("You are 1st in line") == true);
         Assert.Equal(MultivocalRunner.StepWaiting, runner.StatusOf(runId)!.Step);
         Assert.Equal(MultivocalPlanner.StagePlanned, engine.Store.LoadHeader(runId)!.Stage);
+        // A run in line counts as running: it cannot be deleted, noted or cleaned up, and is not a systematic run.
+        Assert.True(engine.Store.IsActive(runId));
+        Assert.False(engine.DeleteRun(runId, key));
+        Assert.DoesNotContain(runId, engine.Coordinator.ActiveRunIds);
 
         Assert.True(engine.CancelRun(runId, key, "Too long a wait"));
         await WaitUntil(() => runner.StatusOf(runId)?.Running == false);
@@ -75,6 +79,8 @@ public class MultivocalQueueTests : IDisposable
         await WaitUntil(() => runner.StatusOf(runId)?.Running == false);
         Assert.NotEqual(MultivocalPlanner.StagePlanned, engine.Store.LoadHeader(runId)!.Stage);
         Assert.Equal((0, 0), (engine.Coordinator.Running, engine.Coordinator.Queued));
+        await WaitUntil(() => !engine.Store.IsActive(runId)); // once its steps end it can be deleted again
+        Assert.True(engine.DeleteRun(runId, key));
     }
 
     [Fact]
@@ -88,5 +94,6 @@ public class MultivocalQueueTests : IDisposable
         var status = runner.StatusOf(runId)!;
         Assert.False(status.Running);
         Assert.StartsWith("The tool is busy", status.Error);
+        Assert.False(engine.Store.IsActive(runId)); // a refused run is not held
     }
 }

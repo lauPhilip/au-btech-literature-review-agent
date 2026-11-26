@@ -17,7 +17,7 @@ namespace AuBtechReviewAgent;
 /// A value of a closed attribute must be one of its values, and a single-choice attribute takes one value. The known
 /// facts and the coverage are recorded by code. The run goes from "Mapped" through "Extracting" to "Extracted".
 /// </summary>
-public sealed class MultivocalExtractor
+public sealed partial class MultivocalExtractor
 {
     public const string ExtractionFile = "multivocal-extraction.json";
     public const string StageExtracting = "Extracting";
@@ -150,8 +150,8 @@ public sealed class MultivocalExtractor
             // A grey page's key also holds the passages sent, which depend on the questions too.
             string attributes = JsonSerializer.Serialize(map.Attributes);
             string key = result.Formal
-                ? ReviewCache.Key(FormalPromptVersion, _model, attributes, plan.Topic, record.Title, snapshot.TextSha256)
-                : ReviewCache.Key(PromptVersion, _model, attributes, plan.Topic, record.Title, snapshot.TextSha256, sent.Passages == null ? null : forModel);
+                ? ReviewCache.Key(FormalPromptVersion, TemplateSha256(formal: true), _model, attributes, plan.Topic, record.Title, snapshot.TextSha256)
+                : ReviewCache.Key(PromptVersion, TemplateSha256(formal: false), _model, attributes, plan.Topic, record.Title, snapshot.TextSha256, sent.Passages == null ? null : forModel);
             ModelExtraction answer;
             if (_cache.TryGet<ModelExtraction>("grey-extraction", key, out var cached) && cached != null && ModelExtraction.Problem(cached, map) == null)
             {
@@ -208,57 +208,6 @@ public sealed class MultivocalExtractor
     /// <summary>A closed attribute's value as the map writes it ("retrieval" becomes "Retrieval").</summary>
     private static string Canonical(MapAttribute attribute, string value) =>
         attribute.Open ? value.Trim() : attribute.Values.FirstOrDefault(v => v.Equals(value.Trim(), StringComparison.OrdinalIgnoreCase)) ?? value.Trim();
-
-    /// <summary>
-    /// The extraction prompt: every attribute of the fixed map, each value with a word-for-word quote. With
-    /// <paramref name="selected"/>, the text is selected passages of a long page or full text.
-    /// </summary>
-    public static async Task<ModelExtraction> AskAsync(IChatCompletionService chat, MultivocalPlan plan, MapVersion map, GreyRecord record, string text, bool selected = false)
-    {
-        string attributes = string.Join("\n", map.Attributes.Select(a =>
-            $"- {a.Name} ({a.Question}; {(a.Open ? "open text" : a.Multiple ? "one or more of: " + string.Join(" | ", a.Values) : "exactly one of: " + string.Join(" | ", a.Values))}): {a.Description}"));
-        string about = $"""
-            - Title: {record.Title}
-            - Address: {record.Url}
-            - Published on: {record.Site}
-            """;
-        // A formal source (block I-5) is named as academic, and its text is its open full text or its abstract.
-        bool formal = record.Kind == MultivocalSearcher.FormalKind;
-        string kind = formal ? "academic source (a paper from a bibliographic database)" : "grey literature source";
-        string textHeading = formal ? "SOURCE TEXT (its open full text or selected passages of it, or its abstract when no full text is open; the only evidence you may use)"
-            : selected ? "PAGE TEXT (selected passages of a long page: its start and the passages most relevant to the map; [passage break] marks text left out; the only evidence you may use)"
-            : "PAGE TEXT (the only evidence you may use)";
-        var prompt = $$"""
-            You extract data from one {{kind}} for a multivocal literature review (Garousi et al. 2019, G12), against the review's systematic map.
-            The review is about: {{PromptSafety.Wrap(plan.Topic, "review topic")}}
-
-            {{PromptSafety.ReviewerInputNotice}}
-            {{PromptSafety.DataOnlyNotice}}
-
-            SOURCE:
-            {{PromptSafety.Wrap(about, "source metadata")}}
-
-            {{textHeading}}:
-            {{PromptSafety.Wrap(text, formal ? "source text" : "page text")}}
-
-            ATTRIBUTES OF THE MAP (from the reviewer):
-            {{PromptSafety.Wrap(attributes, "map attributes")}}
-
-            For every attribute, give the values this page states, each with a short passage copied word for word from the page text that shows it.
-            Use only the listed values for an attribute with a list; use "Other" only when it is listed and nothing else fits. Give at most one value where it says "exactly one".
-            For an open-text attribute, give each name as its own value, never a list of names in one value. When it asks for tools, frameworks or platforms, name the software only: not language models, programming languages or methods.
-            When the page says nothing for an attribute, give no values for it: "not stated" is recorded automatically. Never guess.
-            Also say in one sentence what the source sets out to do (its purpose), with a word-for-word quote.
-
-            {{AnswerShape}}
-            """;
-        return await LlmJson.GetAsync<ModelExtraction>(chat, prompt, LlmJson.JsonMode(0.0), a => ModelExtraction.Problem(a, map));
-    }
-
-    private const string AnswerShape = """
-        Respond ONLY with a valid minified JSON object of this shape, with one entry per attribute:
-        {"purpose":{"value":"One sentence.","quote":"Word for word from the page."},"attributes":[{"attribute":"Practice","values":[{"value":"Retrieval","quote":"Word for word from the page."}]}]}
-        """;
 }
 
 /// <summary>The model's extraction of one source.</summary>

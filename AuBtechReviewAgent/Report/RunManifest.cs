@@ -22,12 +22,13 @@ public static class RunManifest
         Build(runId, state?.ProtocolHash, state?.RunSettings?.Model, files);
 
     /// <summary>The manifest for any kind of review: the run id, its protocol hash and model, and every file's fingerprint.</summary>
-    public static string Build(Guid runId, string? protocolHash, string? model, IReadOnlyList<(string Path, byte[] Content)> files)
+    public static string Build(Guid runId, string? protocolHash, string? model, IReadOnlyList<(string Path, byte[] Content)> files) =>
+        Build(runId, protocolHash, model, files.Select(f => new Entry(f.Path, f.Content.LongLength, Sha256(f.Content))).ToList());
+
+    /// <summary>The same manifest from fingerprints taken while the files were written (<see cref="RunArchive.Write"/>).</summary>
+    public static string Build(Guid runId, string? protocolHash, string? model, IReadOnlyList<Entry> fingerprints)
     {
-        var entries = files
-            .OrderBy(f => f.Path, StringComparer.Ordinal)
-            .Select(f => new Entry(f.Path, f.Content.LongLength, Sha256(f.Content)))
-            .ToList();
+        var entries = fingerprints.OrderBy(f => f.Path, StringComparer.Ordinal).ToList();
 
         var body = new Dictionary<string, object?>
         {
@@ -98,25 +99,30 @@ public static class RunManifest
     {
         using var archive = new System.IO.Compression.ZipArchive(zip, System.IO.Compression.ZipArchiveMode.Read, leaveOpen: true);
         if (archive.Entries.Count > MaxArchiveEntries) throw new InvalidDataException($"The archive has more than {MaxArchiveEntries} files.");
-        var files = new Dictionary<string, byte[]>(StringComparer.Ordinal);
+        // Each file is fingerprinted while it is unpacked; only manifest.json itself is kept.
+        var files = new Dictionary<string, string>(StringComparer.Ordinal);
+        byte[]? manifestBytes = null;
         long total = 0;
         var buffer = new byte[81920];
         foreach (var entry in archive.Entries.Where(e => !e.FullName.EndsWith('/')))
         {
             using var source = entry.Open();
-            using var copy = new MemoryStream();
+            using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
+            using var copy = entry.FullName == "manifest.json" ? new MemoryStream() : null;
             int read;
             // Count what is actually unpacked; the sizes in the zip's own directory can be forged.
             while ((read = source.Read(buffer, 0, buffer.Length)) > 0)
             {
                 total += read;
                 if (total > maxUnpackedBytes) throw new InvalidDataException($"The archive unpacks to more than {maxUnpackedBytes / (1024 * 1024)} MB.");
-                copy.Write(buffer, 0, read);
+                hash.AppendData(buffer, 0, read);
+                copy?.Write(buffer, 0, read);
             }
-            files[entry.FullName] = copy.ToArray();
+            files[entry.FullName] = Convert.ToHexString(hash.GetHashAndReset()).ToLowerInvariant();
+            if (copy != null) manifestBytes = copy.ToArray();
         }
         var none = Array.Empty<string>();
-        if (!files.TryGetValue("manifest.json", out var manifestBytes))
+        if (manifestBytes == null)
             return new ArchiveCheck(false, null, 0, none, none, files.Keys.OrderBy(k => k, StringComparer.Ordinal).ToList(), null, null, null, null, null);
 
         string manifest = Encoding.UTF8.GetString(manifestBytes);
@@ -127,14 +133,14 @@ public static class RunManifest
         var listed = root.GetProperty("Files").EnumerateArray()
             .Select(e => (Path: e.GetProperty("Path").GetString()!, Sha: e.GetProperty("Sha256").GetString()!))
             .ToList();
-        var changed = listed.Where(f => files.TryGetValue(f.Path, out var c) && Sha256(c) != f.Sha).Select(f => f.Path).ToList();
+        var changed = listed.Where(f => files.TryGetValue(f.Path, out var c) && c != f.Sha).Select(f => f.Path).ToList();
         var missing = listed.Where(f => !files.ContainsKey(f.Path)).Select(f => f.Path).ToList();
         var listedPaths = listed.Select(f => f.Path).ToHashSet(StringComparer.Ordinal);
         var notListed = files.Keys.Where(k => k != "manifest.json" && !listedPaths.Contains(k)).OrderBy(k => k, StringComparer.Ordinal).ToList();
 
         // Every listed file in the manifest's order, so a reader sees the whole archive and not only what failed (#245).
         var statuses = listed.Select(f => new ArchiveFileStatus(f.Path,
-            !files.TryGetValue(f.Path, out var content) ? "Missing" : Sha256(content) == f.Sha ? "Matches" : "Changed")).ToList();
+            !files.TryGetValue(f.Path, out var sha) ? "Missing" : sha == f.Sha ? "Matches" : "Changed")).ToList();
         return new ArchiveCheck(true, ManifestIsIntact(manifest), listed.Count, changed, missing, notListed,
             Str("RunId"), Str("CreatedUtc"), Str("AppVersion"), Str("Model"), Str("ProtocolHash"), statuses);
     }

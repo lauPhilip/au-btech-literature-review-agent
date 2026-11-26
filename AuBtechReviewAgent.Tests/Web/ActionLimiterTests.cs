@@ -22,6 +22,18 @@ public class ActionLimiterTests
     }
 
     [Fact]
+    public void Circuits_without_a_known_address_share_one_limited_count()
+    {
+        var limiter = new ActionLimiter(new Dictionary<string, int> { [ActionLimiter.Recheck] = 2 });
+        Assert.True(limiter.TryTake(ActionLimiter.Recheck, "unknown", out _));
+        Assert.True(limiter.TryTake(ActionLimiter.Recheck, null, out _)); // no address at all is the same bucket
+        Assert.False(limiter.TryTake(ActionLimiter.Recheck, "", out string refusal));
+        Assert.StartsWith("This was done many times", refusal);
+        Assert.False(limiter.TryTake(ActionLimiter.Recheck, ActionLimiter.UnknownAddress, out _));
+        Assert.True(limiter.TryTake(ActionLimiter.Recheck, "203.0.113.7", out _)); // a known address keeps its own count
+    }
+
+    [Fact]
     public void A_limit_of_zero_means_no_limit()
     {
         var limiter = new ActionLimiter(new Dictionary<string, int> { [ActionLimiter.Recheck] = 0 });
