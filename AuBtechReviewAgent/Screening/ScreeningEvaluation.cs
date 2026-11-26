@@ -35,6 +35,9 @@ public record ScreeningConfusion(double TruePositives, double FalsePositives, do
         }
     }
 
+    /// <summary>Prevalence- and bias-adjusted kappa (Byrt, Bishop &amp; Carlin, 1993): 2 × raw agreement − 1 for two categories.</summary>
+    public double Pabak => Total <= 0 ? 0 : 2 * Accuracy - 1;
+
     private static double Ratio(double a, double b) => b <= 0 ? 0 : a / b;
 
     public static ScreeningConfusion From(IEnumerable<(bool Gold, bool Predicted)> pairs, double excludedWeight = 1.0)
@@ -49,6 +52,39 @@ public record ScreeningConfusion(double TruePositives, double FalsePositives, do
         }
         return new ScreeningConfusion(tp, fp, tn, fn);
     }
+}
+
+/// <summary>
+/// How agreement between two codings or screenings is reported. Kappa alone misleads when nearly every decision is the
+/// same (it drops although almost everything agrees), so it is given beside the raw agreement, PABAK and n. Both
+/// decisions come from two prompts of the same model, so the figures measure how robust the decisions are to the
+/// prompt, not inter-rater reliability between independent reviewers; the report says so.
+/// </summary>
+public static class Agreement
+{
+    /// <summary>PABAK for two categories from the count of agreements: 2 × agreed / total − 1.</summary>
+    public static double Pabak(int agreed, int total) => total <= 0 ? 0 : 2.0 * agreed / total - 1;
+
+    /// <summary>"raw agreement 95% (19 of 20); Cohen's kappa = 0.40; PABAK = 0.90; n = 20", kappa left out when unknown.</summary>
+    public static string Figures(int agreed, int total, double? kappa)
+    {
+        var inv = CultureInfo.InvariantCulture;
+        string raw = total <= 0 ? "0" : (100.0 * agreed / total).ToString("0", inv);
+        string k = kappa is double value ? $"; Cohen's kappa = {value.ToString("0.00", inv)}" : "";
+        return $"raw agreement {raw}% ({agreed} of {total}){k}; PABAK = {Pabak(agreed, total).ToString("0.00", inv)}; n = {total}";
+    }
+
+    /// <summary>The figures beside kappa as a sentence: "Raw agreement was 95% (19 of 20), PABAK = 0.90, n = 20. "</summary>
+    public static string Sentence(int agreed, int total)
+    {
+        var inv = CultureInfo.InvariantCulture;
+        string raw = total <= 0 ? "0" : (100.0 * agreed / total).ToString("0", inv);
+        return $"Raw agreement was {raw}% ({agreed} of {total}), PABAK = {Pabak(agreed, total).ToString("0.00", inv)}, n = {total}. ";
+    }
+
+    /// <summary>The sentence that says what the figures measure, for the screening or the thematic coding.</summary>
+    public static string SameModelSentence(string what) =>
+        $"The two {what} are two prompts of the same model, so their agreement measures how robust the decisions are to the prompt, not inter-rater reliability between independent reviewers. ";
 }
 
 /// <summary>
