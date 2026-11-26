@@ -65,7 +65,9 @@ public class ArchiveLatexTests : IDisposable
         Assert.Contains("\\resizebox{\\linewidth}{!}{\n\\draw (a) -> (b);\n}\n\\caption{Grounded Architectural Synthesis System Model Diagram}", tex);
         Assert.Contains("\\begin{tabularx}{\\textwidth}{Y Y}\n\\caption{Design \\& Rules}\\label{tab:artifact}\\\\\n\\toprule\n\\textbf{Rule} & \\textbf{Source} \\\\", tex);
         Assert.Contains("Check & Supervisor \\\\ \\addlinespace\n\\bottomrule\n\\end{tabularx}\n\\vspace{2pt}\\noindent\\small From the studies.\\normalsize\n\\vspace{10pt}", tex);
-        Assert.Contains("\\noindent\\textbf{RQ1. How do loops recover?} Through checks.\\par\\smallskip\nLoops recover.", tex);
+        // An answer that cites no study is not rated, and the certainty summary closes the answers (issue #551).
+        Assert.Contains("\\noindent\\textbf{RQ1. How do loops recover?} Through checks. (certainty not rated: no evidence bears on this question)\\par\\smallskip\n" +
+                        "\\noindent The answer to the research question is not rated, because no evidence bears on it.\\par\\smallskip\nLoops recover.", tex);
         // Table A.1 and the references follow the reference numbers.
         Assert.True(tex.IndexOf("Ana (2025)", StringComparison.Ordinal) < tex.IndexOf("Bo (n.d.)", StringComparison.Ordinal));
         Assert.Contains(PrismaReviewEngine.NoProtocolText, tex);

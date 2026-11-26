@@ -78,6 +78,38 @@ public sealed class GalleryPagesTests : IDisposable
     }
 
     [Fact]
+    public async Task EachVersionHasItsOwnAddressAndTwoCanBeCompared()
+    {
+        var runs = new RunStore(Path.Join(_root, "workspace"));
+        var gallery = new GalleryStore(new GalleryOptions { Folder = GalleryFolder }, _root, runs);
+        var first = await GalleryStoreTests.FinishedRunAsync(runs, "AI in schools", new[] { "How is AI used?" }, "The first version");
+        var second = await GalleryStoreTests.FinishedRunAsync(runs, "AI in schools", new[] { "How is AI used?" }, "The <b>second</b> version");
+        var entry = (await gallery.AddAsync(first.Id, first.Key, consent: true)).Entry!;
+        await gallery.AddAsync(second.Id, second.Key, consent: true);
+        using var host = new Host(GalleryFolder);
+        using var client = host.CreateClient();
+
+        string newest = await client.GetStringAsync($"/gallery/{entry.Id}");
+        Assert.Contains("The &lt;b&gt;second&lt;/b&gt; version", newest);
+        Assert.Contains("data-gallery-versions", newest);
+        Assert.Contains($"href=\"/gallery/{entry.Id}/v/1\"", newest);
+        Assert.Matches($"rel=\"canonical\" href=\"[^\"]*/gallery/{entry.Id}\"", newest);
+
+        string older = await client.GetStringAsync($"/gallery/{entry.Id}/v/1");
+        Assert.Contains("The first version", older);
+        Assert.Contains("data-older-version", older);
+        Assert.Contains($"run {first.Id}", older);
+        Assert.Matches($"rel=\"canonical\" href=\"[^\"]*/gallery/{entry.Id}/v/1\"", older);
+        Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync($"/gallery/{entry.Id}/v/3")).StatusCode);
+
+        string compare = await client.GetStringAsync($"/gallery/{entry.Id}/compare?from=1&to=2");
+        Assert.Contains("data-gallery-compare", compare);
+        Assert.Contains("Citations checked", compare);
+        Assert.Contains("noindex", compare);
+        Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync($"/gallery/{entry.Id}/compare?from=1&to=9")).StatusCode);
+    }
+
+    [Fact]
     public async Task AHiddenOrUnknownEntryIsNotFound()
     {
         var entry = await AddedEntryAsync("A hidden review");

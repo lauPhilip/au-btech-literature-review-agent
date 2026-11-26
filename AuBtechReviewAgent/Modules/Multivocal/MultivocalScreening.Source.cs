@@ -77,7 +77,7 @@ public sealed partial class MultivocalScreener
         string version = r.Kind == MultivocalSearcher.FormalKind ? FormalPromptVersion : PromptVersion;
         string stage = secondScreener ? SecondStage : FirstStage;
         // Keyed on the model that answers this stage, so a decision of the main model is not reused as the fast model's.
-        string key = ReviewCache.Key(version, secondScreener ? "second" : "first", _modelFor(stage), plan.InclusionCriteria, plan.ExclusionCriteria,
+        string key = ReviewCache.Key(version, TemplateSha256(r.Kind == MultivocalSearcher.FormalKind, secondScreener), secondScreener ? "second" : "first", _modelFor(stage), plan.InclusionCriteria, plan.ExclusionCriteria,
             r.Title, r.Summary, r.Site, r.Kind, r.Producer, r.Published?.ToString("yyyy-MM-dd"));
         if (_cache.TryGet<ScreeningAnswer>("grey-screening", key, out var cached) && cached != null && ScreeningAnswer.Validate(cached) == null)
             return (cached.Normalized(), true);
@@ -93,7 +93,7 @@ public sealed partial class MultivocalScreener
     /// multivocal review's own first steps (<see cref="FirstProcedure"/>), with the record described as what it is. It is judged on its subject against the criteria, not on being grey literature; an academic
     /// record of the formal pool (block I-3) gets the same criteria, steps and answer format, introduced as academic.
     /// </summary>
-    public static async Task<ScreeningAnswer> ScreenGreyAsync(IChatCompletionService chat, GreyRecord r, string inclusion, string exclusion, bool secondScreener)
+    public static string Prompt(GreyRecord r, string inclusion, string exclusion, bool secondScreener)
     {
         bool formal = r.Kind == MultivocalSearcher.FormalKind;
         string kind = formal ? "Academic literature, from a bibliographic database"
@@ -116,7 +116,7 @@ public sealed partial class MultivocalScreener
             - Abstract or summary: {(r.Summary.Length > 0 ? r.Summary : "none")}
             """;
 
-        var prompt = $$"""
+        return $$"""
             {{intro}}
 
             CRITERIA DIRECTIVES (from the reviewer):
@@ -134,7 +134,31 @@ public sealed partial class MultivocalScreener
 
             {{PrismaReviewEngine.ScreeningAnswerFormat}}
             """;
+    }
 
+    private static readonly Lazy<string>[] Templates = { new(() => Hash(false, false)), new(() => Hash(false, true)), new(() => Hash(true, false)), new(() => Hash(true, true)) };
+
+    /// <summary>
+    /// The fingerprint of the fixed text of one screening prompt (grey or formal, first or second screener), part of the
+    /// cache key, so an edit to it, or to the steps shared with the systematic review, is never answered from the cache.
+    /// </summary>
+    public static string TemplateSha256(bool formal, bool secondScreener) => Templates[(formal ? 2 : 0) + (secondScreener ? 1 : 0)].Value;
+
+    /// <summary>The screening prompt written with placeholders in place of the record and the criteria.</summary>
+    public static string Template(bool formal, bool secondScreener)
+    {
+        string S(string name) => PromptTemplate.Slot(name);
+        var record = new GreyRecord(S("id"), S("title"), S("summary"), S("url"), S("producer"), S("site"),
+            formal ? MultivocalSearcher.FormalKind : S("kind"), new DateTime(2000, 1, 1), new Dictionary<string, long>());
+        return Prompt(record, S("inclusion"), S("exclusion"), secondScreener);
+    }
+
+    private static string Hash(bool formal, bool secondScreener) => PromptTemplate.Hash(Template(formal, secondScreener));
+
+    /// <summary>Screens one source with <see cref="Prompt"/>, at temperature 0.</summary>
+    public static async Task<ScreeningAnswer> ScreenGreyAsync(IChatCompletionService chat, GreyRecord r, string inclusion, string exclusion, bool secondScreener)
+    {
+        string prompt = Prompt(r, inclusion, exclusion, secondScreener);
         var answer = await LlmJson.GetAsync<ScreeningAnswer>(chat, prompt, LlmJson.JsonMode(0.0), ScreeningAnswer.Validate);
         return answer.Normalized();
     }

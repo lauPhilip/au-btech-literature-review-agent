@@ -10,7 +10,7 @@
     @if (entry != null && !asking)
     {
         <p class="text-ink">
-            @(updated ? "This review was already in the gallery; it now shows this run's report." : "This report is in the public gallery.")
+            @(updated ? "This review was already in the gallery. This run is now its newest version; the earlier ones stay." : "This report is in the public gallery.")
             <a href="@($"/gallery/{entry.Id}")" class="ml-1 font-medium text-heading underline underline-offset-2">Open it in the gallery</a>
         </p>
         @if (!confirmWithdraw)
