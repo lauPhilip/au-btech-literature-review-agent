@@ -34,6 +34,10 @@ public sealed class ReferenceEnrichmentEntry
     public Dictionary<string, string> Filled { get; set; } = new();
     /// <summary>Why an answer was not used, such as a title that names another work.</summary>
     public List<string> NotUsed { get; set; } = new();
+    /// <summary>Why a study with a DOI or arXiv number was not looked up; null when it was (issue #566).</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Skipped { get; set; }
+
     public string Before { get; set; } = "";
     public string After { get; set; } = "";
 
@@ -95,7 +99,7 @@ public sealed class ReferenceEnricher
         {
             var (enriched, entry) = await EnrichOneAsync(log, runFolder);
             logs.Add(enriched);
-            if (entry.Lookups.Count > 0) audit.References.Add(entry);
+            if (entry.Lookups.Count > 0 || entry.Skipped != null) audit.References.Add(entry);
         }
         return (logs, audit);
     }
@@ -139,6 +143,9 @@ public sealed class ReferenceEnricher
                 entry.Completed = new CompletedReference { Authors = cited.Authors?.ToList() ?? new(), Venue = cited.VenueName ?? "", Details = cited.Details };
                 return (cited, entry);
             }
+
+        if (arxivId != null && entry.Lookups.Count == 0)
+            entry.Skipped = "it came from arXiv, which gives the full author list, and its arXiv entry names no journal or proceedings to complete it from";
 
         var usable = new List<ReferenceAnswer>();
         foreach (var a in answers)
