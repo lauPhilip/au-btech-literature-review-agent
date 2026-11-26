@@ -65,7 +65,7 @@ public class PrismaFlowCounts
     }
 }
 
-/// <summary>Renders the PRISMA 2020 flow diagram (identification, screening, included) as TikZ for main.tex.</summary>
+/// <summary>Renders the PRISMA 2020 flow diagram (identification, screening, retrieval, eligibility, included) as TikZ for main.tex.</summary>
 public static class PrismaFlowDiagram
 {
     public static string ToTikz(PrismaFlowCounts c)
@@ -99,11 +99,22 @@ public static class PrismaFlowDiagram
         sb.AppendLine($"\\node[sidebox, right=of id] (removed) {{Records removed before screening:\\\\ {string.Join("\\\\ ", removed)}}};");
         sb.AppendLine(Box("screened", ", below=of id", $"Records screened (n = {c.Screened})"));
         sb.AppendLine($"\\node[sidebox, right=of screened] (excluded) {{Records excluded:\\\\ {string.Join("\\\\ ", excluded)}}};");
-        sb.AppendLine(Box("included", ", below=of screened", $"Studies included in review (n = {c.Included})\\\\ Full text used (n = {c.FullTextRetrieved}); abstract only (n = {c.AbstractOnly})"));
+        // The retrieval and eligibility boxes of PRISMA 2020 (item 16a). The tool judges eligibility once, on title and
+        // abstract, so a study whose full text was not found is kept and read from its abstract, and none is excluded on
+        // its full text; the boxes say so rather than show an assessment that did not happen.
+        sb.AppendLine(Box("sought", ", below=of screened", $"Reports sought for retrieval (n = {c.Included})"));
+        sb.AppendLine($"\\node[sidebox, right=of sought] (notretrieved) {{Reports not retrieved (n = {c.AbstractOnly}):\\\\ no full text could be read; kept and read from the abstract}};");
+        sb.AppendLine(Box("assessed", ", below=of sought", $"Reports assessed for eligibility (n = {c.Included})\\\\ on title and abstract at screening; full text used (n = {c.FullTextRetrieved}); abstract only (n = {c.AbstractOnly})"));
+        sb.AppendLine($"\\node[sidebox, right=of assessed] (reportsexcluded) {{Reports excluded (n = 0):\\\\ the tool does not exclude a study on its full text}};");
+        sb.AppendLine(Box("included", ", below=of assessed", $"Studies included in review (n = {c.Included})\\\\ Reports of included studies (n = {c.Included})"));
         sb.AppendLine(@"\draw[arrow] (id) -- (screened);");
-        sb.AppendLine(@"\draw[arrow] (screened) -- (included);");
+        sb.AppendLine(@"\draw[arrow] (screened) -- (sought);");
+        sb.AppendLine(@"\draw[arrow] (sought) -- (assessed);");
+        sb.AppendLine(@"\draw[arrow] (assessed) -- (included);");
         sb.AppendLine(@"\draw[arrow] (id) -- (removed);");
         sb.AppendLine(@"\draw[arrow] (screened) -- (excluded);");
+        sb.AppendLine(@"\draw[arrow] (sought) -- (notretrieved);");
+        sb.AppendLine(@"\draw[arrow] (assessed) -- (reportsexcluded);");
         sb.AppendLine(@"\end{tikzpicture}");
         return sb.ToString();
     }
