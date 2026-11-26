@@ -15,9 +15,10 @@ public static class AiUseStatement
 {
     /// <summary>
     /// The statement for the methods section (several sentences). With the reviewer's edits of the report, it says how
-    /// many sentences were edited and how their citations were checked again; without, it reads as before.
+    /// many sentences were edited and how their citations were checked again; without, it reads as before. With the
+    /// run's artifact, it says that the model chose its content and code drew it.
     /// </summary>
-    public static string Methods(ReviewState state, Guid runId, ReportEditLog? edits = null)
+    public static string Methods(ReviewState state, Guid runId, ReportEditLog? edits = null, ReviewArtifact? artifact = null)
     {
         var s = state.Stats;
         var inv = CultureInfo.InvariantCulture;
@@ -37,6 +38,8 @@ public static class AiUseStatement
         automated.Add(state.ThematicSynthesis is { Themes.Count: > 0 } ? "coding findings into themes and drafting the synthesis" : "drafting the synthesis");
         automated.Add("checking each citation against the cited paper");
         text.Append("The model was used for ").Append(JoinList(automated)).Append(". ");
+        text.Append(LanguageEdit("abstract and introduction"));
+        text.Append(ArtifactSentence(artifact));
         if (state.SeedChaining is { Seeds.Count: > 0 })
             text.Append("The seed studies for citation chaining were chosen in code from the citation counts in the databases' metadata, not by the model. ");
 
@@ -67,17 +70,55 @@ public static class AiUseStatement
         text.Append(FlaggedSources(flagged, s.FullTextRetrieved, "full text", "included study", "included studies", mentioned));
         if (edits?.Sentence() is { Length: > 0 } edited) text.Append(edited).Append(' ');
         text.Append("The complete record of the run (protocol, search responses, every screening decision and model call, and the citation audit) is available as a fingerprinted archive. ");
-        text.Append("The authors reviewed the output and take full responsibility for the content.");
+        text.Append(PaperDeclarations.Responsibility);
         return text.ToString();
     }
 
-    /// <summary>A one-sentence version for acknowledgements or a declaration of AI use.</summary>
-    public static string Short(ReviewState state)
+    /// <summary>A short version for acknowledgements or a declaration of AI use. It does not claim that anyone checked the output.</summary>
+    public static string Short(ReviewState state) =>
+        $"The literature search, screening, data extraction, a first draft of the synthesis and a language edit of the abstract and introduction were carried out with TraceableAI using {Models(state)}; " +
+        "every citation was automatically checked against the cited paper. " + PaperDeclarations.Responsibility;
+
+    /// <summary>The tool and model, for Elsevier's declaration ("the authors used ... in order to ...").</summary>
+    public static string Used(ReviewState state)
+    {
+        string version = string.IsNullOrWhiteSpace(state.RunSettings?.AppVersion) ? "" : $" (version {state.RunSettings!.AppVersion.Split('+')[0]})";
+        return $"TraceableAI{version}, an open-source review tool, with {Models(state)}";
+    }
+
+    /// <summary>What the model was used for, for Elsevier's declaration.</summary>
+    public const string Purpose = "generate search phrasings, screen records, extract and appraise study data, draft the synthesis, check each citation against the cited paper and edit the language of the abstract and introduction";
+
+    /// <summary>
+    /// The sentence on the language edit (once called the stylistic pass): the model rewrote the named parts for clear,
+    /// direct academic prose, and code kept a rewrite only when no number or citation changed. Shared with the multivocal paper.
+    /// </summary>
+    public static string LanguageEdit(string parts) =>
+        $"The {parts} were then given a language edit by the model, for clear and direct prose; code kept an edit only when it changed no number and no citation, and the text before and after each edit is on file. ";
+
+    /// <summary>Who chose the artifact's content and what drew it; empty when the run built none.</summary>
+    public static string ArtifactSentence(ReviewArtifact? artifact)
+    {
+        if (artifact is not { Error: null }) return "";
+        string name = artifact.Kind switch
+        {
+            ArtifactKinds.ConceptMap => "concept map",
+            ArtifactKinds.Flowchart => "flowchart",
+            ArtifactKinds.Table => "comparison table",
+            ArtifactKinds.Bullets => "bullet list",
+            _ => "",
+        };
+        if (name.Length == 0) return "";
+        return artifact.IsDiagram
+            ? $"The content of the {name} (its boxes and the labelled links between them) was chosen by the model from the findings and drawn in code; every cited box was checked like a sentence of the report. "
+            : $"The content of the {name} was chosen by the model from the findings and laid out in code; every cited entry was checked like a sentence of the report. ";
+    }
+
+    private static string Models(ReviewState state)
     {
         string model = string.IsNullOrWhiteSpace(state.RunSettings?.Model) ? "a large language model" : state.RunSettings!.Model;
         if (!string.IsNullOrWhiteSpace(state.RunSettings?.FastModel)) model += $" and {state.RunSettings!.FastModel}";
-        return $"The literature search, screening, data extraction and a first draft of the synthesis were carried out with TraceableAI using {model}; " +
-               "every citation was automatically checked against the cited paper, and the authors reviewed and edited all output and take full responsibility for it.";
+        return model;
     }
 
     /// <summary>

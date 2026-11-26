@@ -6,6 +6,18 @@ namespace AuBtechReviewAgent.Tests;
 public class ReportGuardTests
 {
     [Fact]
+    public async Task TheLanguageEditAsksForAcademicProseAndRecordsItsPromptVersion()
+    {
+        var chat = new FakeChatService().Returns("Layers are kept apart [5].");
+        var (text, delta) = await StylisticRefinerUtility.RefineAcademicProseAsync(chat, "Abstract", "Layers are separated [5].");
+
+        Assert.Equal("Layers are kept apart [5].", text);
+        Assert.Equal(StylisticRefinerUtility.PromptVersion, delta.PromptVersion);
+        Assert.Contains("clear, direct academic prose", chat.Prompts[0]);
+        Assert.DoesNotContain("human", chat.Prompts[0]); // it does not ask the model to pass as a person
+    }
+
+    [Fact]
     public void StylisticRewriteThatTurnsATitleIntoAParagraphIsRejected()
     {
         string original = "Agentic AI Software Frameworks: A Systematic Review";

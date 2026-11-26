@@ -6,8 +6,9 @@
 
 @{
     var s = Stats;
-    int cited = s.CitationsChecked;
-    int flagged = s.CitationsPartiallySupported + s.CitationsNotSupported;
+    var tally = Tally ?? AuBtechReviewAgent.VerdictTally.From(s);
+    int cited = tally.Checked;
+    int flagged = tally.Flagged;
     string report = $"/spec-matrix/{RunId}";
 }
 
@@ -28,7 +29,7 @@
                 @if (cited > 0)
                 {
                     <h2 class="font-display text-lg font-semibold text-heading">@cited @(cited == 1 ? "citation" : "citations") checked against the papers</h2>
-                    <div class="mt-3"><VerdictBar Counts="AuBtechReviewAgent.VerdictTally.From(s)" Total="cited + s.CitationsRemoved" /></div>
+                    <div class="mt-3"><VerdictBar Counts="tally" /></div>
                     <p class="mt-2 text-sm text-muted max-sm:hidden">
                         @(flagged > 0
                             ? $"{flagged} {(flagged == 1 ? "citation is" : "citations are")} only partly or not supported. They stay in the report, marked, so you can judge them."
@@ -77,6 +78,9 @@
 @code {
     [Parameter, EditorRequired] public AuBtechReviewAgent.ReviewStats Stats { get; set; } = new();
     [Parameter, EditorRequired] public Guid RunId { get; set; }
+
+    /// <summary>The citation counts as the report shows them (<see cref="AuBtechReviewAgent.VerdictTally.ForRun"/>); the run's figures when not given.</summary>
+    [Parameter] public AuBtechReviewAgent.VerdictTally? Tally { get; set; }
 
     /// <summary>The run's objective, shown as the title (the query when the run has no objective).</summary>
     [Parameter] public string? Objective { get; set; }

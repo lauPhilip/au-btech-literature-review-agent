@@ -4,7 +4,7 @@
 @inject AuBtechReviewAgent.ReviewModulesOptions ModuleOptions
 
 @* The catalogue of example reports (Runs/GalleryStore.cs). A plain page without a live connection: the filter and the
-   order are links, so the page works without scripts. Every value on a card comes from the run's files and is shown
+   order are links and the search box is a plain GET form (GallerySearch.cs), so the page works without scripts. Every value on a card comes from the run's files and is shown
    as text. A card of a review whose card is not shown on this site is left out (ReviewModulesOptions.Shows). *@
 
 <SeoHead Title="Example reports" Path="/gallery" BreadcrumbName="Gallery"
@@ -30,21 +30,45 @@
     }
     else
     {
+        <form method="get" action="/gallery" role="search" class="flex flex-wrap items-end gap-2" data-gallery-search>
+            <label class="flex min-w-[240px] flex-1 flex-col text-sm text-muted">Find a report by title, question, keyword or review type
+                <input type="search" name="q" value="@Query" maxlength="@AuBtechReviewAgent.GallerySearch.MaxQueryLength" class="ui-input mt-1 min-h-[44px]" />
+            </label>
+            @if (Type != null)
+            {
+                <input type="hidden" name="type" value="@Type" />
+            }
+            @if (Sort != null)
+            {
+                <input type="hidden" name="sort" value="@Sort" />
+            }
+            <button type="submit" class="ui-btn-primary ui-btn-sm min-h-[44px]">Search</button>
+            @if (Query != null)
+            {
+                <a href="@Href(Type, Sort, null)" class="ui-btn-ghost ui-btn-sm min-h-[44px]">Clear search</a>
+            }
+        </form>
+
         <nav aria-label="Filter and order" class="flex flex-wrap items-center justify-between gap-3 border-b border-line pb-3">
             <ul class="flex flex-wrap gap-2">
-                <li><a href="@Href(null, Sort)" aria-current="@(Type == null ? "page" : null)" class="@(Type == null ? "ui-btn-primary" : "ui-btn-secondary") ui-btn-sm min-h-[44px]">All (@Shown.Count)</a></li>
+                <li><a href="@Href(null, Sort, Query)" aria-current="@(Type == null ? "page" : null)" class="@(Type == null ? "ui-btn-primary" : "ui-btn-secondary") ui-btn-sm min-h-[44px]">All (@Found.Count)</a></li>
                 @foreach (var (card, label, count) in Types)
                 {
                     string key = card;
-                    <li><a href="@Href(key, Sort)" aria-current="@(Type == key ? "page" : null)" class="@(Type == key ? "ui-btn-primary" : "ui-btn-secondary") ui-btn-sm min-h-[44px]">@label (@count)</a></li>
+                    <li><a href="@Href(key, Sort, Query)" aria-current="@(Type == key ? "page" : null)" class="@(Type == key ? "ui-btn-primary" : "ui-btn-secondary") ui-btn-sm min-h-[44px]">@label (@count)</a></li>
                 }
             </ul>
             <p class="text-sm text-muted">
                 Order:
-                <a href="@Href(Type, null)" aria-current="@(Sort != "title" ? "page" : null)" class="@(Sort != "title" ? "font-semibold text-heading" : "text-heading underline underline-offset-2")">newest first</a> ·
-                <a href="@Href(Type, "title")" aria-current="@(Sort == "title" ? "page" : null)" class="@(Sort == "title" ? "font-semibold text-heading" : "text-heading underline underline-offset-2")">by title</a>
+                <a href="@Href(Type, null, Query)" aria-current="@(Sort != "title" ? "page" : null)" class="@(Sort != "title" ? "font-semibold text-heading" : "text-heading underline underline-offset-2")">newest first</a> ·
+                <a href="@Href(Type, "title", Query)" aria-current="@(Sort == "title" ? "page" : null)" class="@(Sort == "title" ? "font-semibold text-heading" : "text-heading underline underline-offset-2")">by title</a>
             </p>
         </nav>
+
+        @if (Query != null)
+        {
+            <p class="text-sm text-muted" role="status">@ResultLine</p>
+        }
 
         <ul class="grid grid-cols-1 gap-4 md:grid-cols-2" aria-label="Reports">
             @foreach (var entry in Listed)
@@ -60,6 +84,14 @@
                         <p class="mt-2 text-sm text-ink">@e.Questions[0]@(e.Questions.Count > 1 ? $" (and {e.Questions.Count - 1} more {(e.Questions.Count == 2 ? "question" : "questions")})" : "")</p>
                     }
                     <p class="mt-2 text-sm text-muted">@AuBtechReviewAgent.GalleryCard.Counts(e)</p>
+                    @if (AuBtechReviewAgent.GalleryCard.CitationSupport(e.Citations) is string support)
+                    {
+                        <p class="mt-1 text-sm text-ink" data-citation-support>@support</p>
+                    }
+                    @if (AuBtechReviewAgent.GalleryCard.SelfCheckLine(e.SelfCheck) is string selfCheck)
+                    {
+                        <p class="mt-1 text-sm text-ink" data-self-check>@selfCheck</p>
+                    }
                     @if (e.Keywords.Count > 0)
                     {
                         <ul class="mt-3 flex flex-wrap gap-1.5" aria-label="Themes">
@@ -79,30 +111,47 @@
 @code {
     [SupplyParameterFromQuery(Name = "type")] public string? Type { get; set; }
     [SupplyParameterFromQuery(Name = "sort")] public string? Sort { get; set; }
+    [SupplyParameterFromQuery(Name = "q")] public string? Q { get; set; }
 
-    private List<AuBtechReviewAgent.GalleryEntry> Shown = new();
+    private List<AuBtechReviewAgent.GalleryEntry> Shown = new(), Found = new();
+    private string? Query;
 
     protected override void OnParametersSet()
     {
         Shown = Store.List().Where(e => ModuleOptions.Shows(e.Card)).ToList();
         if (Type != null && !Shown.Any(e => e.Card == Type)) Type = null;
+        if (Sort != null && Sort != "title") Sort = null;
+        Query = AuBtechReviewAgent.GallerySearch.Clean(Q);
+        Found = AuBtechReviewAgent.GallerySearch.Filter(Shown, Query).ToList();
+    }
+
+    private string ResultLine
+    {
+        get
+        {
+            int n = Listed.Count();
+            return n == 0
+                ? $"No report matches \"{Query}\". Try fewer or other words."
+                : $"{n} {(n == 1 ? "report matches" : "reports match")} \"{Query}\".";
+        }
     }
 
     private IEnumerable<AuBtechReviewAgent.GalleryEntry> Listed =>
-        (Type == null ? Shown : Shown.Where(e => e.Card == Type)) is var list && Sort == "title"
+        (Type == null ? Found : Found.Where(e => e.Card == Type)) is var list && Sort == "title"
             ? list.OrderBy(e => e.Title, StringComparer.CurrentCultureIgnoreCase)
             : list.OrderByDescending(e => e.LastChangedUtc);
 
     private IEnumerable<(string Card, string Label, int Count)> Types =>
-        Shown.GroupBy(e => e.Card).OrderBy(g => g.Key, StringComparer.Ordinal).Select(g => (g.Key, TypeLabel(g.Key), g.Count()));
+        Found.GroupBy(e => e.Card).OrderBy(g => g.Key, StringComparer.Ordinal).Select(g => (g.Key, TypeLabel(g.Key), g.Count()));
 
     private static string TypeLabel(string card) => AuBtechReviewAgent.GalleryCard.TypeLabel(card);
 
     private static string Date(DateTime utc) => AuBtechReviewAgent.GalleryCard.Date(utc);
 
-    private static string Href(string? type, string? sort)
+    private static string Href(string? type, string? sort, string? search)
     {
         var query = new List<string>();
+        if (search != null) query.Add("q=" + Uri.EscapeDataString(search));
         if (type != null) query.Add("type=" + Uri.EscapeDataString(type));
         if (sort != null) query.Add("sort=" + Uri.EscapeDataString(sort));
         return "/gallery" + (query.Count > 0 ? "?" + string.Join("&", query) : "");
