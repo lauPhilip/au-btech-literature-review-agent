@@ -208,7 +208,7 @@
         if (Stage == AuBtechReviewAgent.PrismaReviewEngine.StageFailed) return "The run stopped with an error";
         if (Stage == AuBtechReviewAgent.PrismaReviewEngine.StageInterrupted) return "The run was interrupted";
         if (Stage == AuBtechReviewAgent.PrismaReviewEngine.StageCancelled) return "The run was cancelled";
-        return AuBtechReviewAgent.RunProgress.Steps.TryGetValue(Stats.ProgressStep, out var d) ? d.Label : "Writing the protocol";
+        return AuBtechReviewAgent.ReviewSteps.Label(Stats, "Writing the protocol");
     }
 
     private static RenderFragment Record(bool onFile, string text) => __builder =>

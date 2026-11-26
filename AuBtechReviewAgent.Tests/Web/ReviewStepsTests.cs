@@ -23,6 +23,23 @@ public class ReviewStepsTests
     }
 
     [Theory]
+    [InlineData(RunProgress.Screening, 0.2, "Screening")]
+    [InlineData(RunProgress.Chaining, 0.2, "Citation chaining")]
+    [InlineData(RunProgress.Synthesis, 0.5, "Writing")]
+    [InlineData(RunProgress.Synthesis, 0.95, "Artifact")]
+    [InlineData(RunProgress.Checking, 0.3, "Citation checks")]
+    public void TheProgressLineNamesTheStepThatIsRunning(string step, double fraction, string label)
+    {
+        Assert.Equal(label, ReviewSteps.Label(At(step, fraction), "Writing the protocol"));
+    }
+
+    [Fact]
+    public void TheProgressLineSaysWhatItDoesBeforeTheFirstStep()
+    {
+        Assert.Equal("Writing the protocol", ReviewSteps.Label(new ReviewStats(), "Writing the protocol"));
+    }
+
+    [Theory]
     [InlineData(RunProgress.Search, 0.5, ReviewSteps.Search)]
     [InlineData(RunProgress.Screening, 0.2, ReviewSteps.Screening)]
     [InlineData(RunProgress.Chaining, 0.2, ReviewSteps.Screening)]
