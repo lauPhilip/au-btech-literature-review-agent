@@ -170,8 +170,12 @@ public static class ArtifactBuilder
         var sb = new StringBuilder();
         sb.AppendLine(a.Kind == ArtifactKinds.Flowchart ? "flowchart TD" : "flowchart LR");
         foreach (var n in a.Nodes) sb.AppendLine($"    {n.Id}[\"{Q(n.Label)}\"]");
+        // A link no single study states is the review's own reading and is drawn dashed (issue #571).
         foreach (var e in a.Edges)
-            sb.AppendLine(string.IsNullOrWhiteSpace(e.Label) ? $"    {e.From} --> {e.To}" : $"    {e.From} -->|\"{Q(e.Label)}\"| {e.To}");
+        {
+            string arrow = e.Check == ArtifactLinks.Reading ? "-.->" : "-->";
+            sb.AppendLine(string.IsNullOrWhiteSpace(e.Label) ? $"    {e.From} {arrow} {e.To}" : $"    {e.From} {arrow}|\"{Q(e.Label)}\"| {e.To}");
+        }
         return sb.ToString().TrimEnd();
     }
 
@@ -212,7 +216,8 @@ public static class ArtifactBuilder
         foreach (var e in a.Edges)
         {
             string label = string.IsNullOrWhiteSpace(e.Label) ? "" : $" node[midway, fill=white, font=\\tiny, align=center] {{{escape(e.Label)}}}";
-            sb.AppendLine($"\\draw[->, thick] ({e.From}) --{label} ({e.To});");
+            string style = e.Check == ArtifactLinks.Reading ? "->, thick, dashed" : "->, thick";
+            sb.AppendLine($"\\draw[{style}] ({e.From}) --{label} ({e.To});");
         }
         sb.AppendLine(@"\end{tikzpicture}");
         return sb.ToString();
