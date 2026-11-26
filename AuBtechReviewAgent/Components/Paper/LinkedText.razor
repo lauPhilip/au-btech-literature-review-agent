@@ -1,0 +1,30 @@
+@* A reference as text, with every web address in it as a link, on the page and in a saved PDF: a source's address,
+   its DOI and its archived copy. Only http(s) addresses are linked (AGENTS.md rule 7); a sentence's full stop or a
+   closing bracket after an address stays text. Written on one line so no space is added around the links. *@
+@foreach (var part in Parts(Text)){if (part.Link){<a href="@part.Text" target="_blank" rel="noopener" class="text-heading underline underline-offset-2">@part.Text</a>}else{@part.Text}}
+
+@code {
+    [Parameter] public string? Text { get; set; }
+
+    private static readonly System.Text.RegularExpressions.Regex Address = new(@"https?://[^\s<>""]+", System.Text.RegularExpressions.RegexOptions.CultureInvariant | System.Text.RegularExpressions.RegexOptions.IgnoreCase, TimeSpan.FromSeconds(1));
+
+    /// <summary>The text in order, each part either plain text or a web address to link.</summary>
+    public static IReadOnlyList<(string Text, bool Link)> Parts(string? text)
+    {
+        var parts = new List<(string, bool)>();
+        string s = text ?? "";
+        int at = 0;
+        foreach (System.Text.RegularExpressions.Match m in Address.Matches(s))
+        {
+            string address = m.Value.TrimEnd('.', ',', ';', ':', ')', ']', '*', '\'');
+            // A closing bracket that belongs to the address, as in a Wikipedia link, is kept.
+            if (m.Value.Length > address.Length && m.Value[address.Length] == ')' && address.Count(c => c == '(') > address.Count(c => c == ')')) address += ")";
+            if (!AuBtechReviewAgent.PrismaReviewEngine.IsWebAddress(address)) continue;
+            if (m.Index > at) parts.Add((s[at..m.Index], false));
+            parts.Add((address, true));
+            at = m.Index + address.Length;
+        }
+        if (at < s.Length) parts.Add((s[at..], false));
+        return parts;
+    }
+}

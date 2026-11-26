@@ -6,10 +6,11 @@
 @inject NavigationManager Nav
 @inject Microsoft.Extensions.Configuration.IConfiguration Configuration
 
-@* One report in the gallery, shown only as it prints: the report page draws a version's copy (SpecMatrix with
-   GalleryId and GalleryVersion) inside "ui-print-view", which applies the print layout on screen
-   (Styles/tailwind.input.css). /gallery/{id} shows the newest version; /gallery/{id}/v/{n} always shows version n.
-   The page around it is plain; the report and the owner's withdraw button are the only live parts. *@
+@* One report in the gallery, in the layout of the review output page: the report page draws a version's copy
+   (SpecMatrix with GalleryId and GalleryVersion) as the same A4 pages, with the contents list, the citation popups
+   and the citation-check panel, read-only and with no link into the run's files. /gallery/{id} shows the newest
+   version; /gallery/{id}/v/{n} always shows version n. The notes above the report are plain; the report and the
+   owner's withdraw button are the only live parts. *@
 
 @if (entry != null && newest != null)
 {
@@ -39,7 +40,7 @@
                 <p class="mt-1 text-ink" data-self-check>@selfCheck. The report checked its own paper in code once it was finished, as an editor would; a note is worth a look and a fault is something a reader would notice.</p>
             }
             <p class="mt-2 text-muted">
-                @AuBtechReviewAgent.GalleryCard.Provenance(entry). Shown as it prints, drawn from a copy of the run's files with today's layout.
+                @AuBtechReviewAgent.GalleryCard.Provenance(entry). Drawn from a copy of the run's files with today's layout.
                 <a href="/model-card" class="text-heading underline underline-offset-2">How the tool works</a> ·
                 <a href="/privacy#gallery" class="text-heading underline underline-offset-2">What the gallery keeps</a>
             </p>
@@ -51,10 +52,10 @@
         {
             <AuBtechReviewAgent.Components.Gallery.GalleryVersions Entry="entry" Current="entry.Version" />
         }
+    </div>
 
-        <div class="mt-6 border border-line bg-page px-5 py-8 shadow-card sm:px-12 sm:py-12 ui-print-view" data-gallery-report>
-            <AuBtechReviewAgent.Components.Pages.SpecMatrix GalleryId="@entry.Id" GalleryVersion="@entry.Version" />
-        </div>
+    <div data-gallery-report>
+        <AuBtechReviewAgent.Components.Pages.SpecMatrix GalleryId="@entry.Id" GalleryVersion="@entry.Version" />
     </div>
 }
 

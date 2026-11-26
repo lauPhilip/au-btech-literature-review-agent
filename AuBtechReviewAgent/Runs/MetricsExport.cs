@@ -51,6 +51,7 @@ public static class MetricsExport
         C("unverifiable", r => r.CitationsFinal.Unverifiable), C("supported_share", r => r.CitationsFinal.SupportedShare),
         C("second_checked", r => r.SecondChecked), C("second_check_agreed", r => r.SecondCheckAgreed), C("upgraded_by_second_check", r => r.UpgradedBySecondCheck),
         C("repaired", r => r.Repaired), C("removed", r => r.Removed), C("outside_theme", r => r.OutsideTheme), C("invalid_markers_stripped", r => r.InvalidMarkersStripped),
+        C("self_check_passed", r => r.SelfCheckPassed), C("self_check_notes", r => r.SelfCheckNotes), C("self_check_faults", r => r.SelfCheckFaults),
         C("synthesis_words", r => r.SynthesisWords), C("discussion_words", r => r.DiscussionWords), C("sentences", r => r.Sentences),
         C("cited_sentence_share", r => r.CitedSentenceShare), C("citations_per_100_words", r => r.CitationsPer100Words),
         C("multi_paper_sentence_share", r => r.MultiPaperSentenceShare),

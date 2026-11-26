@@ -71,6 +71,8 @@
             <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h4v4H8v3H6v-4zM15 7h4v4h-3v3h-2v-4z"></path></svg>
             <span data-copy-text>Cite</span>
         </button>
+        @if (Info.LinksToRun)
+        {
         <a href="@Link(Info.ArchivePath)" class="ui-btn-secondary min-h-[44px]" title="Every file of the run, fingerprinted, with the source papers and the LaTeX manuscript">
             <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
             Source archive
@@ -79,15 +81,19 @@
             <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5h11M9 12h11M9 19h11M4 5h.01M4 12h.01M4 19h.01"></path></svg>
             Decision log
         </a>
+        }
         <span class="sr-only" role="status" data-copy-status="@CiteId"></span>
     </div>
 
     @* On paper the buttons are links with full addresses, so a printed or saved copy still leads back to the run. *@
     <ul class="af-links hidden print:block">
         <li>Online: <a href="@Link(Info.ReportPath)">@Link(Info.ReportPath)</a></li>
-        <li>Source archive: <a href="@Link(Info.ArchivePath)">@Link(Info.ArchivePath)</a></li>
-        <li>Decision log: <a href="@Link(Info.DecisionLogPath)">@Link(Info.DecisionLogPath)</a></li>
-        @if (Info.HasProtocol)
+        @if (Info.LinksToRun)
+        {
+            <li>Source archive: <a href="@Link(Info.ArchivePath)">@Link(Info.ArchivePath)</a></li>
+            <li>Decision log: <a href="@Link(Info.DecisionLogPath)">@Link(Info.DecisionLogPath)</a></li>
+        }
+        @if (Info.HasProtocol && Info.LinksToRun)
         {
             <li>Protocol: <a href="@Link(Info.ProtocolPath)">@Link(Info.ProtocolPath)</a></li>
         }

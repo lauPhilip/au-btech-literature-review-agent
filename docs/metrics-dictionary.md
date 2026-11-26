@@ -69,6 +69,9 @@ The JSON has the same fields with their types, plus three objects the CSV leaves
 | `removed` | citations | Citations the second repair pass removed as still not supported; not in `citations`. |
 | `outside_theme` | citations | Systematic: citations of a study outside the theme's own studies. |
 | `invalid_markers_stripped` | markers | Citation markers that named no reference and were removed in code. |
+| `self_check_passed` | checks | Systematic: how many of the ten checks the finished paper made of itself passed (`self-check.json`). Empty for a run made before the self-check, never 0. |
+| `self_check_notes` | checks | Systematic: checks that ended in a note, something worth a look. Empty before the self-check. |
+| `self_check_faults` | checks | Systematic: checks that ended in a fault, something a reader would notice as wrong. Empty before the self-check. |
 | `synthesis_words` | words | Words of the written results (theme sections and overview). |
 | `discussion_words` | words | Words of the discussion. |
 | `sentences` | sentences | Sentences of the results and discussion. |

@@ -1,6 +1,6 @@
 @* The footer. On app pages it is one slim line that never moves: the name, and the pages about trust (About,
-   Model card, Privacy, Verify an archive, Glossary, Accessibility) with GitHub; on phones only the name, About, Privacy
-   and Accessibility, so it stays one line at 390 px (issue #244). Privacy and Accessibility are on every page, as on a
+   Model card, Privacy, Verify an archive, Glossary, Accessibility) with GitHub; on phones only About, Example reports,
+   Privacy and Accessibility (the header already carries the name), so it stays one line at 390 px (issues #244, #639). Privacy and Accessibility are on every page, as on a
    public body's site (issues #543, #544); GitHub is one click away on About.
    The landing page (Landing="true") names the department and OSSYM 2026, with Metrics, Example reports, Privacy, Accessibility, Docs and GitHub. *@
 
@@ -22,12 +22,12 @@
         }
         else
         {
-            <p class="py-2"><span class="font-display font-semibold text-heading">TraceableAI</span><span class="max-sm:hidden"> · BTECH, AU</span></p>
+            <p class="py-2 max-sm:hidden"><span class="font-display font-semibold text-heading">TraceableAI</span> · BTECH, AU</p>
             <nav aria-label="About TraceableAI">
                 <ul class="-mx-2 flex flex-wrap items-center">
                     <li><a href="/about" class="@LinkClass">About</a></li>
                     <li class="hidden sm:block"><a href="/model-card" class="@LinkClass">Model card</a></li>
-                    <li class="hidden sm:block"><a href="/gallery" class="@LinkClass">Example reports</a></li>
+                    <li><a href="/gallery" class="@LinkClass">Example reports</a></li>
                     <li><a href="/privacy" class="@LinkClass">Privacy</a></li>
                     <li class="hidden sm:block"><a href="/verify" class="@LinkClass">Verify an archive</a></li>
                     <li class="hidden sm:block"><a href="/glossary" class="@LinkClass">Glossary</a></li>

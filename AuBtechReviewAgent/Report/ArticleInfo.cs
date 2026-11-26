@@ -45,11 +45,19 @@ public sealed record ArticleInfo
     public int? ReadInFull { get; init; }
     /// <summary>The citation verdicts as the report shows them (<see cref="VerdictTally.ForRun"/>); null when the run has none.</summary>
     public VerdictTally? Citations { get; init; }
+    /// <summary>The self-check the run wrote to self-check.json (<see cref="GallerySelfCheck.Read"/>); null when it wrote none.</summary>
+    public GallerySelfCheck? SelfCheck { get; init; }
+    /// <summary>How many included studies are reviews (secondary studies), when the run records it; null shows no count.</summary>
+    public int? ReviewsAmongIncluded { get; init; }
+    /// <summary>What the retraction check found among the included studies, when the run made one; null shows no line.</summary>
+    public RetractionTally? Retractions { get; init; }
     /// <summary>The SHA-256 fingerprint of protocol.md, or the short hash older runs recorded; empty when none.</summary>
     public string ProtocolFingerprint { get; init; } = "";
     public IReadOnlyList<string> Keywords { get; init; } = Array.Empty<string>();
     /// <summary>The report page, relative to the site (e.g. "spec-matrix/{id}").</summary>
     public string ReportPath { get; init; } = "";
+    /// <summary>False for a gallery copy, which outlives its run: the page then offers no link into the run's files.</summary>
+    public bool LinksToRun { get; init; } = true;
     public bool HasProtocol { get; init; }
 
     public string ArchivePath => $"api/workspace/{RunId}/archive";
@@ -113,16 +121,30 @@ public sealed record ArticleInfo
         Add("Records",
             $"{Count(Found)} identified",
             Screened is int screened ? $"{Count(screened)} screened" : null,
-            $"{Count(Included)} included",
+            $"{Count(Included)} included" + (ReviewsAmongIncluded is int reviews ? $" ({Count(reviews)} {(reviews == 1 ? "review" : "reviews")})" : ""),
             ReadInFull is int full && Included > 0 ? $"{Count(full)} of {Count(Included)} read in full" : null);
         Add("Checks",
-            Citations is { Checked: > 0 } c ? $"Citations {Count(c.Supported)} of {Count(c.Checked)} supported" : null);
+            Citations is { Checked: > 0 } c ? $"Citations {Count(c.Supported)} of {Count(c.Checked)} supported" : null,
+            SelfCheckLine(SelfCheck),
+            Retractions?.Line);
         Add("Keywords", Keywords.ToArray());
         Add("Registration", Registration);
         return groups;
     }
 
-    private static string Count(int n) => n.ToString("N0", CultureInfo.InvariantCulture);
+    /// <summary>"Self-check: 8 of 11 passed; 2 notes, 1 fault", from self-check.json; null when the run wrote none.</summary>
+    public static string? SelfCheckLine(GallerySelfCheck? check)
+    {
+        if (check == null) return null;
+        int total = check.Passed + check.Notes + check.Faults;
+        if (total == 0) return null;
+        var rest = new List<string>();
+        if (check.Notes > 0) rest.Add($"{Count(check.Notes)} {(check.Notes == 1 ? "note" : "notes")}");
+        if (check.Faults > 0) rest.Add($"{Count(check.Faults)} {(check.Faults == 1 ? "fault" : "faults")}");
+        return $"Self-check: {Count(check.Passed)} of {Count(total)} passed" + (rest.Count > 0 ? "; " + string.Join(", ", rest) : "");
+    }
+
+    internal static string Count(int n) => n.ToString("N0", CultureInfo.InvariantCulture);
 
     /// <summary>"25 Nov 2026", the short date of the article history.</summary>
     public static string ShortDate(DateTime? utc) =>
@@ -168,7 +190,7 @@ public sealed record ArticleInfo
 
     /// <summary>The systematic review's front page, from its ledger and report.</summary>
     public static ArticleInfo ForSystematic(Guid runId, ReviewState? state, PrismaReport report, string title, string @abstract, bool hasProtocol,
-        VerdictTally? citations = null)
+        VerdictTally? citations = null, string? galleryPath = null, GallerySelfCheck? selfCheck = null, int? reviewsAmongIncluded = null, RetractionTally? retractions = null)
     {
         var models = new[] { state?.RunSettings?.Model, state?.RunSettings?.FastModel }
             .Where(m => !string.IsNullOrWhiteSpace(m)).Select(m => m!.Trim()).Distinct(StringComparer.Ordinal).ToList();
@@ -193,11 +215,15 @@ public sealed record ArticleInfo
             Screened = state?.Stats.Screened,
             ReadInFull = state?.Stats.FullTextRetrieved,
             Citations = citations,
+            SelfCheck = selfCheck,
+            ReviewsAmongIncluded = reviewsAmongIncluded,
+            Retractions = retractions,
             ProtocolFingerprint = fingerprint == "not recorded" ? "" : fingerprint,
             Keywords = state == null ? Array.Empty<string>() : ArticleKeywords.From(state.SearchQuery,
                 state.SearchPerspectives.Count > 0 ? state.SearchPerspectives : new List<string> { state.SearchQuery },
                 state.ThematicSynthesis?.Themes.Select(t => t.Name)),
-            ReportPath = $"spec-matrix/{runId}",
+            ReportPath = galleryPath?.TrimStart('/') ?? $"spec-matrix/{runId}",
+            LinksToRun = galleryPath == null,
             HasProtocol = hasProtocol,
         };
     }
@@ -209,5 +235,36 @@ public sealed record ArticleInfo
                 CultureInfo.InvariantCulture, DateTimeStyles.AdjustToUniversal | DateTimeStyles.AssumeUniversal, out var t) ? t : (DateTime?)null)
             .Where(t => t != null).ToList();
         return times.Count > 0 ? times.Min() : null;
+    }
+}
+
+/// <summary>
+/// What a retraction check found among the included studies, for the front page's Checks group: how many it checked,
+/// and how many were retracted, carry an expression of concern or were corrected. A kind of review fills it only from
+/// the check's own file; without one there is no line, never a guessed "none".
+/// </summary>
+public sealed record RetractionTally(int Checked, int Retracted, int Concerns, int Corrected)
+{
+    /// <summary>The tally of a run's retraction-check.json; null when the run made no check or checked no study (a study that could not be checked is not counted).</summary>
+    public static RetractionTally? From(RetractionCheckFile? file)
+    {
+        var done = file?.Studies.Where(s => s.Status != RetractionStatus.NotChecked).ToList();
+        if (done == null || done.Count == 0) return null;
+        return new(done.Count, done.Count(s => s.Status == RetractionStatus.Retracted), done.Count(s => s.Status == RetractionStatus.Concern),
+            done.Count(s => s.Status == RetractionStatus.Corrected));
+    }
+
+    /// <summary>"Retractions: none in 38 checked" or "Retractions: 1 retracted, 2 corrected, of 38 checked"; null when none was checked.</summary>
+    public string? Line
+    {
+        get
+        {
+            if (Checked <= 0) return null;
+            var found = new List<string>();
+            if (Retracted > 0) found.Add($"{ArticleInfo.Count(Retracted)} retracted");
+            if (Concerns > 0) found.Add($"{ArticleInfo.Count(Concerns)} with an expression of concern");
+            if (Corrected > 0) found.Add($"{ArticleInfo.Count(Corrected)} corrected");
+            return found.Count == 0 ? $"Retractions: none in {ArticleInfo.Count(Checked)} checked" : $"Retractions: {string.Join(", ", found)}, of {ArticleInfo.Count(Checked)} checked";
+        }
     }
 }
