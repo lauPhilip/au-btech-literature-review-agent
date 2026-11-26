@@ -106,9 +106,10 @@ public static partial class MethodsSectionWriter
         int journals = records.Count(r => r.VenueType == "Journals");
         int transactions = records.Count(r => r.VenueType == "Transactions");
         int conferences = records.Count(r => r.VenueType is "Conferences" or "Proceedings");
-        int other = records.Count - journals - transactions - conferences;
+        int books = records.Count(r => r.VenueType == ApaCitationBuilder.BookChapters);
+        int other = records.Count - journals - transactions - conferences - books;
         return $"{span} By the source that first returned them: {sources}. " +
-               $"By venue type: {journals} journal, {transactions} transactions, {conferences} conference and {other} preprint or unknown.";
+               $"By venue type: {journals} journal, {transactions} transactions, {conferences} conference{(books > 0 ? $", {books} book chapter" : "")} and {other} preprint or unknown.";
     }
 
     /// <summary>

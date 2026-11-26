@@ -61,6 +61,12 @@ public static partial class ApaCitationBuilder
     private static readonly Regex ConferencePattern =
         new(@"\b(conference|proceedings|symposium|workshop|congress)\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
+    // "Advances in computational intelligence and robotics book series": a chapter in a book, not an article in a journal.
+    /// <summary>The venue type of a chapter in a book (a book series), which is not a journal.</summary>
+    public const string BookChapters = "Book chapters";
+
+    private static readonly Regex BookPattern = new(@"\bbook series\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
     /// <summary>
     /// Builds the reference. <paramref name="known"/> holds details found outside the venue string, from the reference
     /// enrichment (Crossref, OpenAlex, arXiv); they win over what the venue string carries.
@@ -118,7 +124,8 @@ public static partial class ApaCitationBuilder
         else
         {
             // APA 7 sets volume and issue as "*Journal*, *14*(2), 1–10", not inside the italic name (issue #151).
-            venueType = venue.Contains("Transactions", StringComparison.OrdinalIgnoreCase) ? "Transactions" : "Journals";
+            venueType = venue.Contains("Transactions", StringComparison.OrdinalIgnoreCase) ? "Transactions"
+                : BookPattern.IsMatch(venue) ? BookChapters : "Journals";
             venuePart = $"*{venue}*{JournalLocator(details)}.";
         }
 
