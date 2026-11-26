@@ -69,6 +69,7 @@ All of these can be set in `appsettings.json` (non-secret values only), user sec
 | `ReviewModules:Preview` | (empty) | Modules shown as a preview while they are being built, e.g. `["multivocal"]`: their pages open, their cards get a "Preview" chip, and the model card and privacy page describe them (`ReviewModulesOptions.Shows`). Read only in Development; ignored everywhere else. In production a review is opened and described only once its card is switched on (`Available: true` in its module), which is the one switch that makes it public |
 | `Runs:DemoRunId` | (empty) | A finished run shown on the landing page as "See an example report"; kept and read-only |
 | `Site:PublicUrl` | `https://au-btech-literature-review-agent.dk` | The public address used in the sitemap, robots.txt, canonical links and link previews, so search engines see one address whatever host name a visitor used. `appsettings.Development.json` sets it to empty, which uses the address of the request (`http://localhost:5038` with `dotnet watch`). Set your own address here when you deploy a copy elsewhere |
+| `Report:CompetingInterestsStatement` | (empty) | The statement under "Competing Interests" in a systematic review's main.tex and report page (PRISMA 2020 item 26). Empty means the paper says the reviewer did not report one |
 | `Runs:ScreeningReviewTimeoutHours` | 24 | How long a run waits for the human screening review |
 | `Llm:Provider` | Mistral | `Mistral` or `OpenAICompatible` |
 | `Llm:Model` | mistral-large-latest | The model name sent to the provider |
