@@ -29,14 +29,18 @@ public static partial class DocumentRAGUtility
     /// <summary>
     /// Finds a legal full text for the paper, downloads it and splits it into page-tagged chunks. Tried in
     /// order: arXiv; the open-access PDF link the source reported (OpenAlex, Semantic Scholar, Crossref);
-    /// Unpaywall by DOI. Returns no chunks (and says why) when none is available.
+    /// Unpaywall by DOI. Returns no chunks (and says why) when none is available. The PDF is kept under
+    /// <see cref="FullTextFile.PdfName(AcademicPaper)"/>, with a record of what it is beside it.
     /// </summary>
     public static async Task<FullTextResult> IngestAndChunkPaperAsync(AcademicPaper paper, string targetDir, string contactEmail = "")
     {
         if (string.IsNullOrWhiteSpace(targetDir)) return new FullTextResult(Array.Empty<DocumentChunk>(), "none", null);
         Directory.CreateDirectory(targetDir);
 
-        string pdfPath = Path.Join(targetDir, PdfFileName(paper.Title));
+        // Named by a key of the paper's own (#587); an older run's copy under its title is read, never written.
+        string pdfPath = Path.Join(targetDir, FullTextFile.PdfName(paper));
+        string legacyPath = Path.Join(targetDir, PdfFileName(paper.Title));
+        if (!File.Exists(pdfPath) && File.Exists(legacyPath)) pdfPath = legacyPath;
         string sourceId = ChunkSourceId(paper.Id);
 
         var candidates = new List<(string Label, string Url)>();
@@ -76,6 +80,7 @@ public static partial class DocumentRAGUtility
         {
             label = "already downloaded";
         }
+        if (usedUrl != null) FullTextFile.WriteRecord(targetDir, paper, usedUrl);
 
         if (!File.Exists(pdfPath)) return new FullTextResult(Array.Empty<DocumentChunk>(), candidates.Count == 0 && string.IsNullOrWhiteSpace(contactEmail) ? "none (no open-access copy known)" : "none (no legal open-access PDF found)", null);
         return new FullTextResult(ChunkPdf(pdfPath, sourceId), label, usedUrl);
