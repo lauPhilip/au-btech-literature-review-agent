@@ -16,7 +16,8 @@
        third-party scripts and can run under a strict Content-Security-Policy. It comes after app.css, as the
        CDN version did, so its reset (e.g. links inherit their colour) still wins over app.css. *@
     <link rel="stylesheet" href="@Assets["css/tailwind.css"]" />
-    @* The printed report's journal layout (wiki page 06); plain CSS, for print only. *@
+    @* The report as paper (wiki page 06), plain CSS: the front page and the A4 sheets on screen, and the journal layout for print. *@
+    <link rel="stylesheet" href="@Assets["css/report-paper.css"]" />
     <link rel="stylesheet" href="@Assets["css/journal-print.css"]" media="print" />
     <link rel="icon" href="favicon.ico" sizes="any" />
     <link rel="icon" href="favicon.svg" type="image/svg+xml" />
@@ -34,6 +35,7 @@
     <ReconnectModal />
     <script src="@Assets["js/mermaid-render.js"]"></script>
     <script src="@Assets["js/review-output.js"]"></script>
+    <script src="@Assets["js/paged-preview.js"]"></script>
     <script src="@Assets["js/citation-loop.js"]"></script>
     <script src="@Assets["_framework/blazor.web.js"]"></script>
 </body>

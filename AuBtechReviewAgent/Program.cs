@@ -220,6 +220,8 @@ AuBtechReviewAgent.SiteRateLimits.UseRequestBodyLimit(app, siteLimits);
 
 // The run downloads, with Last-Modified, an ETag and the kept archive of a finished run (Web/WorkspaceDownloads.cs).
 AuBtechReviewAgent.WorkspaceDownloads.MapWorkspaceDownloads(app, reviewEngine, multivocalWriter, multivocalReporter);
+// The engine from the services, which is reviewEngine itself, so a test host that registers its own engine reaches its runs.
+AuBtechReviewAgent.DepositDownload.MapDepositDownload(app, app.Services.GetRequiredService<AuBtechReviewAgent.PrismaReviewEngine>(), multivocalWriter);
 
 // The Metrics page's figures as CSV and JSON, for papers about the tool (Web/MetricsDownloads.cs).
 AuBtechReviewAgent.MetricsDownloads.MapMetricsDownloads(app, metricsStore, app.Services.GetRequiredService<AuBtechReviewAgent.ReviewModulesOptions>(), metricsOptions.Prices);

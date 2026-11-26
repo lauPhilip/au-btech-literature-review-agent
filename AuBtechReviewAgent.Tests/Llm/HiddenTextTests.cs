@@ -95,7 +95,7 @@ public class HiddenTextTests
     }
 
     [Theory]
-    [InlineData("<p class=\"hidden\">Shown</p>")] // a class is not read
+    [InlineData("<p class=\"hidden md:block\">Shown</p>")] // shown again on a wider screen
     [InlineData("<p style=\"color:#fff;background:#000\">Shown</p>")] // white on black is visible
     [InlineData("<p style=\"color:white\">Shown</p>")] // the background is unknown, so it stays
     [InlineData("<p aria-hidden=\"false\">Shown</p>")]

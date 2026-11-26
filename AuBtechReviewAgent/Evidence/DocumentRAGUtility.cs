@@ -19,7 +19,7 @@ public record DocumentChunk(string SourceId, int PageNumber, string Text);
 /// <summary>Where a paper's full text came from (or why there is none), for the ledger.</summary>
 public record FullTextResult(IReadOnlyList<DocumentChunk> Chunks, string Source, string? Url);
 
-public static class DocumentRAGUtility
+public static partial class DocumentRAGUtility
 {
     /// <summary>PDFs larger than this are not downloaded (a download used to have no size limit at all).</summary>
     public const long MaxPdfBytes = 40L * 1024 * 1024;
@@ -44,9 +44,7 @@ public static class DocumentRAGUtility
         if (string.IsNullOrWhiteSpace(targetDir)) return new FullTextResult(Array.Empty<DocumentChunk>(), "none", null);
         Directory.CreateDirectory(targetDir);
 
-        string sanitizedName = Regex.Replace(paper.Title ?? "paper", @"[^a-zA-Z0-9]", "_");
-        if (sanitizedName.Length > 50) sanitizedName = sanitizedName.Substring(0, 50);
-        string pdfPath = Path.Join(targetDir, $"{sanitizedName}.pdf");
+        string pdfPath = Path.Join(targetDir, PdfFileName(paper.Title));
         string sourceId = ChunkSourceId(paper.Id);
 
         var candidates = new List<(string Label, string Url)>();
@@ -72,8 +70,14 @@ public static class DocumentRAGUtility
             }
             if (usedUrl == null && !string.IsNullOrWhiteSpace(paper.Doi) && !string.IsNullOrWhiteSpace(contactEmail) && UnpaywallKnows(paper.Doi!))
             {
-                string? oaUrl = await FindUnpaywallPdfAsync(paper.Doi!, contactEmail);
-                if (oaUrl != null && await TryDownloadPdfAsync(oaUrl, pdfPath)) { label = "Unpaywall"; usedUrl = oaUrl; }
+                string? answer = await AskUnpaywallAsync(paper.Doi!, contactEmail);
+                string? oaUrl = answer == null ? null : ParseUnpaywallPdfUrl(answer);
+                if (oaUrl != null && await TryDownloadPdfAsync(oaUrl, pdfPath))
+                {
+                    label = "Unpaywall";
+                    usedUrl = oaUrl;
+                    SaveUnpaywallAnswer(targetDir, paper.Doi!, answer!);
+                }
             }
         }
         else
@@ -90,41 +94,6 @@ public static class DocumentRAGUtility
     {
         string token = paperId.Contains('/') ? paperId.Split('/').Last() : paperId;
         return Regex.Replace(token, @"[^a-zA-Z0-9\.\-]", "_");
-    }
-
-    // DOI prefixes registered with DataCite rather than Crossref. Unpaywall only covers Crossref DOIs, so it
-    // answers 404 for these every time: Zenodo, figshare, arXiv, OSF, Dryad.
-    private static readonly string[] DataCitePrefixes = { "10.5281/", "10.6084/", "10.48550/", "10.31219/", "10.17605/", "10.5061/" };
-
-    /// <summary>False for DOIs Unpaywall cannot know (DataCite DOIs such as Zenodo's), so they are not looked up.</summary>
-    public static bool UnpaywallKnows(string doi) =>
-        !DataCitePrefixes.Any(p => doi.Trim().StartsWith(p, StringComparison.OrdinalIgnoreCase));
-
-    // DOIs Unpaywall did not know in this process, so the same paper is not looked up again (extraction and
-    // the citation check both ask for the full text).
-    private static readonly ConcurrentDictionary<string, bool> UnpaywallMisses = new(StringComparer.OrdinalIgnoreCase);
-
-    /// <summary>Unpaywall (unpaywall.org) lists legal open-access copies of papers by DOI.</summary>
-    public static async Task<string?> FindUnpaywallPdfAsync(string doi, string contactEmail)
-    {
-        if (UnpaywallMisses.ContainsKey(doi.Trim())) return null;
-        try
-        {
-            string json = await OpenSourceHttp.GetStringAsync($"https://api.unpaywall.org/v2/{Uri.EscapeDataString(doi.Trim())}?email={Uri.EscapeDataString(contactEmail.Trim())}");
-            return ParseUnpaywallPdfUrl(json);
-        }
-        catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
-        {
-            // Normal: Unpaywall does not have every DOI. Not worth a line in the log at the default level.
-            UnpaywallMisses.TryAdd(doi.Trim(), true);
-            _log.LogDebug("Unpaywall does not know {Doi}", doi);
-            return null;
-        }
-        catch (Exception ex)
-        {
-            _log.LogInformation("Unpaywall lookup for {Doi} failed: {Message}", doi, ex.Message);
-            return null;
-        }
     }
 
     /// <summary>The Zenodo record number in a Zenodo DOI ("10.5281/zenodo.18448272" gives "18448272"), or null.</summary>
@@ -169,20 +138,6 @@ public static class DocumentRAGUtility
             if (file.TryGetProperty("links", out var links) && links.TryGetProperty("self", out var self) && self.ValueKind == JsonValueKind.String)
                 return self.GetString();
         }
-        return null;
-    }
-
-    public static string? ParseUnpaywallPdfUrl(string json)
-    {
-        using var doc = JsonDocument.Parse(json);
-        var root = doc.RootElement;
-        if (root.TryGetProperty("best_oa_location", out var best) && best.ValueKind == JsonValueKind.Object
-            && best.TryGetProperty("url_for_pdf", out var pdf) && pdf.ValueKind == JsonValueKind.String && !string.IsNullOrWhiteSpace(pdf.GetString()))
-            return pdf.GetString();
-        if (root.TryGetProperty("oa_locations", out var locs) && locs.ValueKind == JsonValueKind.Array)
-            foreach (var l in locs.EnumerateArray())
-                if (l.TryGetProperty("url_for_pdf", out var p) && p.ValueKind == JsonValueKind.String && !string.IsNullOrWhiteSpace(p.GetString()))
-                    return p.GetString();
         return null;
     }
 

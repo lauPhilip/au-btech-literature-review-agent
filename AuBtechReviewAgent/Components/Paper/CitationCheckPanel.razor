@@ -48,6 +48,7 @@
         @{ string api = $"/api/workspace/{RunId}"; }
         <ul class="mt-2 divide-y divide-line">
             @(Row("Run archive", "Every file fingerprinted, with the LaTeX manuscript", ($"{api}/archive", "Download", "the run archive")))
+            @(Row("Archive to share", "For Zenodo or OSF, without the papers and records that may not be shared", ($"{api}/deposit", "Download", "the archive to share")))
             @if (Multivocal)
             {
                 @(Row("Manuscript", "The paper as LaTeX", ($"{api}/main.tex", "main.tex", "the manuscript")))
