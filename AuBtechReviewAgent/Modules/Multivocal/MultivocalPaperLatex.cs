@@ -32,9 +32,10 @@ public static partial class MultivocalPaper
     }
 
     /// <summary>The paper, ready for <see cref="PaperLatex.Build"/>. The LaTeX slots need the invariant culture, which the caller sets.</summary>
-    public static ReviewPaper Build(MultivocalReportInput input, MultivocalPaperFile paper, MultivocalCitationAudit? audit)
+    public static ReviewPaper Build(MultivocalReportInput input, MultivocalPaperFile paper, MultivocalCitationAudit? audit, ArticleInfo? article = null)
     {
         var plan = input.Planned.Plan;
+        var references = GreyReferences.Build(input.Ledger, input.Pages, input.Extraction).OrderBy(r => r.Number).ToList();
         var themes = new List<PaperSection>();
         var shown = ShownResults(input, paper);
         foreach (var result in shown)
@@ -42,7 +43,7 @@ public static partial class MultivocalPaper
             if (result.Kind == "theme")
             {
                 string latex = MultivocalPaperParts.Prose(result.Text) + "\n\n";
-                if (!string.IsNullOrWhiteSpace(result.Note)) latex += @"\par\smallskip\noindent{\small\textit{" + MultivocalPaperParts.Prose(result.Note) + "}}\n";
+                if (!string.IsNullOrWhiteSpace(result.Note)) latex += @"\par\smallskip\noindent{\small\textit{" + MultivocalPaperParts.Prose(result.Note) + "}\\par}\n";
                 themes.Add(new PaperSection($"{result.Question}: {result.Heading}", result.Text + (result.Note == null ? "" : "\n\n" + result.Note), latex));
                 continue;
             }
@@ -76,8 +77,8 @@ public static partial class MultivocalPaper
             Objectives = Objectives(plan, paper.Objectives),
             Methods = MultivocalPaperParts.Methods(input),
             DataHeading = "Data and the flow of sources",
-            DataText = MultivocalPaperParts.DataText(input),
-            DataLatex = MultivocalPaperParts.DataLatex(input),
+            DataText = MainTexDataText(input),
+            DataLatex = DataPointer(input) + MultivocalPaperParts.DataLatex(input),
             ResultsHeading = "Results",
             ResultsText = ResultsText(new MultivocalPaperFile { Results = shown }),
             Themes = themes,
@@ -89,9 +90,23 @@ public static partial class MultivocalPaper
             Declarations = Declarations(input, paper),
             Keywords = MultivocalArticleInfo.For(input, paper, hasProtocol: false).Keywords,
             AppendixLatex = PaperDeclarations.PublisherVariantsLatex(AiUseTool(input, paper), AiUsePurpose, AiUseShort(input, paper), AiUse(input, paper)),
-            References = GreyReferences.Build(input.Ledger, input.Pages, input.Extraction).Select(GreyReferences.Line).ToList(),
+            References = references.Select(GreyReferences.Line).ToList(),
+            ReferenceKeys = PaperLatex.BibKeys(GreyReferences.ToBibTeX(references)),
+            Article = article,
         };
     }
+
+    // The data text's last sentence points at the figures in words, for the page; main.tex points at them by number.
+    private const string PointerStart = "The figures below show";
+
+    /// <summary>The data text of main.tex: the page's, without its last sentence, since main.tex names the figures by number.</summary>
+    public static string MainTexDataText(MultivocalReportInput input) =>
+        MultivocalPaperParts.DataText(input) is var text && text.IndexOf(PointerStart, StringComparison.Ordinal) is var at and > 0 ? text[..at].TrimEnd() : text;
+
+    private static string DataPointer(MultivocalReportInput input) =>
+        @"Figure~\ref{fig:flow} shows the flow of sources" + (input.Ledger.HasFormalPool ? " in each pool" : "") +
+        @", Figures~\ref{fig:kinds} and~\ref{fig:quality} the extracted sources by kind and outlet tier and the " +
+        (input.Ledger.HasFormalPool ? "grey sources' " : "") + @"quality scores, and Table~\ref{tab:map-counts} how many sources state each value of the map." + "\n\n";
 
     /// <summary>The opening of the results, in code: how each kind of answer was made.</summary>
     public static string ResultsText(MultivocalPaperFile paper)

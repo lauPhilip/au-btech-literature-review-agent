@@ -166,7 +166,11 @@ public sealed partial class MultivocalWriter
         if (input == null || paper?.CheckedUtc == null) return null;
         var previous = System.Globalization.CultureInfo.CurrentCulture;
         System.Globalization.CultureInfo.CurrentCulture = System.Globalization.CultureInfo.InvariantCulture;
-        try { return PaperLatex.Build(MultivocalPaper.Build(input, paper, LoadAudit(runId))); }
+        try
+        {
+            var article = MultivocalArticleInfo.For(input, paper, File.Exists(Path.Join(_runs.FolderOf(runId), "protocol.md")));
+            return PaperLatex.Build(MultivocalPaper.Build(input, paper, LoadAudit(runId), article));
+        }
         finally { System.Globalization.CultureInfo.CurrentCulture = previous; }
     }
 
