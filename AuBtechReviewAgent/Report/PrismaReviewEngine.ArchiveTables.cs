@@ -25,8 +25,8 @@ public partial class PrismaReviewEngine
         var ab = new StringBuilder();
         ab.AppendLine(@"\small");
         // Ragged-right columns (Y): justified text in a narrow column left gaps between words.
-        ab.AppendLine(@"\begin{tabularx}{\textwidth}{>{\hsize=0.6\hsize}Y >{\hsize=1.2\hsize}Y >{\hsize=1.0\hsize}Y >{\hsize=0.5\hsize}Y >{\hsize=1.7\hsize}Y}");
-        ab.Append(PaperLatex.TableHead("Included studies", "tab:A.1", @"\textbf{Paper Name} & \textbf{Executive Summary} & \textbf{Inclusion Rationale} & \textbf{Source} & \textbf{Citation (APA 7th)}"));
+        ab.AppendLine(@"\begin{tabularx}{\textwidth}{>{\hsize=0.3\hsize}Y >{\hsize=0.7\hsize}Y >{\hsize=1.5\hsize}Y >{\hsize=1.2\hsize}Y >{\hsize=0.6\hsize}Y >{\hsize=1.7\hsize}Y}");
+        ab.Append(PaperLatex.TableHead("Included studies", "tab:A.1", @"\textbf{Ref.} & \textbf{Paper Name} & \textbf{Executive Summary} & \textbf{Inclusion Rationale} & \textbf{Source} & \textbf{Citation (APA 7th)}"));
         foreach (var row in records)
         {
             // In sentence case, as in the reference list (issue #567).
@@ -38,7 +38,7 @@ public partial class PrismaReviewEngine
             string source = EscapeLatexText(CategoryLabel(row.Category) + "; " + VenueRank(row));
             string citation = EscapeLatexText(row.ApaCitation);
             // No space before the row's end: chktex reads "Agents}. \\" as a full stop inside a sentence.
-            ab.AppendLine($"{title} & {summary} & {rationale} & {source} & {citation}\\\\ \\addlinespace");
+            ab.AppendLine($"{Cite(new[] { row.ReferenceNumber })} & {title} & {summary} & {rationale} & {source} & {citation}\\\\ \\addlinespace");
         }
         ab.AppendLine(@"\bottomrule");
         ab.AppendLine(@"\end{tabularx}");
