@@ -213,27 +213,51 @@ public static partial class ApaCitationBuilder
         "off", "out", "up", "vs", "with", "from", "into",
     };
 
+    // Proper nouns that often stand in research titles with one capital only. Sentence case lowers every other such word,
+    // so a name missing here is printed in lower case; words with more capitals (GitHub, ReAct, LLMoxie) always keep theirs.
+    private static readonly HashSet<string> ProperNouns = new(StringComparer.Ordinal)
+    {
+        "I", "Python", "Java", "Rust", "Linux", "Android", "Windows", "Excel", "Google", "Microsoft", "Amazon", "Apple", "Meta",
+        "Twitter", "Reddit", "Wikipedia", "Mistral", "Claude", "Gemini", "Llama", "Bayesian", "Markov", "Monte", "Carlo",
+        "Gaussian", "Boolean", "Euclidean", "Fourier", "Kalman", "Turing", "Nash", "Pareto", "Petri", "English", "European",
+        "Europe", "Danish", "Denmark", "German", "Germany", "Chinese", "China", "American", "America", "African", "Africa",
+        "Asian", "Asia", "Indian", "India", "British", "Scrum", "Kanban", "Kubernetes", "Docker",
+        "Azure", "Unreal", "Ethereum", "Bitcoin", "Covid", "Prisma", "Lego", "Delphi",
+    };
+
     /// <summary>
-    /// The title as the source gave it, without a closing full stop. Titles keep their capitalisation, because turning a
-    /// title into sentence case in code would lower proper nouns the source got right ("Python", "Bayesian"). The one
-    /// exception is a title in capitals only ("AGENTIC AI FRAMEWORKS FOR ..."), which APA would never print: it becomes
-    /// sentence case, and words of up to three letters that are not ordinary words stay in capitals ("AI", "LLM").
+    /// The title in sentence case, without a closing full stop (issue #567): the first word and the first word after a
+    /// colon, question mark or dash start with a capital, and every other word with one capital only is lowered unless it
+    /// is a known proper noun. Words with more than one capital (AI, LLMs, ReAct, LLMoxie) and words with digits keep
+    /// their case. A title in capitals only is lowered too, keeping words of up to three letters that are not ordinary
+    /// words ("AI", "LLM"). The original title stays in the ledger and in reference-enrichment.json.
     /// </summary>
     public static string TitleAsGiven(string? raw)
     {
         string title = CleanText(raw).TrimEnd('.');
-        if (!title.Any(char.IsLetter) || title.Any(char.IsLower) || title.Count(char.IsLetter) < 12) return title;
+        if (!title.Any(char.IsLetter)) return title;
+        bool capitals = !title.Any(char.IsLower) && title.Count(char.IsLetter) >= 12;
+        if (!capitals && !title.Any(char.IsLower)) return title;
         bool startOfSentence = true;
         return Regex.Replace(title, @"[\p{L}\p{N}'’]+|[:?!.—]", m =>
         {
             string w = m.Value;
             if (w.Length == 1 && ":?!.—".Contains(w)) { startOfSentence = true; return w; }
-            bool acronym = w.Any(char.IsDigit) || (w.Length <= 3 && !CommonShortWords.Contains(w));
-            string word = acronym ? w : w.ToLowerInvariant();
-            if (startOfSentence && !acronym) word = char.ToUpperInvariant(word[0]) + word[1..];
+            string word = capitals ? FromCapitals(w) : FromMixedCase(w, startOfSentence);
+            if (startOfSentence && char.IsLower(word[0])) word = char.ToUpperInvariant(word[0]) + word[1..];
             startOfSentence = false;
             return word;
         });
+    }
+
+    private static string FromCapitals(string w) =>
+        w.Any(char.IsDigit) || (w.Length <= 3 && !CommonShortWords.Contains(w)) ? w : w.ToLowerInvariant();
+
+    private static string FromMixedCase(string w, bool startOfSentence)
+    {
+        if (startOfSentence || w.Any(char.IsDigit) || ProperNouns.Contains(w)) return w;
+        bool oneCapital = char.IsUpper(w[0]) && w.Skip(1).All(c => !char.IsLetter(c) || char.IsLower(c));
+        return oneCapital ? w.ToLowerInvariant() : w;
     }
 
     // Asterisks would break the italic markers used for venues; collapse stray whitespace/newlines.
