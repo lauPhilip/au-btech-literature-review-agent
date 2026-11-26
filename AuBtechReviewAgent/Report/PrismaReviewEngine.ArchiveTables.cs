@@ -11,15 +11,27 @@ public partial class PrismaReviewEngine
     /// <summary>What the declarations say for a run made before protocols were written, on the report page and in main.tex.</summary>
     public const string NoProtocolText = "No protocol was recorded for this run (it was made before protocols were written).";
 
+    /// <summary>What main.tex says under Competing Interests (PRISMA 2020 item 26) when the server sets no statement.</summary>
+    public const string NoCompetingInterestsText =
+        "Not reported by the reviewer. The tool does not ask for a statement on competing interests; it can be set in the Report:CompetingInterestsStatement configuration value.";
+
+    /// <summary>The competing-interests statement from Report:CompetingInterestsStatement; null or empty means none was given.</summary>
+    public string? CompetingInterestsStatement { get; init; }
+
+    /// <summary>The statement under Competing Interests, in main.tex and on the report page.</summary>
+    public string CompetingInterestsText =>
+        string.IsNullOrWhiteSpace(CompetingInterestsStatement) ? NoCompetingInterestsText : CompetingInterestsStatement.Trim();
+
     /// <summary>The key to Table A.3, printed in the note under the table.</summary>
     public const string AppraisalTableKey =
         "Columns 1 to 5 are the five MMAT 2018 criteria for the study's category, answered Yes, No or ? (can't tell). Met is the number answered Yes; it is not an overall score.";
 
     /// <summary>
-    /// The tables of the included studies, in the appendix after the references as Tables A.1 to A.3 (issue #139).
-    /// Section 3 keeps its text, flow diagram and charts and points to them (AppendixPointer).
+    /// The appendix after the references (issue #139): the tables of the included studies (A.1 to A.3), the seeds of
+    /// citation chaining, the search strategy per source and, when a checklist context is given, the PRISMA 2020
+    /// checklist that points to all of them. Section 3 keeps its text, flow diagram and charts and points to them.
     /// </summary>
-    private string AppendixLatex(List<IncludedPaperMetricRow> records, ReviewState? state)
+    private string AppendixLatex(List<IncludedPaperMetricRow> records, ReviewState? state, PrismaChecklistContext? checklist = null)
     {
         var ab = new StringBuilder();
         ab.AppendLine(@"\small");
@@ -42,18 +54,29 @@ public partial class PrismaReviewEngine
         ab.AppendLine(@"\end{tabularx}");
         ab.AppendLine(@"\vspace{4pt}\noindent\small ");
         ab.AppendLine(@"Table A.1 lists each included study with a short summary, the reason it was included, the database it came from and its reference.");
+        ab.AppendLine(@"\vspace{10pt}");
         int nextTable = 2;
+        string? extractionTable = null, appraisalTable = null, searchTable = null;
         if (state?.Extractions is { Count: > 0 } extractions)
         {
-            ab.AppendLine(@"\vspace{10pt}");
             ab.Append(ExtractionTables(extractions));
-            nextTable += extractions.Any(MethodsSectionWriter.ShowInAppraisalTable) ? 2 : 1;
+            extractionTable = "A.2";
+            if (extractions.Any(MethodsSectionWriter.ShowInAppraisalTable)) appraisalTable = "A.3";
+            nextTable += appraisalTable != null ? 2 : 1;
         }
         if (state?.SeedChaining is { Seeds.Count: > 0 } seeds)
+            ab.Append(SeedStudiesTable.Latex(seeds, $"A.{nextTable++}", EscapeLatexText));
+        if (state != null && SearchStrategyTable.Latex(state, $"A.{nextTable}", EscapeLatexText) is { Length: > 0 } search)
         {
-            if (nextTable == 2) ab.AppendLine(@"\vspace{10pt}"); // the extraction tables end with this space already
-            ab.Append(SeedStudiesTable.Latex(seeds, $"A.{nextTable}", EscapeLatexText));
+            ab.Append(search);
+            searchTable = $"A.{nextTable++}";
         }
+        if (checklist != null)
+            ab.Append(PrismaChecklist.Latex(checklist with
+            {
+                IncludedTable = "A.1", ExtractionTable = extractionTable, AppraisalTable = appraisalTable, SearchTable = searchTable,
+                FlowFigureLabel = state != null ? FlowFigureLabel : null,
+            }, $"A.{nextTable}", EscapeLatexText));
         return ab.ToString();
     }
 
@@ -131,20 +154,21 @@ public partial class PrismaReviewEngine
         static bool HasUnverifiedValue(StudyExtraction e) => e.Error == null && new[] { e.Method, e.Sample }.Concat(e.KeyFindings).Any(Unverified);
         string V(EvidencedValue v) => EscapeLatexText(v.Value) + (Unverified(v) ? "$^{\\dagger}$" : "");
         var sb = new StringBuilder();
-        sb.AppendLine(@"\begin{tabularx}{\textwidth}{>{\hsize=0.25\hsize}X >{\hsize=0.8\hsize}X >{\hsize=1.1\hsize}X >{\hsize=0.9\hsize}X >{\hsize=1.95\hsize}X}");
-        sb.AppendLine(@"\multicolumn{5}{l}{\textbf{Table A.2: Extracted Study Data}} \\");
+        // The text read is the study's reading basis (PRISMA 2020 item 17): full text, abstract only or no text.
+        sb.AppendLine(@"\begin{tabularx}{\textwidth}{>{\hsize=0.25\hsize}X >{\hsize=0.75\hsize}X >{\hsize=0.6\hsize}X >{\hsize=1.0\hsize}X >{\hsize=0.85\hsize}X >{\hsize=2.55\hsize}X}");
+        sb.AppendLine(@"\multicolumn{6}{l}{\textbf{Table A.2: Extracted Study Data}} \\");
         sb.AppendLine(@"\toprule");
-        sb.AppendLine(@"\textbf{Ref.} & \textbf{Study type} & \textbf{Method} & \textbf{Sample} & \textbf{Key findings} \\");
+        sb.AppendLine(@"\textbf{Ref.} & \textbf{Study type} & \textbf{Text read} & \textbf{Method} & \textbf{Sample} & \textbf{Key findings} \\");
         sb.AppendLine(@"\midrule");
         foreach (var e in extractions)
         {
             if (e.Error != null)
             {
-                sb.AppendLine($"{{[}}{e.ReferenceNumber}{{]}} & \\multicolumn{{4}}{{l}}{{Extraction failed.}} \\\\ \\hline");
+                sb.AppendLine($"{{[}}{e.ReferenceNumber}{{]}} & \\multicolumn{{5}}{{l}}{{Extraction failed.}} \\\\ \\hline");
                 continue;
             }
             string findings = string.Join(" ", e.KeyFindings.Select((f, i) => $"({i + 1}) {V(f)}"));
-            sb.AppendLine($"{{[}}{e.ReferenceNumber}{{]}} & {EscapeLatexText(e.StudyType)} & {V(e.Method)} & {V(e.Sample)} & {findings} \\\\ \\hline");
+            sb.AppendLine($"{{[}}{e.ReferenceNumber}{{]}} & {EscapeLatexText(e.StudyType)} & {EscapeLatexText(e.EvidenceBasis)} & {V(e.Method)} & {V(e.Sample)} & {findings} \\\\ \\hline");
         }
         sb.AppendLine(@"\end{tabularx}");
         // The note explains the dagger only when a value in the table carries one (issue #168).

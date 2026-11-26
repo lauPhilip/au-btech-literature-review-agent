@@ -9,6 +9,9 @@ namespace AuBtechReviewAgent;
 public partial class PrismaReviewEngine
 {
     /// <summary>Section 3's figures, drawn in code from the included papers and the run's counters.</summary>
+    /// <summary>The \label of the flow diagram, which the PRISMA 2020 checklist refers to (items 16a and 16b).</summary>
+    public const string FlowFigureLabel = "fig:prisma-flow";
+
     private static string DataFiguresLatex(List<IncludedPaperMetricRow> records, ReviewState? state)
     {
         int journalCount = records.Count(r => r.VenueType.Equals("Journals", StringComparison.OrdinalIgnoreCase));
@@ -45,7 +48,7 @@ public partial class PrismaReviewEngine
             sb.AppendLine(@"\begin{figure}[H]");
             sb.AppendLine(@"\centering");
             sb.AppendLine(PrismaFlowDiagram.ToTikz(flow));
-            sb.AppendLine(@"\caption{PRISMA 2020 flow diagram of this run" + (flow.IsConsistent ? "" : " (note: the run's counters do not fully add up; see transparent-process.json)") + "}");
+            sb.AppendLine(@"\caption{PRISMA 2020 flow diagram of this run" + (flow.IsConsistent ? "" : " (note: the run's counters do not fully add up; see transparent-process.json)") + "}" + $"\\label{{{FlowFigureLabel}}}");
             sb.AppendLine(@"\end{figure}");
             sb.AppendLine(@"\vspace{6pt}");
         }

@@ -102,7 +102,7 @@ The 2 included papers were published between 2025 and 2026, most of them in 2026
 \draw[arrow] (screened) -- (excluded);
 \end{tikzpicture}
 
-\caption{PRISMA 2020 flow diagram of this run}
+\caption{PRISMA 2020 flow diagram of this run}\label{fig:prisma-flow}
 \end{figure}
 \vspace{6pt}
 \begin{figure}[H]
@@ -204,13 +204,13 @@ Agent governance layers & An agent paper. & About agent architecture. & Google S
 \vspace{4pt}\noindent\small 
 Table A.1 lists each included study with a short summary, the reason it was included, the database it came from and its reference.
 \vspace{10pt}
-\begin{tabularx}{\textwidth}{>{\hsize=0.25\hsize}X >{\hsize=0.8\hsize}X >{\hsize=1.1\hsize}X >{\hsize=0.9\hsize}X >{\hsize=1.95\hsize}X}
-\multicolumn{5}{l}{\textbf{Table A.2: Extracted Study Data}} \\
+\begin{tabularx}{\textwidth}{>{\hsize=0.25\hsize}X >{\hsize=0.75\hsize}X >{\hsize=0.6\hsize}X >{\hsize=1.0\hsize}X >{\hsize=0.85\hsize}X >{\hsize=2.55\hsize}X}
+\multicolumn{6}{l}{\textbf{Table A.2: Extracted Study Data}} \\
 \toprule
-\textbf{Ref.} & \textbf{Study type} & \textbf{Method} & \textbf{Sample} & \textbf{Key findings} \\
+\textbf{Ref.} & \textbf{Study type} & \textbf{Text read} & \textbf{Method} & \textbf{Sample} & \textbf{Key findings} \\
 \midrule
-{[}1{]} & design science artefact with evaluation & Supervisor checks & not reported & (1) Loops recover from faults \\ \hline
-{[}2{]} & design science artefact with evaluation & Supervisor checks$^{\dagger}$ & not reported & (1) Loops recover from faults$^{\dagger}$ \\ \hline
+{[}1{]} & design science artefact with evaluation & abstract only & Supervisor checks & not reported & (1) Loops recover from faults \\ \hline
+{[}2{]} & design science artefact with evaluation & abstract only & Supervisor checks$^{\dagger}$ & not reported & (1) Loops recover from faults$^{\dagger}$ \\ \hline
 \end{tabularx}
 \vspace{2pt}\noindent\scriptsize $^{\dagger}$ The supporting quote given by the model was not found in the paper's text; treat the value with caution.\small
 \vspace{10pt}
@@ -224,6 +224,15 @@ Table A.1 lists each included study with a short summary, the reason it was incl
 \bottomrule
 \end{tabularx}
 \vspace{2pt}\noindent\scriptsize Columns 1 to 5 are the five MMAT 2018 criteria for the study's category, answered Yes, No or ? (can't tell). Met is the number answered Yes; it is not an overall score.\small
+\vspace{10pt}
+\begin{tabularx}{\textwidth}{>{\hsize=0.8\hsize}X >{\hsize=1.5\hsize}X >{\hsize=0.8\hsize}X >{\hsize=0.9\hsize}X c >{\hsize=1.0\hsize}X}
+\multicolumn{6}{l}{\textbf{Table A.4: Search Strategy per Source}} \\
+\toprule
+\textbf{Source} & \textbf{Search string} & \textbf{Sent as} & \textbf{Searched (UTC)} & \textbf{Records} & \textbf{Raw answer} \\
+\midrule
+Google Scholar Gateway & agent loops & -- & DATE UTC & 3 & SourceResponses/\allowbreak{}01-google-scholar-gateway-q1.\allowbreak{}json \\ \hline
+\end{tabularx}
+\vspace{2pt}\noindent\scriptsize Each search string was sent as written in the request parameter shown under Sent as, asking for at most 1 record (the limit of 3 per source shared across 3 search strings); no field tags, Boolean operators or search filters were added. No publication-year limit was applied. No peer-review, language or document-type limit was applied. Not sent to any source, because the limit per source was reached first: ``agent orchestration safety''; ``agent fault recovery''. Each raw answer is in the run archive under the name shown, with its SHA-256 fingerprint in transparent-process.\allowbreak{}json.\small
 \vspace{10pt}
 \subsection*{Statements on the Use of AI for Submission}
 Publishers ask for the use of AI to be disclosed in different places. Each statement below is written in code from the run's record; copy the one your venue asks for, check it and edit it to fit.
