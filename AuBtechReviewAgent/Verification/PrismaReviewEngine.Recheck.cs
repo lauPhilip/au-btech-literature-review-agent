@@ -158,8 +158,11 @@ public partial class PrismaReviewEngine
             string sentence = report["CitationCheckSummary"]?.GetValue<string>() ?? "";
             string note = $" {rechecks} citation{(rechecks == 1 ? " was" : "s were")} checked again on request after the run (listed under Rechecks in citation-audit.json).";
             sentence = System.Text.RegularExpressions.Regex.Replace(sentence, @" \d+ citations? (was|were) checked again on request after the run \(listed under Rechecks in citation-audit\.json\)\.", "");
+            // A paragraph written before issue #679 holds the old one-sentence count; later ones end their steps with the final count.
             string oldText = before.ToSentence(), newText = after.ToSentence();
-            sentence = sentence.Contains(oldText, StringComparison.Ordinal) ? sentence.Replace(oldText, newText, StringComparison.Ordinal) : newText + " " + sentence;
+            if (sentence.Contains(oldText, StringComparison.Ordinal)) sentence = sentence.Replace(oldText, newText, StringComparison.Ordinal);
+            else if (sentence.Contains(before.FinalSentence(), StringComparison.Ordinal)) sentence = sentence.Replace(before.FinalSentence(), after.FinalSentence(), StringComparison.Ordinal);
+            else sentence = newText + " " + sentence;
             report["CitationCheckSummary"] = sentence.TrimEnd() + note;
             await SafeFile.WriteAllTextAsync(path, report.ToJsonString(new JsonSerializerOptions { WriteIndented = true }));
         }
