@@ -22,6 +22,8 @@ public partial class SpecMatrix
     internal readonly List<AuBtechReviewAgent.CitationSupportResult> auditChecks = new();
     /// <summary>How many citations the second repair pass removed (RemovedCitations in citation-audit.json).</summary>
     internal int auditRemoved;
+    /// <summary>The paper's check of itself: the run's self-check.json, or for an older run a fresh check from its files (not saved); null without a report.</summary>
+    internal AuBtechReviewAgent.PaperSelfCheckFile? selfCheck;
     internal AuBtechReviewAgent.ThematicCodebook? codebook;
     internal AuBtechReviewAgent.CertaintyFile? certainty;
     internal int journalCount, conferenceCount, transactionsCount, proceedingsCount, preprintCount;
@@ -205,6 +207,7 @@ public partial class SpecMatrix
         openCitation = null;
         deleted = false;
         stats = null;
+        selfCheck = null;
         flow = null;
         runLine = dateLine = "";
         articleInfo = null;
@@ -234,7 +237,11 @@ public partial class SpecMatrix
         // The gallery shows a copy whose run may be gone, so its printout keeps the screen header instead of links to the run.
         if (HasReport && !InGallery)
             articleInfo = AuBtechReviewAgent.ArticleInfo.ForSystematic(ReportRunId, state, report, ScrubAnchors(report.TitleItem), ScrubAnchors(report.AbstractItem), hasProtocol,
-                AuBtechReviewAgent.VerdictTally.From(auditChecks, auditRemoved));
+                AuBtechReviewAgent.VerdictTally.From(auditChecks, auditRemoved), AuBtechReviewAgent.GallerySelfCheck.Read(folder),
+                state?.Extractions is { Count: > 0 } withExtractions ? AuBtechReviewAgent.SecondaryStudy.In(withExtractions).Count : null,
+                AuBtechReviewAgent.RetractionTally.From(state?.RetractionCheck));
+        selfCheck = File.Exists(Path.Join(folder, AuBtechReviewAgent.PaperSelfCheckFile.FileName)) || state == null
+            ? AuBtechReviewAgent.SystematicSelfCheck.Load(folder) : AuBtechReviewAgent.SystematicSelfCheck.Check(folder, state);
         if (state == null) return;
 
         peerReviewOnlyToggle = state.PeerReviewOnlyToggle;
