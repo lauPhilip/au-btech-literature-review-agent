@@ -91,13 +91,26 @@ public static partial class ReviewWriter
     /// <summary>The front-matter prompt's rule on the rationale (issue #675): an argument with the sources as its evidence.</summary>
     public static string RationaleRule(WritingProfile profile) =>
         $"\"rationale\": one or two paragraphs on why the review is needed, written as one argument, not as a list of {profile.Sources}: what is known, what is missing, and why that matters, in that order. " +
+        "It is the paper's first text, so it opens with its subject named in full, never with a word that points back, such as \"They\" or \"This\". " +
         $"Use the {profile.Sources} as evidence for each step of the argument: group {profile.Sources} that support the same point in one sentence, and never write one sentence per {profile.Source}. " +
         $"Every sentence but the last states a point of the argument from what the {profile.Sources} say and ends with an inline [n] marker, using the {profile.Sources} the results cite for it; these sentences use no result figure (no number, percentage or effect size from the results) and cite at most {MaxReferencesPerSentence} {profile.Sources} each, ideally one or two. " +
         $"The last sentence has no citation and states what is not yet known, the gap this review addresses; it names no {profile.Source}, number or {profile.Source} design and uses none of these words: report, found, show, demonstrate, observe, \"studies\", \"the literature\". " +
         "Add no background from general knowledge: leave out a sentence you cannot cite, since code removes every other rationale sentence without a citation.";
 
-    /// <summary>A rationale is judged a list only from this many cited sentences on.</summary>
-    public const int RationaleListingMinSentences = 4;
+    /// <summary>
+    /// A rationale is judged a list only from this many cited sentences on. It was four, and run 34d1af9a's rationale of
+    /// three one-study sentences passed (issue #724).
+    /// </summary>
+    public const int RationaleListingMinSentences = 3;
+
+    // The rationale is the paper's first text, so a word that points back has nothing to point to (run 34d1af9a: "They use ...").
+    private static readonly Regex PointingBack = new(@"^\W*(?<word>they|them|their|these|those|this|it|its|such|both|he|she)\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+    /// <summary>Why the rationale opens on a word that points back to nothing, or null (issue #724). Public for unit tests.</summary>
+    public static string? RationaleOpeningProblem(string? rationale) =>
+        PointingBack.Match(rationale ?? "") is { Success: true } m
+            ? $"The rationale opens with \"{m.Groups["word"].Value}\", but it is the paper's first text, so nothing comes before it to point back to. Open with the subject itself, named in full."
+            : null;
 
     /// <summary>
     /// Why the rationale reads as a list of one-source summaries, or null (issue #675): among at least

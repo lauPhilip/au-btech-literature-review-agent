@@ -86,8 +86,8 @@ public class ClosingFallbackTests : IDisposable
         var (report, folder, tex) = await RunAsync(NothingWritten);
 
         Assert.Equal(2, report.ResearchAnswers.Count);
-        Assert.Contains("Loops recover from faults through supervisor checks [", report.ResearchAnswers[0].Answer);
-        Assert.Contains("in the theme \"Recovery and oversight\"", report.ResearchAnswers[0].Answer);
+        Assert.StartsWith("This answer is not a synthesis: it lists the verified findings on this question, from the theme \"Recovery and oversight\"", report.ResearchAnswers[0].Answer);
+        Assert.Matches(@"Study \[\d+\] reports: Loops recover from faults through supervisor checks\.", report.ResearchAnswers[0].Answer);
         Assert.Equal(AnswersFromEvidence.NoFindingText, report.ResearchAnswers[1].Answer);
         Assert.Contains(AnswersFromEvidence.AssembledSentence, report.ConclusionItem);
         Assert.Contains("assembled in code from the verified findings in the data extraction (Table A.2)", tex);
@@ -127,7 +127,9 @@ public class ClosingFallbackTests : IDisposable
         };
         string answer = AnswersFromEvidence.Write(new[] { "How are they evaluated?" }, book, extractions).Single();
 
-        Assert.StartsWith("The verified findings on this question are in the theme \"Evaluation\". 38% productivity and 41% defect reduction [1].", answer);
+        // Issue #727: the answer says what it is, and each finding is what its study reports, not a bare fragment.
+        Assert.StartsWith("This answer is not a synthesis: it lists the verified findings on this question, from the theme \"Evaluation\", as the studies state them. " +
+                          "Study [1] reports: 38% productivity and 41% defect reduction.", answer);
         Assert.Equal(AnswersFromEvidence.MaxFindings, System.Text.RegularExpressions.Regex.Matches(answer, @"\[\d\]").Count);
         Assert.DoesNotContain("governance agents", answer);
         Assert.DoesNotContain("outside every theme", answer);

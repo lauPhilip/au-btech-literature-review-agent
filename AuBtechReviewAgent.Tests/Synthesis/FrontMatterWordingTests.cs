@@ -33,8 +33,8 @@ public class FrontMatterWordingTests
     [Fact]
     public async Task ARationaleSentenceThatCitesAStudyForAbstractOnlyReadingIsSentBack()
     {
-        const string fragmented = "These evaluations appear fragmented across domains and evidence types, with some relying on abstract-only reports and others on full-text analyses [1].";
-        const string fixedText = "These evaluations appear fragmented across domains and evidence types [1].";
+        const string fragmented = "Agent evaluations appear fragmented across domains and evidence types, with some relying on abstract-only reports and others on full-text analyses [1].";
+        const string fixedText = "Agent evaluations appear fragmented across domains and evidence types [1].";
         var model = new FakeChatService()
             .Returns(Front("We read the studies.", fragmented))
             .Returns(Front("We read the studies.", fixedText));

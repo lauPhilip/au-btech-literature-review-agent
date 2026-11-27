@@ -189,6 +189,18 @@ public class EvidenceCertaintyTests
     }
 
     [Fact]
+    public void OneLevelForEveryAnswerIsCountedInWords()
+    {
+        // Run 34d1af9a: "Of the two answers to the research questions, two are of moderate certainty." (issue #727)
+        var a = Rate(Q("A [1, 2].", new[] { 1, 2 }), S(1), S(2, empirical: false));
+        var b = Rate(Q("B [1, 2].", new[] { 1, 2 }) with { Number = 2, Id = "RQ2" }, S(1), S(2, empirical: false));
+        var c = Rate(Q("C [1, 2].", new[] { 1, 2 }) with { Number = 3, Id = "RQ3" }, S(1), S(2, empirical: false));
+
+        Assert.StartsWith($"Both answers to the research questions are of {a.Overall} certainty.", EvidenceCertainty.Summary(new[] { a, b }));
+        Assert.StartsWith($"All three answers to the research questions are of {a.Overall} certainty.", EvidenceCertainty.Summary(new[] { a, b, c }));
+    }
+
+    [Fact]
     public void TheMethodIsWrittenFromTheRuleAndSaysItIsAnApproximation()
     {
         string method = EvidenceCertainty.Method();

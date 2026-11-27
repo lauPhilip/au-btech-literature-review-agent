@@ -194,6 +194,7 @@ public static partial class ReviewWriter
                     "front-matter call", warn, 2,
                     (a => WeakOpeningProblem(a.Rationale, weakSources, profile), "a rationale that opens on one weak source"),
                     (a => RationaleListingProblem(a.Rationale, profile), "a rationale that lists the sources"),
+                    (a => RationaleOpeningProblem(a.Rationale), "a rationale that opens on a word pointing back"),
                     (a => ZeroCountProblem(a.Abstract, "the abstract"), "a count of zero"),
                     (a => OverclaimProblem(a.Abstract, certainty, "the abstract"), "a claim stronger than the certainty of the evidence"),
                     // Issues #746 and #747: the review's own process is in the methods text, not in a cited sentence.

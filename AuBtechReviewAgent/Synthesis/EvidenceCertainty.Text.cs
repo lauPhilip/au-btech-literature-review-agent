@@ -79,9 +79,14 @@ public static partial class EvidenceCertainty
             .Select(x => $"{Number(x.Count)} {(x.Count == 1 ? "is" : "are")} of {x.Level} certainty").ToList();
         int notRated = answers.Count(a => a.Overall == null);
         if (notRated > 0) levels.Add($"{Number(notRated)} {(notRated == 1 ? "is" : "are")} not rated, because no evidence bears on {(notRated == 1 ? "it" : "them")}");
+        // Run 34d1af9a: "Of the two answers to the research questions, two are of moderate certainty." One level for every
+        // answer is counted in words, "Both answers ..." or "All three answers ..." (issue #727).
+        string? shared = notRated == 0 && answers.Select(a => a.Overall).Distinct().Count() == 1 ? answers[0].Overall : null;
         string head = answers.Count == 1
             ? (answers[0].Overall is { } only ? $"The answer to the research question is of {only} certainty." : "The answer to the research question is not rated, because no evidence bears on it.")
-            : $"Of the {Number(answers.Count)} answers to the research questions, {Join(levels)}.";
+            : shared != null
+                ? $"{(answers.Count == 2 ? "Both answers" : $"All {Number(answers.Count)} answers")} to the research questions are of {shared} certainty."
+                : $"Of the {Number(answers.Count)} answers to the research questions, {Join(levels)}.";
         var fragile = answers.Where(a => a.Overall != null && a.Sensitivity.Any(c => c.Removed.Count > 0 && c.Remaining.Count < rule.FewestSources))
             .Select(a => $"RQ{a.Number}").ToList();
         var rated = answers.Where(a => a.Overall != null).ToList();
