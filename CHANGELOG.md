@@ -18,6 +18,14 @@ On the report page, a citation's card now comes into view when you open it, also
 
 The self-check now knows the count of records that could not be screened. It also flags a figure given in two themes, and it no longer skips a figure such as "F1 0.97". A source now gets more records when some drop out for their year or as duplicates, so it can fill its cap. Keywords are short terms now, not whole search strings.
 
+The themes now build on each other. A theme that meets a finding from an earlier theme points back to it and does not say its figures again. A big theme compares how its studies test the question instead of listing each result. A study that only touches a theme can be called indirect, or left out with its reason on file, so it is not stretched to fit. The rationale now says what is known, what is missing and why it matters.
+
+The abstract no longer says "we", because the author is software. It drops a count of zero, so you read "no duplicates were found" instead of "removed 0 duplicates". It also claims no more than the certainty table allows: with moderate or low certainty it says "suggest" or "may", not "show that". The same goes for the conclusion. A sentence no longer names a study and cites it in the same breath.
+
+The concept map now keeps at most three dashed links, the ones that are the review's own reading. The rest are left out, listed with a reason, and the methods say how many. The self-check notes when more than half the links were dashed, and it now counts a figure that the map repeats.
+
+On the report page, a table's caption and header row now move to the next page with its first row. The appendix table fits a narrow page without breaking words letter by letter.
+
 ## [0.6.0] - 2026-11-26
 
 The systematic review now answers its research questions first, cites what the studies found, and checks its own paper, so it is honest about how good its evidence is. It tells you when a cited study was retracted, marks a citation it could not confirm with a dagger, and rates how sure each answer is. The paper covers the whole PRISMA 2020 checklist, is written in plain technical English (based on ASD-STE100) and has APA 7 references completed from Crossref, OpenAlex and arXiv. It reads like a journal article on A4 pages. Many prompts and checks changed, so a run can differ from 0.5.0, most of all a run with research questions, and a rerun now gives the same themes. The multivocal review, still in preview, learned a lot from its first real run. And the site now puts every review in one fair line, keeps bots at the door and has a gallery of example reports.
