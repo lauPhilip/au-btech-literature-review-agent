@@ -147,6 +147,8 @@ The Decision log on a systematic paper now downloads the run's full ledger as JS
 
 ### 🐛 Bug fixes
 
+- Fixed a bug where hidden characters could stay in text sent to the model: a zero-width joiner next to a plain letter, or a tag character that formed again once the characters around it were removed.
+- Fixed a bug where a form field holding U+FFFE caused a server error, and where cleaning a reviewer's text twice could change it the second time.
 - Fixed a bug where a heading stood alone on a page and its text started on the next one. A paragraph now breaks between two lines when it cannot move whole.
 - Fixed a bug where a long paragraph ran over the page footer and out of the page.
 - Fixed a bug where a tall concept map ran across the edge of a page. It is now scaled to fit one page.
