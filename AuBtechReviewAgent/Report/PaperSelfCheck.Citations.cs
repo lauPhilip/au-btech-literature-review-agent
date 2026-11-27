@@ -52,15 +52,17 @@ public static partial class PaperSelfCheck
             Id = "citation-check",
             Title = "Citations backed by their sources",
             Explanation = $"Every citation was checked against the text of the {input.Source} it cites, and those that failed were repaired once and checked again. " +
-                "A citation still judged not supported stays in the paper, marked in red; a partly supported one is marked too. Removed citations were still not supported after the repair.",
+                "A citation still judged not supported stays in the paper, marked in red; a partly supported one is marked too. Removed citations were still not supported after the repair. A note is also given when more than half of the links of the concept map are the review's own reading, not stated by a study.",
         };
         var s = input.CitationsFinal;
         var shown = ShownMismatches(input);
+        var map = MapLinksEvidence(input);
         if (s == null || s.Checked == 0)
         {
             bool anyCited = input.Written.Any(p => ThematicSynthesis.CitedIn(p.Text).Count > 0);
             check.Evidence.AddRange(shown);
-            check.Outcome = anyCited || shown.Count > 0 ? CheckOutcome.Fault : CheckOutcome.Pass;
+            check.Evidence.AddRange(map);
+            check.Outcome = anyCited || shown.Count > 0 ? CheckOutcome.Fault : map.Count > 0 ? CheckOutcome.Note : CheckOutcome.Pass;
             check.Summary = anyCited ? "The paper cites sources, but no citation was checked."
                 : shown.Count > 0 ? "The run page gives citation counts the report does not have." : "The paper cites no sources, so there was nothing to check.";
             return check;
@@ -79,12 +81,22 @@ public static partial class PaperSelfCheck
         else if (input.CitationsInitial is { } before)
             check.Evidence.Add(new("Citation check", "", $"Before repair: {before.NotSupported} not supported, {before.PartiallySupported} partly", $"Of {before.Checked} citations first checked."));
         check.Evidence.AddRange(shown);
+        check.Evidence.AddRange(map);
         check.Outcome = s.NotSupported > 0 || shown.Count > 0 ? CheckOutcome.Fault
-            : s.PartiallySupported + s.InsufficientEvidence + s.Unverifiable + input.CitationsRemoved > 0 ? CheckOutcome.Note : CheckOutcome.Pass;
+            : s.PartiallySupported + s.InsufficientEvidence + s.Unverifiable + input.CitationsRemoved + map.Count > 0 ? CheckOutcome.Note : CheckOutcome.Pass;
         check.Summary = $"{s.Checked} checked: {Percent(s.Supported, s.Checked)} supported, {Percent(s.PartiallySupported, s.Checked)} partly, {Percent(s.NotSupported, s.Checked)} not supported" +
             (input.CitationsRemoved > 0 ? $"; {input.CitationsRemoved} removed" : "") +
             (shown.Count > 0 ? "; the run page gives other counts." : ".");
         return check;
+    }
+
+    /// <summary>A note when more than half of the diagram's links, counted before the cap on dashed links, are the review's own reading (issue #680).</summary>
+    private static List<CheckEvidence> MapLinksEvidence(PaperCheckInput input)
+    {
+        if (input.MapLinks is not { MostlyReading: true } m) return new();
+        string kept = m.Dropped > 0 ? $" {Plural(m.Dropped, "dashed link was", "dashed links were")} left out of the diagram to keep at most {ArtifactLinks.MaxReading}." : "";
+        return new() { new("Diagram links", "artifact", $"{m.Reading} of {Plural(m.Total, "link", "links")} are the review's own reading",
+            "No study cited by both boxes states them, so the model leaned on its own reading of how the findings relate." + kept) };
     }
 
     /// <summary>Each count of the citation check where the run page and the report differ; empty when they agree or the page has none.</summary>
@@ -122,7 +134,7 @@ public static partial class PaperSelfCheck
                 "An entry without a year, a venue or a DOI is harder for a reader to find; the reference completion fills such gaps from Crossref, OpenAlex or arXiv where it can.",
         };
         var listed = input.References.Select(r => r.Number).ToHashSet();
-        var cited = input.Parts.SelectMany(p => ThematicSynthesis.CitedIn(p.Text)).ToHashSet();
+        var cited = input.Parts.Where(p => p.Kind != PaperPartKind.ConceptMap).SelectMany(p => ThematicSynthesis.CitedIn(p.Text)).ToHashSet();
         var outcomes = new List<string>();
         var dangling = cited.Where(n => !listed.Contains(n)).OrderBy(n => n).ToList();
         if (dangling.Count > 0)

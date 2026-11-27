@@ -24,6 +24,8 @@ public enum PaperPartKind
     Implications,
     FutureResearch,
     Conclusion,
+    /// <summary>The text of the diagram the reviewer asked for (its box and link labels): a place after the results, read by check 5 only (issue #695).</summary>
+    ConceptMap,
     /// <summary>Text written in code (the review's limitations, the coverage line, the check summary): read for references, not judged.</summary>
     CodeWritten,
 }
@@ -33,6 +35,13 @@ public sealed record PaperPart(string Field, string Name, PaperPartKind Kind, st
 
 /// <summary>A count the run made in code, with the words that name it in a sentence ("included", "screened").</summary>
 public sealed record PaperFact(string Label, int Value, params string[] Words);
+
+/// <summary>How the link check judged the links of the diagram, before the cap on dashed links: all links, those that are the review's own reading, and those left out of the diagram.</summary>
+public sealed record PaperMapLinks(int Total, int Reading, int Dropped)
+{
+    /// <summary>More than half of the links are the review's own reading.</summary>
+    public bool MostlyReading => Total > 0 && Reading * 2 > Total;
+}
 
 /// <summary>One theme: its name, the sources it rests on and, for a theme on one source, the reason on file.</summary>
 public sealed record PaperTheme(string Name, IReadOnlyList<int> Sources, string? SingleSourceReason = null);
@@ -52,6 +61,9 @@ public sealed class PaperCheckInput
 {
     public List<PaperPart> Parts { get; init; } = new();
     public List<PaperFact> Facts { get; init; } = new();
+
+    /// <summary>The link check of the diagram as recorded in the run (artifact-links.json); null when the run has none.</summary>
+    public PaperMapLinks? MapLinks { get; init; }
 
     /// <summary>More facts written in code without a label (the evidence base by design), whose numbers a part may use.</summary>
     public string FactsText { get; init; } = "";
@@ -96,7 +108,7 @@ public sealed class PaperCheckInput
     public IEnumerable<PaperPart> Of(params PaperPartKind[] kinds) => Parts.Where(p => kinds.Contains(p.Kind));
 
     /// <summary>The parts the model wrote, in reading order.</summary>
-    public IEnumerable<PaperPart> Written => Parts.Where(p => p.Kind != PaperPartKind.CodeWritten);
+    public IEnumerable<PaperPart> Written => Parts.Where(p => p.Kind is not (PaperPartKind.CodeWritten or PaperPartKind.ConceptMap));
 }
 
 /// <summary>Pass, note or fault. A note is worth a look; a fault is something a reader would notice as wrong.</summary>

@@ -118,4 +118,42 @@ public class ArtifactLinksTests
             ArtifactLinks.MethodsSentence(old));
         Assert.Contains("every link was checked against the studies that both of its boxes cite", AiUseStatement.ArtifactSentence(old));
     }
+
+    [Fact]
+    public async Task AMapKeepsEverySupportedLinkAndTheFirstThreeDashedOnesAndRecordsTheRest()
+    {
+        var chat = new FakeChatService().RespondsWith(Check);
+        string[] labels = { "r1", "tested with", "r2", "r3", "assessed via", "r4", "r5" };
+        var map = Map(labels.Select(l => l.StartsWith('r') || l == "assessed via"
+            ? new ArtifactEdge { From = "n1", To = "n5", Label = l }
+            : new ArtifactEdge { From = "n2", To = "n5", Label = l }).ToArray());
+
+        var decisions = await RunAsync(chat, map);
+
+        Assert.Equal(7, decisions.Count);
+        Assert.Equal(new[] { "r1", "tested with", "r2", "r3" }, map.Edges.Select(e => e.Label));
+        Assert.Equal(3, map.Edges.Count(e => e.Check == ArtifactLinks.Reading));
+        Assert.Equal(3, map.LinksDropped);
+        Assert.Equal(new[] { "assessed via", "r4", "r5" }, decisions.Where(d => d.Dropped).Select(d => d.Label));
+        Assert.All(decisions.Where(d => d.Dropped), d => { Assert.Equal(ArtifactLinks.Reading, d.Check); Assert.Contains("at most 3", d.DroppedReason); });
+        Assert.DoesNotContain(decisions, d => d.Check == ArtifactLinks.Supported && d.Dropped);
+        Assert.Equal(" Each of its 7 links was checked as a sentence against the studies that both of its boxes cite, without repair; 1 is supported, and the other 6 are the review's own reading, of which 3 are drawn dashed. A map keeps at most 3 such links, so the other 3 were left out of the diagram, in the order the model gave them. The verdicts are in artifact-links.json.",
+            ArtifactLinks.MethodsSentence(map));
+        Assert.Equal("Dashed links are the review's own reading: no single included study states them.", ArtifactLinks.DashedNote(map));
+        Assert.DoesNotContain("assessed via", ArtifactBuilder.ToMermaid(map));
+        Assert.Equal(3, map.Nodes.Count);
+    }
+
+    [Fact]
+    public async Task AMapWithThreeDashedLinksOrFewerIsLeftAsItIs()
+    {
+        var chat = new FakeChatService().RespondsWith(Check);
+        var map = Map(new ArtifactEdge { From = "n1", To = "n5", Label = "a" }, new ArtifactEdge { From = "n1", To = "n2", Label = "b" }, new ArtifactEdge { From = "n2", To = "n5", Label = "assessed via" });
+
+        var decisions = await RunAsync(chat, map);
+
+        Assert.Equal(3, map.Edges.Count);
+        Assert.Equal(0, map.LinksDropped);
+        Assert.DoesNotContain(decisions, d => d.Dropped);
+    }
 }

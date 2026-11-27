@@ -72,6 +72,7 @@ public static class ArtifactBuilder
             2. An element that states a finding ends with the citation the results give for it, for example "... [3]" or "... [2, 5]". Elements that only name a concept need no citation.
             3. Keep it focused on the reviewer's request; if the results cannot support the request, build the closest artifact they do support and say so in the caption.
             4. Plain text only inside the fields: no Markdown.
+            5. (Diagrams) Draw a link only where one study states how the two boxes relate: both boxes cite that study, and it says so. A link that no study states is checked in code and drawn dashed as the review's own reading; at most three such links are kept and the rest are left out, so use them rarely. Prefer fewer links that studies state to more links of your own.
 
             {{formats}}
             Respond ONLY with a valid minified JSON object that includes "format".

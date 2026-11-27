@@ -17,7 +17,7 @@ public static class SystematicSelfCheck
     private static readonly JsonSerializerOptions Write = new() { WriteIndented = true };
 
     /// <summary>What citation-audit.json says about the check: after and before repair, the steps of the check, the removed citations and the studies not cited.</summary>
-    public sealed record Audit(CitationSupportSummary? Final, CitationSupportSummary? Initial, int Removed, IReadOnlyList<UncodedStudy> NotCited, CitationCheckSteps? Steps = null);
+    public sealed record Audit(CitationSupportSummary? Final, CitationSupportSummary? Initial, int Removed, IReadOnlyList<UncodedStudy> NotCited, CitationCheckSteps? Steps = null, PaperMapLinks? MapLinks = null);
 
     /// <summary>The paper, counts and checks of a finished systematic review, in the self-check's shape.</summary>
     public static PaperCheckInput Input(PrismaReport report, ReviewState state, Audit audit)
@@ -38,6 +38,8 @@ public static class SystematicSelfCheck
         parts.Add(new("implicationsItem", "Implications", PaperPartKind.Implications, report.ImplicationsItem));
         parts.Add(new("futureResearchItem", "Future research", PaperPartKind.FutureResearch, report.FutureResearchItem));
         parts.Add(new("conclusionItem", "Conclusion", PaperPartKind.Conclusion, report.ConclusionItem));
+        if (MapText(report.Artifact) is { Length: > 0 } map)
+            parts.Add(new("artifact", report.Artifact!.Kind == ArtifactKinds.Flowchart ? "Flowchart" : "Concept map", PaperPartKind.ConceptMap, map));
         parts.Add(new("reviewLimitationsItem", "Limitations of the review", PaperPartKind.CodeWritten, report.ReviewLimitationsItem));
         parts.Add(new("coverage", "Coverage note", PaperPartKind.CodeWritten, report.CoverageSummary));
         parts.Add(new("citationCheck", "Citation check note", PaperPartKind.CodeWritten, report.CitationCheckSummary));
@@ -48,6 +50,7 @@ public static class SystematicSelfCheck
         {
             Parts = parts,
             Facts = Facts(state),
+            MapLinks = audit.MapLinks,
             FactsText = SystematicEvidence.BaseFacts(state.Extractions ?? new List<StudyExtraction>()),
             Themes = report.SynthesisSections.Select(x => themesById.TryGetValue(x.ThemeId, out var t)
                 ? new PaperTheme(x.Heading, t.Studies, t.SingleStudyReason) : new PaperTheme(x.Heading, ThematicSynthesis.CitedIn(x.Text).ToList())).ToList(),
@@ -67,6 +70,11 @@ public static class SystematicSelfCheck
             },
         };
     }
+
+    /// <summary>The text a diagram shows, one line per box and per link label, so check 5 counts a figure it repeats (issue #695); empty for a table, a list or no artifact.</summary>
+    public static string MapText(ReviewArtifact? artifact) =>
+        artifact is not { Error: null, IsDiagram: true } ? ""
+            : string.Join("\n", artifact.Nodes.Select(n => n.Label).Concat(artifact.Edges.Select(e => e.Label)).Where(t => !string.IsNullOrWhiteSpace(t)).Select(t => t.Trim().TrimEnd('.') + "."));
 
     /// <summary>Why each study is not cited: the coverage's reason, or else that the codebook placed it in no theme, and why.</summary>
     private static Dictionary<int, string> NotCitedReasons(Audit audit, ThematicCodebook? book)
@@ -117,7 +125,25 @@ public static class SystematicSelfCheck
     }
 
     /// <summary>Reads what the self-check needs from citation-audit.json; an empty audit when the file is missing or unreadable.</summary>
-    public static Audit ReadAudit(string folder)
+    public static Audit ReadAudit(string folder) => ReadCitationAudit(folder) with { MapLinks = ReadMapLinks(folder) };
+
+    /// <summary>The link check of the diagram from artifact-links.json, which lists every link the model drew, before the cap; null when the run has none.</summary>
+    public static PaperMapLinks? ReadMapLinks(string folder)
+    {
+        string path = Path.Join(folder, ArtifactLinks.FileName);
+        try
+        {
+            if (!File.Exists(path)) return null;
+            var links = JsonSerializer.Deserialize<List<ArtifactLinkCheck>>(File.ReadAllText(path), Read);
+            return links is { Count: > 0 } ? new PaperMapLinks(links.Count, links.Count(l => l.Check == ArtifactLinks.Reading), links.Count(l => l.Dropped)) : null;
+        }
+        catch (Exception ex) when (ex is JsonException or IOException)
+        {
+            return null;
+        }
+    }
+
+    private static Audit ReadCitationAudit(string folder)
     {
         string path = Path.Join(folder, "citation-audit.json");
         try
