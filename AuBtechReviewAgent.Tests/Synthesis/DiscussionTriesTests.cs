@@ -54,14 +54,16 @@ public class DiscussionTriesTests
     {
         const string repeating = "Agents find 34 % more rare scenarios than manual testing [1].";
         const string overCited = "Workflow-level safeguards confine unsafe behavior at the action-chain level [1, 2, 3], and orchestration-based redundancy addresses fault tolerance [4].";
+        const string answer = "Agents find 34 % more rare scenarios [1].";
+        // The answer repeats the theme's figure, so the first two tries spend the soft budget on it.
         var model = new FakeChatService()
-            .Returns(Json(repeating))
-            .Returns(Json(repeating))
-            .Returns(Json(overCited));
+            .Returns(Json(repeating, answer))
+            .Returns(Json(repeating, answer))
+            .Returns(Json(overCited, answer));
         var notes = new List<string>();
 
         var result = await ReviewWriter.WriteDiscussionAndAnswersAsync(model, WritingProfile.Systematic, "agent testing", "Map agent testing", Sections, Evidence(), 4,
-            notes.Add, Array.Empty<string>(), null);
+            notes.Add, new[] { "What do testing agents find?" }, null);
 
         Assert.Equal("Workflow-level safeguards confine unsafe behavior at the action-chain level [1, 2, 3]. Orchestration-based redundancy addresses fault tolerance [4].", result.Text);
         Assert.Contains(notes, n => n.StartsWith("In the discussion, a sentence that cited 4 references was split in code at its clauses"));

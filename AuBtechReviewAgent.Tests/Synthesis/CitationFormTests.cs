@@ -29,7 +29,7 @@ public class CitationFormTests
     [InlineData("Smith et al. [9] describe a remedy.")]
     [InlineData("Some tools, e.g. [9] shows, help.")]
     [InlineData("Study [9] describes a remedy.")]
-    [InlineData("Agents log calls [1], [2] reports and [3] shows more.")]
+    [InlineData("In short, [2] and [3] show more.")]
     [InlineData("Agents log calls, [1] as well.")]
     [InlineData("Costs rose.[9]")]
     public void CitationsAlreadyInFormAreLeftAlone(string text) =>
