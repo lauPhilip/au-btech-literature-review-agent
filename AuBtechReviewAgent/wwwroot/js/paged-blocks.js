@@ -73,5 +73,5 @@
         return target;
     }
 
-    window.traceablePageBlocks = { BLOCKS: BLOCKS, blocks: blocks, opener: opener };
+    window.traceablePageBlocks = { BLOCKS: BLOCKS, blocks: blocks, opener: opener, isAtom: isAtom };
 })();

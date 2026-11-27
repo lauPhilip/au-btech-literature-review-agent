@@ -18,6 +18,8 @@
     const HEADINGS = /^(H[1-5]|CAPTION)$/;
     const blocks = function (sheet, body) { return window.traceablePageBlocks.blocks(sheet, body); };
     const opener = function (el, sheet) { return window.traceablePageBlocks.opener(el, sheet); };
+    const fit = window.traceablePageFit; // moving blocks, figures scaled to a page, paragraphs broken (paged-fit.js)
+    const moveTo = fit.moveTo;
     let timer = 0;
     let printing = false;
 
@@ -41,6 +43,7 @@
             el.removeAttribute('data-page-pushed');
         });
         sheet.querySelectorAll('[data-front-page]').forEach(function (f) { f.style.removeProperty('zoom'); });
+        fit.reset(sheet);
         sheet.removeAttribute('data-paged');
         sheet.style.removeProperty('--sheet-pad');
         sheet.style.removeProperty('min-height');
@@ -48,37 +51,6 @@
         if (overlay) overlay.replaceChildren();
         const above = topOf(sheet);
         if (above) above.replaceChildren();
-    }
-
-    // Adds space above an element: on a table row its cells grow; on a box with a border or a background its margin,
-    // so the box moves whole; on anything else its padding, which never collapses with a neighbour's margin.
-    function push(el, px) {
-        let targets = [el];
-        let side = 'padding-top';
-        if (el.tagName === 'TR') targets = Array.from(el.children);
-        else {
-            const style = getComputedStyle(el);
-            const boxed = parseFloat(style.borderTopWidth) > 0 || (style.backgroundColor !== 'rgba(0, 0, 0, 0)' && style.backgroundColor !== 'transparent') || el.tagName === 'TABLE';
-            if (boxed) side = 'margin-top';
-        }
-        targets.forEach(function (t) {
-            const now = parseFloat(getComputedStyle(t)[side === 'margin-top' ? 'marginTop' : 'paddingTop']) || 0;
-            t.style.setProperty(side, (now + px) + 'px');
-            t.setAttribute('data-page-pushed', '');
-        });
-    }
-
-    // Moves an element so its top is at "to" (from the sheet's top); a margin can collapse with a neighbour's, so it
-    // measures again and makes up the rest.
-    function moveTo(el, to, top) {
-        for (let k = 0; k < 3; k++) {
-            const was = top(el);
-            const delta = to - was;
-            if (delta < 1) return;
-            push(el, delta);
-            // A table row keeps its top while its cells grow, so measuring it again says nothing.
-            if (el.tagName === 'TR' || top(el) - was < delta / 2) return;
-        }
     }
 
     // The first of the blocks before list[i] that must move with it to the next page: every heading and caption in a row
@@ -117,21 +89,24 @@
             const tall = front.getBoundingClientRect().bottom - sheet.getBoundingClientRect().top - pad;
             if (tall > body) front.style.setProperty('zoom', String(Math.max(0.7, Math.floor(body / tall * 1000) / 1000)));
         }
+        fit.figures(sheet, body, front, window.traceablePageBlocks.isAtom);
         const list = blocks(sheet, body).filter(function (el) { return !front || !front.contains(el); });
         let frontDone = !front;
         const top = function (el) { return el.getBoundingClientRect().top - sheet.getBoundingClientRect().top; };
         let guard = list.length * 3;
         // A table that runs on to another page shows its header row again at the top of that page (issue #628).
-        const headers = new Map(), tablePage = new Map(), splits = [];
+        const headers = new Map(), tablePage = new Map(), splits = [], moved = new Set();
         for (let i = 0; i < list.length && guard-- > 0; i++) {
             const el = list[i];
-            const y = top(el);
-            const h = el.getBoundingClientRect().height;
+            // A block looked at again after a move (below) is placed by its text, not by its padded box.
+            const shift = fit.added(el);
+            const y = top(el) + shift;
+            const h = el.getBoundingClientRect().height - shift;
             const page = Math.floor(y / step);
             const start = page * step + pad;
             const end = page * step + height - pad;
             const next = (page + 1) * step + pad;
-            let to = null;
+            let to = null, again;
             if (!frontDone && !front.contains(el)) {
                 // The front page fills its own sheet: the body starts on the next one.
                 frontDone = true;
@@ -140,8 +115,18 @@
             if (to === null) {
                 if (y < start - 1) to = start;                               // in the top margin
                 else if (y > end) to = next;                                 // in the bottom margin or the gap
-                else if (y + h > end + 1 && h <= body) to = next;            // crosses the foot of the page
+                else if (y + h > end + 1) {                                  // crosses the foot of the page
+                    // A paragraph that cannot move whole, being taller than a page or than the room under the headings
+                    // above it on this page, is broken between two lines (issue #737). With too few lines here it
+                    // moves to the next page and is looked at again there.
+                    const led = fit.ledBy(list, i, page, step, sheet);
+                    const whole = h <= body && y + h - led <= body && !moved.has(el); // still crossing after its headings moved
+                    if (!whole && fit.split(el, sheet.getBoundingClientRect().top, end, next, step)) continue;
+                    if (h <= body) to = next;
+                    else if (el.tagName === 'P' && y > start + 1 && !el.hasAttribute('data-page-pushed')) to = next;
+                }
             }
+            again = to === next && el.tagName === 'P' && h > body;
             // A table's heading, caption and header row go with its first body row (issue #691): when that row moves to the
             // next page, the header row above it and the headings before that move too, so a page never ends with a table
             // that has no row. The chain is moved from its first element and this row is looked at again.
@@ -174,7 +159,10 @@
             // block again.
             if (to === next) {
                 const first = chainStart(list, i, el, page, start, step, front, top);
-                if (first >= 0) {
+                // The run moves once, and only when it fits on a page with the block, or with a paragraph's first lines.
+                const need = el.tagName === 'P' ? Math.min(h, 3 * (parseFloat(getComputedStyle(el).lineHeight) || 30)) : h;
+                if (first >= 0 && !moved.has(list[first]) && y + need - top(list[first]) <= body) {
+                    moved.add(list[first]).add(el);
                     moveTo(opener(list[first], sheet), next, top);
                     i -= 1;
                     continue;
@@ -182,6 +170,7 @@
             }
             const target = opener(el, sheet);
             moveTo(target, to, top);
+            if (again) i -= 1;
         }
 
         const content = sheet.scrollHeight - pad;

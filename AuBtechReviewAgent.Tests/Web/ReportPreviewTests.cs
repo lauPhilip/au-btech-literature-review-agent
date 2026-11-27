@@ -3,9 +3,10 @@ using Xunit;
 namespace AuBtechReviewAgent.Tests;
 
 /// <summary>
-/// Three faults of the report preview (issues #637, #628 and #635), read as source: an opened citation closes with a click
-/// outside it or Escape and never with the click that opens it; a table that runs over a page repeats its header row; and
-/// the box of citation checks is not in the pages, because the panel beside them gives the same figures.
+/// Faults of the report preview (issues #637, #628, #635 and #737), read as source: an opened citation closes with a click
+/// outside it or Escape and never with the click that opens it; a table that runs over a page repeats its header row; the
+/// box of citation checks is not in the pages, because the panel beside them gives the same figures; and a paragraph that
+/// cannot move whole breaks between lines, while a figure taller than a page is scaled to fit one.
 /// </summary>
 public class ReportPreviewTests
 {
@@ -77,6 +78,35 @@ public class ReportPreviewTests
         Assert.Contains("document.title = text;", script);
         string app = Read("Components", "App.razor");
         Assert.True(app.IndexOf("js/paged-blocks.js", StringComparison.Ordinal) is var at and >= 0 && at < app.IndexOf("js/paged-preview.js", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void AParagraphBreaksBetweenLinesAndATallFigureIsScaledToAPage()
+    {
+        // Issue #737: a heading alone on a page, text over the footer and a diagram across a page edge. The behaviour
+        // itself is checked in a browser by tools/a11y/paged-check.mjs; this pins the parts down in the source.
+        string fit = Read("wwwroot", "js", "paged-fit.js");
+        if (fit.Length == 0) return;
+        Assert.Contains("window.traceablePageFit", fit);
+        Assert.Contains("const MIN_LINES = 2;", fit);
+        Assert.Contains("'--page-split-shape', 'polygon('", fit);
+        Assert.Contains("data-page-fit", fit);
+        Assert.DoesNotContain("innerHTML", fit);
+        Assert.DoesNotContain("appendChild", fit); // Blazor owns the report: nothing is added inside it
+
+        string pages = Read("wwwroot", "js", "paged-preview.js");
+        Assert.Contains("fit.split(el,", pages);
+        Assert.Contains("fit.figures(sheet, body, front,", pages);
+        Assert.Contains("!moved.has(list[first])", pages); // a run of headings moves once
+        Assert.Contains("isAtom: isAtom", Read("wwwroot", "js", "paged-blocks.js"));
+
+        string css = Read("wwwroot", "css", "report-paper.css");
+        Assert.Contains("[data-paged-sheet] [data-page-split]::before { content: \"\"; float: left; width: 100%; height: var(--page-split-end); shape-outside: var(--page-split-shape); }", css);
+        Assert.Contains("[data-page-split]::before { content: none !important; }", css); // not on paper
+
+        string app = Read("Components", "App.razor");
+        int blocks = app.IndexOf("js/paged-blocks.js", StringComparison.Ordinal), own = app.IndexOf("js/paged-fit.js", StringComparison.Ordinal);
+        Assert.True(blocks >= 0 && blocks < own && own < app.IndexOf("js/paged-preview.js", StringComparison.Ordinal));
     }
 
     [Fact]
