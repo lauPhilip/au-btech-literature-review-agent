@@ -236,8 +236,9 @@ app.MapGet("/robots.txt", (HttpRequest request) =>
 app.MapGet("/llms.txt", (HttpRequest request) =>
     Results.Text(AuBtechReviewAgent.LlmsTxt.Build(AuBtechReviewAgent.SiteSeo.BaseUrl(siteConfiguration, request), apiEnabled), "text/plain; charset=utf-8"));
 var siteBuilt = AuBtechReviewAgent.SiteSeo.BuildDate();
-app.MapGet("/sitemap.xml", (HttpRequest request) =>
-    Results.Text(AuBtechReviewAgent.SiteSeo.SitemapXml(AuBtechReviewAgent.SiteSeo.BaseUrl(siteConfiguration, request), siteBuilt, AuBtechReviewAgent.WikiDocs.SitemapPages), "application/xml; charset=utf-8"));
+app.MapGet("/sitemap.xml", (HttpRequest request, AuBtechReviewAgent.GalleryStore gallery, AuBtechReviewAgent.ReviewModulesOptions modules) =>
+    Results.Text(AuBtechReviewAgent.SiteSeo.SitemapXml(AuBtechReviewAgent.SiteSeo.BaseUrl(siteConfiguration, request), siteBuilt,
+        AuBtechReviewAgent.GalleryCard.SitemapPages(gallery, modules).Concat(AuBtechReviewAgent.WikiDocs.SitemapPages)), "application/xml; charset=utf-8"));
 // For uptime monitoring: storage, model configuration and how the databases have been answering (SiteHealth).
 bool serverModelKey = !string.IsNullOrWhiteSpace(mistralApiKey) && !mistralApiKey.Contains("PLACEHOLDER", StringComparison.OrdinalIgnoreCase);
 app.MapGet("/health", () =>

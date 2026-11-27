@@ -9,7 +9,7 @@ namespace AuBtechReviewAgent.Tests;
 
 /// <summary>
 /// The rest of issue #542, served by the whole app: the year and version filters, the preview a shared entry link
-/// shows, and the full self-check table on an entry's page.
+/// shows, the full self-check table on an entry's page, and the gallery in the sitemap.
 /// </summary>
 [Collection(ApiCollection.Name)]
 public sealed class GallerySharePagesTests : IDisposable
@@ -117,5 +117,18 @@ public sealed class GallerySharePagesTests : IDisposable
         Assert.Contains($"id=\"{ReportOutline.SelfCheckId}\"", html);
         Assert.Contains("Counts agree", html);
         Assert.Contains("The abstract says 8 studies; the flow diagram says 7.", html);
+    }
+
+    [Fact]
+    public async Task TheGalleryAndItsEntriesAreInTheSitemap()
+    {
+        var entry = await AddedAsync("AI in schools", "AI tutors in schools", 2026, "0.7.0");
+        using var host = new Host(GalleryFolder);
+        using var client = host.CreateClient();
+
+        string sitemap = await client.GetStringAsync("/sitemap.xml");
+        Assert.Contains("<loc>https://reviews.example.org/gallery</loc>", sitemap);
+        Assert.Contains($"<loc>https://reviews.example.org/gallery/{entry.Id}</loc>", sitemap);
+        Assert.DoesNotContain($"/gallery/{entry.Id}/v/", sitemap);
     }
 }

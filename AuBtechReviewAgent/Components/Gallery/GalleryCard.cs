@@ -1,5 +1,6 @@
 using System;
 using System.Globalization;
+using System.Collections.Generic;
 using System.Linq;
 
 namespace AuBtechReviewAgent;
@@ -23,6 +24,19 @@ public static class GalleryCard
         if (e.Themes > 0) parts.Add($"{e.Themes} {(e.Themes == 1 ? "theme" : "themes")}");
         parts.Add($"{e.CitationsChecked} {(e.CitationsChecked == 1 ? "citation" : "citations")} checked");
         return string.Join(" · ", parts);
+    }
+
+    /// <summary>
+    /// The gallery's pages for the sitemap (issue #542): the catalogue, and each entry whose page can be opened, at its
+    /// own address (its newest version), with the day it last changed. The entries are public: their owners agreed to
+    /// share them. Older versions keep their addresses but are left out, so a search engine lists each review once.
+    /// </summary>
+    public static IEnumerable<(string Path, string ChangeFrequency, string Priority, DateTime? Changed)> SitemapPages(GalleryStore store, ReviewModulesOptions modules)
+    {
+        if (!store.Enabled) yield break;
+        var shown = store.List().Where(e => modules.Shows(e.Card) && e.Module == ReviewModules.Default.Key).ToList();
+        yield return ("/gallery", "weekly", "0.6", shown.Count > 0 ? shown.Max(e => e.LastChangedUtc) : null);
+        foreach (var e in shown) yield return ($"/gallery/{e.Id}", "monthly", "0.5", e.LastChangedUtc);
     }
 
     /// <summary>
