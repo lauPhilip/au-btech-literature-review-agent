@@ -35,7 +35,7 @@ public static partial class ReviewWriter
             .Where(w => !RetellIgnoredWords.Contains(w)).ToHashSet();
 
     /// <summary>Where one clause of a sentence ends and the next begins.</summary>
-    private static readonly Regex ClauseBreak = new(@";|,\s+(?:while|whereas|but|and)\b", RegexOptions.Compiled);
+    private static readonly Regex CitedClauseBreak = new(@";|,\s+(?:while|whereas|but|and)\b", RegexOptions.Compiled);
 
     /// <summary>
     /// Each source a sentence cites, with the words its citation is attached to (issue #744). A marker that opens its
@@ -53,12 +53,12 @@ public static partial class ReviewWriter
             if (Regex.IsMatch(sentence[end..], @"^\s*\p{L}"))
             {
                 part = sentence[end..(i + 1 < markers.Count ? markers[i + 1].Index : sentence.Length)];
-                if (ClauseBreak.Match(part) is { Success: true } first) part = part[..first.Index];
+                if (CitedClauseBreak.Match(part) is { Success: true } first) part = part[..first.Index];
             }
             else
             {
                 part = sentence[(i == 0 ? 0 : markers[i - 1].Index + markers[i - 1].Length)..markers[i].Index];
-                if (ClauseBreak.Matches(part) is { Count: > 0 } breaks) part = part[(breaks[^1].Index + breaks[^1].Length)..];
+                if (CitedClauseBreak.Matches(part) is { Count: > 0 } breaks) part = part[(breaks[^1].Index + breaks[^1].Length)..];
             }
             var words = FindingWords(part);
             foreach (int r in CitationSupportChecker.ReferencesIn(markers[i].Value)) parts.Add((r, words));
