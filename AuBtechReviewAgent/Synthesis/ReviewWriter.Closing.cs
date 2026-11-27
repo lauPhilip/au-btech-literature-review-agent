@@ -36,11 +36,13 @@ public static partial class ReviewWriter
     /// unchecked ones. A research question the codebook found no evidence for (<paramref name="unanswered"/>, e.g. "RQ2")
     /// is answered in code (<see cref="UnansweredText"/>), and the model answers only the others. When the discussion call
     /// has already answered the questions (<paramref name="givenAnswers"/>, one per question; issue #446), the prompt gives
-    /// them as checked text, asks for no answers, and the conclusion may not restate them.
+    /// them as checked text, asks for no answers, and the conclusion may not restate them. With the certainty of each answer
+    /// (<paramref name="certainty"/>, issue #676) the conclusion's general claim is held to it.
     /// </summary>
     public static async Task<ClosingSections?> WriteClosingAsync(IChatCompletionService chat, WritingProfile profile, string topic, string goal,
         string facts, IReadOnlyList<SynthesisSection> sections, string discussion, ReviewEvidence evidence, int referenceCount, Action<string>? warn = null,
-        IReadOnlyList<string>? researchQuestions = null, IReadOnlyCollection<string>? unanswered = null, IReadOnlyList<string>? givenAnswers = null)
+        IReadOnlyList<string>? researchQuestions = null, IReadOnlyCollection<string>? unanswered = null, IReadOnlyList<string>? givenAnswers = null,
+        IReadOnlyList<AnswerCertainty>? certainty = null)
     {
         string results = string.Join("\n\n", sections.Select(x => $"### {x.Heading}\n{x.Text}")) + $"\n\n### Discussion\n{discussion}";
         var all = (researchQuestions ?? Array.Empty<string>()).Select((q, i) => (Id: QuestionId(i, profile), Text: q)).ToList();
@@ -85,7 +87,7 @@ public static partial class ReviewWriter
             {{evidence.BaseFacts}}
 
             FACTS ABOUT THE REVIEW (counted in code):
-            {{facts}}{{LeftOutBlock(evidence, profile)}}{{questionBlock}}
+            {{facts}}{{LeftOutBlock(evidence, profile)}}{{questionBlock}}{{CertaintyBlock(certainty)}}
 
             RESULTS AND DISCUSSION:
             {{results}}
@@ -94,7 +96,7 @@ public static partial class ReviewWriter
             1. "limitations": one paragraph on {{profile.LimitationsPart}}: what kinds of {{profile.Sources}} it rests on, what they leave unmeasured, and how far the findings generalise. Use the facts above. Do not describe how this review was done; that is written separately.
             2. "implications": one paragraph on {{profile.ImplicationsPart}}: what someone acting on these findings should do or watch for, and how firm each point is. A recommendation is the review's own reading and takes no citation; the finding behind it may come first, in its own cited sentence.
             3. "futureResearch": one paragraph on {{profile.FutureResearchPart}}: the open questions and missing kinds of study the results show, each tied by name to the theme it comes from. A proposal is the review's own reading and takes no citation: say what study is missing, not again what the {{profile.Sources}} found.
-            4. "conclusion": three to five sentences that answer the review objective in plain words, at most {{MaxConclusionWords}} words, with no new claims.{{conclusionRule}}
+            4. "conclusion": three to five sentences that answer the review objective in plain words, at most {{MaxConclusionWords}} words, with no new claims.{{conclusionRule}}{{HedgeRule(certainty, "the conclusion")}}
             {{FigureRule}}
             5. {{EvidenceThenReadingRule(profile)}} In the limitations, the directions for future research and the conclusion, an uncited sentence may name kinds of {{profile.Sources}} (what the evidence rests on, how it was studied, what study is missing). {{ClaimPerCitationRule(profile)}} {{OwnCountRule}} Do not invent numbers, statistics or {{profile.Sources}}.{{leftOutRule}} {{ReadingBasisRule(profile)}} This holds for the limitations too: how this review was done, including what it read, is written separately.{{answerRule}}
             {{ProseCleaner.PlainProseRule}}
@@ -105,9 +107,11 @@ public static partial class ReviewWriter
         {
             ClosingAnswer answer;
             using (LlmStage.Begin("closing"))
-                answer = await LlmJson.GetAsync<ClosingAnswer>(chat, prompt, LlmJson.JsonMode(0.3), WithFigureGuard<ClosingAnswer>(a => CitationLoadSendBack(string.Join("\n", new[] { a.Limitations, a.Implications, a.FutureResearch, a.Conclusion }.Concat(a.Answers ?? new())), "closing call", warn) ?? ClosingProblem(a.Limitations, a.Implications, a.FutureResearch, a.Conclusion, checkedText + "\n" + facts + "\n" + evidence.BaseFacts, referenceCount,
+                answer = await LlmJson.GetAsync<ClosingAnswer>(chat, prompt, LlmJson.JsonMode(0.3), WithSoftGuards<ClosingAnswer>(a => CitationLoadSendBack(string.Join("\n", new[] { a.Limitations, a.Implications, a.FutureResearch, a.Conclusion }.Concat(a.Answers ?? new())), "closing call", warn) ?? ClosingProblem(a.Limitations, a.Implications, a.FutureResearch, a.Conclusion, checkedText + "\n" + facts + "\n" + evidence.BaseFacts, referenceCount,
                     a.Answers, questions.Count, ownFacts: facts + "\n" + evidence.BaseFacts, results: checkedText, evidence: evidence, profile: profile, givenAnswers: given),
-                    a => ClosingFigureProblem(a, sections, discussion, given, facts + "\n" + evidence.BaseFacts), "closing call", warn), repairAttempts: 2);
+                    "closing call", warn, FigureSendBacks,
+                    (a => ClosingFigureProblem(a, sections, discussion, given, facts + "\n" + evidence.BaseFacts), "a repeated result figure"),
+                    (a => OverclaimProblem(a.Conclusion, certainty, "the conclusion"), "a claim stronger than the certainty of the evidence")), repairAttempts: 2);
             string Clean(string? text) => MethodsSectionWriter.StripMarkdownEmphasis(text!.Trim());
             var modelAnswers = new Queue<string>((answer.Answers ?? new()).Where(a => !string.IsNullOrWhiteSpace(a)).Select(Clean));
             return new ClosingSections(Clean(answer.Limitations), Clean(answer.Implications), Clean(answer.FutureResearch), Clean(answer.Conclusion),

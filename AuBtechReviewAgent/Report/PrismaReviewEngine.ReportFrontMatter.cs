@@ -131,7 +131,8 @@ public partial class PrismaReviewEngine
                     _log.LogWarning("{Message}", SanitizeLogMessage(message));
                     lock (thematic.Codebook) (thematic.Codebook.WritingNotes ??= new()).Add(message);
                 },
-                finalState.ResearchQuestions, thematic.Codebook.Unanswered?.Select(u => u.Question).ToList(), thematic.Answers)
+                finalState.ResearchQuestions, thematic.Codebook.Unanswered?.Select(u => u.Question).ToList(), thematic.Answers,
+                CertaintyOf(finalState, thematic, thematic.Answers))
             : null;
 
         var artifactTask = ArtifactAsync();
