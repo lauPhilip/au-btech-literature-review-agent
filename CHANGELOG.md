@@ -99,6 +99,12 @@ The Decision log on a systematic paper now downloads the run's full ledger as JS
 - **Decision log**: screened records as RIS ⇒ the run's whole ledger as JSON (ledger.json)
 - The printed paper links to the same file. A multivocal paper still gives its screened sources as RIS.
 
+### 🐛 Bug fixes
+
+- Fixed a bug where a heading stood alone on a page and its text started on the next one. A paragraph now breaks between two lines when it cannot move whole.
+- Fixed a bug where a long paragraph ran over the page footer and out of the page.
+- Fixed a bug where a tall concept map ran across the edge of a page. It is now scaled to fit one page.
+
 ## [0.7.0] - 2026-11-27
 
 > **Dev note:** This patch is about telling the truth in the paper. We read your criteria more kindly, taught the themes to build on each other and told the abstract to stop shouting "we". The report page lost a few annoying habits on the way.
