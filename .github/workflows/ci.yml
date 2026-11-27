@@ -202,6 +202,13 @@ jobs:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}
 
+      # The check's packages and Chromium install in the background while the run is seeded and the app starts; the
+      # browser checks step waits for it. A process started in one step keeps running into the next ones.
+      - name: Install the browser (in the background)
+        working-directory: tools/a11y
+        run: |
+          (npm ci && npx playwright install --with-deps chromium; echo $? > "$RUNNER_TEMP/browser.done") > "$RUNNER_TEMP/browser.log" 2>&1 &
+
       # A finished fake run of each kind of review (the module kit's), with an edit key, in the folder the app reads, so
       # the report pages can be checked as the owner and as a reader (CtaSeedTests; the check is the last step below).
       - name: Seed a finished run of each kind of review
@@ -220,52 +227,28 @@ jobs:
           for i in $(seq 1 60); do curl -sf http://localhost:5038/ > /dev/null && exit 0; sleep 2; done
           cat app.log; exit 1
 
-      # Fails on any "serious" or "critical" problem; the log lists every rule and element (tools/a11y).
-      # Since redesign step 12 every page takes the dark theme, so the main pages are checked in it too.
-      # /design/frame exists only in development: AppLayout in both themes.
-      # /design/run, also development only, shows New review while a run is going, stopped and done, with sample figures.
-      # /design/report, development only too, shows the report page with a made-up finished run (SampleReport).
-      # /design/metrics, development only too, shows the Metrics page with made-up runs (SampleMetrics).
-      - name: Run axe-core on the public pages
+      # The four browser checks run side by side against the one app (tools/a11y/run-checks.sh), each with its own log group:
+      # axe-core then the print check, the smoke test, and the link and button check (wiki page 07 says what each does).
+      # axe fails on any "serious" or "critical" problem; since redesign step 12 the main pages are checked in the dark theme too.
+      # The /design/* pages exist only in development: the frame, New review while running, stopped and done, and
+      # the report and Metrics pages with made-up figures. The print check needs the made-up report over 3 A4 pages.
+      - name: Run the browser checks
         working-directory: tools/a11y
         env:
           BASE_URL: http://localhost:5038
           A11Y_PAGES: /,/review,/spec-matrix,/start,/metrics,/about,/model-card,/privacy,/accessibility,/verify,/glossary,/docs/api,/not-found,/design/frame,/design/run,/design/run?state=stopped,/design/run?state=done,/design/report,/design/metrics
           A11Y_DARK_PAGES: /,/review,/start,/metrics,/about,/model-card,/privacy,/accessibility,/verify,/glossary,/docs/api,/not-found,/design/frame,/design/run,/design/run?state=done,/design/report,/design/metrics
           A11Y_SCREENSHOTS: ${{ github.workspace }}/a11y-screenshots
-        run: |
-          npm ci
-          npx playwright install --with-deps chromium
-          node axe-check.mjs
-
-      # "Print or save as PDF" (issue #153): the made-up report must flow over several A4 pages without the app's
-      # frame, not stop at one screen. The PDF goes with the screenshots.
-      - name: Print the report to PDF
-        working-directory: tools/a11y
-        env:
-          BASE_URL: http://localhost:5038
           PRINT_PAGES: /design/report=3,/about=1
           PRINT_OUT: ${{ github.workspace }}/a11y-screenshots
-        run: node print-check.mjs
-
-      # Every main page loads with a heading and no console error, and the flows a visitor uses respond: the key
-      # dialog, "Try an example", opening a citation, the glossary search and the theme switch (issue #312).
-      - name: Click through the main pages
-        working-directory: tools/a11y
-        env:
-          BASE_URL: http://localhost:5038
-        run: node smoke.mjs
-
-      # Every link and button on the seeded report pages, as owner and as reader: same-origin links answer 2xx, external
-      # ones are well formed, buttons do what they say with no console error, and the printed PDF's links are absolute,
-      # with the front page's links to the report, archive and protocol (tools/a11y/cta-check.mjs, wiki page 07).
-      - name: Check every link and button on the report pages
-        working-directory: tools/a11y
-        env:
-          BASE_URL: http://localhost:5038
           CTA_KEYS: ${{ github.workspace }}/cta-keys.json
           CTA_OUT: ${{ github.workspace }}/a11y-screenshots
-        run: node cta-check.mjs
+        run: |
+          while [ ! -f "$RUNNER_TEMP/browser.done" ]; do sleep 2; done
+          cat "$RUNNER_TEMP/browser.log"
+          [ "$(cat "$RUNNER_TEMP/browser.done")" = 0 ] || { echo "::error::npm ci or the Playwright install failed"; exit 1; }
+          mkdir -p "$A11Y_SCREENSHOTS"
+          bash run-checks.sh
 
       # Screenshots of every checked page at 390, 1440 and 1920 px, so a pull request that changes markup can be
       # looked at without running the app.
