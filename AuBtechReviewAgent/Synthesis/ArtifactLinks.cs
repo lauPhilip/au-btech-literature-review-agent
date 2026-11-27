@@ -22,6 +22,9 @@ public sealed class ArtifactLinkCheck
     /// <summary><see cref="ArtifactLinks.Supported"/> or <see cref="ArtifactLinks.Reading"/>.</summary>
     public string Check { get; set; } = "";
     public string Reason { get; set; } = "";
+    /// <summary>True when the link was left out of the diagram because the map keeps at most <see cref="ArtifactLinks.MaxReading"/> dashed links; <see cref="Check"/> still says what the check found.</summary>
+    public bool Dropped { get; set; }
+    public string DroppedReason { get; set; } = "";
     public List<CitationSupportResult> Verdicts { get; set; } = new();
 }
 
@@ -36,6 +39,8 @@ public static class ArtifactLinks
     public const string Supported = "supported";
     public const string Reading = "reading";
     public const string FileName = "artifact-links.json";
+    /// <summary>The most dashed links a map keeps (issue #680): a map that is mostly the review's own reading tells the reader little about the literature.</summary>
+    public const int MaxReading = 3;
 
     private static readonly Regex Marker = new(@"\s*\[\d+(?:\s*[,–-]\s*\d+)*\]", RegexOptions.Compiled);
 
@@ -71,6 +76,7 @@ public static class ArtifactLinks
         var ids = artifact.Nodes.Select(n => n.Id).ToHashSet();
         var toCheck = new List<CitedSentence>();
         var decisionOf = new Dictionary<string, (ArtifactEdge Edge, ArtifactLinkCheck Decision)>();
+        var pairs = new List<(ArtifactEdge Edge, ArtifactLinkCheck Decision)>();
         for (int i = 0; i < artifact.Edges.Count; i++)
         {
             var edge = artifact.Edges[i];
@@ -79,6 +85,7 @@ public static class ArtifactLinks
                 .Take(ReviewWriter.MaxReferencesPerSentence).ToList();
             var decision = new ArtifactLinkCheck { From = edge.From, To = edge.To, Label = edge.Label, SharedReferences = shared, Sentence = Sentence(artifact, edge, shared) };
             decisions.Add(decision);
+            pairs.Add((edge, decision));
             if (shared.Count == 0)
             {
                 decision.Check = Reading;
@@ -106,7 +113,26 @@ public static class ArtifactLinks
                 : "None of the studies cited by both boxes states the link with a quote found in its text.";
             edge.Check = decision.Check;
         }
+        CapReading(artifact, pairs);
         return decisions;
+    }
+
+    /// <summary>
+    /// Keeps every supported link and the first <see cref="MaxReading"/> dashed links in the model's order, and takes the
+    /// rest out of the diagram; each dropped link is marked in its decision with the reason. A box left without a link
+    /// stays as it is: nothing is added or removed here.
+    /// </summary>
+    public static void CapReading(ReviewArtifact artifact, IReadOnlyList<(ArtifactEdge Edge, ArtifactLinkCheck Decision)> pairs)
+    {
+        int kept = 0;
+        foreach (var (edge, decision) in pairs.Where(p => p.Edge.Check == Reading))
+        {
+            if (++kept <= MaxReading) continue;
+            decision.Dropped = true;
+            decision.DroppedReason = $"No study states this link, and a map keeps at most {MaxReading} links that are the review's own reading; this was the dashed link number {kept} in the model's order.";
+            artifact.Edges.Remove(edge);
+            artifact.LinksDropped++;
+        }
     }
 
     /// <summary>The field name a link's verdicts are recorded under.</summary>
@@ -119,14 +145,18 @@ public static class ArtifactLinks
     public static string MethodsSentence(ReviewArtifact? artifact)
     {
         if (artifact is not { Error: null, IsDiagram: true } || artifact.Edges.Count == 0 || artifact.Edges.Any(e => e.Check.Length == 0)) return "";
-        int supported = artifact.Edges.Count(e => e.Check == Supported), reading = artifact.Edges.Count - supported;
-        string links = artifact.Edges.Count == 1 ? "Its one link" : $"Each of its {artifact.Edges.Count} links";
+        int supported = artifact.Edges.Count(e => e.Check == Supported), reading = artifact.Edges.Count - supported, all = artifact.Edges.Count + artifact.LinksDropped;
+        string links = all == 1 ? "Its one link" : $"Each of its {all} links";
         string outcome = reading == 0
-            ? (artifact.Edges.Count == 1 ? "it is supported." : "all are supported.")
-            : supported == 0
+            ? (all == 1 ? "it is supported." : "all are supported.")
+            : supported == 0 && artifact.LinksDropped == 0
                 ? (reading == 1 ? "it is not supported, so it is drawn dashed as the review's own reading." : "none is supported, so all are drawn dashed as the review's own reading.")
-                : $"{supported} {(supported == 1 ? "is" : "are")} supported, and the other {reading} {(reading == 1 ? "is" : "are")} drawn dashed as the review's own reading.";
-        return $" {links} was checked as a sentence against the studies that both of its boxes cite, without repair; {outcome} The verdicts are in {FileName}.";
+                : artifact.LinksDropped == 0
+                    ? $"{supported} {(supported == 1 ? "is" : "are")} supported, and the other {reading} {(reading == 1 ? "is" : "are")} drawn dashed as the review's own reading."
+                    : $"{supported} {(supported == 1 ? "is" : "are")} supported, and the other {reading + artifact.LinksDropped} {(reading + artifact.LinksDropped == 1 ? "is" : "are")} the review's own reading, of which {reading} {(reading == 1 ? "is" : "are")} drawn dashed.";
+        string capped = artifact.LinksDropped == 0 ? ""
+            : $" A map keeps at most {MaxReading} such links, so the other {artifact.LinksDropped} {(artifact.LinksDropped == 1 ? "was" : "were")} left out of the diagram, in the order the model gave them.";
+        return $" {links} was checked as a sentence against the studies that both of its boxes cite, without repair; {outcome}{capped} The verdicts are in {FileName}.";
     }
 
     /// <summary>The note under a diagram with dashed links; empty when every link is supported or none was checked.</summary>
