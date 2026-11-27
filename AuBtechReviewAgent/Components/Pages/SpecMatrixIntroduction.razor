@@ -102,9 +102,8 @@
         if (c.ExcludedPeerReview > 0) reasons.Add($"not peer reviewed {c.ExcludedPeerReview}");
         string excludedDetail = string.Join(" · ", reasons);
         string screenedLabel = Page.stats is { DualScreened: > 0 } ? "Screened twice, independently" : "Screened";
-        <figure class="print-keep rounded-card border border-line bg-soft p-4 sm:p-5" aria-labelledby="flow-caption">
-            <figcaption id="flow-caption" class="text-[15px] font-semibold text-ink">Figure 2.1: Flow of records through the review (PRISMA 2020)</figcaption>
-            <ol class="mt-3 space-y-2 text-[15px] leading-snug">
+        <figure class="ui-figure print-keep" aria-labelledby="flow-caption">
+            <ol class="space-y-2 text-[15px] leading-snug">
                 @(FlowRow("Identified", c.Identified, identifiedDetail, "Removed before screening", removed, removedDetail))
                 @(FlowRow(screenedLabel, c.Screened, "Title and abstract", "Excluded", excluded, excludedDetail))
                 @(FlowRow("Included", c.Included, $"full text read {c.FullTextRetrieved} · abstract only {c.AbstractOnly}", null, 0, ""))
@@ -121,6 +120,7 @@
             {
                 <p class="mt-2 text-sm text-partly">These counts do not add up for this run (it may predate the current counting); see transparent-process.json.</p>
             }
+            <figcaption id="flow-caption" class="ui-caption">Figure 2.1: Flow of records through the review (PRISMA 2020)</figcaption>
         </figure>
     };
 
