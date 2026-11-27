@@ -74,10 +74,10 @@ public class ArtifactAndProseTests : IDisposable
         Assert.Equal("[5] warns [5] that governance fails.", ProseCleaner.DropRepeatedCitations("[5] warns [5] that governance fails."));
 
         var (clean, changes) = ProseCleaner.Clean("Audits help [2].\n\n[5] warns that governance can fail [5]. Loops recover [1].", "synthesis-2");
-        Assert.Equal("Audits help [2].\n\n[5] warns that governance can fail. Loops recover [1].", clean);
-        var change = Assert.Single(changes);
-        Assert.Equal("repeated citation removed", change.Kind);
-        Assert.Equal("[5] warns that governance can fail [5].", change.Text);
+        // The sentence that opened with a bare marker now names it (issue #725); both changes are listed.
+        Assert.Equal("Audits help [2].\n\nStudy [5] warns that governance can fail. Loops recover [1].", clean);
+        Assert.Equal(new[] { "citation that opened a sentence named", "repeated citation removed" }, changes.Select(c => c.Kind));
+        Assert.Equal("Study [5] warns that governance can fail [5].", changes[1].Text);
     }
 
     [Fact]
