@@ -61,6 +61,24 @@ public static partial class HiddenText
     public static CleanedText RemoveInvisible(string? text)
     {
         if (string.IsNullOrEmpty(text)) return new CleanedText("", 0, 0, "");
+        // Taking characters out can bring the two halves of a tag character together (a high surrogate, an invisible
+        // character, a low surrogate), so it goes on until a pass removes nothing (#623). Each pass that removes shortens the text.
+        var current = new CleanedText(text, 0, 0, "");
+        var spelled = new StringBuilder();
+        int removed = 0;
+        while (true)
+        {
+            var pass = RemoveOnce(current.Text);
+            if (pass.Text.Length == current.Text.Length) break;
+            removed += pass.InvisibleCharacters;
+            spelled.Append(pass.Hidden);
+            current = pass;
+        }
+        return new CleanedText(current.Text, removed, 0, spelled.ToString());
+    }
+
+    private static CleanedText RemoveOnce(string text)
+    {
         if (!text.Any(c => IsInvisible(c) || c == SoftHyphen || char.IsHighSurrogate(c))) return new CleanedText(text, 0, 0, "");
 
         var kept = new StringBuilder(text.Length);
