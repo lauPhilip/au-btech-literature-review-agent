@@ -177,8 +177,8 @@ public static partial class ReviewWriter
 
             REQUIREMENTS:
             1. "title": one line, at most 25 words, no full stop, naming the topic and the kind of review.
-            2. "abstract": one paragraph of 150 to 250 words: background, method, main results by theme, and what they mean. No citations. Use no number that is not in the facts or the results above. {{ZeroCountRule}}{{HedgeRule(certainty, "the abstract")}}
-            3. {{RationaleRule(profile)}}{{WeakOpeningRule(weakSources, profile)}}
+            2. "abstract": one paragraph of 150 to 250 words: background, method, main results by theme, and what they mean. No citations. Use no number that is not in the facts or the results above. {{ZeroCountRule}} {{NumeralOpeningRule}}{{HedgeRule(certainty, "the abstract")}}
+            3. {{RationaleRule(profile)}} {{ProcessFactsRule(profile)}}{{WeakOpeningRule(weakSources, profile)}}
             4. {{objectivesRule}}
             {{ProseCleaner.PlainProseRule}}
             Respond ONLY with a valid minified JSON object:
@@ -195,7 +195,11 @@ public static partial class ReviewWriter
                     (a => WeakOpeningProblem(a.Rationale, weakSources, profile), "a rationale that opens on one weak source"),
                     (a => RationaleListingProblem(a.Rationale, profile), "a rationale that lists the sources"),
                     (a => ZeroCountProblem(a.Abstract, "the abstract"), "a count of zero"),
-                    (a => OverclaimProblem(a.Abstract, certainty, "the abstract"), "a claim stronger than the certainty of the evidence")), repairAttempts: 2);
+                    (a => OverclaimProblem(a.Abstract, certainty, "the abstract"), "a claim stronger than the certainty of the evidence"),
+                    // Issues #746 and #747: the review's own process is in the methods text, not in a cited sentence.
+                    (a => NumeralOpeningProblem(a.Abstract, "the abstract"), "an abstract sentence that opens on a numeral"),
+                    (a => CitedReadingBasisProblem(a.Rationale, "the rationale"), "a cited rationale sentence on what the review read")),
+                    repairAttempts: 3);
                 return new FrontMatter(
                     answer.Title!.Trim().TrimEnd('.'),
                     MethodsSectionWriter.StripMarkdownEmphasis(answer.Abstract!.Trim()),
