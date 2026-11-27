@@ -119,12 +119,11 @@ public partial class PrismaReviewEngine
             start += d;
         }
         sb.AppendLine(@"\matrix [draw,below,matrix of nodes,font=\tiny,at={(current bounding box.south)},yshift=-0.4cm] {");
-        var cells = slices.Select(x => $"\\node[fill={x.Color},label=right:({x.Count}) {EscapeLatexLabel(x.Label)}] {{}};").ToList();
+        var cells = slices.Select(x => $"\\node[fill={x.Color},label=right:({x.Count}) {PaperLatex.Escape(x.Label)}] {{}};").ToList();
         for (int i = 0; i < cells.Count; i += 2)
             sb.AppendLine(i + 1 < cells.Count ? $"{cells[i]} & {cells[i + 1]} \\\\" : $"{cells[i]} & \\\\");
         sb.AppendLine(@"};");
         return sb.ToString();
     }
 
-    private static string EscapeLatexLabel(string s) => PaperLatex.Escape(s);
 }

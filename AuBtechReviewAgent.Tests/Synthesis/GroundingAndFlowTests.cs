@@ -80,6 +80,23 @@ public class GroundingAndFlowTests
     }
 
     [Fact]
+    public void FlowDiagramEscapesSourceNamesAndReasonsWithTheSharedEscape()
+    {
+        // Issue #538: the hand-written escape left a backslash, braces, "^" and "~" as LaTeX.
+        var flow = new PrismaFlowCounts
+        {
+            IdentifiedBySource = { (@"Evil\input{/etc/passwd}", 2) },
+            ExcludedAtScreening = 1, ExcludedByReason = { ("Off topic ^^5c & 50% ~", 1) },
+        };
+        string tikz = PrismaFlowDiagram.ToTikz(flow);
+
+        Assert.Contains(PaperLatex.Escape(@"Evil\input{/etc/passwd}") + " (n = 2)", tikz);
+        Assert.Contains(@"\quad " + PaperLatex.Escape("Off topic ^^5c & 50% ~") + " (n = 1)", tikz);
+        Assert.DoesNotContain(@"\input{", tikz);
+        Assert.DoesNotContain("^^5c", tikz);
+    }
+
+    [Fact]
     public void FlowDiagramHasTheRetrievalAndEligibilityBoxesAndSaysNoneIsExcludedOnFullText()
     {
         string tikz = PrismaFlowDiagram.ToTikz(PrismaFlowCounts.From(ConsistentState()));
