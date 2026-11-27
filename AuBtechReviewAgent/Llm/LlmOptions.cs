@@ -22,6 +22,13 @@ public class LlmOptions
     public string ApiKey { get; set; } = "";
 
     /// <summary>
+    /// Mistral only: the base URL of its API. The EU regional endpoint by default, so prompts, papers and answers are
+    /// processed in the EU (Mistral's regional inference; the global api.mistral.ai gives no region). A model that the
+    /// EU endpoint does not serve can be reached by setting Llm:MistralBaseUrl to <see cref="LlmFactory.MistralGlobalUrl"/>.
+    /// </summary>
+    public string MistralBaseUrl { get; set; } = LlmFactory.MistralBaseUrl;
+
+    /// <summary>
     /// The earlier name of <see cref="QualityParallelism"/>, still read when that is not set.
     /// </summary>
     public int ScreeningParallelism { get; set; } = 8;
@@ -86,7 +93,7 @@ public class LlmOptions
     /// <summary>The same settings with another model and effort, for the client of <see cref="FastModel"/>.</summary>
     public LlmOptions ForFastModel() => new()
     {
-        Provider = Provider, Model = FastModel.Trim(), BaseUrl = BaseUrl, ApiKey = ApiKey,
+        Provider = Provider, Model = FastModel.Trim(), BaseUrl = BaseUrl, ApiKey = ApiKey, MistralBaseUrl = MistralBaseUrl,
         ScreeningParallelism = FastParallelism, FastParallelism = FastParallelism, ReasoningEffort = FastReasoningEffort,
     };
 
