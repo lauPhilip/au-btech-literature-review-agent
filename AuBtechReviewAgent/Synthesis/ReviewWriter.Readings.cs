@@ -22,7 +22,8 @@ public static partial class ReviewWriter
     /// <summary>The discussion prompt's rule against retelling the results and reading agreement into them.</summary>
     public static string ReadingNotRetellingRule(WritingProfile profile) =>
         $"Do not retell the theme subsections: the results are printed above, so a paragraph that repeats them sentence by sentence is sent back. " +
-        $"Claim that {profile.Sources} agree, converge or are consistent only when they measure the same outcome; results that measure different things in different settings neither agree nor conflict, so say what each measured instead.";
+        $"Claim that {profile.Sources} agree, converge or are consistent only when they measure the same outcome; results that measure different things in different settings neither agree nor conflict, so say what each measured instead. " +
+        ProcessFactsRule(profile);
 
     // A result word with a vague size and no figure ("measurable gains", "significant improvements").
     private static readonly Regex VagueResult = new(
@@ -64,7 +65,7 @@ public static partial class ReviewWriter
 
     /// <summary>
     /// Why a discussion reads wrongly, or null (issue #572): a paragraph that retells the results, a claim of agreement
-    /// between results, or a result given without the figures its source's verified finding has. Public for unit tests.
+    /// between results, a cited sentence on what this review read a source from, or a result given without the figures its source's verified finding has. Public for unit tests.
     /// </summary>
     public static string? DiscussionReadingProblem(string discussion, IEnumerable<string> themeTexts, ReviewEvidence evidence)
     {
@@ -72,7 +73,8 @@ public static partial class ReviewWriter
             return $"discussion paragraph {retold.Paragraph} retells the results (\"{retold.Sentence.Trim()}\"); the results are printed above, so say what they mean together instead of repeating them.";
         if (AgreementSentence(discussion) is { } agreement)
             return $"\"{agreement.Trim()}\" reads agreement or consistency into the results; results that measure different things in different settings neither agree nor conflict. Say what each measured, and claim agreement only between sources that measure the same outcome.";
-        return UnquantifiedFindingProblem(discussion, evidence);
+        // Issue #747: what this review read a source from is in the ledger, not in the source.
+        return CitedReadingBasisProblem(discussion, "the discussion") ?? UnquantifiedFindingProblem(discussion, evidence);
     }
 
     /// <summary>
