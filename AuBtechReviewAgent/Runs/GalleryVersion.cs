@@ -30,6 +30,12 @@ public sealed record GalleryVersion
     /// <summary>The run's self-check of its paper (self-check.json), or null for a run made before it.</summary>
     public GallerySelfCheck? SelfCheck { get; init; }
 
+    /// <summary>
+    /// The DOI a repository (Zenodo, OSF) gave this version's deposit, as the maintainer wrote it in entry.json; null
+    /// when there is none. It is read through <see cref="GalleryDoi.Normalize"/>, so a value that is not a DOI is ignored.
+    /// </summary>
+    public string? Doi { get; init; }
+
     /// <summary>SHA-256 of the edit key of this version's run, with a gallery prefix (GalleryFingerprint.OwnerToken).</summary>
     public string OwnerTokenSha256 { get; init; } = "";
 
