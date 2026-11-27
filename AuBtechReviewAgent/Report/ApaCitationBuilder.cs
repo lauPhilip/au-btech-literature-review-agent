@@ -77,9 +77,11 @@ public static partial class ApaCitationBuilder
         int year = ExtractYear(paper.PublishedDate);
         string title = TitleAsGiven(paper.Title);
         string venue = CleanVenue(paper.JournalSource);
+        string? venuePages = null;
+        if (HoldsCitation(venue, title)) (venue, venuePages) = VenueFromCitation(venue, title);
         // A book's record often repeats its title as the venue; the work then stands alone.
         if (Comparable(venue) == Comparable(title)) venue = "";
-        var parsed = new ReferenceDetails { ArxivId = ReferenceDetails.ArxivIdOf(paper.Doi, paper.Id, paper.Url, paper.JournalSource) };
+        var parsed = new ReferenceDetails { ArxivId = ReferenceDetails.ArxivIdOf(paper.Doi, paper.Id, paper.Url, paper.JournalSource), Pages = venuePages };
         var volumeIssue = VolumeIssuePattern.Match(venue);
         if (volumeIssue.Success && !ConferencePattern.IsMatch(venue))
         {
