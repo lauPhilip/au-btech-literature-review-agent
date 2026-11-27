@@ -183,7 +183,8 @@ public static class SiteSeo
             ["isAccessibleForFree"] = true,
             ["license"] = "https://www.apache.org/licenses/LICENSE-2.0",
             ["offers"] = new Dictionary<string, object> { ["@type"] = "Offer", ["price"] = "0", ["priceCurrency"] = "EUR" },
-            ["sameAs"] = new[] { RepositoryUrl },
+            ["sameAs"] = new[] { RepositoryUrl, "https://doi.org/" + ConceptDoi },
+            ["identifier"] = "https://doi.org/" + ConceptDoi,
             ["creator"] = Creator(),
         };
         return Serialize(data);
