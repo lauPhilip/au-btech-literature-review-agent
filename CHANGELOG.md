@@ -26,7 +26,17 @@ Each `###` heading has exactly one emoji, at its start, and no emoji appears any
 
 ### 🌟 Patch highlights
 
-The Decision log on a systematic paper now downloads the run's full ledger as JSON. A new run gives the same results as 0.7.0.
+The Decision log on a systematic paper now downloads the run's full ledger as JSON. The model is now called in the EU. A new run gives the same results as 0.7.0.
+
+### 🔬 Systematic review
+
+#### Language model
+
+> The tool called Mistral's global address, which does not say where your text is processed.
+
+- **Mistral address**: api.mistral.ai (no region) ⇒ api.eu.mistral.ai (processed in the EU)
+- The multivocal review and your own Mistral key use the EU address too. Mistral charges 10% more for it.
+- A server can choose the global address again with Llm:MistralBaseUrl, for a model the EU address does not serve.
 
 ### 📄 Report page
 
