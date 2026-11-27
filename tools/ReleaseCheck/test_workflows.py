@@ -2,11 +2,11 @@
 
     python3 -m unittest discover -s tools/ReleaseCheck -v
 
-The deploy lives in one place, .github/workflows/deploy.yml, and two workflows call it: ci.yml on every push to
-master, and release.yml once a version's GitHub release is published, so the server's build names the release and
-not a pre-release (#144). The unit tests read the three files as text (the runner has no YAML library) and check
-that wiring. The feature tests run release.yml's "Is the tag master's newest commit?" step with a stand-in for the
-gh command, and check that a tag on master's newest commit is deployed and a tag on an older commit is not.
+The deploy lives in one place, .github/workflows/deploy.yml, and two workflows call it: release.yml once a version's
+GitHub release is published (when the tag is the newest version tag), and deploy-manual.yml, which is started by
+hand for an urgent fix. A merge into master does not deploy (#707), so the server's build names the release (#144).
+The unit tests read the files as text (the runner has no YAML library) and check that wiring. The version order
+itself is tested in test_newest_tag.py.
 """
 
 from __future__ import annotations
@@ -105,25 +105,44 @@ class DeployWorkflowTests(unittest.TestCase):
 
 
 class CallersTests(unittest.TestCase):
-    def test_ci_deploys_after_the_checks_on_a_push_to_master(self):
-        job = jobs(read("ci.yml"))["deploy"]
+    def test_ci_does_not_deploy(self):
+        ci = read("ci.yml")
+        self.assertNotIn("deploy.yml", ci)
+        self.assertNotIn("DEPLOY_ENABLED", ci)
+        self.assertNotIn("deploy", [name.lower() for name in jobs(ci)])
+        self.assertIn("build-and-test", jobs(ci))
+
+    def test_release_deploys_when_the_tag_is_newest(self):
+        job = jobs(read("release.yml"))["deploy"]
         self.assertIn("uses: ./.github/workflows/deploy.yml", job)
-        self.assertIn("needs: [ build-and-test, css-up-to-date, accessibility ]", job)
-        self.assertIn("github.event_name == 'push'", job)
-        self.assertIn("github.ref == 'refs/heads/master'", job)
+        self.assertIn("needs: is-newest", job)
+        self.assertIn("needs.is-newest.outputs.deploy == 'true'", job)
         self.assertIn("vars.DEPLOY_ENABLED == 'true'", job)
 
-    def test_release_deploys_after_the_release_is_published(self):
-        found = jobs(read("release.yml"))
-        self.assertIn("needs: github-release", found["is-master-head"])
-        job = found["deploy"]
+    def test_a_manual_deploy_exists_only_by_dispatch_and_is_gated(self):
+        manual = read("deploy-manual.yml")
+        on = triggers(manual)
+        self.assertIn("workflow_dispatch:", on)
+        for event in ("push:", "pull_request:", "schedule:"):
+            self.assertNotIn(event, on)
+        job = jobs(manual)["deploy"]
         self.assertIn("uses: ./.github/workflows/deploy.yml", job)
-        self.assertIn("needs: is-master-head", job)
-        self.assertIn("needs.is-master-head.outputs.deploy == 'true'", job)
         self.assertIn("vars.DEPLOY_ENABLED == 'true'", job)
+        self.assertIn("needs.gate.outputs.deploy == 'true'", job)
+        self.assertIn('"refs/heads/master"', manual)
+
+    def test_only_the_release_and_the_manual_workflow_call_the_deploy(self):
+        callers = sorted(p.name for p in WORKFLOWS.glob("*.yml")
+                         if "uses: ./.github/workflows/deploy.yml" in p.read_text(encoding="utf-8"))
+        self.assertEqual(["deploy-manual.yml", "release.yml"], callers)
+
+    def test_deploy_waits_for_reviews_and_has_no_docs_only_skip(self):
+        deploy = read("deploy.yml")
+        self.assertIn("wait-idle", deploy)
+        self.assertNotIn("needs-deploy", deploy)
 
     def test_callers_pass_only_the_two_secrets(self):
-        for name in ("ci.yml", "release.yml"):
+        for name in ("release.yml", "deploy-manual.yml"):
             job = jobs(read(name))["deploy"]
             self.assertNotIn("secrets: inherit", job, name)
             self.assertIn("SIMPLY_FTP_USER: ${{ secrets.SIMPLY_FTP_USER }}", job, name)
@@ -148,42 +167,16 @@ class ReleaseBodyWiringTests(unittest.TestCase):
         self.assertNotIn("--generate-notes", self.job)
 
 
-class IsMasterHeadFeatureTests(unittest.TestCase):
-    """Runs the comparison step with a stand-in gh that answers for the tag and for master."""
+class IsNewestWiringTests(unittest.TestCase):
+    def test_release_checks_the_tag_with_the_helper_on_the_whole_history(self):
+        job = jobs(read("release.yml"))["is-newest"]
+        self.assertIn("needs: github-release", job)
+        self.assertIn("fetch-depth: 0", job)
+        self.assertIn('python3 tools/ReleaseCheck/newest_tag.py "$TAG"', job)
+        self.assertNotIn("commits/master", read("release.yml"))
 
-    TAG_SHA = "8a9e23a2a248ab8269e94e2d16186b90e0a0e60c"
-
-    def run_step(self, master_sha: str) -> tuple[str, str]:
-        script = run_block(jobs(read("release.yml"))["is-master-head"])
-        with tempfile.TemporaryDirectory() as tmp:
-            fake_gh = Path(tmp) / "gh"
-            fake_gh.write_text(
-                "#!/bin/sh\n"
-                'case "$2" in\n'
-                f'  */commits/master) echo "{master_sha}" ;;\n'
-                f'  */commits/v0.2.1) echo "{self.TAG_SHA}" ;;\n'
-                '  *) echo "unexpected: $*" >&2; exit 1 ;;\n'
-                "esac\n",
-                encoding="utf-8",
-            )
-            fake_gh.chmod(fake_gh.stat().st_mode | stat.S_IEXEC)
-            output = Path(tmp) / "output"
-            output.touch()
-            env = dict(os.environ, PATH=f"{tmp}{os.pathsep}{os.environ['PATH']}", GITHUB_OUTPUT=str(output),
-                       GH_TOKEN="x", REPO="lauPhilip/au-btech-literature-review-agent", TAG="v0.2.1")
-            result = subprocess.run(["bash", "-e", "-c", script], env=env, capture_output=True, text=True,
-                                    check=True)
-            return output.read_text(encoding="utf-8"), result.stdout
-
-    def test_a_tag_on_masters_newest_commit_is_deployed(self):
-        output, log = self.run_step(master_sha=self.TAG_SHA)
-        self.assertEqual("deploy=true\n", output)
-        self.assertIn("deploying the release", log)
-
-    def test_a_tag_on_an_older_commit_is_not_deployed(self):
-        output, log = self.run_step(master_sha="1111111111111111111111111111111111111111")
-        self.assertEqual("deploy=false\n", output)
-        self.assertIn("Not deployed: v0.2.1 is on", log)
+    def test_the_comparison_is_not_inline_bash(self):
+        self.assertNotIn("is-master-head", read("release.yml"))
 
 
 if __name__ == "__main__":

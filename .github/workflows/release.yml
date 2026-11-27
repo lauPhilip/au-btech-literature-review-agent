@@ -7,8 +7,9 @@
 # tools/ReleaseCheck/release_check.py stops the release, with the reason, if the tag is not a version or has no
 # message, if CHANGELOG.md has no section for it, if CITATION.cff's version or date-released does not match, or if
 # the notes score below 60 for Flesch Reading Ease or do not have exactly one emoji.
-# Once the release is published, the tagged commit is deployed to the server through deploy.yml, if it is still
-# master's newest commit, so the server's build names the release (#144).
+# Once the release is published, the tagged commit is deployed to the server through deploy.yml, if the tag is the
+# newest version tag (tools/ReleaseCheck/newest_tag.py), so the server's build names the release (#144). This is
+# the only automatic deploy: a merge into master does not deploy (#707).
 # (The Dockerfile is not built here: the app is deployed to Simply as a .NET app.) When the repository is linked
 # to Zenodo (zenodo.org -> GitHub -> switch the repository on), every GitHub release is archived there with its
 # own DOI, using the metadata in .zenodo.json.
@@ -111,38 +112,30 @@ jobs:
           if [ "$PRERELEASE" = "true" ]; then flags+=(--prerelease); fi
           gh release create "$TAG" --title "$TITLE" --notes-file release-body.md --verify-tag "${flags[@]}"
 
-  # The deploy on the push to master ran before this tag existed, so the server names itself a pre-release
-  # (0.2.1-alpha.0.1, "not a published release") until it is built again from the tag (#144). This deploys the
-  # tagged commit once the release is published, so the server's version and its papers name the release.
-  # A tag on an older commit is never deployed: that would roll the server back behind master.
-  is-master-head:
-    name: Is the tag master's newest commit?
+  # Deploying is the release's job: a merge into master does not deploy (#707). The server's build reads the tag, so
+  # its version and its papers name the release (#144). A tag older than the newest version tag is never
+  # deployed, because that would roll the server back; a merge that lands on master while this workflow runs
+  # does not matter, since the tag's own commit is built. A pre-release tag (v0.2.0-rc.1) deploys when it is the
+  # newest version.
+  is-newest:
+    name: Is the tag the newest version?
     needs: github-release
     runs-on: ubuntu-latest
     outputs:
       deploy: ${{ steps.compare.outputs.deploy }}
     steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0   # the whole history, with every version tag
       - id: compare
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          REPO: ${{ github.repository }}
           TAG: ${{ github.ref_name }}
-        run: |
-          # commits/<tag> gives the commit an annotated tag points to, not the tag object.
-          tag_sha=$(gh api "repos/${REPO}/commits/${TAG}" --jq .sha)
-          master=$(gh api "repos/${REPO}/commits/master" --jq .sha)
-          if [ "$master" = "$tag_sha" ]; then
-            echo "deploy=true" >> "$GITHUB_OUTPUT"
-            echo "The tag is on master's newest commit ${master}; deploying the release."
-          else
-            echo "deploy=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::Not deployed: ${TAG} is on ${tag_sha}, but master is at ${master}. The server keeps the newer build."
-          fi
+        run: python3 tools/ReleaseCheck/newest_tag.py "$TAG"
 
   deploy:
     name: Deploy the release
-    needs: is-master-head
-    if: needs.is-master-head.outputs.deploy == 'true' && vars.DEPLOY_ENABLED == 'true'
+    needs: is-newest
+    if: needs.is-newest.outputs.deploy == 'true' && vars.DEPLOY_ENABLED == 'true'
     uses: ./.github/workflows/deploy.yml
     secrets:
       SIMPLY_FTP_USER: ${{ secrets.SIMPLY_FTP_USER }}

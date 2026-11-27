@@ -1,0 +1,46 @@
+# Deploys master's newest commit to Simply by hand, for an urgent fix that cannot wait for the next release
+# (#707). A merge into master does not deploy; a release does (release.yml). Start it from the Actions tab:
+# Deploy master -> Run workflow, on the master branch (or: gh workflow run deploy-manual.yml --ref master).
+# It is gated like a release deploy: nothing happens unless the repository variable DEPLOY_ENABLED is true. It
+# waits for running reviews before it takes the site offline (deploy.yml). The build has no tag on its commit,
+# so the server names itself a pre-release (0.2.1-alpha.0.1) until the next release deploys it again.
+name: Deploy master
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  gate:
+    name: Is deploying switched on?
+    runs-on: ubuntu-latest
+    outputs:
+      deploy: ${{ steps.gate.outputs.deploy }}
+    steps:
+      - id: gate
+        env:
+          ENABLED: ${{ vars.DEPLOY_ENABLED }}
+          BRANCH: ${{ github.ref }}
+        run: |
+          if [ "$BRANCH" != "refs/heads/master" ]; then
+            echo "deploy=false" >> "$GITHUB_OUTPUT"
+            echo "::error::Run this workflow on the master branch, not on ${BRANCH}."
+            exit 1
+          fi
+          if [ "$ENABLED" = "true" ]; then
+            echo "deploy=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "deploy=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Not deployed: the repository variable DEPLOY_ENABLED is not true."
+          fi
+
+  deploy:
+    name: Deploy master
+    needs: gate
+    if: needs.gate.outputs.deploy == 'true' && vars.DEPLOY_ENABLED == 'true'
+    uses: ./.github/workflows/deploy.yml
+    secrets:
+      SIMPLY_FTP_USER: ${{ secrets.SIMPLY_FTP_USER }}
+      SIMPLY_FTP_PASSWORD: ${{ secrets.SIMPLY_FTP_PASSWORD }}

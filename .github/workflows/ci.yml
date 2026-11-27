@@ -277,16 +277,3 @@ jobs:
           path: a11y-screenshots/
           if-no-files-found: ignore
           retention-days: 14
-
-  # The deploy itself is in deploy.yml, which release.yml also calls once a version is published, so the
-  # server then names the release and not a pre-release (#144).
-  deploy:
-    name: Deploy
-    needs: [ build-and-test, css-up-to-date, accessibility ]
-    # Runs only on a push to master (a merged PR), and only once you switch it on with a repository variable
-    # DEPLOY_ENABLED = true (Settings -> Secrets and variables -> Actions -> Variables). Until then it is skipped.
-    if: github.event_name == 'push' && github.ref == 'refs/heads/master' && vars.DEPLOY_ENABLED == 'true'
-    uses: ./.github/workflows/deploy.yml
-    secrets:
-      SIMPLY_FTP_USER: ${{ secrets.SIMPLY_FTP_USER }}
-      SIMPLY_FTP_PASSWORD: ${{ secrets.SIMPLY_FTP_PASSWORD }}
