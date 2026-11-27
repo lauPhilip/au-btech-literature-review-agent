@@ -151,6 +151,8 @@ The Decision log on a systematic paper now downloads the run's full ledger as JS
 - Fixed a bug where a long paragraph ran over the page footer and out of the page.
 - Fixed a bug where a tall concept map ran across the edge of a page. It is now scaled to fit one page.
 - Fixed a bug where citations in Table A.1 broke after every letter on a wide screen. They now break between words.
+- Fixed a bug where the abstract or conclusion was sent back for a plain "requires" or "must", such as "a study notes that its protocol requires sign-off". Only a claim in the review's own voice is sent back now.
+- Fixed a bug where the self-check did not count a figure repeated in a comparison table or a list, only in a diagram.
 
 ## [0.7.0] - 2026-11-27
 
@@ -237,9 +239,7 @@ Screening now treats "or" in your inclusion criterion as a choice, so fewer good
 > The self-check gave a wrong outcome on two of its checks, and it did not read the concept map.
 
 - The self-check knows the count of records that could not be screened.
-- It flags a figure given in two themes.
-- It counts a figure that the concept map repeats.
-- It notes when more than half of the map's links were dashed.
+- It flags a figure given in two themes or repeated in the concept map, and notes when more than half of the map's links were dashed.
 
 ### 🔍 Search and sources
 
@@ -279,11 +279,7 @@ Screening now treats "or" in your inclusion criterion as a choice, so fewer good
 
 - Fixed a bug where a pilot run's title said "Pilot Pilot".
 - Fixed a bug where the self-check skipped a figure such as "F1 0.97".
-- Fixed a bug where a source could not fill its cap when records dropped out for their year or as duplicates.
-- Fixed a bug where an opened citation's card stayed out of view.
-- Fixed a bug where a heading sat alone at the foot of a page.
 - Fixed a bug where the report page scrolled sideways at 809 px.
-- Fixed a bug where a table's caption was left behind at the foot of a page.
 
 [Unreleased]: https://github.com/lauPhilip/au-btech-literature-review-agent/compare/v0.7.0...HEAD
 [0.7.0]: https://github.com/lauPhilip/au-btech-literature-review-agent/compare/v0.6.0...v0.7.0

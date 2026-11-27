@@ -39,7 +39,7 @@ public static class SystematicSelfCheck
         parts.Add(new("futureResearchItem", "Future research", PaperPartKind.FutureResearch, report.FutureResearchItem));
         parts.Add(new("conclusionItem", "Conclusion", PaperPartKind.Conclusion, report.ConclusionItem));
         if (MapText(report.Artifact) is { Length: > 0 } map)
-            parts.Add(new("artifact", report.Artifact!.Kind == ArtifactKinds.Flowchart ? "Flowchart" : "Concept map", PaperPartKind.ConceptMap, map));
+            parts.Add(new("artifact", ArtifactPartTitle(report.Artifact!.Kind), PaperPartKind.ConceptMap, map));
         parts.Add(new("reviewLimitationsItem", "Limitations of the review", PaperPartKind.CodeWritten, report.ReviewLimitationsItem));
         parts.Add(new("coverage", "Coverage note", PaperPartKind.CodeWritten, report.CoverageSummary));
         parts.Add(new("citationCheck", "Citation check note", PaperPartKind.CodeWritten, report.CitationCheckSummary));
@@ -71,10 +71,27 @@ public static class SystematicSelfCheck
         };
     }
 
-    /// <summary>The text a diagram shows, one line per box and per link label, so check 5 counts a figure it repeats (issue #695); empty for a table, a list or no artifact.</summary>
-    public static string MapText(ReviewArtifact? artifact) =>
-        artifact is not { Error: null, IsDiagram: true } ? ""
-            : string.Join("\n", artifact.Nodes.Select(n => n.Label).Concat(artifact.Edges.Select(e => e.Label)).Where(t => !string.IsNullOrWhiteSpace(t)).Select(t => t.Trim().TrimEnd('.') + "."));
+    /// <summary>
+    /// The text the artifact shows, one line per box and link label of a diagram, per row of a table or per item of a list,
+    /// so check 5 counts a figure it repeats (issues #695, #702); empty for an artifact that failed or shows no text.
+    /// </summary>
+    public static string MapText(ReviewArtifact? artifact)
+    {
+        if (artifact is not { Error: null }) return "";
+        var lines = artifact.IsDiagram ? artifact.Nodes.Select(n => n.Label).Concat(artifact.Edges.Select(e => e.Label))
+            : artifact.Kind == ArtifactKinds.Table ? artifact.Rows.Select(r => string.Join("; ", r.Where(c => !string.IsNullOrWhiteSpace(c)).Select(c => c.Trim().TrimEnd('.'))))
+            : artifact.Kind == ArtifactKinds.Bullets ? artifact.Bullets
+            : Enumerable.Empty<string>();
+        return string.Join("\n", lines.Where(t => !string.IsNullOrWhiteSpace(t)).Select(t => t.Trim().TrimEnd('.') + "."));
+    }
+
+    private static string ArtifactPartTitle(string kind) => kind switch
+    {
+        ArtifactKinds.Flowchart => "Flowchart",
+        ArtifactKinds.Table => "Comparison table",
+        ArtifactKinds.Bullets => "List",
+        _ => "Concept map",
+    };
 
     /// <summary>Why each study is not cited: the coverage's reason, or else that the codebook placed it in no theme, and why.</summary>
     private static Dictionary<int, string> NotCitedReasons(Audit audit, ThematicCodebook? book)

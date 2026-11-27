@@ -55,10 +55,32 @@ public static partial class ReviewWriter
             ? $"{part}: \"{sentence.Trim()}\" reads as a ban (\"no ... may\"). If a source reports that none of what it studied did this, say so plainly in the past tense: \"none of the evaluated ... combined ...\"."
             : null;
 
-    // A verb that states a claim as settled ("show that", "demonstrate", "requires").
+    // A verb that states a claim as settled ("show that", "demonstrate").
     private static readonly Regex StrongClaim = new(
-        @"\b(?:show(?:s|ed|n)?\s+that|demonstrat(?:e|es|ed|ing)|prov(?:e|es|ed|en)\s+that|establish(?:es|ed)?\s+that|confirm(?:s|ed)?\s+that|requires?|required|must)\b",
+        @"\b(?:show(?:s|ed|n)?\s+that|demonstrat(?:e|es|ed|ing)|prov(?:e|es|ed|en)\s+that|establish(?:es|ed)?\s+that|confirm(?:s|ed)?\s+that)\b",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+    // "Requires" and "must" state a claim as settled only in the review's own voice (issue #703): not in what a source
+    // describes ("a study notes that a protocol requires sign-off") or in a relative clause ("a protocol that requires").
+    private static readonly Regex Obligation = new(@"\b(?:requires?|required|must)\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    private static readonly Regex ReportedBefore = new(
+        @"\b(?:notes?|noted|reports?|reported|describes?|described|explains?|explained|observes?|observed|outlines?|outlined|according\s+to)\b",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    private static readonly Regex RelativeBefore = new(@"\b(?:that|which|who|where)\s*$", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    // A report covers only its own clause: in "a study notes gains, but safe use must ...", "must" is the review's voice.
+    private static readonly Regex ReportClauseBreak = new(@";|\b(?:but|however|yet|although|though|whereas|while)\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+    /// <summary>The verb that states the sentence's claim as settled, or null (issues #698, #703). Public for unit tests.</summary>
+    public static string? SettledClaimVerb(string sentence)
+    {
+        if (StrongClaim.Match(sentence) is { Success: true } verb) return verb.Value;
+        foreach (Match m in Obligation.Matches(sentence))
+        {
+            var before = ReportClauseBreak.Split(sentence[..m.Index])[^1];
+            if (!ReportedBefore.IsMatch(before) && !RelativeBefore.IsMatch(before)) return m.Value;
+        }
+        return null;
+    }
 
     /// <summary>
     /// The first sentence of <paramref name="text"/> that states a claim as settled while no answer is of high certainty,
@@ -68,8 +90,8 @@ public static partial class ReviewWriter
     {
         if (!NoHighCertainty(certainty)) return null;
         foreach (var sentence in CitationSupportChecker.SplitSentences(text ?? ""))
-            if (StrongClaim.Match(sentence) is { Success: true } verb)
-                return $"{part}: \"{sentence.Trim()}\" states a claim as settled (\"{verb.Value}\"), but no answer is of high certainty ({string.Join(", ", certainty!.Select(c => $"{c.Question} {c.Level ?? "not rated"}"))}); write \"suggest\" or \"may\" instead.";
+            if (SettledClaimVerb(sentence) is { } verb)
+                return $"{part}: \"{sentence.Trim()}\" states a claim as settled (\"{verb}\"), but no answer is of high certainty ({string.Join(", ", certainty!.Select(c => $"{c.Question} {c.Level ?? "not rated"}"))}); write \"suggest\" or \"may\" instead.";
         return HedgedAbsenceProblem(text, part);
     }
 
