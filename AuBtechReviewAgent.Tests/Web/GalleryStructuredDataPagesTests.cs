@@ -45,13 +45,12 @@ public sealed class GalleryStructuredDataPagesTests : IDisposable
         return entry;
     }
 
-    private static JsonDocument LdBlock(string html, string type)
+    private static JsonElement LdBlock(string html, string type)
     {
         foreach (Match m in Regex.Matches(html, "<script type=\"application/ld\\+json\">(.*?)</script>", RegexOptions.Singleline))
         {
-            var doc = JsonDocument.Parse(m.Groups[1].Value);
-            if (doc.RootElement.GetProperty("@type").GetString() == type) return doc;
-            doc.Dispose();
+            using var doc = JsonDocument.Parse(m.Groups[1].Value);
+            if (doc.RootElement.GetProperty("@type").GetString() == type) return doc.RootElement.Clone();
         }
         throw new Xunit.Sdk.XunitException($"No {type} block in the page.");
     }
@@ -69,10 +68,10 @@ public sealed class GalleryStructuredDataPagesTests : IDisposable
             Assert.Equal(HttpStatusCode.OK, response.StatusCode);
             string html = await response.Content.ReadAsStringAsync();
 
-            using var article = LdBlock(html, "ScholarlyArticle");
-            Assert.Equal("AI & tutors in schools", article.RootElement.GetProperty("headline").GetString());
-            Assert.Equal("10.5281/zenodo.1234567", article.RootElement.GetProperty("identifier").GetProperty("value").GetString());
-            Assert.Equal($"https://reviews.example.org/gallery/{entry.Id}", article.RootElement.GetProperty("isPartOf").GetProperty("url").GetString());
+            var article = LdBlock(html, "ScholarlyArticle");
+            Assert.Equal("AI & tutors in schools", article.GetProperty("headline").GetString());
+            Assert.Equal("10.5281/zenodo.1234567", article.GetProperty("identifier").GetProperty("value").GetString());
+            Assert.Equal($"https://reviews.example.org/gallery/{entry.Id}", article.GetProperty("isPartOf").GetProperty("url").GetString());
             Assert.Contains("https://doi.org/10.5281/zenodo.1234567", html);
         }
     }
@@ -86,8 +85,8 @@ public sealed class GalleryStructuredDataPagesTests : IDisposable
 
         string html = await client.GetStringAsync($"/gallery/{entry.Id}/v/1");
 
-        using var article = LdBlock(html, "ScholarlyArticle");
-        Assert.False(article.RootElement.TryGetProperty("identifier", out _));
+        var article = LdBlock(html, "ScholarlyArticle");
+        Assert.False(article.TryGetProperty("identifier", out _));
         Assert.DoesNotContain("https://doi.org/", html);
         Assert.Contains($"https://reviews.example.org/gallery/{entry.Id}/v/1", html);
     }
