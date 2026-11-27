@@ -105,13 +105,12 @@ class DeployWorkflowTests(unittest.TestCase):
 
 
 class CallersTests(unittest.TestCase):
-    def test_ci_deploys_after_the_checks_on_a_push_to_master(self):
-        job = jobs(read("ci.yml"))["deploy"]
-        self.assertIn("uses: ./.github/workflows/deploy.yml", job)
-        self.assertIn("needs: [ build-and-test, css-up-to-date, accessibility ]", job)
-        self.assertIn("github.event_name == 'push'", job)
-        self.assertIn("github.ref == 'refs/heads/master'", job)
-        self.assertIn("vars.DEPLOY_ENABLED == 'true'", job)
+    def test_ci_does_not_deploy(self):
+        ci = read("ci.yml")
+        self.assertNotIn("deploy.yml", ci)
+        self.assertNotIn("DEPLOY_ENABLED", ci)
+        self.assertNotIn("deploy", [name.lower() for name in jobs(ci)])
+        self.assertIn("build-and-test", jobs(ci))
 
     def test_release_deploys_when_the_tag_is_newest(self):
         job = jobs(read("release.yml"))["deploy"]
@@ -121,7 +120,7 @@ class CallersTests(unittest.TestCase):
         self.assertIn("vars.DEPLOY_ENABLED == 'true'", job)
 
     def test_callers_pass_only_the_two_secrets(self):
-        for name in ("ci.yml", "release.yml"):
+        for name in ("release.yml",):
             job = jobs(read(name))["deploy"]
             self.assertNotIn("secrets: inherit", job, name)
             self.assertIn("SIMPLY_FTP_USER: ${{ secrets.SIMPLY_FTP_USER }}", job, name)
