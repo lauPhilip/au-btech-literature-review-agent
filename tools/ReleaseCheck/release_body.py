@@ -6,9 +6,9 @@ citation from CITATION.cff, the list of pull requests from GitHub's generated no
 
 The body reads, top to bottom:
 
-  * the summary: the first sentence of the lead paragraph, the text above the first "### " heading,
-  * "What this means for your review": the rest of the lead, then a table of how many changes of each kind,
-  * the Added, Changed and Fixed sections, as written in CHANGELOG.md,
+  * the dev note: the blockquote above the first "### " heading, as written,
+  * "In this patch": a table with one row per "### " area and how many changes it lists,
+  * the areas, as written in CHANGELOG.md, one heading level up so they sit under the release's own parts,
   * "Cite this version": the concept DOI from CITATION.cff, a reference and a BibTeX entry,
   * GitHub's list of merged pull requests, folded in a <details> block,
   * the link that compares the version with the one before.
@@ -20,41 +20,24 @@ from __future__ import annotations
 
 import re
 
-# What each kind of change means for someone running a review. Fixed wording, not about any one version.
-KIND_MEANING = {
-    "Added": "New things you can use.",
-    "Changed": "Works differently now, so a new run can differ from the last.",
-    "Fixed": "Wrong before, right now.",
-    "Removed": "Gone, so check you do not rely on it.",
-    "Deprecated": "Still there, but going soon.",
-    "Security": "Safer to run.",
-}
+from release_style import heading_name, split_section
 
 _TOP_KEY = re.compile(r"^(?P<key>[A-Za-z][A-Za-z-]*):\s*(?P<value>.*?)\s*$")
 
 
-def split_section(notes: str) -> tuple[str, list[tuple[str, str]]]:
-    """The lead (text above the first "### ") and each "### Kind" with its text, in order."""
-    parts = re.split(r"^###\s+(.+?)\s*$", notes, flags=re.M)
-    lead = parts[0].strip()
-    kinds = [(parts[i].strip(), parts[i + 1].strip()) for i in range(1, len(parts), 2)]
-    return lead, kinds
-
-
-def first_sentence(text: str) -> tuple[str, str]:
-    """The first sentence of the text and what follows it. "v0.1.0" or "e.g." mid-word do not end a sentence."""
-    match = re.search(r"(?<=[.!?])\s+(?=[A-Z0-9\"'(])", text)
-    if not match:
-        return text.strip(), ""
-    return text[:match.start()].strip(), text[match.end():].strip()
-
-
 def paragraphs(text: str) -> int:
-    """How many changes a kind has: its paragraphs, or its list items when it is a list."""
+    """How many changes an area lists: its list items, or its paragraphs when it has no list. Headings and
+    quoted "why" notes are not changes."""
     items = re.findall(r"^\s*(?:[-*+]|\d+[.)])\s+\S", text, flags=re.M)
     if items:
         return len(items)
-    return len([block for block in re.split(r"\n\s*\n", text) if block.strip()])
+    prose = "\n".join(line for line in text.splitlines() if not line.lstrip().startswith(("#", ">")))
+    return len([block for block in re.split(r"\n\s*\n", prose) if block.strip()])
+
+
+def _promote(text: str) -> str:
+    """Each heading one level up, so "#### Themes" under "## Systematic review" is a "###"."""
+    return re.sub(r"^(#{3,5})(?=\s)", lambda m: m.group(1)[1:], text, flags=re.M)
 
 
 def citation_authors(citation: str) -> list[tuple[str, str]]:
@@ -156,22 +139,13 @@ def pull_request_block(generated: str | None) -> str:
 def compose_body(tag: str, version: str, notes: str, citation: str, repository: str,
                  previous_tag: str | None = None, generated: str | None = None) -> str:
     """The release body. Deterministic: the same inputs give the same text."""
-    lead, kinds = split_section(notes)
-    summary, rest = first_sentence(lead) if lead else ("", "")
-    blocks: list[str] = []
-    if summary:
-        blocks.append(f"**{summary}**")
-    meaning = [rest] if rest else []
-    known = [(kind, text) for kind, text in kinds if kind in KIND_MEANING]
-    if known:
-        table = ["| Kind of change | How many | What it means |", "|---|---|---|"]
-        table += [f"| [{kind}](#{kind.lower()}) | {paragraphs(text)} | {KIND_MEANING[kind]} |" for kind, text in known]
-        meaning.append("\n".join(table))
-    if meaning:
-        blocks.append("## What this means for your review\n\n" + "\n\n".join(meaning))
-    blocks += [f"## {kind}\n\n{text}" for kind, text in kinds]
-    if not kinds and lead and not summary:
-        blocks.append(lead)
+    lead, areas = split_section(notes)
+    blocks: list[str] = [lead] if lead else []
+    if areas:
+        table = ["## In this patch", "", "| Area | Changes |", "|---|---|"]
+        table += [f"| {heading_name(heading)} | {paragraphs(text)} |" for heading, text in areas]
+        blocks.append("\n".join(table))
+    blocks += [_promote(f"### {heading}\n\n{text}") for heading, text in areas]
     blocks.append(cite_block(citation, version))
     pulls = pull_request_block(generated)
     if pulls:
