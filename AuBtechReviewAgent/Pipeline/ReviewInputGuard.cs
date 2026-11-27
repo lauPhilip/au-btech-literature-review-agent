@@ -100,7 +100,7 @@ public static class ReviewInputGuard
             var category = Rune.GetUnicodeCategory(rune);
             bool counted = rune.Value <= char.MaxValue && HiddenText.IsInvisible((char)rune.Value) || rune.Value is >= 0xE0000 and <= 0xE007F;
             if (category is UnicodeCategory.Control or UnicodeCategory.Format && !counted && rune.Value is not ('\n' or '\t' or '\r' or 0x200C or 0x200D)) continue;
-            sb.Append(rune.ToString());
+            sb.Append(rune);
         }
         return sb.ToString();
     }
