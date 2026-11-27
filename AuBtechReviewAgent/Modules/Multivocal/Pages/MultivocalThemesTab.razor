@@ -47,7 +47,14 @@
                         <ul class="text-ink list-disc pl-4">
                             @foreach (var tension in theme.Tensions)
                             {
-                                <li>Tension (@tension.FindingA, @tension.FindingB@(tension.Between != null ? $"; {tension.Between}" : "")): @tension.Description</li>
+                                @if (tension.IsCited)
+                                {
+                                    <li>Tension (@tension.FindingA, @tension.FindingB@(tension.Between != null ? $"; {tension.Between}" : "")): @tension.Description</li>
+                                }
+                                else
+                                {
+                                    <li>Tension between the values (no source cited): @tension.Description</li>
+                                }
                             }
                         </ul>
                     }

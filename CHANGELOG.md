@@ -49,6 +49,13 @@ The Decision log on a systematic paper now downloads the run's full ledger as JS
 - **Counts in the summary**: a count of sources in an item ⇒ no count; the results give the counts
 - An item that gives a count is sent back to the model with the count quoted.
 
+#### Tensions between sources
+
+> A tension "between the state of the art and the state of the practice" cited two sources that did not disagree.
+
+- **Sources of a tension**: the first pair the code found ⇒ the two quotes the model named, checked in code
+- A tension with no checked pair cites no source, has no pool label, and says so.
+
 ### 📄 Report page
 
 #### Decision log

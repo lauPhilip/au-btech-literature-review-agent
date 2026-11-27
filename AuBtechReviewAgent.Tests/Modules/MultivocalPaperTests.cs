@@ -169,6 +169,24 @@ public class MultivocalPaperTests
     }
 
     [Fact]
+    public void AnUncitedTensionIsBetweenTheValuesAndCitesNoSource()
+    {
+        // Issue #463: without two checked quotes a tension is the model's reading of two values, not a finding of two sources.
+        var input = Input();
+        var theme = input.Synthesis.Themes[0];
+        var tension = theme.Tensions[0];
+        tension.FindingA = tension.FindingB = "";
+        tension.Between = null;
+
+        string note = MultivocalPaperParts.ThemeNote(input, theme);
+
+        Assert.False(tension.IsCited);
+        Assert.EndsWith("Tension between the values: One source summarises, the other retrieves. " + SynthesisTension.UncitedNote, note);
+        Assert.DoesNotContain("Tension between sources", note);
+        Assert.DoesNotContain("IsCited", System.Text.Json.JsonSerializer.Serialize(tension));
+    }
+
+    [Fact]
     public void TheMethodAndDataPartsAreWrittenInCode()
     {
         var input = Input();

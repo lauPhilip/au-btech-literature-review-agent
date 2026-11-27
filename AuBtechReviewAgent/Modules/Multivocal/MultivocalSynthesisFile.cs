@@ -43,6 +43,16 @@ public sealed class SynthesisTension
     public string? Between { get; set; }
 
     public const string ArtAgainstPractice = "the state of the art against the state of the practice";
+
+    /// <summary>
+    /// True when the tension rests on two findings that were checked to be example quotes of their values from two
+    /// sources (issue #463). An uncited tension is the model's reading of two values: no citation and no pool label.
+    /// </summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public bool IsCited => FindingA.Length > 0 && FindingB.Length > 0;
+
+    /// <summary>What the paper and the report say after an uncited tension.</summary>
+    public const string UncitedNote = "No two quotes were found that state it, so no source is cited.";
 }
 
 /// <summary>One theme of one research question, with the evidence it rests on counted in code.</summary>
