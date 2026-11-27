@@ -92,6 +92,16 @@ The Decision log on a systematic paper now downloads the run's full ledger as JS
 - **Self-check box**: at the top of the paper ⇒ under the report; Article info still gives its one line
 - **Cited boxes of the diagram**: a list under the figure ⇒ a table in the appendix, with a one-line pointer under the figure
 
+#### Journal style
+
+> The article front looked like a journal, but the text under it looked like a web page: large sans text, boxed figures and coloured chips.
+
+- **Body text**: 17 px sans at 1.7 ⇒ the abstract's serif at 16 px and 1.55, as wide as the sheet
+- **Headings**: Poppins ⇒ the title's serif in navy, with a thin rule under each chapter
+- **Figures**: a box with the caption on top ⇒ no box, with the caption under the figure
+- **Tables**: the evidence map and the run's table get numbered captions above them, such as "Table 4.1".
+- **Citation numbers**: a filled chip ⇒ a plain number in its verdict's colour. It still opens what the check found.
+
 #### Decision log
 
 > The button said "Decision log" but gave only the screening, so the reasons for every later step were in the archive alone.
