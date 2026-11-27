@@ -1,5 +1,6 @@
 using System;
 using System.Globalization;
+using System.Linq;
 
 namespace AuBtechReviewAgent;
 
@@ -15,6 +16,12 @@ public static class GalleryCitation
     /// <summary>The version's lasting address on this site.</summary>
     public static string Url(string baseUrl, GalleryEntry e) => SiteSeo.Absolute(baseUrl, GalleryCard.VersionPath(e.Id, e.Version));
 
+    /// <summary>
+    /// The address a citation gives: the DOI's landing page (https://doi.org/...) when the version has a valid DOI, which
+    /// resolves to wherever the deposit lives, and otherwise the version's own address on this site.
+    /// </summary>
+    public static string Address(GalleryEntry e, string baseUrl) => GalleryDoi.Landing(e.Doi) ?? Url(baseUrl, e);
+
     /// <summary>What the bracket after the title says the report is, with the tool's version and the run.</summary>
     public static string Description(GalleryEntry e) =>
         $"AI-generated {GalleryCard.TypeLabel(e.Card).ToLowerInvariant()}, TraceableAI {ToolVersion.Display(e.ToolVersion)}, run {e.RunId:D}; not peer reviewed";
@@ -28,7 +35,7 @@ public static class GalleryCitation
         string date = e.CompletedUtc.ToString("yyyy, MMMM d", CultureInfo.InvariantCulture);
         string title = e.Title.Trim().TrimEnd('.');
         return ($"{ArticleInfo.Author}. ({date}). ", title,
-            $" (Version {e.Version}) [{Description(e)}]. {SiteSeo.Organisation}. {Url(baseUrl, e)}");
+            $" (Version {e.Version}) [{Description(e)}]. {SiteSeo.Organisation}. {Address(e, baseUrl)}");
     }
 
     /// <summary>The APA 7 reference as plain text.</summary>
@@ -42,17 +49,21 @@ public static class GalleryCitation
     public static string BibTex(GalleryEntry e, string baseUrl)
     {
         string month = e.CompletedUtc.ToString("MMM", CultureInfo.InvariantCulture).ToLowerInvariant();
-        string url = Url(baseUrl, e);
-        return string.Join("\n",
+        string url = Address(e, baseUrl);
+        var doi = GalleryDoi.Normalize(e.Doi);
+        return string.Join("\n", new string?[]
+        {
             $"@misc{{traceableai_{e.ShortRunId},",
             $"  author       = {{{{{TeX(ArticleInfo.Author.Replace("–", "--"))}}}}},",
             $"  title        = {{{{{TeX(e.Title.Trim().TrimEnd('.'))}}}}},",
             $"  year         = {{{e.CompletedUtc.Year.ToString(CultureInfo.InvariantCulture)}}},",
             $"  month        = {month},",
             $"  howpublished = {{\\url{{{url}}}}},",
+            doi == null ? null : $"  doi          = {{{doi}}},",
             $"  organization = {{{TeX(SiteSeo.Organisation)}}},",
             $"  note         = {{{TeX(Description(e))}. Version {e.Version} in the TraceableAI gallery}},",
-            "}");
+            "}",
+        }.OfType<string>());
     }
 
     /// <summary>
