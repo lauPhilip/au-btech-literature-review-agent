@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using System.Linq;
 using System.Text;
 using Microsoft.AspNetCore.Builder;
@@ -8,8 +9,8 @@ using Microsoft.Net.Http.Headers;
 namespace AuBtechReviewAgent;
 
 /// <summary>
-/// The run downloads under /api/workspace/{id}/: the archive, the references, every screened record, the protocol,
-/// a multivocal run's main.tex and its report. Each answer carries Last-Modified and an ETag from the run folder's
+/// The run downloads under /api/workspace/{id}/: the archive, the references, every screened record, the ledger,
+/// the protocol, a multivocal run's main.tex and its report. Each answer carries Last-Modified and an ETag from the run folder's
 /// <see cref="RunFolderStamp"/>, so a repeat download of an unchanged run is answered 304 Not Modified without
 /// building anything (issue #306). A finished run's archive is kept in its folder (<see cref="RunArchiveCache"/>).
 /// The handlers use the services passed in here instead of taking them as handler parameters: every handler
@@ -61,6 +62,12 @@ public static class WorkspaceDownloads
                 "application/x-research-info-systems", "screened.ris"))
             .RequireRateLimiting("ArchiveDownloadPolicy");
 
+        // The ledger of a systematic run: every step, decision and reason as the run recorded it, the same file as in the
+        // archive. This is what the paper's "Decision log" button gives. A multivocal run has no such file, so 404.
+        app.MapGet("/api/workspace/{sessionId:guid}/" + LedgerDownload, (Guid sessionId, HttpContext http) =>
+            Serve(runs, http, sessionId, () => LedgerBytes(runs, sessionId), "application/json; charset=utf-8", LedgerDownload))
+            .RequireRateLimiting("ArchiveDownloadPolicy");
+
         // The protocol written before the search (PRISMA item 24), linked from the Review Output page; shown, not saved.
         app.MapGet("/api/workspace/{sessionId:guid}/protocol.md", (Guid sessionId, HttpContext http) =>
             Serve(runs, http, sessionId, () => Utf8(engine.Store.ReadProtocol(sessionId)), "text/markdown; charset=utf-8", null))
@@ -75,6 +82,23 @@ public static class WorkspaceDownloads
         app.MapGet("/api/workspace/{sessionId:guid}/mlr-report.md", (Guid sessionId, HttpContext http) =>
             Serve(runs, http, sessionId, () => Utf8(reporter.Build(sessionId)?.ToMarkdown()), "text/markdown; charset=utf-8", MultivocalReporter.ReportFile))
             .RequireRateLimiting("ArchiveDownloadPolicy");
+    }
+
+    /// <summary>The download name of a run's ledger (<see cref="GallerySnapshot.LedgerFile"/> in the run folder).</summary>
+    public const string LedgerDownload = "ledger.json";
+
+    /// <summary>
+    /// The run's ledger as it is on disk, or null when the run has none. Opened with FileShare.ReadWrite, so a download
+    /// never fails because the run is saving its ledger at that moment; the file is replaced whole, never half written.
+    /// </summary>
+    public static byte[]? LedgerBytes(RunStore runs, Guid runId)
+    {
+        string path = Path.Join(runs.FolderOf(runId), GallerySnapshot.LedgerFile);
+        if (!File.Exists(path)) return null;
+        using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+        using var copy = new MemoryStream();
+        stream.CopyTo(copy);
+        return copy.ToArray();
     }
 
     private static byte[]? Utf8(string? text) => text == null ? null : new UTF8Encoding(false).GetBytes(text);
