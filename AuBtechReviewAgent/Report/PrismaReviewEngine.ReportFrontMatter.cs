@@ -24,7 +24,7 @@ public partial class PrismaReviewEngine
     }
 
     private static string ScreeningFacts(ReviewState finalState) => finalState.Stats.HumanReviewed > 0
-        ? $"a language model screened the records and a human reviewer then checked {finalState.Stats.HumanReviewed} decisions and changed {finalState.Stats.HumanOverrides}. Do not claim any other human involvement."
+        ? $"a language model screened the records and a human reviewer then checked {finalState.Stats.HumanReviewed} decisions and changed {(finalState.Stats.HumanOverrides == 0 ? "none" : finalState.Stats.HumanOverrides)}. Do not claim any other human involvement."
         : "done by a language model only; do not claim that any human screened, verified or reviewed records during the run.";
 
     /// <summary>PRISMA items 5 to 8, written in code from the run's configuration and ledger.</summary>
@@ -90,7 +90,8 @@ public partial class PrismaReviewEngine
                 abstractRule: text => AbstractCountsProblem(text, finalState.Stats) ?? AbstractUnplacedProblem(text, finalState.Stats.Included, useThematic ? thematic!.Codebook.Uncoded.Count : 0),
                 questions: finalState.ResearchQuestions,
                 answers: AnswersFor(finalState, thematic, closing).Answers, conclusion: closing?.Conclusion,
-                weakSources: SystematicEvidence.WeakSources(finalState.Extractions ?? new List<StudyExtraction>()));
+                weakSources: SystematicEvidence.WeakSources(finalState.Extractions ?? new List<StudyExtraction>()),
+                certainty: CertaintyOf(finalState, thematic, AnswersFor(finalState, thematic, closing).Answers));
             // The first draft is written only now, and only when the front-matter step failed.
             var draft = written == null ? (await run.Fallback.Value).Draft : null;
             using (LlmStage.Begin("style"))
@@ -130,7 +131,8 @@ public partial class PrismaReviewEngine
                     _log.LogWarning("{Message}", SanitizeLogMessage(message));
                     lock (thematic.Codebook) (thematic.Codebook.WritingNotes ??= new()).Add(message);
                 },
-                finalState.ResearchQuestions, thematic.Codebook.Unanswered?.Select(u => u.Question).ToList(), thematic.Answers)
+                finalState.ResearchQuestions, thematic.Codebook.Unanswered?.Select(u => u.Question).ToList(), thematic.Answers,
+                CertaintyOf(finalState, thematic, thematic.Answers))
             : null;
 
         var artifactTask = ArtifactAsync();
@@ -160,16 +162,31 @@ public partial class PrismaReviewEngine
         if (uncited != null) run.Deltas.Add(uncited);
     }
 
+    /// <summary>
+    /// The certainty of each answer, rated in code as the paper's certainty table rates it (<see cref="SystematicCertainty"/>),
+    /// so the abstract and the conclusion claim no more than it allows (issue #676); null without one answer per question.
+    /// </summary>
+    private static IReadOnlyList<AnswerCertainty>? CertaintyOf(ReviewState state, ThematicResult? thematic, IReadOnlyList<string>? answers)
+    {
+        var questions = state.ResearchQuestions;
+        if (questions is not { Count: > 0 } || answers?.Count != questions.Count) return null;
+        var report = new PrismaReport { ResearchAnswers = questions.Select((q, i) => new ResearchAnswer { Number = i + 1, Question = q, Answer = answers[i] }).ToList() };
+        return SystematicCertainty.Assess(report, thematic?.Codebook, state.Extractions)?.Answers
+            .Select(a => new AnswerCertainty(ReviewWriter.QuestionId(a.Number - 1), a.Overall)).ToList();
+    }
+
     /// <summary>What the front matter may say about the run, counted in code from the ledger.</summary>
     private static string FrontMatterFacts(ReviewState state, ThematicCodebook? book, string includedFacts, string screeningFacts)
     {
         var s = state.Stats;
         var lines = new List<string>
         {
-            $"Records identified: {s.TotalIdentified}; duplicates removed: {s.DuplicatesRemoved}{OtherRemovals(state)}; records screened: {s.Screened}; included: {s.Included}; excluded: {s.Excluded}.",
+            // A count of zero is written in words, so the abstract does not report "removed 0 duplicates" (issue #676).
+            $"Records identified: {s.TotalIdentified}; {(s.DuplicatesRemoved > 0 ? $"duplicates removed: {s.DuplicatesRemoved}" : "no duplicates were found")}{OtherRemovals(state)}; records screened: {s.Screened}; included: {s.Included}; excluded: {(s.Excluded > 0 ? s.Excluded : "none")}.",
             $"Included set: {includedFacts}",
             $"Screening: {screeningFacts}",
-            $"Full text was read for {s.FullTextRetrieved} of the {s.Included} included studies; the others were read from their abstracts.",
+            s.FullTextRetrieved > 0 ? $"Full text was read for {s.FullTextRetrieved} of the {s.Included} included studies; the others were read from their abstracts."
+                : "No included study was read in full text; all were read from their abstracts.",
         };
         if (SearchAdequacy.AbstractFact(state) is { Length: > 0 } pilot) lines.Add(pilot);
         if (book != null) lines.Add($"Thematic synthesis: {book.Themes.Count} theme{(book.Themes.Count == 1 ? "" : "s")} from {book.Codes.Count} code{(book.Codes.Count == 1 ? "" : "s")}.");

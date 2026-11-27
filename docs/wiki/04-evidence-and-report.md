@@ -111,8 +111,8 @@ The report page and main.tex share one list of sections (issue #169). The result
 |---|---|
 | A descriptive sentence has at most 25 words as a target; one over 30 words is a fault the edit must split | No approved-word dictionary and no single meaning per word: normal academic vocabulary is fine |
 | One topic and at most 6 sentences per paragraph | Sentence rhythm may vary, and normal connectives keep the text flowing |
-| Active voice by default; the conventional passive of a methods text ("records were screened") is allowed | Semicolons are allowed, sparingly |
-| Simple tenses; verbs, not nominalisations ("we screened", not "screening was performed") | |
+| Active voice where the text names who acts ("two studies report"); never the first person, since the author is software, so the conventional passive of a methods text ("records were screened") stays | Semicolons are allowed, sparingly |
+| Simple tenses; verbs, not nominalisations ("the records were screened", not "screening of the records was performed") | |
 | Noun clusters of at most 3 words; no articles or other words left out to shorten a sentence | |
 | One key term per concept; no filler or marketing adjectives | |
 

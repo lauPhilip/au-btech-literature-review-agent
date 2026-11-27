@@ -146,8 +146,10 @@ public partial class PrismaReviewEngine
             if (citedStudies.Contains(refNo)) continue;
             var uncodedReason = thematic?.Codebook.Uncoded.FirstOrDefault(u => u.Reference == refNo)?.Reason;
             var theme = useThematic ? thematic!.Codebook.Themes.FirstOrDefault(t => t.Studies.Contains(refNo)) : null;
+            string? leftOut = ThemeCoverage.LeftOutReason(thematic?.Codebook.Coverage, refNo, id => thematic!.Codebook.Themes.FirstOrDefault(t => t.Id == id)?.Name ?? id);
             notCited.Add(new UncodedStudy(refNo,
                 uncodedReason != null ? $"not coded: {uncodedReason.TrimEnd('.')}" :
+                leftOut != null ? leftOut :
                 theme != null && theme.Studies.Count > ReviewWriter.CiteEveryUpTo ? $"coded under \"{theme.Name}\", a theme of {theme.Studies.Count} studies synthesised from those that report its claims most directly; not cited after peer review and citation repair" :
                 theme != null ? $"coded under \"{theme.Name}\" but not cited after the fill pass, peer review and citation repair" :
                 "not cited by the synthesis"));
