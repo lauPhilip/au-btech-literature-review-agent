@@ -82,7 +82,7 @@ public sealed partial class MultivocalWriter
 
         string Plain(string text, string field)
         {
-            var (clean, changes) = ProseCleaner.Clean(text, field);
+            var (clean, changes) = ProseCleaner.Clean(text, field, "source");
             audit.FormattingChanges.AddRange(changes);
             return clean;
         }
