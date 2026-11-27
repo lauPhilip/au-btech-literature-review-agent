@@ -21,6 +21,9 @@ public static partial class ReviewWriter
     /// <summary>The words every send-back for the rule carries, so a step can write it to the notes.</summary>
     private const string LoadMark = "a sentence cites at most";
 
+    /// <summary>What a soft guard calls the rule in its notes, so they read like the hard check's.</summary>
+    internal const string LoadSendBack = "citing too many references in one sentence";
+
     /// <summary>The prompt rule on how many references a sentence cites. It names the number code checks.</summary>
     public static string CitationLoadRule(WritingProfile profile) =>
         $"A sentence cites at most {MaxReferencesPerSentence} {profile.Sources} in all its markers together, and ideally one or two. " +
@@ -44,11 +47,14 @@ public static partial class ReviewWriter
         var existing = before == null ? new HashSet<string>() : OverCitedSentences(before).Select(s => s.Sentence).ToHashSet(StringComparer.Ordinal);
         var over = OverCitedSentences(text).Where(s => !existing.Contains(s.Sentence)).ToList();
         if (over.Count == 0) return null;
+        static string Shown(string s) => s.Length <= 160 ? s : s[..157] + "...";
         var (sentence, references) = over[0];
-        string shown = sentence.Length <= 160 ? sentence : sentence[..157] + "...";
-        return $"{(part == null ? "" : part + ": ")}the sentence \"{shown}\" cites {references.Count} references ({string.Join(", ", references.Select(r => $"[{r}]"))}); " +
-               $"{LoadMark} {MaxReferencesPerSentence}, ideally one or two. Keep the most direct one to {MaxReferencesPerSentence}, or split the claim into sentences that each cite one or two" +
-               (over.Count > 1 ? $" ({over.Count} sentences break this rule)." : ".");
+        // Every sentence that breaks the rule is named (issue #742): with only the first named, a discussion with three
+        // such sentences was never under the rule within its tries.
+        string others = over.Count == 1 ? "" : $" {over.Count} sentences break this rule; the others are " +
+            string.Join("; ", over.Skip(1).Select(o => $"\"{Shown(o.Sentence)}\" ({o.References.Count} references)")) + ".";
+        return $"{(part == null ? "" : part + ": ")}the sentence \"{Shown(sentence)}\" cites {references.Count} references ({string.Join(", ", references.Select(r => $"[{r}]"))}); " +
+               $"{LoadMark} {MaxReferencesPerSentence}, ideally one or two. Keep the most direct one to {MaxReferencesPerSentence}, or split the claim into sentences that each cite one or two." + others;
     }
 
     /// <summary>

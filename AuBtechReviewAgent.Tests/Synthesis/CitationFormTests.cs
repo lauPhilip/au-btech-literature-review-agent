@@ -16,6 +16,10 @@ public class CitationFormTests
     [InlineData("Costs rose. [9] describes a remedy.", "Costs rose. Study [9] describes a remedy.")]
     [InlineData("Costs rose. [2, 9] describe a remedy.", "Costs rose. Studies [2, 9] describe a remedy.")]
     [InlineData("[9] describes a remedy.", "Study [9] describes a remedy.")]
+    // Issue #743, run 866a897b: no space after the stop, and a marker as the subject after an opening clause.
+    [InlineData("It needs layered oversight [1, 2].[1] proposes a layered architecture.", "It needs layered oversight [1, 2]. Study [1] proposes a layered architecture.")]
+    [InlineData("Based on abstract-only evidence, [1] suggests a layered architecture.", "Based on abstract-only evidence, Study [1] suggests a layered architecture.")]
+    [InlineData("In practice, [2, 3] reported fewer faults.", "In practice, Studies [2, 3] reported fewer faults.")]
     public void CitationsAreWrittenInOneForm(string text, string expected) =>
         Assert.Equal(expected, ProseCleaner.Clean(text, "x").Text);
 
@@ -25,6 +29,9 @@ public class CitationFormTests
     [InlineData("Smith et al. [9] describe a remedy.")]
     [InlineData("Some tools, e.g. [9] shows, help.")]
     [InlineData("Study [9] describes a remedy.")]
+    [InlineData("In short, [2] and [3] show more.")]
+    [InlineData("Agents log calls, [1] as well.")]
+    [InlineData("Costs rose.[9]")]
     public void CitationsAlreadyInFormAreLeftAlone(string text) =>
         Assert.Equal(text, ProseCleaner.Clean(text, "x").Text);
 

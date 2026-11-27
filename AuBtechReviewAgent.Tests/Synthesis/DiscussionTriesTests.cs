@@ -26,26 +26,47 @@ public class DiscussionTriesTests
     private static string Json(string text, params string[] answers) => System.Text.Json.JsonSerializer.Serialize(new { answers, text });
 
     [Fact]
-    public async Task AnOverCitedSentenceAfterBothSoftSendBacksIsStillRepaired()
+    public async Task AnOverCitedSentenceAfterBothSoftSendBacksIsKeptAndNotLost()
     {
+        // Issue #742: the rule on references per sentence is a soft check in the discussion, so a sentence still over it
+        // when the budget is spent no longer costs the reader the discussion. This one has no clauses to split at.
         const string repeating = "Agents find 34 % more rare scenarios than manual testing [1].";
         const string overCited = "Agents find more rare scenarios than manual testing [1], [2], [3], [4].";
         const string answer = "Agents find 34 % more rare scenarios [1].";
         var model = new FakeChatService()
             .Returns(Json(repeating, answer))
             .Returns(Json(repeating, answer))
-            .Returns(Json(overCited, answer))
-            .Returns(Json(repeating, answer));
+            .Returns(Json(overCited, answer));
         var notes = new List<string>();
 
         var result = await ReviewWriter.WriteDiscussionAndAnswersAsync(model, WritingProfile.Systematic, "agent testing", "Map agent testing", Sections, Evidence(), 4,
             notes.Add, new[] { "What do testing agents find?" }, null);
 
-        Assert.Equal(4, model.Prompts.Count);
-        Assert.Equal(repeating, result.Text);
+        Assert.Equal(3, model.Prompts.Count);
+        Assert.Equal(overCited, result.Text);
         Assert.Equal(new[] { answer }, result.Answers);
-        Assert.Contains(notes, n => n.StartsWith("The discussion call was sent back for citing too many references in one sentence"));
-        Assert.Contains(notes, n => n.StartsWith("The discussion call was kept after 2 send-backs with a repeated result figure"));
+        Assert.Contains(notes, n => n.StartsWith("The discussion call was kept after 2 send-backs with citing too many references in one sentence"));
+        Assert.Contains(notes, n => n.StartsWith("In the discussion, a sentence still cites 4 references after every try, and it could not be split"));
+    }
+
+    [Fact]
+    public async Task AnOverCitedSentenceWithClausesIsSplitInCodeOnTheLastTry()
+    {
+        const string repeating = "Agents find 34 % more rare scenarios than manual testing [1].";
+        const string overCited = "Workflow-level safeguards confine unsafe behavior at the action-chain level [1, 2, 3], and orchestration-based redundancy addresses fault tolerance [4].";
+        const string answer = "Agents find 34 % more rare scenarios [1].";
+        // The answer repeats the theme's figure, so the first two tries spend the soft budget on it.
+        var model = new FakeChatService()
+            .Returns(Json(repeating, answer))
+            .Returns(Json(repeating, answer))
+            .Returns(Json(overCited, answer));
+        var notes = new List<string>();
+
+        var result = await ReviewWriter.WriteDiscussionAndAnswersAsync(model, WritingProfile.Systematic, "agent testing", "Map agent testing", Sections, Evidence(), 4,
+            notes.Add, new[] { "What do testing agents find?" }, null);
+
+        Assert.Equal("Workflow-level safeguards confine unsafe behavior at the action-chain level [1, 2, 3]. Orchestration-based redundancy addresses fault tolerance [4].", result.Text);
+        Assert.Contains(notes, n => n.StartsWith("In the discussion, a sentence that cited 4 references was split in code at its clauses"));
     }
 
     [Fact]
