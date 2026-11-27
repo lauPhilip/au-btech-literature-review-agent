@@ -27,6 +27,18 @@ public static class ReportOutline
     /// <summary>The self-check table under the citation summary (SelfCheckTable); the Done card links to it.</summary>
     public const string SelfCheckId = "self-check";
 
+    /// <summary>The appendix table of the diagram's cited boxes (issue #738); a line under the figure points to it.</summary>
+    public const string CitedBoxesId = "cited-boxes";
+
+    /// <summary>The cited boxes' table name on the page: after A.1, or after A.2 and A.3 when the run has extracted data.</summary>
+    public static string CitedBoxesTable(bool hasExtractions) => hasExtractions ? "Table A.4" : "Table A.2";
+
+    /// <summary>The indices of the diagram's boxes that cite a study, in order; empty for any other artifact.</summary>
+    public static IReadOnlyList<int> CitedBoxes(ReviewArtifact? artifact) =>
+        artifact is { Error: null, IsDiagram: true }
+            ? Enumerable.Range(0, artifact.Nodes.Count).Where(k => CitationSupportChecker.ReferencesIn(artifact.Nodes[k].Label).Count > 0).ToList()
+            : Array.Empty<int>();
+
     /// <summary>The id of theme subsection <paramref name="index"/> (0-based), numbered 4.2, 4.3, … on the page.</summary>
     public static string ThemeId(int index) => $"s4-{index + 2}";
 
