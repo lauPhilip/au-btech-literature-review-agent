@@ -33,7 +33,7 @@ public class ReportBodyTests
         Assert.Contains("data-cited-boxes-pointer", results);
         Assert.Contains("The citations of each box are checked in", results);
         Assert.Contains("id=\"@AuBtechReviewAgent.ReportOutline.CitedBoxesId\"", appendix);
-        Assert.Contains("Page.CitedText($\"artifact-n{box + 1}\"", appendix);
+        Assert.Contains("CitedText($\"artifact-n{box + 1}\"", appendix); // PageSource takes "Page." out
     }
 
     [Fact]
