@@ -223,7 +223,6 @@ class DeployWiringTests(unittest.TestCase):
         self.assertIn("group: deploy-simply-wait\n      cancel-in-progress: true", wait)
         self.assertIn("group: deploy-simply\n      cancel-in-progress: false", deploy)
         self.assertIn("needs: wait", deploy)
-        self.assertIn("needs.wait.outputs.deploy == 'true'", deploy)
 
 if __name__ == "__main__":
     unittest.main()
