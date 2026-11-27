@@ -44,6 +44,8 @@ public partial class MultivocalStart
     internal MultivocalPaperFile? paper;
     internal string notifyPermission = "unsupported";
     private bool wasRunning;
+    // Set when the run finished while this page was open: true when the paper is checked, false when it stopped (issue #693).
+    private bool? finishedHere;
     private bool tabChosen; // once the reviewer picks a tab, the panel stops following the run
     private string? shownStep;
     internal bool saving;
@@ -163,6 +165,7 @@ public partial class MultivocalStart
             if (wasRunning && status is { Running: false })
             {
                 bool done = stage == MultivocalWriter.StageChecked;
+                finishedHere = done;
                 _ = NotifyAsync(done ? "Your review is ready" : "Your review stopped",
                     done ? "The paper is written and its citations are checked in TraceableAI." : "Open TraceableAI to see what happened.");
             }
@@ -223,13 +226,17 @@ public partial class MultivocalStart
         StateHasChanged();
     }
 
-    /// <summary>The browser tab's title: the progress while the run goes ("42% · Your review"), as on the systematic review's page.</summary>
-    internal string TabTitle()
-    {
-        if (planned != null && Runner.StatusOf(planned.RunId) is { Running: true } status)
-            return $"{MultivocalProgress.Percent(stage, status.Progress)}% · Your review";
-        return (GreyOnly ? "Grey literature review" : "Multivocal literature review") + (CardOn ? "" : " (preview)");
-    }
+    internal string TabTitle() =>
+        TabTitleFor(planned != null && Runner.StatusOf(planned.RunId) is { Running: true } status ? MultivocalProgress.Percent(stage, status.Progress) : null,
+            finishedHere, (GreyOnly ? "Grey literature review" : "Multivocal literature review") + (CardOn ? "" : " (preview)"));
+
+    /// <summary>
+    /// The browser tab's title, as on the systematic review's page: the progress while the run goes ("42% · Your review"),
+    /// "✓ Review ready" or "Run stopped · Your review" when it finished while the page was open, and otherwise the review's name.
+    /// </summary>
+    public static string TabTitleFor(int? percent, bool? finishedHere, string idle) =>
+        percent is { } p ? $"{p}% · Your review"
+            : finishedHere switch { true => "✓ Review ready", false => "Run stopped · Your review", null => idle };
 
     internal string StageLine()
     {
