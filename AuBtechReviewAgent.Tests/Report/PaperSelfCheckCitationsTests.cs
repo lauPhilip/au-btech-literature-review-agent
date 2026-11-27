@@ -124,6 +124,20 @@ public class PaperSelfCheckCitationsTests
     }
 
     [Fact]
+    public void AnArxivPreprintIsNotNotedForMissingAVenueButAnotherWorkIs()
+    {
+        // Run 8942b961: [4] and [5] were arXiv preprints, whose reference names arXiv as the venue (issue #678).
+        var refs = Refs(5);
+        refs[3] = refs[3] with { Venue = "", Text = "He, L., & Xu, J. (2026). *SAT-edge-agent* (arXiv:2608.03728). arXiv. https://doi.org/10.48550/arXiv.2608.03728" };
+        refs[4] = refs[4] with { Venue = "" };
+
+        var check = SelfCheckPaper.Check(WithRefs(SelfCheckPaper.Input(), refs), "references");
+
+        var noVenue = Assert.Single(check.Evidence, e => e.Detail == "No venue.");
+        Assert.Equal("[5]", noVenue.Text);
+    }
+
+    [Fact]
     public void TheRunPageAgreeingWithTheReportChangesNothing()
     {
         var final = new CitationSupportSummary { Checked = 5, Supported = 5 };
