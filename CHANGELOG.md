@@ -2,29 +2,131 @@
 
 All notable changes to TraceableAI are listed here, newest first. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html). While the version starts with 0, the method and the output may still change between minor versions.
 
-Each version's section becomes the notes of its GitHub release, so write it for someone deciding which version to use or cite. Under each version, say what was **Added**, **Changed** and **Fixed** in short, plain paragraphs, and what it means for someone running a review. The notes must score at least 60 for Flesch Reading Ease, have exactly one emoji and may be a bit playful; the release check stops the release otherwise. Changes that are merged but not yet released go under [Unreleased]. How to publish a version is in [CONTRIBUTING.md](CONTRIBUTING.md#publishing-a-version).
+Each version's section becomes the notes of its GitHub release, so write it like a game's patch notes, for someone deciding which version to use or cite. Versions after 0.6.0, and [Unreleased], follow the shape below; the release check stops the release when they break it. Versions up to 0.6.0 stay in the older Keep a Changelog form (**Added**, **Changed** and **Fixed**, with exactly one emoji) and are never rewritten. Changes that are merged but not yet released go under [Unreleased]. How to publish a version is in [CONTRIBUTING.md](CONTRIBUTING.md#publishing-a-version).
+
+A section starts with a signed dev note: a blockquote that begins `> **Dev note:**`, two to four casual sentences on what the patch is about and why, and the signature `> — The TraceableAI team`. Then comes `### 🌟 Patch highlights`, one short paragraph with the headline changes for someone running a review and whether a new run can differ from the last version. After it come the areas that have changes, one `###` section each, in the order of the table. Inside an area, a `####` heading names a stage or a feature, such as Screening or Themes. Under it a short "why" quote (`>`) says why it changed, and one bullet follows for each change. A change with a before and after is written as `- **Label**: old ⇒ new`, with one arrow and exact values; a change without a clean before and after is a plain bullet. The last section, `### 🐛 Bug fixes`, is a list in which every item starts with "Fixed a bug where".
+
+| Area | Emoji |
+|---|---|
+| Patch highlights | 🌟 |
+| Systematic review | 🔬 |
+| Multivocal review (preview) | 🧭 |
+| Report page | 📄 |
+| Self-check | ✅ |
+| Search and sources | 🔍 |
+| Site | 🌐 |
+| Bug fixes | 🐛 |
+
+Each `###` heading has exactly one emoji, at its start, and no emoji appears anywhere else. The notes must score at least 60 for Flesch Reading Ease.
 
 ## [Unreleased]
 
-### Fixed
+> **Dev note:** This patch is about telling the truth in the paper. We read your criteria more kindly, taught the themes to build on each other and told the abstract to stop shouting "we". The report page lost a few annoying habits on the way.
+> — The TraceableAI team
 
-A pilot run's title no longer says "Pilot Pilot", and the PRISMA checklist now tells the truth about a pilot run's title. The methods count reviews by their study type, give book chapters their own count instead of calling them journals, and count a study whose DOI is not at Crossref as not checked for retractions, not as a failed check. Some small grammar slips are gone, and the cap on records per source and the research questions are each said once.
+### 🌟 Patch highlights
 
-The citation check is now told as one story that adds up: what the first check found, what the second check changed, what the repair rewrote or dropped, and how many citations are left. It now sits in the methods, not in the discussion. 🧮 Table A.1 in main.tex starts with the reference number, so you can match a row to its [n].
+Screening now treats "or" in your inclusion criterion as a choice, so fewer good records are dropped. The themes build on each other, the abstract and conclusion claim no more than the evidence allows, and the concept map shows at most three dashed links. A new run can differ from 0.6.0: the screening and language edit prompts have new versions, so old cached screening decisions are not used again.
 
-Screening now reads "or" in your inclusion criterion as a choice. A record needs to show one of the options, not all of them, so fewer good records are dropped in code. The screening prompt has a new version, so old cached decisions are not used again.
+### 🔬 Systematic review
 
-On the report page, a citation's card now comes into view when you open it, also from "Show the first". A heading no longer sits alone at the foot of a page, and the page no longer scrolls sideways at 809 px. The browser tab shows the run's progress and says when the review is ready. The progress line names the artifact step.
+#### Screening
 
-The self-check now knows the count of records that could not be screened. It also flags a figure given in two themes, and it no longer skips a figure such as "F1 0.97". A source now gets more records when some drop out for their year or as duplicates, so it can fill its cap. Keywords are short terms now, not whole search strings.
+> A criterion such as "agent framework or orchestration loop" was read as needing both. A good study was dropped in code and stayed only because the second screening disagreed.
 
-The themes now build on each other. A theme that meets a finding from an earlier theme points back to it and does not say its figures again. A big theme compares how its studies test the question instead of listing each result. A study that only touches a theme can be called indirect, or left out with its reason on file, so it is not stretched to fit. The rationale now says what is known, what is missing and why it matters.
+- **Screening prompt**: screening-v7 ⇒ screening-v8
+- **A criterion with "or"**: every option is needed ⇒ one option is enough
+- The record needs to show one of the options, not all of them, so fewer good records are dropped in code.
+- Old cached screening decisions are not used again, because the prompt has a new version.
 
-The abstract no longer says "we", because the author is software. It drops a count of zero, so you read "no duplicates were found" instead of "removed 0 duplicates". It also claims no more than the certainty table allows: with moderate or low certainty it says "suggest" or "may", not "show that". The same goes for the conclusion. A sentence no longer names a study and cites it in the same breath.
+#### Themes
 
-The concept map now keeps at most three dashed links, the ones that are the review's own reading. The rest are left out, listed with a reason, and the methods say how many. The self-check notes when more than half the links were dashed, and it now counts a figure that the map repeats.
+> The themes said the same things again and again. A study that only touched a theme was stretched to fit, and the rationale read like a list.
 
-On the report page, a table's caption and header row now move to the next page with its first row. The appendix table fits a narrow page without breaking words letter by letter.
+- **Earlier findings in a later theme**: restated with their figures ⇒ pointed back to
+- **A big theme**: lists each result ⇒ compares how its studies test the question
+- **A study that only touches a theme**: stretched to fit ⇒ called indirect, or left out with its reason on file
+- **The rationale**: one study per sentence ⇒ what is known, what is missing and why it matters
+
+#### Abstract and conclusion
+
+> The abstract said "We removed 0 duplicates", although the author is software, and it claimed more than its moderate-certainty answers allow.
+
+- **Language edit prompt**: language-edit-v3 ⇒ language-edit-v4
+- **A count of zero**: "removed 0 duplicates" ⇒ "no duplicates were found"
+- **Wording at moderate or low certainty**: "show that" ⇒ "suggest" or "may"
+- The abstract no longer says "we", because the author is software.
+- The conclusion claims no more than the certainty table allows, as the abstract does.
+- A sentence no longer names a study and cites it in the same breath.
+
+#### Concept map
+
+> In a real run, 12 of 15 links were dashed, so the map told the reader little about the literature.
+
+- **Dashed links**: no limit ⇒ at most 3
+- The dashed links that are the review's own reading and come after the first three are left out of the map and listed with a reason.
+- The methods say how many links were left out.
+
+#### Methods and references
+
+> The methods and the checklist said things that were not quite true.
+
+- **The citation check**: told in the discussion ⇒ told in the methods, as one story that adds up: what the first check found, what the second check changed, what the repair rewrote or dropped, and how many citations are left
+- **A study whose DOI is not at Crossref**: counted as a failed check ⇒ counted as not checked for retractions
+- **Book chapters**: counted as journals ⇒ given their own count
+- Table A.1 in main.tex starts with the reference number, so you can match a row to its [n].
+- The PRISMA checklist now tells the truth about a pilot run's title.
+- The methods count reviews by their study type.
+- The cap on records per source and the research questions are each said once, and some small grammar slips are gone.
+
+### 📄 Report page
+
+#### Paged report
+
+> The paged report broke in small ways, most of all in a narrow window.
+
+- **Minimum table width in a paged sheet**: 700 px ⇒ none
+- A citation's card comes into view when you open it, also from "Show the first".
+- A heading no longer sits alone at the foot of a page.
+- A table's caption and header row move to the next page with its first row.
+- The appendix table fits a narrow page without breaking words letter by letter.
+
+### ✅ Self-check
+
+> The self-check gave a wrong outcome on two of its checks, and it did not read the concept map.
+
+- The self-check knows the count of records that could not be screened.
+- It flags a figure given in two themes.
+- It counts a figure that the concept map repeats.
+- It notes when more than half of the map's links were dashed.
+
+### 🔍 Search and sources
+
+> The search never filled its cap for a source, and the keywords read like search strings.
+
+- **Keyword phrase from a search string**: up to 5 words ⇒ at most 3 words
+- A source now gets more records when some drop out for their year or as duplicates, so it can fill its cap.
+- Keywords are short terms now, not whole search strings.
+
+### 🌐 Site
+
+#### Run page
+
+> The tab said "2% · Your review" for the whole run.
+
+- **Tab title while a review runs**: "2% · Your review" for the whole run ⇒ the run's progress
+- The tab says when the review is ready.
+- **Progress line in the last step of writing**: Writing ⇒ Artifact
+
+### 🐛 Bug fixes
+
+- Fixed a bug where a pilot run's title said "Pilot Pilot".
+- Fixed a bug where the self-check skipped a figure such as "F1 0.97".
+- Fixed a bug where a source could not fill its cap when records dropped out for their year or as duplicates.
+- Fixed a bug where an opened citation's card stayed out of view.
+- Fixed a bug where a heading sat alone at the foot of a page.
+- Fixed a bug where the report page scrolled sideways at 809 px.
+- Fixed a bug where a table's caption was left behind at the foot of a page.
 
 ## [0.6.0] - 2026-11-26
 
@@ -132,132 +234,7 @@ The cost column in the Metrics downloads was always empty, because no price was 
 
 The protocol of a multivocal plan no longer promises a search that does not run, so the paper no longer has to explain the gap with a note about software.
 
-## [0.5.0] - 2026-11-23
-
-TraceableAI has a new look, an API for other tools and a guard against text that tries to steer the model. Many prompts changed, so a run can differ from 0.4.0. A multivocal review, still in preview, now costs far less.
-
-### Added
-
-Other tools can now start a review through an API. Send the form's fields to `/api/v1/reviews` with your own Mistral key, and follow the run by its id. To stop it, send a DELETE with its edit key. Your key is used for that run only and is never stored. The API gives no free reviews, and it stays off on the live site until it is switched on.
-
-The API can also hand back the finished report as data. You get each section, every citation with its verdict and quote, the references and the PRISMA counts. A description of the API is at `/openapi/v1.json`.
-
-AI assistants can run a review too. TraceableAI now has an MCP server at `/mcp`. An assistant can start a review, check on it, read the report and fetch the BibTeX, RIS or LaTeX, all with your own Mistral key. It can also stop a review it started, with the edit key it got back.
-
-The API and the MCP server have their own page, at `/docs/api`. It shows how to start a review, follow it, read the report and stop it, with real examples you can copy. It says what each error means and what to do. Like the API, the page is only there when the API is on.
-
-You can now stop a review you started. The run stops at the next safe point, before its next model call or step. A review that waits in line just leaves the line. The run is marked as cancelled, and the time and your reason are kept on file. Your free review for the day comes back, once a day. Only the browser or tool that started the review can cancel it. Click "Cancel review" beside the run, and the page asks once before it acts. You can say why, if you like. Then the page shows the run as cancelled, with your reason and a button to start a new review. The button works on a phone too.
-
-The multivocal review can now search academic databases as well as the web. It screens papers with the same rules as web sources. It reads a paper's open full text, or its abstract when there is none, and rates it with MMAT, as the systematic review does. Papers and web sources share one map, one set of themes and one paper. Each theme says whether it rests on papers, web sources or both. The paper cites papers as the systematic review does, and it marks a paper read on its abstract alone. The run view shows the two kinds of source side by side. The Multivocal card stays off until a real review has been checked by hand.
-
-The review now looks for text that tries to steer the model. The full text of each included paper, and each kept page of a grey literature review, is checked for phrases that read like instructions to the model, such as "ignore all previous instructions". A finished review lists the papers where it found some, with the phrase, so you can check what was taken from them. Nothing is excluded for it, since papers about language models quote such phrases honestly. The planning form of the grey literature review checks your own answers the same way as the systematic review's form, and asks you to confirm before it starts.
-
-Hidden text is now taken out of a source before it is kept or read by the model. A page or a paper can hide text that you never see but a model does. It can use invisible characters, or a part of a web page that is hidden by its style. That text is removed first, and the run keeps a count of what was removed. A finished review shows which sources lost hidden text. If the hidden text reads like instructions, the source is flagged as well.
-
-The statement on the use of AI now says how many sources were flagged. It counts the sources whose text held phrases that look like instructions to a model. It also says that the flags changed no decision. A run with no flags gets the same statement as before.
-
-The defences now have their own attack test set. It is a small set of poisoned papers and web pages, each with a trick to steer the model, plus a few honest sources as a check. The tests run them through whole reviews with a fake model. They check that every trick is flagged, that no hidden text reaches the model, and that no decision changes. The set found two faults, now fixed. Instructions hidden in invisible tag characters in an abstract were missed at screening. And a paper that only lost a few stray invisible characters was counted as flagged in the statement on AI use.
-
-Citation chaining now looks further out from the studies that matter most. When it is on, code picks the ten included studies with the most citations per year, so a recent study can beat an old classic. For each, it takes the twenty most cited works it cites and the twenty most cited works that cite it, and screens them like any other record. Only studies you already included can be picks, and no model takes part in choosing them. The flow diagram, the methods and a new table in main.tex show what came from them.
-
-The owner of a finished review can now rewrite a sentence of its report, and every citation in that sentence is checked again against its source. A citation that does not hold stays marked, just as in the text the review wrote. Each edit is kept on file with the text before and after, and you can take it back. The parts written in code, such as the method, the counts and the references, cannot be edited. This version adds the engine behind it; the editor on the report page comes next.
-
-### Changed
-
-The theme sections are now written so more citations hold up. Each claim gets its own citation, and sources share one only when each says the whole thing. The writer adds no counts, comparisons or words like "always" that a source does not state.
-
-A repaired paragraph now has to read well, not only be supported. After the repair, each changed paragraph is read once for sense. If it reads badly, it is rewritten once from its supported claims, and every citation in it is checked again. The rewrite stays only if all of them hold. The audit file lists each paragraph and what happened to it.
-
-A repaired sentence in a grey literature review is now checked again as a grey literature sentence, not as part of a systematic review. On a rerun the check comes from the cache.
-
-The rationale in the introduction now keeps only sentences that cite a source. A sentence from the model's general knowledge is left out, and the writing log says which.
-
-The site starts its new look. It now uses a deeper navy, the same one as Coursebot, and two new typefaces: Inter for text and Poppins for headings and buttons. The browser tab shows the new mark, a small robot reading a book. 🤖
-
-The icons that phones and older browsers use now show the same mark on a navy tile. So does the small logo in the header, and an Android phone gets a large icon when you add the site to the home screen.
-
-The top bar is new. It is white, shows the mark next to the name, and has three places: New review, Review output and Metrics. On a phone they fold into a menu. The footer is now one short line with the pages about trust and a link to GitHub.
-
-Every page now sits in one frame. The top bar and the footer stay still, and only the page between them scrolls. A switch in the top bar turns on a dark theme.
-
-The front page now fits on one screen. It says what TraceableAI does in one line and shows a real sentence from a review, with its citations checked one by one: one backed by the paper, one only in part, and one not at all. You can pause it. On a phone the example is left out, so the page fits without scrolling. The front page has its dark theme too.
-
-Starting a review is simpler. The page asks one question, "What should the review find out?", in one box: your objective, your search words and, if you like, up to four research questions. The criteria sit next to it in one panel: years and databases, what to include and leave out, and the picture the review should end with. Fold the panel to one line when you are done with it. On a phone it opens over the page with a Done button. Every field and check from before is still there.
-
-While a review runs, the same page shows its seven steps, from the protocol to the citation check. Each one is ticked off, running or waiting, and the running step says what it is doing. You can close the page; the review keeps going. When it is done, the page opens with what came out: the studies, the themes and how the citations held up, in one coloured bar. One button opens the report, one goes to the citations that need a look, and every file from the run is a click away.
-
-The report is now one calm, long page. It opens with the title, a line on what the review found and one coloured bar for how the citations held up. Every section follows in order, in larger type with shorter lines, so it reads like a paper. A new figure shows how the records flowed from search to the included studies. Each citation is a small coloured chip; open it and a card shows the passage it was checked against. On a laptop a list of sections sits on the left, and on a large screen a panel on the right steps through the citations you choose: all, flagged or abstract only. Printing, notes, re-checks and every download work as before.
-
-The Metrics page now asks one question: how well do the citations hold up? Four figures answer it at the top. Then every review gets its own bar in one chart, oldest on the left, named by the start of its run ID. Three tables follow, each with a total: the share of each verdict per run, the plain counts per run, and the figures for each app version. The detail view of a single run is gone for now; its figures stay in each run's files.
-
-The pages about trust now look alike: About, the model card, privacy, the glossary and the archive check. On a laptop a list on the left takes you between them and to each part of the page you are on. The glossary has a search box and groups its words by method, verdicts and output. Checking an archive is one big box to drop it in, with the result beside it. Choosing the kind of review shows the two you can start as large cards, and a missing page now helps you on your way.
-
-A link to the site now shows a new preview card in the new look. The page you see while a new version goes live has the new look too, in light and dark. The sitemap now tells search engines when each page last changed.
-
-The grey literature review, still in preview, now reads like the systematic one. Its paper is one long page with a list of sections, the coloured bar for how the citations held up and the same panel for stepping through them. Its data appendix and planning page got the new colours too.
-
-Every page now has a dark theme. The switch is in the top bar, and if you have not chosen, the site follows your computer's setting. The citation colours keep their meaning in both themes.
-
-The new look changes nothing about how a review runs. These are the first steps of the redesign; the pages follow one by one.
-
-The citation repair now has a second pass. After the first repair, a citation that is still only partly backed is rewritten once more and checked again. A citation that is still not backed is taken out. If another citation backs the sentence, the sentence stays. If not, the sentence goes too. Each change is kept in citation-audit.json, with the sentence as it was, so nothing goes missing. Both kinds of review use it.
-
-Removed citations are counted on their own. The report says how many there were, and the coloured bar shows them in navy, next to the verdicts. The Metrics page has a column for them in each table, and run-metrics.json keeps the number. The glossary explains what removed means.
-
-The grey literature review now counts removed citations too: in its metrics, the bar on its paper page and its LaTeX note.
-
-On a phone, the main screens now fit without scrolling. A finished review folds the run's files and details into one line that opens with a tap.
-
-Checking an archive now lists every file in it, each marked Matches, Changed or Missing.
-
-Downloads are now smaller on the wire. The reference lists, the protocol, main.tex and the other text files are sent compressed, and so are the site's styles and scripts. Pages load the same, only faster.
-
-Downloads are faster. The archive of a finished review is kept on the server, so a second download sends the same file at once. Before, it was built again each time. A note or a new check of a citation still gives you a fresh archive. Each download now also says when it last changed, so your browser does not fetch a file it already has.
-
-The Metrics page opens faster. The stored figures of past runs are read once and kept in memory, not read again for each visit. A new run still shows at once.
-
-A running review costs the server less. The page that follows a run checked its progress file every second and read it in full each time. Now it reads the file only when it changed.
-
-The research questions now guide every writing step. Each theme says which questions it answers, and a question that no study bears on is named as unanswered, with the reason. The objectives in the paper are now written in code from your plan. Before, only the last step saw the questions, so a theme could drift away from them. A run without research questions is written as before.
-
-The multivocal review now costs far less to run. Screening and the citation checks go to the fast model, as in the systematic review, and the statement on AI use names both models. Each source is screened once. It is screened a second time when the first look kept it, was unsure or found text that looks like instructions, and so is a random sample of at least one in five. Kappa is worked out on that sample, and anyone can draw the sample again from the run's id. A new plan starts with the top 20 hits of each search, not 100. Long pages and papers are sent as their most useful passages, and every quote is still checked against the kept text.
-
-A busy model server no longer ends a run. When the server asks the review to wait, it now waits as long as asked, up to a minute at a time, and tries a few more times. The quick checks also run sixteen at a time instead of eight, so a review is done sooner.
-
-Updating the site no longer stops a review that is running. An update now waits until no review is running, for up to two and a half hours. A change to the docs alone does not update the site at all.
-
-Cards, fields and bars are now square. Only buttons get to keep their round corners.
-
-This release page is new too. It opens with a summary, tells you how to cite the version and folds the long list of pull requests away.
-
-### Fixed
-
-The discussion no longer says the limitations twice. The prompt asks for each part once. If the answer still has two paragraphs on the limitations, the code merges them into one and drops the sentences that only repeat. A note on file says what was dropped.
-
-A grey literature review now counts each tool once. Names that clearly match, such as "MemGPT" and "Letta (MemGPT)", are merged by fixed rules, and the merge is listed in the data appendix. A tool that is one of the review's own sources is not counted as a tool.
-
-The discussion no longer leans on studies the review set aside. When a study fits none of the themes, the later sections now know which one it is and why. Only the limitations may name it. The step that builds the themes now sees the criteria every study met, so it cannot set a study aside for a reason they allow.
-
-The review also stops saying again and again how many studies it read in full. The part on how the review was done says that once. A study is never said to have used the full text as its method, since that is what the review read, not what the study did.
-
-The methods no longer put the model's name in double brackets, such as "(mistral-large-latest (Mistral API), temperature 0)". When the two screenings agree on most records but kappa is still low, the report now says why, so 3 of 4 with a kappa of 0.00 no longer looks like a mistake. The note under Table A.2 explains the dagger only when a value has one, and no longer points to an evidence column the table does not have.
-
-A theme now has one name everywhere: its heading, the overview and the evidence map all use the name from the codebook. The report page and main.tex number their sections the same way, with the same headings and the declarations in the same order, so "see section 5.2" points to the same place in both.
-
-The concept map in main.tex no longer leaves wide gaps between its columns, so it is not shrunk until the text is too small to read. Printing a report, or saving it as a PDF, is now checked on every change: it must run over several pages without the top bar.
-
-A code repository is now cited by the year it was made, not the year of its last change. The last change is still given, as "last updated". Before, every repository was cited as 2026.
-
-A question about how often something happens now gets the same answer in the paper and in the data appendix. Before, the paper counted the answer while the appendix said no theme was found.
-
-The planning form now says which kinds of grey literature each chosen search can find. It warns you when a kind you named has no search that reaches it, and the protocol says the same. Before, a plan could name five kinds and search only GitHub.
-
-The paper of a multivocal review with academic sources now says in its statement on AI use that both pools were screened and appraised, and how each source's citations were checked. Its flow diagram puts each excluded group beside the step where it left. A grey literature review's flow no longer says "1 themes".
-
-Hidden text in your own answers on the planning form is now taken out too. Invisible tag characters could slip into the prompts. Now they are removed, and if they spelled out an instruction, the warning shows you the hidden words.
-
-
-Versions 0.4.0 and earlier are in [docs/changelog-archive.md](docs/changelog-archive.md), so that this file stays under 300 lines.
+Versions 0.5.0 and earlier are in [docs/changelog-archive.md](docs/changelog-archive.md), so that this file stays under 300 lines.
 
 [Unreleased]: https://github.com/lauPhilip/au-btech-literature-review-agent/compare/v0.6.0...HEAD
 [0.6.0]: https://github.com/lauPhilip/au-btech-literature-review-agent/compare/v0.5.0...v0.6.0

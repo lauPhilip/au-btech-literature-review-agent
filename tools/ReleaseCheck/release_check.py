@@ -14,7 +14,9 @@ with every reason it found, and publishes nothing, when:
   * CHANGELOG.md has no section for the version, or the section is empty,
   * CITATION.cff's version or date-released does not match the tag (the date is the day the tag was made),
   * the notes are hard to read: a Flesch Reading Ease score below 60 (plain English),
-  * the notes do not have exactly one emoji.
+  * the notes break the patch-notes style (release_style.py): a signed dev note on top, Patch highlights first,
+    Bug fixes last, one emoji on each "###" heading and none elsewhere, and "old => new" stat lines of one shape.
+    Versions up to 0.6.0 keep the old form instead: exactly one emoji in the notes.
 
 Whether the notes explain what changed for someone running a review, and are a bit playful, is for a person to judge.
 
@@ -34,6 +36,7 @@ from pathlib import Path
 
 from release_body import compose_body
 from release_notes import MIN_READING_EASE, find_emoji, reading_ease
+from release_style import check_style, uses_patch_notes
 
 # Semantic Versioning 2.0.0, from semver.org, with the "v" prefix MinVer reads (MinVerTagPrefix).
 _SEMVER = re.compile(
@@ -121,6 +124,10 @@ def check_notes(notes: str, version: str) -> list[str]:
         problems.append(
             f"The notes for {version} are hard to read: Flesch Reading Ease {shown}, and they need at least "
             f"{MIN_READING_EASE:.0f}. Use shorter sentences and everyday words.")
+    if uses_patch_notes(version):
+        problems.extend(f"The notes for {version}: {problem}" for problem in check_style(notes))
+        return problems
+    # Versions up to 0.6.0 keep the old form: exactly one emoji in the whole text.
     emoji = find_emoji(notes)
     if len(emoji) != 1:
         shown = "none" if not emoji else f"{len(emoji)} ({' '.join(emoji)})"

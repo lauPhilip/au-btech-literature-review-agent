@@ -21,17 +21,35 @@ import release_check as rc  # noqa: E402
 ROOT = Path(__file__).resolve().parents[2]
 REPO = "lauPhilip/au-btech-literature-review-agent"
 
-NOTES = """Reviews are cheaper and better checked. A run can differ from 0.4.0, since the prompts changed.
+NOTES = """> **Dev note:** Reviews are cheaper and better checked. A run can differ from 0.4.0.
+> \u2014 The TraceableAI team
 
-### Added
+### \U0001F31F Patch highlights
 
-You can stop a review. 🛑
+Reviews are cheaper. A new run can differ from 0.4.0, since the prompts changed.
+
+### \U0001F52C Systematic review
+
+#### Screening
+
+> A criterion with "or" was read as needing every part.
+
+- **Screening prompt**: screening-v7 \u21d2 screening-v8
+- Fewer good records are dropped in code.
+
+#### Themes
+
+- Themes point back to earlier ones.
+
+### \U0001F310 Site
+
+You can stop a review.
 
 You can start one through the API.
 
-### Fixed
+### \U0001F41B Bug fixes
 
-The methods no longer use double brackets.
+- Fixed a bug where the methods used double brackets.
 """
 
 CITATION = """cff-version: 1.2.0
@@ -67,19 +85,21 @@ def compose(notes: str = NOTES, generated: str | None = GENERATED, previous: str
 
 
 class PartsTests(unittest.TestCase):
-    def test_splits_lead_and_kinds_in_order(self):
-        lead, kinds = rb.split_section(NOTES)
-        self.assertTrue(lead.startswith("Reviews are cheaper"))
-        self.assertEqual(["Added", "Fixed"], [kind for kind, _ in kinds])
+    def test_splits_lead_and_areas_in_order(self):
+        lead, areas = rb.split_section(NOTES)
+        self.assertTrue(lead.startswith("> **Dev note:**"))
+        self.assertEqual(["\U0001F31F Patch highlights", "\U0001F52C Systematic review", "\U0001F310 Site",
+                          "\U0001F41B Bug fixes"], [heading for heading, _ in areas])
 
-    def test_first_sentence_keeps_versions_whole(self):
-        first, rest = rb.first_sentence("Runs differ from v0.4.0 now. The rest follows.")
-        self.assertEqual("Runs differ from v0.4.0 now.", first)
-        self.assertEqual("The rest follows.", rest)
+    def test_sub_headings_do_not_split_an_area(self):
+        _, areas = rb.split_section(NOTES)
+        self.assertIn("#### Themes", areas[1][1])
 
-    def test_counts_paragraphs_or_list_items(self):
+    def test_counts_list_items_or_paragraphs_and_not_headings_or_quotes(self):
         self.assertEqual(2, rb.paragraphs("One.\n\nTwo."))
         self.assertEqual(3, rb.paragraphs("- a\n- b\n- c"))
+        self.assertEqual(2, rb.paragraphs("#### Screening\n\n> Why.\n\n- a\n- b"))
+        self.assertEqual(1, rb.paragraphs("#### Screening\n\n> Why.\n\nOne change."))
 
     def test_reads_only_the_top_level_authors(self):
         self.assertEqual([("Lau", "Philip S. P."), ("", "Nidhi")], rb.citation_authors(CITATION))
@@ -89,19 +109,31 @@ class BodyTests(unittest.TestCase):
     def setUp(self):
         self.body = compose()
 
-    def test_opens_with_the_first_sentence_in_bold(self):
-        self.assertTrue(self.body.startswith("**Reviews are cheaper and better checked.**\n"))
+    def test_opens_with_the_dev_note_as_written(self):
+        self.assertTrue(self.body.startswith(
+            "> **Dev note:** Reviews are cheaper and better checked. A run can differ from 0.4.0.\n"
+            "> \u2014 The TraceableAI team\n\n## In this patch\n"))
 
-    def test_what_it_means_holds_the_rest_of_the_lead_and_a_table(self):
-        part = self.body.split("## What this means for your review\n\n", 1)[1].split("\n## ", 1)[0]
-        self.assertTrue(part.startswith("A run can differ from 0.4.0, since the prompts changed."))
-        self.assertIn("| [Added](#added) | 2 | New things you can use. |", part)
-        self.assertIn("| [Fixed](#fixed) | 1 | Wrong before, right now. |", part)
-        self.assertNotIn("Changed", part)
+    def test_in_this_patch_has_one_row_per_area_with_its_count(self):
+        part = self.body.split("## In this patch\n\n", 1)[1].split("\n\n", 1)[0]
+        self.assertEqual([
+            "| Area | Changes |", "|---|---|",
+            "| Patch highlights | 1 |", "| Systematic review | 3 |", "| Site | 2 |", "| Bug fixes | 1 |",
+        ], part.splitlines())
 
-    def test_kinds_keep_the_changelog_text_and_order(self):
-        added = self.body.index("## Added\n\nYou can stop a review. 🛑\n\nYou can start one through the API.")
-        self.assertLess(added, self.body.index("## Fixed\n\nThe methods no longer use double brackets."))
+    def test_areas_keep_their_text_and_order_one_heading_level_up(self):
+        first = self.body.index("## \U0001F31F Patch highlights\n\nReviews are cheaper.")
+        second = self.body.index("## \U0001F52C Systematic review\n\n### Screening\n\n> A criterion")
+        site = self.body.index("## \U0001F310 Site\n\nYou can stop a review.\n\nYou can start one through the API.")
+        fixes = self.body.index("## \U0001F41B Bug fixes\n\n- Fixed a bug where the methods used double brackets.")
+        self.assertLess(first, second)
+        self.assertLess(second, site)
+        self.assertLess(site, fixes)
+        self.assertIn("- **Screening prompt**: screening-v7 \u21d2 screening-v8", self.body)
+
+    def test_the_old_what_this_means_part_is_gone(self):
+        self.assertNotIn("What this means for your review", self.body)
+        self.assertNotIn("New things you can use", self.body)
 
     def test_cites_the_concept_doi_and_says_the_version_doi_follows(self):
         part = self.body.split("## Cite this version", 1)[1]
@@ -133,11 +165,11 @@ class BodyTests(unittest.TestCase):
         self.assertIn("## Cite this version", body)
 
     def test_a_version_without_a_lead_starts_with_its_table(self):
-        body = compose(notes="### Fixed\n\nA fix. 🐛")
-        self.assertTrue(body.startswith("## What this means for your review\n\n| Kind of change"))
+        body = compose(notes="### \U0001F41B Bug fixes\n\n- Fixed a bug where a fix was missing.")
+        self.assertTrue(body.startswith("## In this patch\n\n| Area | Changes |"))
 
     def test_the_body_adds_no_emoji_of_its_own(self):
-        self.assertEqual(["🛑"], rc.find_emoji(compose(generated=None)))
+        self.assertEqual(rc.find_emoji(NOTES), rc.find_emoji(compose(generated=None)))
 
 
 class RepositoryBodyTests(unittest.TestCase):
@@ -154,6 +186,7 @@ class RepositoryBodyTests(unittest.TestCase):
         self.assertIn("## Cite this version", body)
         self.assertIn("https://doi.org/10.5281/zenodo.24379094", body)
         self.assertRegex(body, r"> Lau, P\. .*\(Version 9\.9\.9\)")
+        self.assertIn("## In this patch\n\n| Area | Changes |", body)
 
 
 if __name__ == "__main__":

@@ -18,6 +18,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import release_check as rc  # noqa: E402
+from test_release_style import GOOD  # noqa: E402
 
 CHANGELOG = """# Changelog
 
@@ -181,6 +182,30 @@ class PrepareTests(unittest.TestCase):
             rc.prepare(tag, None, None)
         self.assertIn("CHANGELOG.md is missing", str(caught.exception))
         self.assertIn("CITATION.cff is missing", str(caught.exception))
+
+
+class PatchNotesTests(unittest.TestCase):
+    """Versions after 0.6.0 and [Unreleased] are held to the patch-notes style; older versions keep the old form."""
+
+    def test_new_versions_are_held_to_the_style_not_to_one_emoji(self):
+        problems = rc.check_notes(GOOD, "0.7.0")
+        self.assertEqual(problems, [])
+        self.assertEqual(rc.check_notes(GOOD, "Unreleased"), [])
+
+    def test_a_style_fault_is_reported_with_the_version(self):
+        problems = rc.check_notes(GOOD.replace("\U0001F31F ", ""), "0.7.0")
+        self.assertEqual(len(problems), 1)
+        self.assertIn("The notes for 0.7.0:", problems[0])
+        self.assertIn("### Patch highlights", problems[0])
+
+    def test_released_versions_keep_the_one_emoji_rule(self):
+        self.assertEqual(rc.check_notes("### Added\n\n- You can stop a run. \U0001F389", "0.6.0"), [])
+        self.assertIn("exactly one emoji", " ".join(rc.check_notes("### Added\n\n- You can stop a run.", "0.6.0")))
+        self.assertTrue(rc.check_notes(GOOD, "0.6.0"), "the new style has many emoji, which 0.6.0 may not have")
+
+    def test_notes_in_the_style_still_need_to_be_readable(self):
+        hard = GOOD.replace("Screening reads", HARD_NOTES + " Screening reads")
+        self.assertIn("hard to read", " ".join(rc.check_notes(hard, "0.7.0")))
 
 
 class RepositoryFilesTests(unittest.TestCase):

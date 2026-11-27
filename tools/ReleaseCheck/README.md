@@ -9,19 +9,20 @@
 | `CHANGELOG.md` | It has no section `## [0.1.0]`, or the section is empty. The section becomes the release notes |
 | `CITATION.cff` | Its top-level `version` is not `0.1.0`, or its `date-released` is not the day the tag was made |
 | Readability | The notes score below 60 for Flesch Reading Ease, which is plain English |
-| Emoji | The notes do not have exactly one emoji |
+| Patch-notes style | For [Unreleased] and versions after 0.6.0 (`release_style.py`): the text above the first `###` is a blockquote that starts with `**Dev note:**`; the first `###` is Patch highlights; the areas are known and in order; Bug fixes, if present, is last and a list whose items start with "Fixed"; every `###` heading has exactly one emoji at its start, and no emoji is anywhere else; a bullet with ⇒ is `- **label**: old ⇒ new` with one arrow |
+| Emoji, old form | For 0.6.0 and older, which keep the Keep a Changelog form and are never rewritten: the notes do not have exactly one emoji |
 
-The readability score is 206.835 − 1.015 × (words per sentence) − 84.6 × (syllables per word). Headings, link addresses and code marks are not read, and a list item ends a sentence even without a full stop. Syllables are estimated from groups of vowels, so a score can be a point or two off a dictionary count. An emoji made of several characters, such as a flag or a family, counts once. Whether the notes explain what changed for someone running a review, and are a bit playful, is for the person who reviews the pull request.
+The readability score is 206.835 − 1.015 × (words per sentence) − 84.6 × (syllables per word). Headings, link addresses, code marks and blockquote marks are not read, and a list item, such as a stat line, ends a sentence even without a full stop; the arrow ⇒ is not a word. Syllables are estimated from groups of vowels, so a score can be a point or two off a dictionary count. An emoji made of several characters, such as a flag or a family, counts once. Whether the notes explain what changed for someone running a review, and are a bit playful, is for the person who reviews the pull request.
 
-The emoji and readability checks live in `release_notes.py`; `release_check.py` reads the tag and the two files and applies them.
+The emoji count and readability score live in `release_notes.py` and the patch-notes style in `release_style.py`; `release_check.py` reads the tag and the two files and applies them.
 
-`release_body.py` composes the body of the GitHub release, which `release.yml` asks for with `--body-out`. It adds nothing of its own about the version, so the same files give the same body every time.
+`release_body.py` composes the body of the GitHub release, which `release.yml` asks for with `--body-out`. It adds nothing of its own about the version, so the same files give the same body every time. The body follows the shape of the notes: the dev note first, then a table of the areas, then the areas themselves.
 
 | Part of the body | Where it comes from |
 |---|---|
-| The bold summary at the top | The first sentence of the section's lead, the text above its first `###` heading |
-| "What this means for your review" | The rest of the lead, then a table counting the paragraphs under each kind, with a fixed line on what each kind means |
-| Added, Changed and Fixed | The section, as written |
+| The dev note at the top | The blockquote above the section's first `###` heading, as written |
+| "In this patch" | A table with one row per `###` area and how many changes it lists: its bullets, or its paragraphs when it has no bullets |
+| The areas | Each `###` section as written, one heading level up, so a `####` stage becomes a `###` |
 | "Cite this version" | The concept DOI, title, authors and date in `CITATION.cff`; the version DOI follows once Zenodo has archived the release |
 | The folded list of pull requests | GitHub's generated notes since the previous version tag (`--generated-notes`) |
 | The comparison link | The previous version tag (`--previous-tag`) and this one |
@@ -34,7 +35,7 @@ Try it on your own tag before pushing it:
 python3 tools/ReleaseCheck/release_check.py v0.1.0 --notes-out release-notes.md --body-out release-body.md --previous-tag v0.0.9
 ```
 
-The tests sit beside the scripts. `test_release_feature.py` builds small git repositories with good and bad tags. `test_release_notes.py` checks the readability score and the emoji count on texts whose answer is known. `test_release_body.py` checks where each part of the release body comes from. `test_release_check.py` checks each rule on its own and also checks the repository's own `CHANGELOG.md` and `CITATION.cff`, including that the `[Unreleased]` section would pass as release notes. `test_workflows.py` checks how the workflows wire the release and the deploy, and `test_site_health.py` checks the deploy's health script. They run in CI on every pull request:
+The tests sit beside the scripts. `test_release_feature.py` builds small git repositories with good and bad tags. `test_release_notes.py` checks the readability score and the emoji count on texts whose answer is known. `test_release_style.py` checks each rule of the patch-notes style on its own. `test_release_body.py` checks where each part of the release body comes from. `test_release_check.py` checks each rule on its own and also checks the repository's own `CHANGELOG.md` and `CITATION.cff`, including that the `[Unreleased]` section would pass as release notes, and that versions up to 0.6.0 keep the old rules. `test_workflows.py` checks how the workflows wire the release and the deploy, and `test_site_health.py` checks the deploy's health script. They run in CI on every pull request:
 
 ```bash
 python3 -m unittest discover -s tools/ReleaseCheck -v
