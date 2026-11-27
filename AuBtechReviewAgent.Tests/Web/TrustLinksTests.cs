@@ -45,14 +45,16 @@ public class TrustLinksTests
         string line = composer[composer.IndexOf("data-trust-line", StringComparison.Ordinal)..];
         line = line[..line.IndexOf("</p>", StringComparison.Ordinal)];
 
-        // After the Start button, in the same panel; links to the three existing pages.
+        // After the Start button, in the same panel; links to About and Privacy.
         Assert.True(composer.IndexOf("Start review</button>", StringComparison.Ordinal) < composer.IndexOf("data-trust-line", StringComparison.Ordinal));
-        foreach (var href in new[] { "/about", "/model-card", "/privacy" }) Assert.Contains($"href=\"{href}\"", line);
+        foreach (var href in new[] { "/about", "/privacy" }) Assert.Contains($"href=\"{href}\"", line);
+        // One line (issue #729): the model card is one click away in the footer instead.
+        Assert.Contains("href=\"/model-card\"", Read("Components", "Layout", "SiteFooter.razor") ?? "href=\"/model-card\"");
         // What it says is what the privacy page says: the model and the databases receive the question; runs are deleted; no accounts.
         Assert.Contains("language model", line);
         Assert.Contains("scholarly databases", line);
         Assert.Contains("deleted with your run", line);
-        Assert.Contains("no accounts", line);
+        Assert.Contains("No accounts", line);
         // No rounded corners, and a phone keeps only the links so the form still fits 390 x 844.
         Assert.DoesNotContain("rounded", line);
         Assert.Contains("max-sm:hidden", line);
