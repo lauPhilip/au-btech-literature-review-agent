@@ -5,7 +5,7 @@ namespace AuBtechReviewAgent;
 
 /// <summary>
 /// The seven steps New review shows while a run is going (redesign step 7): Protocol, Search, Screening, Evidence,
-/// Writing, Artifact and Checking, the same list as the strip under the composer. A run's own plan
+/// Writing, Artifact and Checking. Since issue #732 the empty form no longer shows them; they appear when the run starts. A run's own plan
 /// (<see cref="RunProgress.Plan"/>) has six to eight steps, because citation chaining and the human screening check
 /// are optional. This maps the plan onto the seven: the protocol is written before the first step of the plan,
 /// chaining and the human check belong to Screening, full texts and extraction to Evidence, and the last phase of
@@ -20,7 +20,16 @@ public static class ReviewSteps
     public static double ArtifactFrom => RunProgress.SynthesisPhases[^2];
 
     /// <summary>Title and one-line explanation of each step, in order.</summary>
-    public static IReadOnlyList<(string Title, string Line)> All => Components.Dashboard.ReviewComposer.PipelineSteps;
+    public static readonly IReadOnlyList<(string Title, string Line)> All = new[]
+    {
+        ("Protocol", "Written first, fingerprinted"),
+        ("Search", "4 open sources"),
+        ("Screening", "Every record twice"),
+        ("Evidence", "Full texts read"),
+        ("Writing", "Theme by theme"),
+        ("Artifact", "From the findings"),
+        ("Checking", "Every citation"),
+    };
 
     /// <summary>
     /// The step the run is in: 0 to 6, <see cref="Count"/> when every step is done, and -1 while the run waits for a

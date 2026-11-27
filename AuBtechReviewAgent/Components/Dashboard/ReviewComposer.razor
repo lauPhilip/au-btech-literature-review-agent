@@ -3,8 +3,8 @@
    straight into UiStateContainer, the same state the old three-step form used, and every change is passed up
    through OnChanged so the page re-checks what is missing and saves the draft. The page supplies the notices
    (example filled in, input check, instruction-like text, why it cannot start yet) as fragments, because they
-   depend on the criteria too. Under 640 px the eyebrow, help texts, free-tier badge and step strip are hidden so
-   the screen fits 390 × 844. *@
+   depend on the criteria too. Under 640 px the eyebrow, help texts and free-tier badge are hidden so the screen
+   fits 390 × 844. The seven steps a review takes show once the run starts (RunProgressPanel), not here (issue #732). *@
 
 <div class="mx-auto w-full max-w-[760px] min-w-0">
     <p class="font-display text-xs font-semibold uppercase tracking-[0.14em] text-muted max-sm:hidden">
@@ -22,7 +22,7 @@
                       @bind="State.ReviewObjective" @bind:event="oninput" @bind:after="Changed"
                       placeholder="e.g. Which safety mechanisms do agent frameworks use, and how are they evaluated?"
                       class="ui-input resize-y text-lg leading-relaxed max-sm:h-[4.75rem] max-sm:text-base"></textarea>
-            <FieldHelp Id="h-objective" Text="The question the review answers. It guides the themes and the discussion." Value="@State.ReviewObjective" Max="AuBtechReviewAgent.ReviewInputGuard.MaxObjective" />
+            <FieldHelp Id="h-objective" Value="@State.ReviewObjective" Max="AuBtechReviewAgent.ReviewInputGuard.MaxObjective" />
         </div>
 
         <div>
@@ -30,8 +30,8 @@
             <input id="f-query" type="text" aria-required="true" aria-describedby="h-query" aria-invalid="@FieldHelp.Invalid(InputCheck, "Search query")"
                    maxlength="@AuBtechReviewAgent.ReviewInputGuard.MaxQuery"
                    @bind="State.SearchQuery" @bind:event="oninput" @bind:after="Changed"
-                   placeholder="e.g. agentic AI software frameworks" class="ui-input text-base" />
-            <FieldHelp Id="h-query" Text="The words sent to the databases. Short and specific works best." Value="@State.SearchQuery" Max="AuBtechReviewAgent.ReviewInputGuard.MaxQuery" />
+                   placeholder="Short and specific works best, e.g. agentic AI software frameworks" class="ui-input text-base" />
+            <FieldHelp Id="h-query" Value="@State.SearchQuery" Max="AuBtechReviewAgent.ReviewInputGuard.MaxQuery" />
         </div>
         <Honeypot Id="f-website" @bind-Value="State.Honeypot" />
 
@@ -81,26 +81,13 @@
         </div>
 
         @* The decision to trust the tool with a question is made here, so the pages that answer it are one click away
-           (issue #642). The sentence says what the privacy page says; the numbers stay on that page. *@
+           (issues #642 and #729). One line: the sentence says what the privacy page says, and the numbers stay there.
+           The model card is in the footer. *@
         <p data-trust-line class="text-xs leading-snug text-muted">
-            <span class="max-sm:hidden">Your question goes to a language model and to scholarly databases, and is deleted with your run after a limited time. There are no accounts. </span>Read
-            <a href="/about" class="text-heading underline underline-offset-2">About</a>, the
-            <a href="/model-card" class="text-heading underline underline-offset-2">model card</a> and
-            <a href="/privacy" class="text-heading underline underline-offset-2">Privacy</a>.
+            <span class="max-sm:hidden">Your question goes to a language model and scholarly databases and is deleted with your run. No accounts. </span><a href="/about" class="text-heading underline underline-offset-2">About</a> ·
+            <a href="/privacy" class="text-heading underline underline-offset-2">Privacy</a>
         </p>
     </div>
-
-    @* The seven steps every systematic review takes, so the empty page explains the tool. Hidden on a phone. *@
-    <ol class="mt-5 grid grid-cols-2 gap-x-4 gap-y-3 max-sm:hidden sm:grid-cols-4 lg:grid-cols-7" aria-label="What the review does">
-        @for (int i = 0; i < PipelineSteps.Count; i++)
-        {
-            var step = PipelineSteps[i];
-            <li class="min-w-0 border-t-2 border-line pt-2">
-                <span class="block font-display text-xs font-semibold text-heading"><span class="text-muted">@(i + 1)</span> @step.Title</span>
-                <span class="block text-xs leading-snug text-muted">@step.Line</span>
-            </li>
-        }
-    </ol>
 </div>
 
 @code {
@@ -122,18 +109,6 @@
     [Parameter] public EventCallback OnStart { get; set; }
     [Parameter] public EventCallback OnLoadExample { get; set; }
     [Parameter] public EventCallback OnOpenKeys { get; set; }
-
-    /// <summary>The seven steps in the strip under the card, with their one-line explanation.</summary>
-    public static readonly IReadOnlyList<(string Title, string Line)> PipelineSteps = new[]
-    {
-        ("Protocol", "Written first, fingerprinted"),
-        ("Search", "4 open sources"),
-        ("Screening", "Every record twice"),
-        ("Evidence", "Full texts read"),
-        ("Writing", "Theme by theme"),
-        ("Artifact", "From the findings"),
-        ("Checking", "Every citation"),
-    };
 
     private static readonly string ResearchQuestionsHelp =
         $"Up to {AuBtechReviewAgent.ReviewInputGuard.MaxResearchQuestions}, one per line. The protocol lists them, and the conclusion answers each one.";

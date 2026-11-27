@@ -86,15 +86,15 @@
                           maxlength="@AuBtechReviewAgent.ReviewInputGuard.MaxCriteria"
                           @bind="State.InclusionCriteria" @bind:event="oninput" @bind:after="Changed"
                           placeholder="e.g. describe or evaluate an agent framework, with some form of evaluation" class="ui-input resize-y"></textarea>
-                <FieldHelp Id="h-inclusion" Text="What a study must be about or contain." Value="@State.InclusionCriteria" Max="AuBtechReviewAgent.ReviewInputGuard.MaxCriteria" />
+                <FieldHelp Id="h-inclusion" Value="@State.InclusionCriteria" Max="AuBtechReviewAgent.ReviewInputGuard.MaxCriteria" />
             </div>
             <div>
-                <label for="f-exclusion" class="ui-label">Exclude studies that…</label>
+                <label for="f-exclusion" class="ui-label">Exclude studies that… <span class="font-normal text-muted">(optional)</span></label>
                 <textarea id="f-exclusion" rows="2" aria-describedby="h-exclusion" aria-invalid="@FieldHelp.Invalid(InputCheck, "Exclusion criteria")"
                           maxlength="@AuBtechReviewAgent.ReviewInputGuard.MaxCriteria"
                           @bind="State.ExclusionCriteria" @bind:event="oninput" @bind:after="Changed"
                           placeholder="e.g. are about agriculture or marketing, or are opinion pieces without evidence" class="ui-input resize-y"></textarea>
-                <FieldHelp Id="h-exclusion" Text="What rules a study out. Optional." Value="@State.ExclusionCriteria" Max="AuBtechReviewAgent.ReviewInputGuard.MaxCriteria" />
+                <FieldHelp Id="h-exclusion" Value="@State.ExclusionCriteria" Max="AuBtechReviewAgent.ReviewInputGuard.MaxCriteria" />
             </div>
         </fieldset>
 
@@ -117,7 +117,7 @@
                           maxlength="@AuBtechReviewAgent.ReviewInputGuard.MaxDirective"
                           @bind="State.SynthesisTargetDirective" @bind:event="oninput" @bind:after="Changed"
                           placeholder="e.g. a flowchart of how the studies evaluate agent safety, from threat to mitigation" class="ui-input mt-3 resize-y"></textarea>
-                <FieldHelp Id="h-directive" Text="Built after the analysis, only from what the review found; what it cites is checked like the text." Value="@State.SynthesisTargetDirective" Max="AuBtechReviewAgent.ReviewInputGuard.MaxDirective" />
+                <FieldHelp Id="h-directive" Value="@State.SynthesisTargetDirective" Max="AuBtechReviewAgent.ReviewInputGuard.MaxDirective" />
             }
         </fieldset>
 

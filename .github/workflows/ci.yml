@@ -243,6 +243,7 @@ jobs:
           PRINT_OUT: ${{ github.workspace }}/a11y-screenshots
           CTA_KEYS: ${{ github.workspace }}/cta-keys.json
           CTA_OUT: ${{ github.workspace }}/a11y-screenshots
+          FIT_SHOTS: '1'
         run: |
           while [ ! -f "$RUNNER_TEMP/browser.done" ]; do sleep 2; done
           cat "$RUNNER_TEMP/browser.log"

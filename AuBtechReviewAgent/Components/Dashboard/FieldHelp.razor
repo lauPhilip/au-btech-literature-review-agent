@@ -1,13 +1,18 @@
 @* A short help line under a form field; the character count only appears when the text gets near the limit.
    The id is what the field's aria-describedby points to, so screen readers read the help with the field. Under
-   640 px the help text is hidden to keep the form on one screen, but the count still shows. *@
+   640 px the help text is hidden to keep the form on one screen, but the count still shows. A field whose label
+   says it all has no help text (issue #729): the line then holds only the count, and takes no room until it shows. *@
 
 @{
     int length = Value?.Length ?? 0;
+    bool counting = length > Max * 0.8;
 }
-<div id="@Id" class="mt-1 flex justify-between gap-2 text-xs leading-snug">
-    <span class="text-muted max-sm:sr-only">@Text</span>
-    @if (length > Max * 0.8)
+<div id="@Id" class="@(string.IsNullOrEmpty(Text) && !counting ? "hidden" : "flex") mt-1 justify-between gap-2 text-xs leading-snug">
+    @if (!string.IsNullOrEmpty(Text))
+    {
+        <span class="text-muted max-sm:sr-only">@Text</span>
+    }
+    @if (counting)
     {
         <span class="ml-auto shrink-0 font-mono @(length > Max * 0.95 ? "text-not-supported" : "text-partly")">@length / @Max</span>
     }
@@ -15,7 +20,8 @@
 
 @code {
     [Parameter, EditorRequired] public string Id { get; set; } = "";
-    [Parameter, EditorRequired] public string Text { get; set; } = "";
+    /// <summary>The help line; empty when the label says it all.</summary>
+    [Parameter] public string Text { get; set; } = "";
     [Parameter] public string? Value { get; set; }
     [Parameter] public int Max { get; set; }
 

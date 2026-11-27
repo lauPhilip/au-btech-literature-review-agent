@@ -39,24 +39,39 @@ public class ReviewComposerTests
     }
 
     [Fact]
-    public async Task TheComposerShowsTheSevenStepsAndTheFreeTierBadgeAboveAPhone()
+    public async Task TheEmptyFormHasNoStepStripAndShowsTheBadgeAboveAPhone()
     {
         var quota = new QuotaStatus(QuotaTier.Free, true, 1, 3, "");
         string html = await RenderAsync<ReviewComposer>(new UiStateContainer(), new() { ["Method"] = ReviewMethods.Default, ["Quota"] = quota });
 
-        Assert.Equal(7, ReviewComposer.PipelineSteps.Count);
-        Assert.Equal(new[] { "Protocol", "Search", "Screening", "Evidence", "Writing", "Artifact", "Checking" }, ReviewComposer.PipelineSteps.Select(s => s.Title));
-        foreach (var (title, line) in ReviewComposer.PipelineSteps)
-        {
-            Assert.Contains(title, html);
-            Assert.Contains(line, html);
-        }
-        Assert.Contains("lg:grid-cols-7", html);
+        // The seven steps show when the run starts, not on the empty form (issue #732).
+        Assert.DoesNotContain("What the review does", html);
+        foreach (var (_, line) in ReviewSteps.All) Assert.DoesNotContain(line, html);
         Assert.Contains("Free tier · 2 of 3 left today", html);
-        // On a phone the eyebrow, the badge and the strip are hidden; the help text is kept for screen readers.
-        Assert.Contains("max-sm:hidden sm:grid-cols-4", html);
-        Assert.Contains("text-muted max-sm:sr-only", html);
+        // Try an example, the badge, API keys and Start share one row from 640 px.
+        int row = html.IndexOf("sm:flex-row", StringComparison.Ordinal);
+        Assert.True(row >= 0 && row < html.IndexOf(">Try an example<", StringComparison.Ordinal));
+        Assert.True(html.IndexOf(">API keys<", StringComparison.Ordinal) < html.IndexOf(">Start review<", StringComparison.Ordinal));
         Assert.Contains("max-sm:w-full\">Start review", html);
+    }
+
+    [Fact]
+    public async Task TheObjectiveAndQueryHaveNoHelpLineThatRepeatsTheirLabel()
+    {
+        string html = await RenderAsync<ReviewComposer>(new UiStateContainer(), new() { ["Method"] = ReviewMethods.Default });
+
+        // Issue #729: the title already asks the question, and the query's hint is its placeholder.
+        Assert.DoesNotContain("The question the review answers", html);
+        Assert.DoesNotContain("The words sent to the databases", html);
+        Assert.Contains("placeholder=\"Short and specific works best, e.g. agentic AI software frameworks\"", html);
+        // The line stays for the character count, folded away until the text nears the limit.
+        Assert.Contains("id=\"h-objective\" class=\"hidden mt-1", html);
+        Assert.Contains("id=\"h-query\" class=\"hidden mt-1", html);
+
+        var near = new UiStateContainer { SearchQuery = new string('a', ReviewInputGuard.MaxQuery) };
+        string counted = await RenderAsync<ReviewComposer>(near, new() { ["Method"] = ReviewMethods.Default });
+        Assert.Contains($"id=\"h-query\" class=\"flex mt-1", counted);
+        Assert.Contains($"{ReviewInputGuard.MaxQuery} / {ReviewInputGuard.MaxQuery}", counted);
     }
 
     [Fact]
@@ -157,6 +172,21 @@ public class ReviewComposerTests
         var none = new UiStateContainer { ArtifactKind = ArtifactKinds.None };
         string withoutVisual = await RenderAsync<CriteriaPanel>(none, new() { ["SourceAvailability"] = OpenSourcesOnly });
         Assert.DoesNotContain("id=\"f-directive\"", withoutVisual);
+    }
+
+    [Fact]
+    public async Task TheCriteriaHaveNoHelpLineThatRepeatsTheirLabel()
+    {
+        string html = await RenderAsync<CriteriaPanel>(new UiStateContainer(), new() { ["SourceAvailability"] = OpenSourcesOnly });
+
+        // Issue #729: the labels say it; the exclusion label says it is optional, as the query says it is required.
+        Assert.DoesNotContain("What a study must be about or contain.", html);
+        Assert.DoesNotContain("What rules a study out.", html);
+        Assert.Contains("Exclude studies that… <span class=\"font-normal text-muted\">(optional)</span>", html);
+        // The visual summary's note lives in its (?) tooltip, which screen readers read as its description.
+        Assert.DoesNotContain("id=\"h-directive\" class=\"flex", html);
+        Assert.Contains("What it cites is checked like the text.", Glossary.Find("artifact")!.Explanation);
+        Assert.Contains("What it cites is checked like the text.", html);
     }
 
     [Fact]
