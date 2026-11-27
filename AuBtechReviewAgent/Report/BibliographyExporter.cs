@@ -43,7 +43,8 @@ public static class BibliographyExporter
             if (d?.Issue != null) fields.Add(("number", Bib(d.Issue)));
             if (d?.Pages != null) fields.Add(("pages", Bib(d.Pages.Replace("\u2013", "--"))));
             else if (d?.ArticleNumber != null) fields.Add(("eid", Bib(d.ArticleNumber)));
-            if (d?.Publisher != null && type == "inproceedings") fields.Add(("publisher", Bib(d.Publisher)));
+            if (d?.Editors is { Count: > 0 } editors && type == "incollection") fields.Add(("editor", string.Join(" and ", editors.Select(BibAuthor))));
+            if (d?.Publisher != null && type is "inproceedings" or "incollection") fields.Add(("publisher", Bib(d.Publisher)));
             if (!string.IsNullOrWhiteSpace(r.Doi)) fields.Add(("doi", r.Doi!));
             // The database's landing page adds nothing when the DOI is there; only http(s), since a source can return any scheme.
             else if (PrismaReviewEngine.IsWebAddress(r.Url)) fields.Add(("url", r.Url!));

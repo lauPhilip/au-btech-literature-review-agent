@@ -23,6 +23,8 @@ public static class ReferenceEnrichmentText
         ("pages", "the pages"),
         ("articleNumber", "the article number"),
         ("publisher", "the publisher"),
+        ("book", "the book a chapter is in"),
+        ("editors", "the book's editors"),
     };
 
     private static readonly string[] Services = { ReferenceAnswers.Crossref, ReferenceAnswers.OpenAlex, ReferenceAnswers.Arxiv };
@@ -77,6 +79,7 @@ public static class ReferenceEnrichmentText
             $"looked up in code at {Join(asked)} by that identifier{byTitle}, and {result}.{notLooked} " +
             "No language model was involved: an answer was used only when its title named the same work, it filled gaps without " +
             "changing the year, title or venue the source gave" + (published > 0 ? " (except for a published version, which replaces the preprint)" : "") +
+            (looked.Any(r => r.Filled.ContainsKey("book") && r.Filled.ContainsKey("venue")) ? ", except that a chapter is cited in its book rather than in the book series around it" : "") +
             $", and every lookup and filled field is listed in {ReferenceEnrichmentFile.FileName}.";
     }
 
