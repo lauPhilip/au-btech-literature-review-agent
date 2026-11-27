@@ -70,4 +70,11 @@ public class CitationSplitTests
         Assert.Contains("the sentence \"Logs help [1, 2, 3, 4].\" cites 4 references", problem);
         Assert.Contains("3 sentences break this rule; the others are \"Replays help [1, 2, 3, 5].\" (4 references); \"Loops help [2, 3, 4, 5].\" (4 references).", problem);
     }
+
+    [Fact]
+    public void TheClosingCanLeaveTheRuleToItsSoftCheck()
+    {
+        Assert.NotNull(ReviewWriter.ClosingProblem("The evidence rests on surveys [1, 2, 3, 4].", "Teams should log calls.", "Trials are missing.", "Logging matters.", "", 4));
+        Assert.Null(ReviewWriter.ClosingProblem("The evidence rests on surveys [1, 2, 3, 4].", "Teams should log calls.", "Trials are missing.", "Logging matters.", "", 4, checkLoad: false));
+    }
 }

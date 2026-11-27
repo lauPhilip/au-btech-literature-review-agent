@@ -73,7 +73,9 @@ public static partial class ReviewWriter
         // The given answers are checked text: their numbers may be used, as the results' may.
         string checkedText = given == null ? results : results + "\n\n### Answers to the research questions\n" + AnswerLines(given, profile);
         // Studies left out of the themes may be named in the limitations, never used as evidence (issue #166).
-        string leftOutRule = evidence.LeftOut.Count == 0 ? "" : $" The {profile.Sources} left out of the themes may be named only in the limitations, to say they were left out; no other part cites them.";
+        // Issue #742: run 866a897b's limitations listed them all in one sentence, "The excluded records are [4], [6], [13], and [14].",
+        // which broke the rule on references per sentence; the methods already list them, so the closing says how many, uncited.
+        string leftOutRule = evidence.LeftOut.Count == 0 ? "" : $" Never cite the {profile.Sources} left out of the themes: the methods list them, so the limitations may say how many were left out, in words, with no markers, and no other part mentions them.";
         string prompt = $$"""
             You are writing the sections that follow the discussion of {{profile.Review}}. Its results and discussion are finished and checked; write only what they and the facts below say.
 
@@ -108,15 +110,21 @@ public static partial class ReviewWriter
         {
             ClosingAnswer answer;
             using (LlmStage.Begin("closing"))
-                answer = await LlmJson.GetAsync<ClosingAnswer>(chat, prompt, LlmJson.JsonMode(0.3), WithSoftGuards<ClosingAnswer>(a => CitationLoadSendBack(string.Join("\n", new[] { a.Limitations, a.Implications, a.FutureResearch, a.Conclusion }.Concat(a.Answers ?? new())), "closing call", warn) ?? ClosingProblem(a.Limitations, a.Implications, a.FutureResearch, a.Conclusion, checkedText + "\n" + facts + "\n" + evidence.BaseFacts, referenceCount,
-                    a.Answers, questions.Count, ownFacts: facts + "\n" + evidence.BaseFacts, results: checkedText, evidence: evidence, profile: profile, givenAnswers: given),
+                answer = await LlmJson.GetAsync<ClosingAnswer>(chat, prompt, LlmJson.JsonMode(0.3), WithSoftGuards<ClosingAnswer>(a => ClosingProblem(a.Limitations, a.Implications, a.FutureResearch, a.Conclusion, checkedText + "\n" + facts + "\n" + evidence.BaseFacts, referenceCount,
+                    a.Answers, questions.Count, ownFacts: facts + "\n" + evidence.BaseFacts, results: checkedText, evidence: evidence, profile: profile, givenAnswers: given, checkLoad: false),
                     "closing call", warn, FigureSendBacks,
                     (a => ClosingFigureProblem(a, sections, discussion, given, facts + "\n" + evidence.BaseFacts), "a repeated result figure"),
-                    (a => OverclaimProblem(a.Conclusion, certainty, "the conclusion"), "a claim stronger than the certainty of the evidence")), repairAttempts: 2);
-            string Clean(string? text) => MethodsSectionWriter.StripMarkdownEmphasis(text!.Trim());
-            var modelAnswers = new Queue<string>((answer.Answers ?? new()).Where(a => !string.IsNullOrWhiteSpace(a)).Select(Clean));
-            return new ClosingSections(Clean(answer.Limitations), Clean(answer.Implications), Clean(answer.FutureResearch), Clean(answer.Conclusion),
+                    (a => OverclaimProblem(a.Conclusion, certainty, "the conclusion"), "a claim stronger than the certainty of the evidence"),
+                    // Issue #742: soft and last; a sentence still over the rule is split in code below, so the closing is never lost to it.
+                    (a => ClosingLoadProblem(a), LoadSendBack)), repairAttempts: 2);
+            var splits = new List<string>();
+            string Clean(string? text, string part) => SplitOverCited(MethodsSectionWriter.StripMarkdownEmphasis(text!.Trim()), part, splits);
+            var modelAnswers = new Queue<string>((answer.Answers ?? new()).Where(a => !string.IsNullOrWhiteSpace(a)).Select((a, i) => Clean(a, $"answer {i + 1}")));
+            var closing = new ClosingSections(Clean(answer.Limitations, "the limitations"), Clean(answer.Implications, "the implications"),
+                Clean(answer.FutureResearch, "the future research"), Clean(answer.Conclusion, "the conclusion"),
                 all.Count == 0 ? null : given?.ToList() ?? all.Select(q => InCode(q) ? UnansweredText(profile) : modelAnswers.Dequeue()).ToList());
+            foreach (var split in splits) warn?.Invoke(split);
+            return closing;
         }
         catch (Exception ex)
         {
@@ -137,10 +145,19 @@ public static partial class ReviewWriter
             (given ?? Array.Empty<string>()).Append(discussion), new[] { "the future research", "the conclusion" });
     }
 
-    /// <summary>Why a closing answer cannot be used, or null. Public for unit tests.</summary>
+    /// <summary>The first part of a closing answer that breaks the rule on references per sentence, or null.</summary>
+    private static string? ClosingLoadProblem(ClosingAnswer a) =>
+        new[] { ("limitations", a.Limitations), ("implications", a.Implications), ("futureResearch", a.FutureResearch), ("conclusion", a.Conclusion) }
+            .Concat((a.Answers ?? new()).Select((t, i) => ($"answer {i + 1}", (string?)t)))
+            .Select(p => CitationLoadProblem(p.Item2, part: p.Item1)).FirstOrDefault(p => p != null);
+
+    /// <summary>
+    /// Why a closing answer cannot be used, or null. With <paramref name="checkLoad"/> false the rule on references per
+    /// sentence is left to a soft check (issue #742). Public for unit tests.
+    /// </summary>
     public static string? ClosingProblem(string? limitations, string? implications, string? futureResearch, string? conclusion, string known, int referenceCount,
         IReadOnlyList<string>? answers = null, int questions = 0, string ownFacts = "", string results = "", ReviewEvidence? evidence = null, WritingProfile? profile = null,
-        IReadOnlyList<string>? givenAnswers = null)
+        IReadOnlyList<string>? givenAnswers = null, bool checkLoad = true)
     {
         if (questions > 0)
         {
@@ -162,7 +179,7 @@ public static partial class ReviewWriter
             return $"conclusion sentence {repeat.Sentence} restates the answer to RQ{repeat.Answer}; the answers are printed just before the conclusion, so say what they mean together for the review objective instead.";
         if (printed != null && ThematicSynthesis.CitedIn(conclusion).Count > 0)
             return "the conclusion takes no citations when there are research questions: the answers carry them, and the conclusion is the review's own reading of the answers together.";
-        foreach (var (name, text) in parts)
+        foreach (var (name, text) in parts.Where(_ => checkLoad))
             if (CitationLoadProblem(text, part: name) is { } load) return load;
         foreach (var (name, text) in parts)
             if (OwnCountCited(text!, ownFacts, results) is { } own)
