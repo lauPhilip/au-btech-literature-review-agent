@@ -75,6 +75,32 @@ public class ArchiveLatexTests : IDisposable
     }
 
     [Fact]
+    public void AConceptMapAndTheSynthesisDiagramShareOneBreakFromTheColumns()
+    {
+        var report = new PrismaReport
+        {
+            TitleItem = "Agent loops",
+            SynthesisResultsItem = "Overview.[TIKZ_START]\\node (a) {Loop};\\node[right=of a] (b) {Stop};\\draw (a) -> (b);[TIKZ_END]",
+            Artifact = new ReviewArtifact
+            {
+                Kind = ArtifactKinds.ConceptMap, Title = "Map", Caption = "From the studies.",
+                Nodes = { new ArtifactNode { Id = "n1", Label = "Loop" }, new ArtifactNode { Id = "n2", Label = "Stop" } },
+                Edges = { new ArtifactEdge { From = "n1", To = "n2" } },
+            },
+        };
+
+        string tex = MainTex(report, TwoJournalPapers());
+
+        // Issue #684: the map is shrunk only when it does not fit, and two figures in a row leave no empty columns.
+        Assert.Contains("\\adjustbox{max width=\\linewidth, max totalheight=0.8\\textheight}{%\n\\begin{tikzpicture}", tex);
+        Assert.DoesNotContain("\\begin{multicols}{2}\n\n\\end{multicols}", tex);
+        int map = tex.IndexOf("\\label{fig:artifact}", StringComparison.Ordinal);
+        int diagram = tex.IndexOf("Grounded Architectural Synthesis System Model Diagram", StringComparison.Ordinal);
+        Assert.True(map > 0 && diagram > map);
+        Assert.DoesNotContain("multicols", tex[map..diagram]);
+    }
+
+    [Fact]
     public void TableA1StartsWithTheReferenceNumberAndStillFitsThePage()
     {
         string tex = MainTex(new PrismaReport { TitleItem = "Agent loops" }, TwoJournalPapers());

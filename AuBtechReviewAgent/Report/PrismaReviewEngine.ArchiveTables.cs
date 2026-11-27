@@ -91,7 +91,8 @@ public partial class PrismaReviewEngine
         {
             sb.AppendLine(@"\begin{figure}[H]");
             sb.AppendLine(@"\centering");
-            sb.AppendLine(@"\resizebox{\linewidth}{!}{");
+            // Shrunk only when it is too wide or too tall for the page, never blown up (issue #684).
+            sb.AppendLine(@"\adjustbox{max width=\linewidth, max totalheight=0.8\textheight}{%");
             sb.Append(ArtifactBuilder.ToTikz(artifact, EscapeLatexText));
             sb.AppendLine(@"}");
             string dashed = ArtifactLinks.DashedNote(artifact);
