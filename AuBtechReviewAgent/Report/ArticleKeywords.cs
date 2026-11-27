@@ -73,7 +73,7 @@ public static class ArticleKeywords
 
     // A word keeps its capitals when it is an acronym or a name with a digit (AI, LLMs, GPT-4, RTW-A); every other word is lower case.
     // A capital at the start of each part of a hyphenated title-case word ("Agent-Level") is not an acronym (#746).
-    private static bool KeepsCapitals(string word) => word.Any(char.IsDigit) || word.Split('-').Any(part => part.Count(char.IsUpper) > 1);
+    internal static bool KeepsCapitals(string word) => word.Any(char.IsDigit) || word.Split('-').Any(part => part.Count(char.IsUpper) > 1);
 
     private static string Shown(string phrase, int maxWords)
     {
