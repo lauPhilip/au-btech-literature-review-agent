@@ -121,8 +121,7 @@ public partial class PrismaReviewEngine
                 thematic = await thematicTask;
                 finalState.ThematicSynthesis = thematic.Codebook;
             }
-            // Checked theme subsections are kept when the discussion could not be written (issue #723): the paper says so
-            // in its place, and the closing parts are still written from the subsections.
+            // Checked theme subsections are kept when the discussion was not written; the paper says so (issue #723).
             bool useThematic = thematic != null && thematic.Sections.Count > 0;
             if (useThematic && string.IsNullOrWhiteSpace(thematic!.Discussion))
                 (thematic.Codebook.WritingNotes ??= new()).Add(DiscussionUnwrittenNote);
