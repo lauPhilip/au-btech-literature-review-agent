@@ -24,6 +24,16 @@ public class ArticleInfoTests
     }
 
     [Fact]
+    public void AThemeNameIsLoweredAsAWholeKeepingItsAcronyms()
+    {
+        // Run 866a897b (issue #746): only the first letter of "Agent-Level" was lowered, and "RTW-A" must stay.
+        var keywords = ArticleKeywords.From(null, null,
+            new[] { "Architectural and Agent-Level Safety Mechanisms", "Defences such as RTW-A", "LLM Agents and GPT-4" });
+
+        Assert.Equal(new[] { "architectural and agent-level safety mechanisms", "defences such as RTW-A", "LLM agents and GPT-4" }, keywords);
+    }
+
+    [Fact]
     public void ASearchStringIsKeptAsAKeywordOnlyWhenItHasAtMostThreeWords()
     {
         // The four strings of run 8942b961 (issue #681): whole sentences of search terms are not keywords.
