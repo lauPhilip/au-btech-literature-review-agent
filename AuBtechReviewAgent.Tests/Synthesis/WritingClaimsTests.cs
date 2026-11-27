@@ -210,7 +210,7 @@ public class RedThreadTests
     {
         // Issue #746: "within Architectural and Agent-Level Safety Mechanisms" in running text.
         var evidence = Evidence();
-        string head = "The studies evaluate agents in simulations [1, 2] and in deployments [3, 4]. ";
+        string head = "The studies evaluate agents in simulations [1, 2] and in deployments [3]. ";
         string tail = " caching plans saves cost [5]. Latency is measured too [6, 7]. One study places services [8].";
         var model = new FakeChatService()
             .Returns("{\"heading\":\"x\",\"text\":\"" + head + "Within Plan reuse," + tail + "\",\"leftOut\":[]}")

@@ -18,7 +18,7 @@ public static partial class ReviewWriter
 
     /// <summary>The prompt rule on the wording of a subsection (issue #746).</summary>
     public static string WordingRule(WritingProfile profile) =>
-        NumeralOpeningRule + " " +
+        $"Never open a sentence with a numeral: spell the number out or reword (\"Of the 16 {profile.Sources}, 12 ...\"). " +
         $"Every sentence says what a {profile.Source} found or means; never write a sentence whose only verb is \"is reported\" or \"is described\" (\"X is reported [1], and Y is reported [2].\"), since that says only that something exists. " +
         "When you refer to another theme, write its name in lower case, keeping acronyms (\"as reported under architectural and agent-level safety mechanisms\"), never with its capitals.";
 
@@ -42,7 +42,7 @@ public static partial class ReviewWriter
         var pieces = Regex.Split((text ?? "").Trim(), @"(?<=[.!?])\s+|\n+").Where(p => p.Length > 0).ToList();
         for (int i = 0; i < pieces.Count; i++)
             if (char.IsDigit(pieces[i][0]) && (i == 0 || !Abbreviation.IsMatch(pieces[i - 1])))
-                return $"{part}: \"{pieces[i]}\" opens on a numeral; spell the number out or reword (\"Of the 16 studies, 12 ...\").";
+                return $"{part}: \"{pieces[i]}\" opens on a numeral; spell the number out or reword the sentence.";
         return null;
     }
 
