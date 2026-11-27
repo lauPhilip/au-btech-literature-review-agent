@@ -1,6 +1,9 @@
+<p align="center"> <img width="192" height="192" alt="favicon" src="https://github.com/user-attachments/assets/99e247aa-e0c3-4a03-8dd4-defab1c0ed17" /></p>
+
 # TraceableAI
 
 **Literature reviews written by AI, where every citation can be checked.**
+
 
 Ask a language model to review the literature and you get fluent text with citations that are often wrong, mismatched or invented. TraceableAI runs a full PRISMA 2020 systematic review instead, and for every cited sentence it shows you the passage in the paper that supports it, or tells you plainly that it could not find one.
 
