@@ -18,7 +18,15 @@
         <link rel="canonical" href="@Url" />
     }
     <meta property="og:site_name" content="@AuBtechReviewAgent.SiteSeo.SiteName" />
-    <meta property="og:type" content="website" />
+    <meta property="og:type" content="@(Published != null ? "article" : "website")" />
+    @if (Published is DateTime published)
+    {
+        <meta property="article:published_time" content="@IsoDate(published)" />
+        @if (Modified is DateTime modified && modified > published)
+        {
+            <meta property="article:modified_time" content="@IsoDate(modified)" />
+        }
+    }
     <meta property="og:title" content="@FullTitle" />
     <meta property="og:description" content="@Description" />
     <meta property="og:url" content="@Url" />
@@ -72,6 +80,17 @@
     /// models (empty when none is recorded). Null on every other page.
     /// </summary>
     [Parameter] public IReadOnlyList<string>? AiGeneratedBy { get; set; }
+
+    /// <summary>
+    /// Set on a page that is one piece of writing, such as a gallery report (issue #542): link previews then show it as
+    /// an article (og:type) with this date, and <see cref="Modified"/> when it changed later. Null on every other page.
+    /// </summary>
+    [Parameter] public DateTime? Published { get; set; }
+
+    [Parameter] public DateTime? Modified { get; set; }
+
+    private static string IsoDate(DateTime utc) =>
+        DateTime.SpecifyKind(utc, DateTimeKind.Utc).ToString("yyyy-MM-ddTHH:mm:ssZ", System.Globalization.CultureInfo.InvariantCulture);
 
     /// <summary>The page's name in the breadcrumb trail; the title when not set.</summary>
     [Parameter] public string? BreadcrumbName { get; set; }

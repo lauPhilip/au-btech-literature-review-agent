@@ -25,6 +25,21 @@ public static class GalleryCard
         return string.Join(" · ", parts);
     }
 
+    /// <summary>
+    /// The description a shared link shows (meta description, Open Graph and Twitter, issue #542): what kind of report it
+    /// is, then its first research question, cut at a word to about 200 characters. The page escapes it as text.
+    /// </summary>
+    public static string ShareDescription(GalleryEntry e)
+    {
+        string text = $"An example {TypeLabel(e.Card).ToLowerInvariant()} made with TraceableAI, with every citation checked against its source.";
+        if (e.Questions.FirstOrDefault(q => !string.IsNullOrWhiteSpace(q)) is string question)
+            text += " " + string.Join(' ', question.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
+        const int max = 200;
+        if (text.Length <= max) return text;
+        int cut = text.LastIndexOf(' ', max - 1);
+        return text[..(cut > 100 ? cut : max - 1)].TrimEnd(',', ';', ':', '.') + "…";
+    }
+
     /// <summary>"TraceableAI 1.4.0 · run 1a2b3c4d · added 20 November 2026 · 3 versions, newest 24 November 2026".</summary>
     public static string Provenance(GalleryEntry e)
     {
