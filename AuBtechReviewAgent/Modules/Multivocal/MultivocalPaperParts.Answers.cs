@@ -144,6 +144,13 @@ public static partial class MultivocalPaperParts
         {
             var refs = new[] { byId.GetValueOrDefault(tension.FindingA)?.Address, byId.GetValueOrDefault(tension.FindingB)?.Address }
                 .OfType<string>().Where(numbers.ContainsKey).Select(a => numbers[a]);
+            if (!tension.IsCited)
+            {
+                sb.Append($" Tension between the values: {Sentence(tension.Description)}".TrimEnd());
+                if (!sb.ToString().EndsWith('.')) sb.Append('.');
+                sb.Append(' ').Append(SynthesisTension.UncitedNote);
+                continue;
+            }
             sb.Append($" Tension between sources{(tension.Between != null ? $", {tension.Between}" : "")}: {Sentence(tension.Description)}{Cite(refs)}".TrimEnd());
             if (!sb.ToString().EndsWith('.')) sb.Append('.');
         }
