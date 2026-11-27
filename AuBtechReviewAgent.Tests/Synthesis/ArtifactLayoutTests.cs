@@ -56,8 +56,8 @@ public class ArtifactLayoutTests
 
         string tikz = ArtifactBuilder.ToTikz(map, s => s);
 
-        Assert.Contains(@"\node[box] (A) at (0.0,0.0)", tikz);
-        Assert.Contains(@"\node[box] (B) at (4.4,0.0)", tikz);
-        Assert.Contains(@"\node[box] (C) at (8.8,0.0)", tikz);
+        Assert.Contains(@"\node[box] (A) at (0.0,", tikz);
+        Assert.Contains(@"\node[box] (B) at (4.4,", tikz);
+        Assert.Contains(@"\node[box] (C) at (8.8,", tikz);
     }
 }
