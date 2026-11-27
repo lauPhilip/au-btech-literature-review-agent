@@ -33,6 +33,9 @@ public static class MultivocalArticleInfo
             Keywords = ArticleKeywords.From(plan.Topic, strings, input.Synthesis.Themes.Select(t => t.Name)),
             ReportPath = $"mlr-paper/{input.Planned.RunId}",
             HasProtocol = hasProtocol,
+            // A multivocal run keeps no systematic ledger; its decisions are its screened sources (screened.ris).
+            DecisionLogFile = GreyReferences.ScreenedFile,
+            DecisionLogTitle = "Every screened source with its decision and the reason, as RIS",
         };
     }
 }
