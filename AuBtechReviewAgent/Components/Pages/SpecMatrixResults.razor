@@ -22,9 +22,9 @@
     @if (Page.codebook is { Themes.Count: > 0 })
     {
         <div class="mt-4">
-            <h3 class="mb-2 font-display text-base font-semibold text-heading">Evidence map: studies by theme</h3>
             <div class="overflow-x-auto print:overflow-visible" tabindex="0" role="region" aria-label="Scrolls sideways">
                 <table class="w-full border border-line text-sm">
+                    <caption class="ui-caption pb-2 text-left">Table 4.1: Evidence map of studies by theme</caption>
                     <thead class="bg-soft text-muted">
                         <tr>
                             <th class="border-b border-line p-2 text-left">Theme</th>
@@ -58,18 +58,20 @@
 
     @if (Page.report.Artifact is { } art)
     {
-        <div class="mt-5 border border-line p-3 space-y-2">
-            <span class="text-xs font-bold text-muted uppercase block">Artifact: @(string.IsNullOrWhiteSpace(art.Title) ? AuBtechReviewAgent.ArtifactKinds.All.FirstOrDefault(k => k.Key == art.Requested).Label : art.Title)</span>
+        @* Set as in a journal (issue #736): a diagram is a figure with its numbered caption under it, a table has its
+           numbered caption above it, and nothing is boxed. *@
+        string artTitle = string.IsNullOrWhiteSpace(art.Title) ? AuBtechReviewAgent.ArtifactKinds.All.FirstOrDefault(k => k.Key == art.Requested).Label : art.Title;
+        string artName = artTitle.Trim();
+        string artLabel = artName.EndsWith('.') || artName.EndsWith('?') || artName.EndsWith('!') ? artName : artName + ".";
+        string artCaption = string.IsNullOrWhiteSpace(art.Caption) ? "" : " " + art.Caption.Trim();
+        int artTable = Page.codebook is { Themes.Count: > 0 } ? 2 : 1;
+        <figure class="ui-figure mt-5">
             @if (art.Error != null)
             {
-                <p class="text-[13px] text-muted italic">@art.Error</p>
+                <p class="text-[13px] text-muted italic">@artTitle: @art.Error</p>
             }
             else
             {
-                @if (!string.IsNullOrWhiteSpace(art.Caption))
-                {
-                    <p class="text-[13px] text-muted">@art.Caption</p>
-                }
                 @if (art.IsDiagram && !string.IsNullOrEmpty(Page.mermaidDiagramCode))
                 {
                     @* Filled by wwwroot/js/mermaid-render.js; Blazor leaves the empty element alone. *@
@@ -83,11 +85,13 @@
                     {
                         <p class="text-xs text-muted" data-cited-boxes-pointer>The citations of each box are checked in <a href="#@AuBtechReviewAgent.ReportOutline.CitedBoxesId" class="text-heading underline underline-offset-2">@AuBtechReviewAgent.ReportOutline.CitedBoxesTable(Page.extractions.Count > 0)</a>.</p>
                     }
+                    <figcaption class="ui-caption">Figure 4.1: @artLabel@artCaption</figcaption>
                 }
                 else if (art.Kind == AuBtechReviewAgent.ArtifactKinds.Table)
                 {
                     <div class="overflow-x-auto print:overflow-visible" tabindex="0" role="region" aria-label="Scrolls sideways">
                         <table class="w-full text-[13px] border border-line align-top">
+                            <caption class="ui-caption pb-2 text-left">Table 4.@artTable: @artLabel@artCaption</caption>
                             <thead class="bg-soft text-muted text-left">
                                 <tr>@foreach (var col in art.Columns) { <th class="p-1.5 border-b border-line">@col</th> }</tr>
                             </thead>
@@ -108,6 +112,7 @@
                 }
                 else
                 {
+                    <p class="ui-caption font-semibold">@artLabel@artCaption</p>
                     <ul class="list-disc pl-5 space-y-1">
                         @for (int b = 0; b < art.Bullets.Count; b++)
                         {
@@ -116,7 +121,7 @@
                     </ul>
                 }
             }
-        </div>
+        </figure>
     }
     else if (!string.IsNullOrEmpty(Page.mermaidDiagramCode))
     {
