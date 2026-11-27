@@ -41,6 +41,10 @@ internal sealed class ApiTestHost : WebApplicationFactory<Program>
     /// <summary>Set when the model is first asked; with a gate, the model then waits until the gate opens.</summary>
     public ManualResetEventSlim ModelEntered { get; } = new(false);
 
+    /// <summary>Starts the app with the API switched on or off, in the given environment, with the fake model and sources.</summary>
+    /// <param name="enabled">Api:Enabled, or null to leave the app's own default.</param>
+    /// <param name="environment">The hosting environment, Development unless a test needs Production.</param>
+    /// <param name="gate">When given, the model waits at its first call until the gate opens.</param>
     /// <param name="papers">Papers the fake sources return besides their usual ones, such as an attack paper.</param>
     public ApiTestHost(bool? enabled = true, string environment = "Development", ManualResetEventSlim? gate = null, AcademicPaper[]? papers = null)
     {

@@ -76,7 +76,8 @@ public static partial class ReviewWriter
             1. "lead": one plain sentence saying whom the summary is for and what it covers. No citations.
             2. "items": three to {{MaxSummaryItems}} checklist items a practitioner can act on or check against, in plain words and in the order of importance the results give them. Each item is ONE sentence of at most 35 words that ends with an inline [n] marker for the {{profile.Sources}} the results cite for it.
             3. Say how strong the support is where the results say so (for example, when a practice rests only on blog posts). Do not invent numbers, practices, tools or {{profile.Sources}}.
-            4. {{CitationLoadRule(profile)}}
+            4. Give no count of {{profile.Sources}} in an item (not "as 65 {{profile.Sources}} describe" or "noted in 12"): a count in the results belongs to one value of the map, and the item may not name that value. The [n] markers show the support; the results give the counts.
+            5. {{CitationLoadRule(profile)}}
             {{ProseCleaner.PlainProseRule}}
             Respond ONLY with a valid minified JSON object:
             {"lead":"...","items":["... [n]","... [n, m]"]}
@@ -98,6 +99,16 @@ public static partial class ReviewWriter
         }
     }
 
+    /// <summary>
+    /// A count of sources in a summary item: "65 sources", "in 12 of the posts", "noted in 58". Run 50e9a8e3 (issue #465)
+    /// gave three such counts, and each belonged to another value of the map than the practice the item named, so the
+    /// check that the number appears in the results passed. Items now give no counts at all. Only one to three digits
+    /// count, so a year ("2025 reports") or a model name ("GPT-4 papers") is not taken for a count.
+    /// </summary>
+    public static readonly Regex SourceCount = new(
+        @"(?<![\w.,-])\d{1,3}\s+(?:of\s+(?:the\s+)?(?:\d+\s+)?)?(?:\w+\s+)?(?:sources?|stud(?:y|ies)|papers?|articles?|posts?|repositor(?:y|ies)|documents?|reports?|records?|pages?|threads?)\b|\b(?:noted|described|recommended|named|cited|mentioned|reported)\s+(?:in|by)\s+\d{1,3}(?![\d.,])",
+        RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+
     private static string? SummaryProblem(SummaryAnswer a, string results, int referenceCount)
     {
         if (string.IsNullOrWhiteSpace(a.Lead) || a.Items == null) return "lead and items must both be given.";
@@ -110,6 +121,8 @@ public static partial class ReviewWriter
         if (tooLong >= 0) return $"item {tooLong + 1} is too long; keep each item to one sentence of at most 35 words.";
         var outside = items.SelectMany(ThematicSynthesis.CitedIn).Where(r => r < 1 || r > referenceCount).Distinct().ToList();
         if (outside.Count > 0) return $"citation numbers {string.Join(", ", outside)} are not in the reference list.";
+        int counted = items.FindIndex(i => SourceCount.IsMatch(i));
+        if (counted >= 0) return $"item {counted + 1} gives a count of sources (\"{SourceCount.Match(items[counted]).Value}\"); leave counts out of the items, the results give them.";
         int heavy = items.FindIndex(i => CitationLoadProblem(i) != null);
         if (heavy >= 0) return $"item {heavy + 1}: {CitationLoadProblem(items[heavy])}";
         var known = NumbersIn(results);
