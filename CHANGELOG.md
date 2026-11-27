@@ -153,6 +153,9 @@ The Decision log on a systematic paper now downloads the run's full ledger as JS
 - Fixed a bug where citations in Table A.1 broke after every letter on a wide screen. They now break between words.
 - Fixed a bug where the abstract or conclusion was sent back for a plain "requires" or "must", such as "a study notes that its protocol requires sign-off". Only a claim in the review's own voice is sent back now.
 - Fixed a bug where the self-check did not count a figure repeated in a comparison table or a list, only in a diagram.
+- Fixed a bug where links in the concept map of main.tex ran through other boxes. Linked boxes now sit side by side, and a long link goes around the boxes.
+- Fixed a bug where main.tex left blank space between two figures in the results.
+- Fixed a bug where the tab of a multivocal run page did not say when the run had finished while the page was open.
 
 ## [0.7.0] - 2026-11-27
 

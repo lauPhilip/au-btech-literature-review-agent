@@ -180,47 +180,6 @@ public static class ArtifactBuilder
         return sb.ToString().TrimEnd();
     }
 
-    /// <summary>
-    /// A TikZ picture for main.tex: boxes in layers by their longest path from a starting box (left to right
-    /// for concept maps, top to bottom for flowcharts), arrows between them. Compiles with plain pdflatex.
-    /// </summary>
-    public static string ToTikz(ReviewArtifact a, Func<string, string> escape)
-    {
-        if (!a.IsDiagram || a.Nodes.Count == 0) return "";
-        var layer = a.Nodes.ToDictionary(n => n.Id, _ => 0);
-        // Longest-path layering; at most Nodes.Count rounds, so a cycle cannot loop forever.
-        for (int round = 0; round < a.Nodes.Count; round++)
-        {
-            bool changed = false;
-            foreach (var e in a.Edges)
-                if (e.From != e.To && layer[e.To] < layer[e.From] + 1 && layer[e.From] + 1 < a.Nodes.Count) { layer[e.To] = layer[e.From] + 1; changed = true; }
-            if (!changed) break;
-        }
-        bool vertical = a.Kind == ArtifactKinds.Flowchart;
-        var sb = new StringBuilder();
-        sb.AppendLine(@"\begin{tikzpicture}[box/.style={draw, rounded corners, align=center, text width=3.2cm, font=\scriptsize, inner sep=3pt}, every edge/.style={draw, ->, thick}]");
-        // Layers are placed next to each other by their order, not their number: a cycle can push the longest path
-        // far up, and a gap of empty layers made the map so wide that it shrank to an unreadable size (issue #126).
-        int column = 0;
-        foreach (var group in a.Nodes.GroupBy(n => layer[n.Id]).OrderBy(g => g.Key))
-        {
-            int i = 0;
-            foreach (var n in group)
-            {
-                double x = vertical ? i * 4.0 : column * 4.4;
-                double y = vertical ? -column * 2.2 : -i * 2.0;
-                sb.AppendLine($"\\node[box] ({n.Id}) at ({x.ToString("0.0", CultureInfo.InvariantCulture)},{y.ToString("0.0", CultureInfo.InvariantCulture)}) {{{escape(n.Label)}}};");
-                i++;
-            }
-            column++;
-        }
-        foreach (var e in a.Edges)
-        {
-            string label = string.IsNullOrWhiteSpace(e.Label) ? "" : $" node[midway, fill=white, font=\\tiny, align=center] {{{escape(e.Label)}}}";
-            string style = e.Check == ArtifactLinks.Reading ? "->, thick, dashed" : "->, thick";
-            sb.AppendLine($"\\draw[{style}] ({e.From}) --{label} ({e.To});");
-        }
-        sb.AppendLine(@"\end{tikzpicture}");
-        return sb.ToString();
-    }
+    /// <summary>A TikZ picture for main.tex, laid out by <see cref="ArtifactTikz"/>.</summary>
+    public static string ToTikz(ReviewArtifact a, Func<string, string> escape) => ArtifactTikz.Draw(a, escape);
 }

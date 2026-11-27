@@ -74,13 +74,17 @@ public static partial class PaperLatex
         foreach (var theme in paper.Themes) Section(theme);
         if (!string.IsNullOrWhiteSpace(paper.CoverageNote))
             Paragraph(@"\par\smallskip\noindent\textit{" + Escape(paper.CoverageNote) + "}");
-        foreach (var block in paper.ResultsLatex)
+        // Figures and wide tables leave the two columns together and come back to them once, so two blocks in a row
+        // leave no empty pair of columns between them (issue #684).
+        if (paper.ResultsLatex.Count > 0)
         {
-            // Figures and wide tables leave the two columns and come back to them.
             sb.AppendLine(@"\end{multicols}");
             sb.AppendLine();
-            sb.Append(block);
-            sb.AppendLine();
+            foreach (var block in paper.ResultsLatex)
+            {
+                sb.Append(block);
+                sb.AppendLine();
+            }
             lastColumns = sb.Length;
             sb.AppendLine(@"\begin{multicols}{2}");
             sb.AppendLine();
