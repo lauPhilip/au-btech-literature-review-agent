@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text;
 using System.Text.RegularExpressions;
 
 namespace AuBtechReviewAgent;
@@ -32,20 +33,22 @@ public static partial class ReviewWriter
     public static string SplitOverCited(string? text, string part, List<string> notes)
     {
         if (string.IsNullOrEmpty(text)) return text ?? "";
-        string result = text;
+        var result = new StringBuilder(text.Length);
+        int copied = 0;
         foreach (var (sentence, references) in OverCitedSentences(text))
         {
-            int at = result.IndexOf(sentence, StringComparison.Ordinal);
+            int at = text.IndexOf(sentence, copied, StringComparison.Ordinal);
             if (at < 0) continue;
             if (SplitAtClauses(sentence) is { } split)
             {
-                result = result[..at] + split + result[(at + sentence.Length)..];
+                result.Append(text, copied, at - copied).Append(split);
+                copied = at + sentence.Length;
                 notes.Add($"In {part}, a sentence that cited {references.Count} references was split in code at its clauses: \"{sentence}\" became \"{split}\"");
             }
             else
                 notes.Add($"In {part}, a sentence still cites {references.Count} references after every try, and it could not be split at its clauses, so it was kept: \"{sentence}\"");
         }
-        return result;
+        return result.Append(text, copied, text.Length - copied).ToString();
     }
 
     /// <summary>The sentence split at its clauses so that each new sentence cites at most the rule's number, or null.</summary>
