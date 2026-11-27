@@ -28,7 +28,7 @@ Version 0.6.0 is in [docs/changelog-0.6.md](docs/changelog-0.6.md), and versions
 
 ### 🌟 Patch highlights
 
-The Decision log on a systematic paper now downloads the run's full ledger as JSON. A server can now choose to call the model in the EU. A systematic paper no longer loses its theme sections when the discussion fails. Citations in the text are now written in one form, such as "[2, 9, 11]" and "Study [9] describes". Otherwise a new systematic run gives the same results as 0.7.0, and a multivocal summary can be worded a little differently.
+The Decision log on a systematic paper now downloads the run's full ledger as JSON. A server can now choose to call the model in the EU. A systematic paper no longer loses its theme sections when the discussion fails. Citations in the text are now written in one form, such as "[2, 9, 11]" and "Study [9] describes". A systematic paper no longer opens a sentence on a number or writes a theme name with capitals in running text. Otherwise a new systematic run gives the same results as 0.7.0, and a multivocal summary can be worded a little differently.
 
 ### 🔬 Systematic review
 
@@ -56,6 +56,16 @@ The Decision log on a systematic paper now downloads the run's full ledger as JS
 - A sentence that starts with a marker now names it: "Study [9] describes". A marker stuck to a word gets a space.
 - Two more bare markers are named: "[1, 2].[1] proposes" and "evidence, [1] suggests" now read "Study [1] proposes" and "evidence, Study [1] suggests".
 - **Hedge rule**: "No platform may combine ..." ⇒ "None of the evaluated platforms combined ...". What a study found in its own sample is stated plainly.
+
+#### Wording
+
+> Run 866a897b put "Architectural and Agent-Level Safety Mechanisms" in running text, opened sentences with "12 studies yielded 36 codes", and cited a study for "abstract-only reports".
+
+- **Theme names**: "Architectural and Agent-Level Safety Mechanisms" in a sentence ⇒ "architectural and agent-level safety mechanisms". The keywords line is lowered as a whole too, and acronyms such as RTW-A stay.
+- **Numbers that open a sentence**: "12 studies yielded 36 codes" ⇒ "Of the 16 included studies, 12 yielded 36 codes". The same holds for the abstract and each theme.
+- **Empty sentences**: "X is reported [1], and Y is reported [2]." is sent back to the model.
+- **Reading basis**: a cited sentence in the rationale or the discussion that says "abstract-only" or "full text" is sent back. The methods text says what the review read.
+- The overview of the synthesis in a systematic paper is worded a little differently.
 
 ### 🧭 Multivocal review (preview)
 

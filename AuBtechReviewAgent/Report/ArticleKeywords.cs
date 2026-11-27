@@ -71,13 +71,16 @@ public static class ArticleKeywords
         }
     }
 
-    // A word keeps its capitals when it is an acronym or a name with a digit (AI, LLMs, GPT-4); every other word is lower case.
+    // A word keeps its capitals when it is an acronym or a name with a digit (AI, LLMs, GPT-4, RTW-A); every other word is lower case.
+    // A capital at the start of each part of a hyphenated title-case word ("Agent-Level") is not an acronym (#746).
+    internal static bool KeepsCapitals(string word) => word.Any(char.IsDigit) || word.Split('-').Any(part => part.Count(char.IsUpper) > 1);
+
     private static string Shown(string phrase, int maxWords)
     {
         var words = Space.Split(Junk.Replace(phrase, " ").Trim()).Where(w => w.Length > 0).ToList();
         if (words.Count == 0 || words.Count > maxWords || words.All(StopWords.Contains)) return "";
         if (words.Sum(w => w.Length) < 3) return "";
-        return string.Join(' ', words.Select(w => w.Count(char.IsUpper) > 1 || w.Any(char.IsDigit) ? w : w.ToLowerInvariant()));
+        return string.Join(' ', words.Select(w => KeepsCapitals(w) ? w : w.ToLowerInvariant()));
     }
 
     // For comparing: lower case, each word without a final plural "s".

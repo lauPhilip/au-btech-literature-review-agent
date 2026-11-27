@@ -209,11 +209,12 @@ public static partial class ThematicSynthesis
         var sb = new StringBuilder();
         int coded = book.CodedStudies.Count();
         sb.Append($"The findings of the {included} included {(included == 1 ? "study were" : "studies were")} synthesised thematically. ");
-        sb.Append($"{coded} {(coded == 1 ? "study" : "studies")} yielded {book.Codes.Count} {(book.Codes.Count == 1 ? "code" : "codes")}, grouped into {book.Themes.Count} {(book.Themes.Count == 1 ? "theme" : "themes")}: ");
+        // A sentence never opens on a numeral (issue #746): "Of the 16 studies, 12 yielded ...".
+        sb.Append($"{(included == 1 ? "The included study" : $"Of the {included} included studies, {coded}")} yielded {book.Codes.Count} {(book.Codes.Count == 1 ? "code" : "codes")}, grouped into {book.Themes.Count} {(book.Themes.Count == 1 ? "theme" : "themes")}: ");
         sb.Append(string.Join("; ", book.Themes.Select(t => $"{t.Name} ({t.Studies.Count} {(t.Studies.Count == 1 ? "study" : "studies")})")));
         sb.Append(". ");
         if (book.Uncoded.Count > 0)
-            sb.Append($"{book.Uncoded.Count} {(book.Uncoded.Count == 1 ? "study was" : "studies were")} not placed in a theme; the reasons are listed in the evidence map. ");
+            sb.Append($"{(included == 1 ? "The included study was" : $"Of the {included} included studies, {book.Uncoded.Count} {(book.Uncoded.Count == 1 ? "was" : "were")}")} not placed in a theme; the reasons are listed in the evidence map. ");
         sb.Append("Each theme is reported in its own subsection below, and the evidence map shows which studies contribute to which theme.");
         return sb.ToString();
     }

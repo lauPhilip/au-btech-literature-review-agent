@@ -195,12 +195,31 @@ public class RedThreadTests
     public async Task ALaterThemesPromptCarriesTheEarlierThemesCodesAndTheClauseRule()
     {
         var evidence = Evidence();
-        var model = new FakeChatService().Returns("""{"heading":"x","text":"The studies evaluate agents in simulations [1, 2] and in deployments [3, 4]. As reported under Plan reuse, caching plans saves cost [5]. Latency is measured too [6, 7]. One study places services [8].","leftOut":[]}""");
+        var model = new FakeChatService().Returns("""{"heading":"x","text":"The studies evaluate agents in simulations [1, 2] and in deployments [3, 4]. As reported under plan reuse, caching plans saves cost [5]. Latency is measured too [6, 7]. One study places services [8].","leftOut":[]}""");
 
         await ReviewWriter.WriteThemeAsync(model, WritingProfile.Systematic, "Map agent safety", evidence, evidence.Themes[1], 2, referenceCount: 9);
 
         Assert.Contains("Under \"Plan reuse\": [5] plan reuse cuts cost by 34%", model.Prompts[0]);
         Assert.Contains("refer to it briefly by that theme's name", model.Prompts[0]);
         Assert.Contains("never both in one clause", model.Prompts[0]);
+        Assert.Contains("8. Never open a sentence with a numeral", model.Prompts[0]);
+    }
+
+    [Fact]
+    public async Task AnotherThemeNamedWithItsCapitalsIsSentBackAndLoweredInThePrompt()
+    {
+        // Issue #746: "within Architectural and Agent-Level Safety Mechanisms" in running text.
+        var evidence = Evidence();
+        string head = "The studies evaluate agents in simulations [1, 2] and in deployments [3]. ";
+        string tail = " caching plans saves cost [5]. Latency is measured too [6, 7]. One study places services [8].";
+        var model = new FakeChatService()
+            .Returns("{\"heading\":\"x\",\"text\":\"" + head + "Within Plan reuse," + tail + "\",\"leftOut\":[]}")
+            .Returns("{\"heading\":\"x\",\"text\":\"" + head + "Within plan reuse," + tail + "\",\"leftOut\":[]}");
+
+        var (section, _) = await ReviewWriter.WriteThemeAsync(model, WritingProfile.Systematic, "Map agent safety", evidence, evidence.Themes[1], 2, referenceCount: 9);
+
+        Assert.Contains("do not cover them here): plan reuse", model.Prompts[0]);
+        Assert.Contains("names another theme with its capitals", model.Prompts[1]);
+        Assert.Contains("Within plan reuse,", section!.Text);
     }
 }
