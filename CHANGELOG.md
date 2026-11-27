@@ -48,6 +48,15 @@ The Decision log on a systematic paper now downloads the run's full ledger as JS
 - **Too many references in a discussion sentence**: the whole discussion and conclusion lost ⇒ the sentence split at its clauses, and the sections kept
 - A send-back now names every sentence with too many references, not only the first. The closing no longer cites the studies left out of the themes.
 
+#### Rationale and answers
+
+> Run 34d1af9a's rationale began "They use ...", with nothing before it, and its answers built in code read as a list of loose fragments.
+
+- **Rationale opening**: "They use ..." ⇒ the subject named in full. A rationale that opens on "They" or "These" is sent back.
+- **A rationale that lists studies**: caught from four cited sentences ⇒ caught from three
+- **Answers built in code**: loose fragments ⇒ a first line that says they are not a synthesis, then "Study [3] reports: ..."
+- **Certainty summary**: "Of the two answers ..., two are of moderate certainty." ⇒ "Both answers ... are of moderate certainty."
+
 #### Citations in the text
 
 > The paper printed "[9][2][11]", opened a sentence with a bare "[9]", and wrote "No evaluated platform may combine ..." for what one study found.
