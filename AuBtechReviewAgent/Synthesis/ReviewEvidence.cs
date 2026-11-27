@@ -50,8 +50,9 @@ public sealed class EvidenceTheme
     public IReadOnlyDictionary<int, IReadOnlyList<string>> Codes { get; init; } = new Dictionary<int, IReadOnlyList<string>>();
 
     /// <summary>
-    /// The ids of the findings that put each source in this theme, for a lean source block (<see cref="WritingProfile.LeanEvidence"/>).
-    /// Empty when the module gives none; then a source's block lists all its findings, as before.
+    /// The ids of the findings that put each source in this theme. A source's block in the theme lists only these findings,
+    /// so a study that fits the theme with one finding does not bring its other results along (issue #745). Empty, for the
+    /// whole theme or for one source, when the module gives none; then the block lists all its findings, as before.
     /// </summary>
     public IReadOnlyDictionary<int, IReadOnlyList<string>> FindingIds { get; init; } = new Dictionary<int, IReadOnlyList<string>>();
 
@@ -109,8 +110,8 @@ public sealed class ReviewEvidence
     /// <summary>
     /// What the writer gets for one source of a theme: its profile, its codes in the theme, its verified findings
     /// (or its abstract when it has none) and a few excerpts of its text chosen by the theme's words.
-    /// A <paramref name="lean"/> block (<see cref="WritingProfile.LeanEvidence"/>) lists, in a theme, only the findings
-    /// that put the source in it (<see cref="EvidenceTheme.FindingIds"/>), and leaves out the codes line when every
+    /// In a theme, the block lists only the findings that put the source in it (<see cref="EvidenceTheme.FindingIds"/>).
+    /// A <paramref name="lean"/> block (<see cref="WritingProfile.LeanEvidence"/>) also leaves out the codes line when every
     /// code is already the value of a listed finding, and carries one excerpt of at most <see cref="LeanExcerptCharacters"/>
     /// characters, cut on sentence ends, instead of <paramref name="excerpts"/> whole chunks. Every finding listed still
     /// carries its verified quote; the citation check still reads the whole text.
@@ -124,8 +125,8 @@ public sealed class ReviewEvidence
         if (!string.IsNullOrEmpty(source?.Profile)) sb.AppendLine(source.Profile);
         var codes = (theme == null ? source?.Codes : theme.Codes.GetValueOrDefault(reference)) ?? Array.Empty<string>();
         var findings = source?.Findings ?? Array.Empty<EvidenceFinding>();
-        if (lean && theme != null && theme.FindingIds.TryGetValue(reference, out var inTheme))
-            findings = findings.Where(f => inTheme.Contains(f.Id)).ToList();
+        if (theme != null && theme.FindingIds.TryGetValue(reference, out var inTheme) && inTheme.Count > 0)
+            findings = findings.Where(f => inTheme.Contains(f.Id, StringComparer.OrdinalIgnoreCase)).ToList();
         bool codesRepeatFindings = lean && findings.Count > 0 && codes.All(c => findings.Any(f => f.Value == c));
         if (codes.Count > 0 && !codesRepeatFindings) sb.AppendLine($"Codes{(theme == null ? "" : " in this theme")}: {string.Join("; ", codes)}");
         foreach (var f in findings) sb.AppendLine($"Finding {f.Id}: {f.Value} (verbatim: \"{f.Quote}\")");

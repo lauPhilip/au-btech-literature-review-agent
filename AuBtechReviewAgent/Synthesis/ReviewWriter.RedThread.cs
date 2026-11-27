@@ -39,7 +39,7 @@ public static partial class ReviewWriter
 
     /// <summary>
     /// What the themes before this one hold of its sources: for each source of this theme that an earlier theme holds too,
-    /// the codes (or, in a lean review, the findings) that put it there, by theme. Empty for the first theme and when no
+    /// the codes (or the findings, when the module gives them) that put it there, by theme. Empty for the first theme and when no
     /// source is shared. The codes are model text, so the caller wraps the block with <see cref="PromptSafety.Wrap"/>.
     /// </summary>
     public static string EarlierThemesEvidence(ReviewEvidence evidence, EvidenceTheme theme)
@@ -78,7 +78,9 @@ public static partial class ReviewWriter
             rule.Add($"A finding the earlier themes report (listed above) is written up there: refer to it briefly by that theme's name (\"as reported under ...\") with its citation, and do not restate it with its figures; say only what it adds to this theme.");
         if (IsBroadTheme(evidence, theme))
             rule.Add($"This theme holds {theme.Sources.Count} of the review's {evidence.Themes.SelectMany(t => t.Sources).Distinct().Count()} {ss}, so compare how the {ss} evaluate or approach the question (their designs, measures, settings and what each leaves out) instead of listing each {s}'s result again.");
-        rule.Add($"Never stretch a {s} to fit the theme: when its evidence bears on the theme only indirectly, say so plainly (\"[9], a study of focus groups, bears on this only indirectly\"), or leave it out and list it in \"leftOut\" with the reason; the review keeps that reason on file.");
+        rule.Add($"Never stretch a {s} to fit the theme: when its evidence bears on the theme only indirectly, say so plainly (\"[9], a study of focus groups, bears on this only indirectly\"), or leave it out and list it in \"leftOut\" with the reason; the review keeps that reason on file." +
+            // Issue #745: a binder-design study coded for its recovery mechanism had its protein-design scores cited as safety evidence.
+            $" The same holds for each finding: when one finding of a {s} fits the theme, its other results (scores or outcomes in its own field or task) do not come with it; report only what bears on the review objective.");
         return string.Join(" ", rule);
     }
 

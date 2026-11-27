@@ -144,6 +144,9 @@ public class RedThreadTests
         Assert.Contains("This theme holds 8 of the review's 9 studies, so compare how the studies evaluate or approach the question", broad);
         Assert.Contains("Never stretch a study to fit the theme", broad);
         Assert.StartsWith("Never stretch a study", ReviewWriter.RedThreadRule(WritingProfile.Systematic, evidence, evidence.Themes[0]));
+        // Issue #745: the rule holds for each finding, not only for each study.
+        Assert.Contains("when one finding of a study fits the theme, its other results (scores or outcomes in its own field or task) do not come with it",
+            ReviewWriter.RedThreadRule(WritingProfile.Systematic, evidence, evidence.Themes[0]));
     }
 
     [Fact]

@@ -54,8 +54,10 @@ public static partial class ReviewWriter
 
     /// <summary>
     /// The sentences of later subsections that say again what an earlier subsection says (the same source cited, and most
-    /// of the words the same, <see cref="SaysAgain"/>, or the same result figure with its unit, such as "34 %", issue #674),
-    /// each with the heading of the subsection that says it first. Public for unit tests.
+    /// of the words the same, <see cref="SaysAgain"/>, the same result figure with its unit, such as "34 %", issue #674, or
+    /// the same finding in other words, <see cref="RetoldSources"/>, issue #744), each with the heading of the subsection
+    /// that says it first. A sentence that tells again the findings of two or more sources from earlier in its own
+    /// subsection, a summing up of what was just said, is listed too, with its own heading. Public for unit tests.
     /// </summary>
     public static IReadOnlyList<(string Field, string Sentence, string EarlierHeading)> RepeatedClaims(IReadOnlyList<SynthesisSection> sections)
     {
@@ -64,9 +66,17 @@ public static partial class ReviewWriter
         foreach (var section in sections)
         {
             var own = CitationSupportChecker.SplitSentences(section.Text).Select(s => (Sentence: s, Refs: CitationSupportChecker.ReferencesIn(s))).ToList();
-            foreach (var (sentence, refs) in own.Where(x => x.Refs.Count > 0))
+            for (int i = 0; i < own.Count; i++)
+            {
+                var (sentence, refs) = own[i];
+                if (refs.Count == 0) continue;
                 if (earlier.FirstOrDefault(e => e.Refs.Intersect(refs).Any() && (SaysAgain(sentence, e.Sentence) || UnitFigures(sentence).Overlaps(UnitFigures(e.Sentence)))) is { Heading: { } heading })
                     repeats.Add((section.Field, sentence, heading));
+                else if (RetoldSources(sentence, earlier.Select(e => (e.Sentence, e.Refs))) is { Count: > 0 } retold)
+                    repeats.Add((section.Field, sentence, earlier.First(e => e.Refs.Contains(retold[0])).Heading));
+                else if (refs.Count >= 2 && RetoldSources(sentence, own.Take(i).Select(o => (o.Sentence, o.Refs))).Count >= 2)
+                    repeats.Add((section.Field, sentence, section.Heading));
+            }
             earlier.AddRange(own.Where(x => x.Refs.Count > 0).Select(x => (x.Sentence, x.Refs, section.Heading)));
         }
         return repeats;
@@ -87,7 +97,9 @@ public static partial class ReviewWriter
             var section = sections.First(x => x.Field == group.Key);
             var themeCoverage = coverage.FirstOrDefault(c => c.Field == group.Key);
             var allowed = ThemeSources(section, evidence) ?? Array.Empty<int>();
-            string list = string.Join("\n", group.Select(r => $"- \"{r.Sentence}\" (already reported under \"{r.EarlierHeading}\")"));
+            string list = string.Join("\n", group.Select(r => r.EarlierHeading == section.Heading
+                ? $"- \"{r.Sentence}\" (sums up what this subsection already said)"
+                : $"- \"{r.Sentence}\" (already reported under \"{r.EarlierHeading}\")"));
             string prompt = $$"""
                 You are revising one theme subsection of {{profile.ReviewShort}}. Some of its sentences say again what an earlier subsection already reports, so the review repeats itself.
 
@@ -99,7 +111,7 @@ public static partial class ReviewWriter
                 REPEATED SENTENCES:
                 {{list}}
 
-                TASK: Rewrite each repeated sentence so it adds what is specific to this theme, or shorten it to a brief pointer to the earlier subsection by its heading in words ("as reported under ..."), keeping its citation. Change nothing else. Keep every existing citation, and cite only {{profile.Sources}} of this theme or already cited here.
+                TASK: A finding told again in other words is a repeat too. Rewrite each repeated sentence so it adds what is specific to this theme, or shorten it to a brief pointer to the earlier subsection by its heading in words ("as reported under ..."), keeping its citation. Delete a sentence that only sums up what this subsection already said. Change nothing else. Keep every existing citation, and cite only {{profile.Sources}} of this theme or already cited here.
                 {{CitationLoadRule(profile)}}
                 {{ProseCleaner.PlainProseRule}}
                 Respond ONLY with a valid minified JSON object:
