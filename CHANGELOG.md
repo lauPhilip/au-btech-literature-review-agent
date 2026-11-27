@@ -26,7 +26,7 @@ Each `###` heading has exactly one emoji, at its start, and no emoji appears any
 
 ### 🌟 Patch highlights
 
-Screening now treats "or" in your inclusion criterion as a choice, so fewer good records are dropped. The themes build on each other, the abstract and conclusion claim no more than the evidence allows, and the concept map shows at most three dashed links. A new run can differ from 0.6.0: the screening and language edit prompts have new versions, so old cached screening decisions are not used again.
+Screening now treats "or" in your inclusion criterion as a choice, so fewer good records are dropped. The themes build on each other, the abstract and conclusion claim no more than the evidence allows, and the concept map shows at most three dashed links. Diagrams the model writes are checked before they reach main.tex, and the live site is now updated only when a version is published. A new run can differ from 0.6.0: the screening and language edit prompts have new versions, so old cached screening decisions are not used again.
 
 ### 🔬 Systematic review
 
@@ -79,6 +79,14 @@ Screening now treats "or" in your inclusion criterion as a choice, so fewer good
 - The methods count reviews by their study type.
 - The cap on records per source and the research questions are each said once, and some small grammar slips are gone.
 
+#### Figures in main.tex
+
+> A diagram the model wrote in TikZ went into main.tex as it was, and the paper itself was never compiled in CI.
+
+- A diagram the model writes is checked in code and drawn again with fixed styles. One that tries to read or write files or define commands is left out, and the choice is saved in diagram-check.json.
+- The flow diagram and the pie chart escape their labels the same way as the rest of the paper.
+- CI now compiles the systematic and the multivocal main.tex, so a paper that does not compile stops the build.
+
 ### 📄 Report page
 
 #### Paged report
@@ -117,6 +125,22 @@ Screening now treats "or" in your inclusion criterion as a choice, so fewer good
 - **Tab title while a review runs**: "2% · Your review" for the whole run ⇒ the run's progress
 - The tab says when the review is ready.
 - **Progress line in the last step of writing**: Writing ⇒ Artifact
+
+#### Finding and citing the tool
+
+> Search engines and AI crawlers had to guess what the site is, and the About page had no DOI.
+
+- robots.txt names the AI crawlers on purpose. They may read the public pages, but not /api/.
+- A new /llms.txt says what TraceableAI is and which pages matter.
+- The About page shows the tool's DOI and a "Cite this tool" block in APA 7 and BibTeX.
+- A gallery report with a DOI is cited by its DOI address, and each version page carries data that says what it is.
+
+#### Updates to the live site
+
+> Every merge took the site offline for a moment and stopped any review that was running.
+
+- **When the live site is updated**: on every merge ⇒ only when a version is published
+- An urgent fix can still be put live by hand, and it waits for running reviews first.
 
 ### 🐛 Bug fixes
 
