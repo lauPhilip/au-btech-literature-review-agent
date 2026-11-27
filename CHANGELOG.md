@@ -118,6 +118,14 @@ The Decision log on a systematic paper now downloads the run's full ledger as JS
 - **Where the wiki lives**: GitHub's Wiki tab only ⇒ the site's own address too, at /docs, with its diagrams drawn
 - Each page links to its source file, and the sitemap and llms.txt list the pages. The Wiki tab still gets a copy.
 
+#### Example reports
+
+> Shared reports were hard to find from outside the site, and a shared link showed only a general line about the tool.
+
+- **Filters**: type and search only ⇒ also the year a report finished and the TraceableAI version it was made with
+- **Shared link preview**: a general line about the tool ⇒ the kind of review and its first research question
+- The gallery and each shared report are now in the sitemap, so search engines can find them.
+
 ### 🐛 Bug fixes
 
 - Fixed a bug where a heading stood alone on a page and its text started on the next one. A paragraph now breaks between two lines when it cannot move whole.

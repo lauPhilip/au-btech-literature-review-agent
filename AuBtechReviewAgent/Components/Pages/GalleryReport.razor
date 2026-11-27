@@ -16,7 +16,9 @@
 {
     <SeoHead Title="@entry.Title" Path="@CanonicalPath" BreadcrumbName="Gallery" AiGeneratedBy="@(Array.Empty<string>())"
              ExtraJsonLd="@(baseUrl => AuBtechReviewAgent.GalleryStructuredData.ScholarlyArticle(entry!, baseUrl))"
-             Description="@($"An example {AuBtechReviewAgent.GalleryCard.TypeLabel(entry.Card).ToLowerInvariant()} made with TraceableAI, shown as it prints, with every citation checked against its source.")" />
+             Description="@AuBtechReviewAgent.GalleryCard.ShareDescription(entry)"
+             Published="@(entry.Versions.FirstOrDefault(v => v.Number == entry.Version)?.AddedUtc ?? entry.AddedUtc)"
+             Modified="@(entry.Version == newest.Version ? entry.UpdatedUtc : null)" />
 
     <div class="mx-auto w-full max-w-[960px] px-[clamp(16px,3vw,40px)] py-6 sm:py-10">
         <a href="/gallery" class="ui-btn-ghost min-h-[44px] px-2"><span aria-hidden="true">←</span> All example reports</a>

@@ -46,8 +46,8 @@ public static class WikiDocs
     public static string PathOf(WikiPage page) => page.Slug.Length == 0 ? BasePath : $"{BasePath}/{page.Slug}";
 
     /// <summary>The wiki's pages for the sitemap: the front page a little above the others.</summary>
-    public static IEnumerable<(string Path, string ChangeFrequency, string Priority)> SitemapPages =>
-        Pages.Select(p => (PathOf(p), "monthly", p.Slug.Length == 0 ? "0.5" : "0.4"));
+    public static IEnumerable<(string Path, string ChangeFrequency, string Priority, DateTime? Changed)> SitemapPages =>
+        Pages.Select(p => (PathOf(p), "monthly", p.Slug.Length == 0 ? "0.5" : "0.4", default(DateTime?)));
 
     /// <summary>The page's Markdown file on GitHub, where it is edited.</summary>
     public static string SourceUrl(WikiPage page) => $"{SiteSeo.RepositoryUrl}/blob/master/docs/wiki/{page.FileName}";

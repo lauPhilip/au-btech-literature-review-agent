@@ -134,18 +134,21 @@ public static class SiteSeo
     /// <summary>
     /// The sitemap of the public pages. <paramref name="lastModified"/> is the day the running version was built: the
     /// pages change only with a new version, so that is when each of them last changed. <paramref name="more"/> are
-    /// pages that are not in <see cref="IndexedPages"/>, such as the developer wiki's (WikiDocs.SitemapPages).
+    /// pages that are not in <see cref="IndexedPages"/>, such as the developer wiki's (WikiDocs.SitemapPages) and the
+    /// gallery's (GalleryCard.SitemapPages); one of them that changes on its own, as a gallery entry does, gives its own
+    /// last change, and the others take the build day.
     /// </summary>
     public static string SitemapXml(string baseUrl, DateTime? lastModified = null,
-        IEnumerable<(string Path, string ChangeFrequency, string Priority)>? more = null)
+        IEnumerable<(string Path, string ChangeFrequency, string Priority, DateTime? Changed)>? more = null)
     {
         XNamespace ns = "http://www.sitemaps.org/schemas/sitemap/0.9";
         var doc = new XDocument(
             new XDeclaration("1.0", "utf-8", null),
             new XElement(ns + "urlset",
-                IndexedPages.Concat(more ?? Array.Empty<(string, string, string)>()).Select(p => new XElement(ns + "url",
+                IndexedPages.Select(p => (p.Path, p.ChangeFrequency, p.Priority, Changed: default(DateTime?)))
+                    .Concat(more ?? Array.Empty<(string, string, string, DateTime?)>()).Select(p => new XElement(ns + "url",
                     new XElement(ns + "loc", Absolute(baseUrl, p.Path)),
-                    lastModified is { } day ? new XElement(ns + "lastmod", day.ToUniversalTime().ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture)) : null,
+                    (p.Changed ?? lastModified) is { } day ? new XElement(ns + "lastmod", day.ToUniversalTime().ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture)) : null,
                     new XElement(ns + "changefreq", p.ChangeFrequency),
                     new XElement(ns + "priority", p.Priority)))));
         return doc.Declaration + "\n" + doc.Root;
