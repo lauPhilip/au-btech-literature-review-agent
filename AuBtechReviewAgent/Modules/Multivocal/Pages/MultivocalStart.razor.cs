@@ -235,8 +235,9 @@ public partial class MultivocalStart
     /// "✓ Review ready" or "Run stopped · Your review" when it finished while the page was open, and otherwise the review's name.
     /// </summary>
     public static string TabTitleFor(int? percent, bool? finishedHere, string idle) =>
-        percent is { } p ? $"{p}% · Your review"
-            : finishedHere switch { true => "✓ Review ready", false => "Run stopped · Your review", null => idle };
+        percent.HasValue ? $"{percent.Value}% · Your review"
+            : !finishedHere.HasValue ? idle
+            : finishedHere.Value ? "✓ Review ready" : "Run stopped · Your review";
 
     internal string StageLine()
     {
