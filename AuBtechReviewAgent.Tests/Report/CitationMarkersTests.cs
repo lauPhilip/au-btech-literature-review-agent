@@ -21,4 +21,23 @@ public class CitationMarkersTests
     [InlineData("A falling range [5-2].")]
     public void LeavesAnythingThatIsNotAListOfReferenceNumbers(string text) =>
         Assert.Equal(text, CitationMarkers.Tidy(text));
+
+    [Theory]
+    [InlineData("Agents plan [9][2][11].", "Agents plan [2, 9, 11].")]
+    [InlineData("Agents plan [9] [2].", "Agents plan [2, 9].")]
+    [InlineData("Agents plan [9], [2, 3] and [11].", "Agents plan [2, 3, 9] and [11].")]
+    [InlineData("Agents plan [4][2-3][4].", "Agents plan [2, 3, 4].")]
+    public void MergesMarkersSideBySideIntoOne(string text, string expected) =>
+        Assert.Equal(expected, CitationMarkers.MergeAdjacent(text));
+
+    [Theory]
+    [InlineData("A range [0, 1][2].")]
+    [InlineData("Mixed [1][2,,3][4].")]
+    [InlineData("Apart [1] and [2].")]
+    public void LeavesGroupsThatAreNotAllReferenceMarkers(string text) =>
+        Assert.Equal(text, CitationMarkers.MergeAdjacent(text));
+
+    [Fact]
+    public void TidyMergesThenRangesMarkersSideBySide() =>
+        Assert.Equal("Agents plan [2–4, 9].", CitationMarkers.Tidy("Agents plan [9][4][2, 3]."));
 }

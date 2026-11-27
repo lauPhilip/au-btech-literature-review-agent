@@ -94,4 +94,12 @@ public class PaperLatexTests
         Assert.True(tex.IndexOf(@"\usepackage[T1]{fontenc}", StringComparison.Ordinal) < tex.IndexOf(@"\usepackage{tgtermes}", StringComparison.Ordinal));
         Assert.Contains("Agents <and> tools | a review", tex);
     }
+
+    [Theory]
+    [InlineData("Costs rise in economics[4].", @"Costs rise in economics~\cite{ref4}.")]
+    [InlineData("Agents plan [9][2][11].", @"Agents plan~\cite{ref2,ref9,ref11}.")]
+    [InlineData("(see [3])", @"(see~\cite{ref3})")]
+    [InlineData("([3])", @"({\cite{ref3}})")]
+    public void A_citation_gets_a_tie_and_markers_side_by_side_become_one(string input, string expected) =>
+        Assert.Equal(expected, PaperLatex.Escape(input)); // issue #725
 }

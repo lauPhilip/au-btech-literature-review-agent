@@ -28,7 +28,7 @@ Version 0.6.0 is in [docs/changelog-0.6.md](docs/changelog-0.6.md), and versions
 
 ### 🌟 Patch highlights
 
-The Decision log on a systematic paper now downloads the run's full ledger as JSON. A server can now choose to call the model in the EU. A systematic paper no longer loses its theme sections when the discussion fails. Otherwise a new systematic run gives the same results as 0.7.0, and a multivocal summary can be worded a little differently.
+The Decision log on a systematic paper now downloads the run's full ledger as JSON. A server can now choose to call the model in the EU. A systematic paper no longer loses its theme sections when the discussion fails. Citations in the text are now written in one form, such as "[2, 9, 11]" and "Study [9] describes". Otherwise a new systematic run gives the same results as 0.7.0, and a multivocal summary can be worded a little differently.
 
 ### 🔬 Systematic review
 
@@ -45,6 +45,14 @@ The Decision log on a systematic paper now downloads the run's full ledger as JS
 - **Failed discussion**: the themes dropped for a one-pass overview ⇒ the themes kept, and the paper says the discussion is missing
 - The discussion gets one more try, so a sentence with too many references is still fixed after two other send-backs. The multivocal discussion gets it too.
 - The conclusion, limitations and answers are still written from the themes.
+
+#### Citations in the text
+
+> The paper printed "[9][2][11]", opened a sentence with a bare "[9]", and wrote "No evaluated platform may combine ..." for what one study found.
+
+- **Markers side by side**: "[9][2][11]" ⇒ "[2, 9, 11]", on the page and in main.tex
+- A sentence that starts with a marker now names it: "Study [9] describes". A marker stuck to a word gets a space.
+- **Hedge rule**: "No platform may combine ..." ⇒ "None of the evaluated platforms combined ...". What a study found in its own sample is stated plainly.
 
 ### 🧭 Multivocal review (preview)
 
