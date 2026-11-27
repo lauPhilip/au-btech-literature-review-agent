@@ -23,6 +23,7 @@ public class MultivocalGoldenPaperTests
         tex = Regex.Replace(tex, @"\b\d{1,2} (?:January|February|March|April|May|June|July|August|September|October|November|December) \d{4}\b", "DAY");
         tex = Regex.Replace(tex, @"\b(?:January|February|March|April|May|June|July|August|September|October|November|December) \d{4}\b", "MONTH");
         tex = Regex.Replace(tex, @"\(run [^)]*\)", "(run RUNID)");
+        tex = Regex.Replace(tex, @"the seed [0-9a-f]{8}\b", "the seed SEED"); // the audit sample's random seed
         tex = Regex.Replace(tex, @"web\.archive\.org/web/\d{14}", "web.archive.org/web/TIMESTAMP");
         tex = Regex.Replace(tex, @"[0-9a-f]{8}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{12}", "RUNID");
         tex = Regex.Replace(tex, @"(?:[0-9a-f]|\\allowbreak\{\}){16,}", "FINGERPRINT"); // with its break points
