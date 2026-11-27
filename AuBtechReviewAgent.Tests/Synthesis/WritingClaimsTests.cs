@@ -59,6 +59,27 @@ public class WritingClaimsTests
         Assert.Contains("what is known, what is missing, and why that matters", ReviewWriter.RationaleRule(WritingProfile.Systematic));
     }
 
+    [Theory]
+    [InlineData("They use deterministic interruption states against prompt injection [8]. Little is known about how these combine.", "They")]
+    [InlineData("This growth raises new risks [3].", "This")]
+    [InlineData("Agent systems now act with little oversight [3, 7].", null)]
+    [InlineData("Theory-driven agents are rare [2].", null)]
+    public void ARationaleThatOpensOnAWordPointingBackIsSentBack(string rationale, string? word)
+    {
+        // Run 34d1af9a's rationale began "They use ...", with nothing before it (issue #724).
+        string? problem = ReviewWriter.RationaleOpeningProblem(rationale);
+        if (word == null) Assert.Null(problem);
+        else Assert.StartsWith($"The rationale opens with \"{word}\"", problem);
+    }
+
+    [Fact]
+    public void ThreeOneStudySentencesAreAlreadyAList()
+    {
+        const string three = "Governance layers audit agents [2]. Evaluation uses four axes [5]. Simulation shows gains [8]. How these combine is not known.";
+        Assert.StartsWith("3 of the rationale's 3 cited sentences", ReviewWriter.RationaleListingProblem(three, WritingProfile.Systematic));
+        Assert.Contains("never with a word that points back", ReviewWriter.RationaleRule(WritingProfile.Systematic));
+    }
+
     private static string Front(string abstractText, string rationale) => System.Text.Json.JsonSerializer.Serialize(new Dictionary<string, string>
         { ["title"] = "Agent safety: a systematic review", ["abstract"] = abstractText, ["rationale"] = rationale, ["objectives"] = "To map agent safety." });
 
