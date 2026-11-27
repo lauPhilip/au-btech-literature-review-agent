@@ -119,13 +119,30 @@ class CallersTests(unittest.TestCase):
         self.assertIn("needs.is-newest.outputs.deploy == 'true'", job)
         self.assertIn("vars.DEPLOY_ENABLED == 'true'", job)
 
+    def test_a_manual_deploy_exists_only_by_dispatch_and_is_gated(self):
+        manual = read("deploy-manual.yml")
+        on = triggers(manual)
+        self.assertIn("workflow_dispatch:", on)
+        for event in ("push:", "pull_request:", "schedule:"):
+            self.assertNotIn(event, on)
+        job = jobs(manual)["deploy"]
+        self.assertIn("uses: ./.github/workflows/deploy.yml", job)
+        self.assertIn("vars.DEPLOY_ENABLED == 'true'", job)
+        self.assertIn("needs.gate.outputs.deploy == 'true'", job)
+        self.assertIn('"refs/heads/master"', manual)
+
+    def test_only_the_release_and_the_manual_workflow_call_the_deploy(self):
+        callers = sorted(p.name for p in WORKFLOWS.glob("*.yml")
+                         if "uses: ./.github/workflows/deploy.yml" in p.read_text(encoding="utf-8"))
+        self.assertEqual(["deploy-manual.yml", "release.yml"], callers)
+
     def test_deploy_waits_for_reviews_and_has_no_docs_only_skip(self):
         deploy = read("deploy.yml")
         self.assertIn("wait-idle", deploy)
         self.assertNotIn("needs-deploy", deploy)
 
     def test_callers_pass_only_the_two_secrets(self):
-        for name in ("release.yml",):
+        for name in ("release.yml", "deploy-manual.yml"):
             job = jobs(read(name))["deploy"]
             self.assertNotIn("secrets: inherit", job, name)
             self.assertIn("SIMPLY_FTP_USER: ${{ secrets.SIMPLY_FTP_USER }}", job, name)
