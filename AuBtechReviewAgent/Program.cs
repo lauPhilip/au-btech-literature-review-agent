@@ -232,6 +232,9 @@ AuBtechReviewAgent.MetricsDownloads.MapMetricsDownloads(app, metricsStore, app.S
 var siteConfiguration = app.Configuration;
 app.MapGet("/robots.txt", (HttpRequest request) =>
     Results.Text(AuBtechReviewAgent.SiteSeo.RobotsTxt(AuBtechReviewAgent.SiteSeo.BaseUrl(siteConfiguration, request)), "text/plain; charset=utf-8"));
+// What the site is and which pages matter, for answer engines and agents (issue #610); the API lines follow the switch.
+app.MapGet("/llms.txt", (HttpRequest request) =>
+    Results.Text(AuBtechReviewAgent.LlmsTxt.Build(AuBtechReviewAgent.SiteSeo.BaseUrl(siteConfiguration, request), apiEnabled), "text/plain; charset=utf-8"));
 var siteBuilt = AuBtechReviewAgent.SiteSeo.BuildDate();
 app.MapGet("/sitemap.xml", (HttpRequest request) =>
     Results.Text(AuBtechReviewAgent.SiteSeo.SitemapXml(AuBtechReviewAgent.SiteSeo.BaseUrl(siteConfiguration, request), siteBuilt), "application/xml; charset=utf-8"));

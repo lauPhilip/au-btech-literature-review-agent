@@ -44,6 +44,12 @@ public static class SiteSeo
         ("/accessibility", "yearly", "0.3"),
     };
 
+    /// <summary>
+    /// The concept DOI of the tool on Zenodo: it always resolves to the newest version (CITATION.cff and the README
+    /// badge carry the same one). Held here once; llms.txt and the citation block on About read it from here.
+    /// </summary>
+    public const string ConceptDoi = "10.5281/zenodo.24379094";
+
     public const string RepositoryUrl = "https://github.com/lauPhilip/au-btech-literature-review-agent";
     public const string Organisation = "Department of Business Development and Technology, Aarhus University";
     public const string Authors = "Philip S. P. Ø. O. Lau and Nidhi";
