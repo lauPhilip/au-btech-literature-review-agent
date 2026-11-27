@@ -35,7 +35,7 @@ public class ArchiveLatexTests : IDisposable
         var report = new PrismaReport
         {
             TitleItem = "Agent loops",
-            SynthesisResultsItem = "Overview.[TIKZ_START]\\draw (a) -¿ (b);[TIKZ_END]",
+            SynthesisResultsItem = "Overview.[TIKZ_START]\\node (a) {Loop};\\node[right=of a] (b) {Check & stop};\\draw (a) -¿ (b);[TIKZ_END]",
             ConclusionItem = "Loops recover.",
             ResearchAnswers = { new ResearchAnswer { Number = 1, Question = "How do loops recover?", Answer = "Through checks." } },
             Artifact = new ReviewArtifact
@@ -62,7 +62,8 @@ public class ArchiveLatexTests : IDisposable
         Assert.Contains("xtick={1,2}, xticklabels={2025,n.d.}, xmin=0.5, xmax=2.5, ymin=0, ymax=4,", tex);
         Assert.Contains(@"\addplot[fill=blue!50] coordinates {(1,1) (2,1)};", tex);
         Assert.Contains(@"\draw[fill=blue!50] (0,0) circle (1.2cm); \node at (0,0) {\scriptsize 2};", tex);
-        Assert.Contains("\\resizebox{\\linewidth}{!}{\n\\draw (a) -> (b);\n}\n\\caption{Grounded Architectural Synthesis System Model Diagram}", tex);
+        // The model's diagram is checked and drawn again in code (issue #538): its labels escaped, the mangled "-¿" an arrow.
+        Assert.Contains("\\node[box, right=of a] (b) {Check \\& stop};\n\\draw[link, ->] (a) -- (b);\n\\end{tikzpicture}\n}\n\\caption{Grounded Architectural Synthesis System Model Diagram}", tex);
         Assert.Contains("\\begin{tabularx}{\\textwidth}{Y Y}\n\\caption{Design \\& Rules}\\label{tab:artifact}\\\\\n\\toprule\n\\textbf{Rule} & \\textbf{Source} \\\\", tex);
         Assert.Contains("Check & Supervisor \\\\ \\addlinespace\n\\bottomrule\n\\end{tabularx}\n\\vspace{2pt}\\noindent\\small From the studies.\\normalsize\n\\vspace{10pt}", tex);
         // An answer that cites no study is not rated, and the certainty summary closes the answers (issue #551).

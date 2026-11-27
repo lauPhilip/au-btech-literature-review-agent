@@ -53,14 +53,8 @@ public partial class PrismaReviewEngine
         string textSynthesisOnly = Regex.Replace(rawSynthesis, @"\[MERMAID_START\].*?\[MERMAID_END\]", "", RegexOptions.Singleline);
         textSynthesisOnly = Regex.Replace(textSynthesisOnly, @"\[TIKZ_START\].*?\[TIKZ_END\]", "", RegexOptions.Singleline).Trim();
 
-        string tikzDiagramCode = "";
-        var tikzMatch = Regex.Match(rawSynthesis, @"\[TIKZ_START\](.*?)\[TIKZ_END\]", RegexOptions.Singleline);
-        if (tikzMatch.Success) {
-            tikzDiagramCode = tikzMatch.Groups[1].Value.Trim();
-            // "-->" is not a TikZ arrow tip (it made every generated main.tex fail to compile); only repair the
-            // mangled "-¿" some model outputs contain.
-            tikzDiagramCode = tikzDiagramCode.Replace("-¿", "->");
-        }
+        // A diagram the model wrote is checked in code and drawn again in code (issue #538); one that fails is left out.
+        var (tikzDiagram, tikzProblem) = TikzDiagram.BlockIn(rawSynthesis) is string tikzCode ? TikzDiagram.Check(tikzCode) : (null, null);
 
         // The systematic review's own parts of the shared paper (Report/ReviewPaper.cs): its PRISMA method items,
         // its data figures and tables, and the evidence map and artifact. All of it is drawn in code.
@@ -96,12 +90,14 @@ public partial class PrismaReviewEngine
             resultsLatex.Add(ArtifactLatex(artifact));
         // The certainty table is numbered by LaTeX after the evidence map and a table artifact.
         if (certainty != null) resultsLatex.Add(CertaintyLatex.Table(certainty));
-        if (!string.IsNullOrEmpty(tikzDiagramCode))
+        if (tikzDiagram != null)
             resultsLatex.Add(string.Join("", new[]
             {
-                @"\begin{figure}[H]", @"\centering", @"\resizebox{\linewidth}{!}{", tikzDiagramCode, @"}",
+                @"\begin{figure}[H]", @"\centering", @"\resizebox{\linewidth}{!}{%", tikzDiagram.ToLatex().TrimEnd(), @"}",
                 @"\caption{Grounded Architectural Synthesis System Model Diagram}", @"\end{figure}",
             }.Select(line => line + Environment.NewLine)));
+        else if (tikzProblem != null)
+            resultsLatex.Add("% A diagram the model wrote was left out: it did not pass the check in code (diagram-check.json)." + Environment.NewLine);
 
         // PRISMA 2020 items 23b to 23d after the general interpretation (23a), as published reviews give them their own headings.
         var discussionNotes = new List<PaperSection>();
