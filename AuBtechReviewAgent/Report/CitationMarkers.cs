@@ -97,11 +97,35 @@ public static class CitationMarkers
     // "[1]", "[1, 2]", "[2-4]", "[2–4, 7]": a marker of reference numbers only.
     private static readonly Regex Marker = new(@"\[(\d{1,4}(?:\s*(?:,|[-–])\s*\d{1,4})*)\]", RegexOptions.Compiled);
 
+    // Two or more markers side by side, apart by spaces or a comma at most: "[9][2][11]", "[9] [2]", "[9], [2]".
+    private static readonly Regex Adjacent = new(@"\[\d[\d,\s\-–]*\](?:[ \t]*,?[ \t]*\[\d[\d,\s\-–]*\])+", RegexOptions.Compiled);
+
     public static string Tidy(string? text)
     {
         if (string.IsNullOrEmpty(text)) return text ?? "";
-        return Marker.Replace(text, m => Numbers(m.Groups[1].Value) is { } numbers ? $"[{Compress(numbers)}]" : m.Value);
+        return Marker.Replace(MergeAdjacent(text), m => Numbers(m.Groups[1].Value) is { } numbers ? $"[{Compress(numbers)}]" : m.Value);
     }
+
+    /// <summary>
+    /// Markers side by side as one marker, so "[9][2][11]" reads "[2, 9, 11]" (issue #725); a group that holds anything
+    /// but reference numbers is left as it is. Public for unit tests.
+    /// </summary>
+    public static string MergeAdjacent(string? text)
+    {
+        if (string.IsNullOrEmpty(text)) return text ?? "";
+        return Adjacent.Replace(text, group =>
+        {
+            var parts = Marker.Matches(group.Value).Cast<Match>().ToList();
+            var numbers = parts.Select(p => Numbers(p.Groups[1].Value)).ToList();
+            if (numbers.Any(n => n == null) || !OnlyMarkers(group.Value, parts)) return group.Value;
+            return $"[{string.Join(", ", numbers.SelectMany(n => n!).Distinct().OrderBy(n => n))}]";
+        });
+    }
+
+    // A group is merged only when its markers are all it holds: it starts and ends with one, and only spaces and a comma lie between.
+    private static bool OnlyMarkers(string group, List<Match> parts) =>
+        parts.Count >= 2 && parts[0].Index == 0 && parts[^1].Index + parts[^1].Length == group.Length &&
+        parts.Zip(parts.Skip(1), (a, b) => group[(a.Index + a.Length)..b.Index]).All(gap => Regex.IsMatch(gap, @"^[ \t]*,?[ \t]*$"));
 
     /// <summary>The numbers of a marker with its ranges expanded, or null when it is not a list of reference numbers.</summary>
     private static List<int>? Numbers(string inside)
