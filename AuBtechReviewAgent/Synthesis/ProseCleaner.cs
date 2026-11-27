@@ -132,6 +132,14 @@ public static class ProseCleaner
     private static readonly Regex OpeningMarker = new(
         @"(?<=(?:^|\n|(?<!\bal|\be\.g|\bi\.e)[.!?]["")]?[ \t]+))\[(\d+(?:\s*[,–-]\s*\d+)*)\](?=[ \t]+\p{Ll})", RegexOptions.Compiled);
 
+    // A marker glued to the stop before it and used as a subject: "[1, 2].[1] proposes" (issue #743).
+    private static readonly Regex StopGluedMarker = new(@"(?<=[.!?])(?=\[\d+(?:\s*[,–-]\s*\d+)*\][ \t]+\p{Ll})", RegexOptions.Compiled);
+
+    // A marker that is the subject after an opening clause: "Based on abstract-only evidence, [1] suggests" (issue #743).
+    // Only before a verb ending in -s or -ed, and not after another marker, so a list such as "[1], [2] and [3]" is left alone.
+    private static readonly Regex CommaMarker = new(
+        @"(?<=[^\]\s],[ \t]+)\[(\d+(?:\s*[,–-]\s*\d+)*)\](?=[ \t]+(?!(?:as|thus|this|its|plus|across|us|is)\b)\p{Ll}+(?:s|ed)\b)", RegexOptions.Compiled);
+
     /// <summary>
     /// How the citations of a text are written (issue #725): markers side by side become one ("[9][2][11]" -> "[2, 9, 11]"),
     /// a marker gets a space before it, and a sentence that opens with a bare marker names what it is ("[9] describes" ->
@@ -141,14 +149,16 @@ public static class ProseCleaner
     {
         string merged = CitationMarkers.MergeAdjacent(text);
         if (merged != text) changes.Add(new FormattingChange(field, "citations side by side merged", text));
-        string spaced = GluedMarker.Replace(merged, " ");
+        string spaced = StopGluedMarker.Replace(GluedMarker.Replace(merged, " "), " ");
         if (spaced != merged) changes.Add(new FormattingChange(field, "space put before a citation", merged));
-        string named = OpeningMarker.Replace(spaced, m =>
+        // "Study [1]" is written with a capital wherever it stands, as the issue that named it asks ("evidence, Study [1] suggests").
+        string Name(Match m)
         {
             string word = CitationSupportChecker.ReferencesIn(m.Value).Count < 2 ? source
                 : source.EndsWith('y') ? source[..^1] + "ies" : source + "s";
             return char.ToUpperInvariant(word[0]) + word[1..] + " " + m.Value;
-        });
+        }
+        string named = CommaMarker.Replace(OpeningMarker.Replace(spaced, Name), Name);
         if (named != spaced) changes.Add(new FormattingChange(field, "citation that opened a sentence named", spaced));
         return named;
     }

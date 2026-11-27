@@ -72,7 +72,6 @@ public static partial class ReviewWriter
                 if (string.IsNullOrWhiteSpace(a.Text)) return "text must not be empty.";
                 var outside = ThematicSynthesis.CitedIn(a.Text).Where(r => r < 1 || r > referenceCount).ToList();
                 if (outside.Count > 0) return $"citation numbers {string.Join(", ", outside)} are not in the reference list.";
-                if (CitationLoadSendBack(string.Join("\n", (a.Answers ?? new()).Append(a.Text)), "discussion call", warn) is { } load) return load;
                 if (LeftOutCited(a.Text, evidence) is { } leftOut) return leftOut;
                 if (ReadingBasisSentence(a.Text) is { } basis) return ReadingBasisProblem(basis, profile);
                 if (UncitedAttribution(a.Text, evidence.BaseFacts) is { } reported) return reported;
@@ -85,12 +84,18 @@ public static partial class ReviewWriter
                 // Issue #572: soft, sharing the figure guard's budget, so a discussion is never lost to it; an uncited claim
                 // of agreement that is left is taken out in code below.
                 (a => DiscussionReadingProblem(a.Text!, sections.Select(x => x.Text), evidence) ?? (a.Answers ?? new()).Select(t => UnquantifiedFindingProblem(t, evidence)).FirstOrDefault(p => p != null),
-                    "a retold result, an agreement the results do not show or a result without its figures")),
+                    "a retold result, an agreement the results do not show or a result without its figures"),
+                // Issue #742: soft and last, so the other checks get the budget first; a sentence still over the rule is
+                // split in code below, and the discussion is never lost to a citation count.
+                (a => CitationLoadProblem(string.Join("\n", (a.Answers ?? new()).Append(a.Text))), LoadSendBack)),
                 // Issue #723: one try more than the soft budget, so a hard problem that comes after both soft send-backs
-                // (run 34d1af9a: a sentence citing four references) still gets a repair instead of failing the discussion.
+                // still gets a repair instead of failing the discussion.
                 repairAttempts: FigureSendBacks + 1);
-            string text = OneLimitationsParagraph(MethodsSectionWriter.StripMarkdownEmphasis(reply.Text!.Trim()), out string? merged);
+            var splits = new List<string>();
+            string text = OneLimitationsParagraph(MethodsSectionWriter.StripMarkdownEmphasis(SplitOverCited(reply.Text!.Trim(), "the discussion", splits)), out string? merged);
             if (merged != null) warn?.Invoke(merged);
+            if (reply.Answers != null) reply.Answers = reply.Answers.Select((t, i) => SplitOverCited(t, $"answer {i + 1}", splits)).ToList();
+            foreach (var split in splits) warn?.Invoke(split);
             text = WithoutUncitedAgreement(text, out string? agreement);
             if (agreement != null) warn?.Invoke(agreement);
             return new DiscussionWithAnswers(text, answer && all.Count > 0 ? AllAnswers(all, asked, reply.Answers ?? new(), profile) : null);
