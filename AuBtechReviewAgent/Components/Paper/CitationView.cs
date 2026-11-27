@@ -40,6 +40,20 @@ public static class CitationView
         _ => "border-line bg-soft text-muted",
     };
 
+    /// <summary>
+    /// The colour of a citation number in running text: its verdict's text colour and nothing else, so the number reads
+    /// as a quiet marker in the paper (ui-cite, issue #736). Its verdict is also in its title and its accessible name.
+    /// </summary>
+    public static string Marker(string? verdict) => verdict switch
+    {
+        CitationSupportChecker.Supported => "text-supported",
+        CitationSupportChecker.Partial => "text-partly",
+        CitationSupportChecker.NotSupported => "text-not-supported",
+        CitationSupportChecker.InsufficientEvidence => "text-abstract-only",
+        CitationSupportChecker.Unverifiable => "text-unverifiable",
+        _ => "text-muted",
+    };
+
     /// <summary>The id of a citation number on the page.</summary>
     public static string CiteId(string field, int sentence, int reference) => $"cite-{field}-{sentence}-{reference}";
 

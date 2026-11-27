@@ -3,10 +3,10 @@
    the sheets follow the theme: white in light, dark with a light hairline border in dark. On paper
    wwwroot/css/journal-print.css takes over and the sheets are white. No rounded corners except on buttons. */
 
-.article-front {
+.article-front, .journal {
     --paper-serif: Charter, "Bitstream Charter", "Sitka Text", Cambria, "Source Serif Pro", "Noto Serif", "DejaVu Serif", Georgia, serif;
-    color: rgb(var(--text));
 }
+.article-front { color: rgb(var(--text)); }
 .article-front p { max-width: none; }
 .af-masthead { display: flex; align-items: flex-end; justify-content: space-between; gap: 1rem; padding-bottom: 0.75rem; border-bottom: 2px solid rgb(var(--text)); }
 .af-wordmark { font-family: Poppins, Inter, system-ui, sans-serif; font-size: 1.35rem; font-weight: 700; line-height: 1.2; color: rgb(var(--navy)); }
@@ -38,6 +38,14 @@
 }
 
 @media screen {
+    /* The body of the report in the front page's style (issue #736): the abstract's serif, size and leading (the
+       sheet sets 16 px at 1.55), section headings in the title's serif and navy with the Abstract label's rule, and
+       controls in the app's sans. Paper has its own rules in journal-print.css. */
+    .journal { font-family: var(--paper-serif); }
+    .journal :is(button:not([id^="cite-"]), input, textarea, select, label, [data-citation-panel], .ui-chip) { font-family: Inter, "Segoe UI", system-ui, sans-serif; }
+    .journal h2:not(.af-label) { font-family: var(--paper-serif); font-size: 1.375rem; font-weight: 400; line-height: 1.3; letter-spacing: 0; color: rgb(var(--navy)); padding-bottom: 0.4rem; border-bottom: 1px solid rgb(var(--border)); }
+    .journal h3 { font-family: var(--paper-serif); font-size: 1.0625rem; font-weight: 700; line-height: 1.4; letter-spacing: 0; color: rgb(var(--navy)); }
+
     /* The desk the sheets lie on: a neutral colour a step away from the sheet in both themes. */
     .paper-desk { background: rgb(var(--panel)); }
     .paged-holder { position: relative; }

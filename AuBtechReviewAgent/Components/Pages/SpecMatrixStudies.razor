@@ -22,8 +22,7 @@
 
 <div class="space-y-4 pt-2 overflow-visible">
     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div class="space-y-2 border border-line p-3 bg-page print-keep">
-            <span class="text-[13px] font-bold text-ink block border-b border-line pb-1">Figure 3.1: Included Publications per Year</span>
+        <figure class="ui-figure print-keep">
             <div class="space-y-2 pt-1">
                 @{ int maxYear = Math.Max(1, Page.publicationsByYear.Values.DefaultIfEmpty(0).Max()); }
                 @foreach (var kvp in Page.publicationsByYear)
@@ -37,10 +36,10 @@
                     </div>
                 }
             </div>
-        </div>
+            <figcaption class="ui-caption">Figure 3.1: Included Publications per Year</figcaption>
+        </figure>
 
-        <div class="space-y-2 border border-line p-3 bg-page print-keep">
-            <span class="text-[13px] font-bold text-ink block border-b border-line pb-1">Figure 3.2: Included Papers by Source</span>
+        <figure class="ui-figure print-keep">
             <div class="space-y-2 pt-1">
                 @{ int maxPlatform = Math.Max(1, Page.platformShares.Select(p => p.Count).DefaultIfEmpty(0).Max()); }
                 @foreach (var share in Page.platformShares)
@@ -54,12 +53,12 @@
                     </div>
                 }
             </div>
-        </div>
+            <figcaption class="ui-caption">Figure 3.2: Included Papers by Source</figcaption>
+        </figure>
     </div>
 
     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div class="space-y-2 border border-line p-3 bg-page print-keep">
-            <span class="text-[13px] font-bold text-ink block border-b border-line pb-1">Figure 3.3: Distribution by Publishing Venue Type</span>
+        <figure class="ui-figure print-keep">
             @{
                 int totalVenues = Page.journalCount + Page.conferenceCount + Page.transactionsCount + Page.proceedingsCount + Page.preprintCount;
                 double jP = totalVenues > 0 ? ((double)Page.journalCount / totalVenues) * 360 : 0;
@@ -80,10 +79,10 @@
                     <div class="flex items-center gap-1.5"><div class="w-2.5 h-2.5 bg-red-600 "></div> Preprints (@Page.preprintCount)</div>
                 </div>
             </div>
-        </div>
+            <figcaption class="ui-caption">Figure 3.3: Distribution by Publishing Venue Type</figcaption>
+        </figure>
 
-        <div class="space-y-2 border border-line p-3 bg-page print-keep">
-            <span class="text-[13px] font-bold text-ink block border-b border-line pb-1">Figure 3.4: Journal Quartile and Venue Tier</span>
+        <figure class="ui-figure print-keep">
             <div class="flex items-end justify-between h-28 pt-2 border-b border-line-field px-2">
                 @foreach (var label in new[] { "Q1", "Q2", "Q3", "Q4", "Conf", "Preprint" })
                 {
@@ -111,7 +110,8 @@
                 }
             </div>
             <p class="text-xs text-muted">Quartiles from SCImago Journal Rank (SJR), exact title match only.</p>
-        </div>
+            <figcaption class="ui-caption">Figure 3.4: Journal Quartile and Venue Tier</figcaption>
+        </figure>
     </div>
 </div>
 

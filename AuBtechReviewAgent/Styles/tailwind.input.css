@@ -154,6 +154,11 @@
     .ui-chip-ok { @apply ui-chip border-supported-border bg-supported-fill text-supported; }
     .ui-chip-partial { @apply ui-chip border-partly-border bg-partly-fill text-partly; }
     .ui-chip-bad { @apply ui-chip border-not-supported-border bg-not-supported-fill text-not-supported; }
+    /* The report body set as a journal article (issue #736): a figure has no box and its caption under it, a table its
+       caption above it, and a citation number in running text is a quiet marker in its verdict's colour. */
+    .ui-figure { @apply space-y-3; }
+    .ui-caption { @apply text-[14px] leading-snug text-ink; }
+    .ui-cite { @apply inline align-baseline text-[0.9em] font-semibold underline-offset-2 hover:underline; }
     /* The live line of a running review (Components/Dashboard/LiveActivityLine.razor). */
     .ui-live { @apply flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-sm leading-snug text-ink; }
     .ui-live-dot { @apply inline-block h-2 w-2 shrink-0 self-center rounded-full bg-supported-chart; }
