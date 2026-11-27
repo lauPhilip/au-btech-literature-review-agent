@@ -64,6 +64,7 @@ The **module test kit** (`Modules/ModuleKit.cs` and `Modules/ModuleKitTests.cs`)
 | `RealRunRegressionTests.cs` | Cases taken from real runs that once went wrong |
 | `OpenSourceAdapterTests.cs`, `ArxivSourceTests.cs` | Source parsers on saved real responses (OpenAlex, Semantic Scholar, Crossref, Unpaywall, arXiv), rate-limit handling and retries, the PDF size limit |
 | `Security/InjectionAttackSet*.cs` | The attack set of poisoned sources (`Security/AttackSet/`), case by case and through a whole systematic and grey literature review |
+| `Security/SecuritySmokeTests.cs` | One walk through the real app as an attacker would go (issue #626): run ids shaped like paths answer 404 and give no file, a body over `ApiEndpoints.MaxBodyBytes` is refused and leaves no run folder, an instruction in the objective is refused until accepted and is then on file in the ledger (`InputFlags`) and `protocol.md`, and a paper that demands inclusion is flagged in its screening record and still excluded. When a defence changes, this test should still describe what an attacker meets |
 | `SafetyAndRecordsTests.cs` | Prompt-injection markers, structured model output, the cache, the manifest, the security headers, and methods text from the run's own counts |
 | `DocPathsTests.cs` | Every file or folder the docs name in backticks exists in the repository |
 | `ArtifactAndProseTests.cs` | Markdown turned into prose, artifact validation and drawing (Mermaid, TikZ), custom requests, compacting after repair, progress that never moves back, a full run with an artifact and with none |
@@ -81,6 +82,10 @@ The **module test kit** (`Modules/ModuleKit.cs` and `Modules/ModuleKitTests.cs`)
 When you fix a bug found in a real run, add a case to `RealRunRegressionTests.cs` with the input that caused it.
 
 Most tests take a few milliseconds. The API and MCP tests (`Api/`, `Mcp/` and `ApiDocsPageTests.cs`) start the whole app, so they share one collection that runs on its own after the rest; they wait for a run with `ApiTestHost.WaitForFinishedStatusAsync`, which looks at the run every 20 ms, so do not add waits of your own. The durations `dotnet test` reports are wall-clock times: on a busy machine a quick test can show tens of seconds while it waits for a free thread, so time a class on its own (`--filter "FullyQualifiedName~.TheClass"`) before you look for a cause in it.
+
+## Supply-chain checks
+
+OpenSSF Scorecard (`.github/workflows/scorecard.yml`, issue #621) scores the repository's hygiene on every push to master, once a week and when branch protection changes. Its findings appear under Security, Code scanning, and the score is published for the README badge. Every action is pinned by its commit hash with the version in a comment, and every workflow is read-only at the top, so a job that needs more asks for it itself, as the wiki job does. When Scorecard flags something, fix it when the fix is cheap; otherwise write the finding and the reason it is accepted in this section. Accepted today: none yet; the first run on master sets the baseline. Allstar is not set up, because it needs its GitHub app installed on the account.
 
 ## Measuring screening accuracy
 
