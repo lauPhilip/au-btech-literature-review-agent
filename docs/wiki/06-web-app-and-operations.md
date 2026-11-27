@@ -237,15 +237,12 @@ The REST API under `/api/v1` is a second way in, off in production until `Api:En
 
 ```mermaid
 flowchart LR
-    PUSH["push / merged PR<br/>to master"] --> BT["Build & Test<br/>dotnet test"]
-    PUSH --> CSS["Compiled CSS matches<br/>components"]
-    PUSH --> CQ["CodeQL<br/>(separate workflow)"]
+    PUSH["push / merged PR<br/>to master"] --> BT["Build & Test, CSS check,<br/>accessibility, CodeQL<br/>(no deploy)"]
     TAG["push a version tag<br/>(release.yml)"] --> REL["check, test,<br/>publish the release"]
-    REL --> HEAD{"tag on master's<br/>newest commit?"}
-    HEAD -- yes --> DEP
-    BT & CSS --> DEP{"DEPLOY_ENABLED?<br/>(deploy.yml)"}
-    DEP -- yes --> DOCS{"only docs changed<br/>since the site's commit?"}
-    DOCS -- no --> IDLE["wait until no review runs<br/>(/health, at most 2.5 h)"]
+    REL --> NEW{"tag is the newest<br/>version tag?"}
+    NEW -- yes --> DEP{"DEPLOY_ENABLED?<br/>(deploy.yml)"}
+    MAN["Deploy master<br/>(by hand)"] --> DEP
+    DEP -- yes --> IDLE["wait until no review runs<br/>(/health, at most 2.5 h)"]
     IDLE --> PUB["dotnet publish<br/>win-x86, self-contained"]
     PUB --> OFF["upload app_offline.htm"]
     OFF --> UP["upload every file over FTPS<br/>(not web.config, App_Data,<br/>WorkspaceStore)"]
@@ -256,7 +253,7 @@ flowchart LR
 
 The site runs on Simply.com's Windows hosting under IIS. That hosting only has .NET Framework installed, so the app is published **self-contained for win-x86** and runs **out of process** (`AspNetCoreHostingModel` in the project file): with in-process hosting, IIS returned empty static files from the host's network share.
 
-`.github/workflows/deploy.yml` does the deployment, and two workflows call it. `ci.yml` calls it on every push to master, once *Build & Test*, the CSS check and the accessibility check pass and the repository variable `DEPLOY_ENABLED` is `true`. `release.yml` calls it again once a version's GitHub release is published, because the deploy on the push to master ran before the tag existed: that build reads no tag on its commit, so MinVer names it a pre-release (`0.2.1-alpha.0.1`) and its papers say the run used code that "is not a published release". Built again from the tag, the server names the release, v0.2.1. Before that second deploy, a small job asks GitHub which commit the tag points to and which commit master is at, and deploys only when they are the same, so tagging an older commit never rolls the server back; the workflow then shows a note that it did not deploy. Every deploy waits for the one before it, across both workflows. If the deploy for the push to master happens to start after the tag was pushed, it already reads the tag and names the release, so the order does not matter. `tools/ReleaseCheck/test_workflows.py` tests this wiring and the comparison on every pull request.
+`.github/workflows/deploy.yml` does the deployment, and two workflows call it. A merge into master does not deploy: it runs *Build & Test*, the CSS check and the accessibility check, which keeps a push to master fast and leaves a running review alone (issue #707). The server is deployed when a version is released. `release.yml` calls `deploy.yml` once a version's GitHub release is published and the repository variable `DEPLOY_ENABLED` is `true`, so the build reads the tag on its commit and MinVer names it the release, v0.2.1, and not a pre-release (`0.2.1-alpha.0.1`), which would make the papers say the run used code that "is not a published release" (#144). Before that, a small job (`tools/ReleaseCheck/newest_tag.py`) checks that the tag is the newest version tag in Semantic Versioning order, so tagging an older version never rolls the server back; the workflow then shows a note that it did not deploy. A merge that lands on master while the release runs does not matter, because the tagged commit is the one built. A pre-release tag such as v0.2.0-rc.1 deploys when it is the newest version. For an urgent fix that cannot wait, *Deploy master* (`deploy-manual.yml`) is started by hand from the Actions tab on the master branch. It deploys master's newest commit, under the same `DEPLOY_ENABLED` gate and the same wait for running reviews, and always deploys, even when only documentation changed. The server then names a pre-release until the next release deploys again. Every deploy waits for the one before it, across both workflows. `tools/ReleaseCheck/test_workflows.py` and `test_newest_tag.py` test this wiring and the version order on every pull request.
 
 `ci.yml` keeps the tools its jobs download between runs, so a check does not fetch them again each time (issue #383). The NuGet packages in `~/.nuget/packages` are cached under a key made from the project files, because the repository has no `packages.lock.json` and `setup-dotnet`'s own cache needs one; *Build & Test* and the accessibility job each keep their own copy, since they restore different projects. `setup-node` caches npm's download folder for the CSS check and the accessibility job, keyed on their `package-lock.json`. The Playwright browsers in `~/.cache/ms-playwright` are cached under the Playwright version read from `tools/a11y/package-lock.json`, so a new version downloads fresh browsers. `npx playwright install --with-deps chromium` still runs on every job: it skips a browser that is already there, but the system libraries Chromium needs are installed outside the cache. A cache only speeds a job up; with an empty cache every job does what it did before. Caches made on master are open to every pull request, and a pull request's own cache stays with its branch.
 
