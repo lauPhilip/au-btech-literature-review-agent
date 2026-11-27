@@ -12,12 +12,12 @@
     </p>
     <h1 class="font-display sm:mt-2 text-[clamp(26px,2.4vw,40px)] font-semibold leading-tight tracking-[-0.025em] text-heading">What should the review find out?</h1>
 
-    <div class="ui-card mt-4 space-y-3 p-4 sm:mt-5 sm:space-y-4 sm:p-6">
+    <div class="ui-card mt-4 space-y-3 p-4 sm:p-6">
         @Notice
 
         <div>
             <label for="f-objective" class="ui-label">Review objective</label>
-            <textarea id="f-objective" rows="3" aria-describedby="h-objective" aria-invalid="@FieldHelp.Invalid(InputCheck, "Review objective")"
+            <textarea id="f-objective" rows="2" aria-describedby="h-objective" aria-invalid="@FieldHelp.Invalid(InputCheck, "Review objective")"
                       maxlength="@AuBtechReviewAgent.ReviewInputGuard.MaxObjective"
                       @bind="State.ReviewObjective" @bind:event="oninput" @bind:after="Changed"
                       placeholder="e.g. Which safety mechanisms do agent frameworks use, and how are they evaluated?"
@@ -39,7 +39,7 @@
         {
             <div>
                 <label for="f-questions" class="ui-label">Research questions <span class="font-normal text-muted">(optional)</span></label>
-                <textarea id="f-questions" rows="3" aria-describedby="h-questions" aria-invalid="@FieldHelp.Invalid(InputCheck, "Research question")"
+                <textarea id="f-questions" rows="2" aria-describedby="h-questions" aria-invalid="@FieldHelp.Invalid(InputCheck, "Research question")"
                           maxlength="@ResearchQuestionsMaxLength"
                           @bind="State.ResearchQuestions" @bind:event="oninput" @bind:after="Changed"
                           placeholder="One per line, e.g. RQ1: Which safety mechanisms do the frameworks use?" class="ui-input resize-y"></textarea>

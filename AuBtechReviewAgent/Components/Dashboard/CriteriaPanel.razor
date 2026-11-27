@@ -14,7 +14,7 @@
     string sheet = Open == true ? "max-sm:fixed max-sm:inset-0 max-sm:z-50 max-sm:overflow-y-auto max-sm:rounded-none max-sm:border-0" : "";
 }
 <section id="criteria" class="ui-card min-w-0 @sheet" aria-labelledby="criteria-title" data-open="@(Open?.ToString().ToLowerInvariant() ?? "auto")">
-    <div class="flex items-start gap-3 px-4 pb-3 pt-4 sm:px-5">
+    <div class="flex items-center gap-3 px-4 py-1 sm:px-5">
         <div class="min-w-0 flex-1">
             <h2 id="criteria-title" class="font-display text-base font-semibold text-heading">Criteria</h2>
             <p class="mt-0.5 text-sm text-muted @summary" data-criteria-summary>@Summary()</p>
@@ -31,58 +31,65 @@
         }
     </div>
 
-    <div id="criteria-body" class="@body space-y-6 border-t border-line px-4 pb-5 pt-4 sm:px-5">
-        <fieldset class="space-y-3">
-            <legend class="mb-2 font-display text-sm font-semibold text-heading">Scope</legend>
+    <div id="criteria-body" class="@body space-y-3 border-t border-line px-4 pb-4 pt-3 sm:px-5">
+        @* The groups' legends are for screen readers only; each field's own label is enough to see (issue #728). *@
+        <fieldset class="space-y-2">
+            <legend class="sr-only">Scope</legend>
             <div>
-                <span id="l-years" class="ui-label">Publication years</span>
-                <div class="flex items-center gap-2" role="group" aria-labelledby="l-years">
-                    <input type="number" aria-label="From year" min="1900" max="@DateTime.UtcNow.Year" @bind="YearFrom" @bind:after="Changed" class="ui-input w-28" />
-                    <span class="text-muted" aria-hidden="true">–</span>
-                    <input type="number" aria-label="To year" min="1900" max="@DateTime.UtcNow.Year" @bind="YearTo" @bind:after="Changed" class="ui-input w-28" />
+                <div class="flex items-center justify-between gap-3">
+                    <span id="l-years" class="ui-label mb-0">Publication years</span>
+                    <div class="flex items-center gap-2" role="group" aria-labelledby="l-years">
+                        <input type="number" aria-label="From year" min="1900" max="@DateTime.UtcNow.Year" @bind="YearFrom" @bind:after="Changed" class="ui-input w-24" />
+                        <span class="text-muted" aria-hidden="true">–</span>
+                        <input type="number" aria-label="To year" min="1900" max="@DateTime.UtcNow.Year" @bind="YearTo" @bind:after="Changed" class="ui-input w-24" />
+                    </div>
                 </div>
-                <div class="mt-2 flex flex-wrap gap-1.5">
+                <div class="mt-1.5 flex flex-wrap gap-1.5">
                     @foreach (var (label, from) in YearPresets)
                     {
                         int start = from;
                         bool chosen = YearFrom == start && YearTo == DateTime.UtcNow.Year;
                         <button type="button" @onclick="() => SetYears(start)" aria-pressed="@(chosen ? "true" : "false")"
-                                class="min-h-[32px] rounded-full border px-3 py-1 text-xs @(chosen ? "border-heading bg-active text-heading" : "border-line-field text-muted hover:bg-soft")">@label</button>
+                                class="min-h-[32px] border px-3 py-1 text-xs @(chosen ? "border-heading bg-active text-heading" : "border-line-field text-muted hover:bg-soft")">@label</button>
                     }
                 </div>
             </div>
+            @* The databases this visitor can search, as one row of chips (issue #731). A keyed database shows once its key
+               is set; until then one link opens API keys. A database that had trouble lately carries a mark whose note
+               is its title and, for screen readers, part of its name; the full story stays in the run's log. *@
             <div id="f-sources" tabindex="-1" role="group" aria-labelledby="l-sources">
                 <span id="l-sources" class="ui-label">Databases <span class="font-normal text-muted">(at least one · @SourceCountText())</span></span>
-                <div class="grid grid-cols-2 gap-x-3 gap-y-1.5">
-                    @foreach (var source in AuBtechReviewAgent.SourceCatalog.All)
+                <div class="flex flex-wrap gap-1.5">
+                    @foreach (var source in AuBtechReviewAgent.SourceCatalog.All.Where(s => IsAvailable(s.Key)))
                     {
                         var option = source;
-                        bool available = IsAvailable(option.Key);
-                        <label class="flex min-h-[32px] select-none items-start gap-2 text-sm leading-snug @(available ? "cursor-pointer text-ink" : "cursor-not-allowed text-muted")"
-                               title="@(available ? "" : $"Needs an {option.KeyLabel}. Add one under API keys.")">
-                            <input type="checkbox" class="mt-0.5 h-4 w-4 shrink-0 accent-brand"
-                                   checked="@(available && State.SelectedSources.Contains(option.Key))"
-                                   disabled="@(!available || Busy)"
+                        bool on = State.SelectedSources.Contains(option.Key);
+                        string? note = AuBtechReviewAgent.SourceStatus.NoteFor(option.DisplayName);
+                        <label data-fit-control title="@note"
+                               class="inline-flex min-h-[44px] cursor-pointer select-none items-center gap-2 border px-3 text-sm @(on ? "border-heading bg-active text-heading" : "border-line-field text-ink hover:bg-soft")">
+                            <input type="checkbox" class="h-4 w-4 shrink-0 accent-brand" checked="@on" disabled="@Busy"
                                    @onchange="e => ToggleSource(option.Key, e)" />
-                            <span class="min-w-0">
-                                @option.DisplayName
-                                @if (!available)
-                                {
-                                    <span class="block text-[11px]">(needs key)</span>
-                                }
-                            </span>
+                            @option.DisplayName
+                            @if (note != null)
+                            {
+                                <span class="text-partly" aria-hidden="true">⚠</span><span class="sr-only">: @note</span>
+                            }
                         </label>
                     }
+                    @if (MissingKeys() is { } missing)
+                    {
+                        <button type="button" @onclick="OnOpenKeys" aria-label="@($"Add a key for {missing}")"
+                                class="inline-flex min-h-[44px] items-center border border-dashed border-line-field px-3 text-sm text-muted hover:bg-soft hover:text-heading">+ Key for @missing</button>
+                    }
                 </div>
-                <div class="mt-2"><SourceStatusNote /></div>
             </div>
         </fieldset>
 
-        <fieldset class="space-y-3">
-            <legend class="mb-2 font-display text-sm font-semibold text-heading">Include and exclude</legend>
+        <fieldset class="space-y-2">
+            <legend class="sr-only">Include and exclude</legend>
             <div>
                 <label for="f-inclusion" class="ui-label">Include studies that… <span class="font-normal text-muted">(required)</span></label>
-                <textarea id="f-inclusion" rows="3" aria-required="true" aria-describedby="h-inclusion" aria-invalid="@FieldHelp.Invalid(InputCheck, "Inclusion criteria")"
+                <textarea id="f-inclusion" rows="2" aria-required="true" aria-describedby="h-inclusion" aria-invalid="@FieldHelp.Invalid(InputCheck, "Inclusion criteria")"
                           maxlength="@AuBtechReviewAgent.ReviewInputGuard.MaxCriteria"
                           @bind="State.InclusionCriteria" @bind:event="oninput" @bind:after="Changed"
                           placeholder="e.g. describe or evaluate an agent framework, with some form of evaluation" class="ui-input resize-y"></textarea>
@@ -98,20 +105,22 @@
             </div>
         </fieldset>
 
+        @* One native select instead of six tiles (issue #730): it works by keyboard and screen reader as it is, and
+           the note shows only for Custom, or when it holds the reviewer's own words (an example or a draft). *@
         <fieldset id="f-artifact">
-            <legend class="mb-2 font-display text-sm font-semibold text-heading">Visual summary <Term Key="artifact" Icon="true" /></legend>
-            <div class="grid grid-cols-2 gap-2">
-                @foreach (var kind in AuBtechReviewAgent.ArtifactKinds.All)
-                {
-                    var key = kind.Key;
-                    bool chosen = State.ArtifactKind == key;
-                    <label class="flex min-h-[44px] cursor-pointer items-center gap-2 rounded-field border px-3 py-2 text-sm @(chosen ? "border-heading bg-active text-heading" : "border-line-field text-ink hover:bg-soft")">
-                        <input type="radio" name="artifact-kind" value="@key" checked="@chosen" disabled="@Busy" @onchange="() => ChooseArtifact(key)" class="h-4 w-4 accent-brand" />
-                        <span>@ShortLabel(key)</span>
-                    </label>
-                }
+            <legend class="sr-only">Visual summary</legend>
+            <div class="flex items-center gap-2">
+                <span class="font-display text-sm font-semibold text-heading" aria-hidden="true">Visual summary</span><Term Key="artifact" Icon="true" />
+                <select id="f-artifact-kind" aria-label="Visual summary" data-fit-control disabled="@Busy"
+                        @onchange="e => ChooseArtifact(e.Value?.ToString())" class="ui-input ml-auto min-h-[44px] w-auto min-w-[12rem]">
+                    @foreach (var kind in AuBtechReviewAgent.ArtifactKinds.All)
+                    {
+                        var key = kind.Key;
+                        <option value="@key" selected="@(State.ArtifactKind == key)">@ShortLabel(key)</option>
+                    }
+                </select>
             </div>
-            @if (State.ArtifactKind != AuBtechReviewAgent.ArtifactKinds.None)
+            @if (DirectiveShown)
             {
                 <textarea id="f-directive" rows="2" aria-label="What the visual summary should show" aria-describedby="h-directive" aria-invalid="@FieldHelp.Invalid(InputCheck, "Artifact target")"
                           maxlength="@AuBtechReviewAgent.ReviewInputGuard.MaxDirective"
@@ -144,6 +153,8 @@
     /// <summary>Folded extras at the end of the panel: the search strings and the advanced options.</summary>
     [Parameter] public RenderFragment? MoreOptions { get; set; }
     [Parameter] public EventCallback OnChanged { get; set; }
+    /// <summary>Opens API keys, where a key for a keyed database (Scopus, IEEE) is added.</summary>
+    [Parameter] public EventCallback OnOpenKeys { get; set; }
 
     private static readonly (string Label, int From)[] YearPresets =
         { ("Last 5 years", DateTime.UtcNow.Year - 5), ("Since 2015", 2015), ("Since 2000", 2000) };
@@ -171,6 +182,14 @@
 
     private bool IsAvailable(string key) => SourceAvailability.TryGetValue(key, out var ok) && ok;
 
+    /// <summary>"Scopus or IEEE": the first word of each keyed database that has no key yet, or null when none lacks one.</summary>
+    private string? MissingKeys()
+    {
+        var names = AuBtechReviewAgent.SourceCatalog.All.Where(s => s.KeyKind != AuBtechReviewAgent.SourceKeyKind.None && !IsAvailable(s.Key))
+            .Select(s => s.DisplayName.Split(' ')[0]).ToList();
+        return names.Count == 0 ? null : string.Join(" or ", names);
+    }
+
     private int SelectedCount => State.SelectedSources.Count(IsAvailable);
 
     private string SourceCountText()
@@ -187,7 +206,7 @@
     }
 
     /// <summary>Choosing a kind fills in its default instruction, unless the reviewer wrote their own.</summary>
-    private async Task ChooseArtifact(string key)
+    private async Task ChooseArtifact(string? key)
     {
         string previous = State.ArtifactKind;
         State.ArtifactKind = AuBtechReviewAgent.ArtifactKinds.Normalize(key);
@@ -196,6 +215,17 @@
         if (untouched) State.SynthesisTargetDirective = AuBtechReviewAgent.ArtifactKinds.DefaultInstruction(State.ArtifactKind);
         await Changed();
     }
+
+    /// <summary>
+    /// The note is shown for Custom, and for any other kind whose note is not the kind's default, so text the reviewer
+    /// wrote (or an example or a draft brought in) is never sent unseen.
+    /// </summary>
+    public static bool ShowsDirective(string kind, string? directive) =>
+        kind == AuBtechReviewAgent.ArtifactKinds.Custom
+        || (kind != AuBtechReviewAgent.ArtifactKinds.None && !string.IsNullOrWhiteSpace(directive)
+            && directive != AuBtechReviewAgent.ArtifactKinds.DefaultInstruction(kind));
+
+    private bool DirectiveShown => ShowsDirective(State.ArtifactKind, State.SynthesisTargetDirective);
 
     /// <summary>The short name of a kind of visual summary, as the options and the folded summary show it.</summary>
     public static string ShortLabel(string kind) => kind switch

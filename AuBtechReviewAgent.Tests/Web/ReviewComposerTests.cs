@@ -64,6 +64,8 @@ public class ReviewComposerTests
         Assert.DoesNotContain("The question the review answers", html);
         Assert.DoesNotContain("The words sent to the databases", html);
         Assert.Contains("placeholder=\"Short and specific works best, e.g. agentic AI software frameworks\"", html);
+        // Two rows for the objective, so the composer fits beside the criteria at 1366 × 768 (issue #728).
+        Assert.Contains("<textarea id=\"f-objective\" rows=\"2\"", html);
         // The line stays for the character count, folded away until the text nears the limit.
         Assert.Contains("id=\"h-objective\" class=\"hidden mt-1", html);
         Assert.Contains("id=\"h-query\" class=\"hidden mt-1", html);
@@ -114,7 +116,7 @@ public class ReviewComposerTests
         Assert.Contains("aria-expanded=\"false\" aria-controls=\"criteria-body\" aria-label=\"Show the criteria\" class=\"lg:hidden", html);
         Assert.Contains("aria-expanded=\"true\" aria-controls=\"criteria-body\" aria-label=\"Fold the criteria\" class=\"hidden lg:inline-flex", html);
         Assert.Contains("lg:hidden\" data-criteria-summary", html);
-        foreach (var group in new[] { ">Scope</legend>", ">Include and exclude</legend>", ">Visual summary " })
+        foreach (var group in new[] { ">Scope</legend>", ">Include and exclude</legend>", ">Visual summary<" })
             Assert.Contains(group, html);
         Assert.DoesNotContain("max-sm:fixed", html);
     }
@@ -130,7 +132,7 @@ public class ReviewComposerTests
         Assert.Contains("aria-expanded=\"true\"", open);
 
         string folded = await RenderAsync<CriteriaPanel>(new UiStateContainer(), new() { ["Open"] = (bool?)false, ["SourceAvailability"] = OpenSourcesOnly });
-        Assert.Contains("id=\"criteria-body\" class=\"hidden space-y-6", folded);
+        Assert.Contains("id=\"criteria-body\" class=\"hidden space-y-3", folded);
         Assert.Contains("aria-expanded=\"false\"", folded);
         Assert.DoesNotContain("max-sm:fixed", folded);
     }
@@ -161,17 +163,17 @@ public class ReviewComposerTests
         Assert.Contains("aria-label=\"To year\"", html);
         Assert.Contains(">Last 5 years</button>", html);
         Assert.Contains("id=\"f-sources\" tabindex=\"-1\"", html);
-        foreach (var source in SourceCatalog.All)
+        foreach (var source in SourceCatalog.All.Where(s => OpenSourcesOnly[s.Key]))
             Assert.Contains(source.DisplayName, html);
-        Assert.Contains("(needs key)", html);
-        Assert.Contains("id=\"f-inclusion\" rows=\"3\" aria-required=\"true\" aria-describedby=\"h-inclusion\" aria-invalid=\"true\"", html);
+        Assert.Contains("aria-label=\"Add a key for Scopus or IEEE\"", html);
+        Assert.Contains("id=\"f-inclusion\" rows=\"2\" aria-required=\"true\" aria-describedby=\"h-inclusion\" aria-invalid=\"true\"", html);
         Assert.Contains("id=\"f-exclusion\"", html);
-        Assert.Equal(ArtifactKinds.All.Count, Count(html, "name=\"artifact-kind\""));
-        Assert.Contains("id=\"f-directive\"", html);
+        Assert.Equal(ArtifactKinds.All.Count, Count(html, "<option value="));
+        Assert.Contains("id=\"f-artifact-kind\"", html);
 
-        var none = new UiStateContainer { ArtifactKind = ArtifactKinds.None };
-        string withoutVisual = await RenderAsync<CriteriaPanel>(none, new() { ["SourceAvailability"] = OpenSourcesOnly });
-        Assert.DoesNotContain("id=\"f-directive\"", withoutVisual);
+        var custom = new UiStateContainer { ArtifactKind = ArtifactKinds.Custom, SynthesisTargetDirective = "" };
+        string withNote = await RenderAsync<CriteriaPanel>(custom, new() { ["SourceAvailability"] = OpenSourcesOnly });
+        Assert.Contains("id=\"f-directive\"", withNote);
     }
 
     [Fact]
