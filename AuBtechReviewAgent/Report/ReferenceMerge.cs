@@ -31,6 +31,12 @@ public static class ReferenceMerge
             venue = withVenue.Venue;
             filled["venue"] = withVenue.Service;
         }
+        // A book series is not where a chapter was published; the book is (issue #678).
+        else if (ApaCitationBuilder.IsBookSeries(venue) && answers.FirstOrDefault(a => a.Details.Book != null) is { } withBook)
+        {
+            venue = withBook.Details.Book!;
+            filled["venue"] = withBook.Service;
+        }
         foreach (var a in answers)
         {
             details.Volume ??= Take("volume", a.Details.Volume, a.Service, filled);
@@ -38,6 +44,12 @@ public static class ReferenceMerge
             details.Pages ??= Take("pages", a.Details.Pages, a.Service, filled);
             details.ArticleNumber ??= Take("articleNumber", a.Details.ArticleNumber, a.Service, filled);
             details.Publisher ??= Take("publisher", a.Details.Publisher, a.Service, filled);
+            details.Book ??= Take("book", a.Details.Book, a.Service, filled);
+            if (details.Editors == null && a.Details.Editors is { Count: > 0 } editors)
+            {
+                details.Editors = editors.ToList();
+                filled["editors"] = a.Service;
+            }
         }
         if (filled.Count == 0) return log;
 
@@ -108,5 +120,6 @@ public static class ReferenceMerge
     private static ReferenceDetails Copy(ReferenceDetails d) => new()
     {
         Volume = d.Volume, Issue = d.Issue, Pages = d.Pages, ArticleNumber = d.ArticleNumber, Publisher = d.Publisher, ArxivId = d.ArxivId,
+        Book = d.Book, Editors = d.Editors?.ToList(),
     };
 }
