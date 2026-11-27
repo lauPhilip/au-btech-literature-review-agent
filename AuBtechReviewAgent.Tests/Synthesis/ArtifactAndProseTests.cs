@@ -118,7 +118,7 @@ public class ArtifactAndProseTests : IDisposable
         Assert.Contains("n2 -->|\"constrains\"| n3", mermaid);
         string tikz = ArtifactBuilder.ToTikz(art, t => t);
         Assert.Contains(@"\node[box] (n3) at (4.4,", tikz); // the shared target sits one layer to the right
-        Assert.Contains(@"\draw[->, thick] (n1) --", tikz);
+        Assert.Contains(@"\draw[->, thick] (n1.east) --", tikz);
         Assert.Equal(new[] { "artifact-n1", "artifact-n2", "artifact-n3" }, art.CitableTexts().Select(t => t.Field));
     }
 

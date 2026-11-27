@@ -70,7 +70,7 @@ public class ArtifactLinksTests
         Assert.Empty(decision.SharedReferences);
         Assert.Equal(ArtifactLinks.Reading, map.Edges[0].Check);
         Assert.Contains("n1 -.->|\"deployed in\"| n5", ArtifactBuilder.ToMermaid(map));
-        Assert.Contains(@"\draw[->, thick, dashed] (n1)", ArtifactBuilder.ToTikz(map, s => s));
+        Assert.Contains(@"\draw[->, thick, dashed] (n1.", ArtifactBuilder.ToTikz(map, s => s));
     }
 
     [Fact]
