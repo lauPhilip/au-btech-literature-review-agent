@@ -129,7 +129,7 @@ public static partial class ReviewWriter
         var coverage = new ThemeCoverage { ThemeId = theme.Id, Field = field, Studies = theme.Sources.ToList() };
         int excerpts = theme.Sources.Count <= 12 ? 2 : 1;
         string themeEvidence = string.Join("\n", theme.Sources.Select(r => evidence.SourceBlock(r, theme, excerpts, profile.LeanEvidence)));
-        string otherThemes = string.Join("; ", evidence.Themes.Where(t => t.Id != theme.Id).Select(t => t.Name));
+        string otherThemes = string.Join("; ", evidence.Themes.Where(t => t.Id != theme.Id).Select(t => ThemeNameInText(t.Name)));
         int paragraphs = ThematicSynthesis.ParagraphsFor(theme.Sources.Count);
         string s = profile.Source, ss = profile.Sources;
         // The theme's own counts (issue #146), when the module gives them; without them the prompt is as before.
@@ -161,6 +161,7 @@ public static partial class ReviewWriter
             5. {{ReadingBasisRule(profile)}}
             6. {{ClaimPerCitationRule(profile)}}
             7. {{RedThreadRule(profile, evidence, theme)}} Each entry of "leftOut" is {"ref":n,"reason":"why it bears on the theme only indirectly"}; leave the list empty when every {{s}} fits.
+            8. {{WordingRule(profile)}}
             {{ProseCleaner.PlainProseRule}}
             Respond ONLY with a valid minified JSON object:
             {"heading":"...","text":"the subsection with inline [n] citations","leftOut":[]}
@@ -182,7 +183,11 @@ public static partial class ReviewWriter
                     if (outside.Count > 0) return $"citation numbers {string.Join(", ", outside)} are not in the reference list.";
                     return LeftOutProblem(a.LeftOut, a.Text, theme.Sources) ?? CitationLoadSendBack(a.Text, "subsection", Note);
                 }, "subsection", Note, 2, (a => ListingProblem(a.Text!, theme.Sources.Count, profile), "a list of one-source summaries"),
-                    (a => UnquantifiedFindingProblem(a.Text!, evidence), "a result without its figures")), repairAttempts: 2);
+                    (a => UnquantifiedFindingProblem(a.Text!, evidence), "a result without its figures"),
+                    // Issue #746: soft, sharing the budget above, so a subsection is never lost to wording.
+                    (a => NumeralOpeningProblem(a.Text, "the subsection") ?? EmptyReportedProblem(a.Text, "the subsection"), "a sentence that opens on a numeral or only says something is reported"),
+                    (a => OtherThemeCaseProblem(a.Text, evidence.Themes.Where(t => t.Id != theme.Id).Select(t => t.Name)), "another theme named with its capitals")),
+                    repairAttempts: 3);
                 text = MethodsSectionWriter.StripMarkdownEmphasis(answer.Text!.Trim());
                 // A source left out of the theme is on file with its reason, and no fill pass puts it back (issue #675).
                 if (answer.LeftOut is { Count: > 0 } left)
