@@ -150,10 +150,10 @@ public class RedThreadTests
     public void ASourceLeftOutMustBelongToTheThemeBeUncitedAndHaveAReason()
     {
         var sources = new[] { 8, 9 };
-        Assert.Null(ReviewWriter.LeftOutProblem(new[] { (9, (string?)"a focus group study, not a safety mechanism") }, "Placement is studied [8].", sources));
-        Assert.Contains("not a source of this theme", ReviewWriter.LeftOutProblem(new[] { (4, (string?)"it is about something else") }, "Placement [8].", sources));
-        Assert.Contains("but the text cites it", ReviewWriter.LeftOutProblem(new[] { (8, (string?)"it is about something else") }, "Placement [8].", sources));
-        Assert.Contains("gives no reason", ReviewWriter.LeftOutProblem(new[] { (9, (string?)"off topic") }, "Placement [8].", sources));
+        Assert.Null(ReviewWriter.LeftOutProblem(new (int, string?)[] { (9, "a focus group study, not a safety mechanism") }, "Placement is studied [8].", sources));
+        Assert.Contains("not a source of this theme", ReviewWriter.LeftOutProblem(new (int, string?)[] { (4, "it is about something else") }, "Placement [8].", sources));
+        Assert.Contains("but the text cites it", ReviewWriter.LeftOutProblem(new (int, string?)[] { (8, "it is about something else") }, "Placement [8].", sources));
+        Assert.Contains("gives no reason", ReviewWriter.LeftOutProblem(new (int, string?)[] { (9, "off topic") }, "Placement [8].", sources));
     }
 
     [Fact]
