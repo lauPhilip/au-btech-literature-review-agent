@@ -82,13 +82,14 @@ public sealed partial class MultivocalSynthesiser
             {{PromptSafety.ReviewerInputNotice}}
             {{PromptSafety.DataOnlyNotice}}
 
-            VALUES IN THIS THEME (id, attribute: value, sources, example quotes):
+            VALUES IN THIS THEME (id, attribute: value, sources, example quotes with their finding ids):
             {{PromptSafety.Wrap(list, "values")}}
 
             Name the tensions: pairs of values whose sources disagree or contradict each other about how to do something or what works, with one sentence on how, using the values' names, not their ids. Values that are merely different, or different options, are not tensions. Only real disagreements; none is fine.{{poolNote}}
+            For each tension also give "findingA" and "findingB": the finding ids (such as F1.3) of one example quote of each value, where the two quotes themselves disagree. Leave both empty when no two of the example quotes disagree directly; the tension is then shown between the values, citing no source.
 
             Respond ONLY with a valid minified JSON object of this shape:
-            {"tensions":[{"groupA":"V1","groupB":"V4","description":"One sentence."}]}
+            {"tensions":[{"groupA":"V1","groupB":"V4","findingA":"F1.3","findingB":"F4.2","description":"One sentence."}]}
             """;
         return await LlmJson.GetAsync<ModelTensions>(chat, prompt, LlmJson.JsonMode(0.2), ModelTensions.Problem);
     }
@@ -102,7 +103,9 @@ public sealed partial class MultivocalSynthesiser
 
     /// <summary>
     /// The model's tensions as pairs of findings from different sources, one from each value; a tension that names a
-    /// value outside the theme, or whose two values come from the same single source, is left out with a note.
+    /// value outside the theme, or whose two values come from the same single source, is left out with a note. The two
+    /// findings are the ones the model names when both are example quotes of their values and come from two sources
+    /// (<see cref="NamedPair"/>); the pool label is decided from them.
     /// </summary>
     public static List<SynthesisTension> TensionsFor(ModelTensions answer, IReadOnlyList<ValueGroup> groups, IReadOnlyList<SynthesisFinding> findings, out List<string> notes)
     {
@@ -110,7 +113,7 @@ public sealed partial class MultivocalSynthesiser
         var byId = groups.ToDictionary(g => g.Id);
         var byFinding = findings.ToDictionary(f => f.Id);
         var tensions = new List<SynthesisTension>();
-        int outside = 0, oneSource = 0;
+        int outside = 0, oneSource = 0, unchecked_ = 0;
         foreach (var t in answer.Tensions)
         {
             if (!byId.TryGetValue(t.GroupA.Trim(), out var a) || !byId.TryGetValue(t.GroupB.Trim(), out var b) || a == b)
@@ -118,14 +121,16 @@ public sealed partial class MultivocalSynthesiser
                 outside++;
                 continue;
             }
-            // A pair across the pools comes first, so a tension between the state of the art and of the practice is shown as one.
-            var pair = a.Findings.SelectMany(fa => b.Findings.Select(fb => (A: byFinding[fa], B: byFinding[fb])))
-                .Where(x => x.A.Address != x.B.Address).OrderBy(x => x.A.Literature == x.B.Literature ? 1 : 0).FirstOrDefault();
-            if (pair.A == null)
+            if (!a.Findings.Any(fa => b.Findings.Any(fb => byFinding[fa].Address != byFinding[fb].Address)))
             {
                 oneSource++;
                 continue;
             }
+            var named = NamedPair(t, a, b, byFinding);
+            if (named == null && (!string.IsNullOrWhiteSpace(t.FindingA) || !string.IsNullOrWhiteSpace(t.FindingB))) unchecked_++;
+            // A pair across the pools comes first, so a tension between the state of the art and of the practice is shown as one.
+            var pair = named ?? a.Findings.SelectMany(fa => b.Findings.Select(fb => (A: byFinding[fa], B: byFinding[fb])))
+                .Where(x => x.A.Address != x.B.Address).OrderBy(x => x.A.Literature == x.B.Literature ? 1 : 0).First();
             // The model sees the values by id; the reader sees their names.
             string description = ValueId.Replace(t.Description.Trim(), m => byId.TryGetValue(m.Value, out var g) ? $"\"{g.Value}\"" : "another value");
             tensions.Add(new SynthesisTension
@@ -140,7 +145,20 @@ public sealed partial class MultivocalSynthesiser
         }
         if (outside > 0) notes.Add($"{outside} tension(s) named a value outside the theme; left out.");
         if (oneSource > 0) notes.Add($"{oneSource} tension(s) were between values of one source only; left out.");
+        if (unchecked_ > 0) notes.Add($"{unchecked_} tension(s) named findings that are not example quotes of their two values from two sources; not cited.");
         return tensions;
+    }
+
+    /// <summary>
+    /// The two findings the model names for a tension, when each is one of the example quotes it was shown for its value
+    /// (<see cref="ValueGroup.Samples"/>) and the two come from different sources; null otherwise.
+    /// </summary>
+    public static (SynthesisFinding A, SynthesisFinding B)? NamedPair(ModelTension tension, ValueGroup a, ValueGroup b, IReadOnlyDictionary<string, SynthesisFinding> byFinding)
+    {
+        string fa = tension.FindingA?.Trim() ?? "", fb = tension.FindingB?.Trim() ?? "";
+        static bool Shown(ValueGroup g, string id) => id.Length > 0 && g.Findings.Contains(id) && g.Samples.Any(s => s.StartsWith(id + " ", StringComparison.Ordinal));
+        if (!Shown(a, fa) || !Shown(b, fb) || !byFinding.TryGetValue(fa, out var x) || !byFinding.TryGetValue(fb, out var y) || x.Address == y.Address) return null;
+        return (x, y);
     }
 }
 
@@ -242,5 +260,8 @@ public sealed class ModelTension
 {
     public string GroupA { get; set; } = "";
     public string GroupB { get; set; } = "";
+    /// <summary>The id of an example quote of value A that disagrees with <see cref="FindingB"/>; empty when none does.</summary>
+    public string? FindingA { get; set; }
+    public string? FindingB { get; set; }
     public string Description { get; set; } = "";
 }

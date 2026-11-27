@@ -176,7 +176,8 @@ public sealed partial class MultivocalSynthesiser
             Value = g.First().Value.Trim(),
             Findings = g.Select(f => f.Id).ToList(),
             Sources = g.Select(f => f.Address).Distinct().Count(),
-            Samples = g.GroupBy(f => f.Address).Select(s => s.First()).Take(2).Select(f => $"\"{Short(f.Quote)}\" ({f.Title})").ToList(),
+            // Each example carries its finding's id, so a tension can name the two quotes that disagree (issue #463).
+            Samples = g.GroupBy(f => f.Address).Select(s => s.First()).Take(2).Select(f => $"{f.Id} \"{Short(f.Quote)}\" ({f.Title})").ToList(),
         })
         .ToList();
 

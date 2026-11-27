@@ -21,7 +21,7 @@ public sealed partial class MultivocalSynthesiser
 {
     public const string SynthesisFile = "multivocal-synthesis.json";
     public const string StageSynthesised = "Synthesised";
-    public const string PromptVersion = "grey-synthesis-v5";
+    public const string PromptVersion = "grey-synthesis-v6";
     public const int MaxThemesPerQuestion = 6;
 
     private static readonly JsonSerializerOptions Json = new() { WriteIndented = true };
