@@ -162,6 +162,12 @@ else
         <div data-page-top aria-hidden="true"></div>
         </div>
         </div>
+        @* The paper's check of itself (issue #532) is about the tool, not part of the paper: it sits under the report, on
+           screen only, and Article info gives its one line (issue #735). *@
+        @if (selfCheck != null && selfCheck.Checks.Count > 0)
+        {
+            <div class="mx-auto w-full max-w-[880px]"><SelfCheckTable Result="selfCheck" /></div>
+        }
         @if (editLog.Edits.Count > 0 || CanEditText)
         {
             <div class="mx-auto mt-6 w-full max-w-[880px]">
