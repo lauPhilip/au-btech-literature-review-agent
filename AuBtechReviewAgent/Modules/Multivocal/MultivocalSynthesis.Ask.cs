@@ -105,7 +105,8 @@ public sealed partial class MultivocalSynthesiser
     /// The model's tensions as pairs of findings from different sources, one from each value; a tension that names a
     /// value outside the theme, or whose two values come from the same single source, is left out with a note. The two
     /// findings are the ones the model names when both are example quotes of their values and come from two sources
-    /// (<see cref="NamedPair"/>); the pool label is decided from them.
+    /// (<see cref="NamedPair"/>); the pool label is decided from them. Without such a pair the tension is kept between the
+    /// values, with no findings and no pool label.
     /// </summary>
     public static List<SynthesisTension> TensionsFor(ModelTensions answer, IReadOnlyList<ValueGroup> groups, IReadOnlyList<SynthesisFinding> findings, out List<string> notes)
     {
@@ -128,17 +129,16 @@ public sealed partial class MultivocalSynthesiser
             }
             var named = NamedPair(t, a, b, byFinding);
             if (named == null && (!string.IsNullOrWhiteSpace(t.FindingA) || !string.IsNullOrWhiteSpace(t.FindingB))) unchecked_++;
-            // A pair across the pools comes first, so a tension between the state of the art and of the practice is shown as one.
-            var pair = named ?? a.Findings.SelectMany(fa => b.Findings.Select(fb => (A: byFinding[fa], B: byFinding[fb])))
-                .Where(x => x.A.Address != x.B.Address).OrderBy(x => x.A.Literature == x.B.Literature ? 1 : 0).First();
+            // Without a checked pair the tension stays between the values: no citation and no pool label, since code may not
+            // pick two findings that do not disagree and call it a tension between the art and the practice (issue #463).
             // The model sees the values by id; the reader sees their names.
             string description = ValueId.Replace(t.Description.Trim(), m => byId.TryGetValue(m.Value, out var g) ? $"\"{g.Value}\"" : "another value");
             tensions.Add(new SynthesisTension
             {
-                FindingA = pair.A.Id,
-                FindingB = pair.B.Id,
+                FindingA = named?.A.Id ?? "",
+                FindingB = named?.B.Id ?? "",
                 Description = $"{a.Value} against {b.Value}. {description}",
-                Between = !findings.Any(f => f.Literature == "formal") ? null
+                Between = named is not { } pair || !findings.Any(f => f.Literature == "formal") ? null
                     : pair.A.Literature != pair.B.Literature ? SynthesisTension.ArtAgainstPractice
                     : pair.A.Literature == "formal" ? "within the state of the art" : "within the state of the practice",
             });

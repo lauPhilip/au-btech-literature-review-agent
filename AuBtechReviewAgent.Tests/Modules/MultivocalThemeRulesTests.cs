@@ -112,7 +112,7 @@ public class MultivocalThemeRulesTests
         {
             Tensions =
             {
-                new ModelTension { GroupA = "V1", GroupB = "V2", Description = "V1 keeps a summary, V2 never does, unlike V9." },
+                new ModelTension { GroupA = "V1", GroupB = "V2", FindingA = "F1.1", FindingB = "F2.1", Description = "V1 keeps a summary, V2 never does, unlike V9." },
                 new ModelTension { GroupA = "V1", GroupB = "V7", Description = "Outside the theme." },
                 new ModelTension { GroupA = "V1", GroupB = "V1", Description = "With itself." },
             },
@@ -121,7 +121,7 @@ public class MultivocalThemeRulesTests
         var tensions = MultivocalSynthesiser.TensionsFor(answer, groups, findings, out var notes);
 
         var kept = Assert.Single(tensions);
-        Assert.Equal(("F1.1", "F2.1"), (kept.FindingA, kept.FindingB)); // F1.2 is from the same source as F1.1, so F2.1 is chosen
+        Assert.Equal(("F1.1", "F2.1"), (kept.FindingA, kept.FindingB)); // the two quotes the model named
         // The reader sees the values' names, never the ids the model was given.
         Assert.Equal("Summarise against Never summarise. \"Summarise\" keeps a summary, \"Never summarise\" never does, unlike another value.", kept.Description);
         Assert.Equal("2 tension(s) named a value outside the theme; left out.", Assert.Single(notes));
@@ -129,6 +129,32 @@ public class MultivocalThemeRulesTests
         var oneSource = MultivocalSynthesiser.TensionsFor(answer, MultivocalSynthesiser.ValueGroups(findings.Take(2).ToList()), findings.Take(2).ToList(), out var oneNotes);
         Assert.Empty(oneSource);
         Assert.Equal(new[] { "2 tension(s) named a value outside the theme; left out.", "1 tension(s) were between values of one source only; left out." }, oneNotes);
+    }
+
+    [Fact]
+    public void ATensionWithoutTwoCheckedQuotesCitesNoSourceAndHasNoPoolLabel()
+    {
+        // Issue #463: code used to pick the first pair of findings of the two values, which need not disagree.
+        static SynthesisFinding In(string pool, SynthesisFinding finding) { finding.Literature = pool; return finding; }
+        var findings = new List<SynthesisFinding>
+        {
+            In("grey", Coded("F1.1", "a", "Practice", "Summarise")), In("formal", Coded("F2.1", "b", "Practice", "Never summarise")),
+            In("grey", Coded("F3.1", "c", "Practice", "Never summarise")),
+        };
+        var groups = MultivocalSynthesiser.ValueGroups(findings);
+        ModelTensions Named(string? a, string? b) => new() { Tensions = { new ModelTension { GroupA = "V1", GroupB = "V2", FindingA = a, FindingB = b, Description = "V1 keeps a summary, V2 never does." } } };
+
+        foreach (var (a, b) in new (string?, string?)[] { (null, null), ("", ""), ("F1.1", "F9.9"), ("F2.1", "F1.1"), ("F1.1", null) })
+        {
+            var tension = Assert.Single(MultivocalSynthesiser.TensionsFor(Named(a, b), groups, findings, out var notes));
+            Assert.Equal(("", "", null), (tension.FindingA, tension.FindingB, tension.Between));
+            Assert.Equal(a is null or "" ? 0 : 1, notes.Count(n => n.Contains("not cited")));
+        }
+
+        var checkedPair = Assert.Single(MultivocalSynthesiser.TensionsFor(Named("F1.1", "F2.1"), groups, findings, out _));
+        Assert.Equal(("F1.1", "F2.1", SynthesisTension.ArtAgainstPractice), (checkedPair.FindingA, checkedPair.FindingB, checkedPair.Between));
+        var withinPractice = Assert.Single(MultivocalSynthesiser.TensionsFor(Named("F1.1", "F3.1"), groups, findings, out _));
+        Assert.Equal("within the state of the practice", withinPractice.Between);
     }
 
     [Fact]

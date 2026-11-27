@@ -169,9 +169,16 @@ public class MultivocalFormalRunTests : IDisposable
         Assert.All(formal, s => Assert.All(s.Attributes.SelectMany(a => a.Values), v => Assert.Equal("found", run.Pages.CheckQuote(run.RunId, s.Address, v.Quote))));
     }
 
-    /// <summary>The tension step names the summaries against retrieval; everything else as the kit answers.</summary>
-    private static string? WithATension(string prompt) =>
-        prompt.Contains("Name the tensions") ? """{"tensions":[{"groupA":"V1","groupB":"V2","description":"V1 keeps a summary where V2 pages turns out."}]}""" : null;
+    /// <summary>
+    /// The tension step names the summaries against retrieval, with the first example quote of each value as the pair
+    /// that disagrees (the ids are read from the prompt); everything else as the kit answers.
+    /// </summary>
+    private static string? WithATension(string prompt)
+    {
+        if (!prompt.Contains("Name the tensions")) return null;
+        string First(string value) => System.Text.RegularExpressions.Regex.Match(prompt, $@"(?m)^{value} .*?for example (F\d+\.\d+) ").Groups[1].Value;
+        return $$"""{"tensions":[{"groupA":"V1","groupB":"V2","findingA":"{{First("V1")}}","findingB":"{{First("V2")}}","description":"V1 keeps a summary where V2 pages turns out."}]}""";
+    }
 
     [Fact]
     public async Task EachThemeSaysInCodeWhatItRestsOnAndATensionAcrossThePoolsIsNamedAsSuch()
@@ -191,8 +198,9 @@ public class MultivocalFormalRunTests : IDisposable
 
         var tension = Assert.Single(theme.Tensions);
         Assert.Equal(SynthesisTension.ArtAgainstPractice, tension.Between);
-        Assert.Equal(("F1.1", "F3.1"), (tension.FindingA, tension.FindingB)); // the grey finding of V1, not the formal one, against V2's paper
+        Assert.Equal(("F1.1", "F3.1"), (tension.FindingA, tension.FindingB)); // the grey finding of V1 against V2's paper, as named
         string tensionPrompt = run.Model.Prompts.Single(p => p.Contains("Name the tensions"));
+        Assert.Contains("for example F1.1 \"", tensionPrompt); // each example quote carries its finding id
         Assert.Contains("(2 sources, 1 academic, 1 grey)", tensionPrompt);
         Assert.Contains("Academic sources show the state of the art and grey sources the state of the practice", tensionPrompt);
     }
