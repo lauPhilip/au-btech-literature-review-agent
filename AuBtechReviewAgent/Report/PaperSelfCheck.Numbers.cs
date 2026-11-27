@@ -108,7 +108,7 @@ public static partial class PaperSelfCheck
 
     /// <summary>
     /// Check 5: a result figure appears in one theme, in the abstract and in one place after the results (one answer, the
-    /// discussion or one closing part), and never in a second theme or in the directions for future research or the
+    /// discussion, one closing part or the concept map), and never in a second theme or in the directions for future research or the
     /// conclusion (the figure guard's rule, issue #452; the second theme, issue #673). The guard sends an answer back twice
     /// and then keeps it; this says what was kept.
     /// </summary>
@@ -119,13 +119,13 @@ public static partial class PaperSelfCheck
             Id = "figures",
             Title = "Result figures not repeated",
             Explanation = "A figure from the results (a percentage, an effect size, a count a study reports) belongs in one theme, the abstract and at most one place after the results. " +
-                "A second theme does not repeat it. The directions for future research and the conclusion say what the results mean, so they repeat no figure.",
+                "The concept map counts as a place after the results. A second theme does not repeat it. The directions for future research and the conclusion say what the results mean, so they repeat no figure.",
         };
         var themes = input.Of(PaperPartKind.Theme).ToList();
         var results = themes.Count > 0 ? themes : input.Of(PaperPartKind.Overview).ToList();
         string facts = string.Join(" ", input.Facts.Select(f => f.Value)) + "\n" + input.FactsText + $"\n{input.Questions.Count}";
         var figures = ReviewWriter.ResultFigures(Plain(string.Join("\n", results.Select(p => p.Text))), facts);
-        var after = input.Of(PaperPartKind.Discussion, PaperPartKind.Answer, PaperPartKind.Limitations, PaperPartKind.Implications).ToList();
+        var after = input.Of(PaperPartKind.Discussion, PaperPartKind.Answer, PaperPartKind.Limitations, PaperPartKind.Implications, PaperPartKind.ConceptMap).ToList();
         var none = input.Of(PaperPartKind.FutureResearch, PaperPartKind.Conclusion).ToList();
         var repeated = new HashSet<string>();
         static string Names(IReadOnlyList<string> names) => names.Count == 1 ? names[0] : string.Join(", ", names.Take(names.Count - 1)) + " and " + names[^1];

@@ -51,6 +51,8 @@ public class ReviewArtifact
     public List<string> Bullets { get; set; } = new();
     /// <summary>Why no artifact could be built (the report says so instead of showing something invented).</summary>
     public string? Error { get; set; }
+    /// <summary>How many links the link check left out of the diagram because the map keeps at most <see cref="ArtifactLinks.MaxReading"/> dashed ones (0 on runs from before the cap).</summary>
+    public int LinksDropped { get; set; }
     /// <summary>Mermaid source drawn from Nodes and Edges (empty for tables and lists).</summary>
     public string Mermaid { get; set; } = "";
 
