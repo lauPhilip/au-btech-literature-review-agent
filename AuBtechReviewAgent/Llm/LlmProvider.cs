@@ -66,17 +66,20 @@ public static class LlmFactory
     }
 
     /// <summary>
-    /// The Mistral chat completions API, which follows the OpenAI format, at its EU regional endpoint: requests sent
-    /// there are processed in the EU. Mistral bills regional calls at 1.1 times its list price.
+    /// The Mistral chat completions API, which follows the OpenAI format, at its global endpoint and list price. Lau
+    /// chose this default on 27 November 2026: the EU endpoint costs 1.1 times as much.
     /// </summary>
-    public const string MistralBaseUrl = "https://api.eu.mistral.ai/v1";
-
-    /// <summary>Mistral's global endpoint, which names no region. Only for a model the EU endpoint does not serve.</summary>
-    public const string MistralGlobalUrl = "https://api.mistral.ai/v1";
+    public const string MistralBaseUrl = "https://api.mistral.ai/v1";
 
     /// <summary>
-    /// The Mistral address a run calls: <see cref="LlmOptions.MistralBaseUrl"/> when it is an https address, else the EU
-    /// endpoint, so a mistyped setting never sends a key in clear text or to a relative path.
+    /// Mistral's EU regional endpoint: requests sent there are processed in the EU, at 1.1 times the list price. A server
+    /// chooses it by setting Llm:MistralBaseUrl to this address.
+    /// </summary>
+    public const string MistralEuUrl = "https://api.eu.mistral.ai/v1";
+
+    /// <summary>
+    /// The Mistral address a run calls: <see cref="LlmOptions.MistralBaseUrl"/> when it is an https address, else the
+    /// default, so a mistyped setting never sends a key in clear text or to a relative path.
     /// </summary>
     public static string MistralEndpoint(LlmOptions options) =>
         Uri.TryCreate(options.MistralBaseUrl?.Trim(), UriKind.Absolute, out var url) && url.Scheme == Uri.UriSchemeHttps
