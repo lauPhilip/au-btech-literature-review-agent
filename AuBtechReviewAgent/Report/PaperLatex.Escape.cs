@@ -112,7 +112,7 @@ public static partial class PaperLatex
         if (!references) escaped = Typography(escaped);
         // A long hash or name may end the line at its separators, so it stays inside the margin.
         escaped = LatexBreaks.Allow(escaped);
-        if (!references) escaped = Marker.Replace(escaped, Cite);
+        if (!references) escaped = Marker.Replace(escaped, m => Cite(m, escaped));
         // One sentence per line in a paragraph; elsewhere a full stop before a command ("orchestration. \textit{...}")
         // is not a sentence's end, so it gets a word space.
         if (prose) return ShowAddresses(SentenceEnd.Replace(escaped, "\n"), addresses);
@@ -167,7 +167,7 @@ public static partial class PaperLatex
     }
 
     // "[1, 3–5]" -> "~\cite{ref1,ref3,ref4,ref5}": the cite package sorts and ranges them again, as CitationMarkers does.
-    private static string Cite(Match m)
+    private static string Cite(Match m, string text)
     {
         var numbers = m.Groups[2].Value.Split(", ").SelectMany(part =>
         {
@@ -175,8 +175,10 @@ public static partial class PaperLatex
             return ends.Length == 2 ? Enumerable.Range(ends[0], ends[1] - ends[0] + 1) : ends;
         });
         string cite = @"\cite{" + string.Join(",", numbers.Select(n => "ref" + n)) + "}";
-        // A citation that starts a table cell or follows a bracket is braced, which tells chktex no space was wanted.
-        return m.Groups[1].Length > 0 ? "~" + cite : "{" + cite + "}";
+        // A citation that starts a table cell or follows a bracket is braced, which tells chktex no space was wanted; one
+        // written onto a word ("economics[4]") gets the tie the text left out (issue #725).
+        bool onWord = m.Index > 0 && char.IsLetterOrDigit(text[m.Index - 1]);
+        return m.Groups[1].Length > 0 || onWord ? "~" + cite : "{" + cite + "}";
     }
 
     private static string Plain(string maths) => Regex.Replace(maths, @"\\([a-zA-Z]+)\s*", "$1 ").Replace("{", "").Replace("}", "").Replace("^", "").Replace("_", "").Trim();
