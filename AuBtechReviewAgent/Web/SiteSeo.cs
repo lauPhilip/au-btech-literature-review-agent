@@ -44,6 +44,12 @@ public static class SiteSeo
         ("/accessibility", "yearly", "0.3"),
     };
 
+    /// <summary>
+    /// The concept DOI of the tool on Zenodo: it always resolves to the newest version (CITATION.cff and the README
+    /// badge carry the same one). Held here once; llms.txt and the citation block on About read it from here.
+    /// </summary>
+    public const string ConceptDoi = "10.5281/zenodo.24379094";
+
     public const string RepositoryUrl = "https://github.com/lauPhilip/au-btech-literature-review-agent";
     public const string Organisation = "Department of Business Development and Technology, Aarhus University";
     public const string Authors = "Philip S. P. Ø. O. Lau and Nidhi";
@@ -92,11 +98,38 @@ public static class SiteSeo
         }
     }
 
-    public static string RobotsTxt(string baseUrl) =>
-        "User-agent: *\n" +
-        "Allow: /\n" +
-        "Disallow: /api/\n" +
-        $"Sitemap: {Absolute(baseUrl, "sitemap.xml")}\n";
+    /// <summary>
+    /// The crawlers of AI systems that robots.txt names (issue #611). Being cited correctly by answer engines is part
+    /// of what the tool is for, so they are welcome on purpose and not by implication. A crawler that is named
+    /// ignores the "*" group, so the group repeats the /api/ rule instead of leaving it to the "*" group.
+    /// </summary>
+    public static readonly IReadOnlyList<string> AiCrawlers = new[]
+    {
+        "GPTBot", "OAI-SearchBot", "ChatGPT-User", "ClaudeBot", "Claude-User", "Claude-SearchBot", "anthropic-ai",
+        "PerplexityBot", "Perplexity-User", "Google-Extended", "CCBot", "Applebot-Extended", "Bytespider", "cohere-ai",
+    };
+
+    public static string RobotsTxt(string baseUrl)
+    {
+        var sb = new System.Text.StringBuilder();
+        sb.Append("# AI crawlers are welcome on the public pages: being cited correctly by answer engines is part of what\n");
+        sb.Append("# TraceableAI is for. See also /llms.txt. The downloads and the API under /api/ are for programs that\n");
+        sb.Append("# call them on purpose, not for crawling. A named crawler ignores the group for all crawlers below, so\n");
+        sb.Append("# the /api/ rule is repeated here.\n");
+        sb.Append("# A run's own pages (/review/{id}) are not blocked on purpose: they carry a visitor's research question,\n");
+        sb.Append("# but they are marked noindex, and a crawler that may not fetch a page never sees its noindex.\n");
+        foreach (string crawler in AiCrawlers) sb.Append("User-agent: ").Append(crawler).Append('\n');
+        sb.Append("Allow: /\n");
+        sb.Append("Disallow: /api/\n");
+        sb.Append('\n');
+        sb.Append("# Every other crawler\n");
+        sb.Append("User-agent: *\n");
+        sb.Append("Allow: /\n");
+        sb.Append("Disallow: /api/\n");
+        sb.Append('\n');
+        sb.Append("Sitemap: ").Append(Absolute(baseUrl, "sitemap.xml")).Append('\n');
+        return sb.ToString();
+    }
 
     /// <summary>
     /// The sitemap of the public pages. <paramref name="lastModified"/> is the day the running version was built: the
@@ -150,7 +183,8 @@ public static class SiteSeo
             ["isAccessibleForFree"] = true,
             ["license"] = "https://www.apache.org/licenses/LICENSE-2.0",
             ["offers"] = new Dictionary<string, object> { ["@type"] = "Offer", ["price"] = "0", ["priceCurrency"] = "EUR" },
-            ["sameAs"] = new[] { RepositoryUrl },
+            ["sameAs"] = new[] { RepositoryUrl, "https://doi.org/" + ConceptDoi },
+            ["identifier"] = "https://doi.org/" + ConceptDoi,
             ["creator"] = Creator(),
         };
         return Serialize(data);
