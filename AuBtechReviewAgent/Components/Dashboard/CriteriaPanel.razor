@@ -51,30 +51,33 @@
                     }
                 </div>
             </div>
+            @* The databases this visitor can search, as one row of chips (issue #731). A keyed database shows once its key
+               is set; until then one link opens API keys. A database that had trouble lately carries a mark whose note
+               is its title and, for screen readers, part of its name; the full story stays in the run's log. *@
             <div id="f-sources" tabindex="-1" role="group" aria-labelledby="l-sources">
                 <span id="l-sources" class="ui-label">Databases <span class="font-normal text-muted">(at least one · @SourceCountText())</span></span>
-                <div class="grid grid-cols-2 gap-x-3 gap-y-1.5">
-                    @foreach (var source in AuBtechReviewAgent.SourceCatalog.All)
+                <div class="flex flex-wrap gap-1.5">
+                    @foreach (var source in AuBtechReviewAgent.SourceCatalog.All.Where(s => IsAvailable(s.Key)))
                     {
                         var option = source;
-                        bool available = IsAvailable(option.Key);
-                        <label class="flex min-h-[32px] select-none items-start gap-2 text-sm leading-snug @(available ? "cursor-pointer text-ink" : "cursor-not-allowed text-muted")"
-                               title="@(available ? "" : $"Needs an {option.KeyLabel}. Add one under API keys.")">
-                            <input type="checkbox" class="mt-0.5 h-4 w-4 shrink-0 accent-brand"
-                                   checked="@(available && State.SelectedSources.Contains(option.Key))"
-                                   disabled="@(!available || Busy)"
+                        bool on = State.SelectedSources.Contains(option.Key);
+                        string? note = AuBtechReviewAgent.SourceStatus.NoteFor(option.DisplayName);
+                        <label data-fit-control title="@note"
+                               class="inline-flex min-h-[44px] cursor-pointer select-none items-center gap-2 border px-3 text-sm @(on ? "border-heading bg-active text-heading" : "border-line-field text-ink hover:bg-soft")">
+                            <input type="checkbox" class="h-4 w-4 shrink-0 accent-brand" checked="@on" disabled="@Busy"
                                    @onchange="e => ToggleSource(option.Key, e)" />
-                            <span class="min-w-0">
-                                @option.DisplayName
-                                @if (!available)
-                                {
-                                    <span class="block text-[11px]">(needs key)</span>
-                                }
-                            </span>
+                            @option.DisplayName
+                            @if (note != null)
+                            {
+                                <span class="text-partly" aria-hidden="true">⚠</span><span class="sr-only">: @note</span>
+                            }
                         </label>
                     }
                 </div>
-                <div class="mt-2"><SourceStatusNote /></div>
+                @if (MissingKeys() is { } missing)
+                {
+                    <button type="button" @onclick="OnOpenKeys" class="mt-1 min-h-[44px] text-xs font-medium text-muted underline underline-offset-2 hover:text-heading">Add a key for @missing</button>
+                }
             </div>
         </fieldset>
 
@@ -143,6 +146,8 @@
     /// <summary>Folded extras at the end of the panel: the search strings and the advanced options.</summary>
     [Parameter] public RenderFragment? MoreOptions { get; set; }
     [Parameter] public EventCallback OnChanged { get; set; }
+    /// <summary>Opens API keys, where a key for a keyed database (Scopus, IEEE) is added.</summary>
+    [Parameter] public EventCallback OnOpenKeys { get; set; }
 
     private static readonly (string Label, int From)[] YearPresets =
         { ("Last 5 years", DateTime.UtcNow.Year - 5), ("Since 2015", 2015), ("Since 2000", 2000) };
@@ -169,6 +174,14 @@
     }
 
     private bool IsAvailable(string key) => SourceAvailability.TryGetValue(key, out var ok) && ok;
+
+    /// <summary>"Scopus or IEEE": the first word of each keyed database that has no key yet, or null when none lacks one.</summary>
+    private string? MissingKeys()
+    {
+        var names = AuBtechReviewAgent.SourceCatalog.All.Where(s => s.KeyKind != AuBtechReviewAgent.SourceKeyKind.None && !IsAvailable(s.Key))
+            .Select(s => s.DisplayName.Split(' ')[0]).ToList();
+        return names.Count == 0 ? null : string.Join(" or ", names);
+    }
 
     private int SelectedCount => State.SelectedSources.Count(IsAvailable);
 

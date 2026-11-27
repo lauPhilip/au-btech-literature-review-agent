@@ -161,9 +161,9 @@ public class ReviewComposerTests
         Assert.Contains("aria-label=\"To year\"", html);
         Assert.Contains(">Last 5 years</button>", html);
         Assert.Contains("id=\"f-sources\" tabindex=\"-1\"", html);
-        foreach (var source in SourceCatalog.All)
+        foreach (var source in SourceCatalog.All.Where(s => OpenSourcesOnly[s.Key]))
             Assert.Contains(source.DisplayName, html);
-        Assert.Contains("(needs key)", html);
+        Assert.Contains(">Add a key for Scopus or IEEE</button>", html);
         Assert.Contains("id=\"f-inclusion\" rows=\"3\" aria-required=\"true\" aria-describedby=\"h-inclusion\" aria-invalid=\"true\"", html);
         Assert.Contains("id=\"f-exclusion\"", html);
         Assert.Equal(ArtifactKinds.All.Count, Count(html, "<option value="));
