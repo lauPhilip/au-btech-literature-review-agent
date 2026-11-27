@@ -159,6 +159,25 @@
     .ui-figure { @apply space-y-3; }
     .ui-caption { @apply text-[14px] leading-snug text-ink; }
     .ui-cite { @apply inline align-baseline text-[0.9em] font-semibold underline-offset-2 hover:underline; }
+    /* The developer wiki under /docs (Components/Pages/Wiki.razor): Markdown rendered by Web/WikiDocs.cs. Wide tables and
+       code scroll sideways inside the card, and they take keyboard focus (WikiDocs adds tabindex). */
+    .ui-wiki { @apply text-base leading-relaxed text-ink; }
+    .ui-wiki > * + * { @apply mt-4; }
+    .ui-wiki p, .ui-wiki li { @apply max-w-[75ch]; }
+    .ui-wiki h2 { @apply mt-10 font-display text-2xl font-semibold tracking-tight text-heading; }
+    .ui-wiki h3 { @apply mt-8 font-display text-lg font-semibold text-heading; }
+    .ui-wiki h4 { @apply mt-6 font-display text-base font-semibold text-heading; }
+    .ui-wiki ul { @apply list-disc space-y-1 pl-6; }
+    .ui-wiki ol { @apply list-decimal space-y-1 pl-6; }
+    .ui-wiki a { @apply font-medium text-heading underline underline-offset-2; }
+    .ui-wiki code { @apply font-mono text-[0.9em] text-heading; }
+    .ui-wiki pre { @apply max-w-full overflow-x-auto border border-line bg-soft p-4 text-[13px] leading-6; }
+    .ui-wiki pre code { @apply text-[1em] text-ink; }
+    .ui-wiki table { @apply block max-w-full overflow-x-auto border-collapse text-sm; }
+    .ui-wiki th, .ui-wiki td { @apply border border-line px-3 py-2 text-left align-top; }
+    .ui-wiki th { @apply bg-soft font-semibold text-heading; }
+    .ui-wiki blockquote { @apply border-l-4 border-line pl-4 text-muted; }
+    .ui-wiki :focus-visible { @apply outline outline-2 outline-offset-2 outline-heading; }
     /* The live line of a running review (Components/Dashboard/LiveActivityLine.razor). */
     .ui-live { @apply flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-sm leading-snug text-ink; }
     .ui-live-dot { @apply inline-block h-2 w-2 shrink-0 self-center rounded-full bg-supported-chart; }
