@@ -22,7 +22,7 @@
                       @bind="State.ReviewObjective" @bind:event="oninput" @bind:after="Changed"
                       placeholder="e.g. Which safety mechanisms do agent frameworks use, and how are they evaluated?"
                       class="ui-input resize-y text-lg leading-relaxed max-sm:h-[4.75rem] max-sm:text-base"></textarea>
-            <FieldHelp Id="h-objective" Text="The question the review answers. It guides the themes and the discussion." Value="@State.ReviewObjective" Max="AuBtechReviewAgent.ReviewInputGuard.MaxObjective" />
+            <FieldHelp Id="h-objective" Value="@State.ReviewObjective" Max="AuBtechReviewAgent.ReviewInputGuard.MaxObjective" />
         </div>
 
         <div>
@@ -30,8 +30,8 @@
             <input id="f-query" type="text" aria-required="true" aria-describedby="h-query" aria-invalid="@FieldHelp.Invalid(InputCheck, "Search query")"
                    maxlength="@AuBtechReviewAgent.ReviewInputGuard.MaxQuery"
                    @bind="State.SearchQuery" @bind:event="oninput" @bind:after="Changed"
-                   placeholder="e.g. agentic AI software frameworks" class="ui-input text-base" />
-            <FieldHelp Id="h-query" Text="The words sent to the databases. Short and specific works best." Value="@State.SearchQuery" Max="AuBtechReviewAgent.ReviewInputGuard.MaxQuery" />
+                   placeholder="Short and specific works best, e.g. agentic AI software frameworks" class="ui-input text-base" />
+            <FieldHelp Id="h-query" Value="@State.SearchQuery" Max="AuBtechReviewAgent.ReviewInputGuard.MaxQuery" />
         </div>
         <Honeypot Id="f-website" @bind-Value="State.Honeypot" />
 
@@ -88,7 +88,6 @@
             <a href="/privacy" class="text-heading underline underline-offset-2">Privacy</a>
         </p>
     </div>
-
 </div>
 
 @code {

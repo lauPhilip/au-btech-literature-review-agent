@@ -56,6 +56,25 @@ public class ReviewComposerTests
     }
 
     [Fact]
+    public async Task TheObjectiveAndQueryHaveNoHelpLineThatRepeatsTheirLabel()
+    {
+        string html = await RenderAsync<ReviewComposer>(new UiStateContainer(), new() { ["Method"] = ReviewMethods.Default });
+
+        // Issue #729: the title already asks the question, and the query's hint is its placeholder.
+        Assert.DoesNotContain("The question the review answers", html);
+        Assert.DoesNotContain("The words sent to the databases", html);
+        Assert.Contains("placeholder=\"Short and specific works best, e.g. agentic AI software frameworks\"", html);
+        // The line stays for the character count, folded away until the text nears the limit.
+        Assert.Contains("id=\"h-objective\" class=\"hidden mt-1", html);
+        Assert.Contains("id=\"h-query\" class=\"hidden mt-1", html);
+
+        var near = new UiStateContainer { SearchQuery = new string('a', ReviewInputGuard.MaxQuery) };
+        string counted = await RenderAsync<ReviewComposer>(near, new() { ["Method"] = ReviewMethods.Default });
+        Assert.Contains($"id=\"h-query\" class=\"flex mt-1", counted);
+        Assert.Contains($"{ReviewInputGuard.MaxQuery} / {ReviewInputGuard.MaxQuery}", counted);
+    }
+
+    [Fact]
     public async Task TheResearchQuestionsShowWhenTheyHaveTextOrWereRejected()
     {
         var state = new UiStateContainer { ResearchQuestions = "Which mechanisms are used?" };
