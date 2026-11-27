@@ -145,7 +145,7 @@ public static class SiteSeo
         var doc = new XDocument(
             new XDeclaration("1.0", "utf-8", null),
             new XElement(ns + "urlset",
-                IndexedPages.Select(p => (p.Path, p.ChangeFrequency, p.Priority, Changed: (DateTime?)null))
+                IndexedPages.Select(p => (p.Path, p.ChangeFrequency, p.Priority, Changed: default(DateTime?)))
                     .Concat(more ?? Array.Empty<(string, string, string, DateTime?)>()).Select(p => new XElement(ns + "url",
                     new XElement(ns + "loc", Absolute(baseUrl, p.Path)),
                     (p.Changed ?? lastModified) is { } day ? new XElement(ns + "lastmod", day.ToUniversalTime().ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture)) : null,
