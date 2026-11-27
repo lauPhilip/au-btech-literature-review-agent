@@ -12,8 +12,8 @@ public class PractitionerSummaryCountTests
 {
     [Theory]
     [InlineData("Apply summarization, compression, or compaction, as 65 sources describe managing token budgets [3].", "65 sources")]
-    [InlineData("Expose tools and skills via progressive disclosure or MCP, noted in 58 sources [4].", "58 sources")]
-    [InlineData("Judge practices with formal evaluation pipelines, recommended in 25 sources [5].", "25 sources")]
+    [InlineData("Expose tools and skills via progressive disclosure or MCP, noted in 58 sources [4].", "noted in 58")]
+    [InlineData("Judge practices with formal evaluation pipelines, recommended in 25 sources [5].", "recommended in 25")]
     [InlineData("Prefer MCP for tools, as noted in 12 [2].", "noted in 12")]
     [InlineData("Keep summaries short, as in 12 of the 40 posts [1].", "12 of the 40 posts")]
     [InlineData("Treat this with care: 7 grey sources say so [1].", "7 grey sources")]
