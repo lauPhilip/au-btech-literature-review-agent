@@ -114,25 +114,6 @@ Table A.1 links each study's DOI (or its source page when it has no DOI) and, wh
 
 After deploying, add the site in Google Search Console, submit `https://<your address>/sitemap.xml`, and check the preview with the Rich Results Test.
 
-### Accessibility
-
-The app aims at WCAG 2.2 level AA. What that means in the code:
-
-| What | Where |
-|---|---|
-| A "Skip to content" link as the first thing on every page, and an element with `id="main"` on every page that it jumps to | `SiteHeader.razor`, the `data-skip-to` handler in `wwwroot/js/review-output.js` (a plain `#main` link would go to the home page because of `<base href="/">`) |
-| A visible focus ring on everything that can be focused | `:focus-visible` in `Styles/tailwind.input.css` |
-| Every form field has a label; its help line is linked with `aria-describedby`; required fields say so; a field the input check rejects gets `aria-invalid` and receives focus | `FieldHelp.razor` (`Invalid`), `FocusFirstInvalidField` in `Home.razor` |
-| "Start review" is never silently disabled: the reason is shown above it, and pressing it (or the reason) goes to the field that needs attention, opening the criteria panel first when the field is there | `StartBlocker`, `BlockerTarget`, `GoToProblem` in `Home.razor` |
-| Step changes and the end of a run are announced to screen readers, not every percent | the `role="status"` element and `Announcement()` in `Home.razor` |
-| The API key window is a real modal dialog: Escape closes it, Tab stays inside, and focus returns to the button that opened it | `HomeKeyDialog.razor`, `Home.Keys.cs`, `trapFocus`/`releaseFocus` in `review-output.js` |
-| Opening a citation on Review Output moves focus to its verdict; Escape or Close returns to the citation number, which says its verdict in words | `SpecMatrix.razor`, `Components/Paper/CitedProse.razor` |
-| Terms have plain-language explanations on hover and keyboard focus, dismissed with Escape, from one list that also feeds the `/glossary` page | `Glossary.cs`, `Components/Layout/Term.razor` |
-| Text contrast at least 4.5:1 (no `text-gray-400` for text), links inside text underlined, click targets at least 24 × 24 px, verdicts never shown by colour alone | the components and `ui-*` classes |
-| Animations stop when the system asks for reduced motion | `Styles/tailwind.input.css` |
-
-The CI job **Accessibility** starts the app and runs axe-core on the public pages (`tools/a11y/axe-check.mjs`); a serious or critical problem fails the build. The pages named in `A11Y_DARK_PAGES` are checked a second time in the dark theme. Four pages are checked at once (`A11Y_WORKERS`, issue #396), each in its own browser context as before, and the log lists the pages in their usual order whatever order they finish in, so the pages, the rules and the failures reported are the same as when they were checked one by one; on CI this cut the axe-core step from about 135 s to 44 s. Every page is opened asking for less motion (`prefers-reduced-motion: reduce`) and checked only once its moving parts are at rest (issue #503). axe reads colours as they are drawn, so text caught half-way through a fade used to fail colour contrast at random, most often in the landing page's citation example. With less motion asked for, `CitationLoop` stops on its first verdict, fully drawn; any animation or transition that still runs to an end is then run to it, and one that repeats for ever is paused where it is, so axe and the screenshots see the same frame. No page and no rule is left out. The example's other states (a citation being checked, Partly supported, Not supported) are not seen by axe this way, so `CitationLoopContrastTests` checks each of them at its final colours in both themes, from the tokens in `Styles/tailwind.input.css`. The job also photographs every checked page at 390 × 844, 1440 × 900 and 1920 × 1080 px and uploads the pictures as the workflow artifact `a11y-screenshots`, so a pull request that changes markup can be looked at without running the app. A page that scrolls is also photographed whole at 1440 px (`<page>-<theme>-1440-full.png`, issue #246): the app frame is released as print mode releases it, so the Metrics tables, the report's later sections and the lower parts of the trust pages can be reviewed too. Automated checks find only part of the problems, so keyboard and screen-reader checks by hand are still needed after larger UI changes.
-
 ### Speed and the live connection
 
 - **Static files.** `App.razor` links CSS and scripts through `@Assets[...]`, which gives each file a fingerprinted address that changes when the file changes. `MapStaticAssets` serves them Brotli- or gzip-compressed (compressed at build time) with `Cache-Control: max-age=31536000, immutable`, so a returning visitor downloads nothing again until a new version is deployed. Until issue #301, `app.UseStaticFiles()` ran ahead of it and answered first, without the compressed copies; it is gone, so `MapStaticAssets` serves all of `wwwroot`. Mermaid (3.5 MB) is loaded only when a report has a diagram (`wwwroot/js/mermaid-render.js`). The unused Bootstrap copy was removed from `wwwroot/lib`.
