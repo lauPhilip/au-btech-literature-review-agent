@@ -56,12 +56,25 @@ public static class AnswersFromEvidence
                 answers.Add(NoFindingText);
                 continue;
             }
-            string themeLine = themes.Count == 0 ? "" : themes.Count == 1
-                ? $"The verified findings on this question are in the theme \"{themes[0].Name.Trim()}\". "
-                : $"The verified findings on this question are in the themes {string.Join(", ", themes.Take(themes.Count - 1).Select(t => $"\"{t.Name.Trim()}\""))} and \"{themes[^1].Name.Trim()}\". ";
-            answers.Add(themeLine + string.Join(" ", findings.Select(f => $"{Sentence(f.Finding.Value)} [{f.Reference}].")));
+            answers.Add(Lead(themes) + string.Join(" ", findings.Select(f => $"Study [{f.Reference}] reports: {Sentence(f.Finding.Value)}.")));
         }
         return answers;
+    }
+
+    /// <summary>
+    /// The sentence that opens an assembled answer and says what follows (issue #727): in run 34d1af9a the answers read as
+    /// a run of extraction fragments ("LLM, MARL, ReAct and RAG-HIL methods are used"), with nothing to say they were not
+    /// a synthesis. Each finding is then given as what its study reports.
+    /// </summary>
+    public static string Lead(IReadOnlyList<Theme> themes)
+    {
+        string from = themes.Count switch
+        {
+            0 => "",
+            1 => $", from the theme \"{themes[0].Name.Trim()}\"",
+            _ => $", from the themes {string.Join(", ", themes.Take(themes.Count - 1).Select(t => $"\"{t.Name.Trim()}\""))} and \"{themes[^1].Name.Trim()}\"",
+        };
+        return $"This answer is not a synthesis: it lists the verified findings on this question{from}, as the studies state them. ";
     }
 
     private static bool Same(string? a, string id) => a?.Trim().Equals(id, StringComparison.OrdinalIgnoreCase) == true;
