@@ -3,8 +3,8 @@
    straight into UiStateContainer, the same state the old three-step form used, and every change is passed up
    through OnChanged so the page re-checks what is missing and saves the draft. The page supplies the notices
    (example filled in, input check, instruction-like text, why it cannot start yet) as fragments, because they
-   depend on the criteria too. Under 640 px the eyebrow, help texts, free-tier badge and step strip are hidden so
-   the screen fits 390 × 844. *@
+   depend on the criteria too. Under 640 px the eyebrow, help texts and free-tier badge are hidden so the screen
+   fits 390 × 844. The seven steps a review takes show once the run starts (RunProgressPanel), not here (issue #732). *@
 
 <div class="mx-auto w-full max-w-[760px] min-w-0">
     <p class="font-display text-xs font-semibold uppercase tracking-[0.14em] text-muted max-sm:hidden">
@@ -89,17 +89,6 @@
         </p>
     </div>
 
-    @* The seven steps every systematic review takes, so the empty page explains the tool. Hidden on a phone. *@
-    <ol class="mt-5 grid grid-cols-2 gap-x-4 gap-y-3 max-sm:hidden sm:grid-cols-4 lg:grid-cols-7" aria-label="What the review does">
-        @for (int i = 0; i < PipelineSteps.Count; i++)
-        {
-            var step = PipelineSteps[i];
-            <li class="min-w-0 border-t-2 border-line pt-2">
-                <span class="block font-display text-xs font-semibold text-heading"><span class="text-muted">@(i + 1)</span> @step.Title</span>
-                <span class="block text-xs leading-snug text-muted">@step.Line</span>
-            </li>
-        }
-    </ol>
 </div>
 
 @code {
@@ -121,18 +110,6 @@
     [Parameter] public EventCallback OnStart { get; set; }
     [Parameter] public EventCallback OnLoadExample { get; set; }
     [Parameter] public EventCallback OnOpenKeys { get; set; }
-
-    /// <summary>The seven steps in the strip under the card, with their one-line explanation.</summary>
-    public static readonly IReadOnlyList<(string Title, string Line)> PipelineSteps = new[]
-    {
-        ("Protocol", "Written first, fingerprinted"),
-        ("Search", "4 open sources"),
-        ("Screening", "Every record twice"),
-        ("Evidence", "Full texts read"),
-        ("Writing", "Theme by theme"),
-        ("Artifact", "From the findings"),
-        ("Checking", "Every citation"),
-    };
 
     private static readonly string ResearchQuestionsHelp =
         $"Up to {AuBtechReviewAgent.ReviewInputGuard.MaxResearchQuestions}, one per line. The protocol lists them, and the conclusion answers each one.";

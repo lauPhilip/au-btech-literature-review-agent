@@ -39,23 +39,19 @@ public class ReviewComposerTests
     }
 
     [Fact]
-    public async Task TheComposerShowsTheSevenStepsAndTheFreeTierBadgeAboveAPhone()
+    public async Task TheEmptyFormHasNoStepStripAndShowsTheBadgeAboveAPhone()
     {
         var quota = new QuotaStatus(QuotaTier.Free, true, 1, 3, "");
         string html = await RenderAsync<ReviewComposer>(new UiStateContainer(), new() { ["Method"] = ReviewMethods.Default, ["Quota"] = quota });
 
-        Assert.Equal(7, ReviewComposer.PipelineSteps.Count);
-        Assert.Equal(new[] { "Protocol", "Search", "Screening", "Evidence", "Writing", "Artifact", "Checking" }, ReviewComposer.PipelineSteps.Select(s => s.Title));
-        foreach (var (title, line) in ReviewComposer.PipelineSteps)
-        {
-            Assert.Contains(title, html);
-            Assert.Contains(line, html);
-        }
-        Assert.Contains("lg:grid-cols-7", html);
+        // The seven steps show when the run starts, not on the empty form (issue #732).
+        Assert.DoesNotContain("What the review does", html);
+        foreach (var (_, line) in ReviewSteps.All) Assert.DoesNotContain(line, html);
         Assert.Contains("Free tier · 2 of 3 left today", html);
-        // On a phone the eyebrow, the badge and the strip are hidden; the help text is kept for screen readers.
-        Assert.Contains("max-sm:hidden sm:grid-cols-4", html);
-        Assert.Contains("text-muted max-sm:sr-only", html);
+        // Try an example, the badge, API keys and Start share one row from 640 px.
+        int row = html.IndexOf("sm:flex-row", StringComparison.Ordinal);
+        Assert.True(row >= 0 && row < html.IndexOf(">Try an example<", StringComparison.Ordinal));
+        Assert.True(html.IndexOf(">API keys<", StringComparison.Ordinal) < html.IndexOf(">Start review<", StringComparison.Ordinal));
         Assert.Contains("max-sm:w-full\">Start review", html);
     }
 
