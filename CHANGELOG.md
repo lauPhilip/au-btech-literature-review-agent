@@ -2,29 +2,131 @@
 
 All notable changes to TraceableAI are listed here, newest first. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html). While the version starts with 0, the method and the output may still change between minor versions.
 
-Each version's section becomes the notes of its GitHub release, so write it for someone deciding which version to use or cite. Under each version, say what was **Added**, **Changed** and **Fixed** in short, plain paragraphs, and what it means for someone running a review. The notes must score at least 60 for Flesch Reading Ease, have exactly one emoji and may be a bit playful; the release check stops the release otherwise. Changes that are merged but not yet released go under [Unreleased]. How to publish a version is in [CONTRIBUTING.md](CONTRIBUTING.md#publishing-a-version).
+Each version's section becomes the notes of its GitHub release, so write it like a game's patch notes, for someone deciding which version to use or cite. Versions after 0.6.0, and [Unreleased], follow the shape below; the release check stops the release when they break it. Versions up to 0.6.0 stay in the older Keep a Changelog form (**Added**, **Changed** and **Fixed**, with exactly one emoji) and are never rewritten. Changes that are merged but not yet released go under [Unreleased]. How to publish a version is in [CONTRIBUTING.md](CONTRIBUTING.md#publishing-a-version).
+
+A section starts with a signed dev note: a blockquote that begins `> **Dev note:**`, two to four casual sentences on what the patch is about and why, and the signature `> — The TraceableAI team`. Then comes `### 🌟 Patch highlights`, one short paragraph with the headline changes for someone running a review and whether a new run can differ from the last version. After it come the areas that have changes, one `###` section each, in the order of the table. Inside an area, a `####` heading names a stage or a feature, such as Screening or Themes. Under it a short "why" quote (`>`) says why it changed, and one bullet follows for each change. A change with a before and after is written as `- **Label**: old ⇒ new`, with one arrow and exact values; a change without a clean before and after is a plain bullet. The last section, `### 🐛 Bug fixes`, is a list in which every item starts with "Fixed a bug where".
+
+| Area | Emoji |
+|---|---|
+| Patch highlights | 🌟 |
+| Systematic review | 🔬 |
+| Multivocal review (preview) | 🧭 |
+| Report page | 📄 |
+| Self-check | ✅ |
+| Search and sources | 🔍 |
+| Site | 🌐 |
+| Bug fixes | 🐛 |
+
+Each `###` heading has exactly one emoji, at its start, and no emoji appears anywhere else. The notes must score at least 60 for Flesch Reading Ease.
 
 ## [Unreleased]
 
-### Fixed
+> **Dev note:** This patch is about telling the truth in the paper. We read your criteria more kindly, taught the themes to build on each other and told the abstract to stop shouting "we". The report page lost a few annoying habits on the way.
+> — The TraceableAI team
 
-A pilot run's title no longer says "Pilot Pilot", and the PRISMA checklist now tells the truth about a pilot run's title. The methods count reviews by their study type, give book chapters their own count instead of calling them journals, and count a study whose DOI is not at Crossref as not checked for retractions, not as a failed check. Some small grammar slips are gone, and the cap on records per source and the research questions are each said once.
+### 🌟 Patch highlights
 
-The citation check is now told as one story that adds up: what the first check found, what the second check changed, what the repair rewrote or dropped, and how many citations are left. It now sits in the methods, not in the discussion. 🧮 Table A.1 in main.tex starts with the reference number, so you can match a row to its [n].
+Screening now treats "or" in your inclusion criterion as a choice, so fewer good records are dropped. The themes build on each other, the abstract and conclusion claim no more than the evidence allows, and the concept map shows at most three dashed links. A new run can differ from 0.6.0: the screening and language edit prompts have new versions, so old cached screening decisions are not used again.
 
-Screening now reads "or" in your inclusion criterion as a choice. A record needs to show one of the options, not all of them, so fewer good records are dropped in code. The screening prompt has a new version, so old cached decisions are not used again.
+### 🔬 Systematic review
 
-On the report page, a citation's card now comes into view when you open it, also from "Show the first". A heading no longer sits alone at the foot of a page, and the page no longer scrolls sideways at 809 px. The browser tab shows the run's progress and says when the review is ready. The progress line names the artifact step.
+#### Screening
 
-The self-check now knows the count of records that could not be screened. It also flags a figure given in two themes, and it no longer skips a figure such as "F1 0.97". A source now gets more records when some drop out for their year or as duplicates, so it can fill its cap. Keywords are short terms now, not whole search strings.
+> A criterion such as "agent framework or orchestration loop" was read as needing both. A good study was dropped in code and stayed only because the second screening disagreed.
 
-The themes now build on each other. A theme that meets a finding from an earlier theme points back to it and does not say its figures again. A big theme compares how its studies test the question instead of listing each result. A study that only touches a theme can be called indirect, or left out with its reason on file, so it is not stretched to fit. The rationale now says what is known, what is missing and why it matters.
+- **Screening prompt**: screening-v7 ⇒ screening-v8
+- **A criterion with "or"**: every option is needed ⇒ one option is enough
+- The record needs to show one of the options, not all of them, so fewer good records are dropped in code.
+- Old cached screening decisions are not used again, because the prompt has a new version.
 
-The abstract no longer says "we", because the author is software. It drops a count of zero, so you read "no duplicates were found" instead of "removed 0 duplicates". It also claims no more than the certainty table allows: with moderate or low certainty it says "suggest" or "may", not "show that". The same goes for the conclusion. A sentence no longer names a study and cites it in the same breath.
+#### Themes
 
-The concept map now keeps at most three dashed links, the ones that are the review's own reading. The rest are left out, listed with a reason, and the methods say how many. The self-check notes when more than half the links were dashed, and it now counts a figure that the map repeats.
+> The themes said the same things again and again. A study that only touched a theme was stretched to fit, and the rationale read like a list.
 
-On the report page, a table's caption and header row now move to the next page with its first row. The appendix table fits a narrow page without breaking words letter by letter.
+- **Earlier findings in a later theme**: restated with their figures ⇒ pointed back to
+- **A big theme**: lists each result ⇒ compares how its studies test the question
+- **A study that only touches a theme**: stretched to fit ⇒ called indirect, or left out with its reason on file
+- **The rationale**: one study per sentence ⇒ what is known, what is missing and why it matters
+
+#### Abstract and conclusion
+
+> The abstract said "We removed 0 duplicates", although the author is software, and it claimed more than its moderate-certainty answers allow.
+
+- **Language edit prompt**: language-edit-v3 ⇒ language-edit-v4
+- **A count of zero**: "removed 0 duplicates" ⇒ "no duplicates were found"
+- **Wording at moderate or low certainty**: "show that" ⇒ "suggest" or "may"
+- The abstract no longer says "we", because the author is software.
+- The conclusion claims no more than the certainty table allows, as the abstract does.
+- A sentence no longer names a study and cites it in the same breath.
+
+#### Concept map
+
+> In a real run, 12 of 15 links were dashed, so the map told the reader little about the literature.
+
+- **Dashed links**: no limit ⇒ at most 3
+- The dashed links that are the review's own reading and come after the first three are left out of the map and listed with a reason.
+- The methods say how many links were left out.
+
+#### Methods and references
+
+> The methods and the checklist said things that were not quite true.
+
+- **The citation check**: told in the discussion ⇒ told in the methods, as one story that adds up: what the first check found, what the second check changed, what the repair rewrote or dropped, and how many citations are left
+- **A study whose DOI is not at Crossref**: counted as a failed check ⇒ counted as not checked for retractions
+- **Book chapters**: counted as journals ⇒ given their own count
+- Table A.1 in main.tex starts with the reference number, so you can match a row to its [n].
+- The PRISMA checklist now tells the truth about a pilot run's title.
+- The methods count reviews by their study type.
+- The cap on records per source and the research questions are each said once, and some small grammar slips are gone.
+
+### 📄 Report page
+
+#### Paged report
+
+> The paged report broke in small ways, most of all in a narrow window.
+
+- **Minimum table width in a paged sheet**: 700 px ⇒ none
+- A citation's card comes into view when you open it, also from "Show the first".
+- A heading no longer sits alone at the foot of a page.
+- A table's caption and header row move to the next page with its first row.
+- The appendix table fits a narrow page without breaking words letter by letter.
+
+### ✅ Self-check
+
+> The self-check gave a wrong outcome on two of its checks, and it did not read the concept map.
+
+- The self-check knows the count of records that could not be screened.
+- It flags a figure given in two themes.
+- It counts a figure that the concept map repeats.
+- It notes when more than half of the map's links were dashed.
+
+### 🔍 Search and sources
+
+> The search never filled its cap for a source, and the keywords read like search strings.
+
+- **Keyword phrase from a search string**: up to 5 words ⇒ at most 3 words
+- A source now gets more records when some drop out for their year or as duplicates, so it can fill its cap.
+- Keywords are short terms now, not whole search strings.
+
+### 🌐 Site
+
+#### Run page
+
+> The tab said "2% · Your review" for the whole run.
+
+- **Tab title while a review runs**: "2% · Your review" for the whole run ⇒ the run's progress
+- The tab says when the review is ready.
+- **Progress line in the last step of writing**: Writing ⇒ Artifact
+
+### 🐛 Bug fixes
+
+- Fixed a bug where a pilot run's title said "Pilot Pilot".
+- Fixed a bug where the self-check skipped a figure such as "F1 0.97".
+- Fixed a bug where a source could not fill its cap when records dropped out for their year or as duplicates.
+- Fixed a bug where an opened citation's card stayed out of view.
+- Fixed a bug where a heading sat alone at the foot of a page.
+- Fixed a bug where the report page scrolled sideways at 809 px.
+- Fixed a bug where a table's caption was left behind at the foot of a page.
 
 ## [0.6.0] - 2026-11-26
 
