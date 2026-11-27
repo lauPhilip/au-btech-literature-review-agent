@@ -22,9 +22,8 @@ public class LlmOptions
     public string ApiKey { get; set; } = "";
 
     /// <summary>
-    /// Mistral only: the base URL of its API. The EU regional endpoint by default, so prompts, papers and answers are
-    /// processed in the EU (Mistral's regional inference; the global api.mistral.ai gives no region). A model that the
-    /// EU endpoint does not serve can be reached by setting Llm:MistralBaseUrl to <see cref="LlmFactory.MistralGlobalUrl"/>.
+    /// Mistral only: the base URL of its API. The global endpoint at list price by default; set it to
+    /// <see cref="LlmFactory.MistralEuUrl"/> to have prompts, papers and answers processed in the EU, at 1.1 times the price.
     /// </summary>
     public string MistralBaseUrl { get; set; } = LlmFactory.MistralBaseUrl;
 

@@ -4,34 +4,34 @@ using Xunit;
 namespace AuBtechReviewAgent.Tests;
 
 /// <summary>
-/// Mistral's DPA promises EU processing only on the regional endpoint, so the tool calls api.eu.mistral.ai unless the
-/// server is told otherwise, and only an https address is ever used instead.
+/// The tool calls Mistral's global endpoint at list price unless the server chooses the EU endpoint, which costs 1.1
+/// times as much (Lau, 27 November 2026). Only an https address is ever used instead of the default.
 /// </summary>
 public class MistralEndpointTests
 {
     [Fact]
-    public void ARunCallsTheEuEndpointByDefault()
+    public void ARunCallsTheGlobalEndpointByDefault()
     {
-        Assert.Equal("https://api.eu.mistral.ai/v1", LlmFactory.MistralEndpoint(new LlmOptions()));
-        Assert.Equal("https://api.eu.mistral.ai/v1", LlmFactory.MistralEndpoint(new LlmOptions { FastModel = "mistral-small-latest" }.ForFastModel()));
+        Assert.Equal("https://api.mistral.ai/v1", LlmFactory.MistralEndpoint(new LlmOptions()));
+        Assert.Equal("https://api.mistral.ai/v1", LlmFactory.MistralEndpoint(new LlmOptions { FastModel = "mistral-small-latest" }.ForFastModel()));
     }
 
     [Fact]
-    public void TheServerCanChooseTheGlobalEndpointAndTheFastModelFollows()
+    public void TheServerCanChooseTheEuEndpointAndTheFastModelFollows()
     {
-        var options = new LlmOptions { MistralBaseUrl = LlmFactory.MistralGlobalUrl + "/", FastModel = "mistral-small-latest" };
+        var options = new LlmOptions { MistralBaseUrl = LlmFactory.MistralEuUrl + "/", FastModel = "mistral-small-latest" };
 
-        Assert.Equal("https://api.mistral.ai/v1", LlmFactory.MistralEndpoint(options));
-        Assert.Equal("https://api.mistral.ai/v1", LlmFactory.MistralEndpoint(options.ForFastModel()));
+        Assert.Equal("https://api.eu.mistral.ai/v1", LlmFactory.MistralEndpoint(options));
+        Assert.Equal("https://api.eu.mistral.ai/v1", LlmFactory.MistralEndpoint(options.ForFastModel()));
     }
 
     [Theory]
     [InlineData("")]
     [InlineData("   ")]
-    [InlineData("http://api.mistral.ai/v1")]
-    [InlineData("api.mistral.ai/v1")]
+    [InlineData("http://api.eu.mistral.ai/v1")]
+    [InlineData("api.eu.mistral.ai/v1")]
     [InlineData("file:///etc/passwd")]
-    public void AnAddressThatIsNotHttpsFallsBackToTheEuEndpoint(string setting)
+    public void AnAddressThatIsNotHttpsFallsBackToTheDefault(string setting)
     {
         Assert.Equal(LlmFactory.MistralBaseUrl, LlmFactory.MistralEndpoint(new LlmOptions { MistralBaseUrl = setting }));
     }
