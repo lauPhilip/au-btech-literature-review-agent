@@ -109,6 +109,15 @@ The Decision log on a systematic paper now downloads the run's full ledger as JS
 - **Decision log**: screened records as RIS ⇒ the run's whole ledger as JSON (ledger.json)
 - The printed paper links to the same file. A multivocal paper still gives its screened sources as RIS.
 
+### 🌐 Site
+
+#### Developer wiki
+
+> The wiki lived only in GitHub's Wiki tab, which search engines and AI tools rank poorly.
+
+- **Where the wiki lives**: GitHub's Wiki tab only ⇒ the site's own address too, at /docs, with its diagrams drawn
+- Each page links to its source file, and the sitemap and llms.txt list the pages. The Wiki tab still gets a copy.
+
 ### 🐛 Bug fixes
 
 - Fixed a bug where a heading stood alone on a page and its text started on the next one. A paragraph now breaks between two lines when it cannot move whole.

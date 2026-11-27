@@ -12,6 +12,8 @@ WORKDIR /src
 COPY AuBtechReviewAgent/AuBtechReviewAgent.csproj AuBtechReviewAgent/
 RUN dotnet restore AuBtechReviewAgent/AuBtechReviewAgent.csproj
 COPY AuBtechReviewAgent/ AuBtechReviewAgent/
+# The developer wiki is built into the app and served under /docs (Web/WikiDocs.cs).
+COPY docs/wiki/ docs/wiki/
 # The image is built without the git history, so MinVer cannot read the tag here: pass the version instead,
 #   docker build --build-arg APP_VERSION=$(git describe --tags) -t traceableai .
 RUN dotnet publish AuBtechReviewAgent/AuBtechReviewAgent.csproj -c Release -o /app/publish --no-restore \

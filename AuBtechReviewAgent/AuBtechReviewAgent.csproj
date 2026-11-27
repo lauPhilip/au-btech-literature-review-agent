@@ -17,6 +17,13 @@
     <PackageReference Include="MinVer" Version="8.0.0" PrivateAssets="all" />
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.15" />
     <PackageReference Include="ModelContextProtocol.AspNetCore" Version="2.4.0" />
+    <PackageReference Include="Markdig" Version="1.6.0" />
+  </ItemGroup>
+
+  <!-- The developer wiki is served under /docs (Web/WikiDocs.cs, issue #613): docs/wiki/ is built into the app, so the
+       site always shows the same text as the repository. The Dockerfile copies docs/wiki/ for the same reason. -->
+  <ItemGroup>
+    <EmbeddedResource Include="..\docs\wiki\*.md" LogicalName="wiki/%(Filename)%(Extension)" Visible="false" />
   </ItemGroup>
 
 <!-- The version comes from the git tag, and only from there (Semantic Versioning, tags vMAJOR.MINOR.PATCH).

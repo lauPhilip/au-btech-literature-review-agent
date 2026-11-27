@@ -2,7 +2,7 @@
 
 This wiki explains how the code of TraceableAI fits together, for someone who has to change it without having written it. It reads best in order: start with the system overview, follow a single review through the pipeline, and then go into whichever part you need to change. Every page names the files and methods it describes, so you can keep the code open next to it.
 
-These pages live in `docs/wiki/` in the repository and are copied to the repository's Wiki tab automatically (`.github/workflows/wiki.yml`) whenever they change on master, so edit them here, not in the Wiki tab.
+These pages live in `docs/wiki/` in the repository. The site serves them at [/docs](https://au-btech-literature-review-agent.dk/docs), which is the address to cite, and they are also copied to the repository's Wiki tab automatically (`.github/workflows/wiki.yml`) whenever they change on master, so edit them here, not in the Wiki tab.
 
 The wiki describes the design as it is in the repository. When you change how something works, change the page that describes it in the same pull request; a wiki that has drifted away from the code is worse than none.
 

@@ -133,15 +133,17 @@ public static class SiteSeo
 
     /// <summary>
     /// The sitemap of the public pages. <paramref name="lastModified"/> is the day the running version was built: the
-    /// pages change only with a new version, so that is when each of them last changed.
+    /// pages change only with a new version, so that is when each of them last changed. <paramref name="more"/> are
+    /// pages that are not in <see cref="IndexedPages"/>, such as the developer wiki's (WikiDocs.SitemapPages).
     /// </summary>
-    public static string SitemapXml(string baseUrl, DateTime? lastModified = null)
+    public static string SitemapXml(string baseUrl, DateTime? lastModified = null,
+        IEnumerable<(string Path, string ChangeFrequency, string Priority)>? more = null)
     {
         XNamespace ns = "http://www.sitemaps.org/schemas/sitemap/0.9";
         var doc = new XDocument(
             new XDeclaration("1.0", "utf-8", null),
             new XElement(ns + "urlset",
-                IndexedPages.Select(p => new XElement(ns + "url",
+                IndexedPages.Concat(more ?? Array.Empty<(string, string, string)>()).Select(p => new XElement(ns + "url",
                     new XElement(ns + "loc", Absolute(baseUrl, p.Path)),
                     lastModified is { } day ? new XElement(ns + "lastmod", day.ToUniversalTime().ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture)) : null,
                     new XElement(ns + "changefreq", p.ChangeFrequency),
