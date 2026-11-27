@@ -45,6 +45,18 @@ public class OperationsTests
     }
 
     [Fact]
+    public void ADatabaseChipGetsItsOwnNoteOnlyWhenItHadTrouble()
+    {
+        string bad = NewHost(), good = NewHost();
+        SourceStatus.Record(bad, HttpStatusCode.TooManyRequests, TimeSpan.FromSeconds(2));
+        SourceStatus.Record(good, HttpStatusCode.OK, TimeSpan.FromMilliseconds(300));
+
+        Assert.Equal($"{bad} is rate-limiting requests, so it is slower than usual.", SourceStatus.NoteFor(bad));
+        Assert.Null(SourceStatus.NoteFor(good));
+        Assert.Null(SourceStatus.NoteFor(NewHost()));
+    }
+
+    [Fact]
     public void KnownHostsGetTheirEverydayNames()
     {
         Assert.Equal("arXiv", SourceStatus.DisplayName("export.arxiv.org"));

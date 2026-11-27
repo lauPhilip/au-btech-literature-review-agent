@@ -104,6 +104,18 @@ public static class SourceStatus
         return parts.Count == 0 ? null : string.Join("; ", parts) + ".";
     }
 
+    /// <summary>
+    /// What went wrong with one database in the last half hour, such as "Crossref is rate-limiting requests, so it is
+    /// slower than usual.", or null when it answered normally. New review shows it on the database's chip (issue #731).
+    /// </summary>
+    public static string? NoteFor(string displayName)
+    {
+        var now = UtcNow();
+        var host = Snapshot().FirstOrDefault(h => string.Equals(DisplayName(h.Host), displayName, StringComparison.OrdinalIgnoreCase)
+            && h.LastProblemUtc is { } t && now - t <= RecentWindow && h.LastProblem != Problem.None);
+        return host == null ? null : $"{DisplayName(host.Host)} {Describe(host)}.";
+    }
+
     private static string Describe(HostState h) => h.LastProblem switch
     {
         Problem.RateLimited => "is rate-limiting requests, so it is slower than usual",
