@@ -24,13 +24,20 @@ public sealed class ReferenceDetails
     /// <summary>The publisher, printed for proceedings papers as APA 7 asks ("IEEE").</summary>
     public string? Publisher { get; set; }
 
+    /// <summary>The title of the book a chapter is in, when a service names it apart from the book's series (issue #678).</summary>
+    public string? Book { get; set; }
+
+    /// <summary>The editors of that book as "Family, Given", when the chapter's record names them.</summary>
+    public List<string>? Editors { get; set; }
+
     /// <summary>The arXiv identifier without its version ("2607.02703").</summary>
     public string? ArxivId { get; set; }
 
     /// <summary>Field name ("authors", "venue", "volume", ...) to the service that filled it ("Crossref", "OpenAlex", "arXiv").</summary>
     public Dictionary<string, string>? EnrichedFrom { get; set; }
 
-    public bool IsEmpty => Volume == null && Issue == null && Pages == null && ArticleNumber == null && Publisher == null && ArxivId == null;
+    public bool IsEmpty => Volume == null && Issue == null && Pages == null && ArticleNumber == null && Publisher == null && ArxivId == null
+        && Book == null && (Editors == null || Editors.Count == 0);
 
     /// <summary>These details, with every field this copy lacks taken from <paramref name="other"/>.</summary>
     public ReferenceDetails Or(ReferenceDetails? other) => other == null ? this : new ReferenceDetails
@@ -41,6 +48,8 @@ public sealed class ReferenceDetails
         ArticleNumber = ArticleNumber ?? other.ArticleNumber,
         Publisher = Publisher ?? other.Publisher,
         ArxivId = ArxivId ?? other.ArxivId,
+        Book = Book ?? other.Book,
+        Editors = Editors ?? other.Editors,
         EnrichedFrom = EnrichedFrom ?? other.EnrichedFrom,
     };
 

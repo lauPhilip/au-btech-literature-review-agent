@@ -48,6 +48,10 @@ public static class ReferenceAnswers
                 else if (name.Length > 0) { authors.Add(name); structured = false; }
             }
         string type = Str(m, "type");
+        // A chapter's containers run from the series to the book ("Advances in Computational Intelligence and Robotics",
+        // "Accelerating Logistics Through Generative AI, ..."), so its venue is the last one (issue #678).
+        bool chapter = type == "book-chapter";
+        string? book = chapter ? Null(Last(m, "container-title")) : null;
         return new ReferenceAnswer
         {
             Service = Crossref,
@@ -55,14 +59,16 @@ public static class ReferenceAnswers
             Authors = authors,
             StructuredNames = structured,
             // A posted preprint's "container" is the server, not a venue.
-            Venue = type == "posted-content" ? "" : First(m, "container-title"),
+            Venue = type == "posted-content" ? "" : book ?? First(m, "container-title"),
             Details = new ReferenceDetails
             {
                 Volume = Null(Str(m, "volume")),
                 Issue = Null(Str(m, "issue")),
                 Pages = ReferenceDetails.PageRange(Str(m, "page")),
                 ArticleNumber = Null(Str(m, "article-number")),
-                Publisher = type == "proceedings-article" ? Null(Str(m, "publisher")) : null,
+                Publisher = type == "proceedings-article" || chapter ? Null(Str(m, "publisher")) : null,
+                Book = book,
+                Editors = chapter ? Names(m, "editor") : null,
             },
         };
     }
@@ -140,6 +146,24 @@ public static class ReferenceAnswers
             JsonValueKind.Number => v.GetRawText(),
             _ => "",
         } : "";
+
+    private static string Last(JsonElement e, string name) =>
+        e.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.Array && v.GetArrayLength() > 0 && v[v.GetArrayLength() - 1].ValueKind == JsonValueKind.String
+            ? Regex.Replace(v[v.GetArrayLength() - 1].GetString()!, @"\s+", " ").Trim()
+            : "";
+
+    // "Family, Given" from Crossref's structured names; null when the record names nobody.
+    private static List<string>? Names(JsonElement e, string name)
+    {
+        if (!e.TryGetProperty(name, out var list) || list.ValueKind != JsonValueKind.Array) return null;
+        var names = new List<string>();
+        foreach (var a in list.EnumerateArray())
+        {
+            string family = Str(a, "family"), given = Str(a, "given");
+            if (family.Length > 0) names.Add(given.Length > 0 ? $"{family}, {given}" : family);
+        }
+        return names.Count > 0 ? names : null;
+    }
 
     private static string First(JsonElement e, string name) =>
         e.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.Array && v.GetArrayLength() > 0 && v[0].ValueKind == JsonValueKind.String
