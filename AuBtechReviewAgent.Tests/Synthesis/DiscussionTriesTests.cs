@@ -62,4 +62,17 @@ public class DiscussionTriesTests
         Assert.Equal("", result.Text);
         Assert.Contains(notes, n => n.StartsWith("Discussion could not be written"));
     }
+    [Fact]
+    public async Task APeerReviewLeavesOutADiscussionThatWasNotWritten()
+    {
+        var model = new FakeChatService().Returns("""{"comments":[]}""");
+
+        var (log, discussion) = await ReviewWriter.PeerReviewAsync(model, WritingProfile.Systematic, Sections.ToList(), "", Evidence(), 4, 1);
+
+        Assert.Single(model.Prompts);
+        Assert.DoesNotContain("[discussion] Discussion", model.Prompts[0]);
+        Assert.DoesNotContain("one of: synthesis-1, discussion", model.Prompts[0]);
+        Assert.Equal("", discussion);
+        Assert.Equal("", log.DiscussionBefore);
+    }
 }
