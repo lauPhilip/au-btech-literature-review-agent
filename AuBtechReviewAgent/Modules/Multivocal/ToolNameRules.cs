@@ -132,7 +132,7 @@ public static class ToolNameRules
     public static string Key(string text)
     {
         var sb = new StringBuilder();
-        foreach (char c in ReviewInputGuard.WithoutLoneSurrogates(text ?? "").Normalize(NormalizationForm.FormKC))
+        foreach (char c in ReviewInputGuard.WithoutInvalidCodePoints(text ?? "").Normalize(NormalizationForm.FormKC))
             if (char.IsLetterOrDigit(c)) sb.Append(char.ToLowerInvariant(c));
         return sb.ToString();
     }

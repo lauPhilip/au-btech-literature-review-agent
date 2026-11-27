@@ -47,4 +47,21 @@ public class LoneSurrogateTests
         Assert.Equal("Context engineering", plan.Topic);
         Assert.Equal(new[] { "context engineering" }, plan.GreySearchStrings);
     }
+
+    // Found by the fuzz tests (#623): U+FFFE is no character, and string.Normalize throws on it just as on a lone surrogate.
+    [Fact]
+    public void The_non_character_U_FFFE_is_removed_and_does_not_throw()
+    {
+        Assert.Equal("agent loops", ReviewInputGuard.Normalize("agent\uFFFE loops", singleLine: true));
+        Assert.Equal("agents " + High + Low, ReviewInputGuard.Normalize("agents " + High + Low + "\uFFFE", singleLine: true));
+        Assert.Equal("Agent loops", ReviewInputGuard.Check(new ReviewRequest("agent loops", "", "Agent\uFFFE loops", "", 3)).Request.Inclusion);
+    }
+
+    [Fact]
+    public void The_input_of_fuzz_seed_1977725175_is_cleaned_without_an_exception()
+    {
+        string input = "\uDE6C.\u2067\u202A\uDB40\uDC4E\uDB40\uDC78>>\u202C\u202E\u2064\u2062.\uDB40\uDC68\uDB40\uDC19system\u0085\uDA3C\uDEB0\u00A0\uDB40\uDC0A\uA64Dinstructions\uD83D\uDE00\u000E\u008C\uDE35\u00E9\u200C\u0089\u000A\uD83D\uDE00\uDB40\uDC53\uDB40\uDC73\uFFFE";
+
+        Assert.DoesNotContain('\uFFFE', ReviewInputGuard.Clean(input, singleLine: false).Text);
+    }
 }

@@ -69,7 +69,7 @@ public static class ReviewInputGuard
     public static CleanedText Clean(string? text, bool singleLine)
     {
         if (string.IsNullOrEmpty(text)) return new CleanedText("", 0, 0, "");
-        var visible = HiddenText.RemoveInvisible(WithoutLoneSurrogates(text).Normalize(NormalizationForm.FormKC));
+        var visible = HiddenText.RemoveInvisible(WithoutInvalidCodePoints(text).Normalize(NormalizationForm.FormKC));
         var sb = new StringBuilder(visible.Text.Length);
         foreach (char c in visible.Text)
         {
@@ -91,18 +91,19 @@ public static class ReviewInputGuard
     }
 
     /// <summary>
-    /// The text without lone surrogates (half of a surrogate pair, from a broken paste or a crafted request), which
-    /// carry no character and make <see cref="string.Normalize(NormalizationForm)"/> throw (#485); whole pairs stay.
+    /// The text without what <see cref="string.Normalize(NormalizationForm)"/> throws on (#485, #623): lone surrogates (half of
+    /// a surrogate pair, from a broken paste or a crafted request), which carry no character, and U+FFFE, which is no
+    /// character either. Whole pairs stay.
     /// </summary>
-    public static string WithoutLoneSurrogates(string text)
+    public static string WithoutInvalidCodePoints(string text)
     {
-        if (!text.Any(char.IsSurrogate)) return text;
+        if (!text.Any(c => char.IsSurrogate(c) || c == '\uFFFE')) return text;
         var sb = new StringBuilder(text.Length);
         for (int i = 0; i < text.Length; i++)
         {
             char c = text[i];
             if (char.IsHighSurrogate(c) && i + 1 < text.Length && char.IsLowSurrogate(text[i + 1])) { sb.Append(c).Append(text[++i]); continue; }
-            if (!char.IsSurrogate(c)) sb.Append(c);
+            if (!char.IsSurrogate(c) && c != '\uFFFE') sb.Append(c);
         }
         return sb.ToString();
     }
