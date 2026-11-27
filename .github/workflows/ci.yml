@@ -227,8 +227,8 @@ jobs:
           for i in $(seq 1 60); do curl -sf http://localhost:5038/ > /dev/null && exit 0; sleep 2; done
           cat app.log; exit 1
 
-      # The four browser checks run side by side against the one app (tools/a11y/run-checks.sh), each with its own log group:
-      # axe-core then the print check, the smoke test, and the link and button check (wiki page 07 says what each does).
+      # The five browser checks run side by side against the one app (tools/a11y/run-checks.sh), each with its own log group:
+      # axe-core, the print check then the paged report check, the smoke test, and the link and button check (wiki page 07).
       # axe fails on any "serious" or "critical" problem; since redesign step 12 the main pages are checked in the dark theme too.
       # The /design/* pages exist only in development: the frame, New review while running, stopped and done, and
       # the report and Metrics pages with made-up figures. The print check needs the made-up report over 3 A4 pages.
