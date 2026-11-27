@@ -175,6 +175,21 @@ public class ReviewComposerTests
     }
 
     [Fact]
+    public async Task TheCriteriaHaveNoHelpLineThatRepeatsTheirLabel()
+    {
+        string html = await RenderAsync<CriteriaPanel>(new UiStateContainer(), new() { ["SourceAvailability"] = OpenSourcesOnly });
+
+        // Issue #729: the labels say it; the exclusion label says it is optional, as the query says it is required.
+        Assert.DoesNotContain("What a study must be about or contain.", html);
+        Assert.DoesNotContain("What rules a study out.", html);
+        Assert.Contains("Exclude studies that… <span class=\"font-normal text-muted\">(optional)</span>", html);
+        // The visual summary's note lives in its (?) tooltip, which screen readers read as its description.
+        Assert.DoesNotContain("id=\"h-directive\" class=\"flex", html);
+        Assert.Contains("What it cites is checked like the text.", Glossary.Find("artifact")!.Explanation);
+        Assert.Contains("What it cites is checked like the text.", html);
+    }
+
+    [Fact]
     public async Task ThePanelShowsTheExtraOptionsThePageGivesIt()
     {
         RenderFragment more = b => b.AddMarkupContent(0, "<details id=\"advanced\">Advanced options</details>");

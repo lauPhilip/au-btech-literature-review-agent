@@ -58,7 +58,7 @@ public static class Glossary
         new Entry("removed", "Removed",
             "The citation was still not supported after the repair, so it was taken out, with its claim when no other citation backed it. It is counted on its own and listed in the citation audit."),
         new Entry("artifact", "Artifact",
-            "A concept map, flowchart, table or list built after the analysis, only from what the review found."),
+            "A concept map, flowchart, table or list built after the analysis, only from what the review found. What it cites is checked like the text."),
         new Entry("archive", "Run archive",
             "One zip file with everything the run did: protocol, raw search results, every decision and model call, the citation audit and the manuscript, each fingerprinted with SHA-256."),
     };
