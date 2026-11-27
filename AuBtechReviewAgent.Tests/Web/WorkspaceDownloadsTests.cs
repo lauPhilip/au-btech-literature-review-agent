@@ -139,4 +139,30 @@ public class WorkspaceDownloadsTests : IDisposable
         Assert.Equal(0, stamp.LastModified.Ticks % TimeSpan.TicksPerSecond);
         Assert.Matches("^\"[0-9a-f]{32}\"$", stamp.ETag);
     }
+
+    [Fact]
+    public async Task TheLedgerIsServedAsItIsOnDiskAndIsMissingForARunWithoutOne()
+    {
+        Assert.Null(WorkspaceDownloads.LedgerBytes(_runs, _run)); // a multivocal run keeps no transparent-process.json
+        string ledger = "{\"Method\":\"systematic\",\"ScreeningLogs\":[{\"Decision\":\"Excluded\",\"Reasoning\":\"About marketing\"}]}";
+        Touch(GallerySnapshot.LedgerFile, ledger);
+
+        var context = new DefaultHttpContext { RequestServices = new ServiceCollection().AddLogging().BuildServiceProvider() };
+        context.Response.Body = new MemoryStream();
+        await WorkspaceDownloads.Serve(_runs, context, _run, () => WorkspaceDownloads.LedgerBytes(_runs, _run),
+            "application/json; charset=utf-8", WorkspaceDownloads.LedgerDownload).ExecuteAsync(context);
+
+        Assert.Equal(200, context.Response.StatusCode);
+        Assert.Equal(ledger, Body(context));
+        Assert.Contains("ledger.json", context.Response.Headers.ContentDisposition.ToString());
+    }
+
+    [Fact]
+    public void TheLedgerCanBeReadWhileTheRunHoldsItOpenForWriting()
+    {
+        Touch(GallerySnapshot.LedgerFile, "{}");
+        using var writer = new FileStream(Path.Join(_runs.FolderOf(_run), GallerySnapshot.LedgerFile), FileMode.Open, FileAccess.ReadWrite, FileShare.ReadWrite);
+
+        Assert.Equal("{}", Encoding.UTF8.GetString(WorkspaceDownloads.LedgerBytes(_runs, _run)!));
+    }
 }

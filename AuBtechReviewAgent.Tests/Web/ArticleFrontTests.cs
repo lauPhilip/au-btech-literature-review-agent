@@ -94,10 +94,10 @@ public class ArticleFrontTests
         Assert.Contains($"<span id=\"cite-text-596541db\">TraceableAI. (2026). Which safety mechanisms do agentic AI frameworks use? [Systematic review, run 596541db; not peer reviewed]. Version 0.6.0. {site}spec-matrix/{Run}</span>", html);
         Assert.Contains($"data-copy-status=\"cite-text-596541db\"", html);
         Assert.Contains($"href=\"{site}api/workspace/{Run}/archive\" class=\"ui-btn-secondary", html);
-        Assert.Contains($"href=\"{site}api/workspace/{Run}/screened.ris\" class=\"ui-btn-secondary", html);
+        Assert.Contains($"href=\"{site}api/workspace/{Run}/ledger.json\" class=\"ui-btn-secondary min-h-[44px]\" title=\"{ArticleInfo.LedgerLogTitle}\"", html);
         // On paper: the buttons are hidden and the same places are written out as links.
         Assert.Contains("class=\"af-actions print:hidden\"", html);
-        foreach (string path in new[] { $"spec-matrix/{Run}", $"api/workspace/{Run}/archive", $"api/workspace/{Run}/screened.ris", $"api/workspace/{Run}/protocol.md" })
+        foreach (string path in new[] { $"spec-matrix/{Run}", $"api/workspace/{Run}/archive", $"api/workspace/{Run}/ledger.json", $"api/workspace/{Run}/protocol.md" })
             Assert.Contains($"<a href=\"{site}{path}\">{site}{path}</a>", html);
 
         string script = Asset("js", "review-output.js");

@@ -62,8 +62,17 @@ public sealed record ArticleInfo
 
     public string ArchivePath => $"api/workspace/{RunId}/archive";
     public string ProtocolPath => $"api/workspace/{RunId}/protocol.md";
-    /// <summary>The decision log: every screened record with its decision and the reason, as RIS.</summary>
-    public string DecisionLogPath => $"api/workspace/{RunId}/screened.ris";
+    /// <summary>
+    /// The run file the paper's Decision log button gives (a name under api/workspace/{id}/). The systematic review
+    /// gives its whole ledger, every step with its decision and the reason (<see cref="WorkspaceDownloads.LedgerDownload"/>).
+    /// </summary>
+    public string DecisionLogFile { get; init; } = WorkspaceDownloads.LedgerDownload;
+    /// <summary>What the Decision log gives, in one sentence, for the button's title.</summary>
+    public string DecisionLogTitle { get; init; } = LedgerLogTitle;
+    public string DecisionLogPath => $"api/workspace/{RunId}/{DecisionLogFile}";
+
+    /// <summary>The title of a decision log that is the run's whole ledger.</summary>
+    public const string LedgerLogTitle = "Every step of the run with its decision and the reason, as the JSON ledger";
 
     /// <summary>The title for the running header: the part before a colon when it is long enough, cut at a word near 60 characters.</summary>
     public string ShortTitle
