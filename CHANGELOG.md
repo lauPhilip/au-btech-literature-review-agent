@@ -56,6 +56,13 @@ The Decision log on a systematic paper now downloads the run's full ledger as JS
 
 ### 📄 Report page
 
+#### Paper body
+
+> The paper opened with "The paper checked itself: ...", and a list under the concept map repeated the diagram right below it.
+
+- **Self-check box**: at the top of the paper ⇒ under the report; Article info still gives its one line
+- **Cited boxes of the diagram**: a list under the figure ⇒ a table in the appendix, with a one-line pointer under the figure
+
 #### Decision log
 
 > The button said "Decision log" but gave only the screening, so the reasons for every later step were in the archive alone.
