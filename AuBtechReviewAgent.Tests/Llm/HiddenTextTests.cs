@@ -154,4 +154,50 @@ public class HiddenTextTests
         Assert.Equal("1 invisible character and 2 hidden parts of the page", new HiddenTextRemoved(1, 2).ToString());
         Assert.Equal("3 invisible characters", new HiddenTextRemoved(3, 0).ToString());
     }
+
+    // Found by the fuzz tests (#623): a joiner decided on its neighbours before a soft hyphen or tag character between them was taken out.
+    [Theory]
+    [InlineData("a\u00AD\u200D\u00E9", "a\u00E9")]
+    [InlineData("a\uDB40\uDC41\u200D\u00E9", "a\u00E9")]
+    [InlineData("a\u200D\u200D\u00E9", "a\u00E9")]
+    [InlineData("\u00E9\u200D\u200Da", "\u00E9a")]
+    [InlineData("\u00E9\u200D\u200D\u00E9", "\u00E9\u200D\u200D\u00E9")]
+    [InlineData("\u0928\u200D", "\u0928")]
+    public void AJoinerStaysOnlyBetweenTwoCharactersOutsideAsciiOnceTheRestIsOut(string text, string expected)
+    {
+        var clean = HiddenText.RemoveInvisible(text);
+
+        Assert.Equal(expected, clean.Text);
+        Assert.Equal(expected, HiddenText.RemoveInvisible(clean.Text).Text);
+    }
+
+    [Fact]
+    public void ARunOfJoinersRemovedNextToAsciiIsCounted()
+    {
+        Assert.Equal(2, HiddenText.RemoveInvisible("a\u200D\u200D\u00E9").InvisibleCharacters);
+        Assert.Equal(2, HiddenText.RemoveInvisible("a\u00AD\u200D\u00E9\u200B").InvisibleCharacters);
+    }
+
+    // Found by the fuzz tests (#623): the halves of a tag character, apart in the typed text, met once what stood between them was removed.
+    [Fact]
+    public void ATagCharacterWhoseHalvesMeetOnceAnInvisibleCharacterIsOutIsRemovedToo()
+    {
+        var clean = HiddenText.RemoveInvisible("a\uDB40\u200B\uDC41b");
+
+        Assert.Equal("ab", clean.Text);
+        Assert.Equal(2, clean.InvisibleCharacters);
+        Assert.Equal("A", clean.Hidden);
+    }
+
+    [Fact]
+    public void TheInputOfFuzzSeed27278179LeavesNoTagCharacter()
+    {
+        string input = "\u007F\u202E\u0E2A\u0E27\u0E31\u0E2A\u0E14\u0E35\u8203\u2003\uDB49\uDEEB\uDB40\u202A\uDB40\uDC3B\uDB40\uDC0C\uDC2D\u200F\u0627\u200C\u0628\u0085\u2069\u2066\u200D\u200F\u200E\uFF1E\uFF1E\uFF1E\u00AB\u2066\uC2FF";
+
+        var clean = HiddenText.RemoveInvisible(input);
+
+        Assert.DoesNotContain('\uDB40', clean.Text);
+        Assert.Equal(clean.Text, HiddenText.RemoveInvisible(clean.Text).Text);
+        Assert.DoesNotContain('\uDB40', PromptSafety.Wrap(input, "paper"));
+    }
 }
