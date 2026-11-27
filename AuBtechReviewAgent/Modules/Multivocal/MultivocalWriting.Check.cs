@@ -133,7 +133,8 @@ public sealed partial class MultivocalWriter
         {
             if (cited.Contains(reference)) continue;
             var theme = evidence.Themes.FirstOrDefault(t => t.Sources.Contains(reference));
-            audit.NotCited.Add(new UncitedSource(reference, theme != null && theme.Sources.Count > ReviewWriter.CiteEveryUpTo
+            string? leftOut = ThemeCoverage.LeftOutReason(file.Coverage, reference, id => evidence.Themes.FirstOrDefault(t => t.Id == id)?.Name ?? id);
+            audit.NotCited.Add(new UncitedSource(reference, leftOut != null ? leftOut : theme != null && theme.Sources.Count > ReviewWriter.CiteEveryUpTo
                 ? $"in the theme \"{theme.Name}\" of {theme.Sources.Count} sources, which is synthesised from those that report its claims most directly; not cited after the peer review and the citation repair"
                 : theme != null
                 ? "in a theme, but not cited after the fill pass, the peer review and the citation repair"

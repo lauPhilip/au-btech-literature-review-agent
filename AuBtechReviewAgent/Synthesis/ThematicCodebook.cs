@@ -103,6 +103,23 @@ public class ThemeCoverage
     /// <summary>What code decided about the subsection's shape (issue #464): send-backs for a list of sources, revisions of repeated claims; null when none.</summary>
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
     public List<string>? WritingNotes { get; set; }
+
+    /// <summary>
+    /// The sources of the theme its writer left out, each with the writer's reason, because they bear on the theme only
+    /// indirectly and would otherwise be stretched to fit it (issue #675); null when none was left out.
+    /// </summary>
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public List<UncodedStudy>? LeftOut { get; set; }
+
+    /// <summary>
+    /// Why a source the final text does not cite was left out of a theme by its writer, for its not-cited reason, or null
+    /// when no writer left it out.
+    /// </summary>
+    public static string? LeftOutReason(IEnumerable<ThemeCoverage>? coverage, int reference, Func<string, string> themeName) =>
+        (coverage ?? Enumerable.Empty<ThemeCoverage>())
+            .SelectMany(c => (c.LeftOut ?? new()).Where(l => l.Reference == reference).Select(l => (c.ThemeId, l.Reason)))
+            .Select(x => $"left out of \"{themeName(x.ThemeId)}\" by the writer of that theme, because it bears on the theme only indirectly: {x.Reason.Trim().TrimEnd('.')}")
+            .FirstOrDefault();
 }
 
 /// <summary>The second, independent assignment of studies to themes and its agreement with the first.</summary>
