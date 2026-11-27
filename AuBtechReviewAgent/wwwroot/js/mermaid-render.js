@@ -1,4 +1,4 @@
-// Renders the Mermaid diagram on the Review Output page.
+// Renders the Mermaid diagram on the Review Output page, and the diagrams of the developer wiki under /docs.
 // - Mermaid 11.17.2 is served by the app itself (wwwroot/lib/mermaid, MIT licence), not from a CDN, so the
 //   page loads no third-party script and the exact version is part of the repository.
 // - securityLevel "strict": the diagram text comes from the language model, so no HTML or click handlers.
@@ -50,6 +50,29 @@ window.traceableMermaid = (function () {
             return false;
         }
     }
+
+    // The developer wiki (Components/Pages/Wiki.razor) is a plain page: its diagrams arrive as code blocks of Mermaid
+    // source, and each is drawn in its place. A page that arrives later by enhanced navigation is caught by the
+    // observer. Without scripts, or if a diagram cannot be drawn, the source stays readable.
+    let wikiCounter = 0;
+    function drawWikiDiagrams() {
+        document.querySelectorAll('.ui-wiki pre > code.language-mermaid').forEach(function (code) {
+            const holder = document.createElement('figure');
+            holder.id = 'wiki-diagram-' + (++wikiCounter);
+            holder.className = 'overflow-x-auto border border-line bg-white p-4';  // white in both themes: Mermaid draws dark lines
+            const source = code.textContent;
+            code.parentElement.replaceWith(holder);
+            render(holder.id, source);
+        });
+    }
+    function watchWiki() {
+        drawWikiDiagrams();
+        new MutationObserver(function () {
+            if (document.querySelector('.ui-wiki pre > code.language-mermaid')) drawWikiDiagrams();
+        }).observe(document.body, { childList: true, subtree: true });
+    }
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', watchWiki);
+    else watchWiki();
 
     return { render: render };
 })();
