@@ -41,11 +41,36 @@ public class PaperSelfCheckMapTests
     }
 
     [Fact]
-    public void TheMapTextHoldsEveryBoxAndLinkLabelAndNothingForATableOrAnError()
+    public void TheMapTextHoldsEveryBoxAndLinkLabelAndNothingForAnEmptyTableOrAnError()
     {
         Assert.Equal("Latency fell by 93.12% [1].\nAudit logs [3].\nsupports.", SystematicSelfCheck.MapText(Map("Latency fell by 93.12% [1]")));
         Assert.Equal("", SystematicSelfCheck.MapText(new ReviewArtifact { Kind = ArtifactKinds.Table }));
+        Assert.Equal("", SystematicSelfCheck.MapText(new ReviewArtifact { Kind = ArtifactKinds.Bullets, Bullets = { "Gains [1]" }, Error = "no items" }));
         Assert.Equal("", SystematicSelfCheck.MapText(null));
+    }
+
+    // Issue #702: a comparison table or a list repeats figures as well as a diagram does.
+    [Fact]
+    public void TheTextOfATableIsOneLinePerRowAndOfAListOneLinePerItem()
+    {
+        var table = new ReviewArtifact { Kind = ArtifactKinds.Table, Columns = { "Study", "Result" }, Rows = { new() { "[1]", "Latency fell by 93.12%." }, new() { "[2]", " ", "Fewer errors" } } };
+        var list = new ReviewArtifact { Kind = ArtifactKinds.Bullets, Bullets = { "Latency fell by 93.12% [1].", "", "Audit logs help [3]" } };
+
+        Assert.Equal("[1]; Latency fell by 93.12%.\n[2]; Fewer errors.", SystematicSelfCheck.MapText(table));
+        Assert.Equal("Latency fell by 93.12% [1].\nAudit logs help [3].", SystematicSelfCheck.MapText(list));
+    }
+
+    [Fact]
+    public void AFigureRepeatedInAComparisonTableIsAFaultInCheck5()
+    {
+        var table = new ReviewArtifact { Kind = ArtifactKinds.Table, Columns = { "Study", "Result" }, Rows = { new() { "[1]", "Latency fell by 93.12%" } } };
+        var input = SelfCheckPaper.Input(theme1: "Latency fell by 93.12% [1].", answer1: "Latency fell by 93.12% [1].");
+        input.Parts.Add(new PaperPart("artifact", "Comparison table", PaperPartKind.ConceptMap, SystematicSelfCheck.MapText(table)));
+
+        var check = SelfCheckPaper.Check(input, "figures");
+
+        Assert.Equal(CheckOutcome.Fault, check.Outcome);
+        Assert.Equal("Comparison table", Assert.Single(check.Evidence).Part);
     }
 
     [Fact]
