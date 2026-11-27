@@ -4,9 +4,9 @@ using Xunit;
 namespace AuBtechReviewAgent.Tests;
 
 /// <summary>
-/// The lean source blocks of the shared writing steps (<see cref="WritingProfile.LeanEvidence"/>): off by default, so
-/// the systematic review's theme prompts are byte for byte what they were, and on for the multivocal review, whose
-/// theme prompts then get only the findings placed in the theme, each still with its verified quote.
+/// The source blocks of the shared writing steps. In a theme every block lists only the findings placed in the theme,
+/// each still with its verified quote (issue #745). The lean blocks (<see cref="WritingProfile.LeanEvidence"/>) are off
+/// by default and on for the multivocal review, which then also drops codes that repeat findings and cuts the excerpts.
 /// </summary>
 public class LeanEvidenceTests
 {
@@ -38,7 +38,7 @@ public class LeanEvidenceTests
     }
 
     [Fact]
-    public void TheSystematicProfileIsNotLeanAndADefaultBlockListsEveryFindingAsBefore()
+    public void ADefaultBlockListsOnlyTheThemesFindingsButKeepsItsCodesAndExcerpts()
     {
         Assert.False(WritingProfile.Systematic.LeanEvidence);
         var evidence = Evidence();
@@ -46,10 +46,23 @@ public class LeanEvidenceTests
 
         string block = evidence.SourceBlock(1, theme, 2);
         Assert.Equal(block, evidence.SourceBlock(1, theme, 2, lean: false));
-        // Every finding of the source, the codes line, and two excerpts: the block as it was before the lean option.
-        Assert.All(evidence.Source(1)!.Findings, f => Assert.Contains($"Finding {f.Id}: {f.Value} (verbatim: \"{f.Quote}\")", block));
+        // Issue #745: a study in the theme for one finding does not bring its other results along.
+        Assert.Contains("Finding F1.1: Practice: value 1-1 about summaries (verbatim: \"Quote 1-1 found in the page.\")", block);
+        Assert.Contains("Finding F1.3:", block);
+        Assert.DoesNotContain("Finding F1.2:", block);
+        Assert.DoesNotContain("Finding F1.4:", block);
         Assert.Contains("Codes in this theme: ", block);
         Assert.Equal(2, block.Split("[1, page ").Length - 1);
+    }
+
+    [Fact]
+    public void AThemeThatGivesNoFindingsForASourceListsEveryOneOfThem()
+    {
+        var evidence = Evidence();
+        var theme = new EvidenceTheme { Id = "T9", Name = "Summaries", Sources = new[] { 1 }, FindingIds = new Dictionary<int, IReadOnlyList<string>> { [1] = Array.Empty<string>() } };
+
+        foreach (var block in new[] { evidence.SourceBlock(1, theme, 0), evidence.SourceBlock(1, new EvidenceTheme { Id = "T8", Sources = new[] { 1 } }, 0) })
+            Assert.All(evidence.Source(1)!.Findings, f => Assert.Contains($"Finding {f.Id}:", block));
     }
 
     [Fact]
@@ -85,7 +98,7 @@ public class LeanEvidenceTests
     }
 
     [Fact]
-    public async Task TheThemePromptOfTheDefaultProfileIsUnchangedAndTheLeanOneHasOnlyTheThemesFindings()
+    public async Task BothThemePromptsHaveOnlyTheThemesFindingsAndTheLeanOneIsShorter()
     {
         var evidence = Evidence();
         async Task<string> Prompt(WritingProfile profile)
@@ -96,9 +109,10 @@ public class LeanEvidenceTests
         }
 
         string systematic = await Prompt(WritingProfile.Systematic);
-        // The default prompt carries the default blocks, every finding of each source included.
+        // The default prompt carries the default blocks, with only the theme's findings of each source (issue #745).
         Assert.Contains(evidence.SourceBlock(1, evidence.Themes[0], 2) + "\n" + evidence.SourceBlock(2, evidence.Themes[0], 2), systematic);
-        Assert.Contains("Finding F1.2:", systematic);
+        Assert.Contains("Finding F1.1:", systematic);
+        Assert.DoesNotContain("Finding F1.2:", systematic);
 
         string lean = await Prompt(WritingProfile.Systematic with { LeanEvidence = true });
         Assert.Contains("Finding F1.1:", lean);

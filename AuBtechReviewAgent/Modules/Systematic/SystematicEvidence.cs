@@ -53,6 +53,9 @@ public static class SystematicEvidence
             Description = t.Description,
             Sources = t.Studies.ToList(),
             Codes = t.Studies.ToDictionary(r => r, r => (IReadOnlyList<string>)book.Codes.Where(c => c.Reference == r && t.CodeIds.Contains(c.Id)).Select(c => c.Label).ToList()),
+            // The findings the theme's codes rest on, so its writer sees only those of each study (issue #745).
+            FindingIds = t.Studies.ToDictionary(r => r, r => (IReadOnlyList<string>)book.Codes.Where(c => c.Reference == r && t.CodeIds.Contains(c.Id))
+                .SelectMany(c => c.FindingIds).Distinct(StringComparer.OrdinalIgnoreCase).ToList()),
             Facts = ThemeFacts(t.Studies, byExtraction),
             // The questions the codebook says the theme answers, with their text (issue #124).
             Question = string.Join("; ", questions.Select((q, i) => (Id: ReviewWriter.QuestionId(i), Text: q.Trim()))
