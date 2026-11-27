@@ -216,7 +216,7 @@ public partial class PrismaReviewEngine
             When writing "synthesisResultsItem" and "discussionItem", every specific claim, finding, or comparison drawn from the literature MUST end with an inline citation marker in square brackets referencing the OFFICIAL ALPHABETIZED REFERENCE LIST above by its number, e.g. "...improves fault isolation [3]." or "...as shown in both [2] and [5]." Only cite numbers that actually appear in that list - never invent one. General framing sentences that state no specific finding do not need a citation marker.
 
             TASK:
-            Generate a fully formed, detailed academic paragraph for each checklist field below.
+            Generate a fully formed, detailed academic paragraph for each checklist field below. For "rationaleItem", the same rule holds as for a rationale written on its own: {{ReviewWriter.RationaleRule(WritingProfile.Systematic)}}
 
             Respond ONLY with a single valid minified JSON object matching the template below. Plain text in every field: no Markdown, no diagram code.
 
@@ -224,7 +224,7 @@ public partial class PrismaReviewEngine
             {
                 "titleItem": "A single-line systematic review title (at most 25 words, no full stop) on '{{query}}' mapping to PRISMA Item 1.",
                 "abstractItem": "A formal abstract overview addressing the core objective ('{{explicitObjective}}') mapping to PRISMA Item 2.",
-                "rationaleItem": "A rigorous context justification on the current state of research on '{{query}}' and why a review is needed, mapping to PRISMA Item 3.",
+                "rationaleItem": "Why a review of '{{query}}' is needed, as one argument with inline [n] markers (see the rule above), mapping to PRISMA Item 3.",
                 "objectivesItem": "The explicit question formulation matching the stated goal: '{{explicitObjective}}' mapping to PRISMA Item 4.",
                 "biasAssessmentItem": "This field will be post-processed. Output exactly: 'PREDEFINED_METADATA_MARKER'",
                 "synthesisResultsItem": "Your simple-English factual literature summary paragraph mapping to PRISMA Item 20a. Do not place code syntax here.",
