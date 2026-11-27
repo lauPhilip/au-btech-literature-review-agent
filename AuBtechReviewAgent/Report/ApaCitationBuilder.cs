@@ -77,9 +77,11 @@ public static partial class ApaCitationBuilder
         int year = ExtractYear(paper.PublishedDate);
         string title = TitleAsGiven(paper.Title);
         string venue = CleanVenue(paper.JournalSource);
+        string? venuePages = null;
+        if (HoldsCitation(venue, title)) (venue, venuePages) = VenueFromCitation(venue, title);
         // A book's record often repeats its title as the venue; the work then stands alone.
         if (Comparable(venue) == Comparable(title)) venue = "";
-        var parsed = new ReferenceDetails { ArxivId = ReferenceDetails.ArxivIdOf(paper.Doi, paper.Id, paper.Url, paper.JournalSource) };
+        var parsed = new ReferenceDetails { ArxivId = ReferenceDetails.ArxivIdOf(paper.Doi, paper.Id, paper.Url, paper.JournalSource), Pages = venuePages };
         var volumeIssue = VolumeIssuePattern.Match(venue);
         if (volumeIssue.Success && !ConferencePattern.IsMatch(venue))
         {
@@ -100,10 +102,18 @@ public static partial class ApaCitationBuilder
         var details = (known ?? new ReferenceDetails()).Or(parsed);
         string link = BuildLink(paper);
 
+        // A chapter whose book the enrichment named is cited in that book, not in the series around it (issue #678).
+        if (details.Book != null) venue = CleanText(details.Book).TrimEnd('.');
+
         string venueType;
         string venuePart;
         bool standAlone = string.IsNullOrEmpty(venue);
-        if (standAlone)
+        if (details.Book != null)
+        {
+            venueType = BookChapters;
+            venuePart = ChapterPart(venue, details);
+        }
+        else if (standAlone)
         {
             // No venue: an arXiv record without a journal_ref is a preprint, cited with its identifier (APA 7, 10.8).
             venueType = "Preprints";

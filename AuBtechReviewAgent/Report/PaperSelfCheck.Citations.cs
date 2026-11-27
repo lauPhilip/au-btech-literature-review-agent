@@ -159,7 +159,9 @@ public static partial class PaperSelfCheck
         var lacking = new[]
         {
             ("year", input.References.Where(r => r.Year is null or <= 0).Select(r => r.Number).ToList()),
-            ("venue", input.References.Where(r => string.IsNullOrWhiteSpace(r.Venue)).Select(r => r.Number).ToList()),
+            // An arXiv preprint names arXiv as its venue ("(arXiv:2512.21309). arXiv."), as APA 7 (10.8) asks (issue #678).
+            ("venue", input.References.Where(r => string.IsNullOrWhiteSpace(r.Venue) && !r.Text.Contains("(arXiv:", StringComparison.Ordinal))
+                .Select(r => r.Number).ToList()),
             ("DOI", input.References.Where(r => string.IsNullOrWhiteSpace(r.Doi)).Select(r => r.Number).ToList()),
         };
         foreach (var (what, numbers) in lacking.Where(l => l.Item2.Count > 0))
