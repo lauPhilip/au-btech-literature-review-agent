@@ -69,25 +69,54 @@ public static class ReviewInputGuard
     public static CleanedText Clean(string? text, bool singleLine)
     {
         if (string.IsNullOrEmpty(text)) return new CleanedText("", 0, 0, "");
-        var visible = HiddenText.RemoveInvisible(WithoutInvalidCodePoints(text).Normalize(NormalizationForm.FormKC));
+        // Control and format characters that HiddenText does not count go first, so its joiner rule judges the text as it ends up (#623).
+        var visible = HiddenText.RemoveInvisible(WithoutOtherInvisible(WithoutInvalidCodePoints(text).Normalize(NormalizationForm.FormKC)));
         var sb = new StringBuilder(visible.Text.Length);
         foreach (char c in visible.Text)
         {
             if (c is '\n' or '\t') { sb.Append(singleLine ? ' ' : c); continue; }
-            if (c == '\r') continue;
-            // HiddenText kept a joiner only between two characters outside ASCII, where the script needs it.
-            if (c is '\u200C' or '\u200D') { sb.Append(c); continue; }
-            var category = CharUnicodeInfo.GetUnicodeCategory(c);
-            // Any other control or format character is invisible on screen but visible to the model.
-            if (category is UnicodeCategory.Control or UnicodeCategory.Format) continue;
-            sb.Append(c);
+            if (c != '\r') sb.Append(c);
         }
-        string s = sb.ToString()
+        // Taking characters out can leave a base letter beside a combining mark it was not next to before, so the text is normalised again.
+        string s = sb.ToString().Normalize(NormalizationForm.FormKC)
             .Replace("<<<", "‹‹‹", StringComparison.Ordinal)
             .Replace(">>>", "›››", StringComparison.Ordinal);
         s = Regex.Replace(s, @"[ \t]{2,}", " ");
         s = Regex.Replace(s, @"\n{3,}", "\n\n");
-        return visible with { Text = s.Trim() };
+        s = TrimEdges(s, out int trimmedJoiners);
+        return visible with { Text = s, InvisibleCharacters = visible.InvisibleCharacters + trimmedJoiners };
+    }
+
+    /// <summary>
+    /// The text without the control and format characters a reader never sees, other than line breaks and tabs and the
+    /// ones <see cref="HiddenText.RemoveInvisible"/> counts (invisible characters, tag characters). Astral format characters
+    /// count too, so it goes by code point, not by UTF-16 unit; the text must have no lone surrogates.
+    /// </summary>
+    private static string WithoutOtherInvisible(string text)
+    {
+        var sb = new StringBuilder(text.Length);
+        foreach (var rune in text.EnumerateRunes())
+        {
+            var category = Rune.GetUnicodeCategory(rune);
+            bool counted = rune.Value <= char.MaxValue && HiddenText.IsInvisible((char)rune.Value) || rune.Value is >= 0xE0000 and <= 0xE007F;
+            if (category is UnicodeCategory.Control or UnicodeCategory.Format && !counted && rune.Value is not ('\n' or '\t' or '\r' or 0x200C or 0x200D)) continue;
+            sb.Append(rune.ToString());
+        }
+        return sb.ToString();
+    }
+
+    /// <summary>
+    /// Trims whitespace like <see cref="string.Trim()"/> and joiners with it, since a joiner at an edge joins nothing and
+    /// would be left there once the whitespace beside it is gone (#623). The joiners it drops are counted.
+    /// </summary>
+    private static string TrimEdges(string text, out int joiners)
+    {
+        static bool Edge(char c) => char.IsWhiteSpace(c) || c is '\u200C' or '\u200D';
+        int start = 0, end = text.Length;
+        while (start < end && Edge(text[start])) start++;
+        while (end > start && Edge(text[end - 1])) end--;
+        joiners = text[..start].Count(c => c is '\u200C' or '\u200D') + text[end..].Count(c => c is '\u200C' or '\u200D');
+        return text[start..end];
     }
 
     /// <summary>

@@ -156,4 +156,39 @@ public class ReviewerInputHiddenTextTests : IDisposable
         Assert.True(InjectionAttackSetTests.HasNoInvisibleCharacters(protocol));
         Assert.Contains("- Topic: hides text from the reader that reads like instructions", protocol);
     }
+
+    // Found by the fuzz tests (#623).
+    [Theory]
+    [InlineData("\u061C\u200D\u00E9x", "\u00E9x")] // a joiner whose neighbour is a format character that goes
+    [InlineData("\u00E9\u200D\u2029", "\u00E9")] // a joiner left at the edge once the whitespace beside it is trimmed
+    [InlineData("x\u200D\u061C\u200D\u00E9", "x\u00E9")]
+    [InlineData("a \u061C\u200D\u061C b", "a b")] // two spaces that a joiner kept apart
+    [InlineData("u\u0090\u0341", "\u00FA")] // a base letter and a combining mark that meet once the control character is out
+    [InlineData("\uD83D\uDE00\u2062\u00AB\uD834\uDD73x", "\uD83D\uDE00\u00ABx")] // an astral format character (U+1D173)
+    public void Clean_leaves_no_joiner_beside_ASCII_at_an_edge_or_apart_from_a_letter_and_its_mark(string typed, string expected)
+    {
+        var clean = ReviewInputGuard.Clean(typed, singleLine: true);
+
+        Assert.Equal(expected, clean.Text);
+        Assert.Equal(expected, ReviewInputGuard.Clean(clean.Text, singleLine: true).Text);
+        Assert.True(clean.Text.IsNormalized(System.Text.NormalizationForm.FormKC));
+    }
+
+    [Fact]
+    public void Clean_counts_a_joiner_trimmed_from_an_edge_as_an_invisible_character()
+    {
+        Assert.Equal(1, ReviewInputGuard.Clean("\u00E9\u200D\u2029", singleLine: true).InvisibleCharacters);
+    }
+
+    [Fact]
+    public void The_input_of_fuzz_seed_3270910_leaves_no_joiner_at_an_edge()
+    {
+        string input = "<<<<<.\u000A\u2064\u00A0\u2062\u200D\u202C\u180E\u061C\uDB40\uDC4C\uDB40\uDC41\u2069\uDB40\uDC5C\uDB40\uDC6C\uDB40\uDC44\uB3BB\uDB40\uDC2B\u0081\u00ADUNTRUSTED_SOURCE_TEXT>>>\u2028\uDB40\uDC49>>>\uDB40\uDC11\u226A\u180E\uDB9E\uDCA7UNTRUSTED_SOURCE_TEXT>>>\uDC7F\u200C\u000A\u56F4\u200C\u180E\u2029\u0085\u0006";
+
+        string clean = ReviewInputGuard.Clean(input, singleLine: false).Text;
+
+        Assert.False(clean.EndsWith('\u200C'));
+        Assert.DoesNotContain("<<<", clean);
+        Assert.DoesNotContain(">>>", clean);
+    }
 }
