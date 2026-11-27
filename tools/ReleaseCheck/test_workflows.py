@@ -119,6 +119,11 @@ class CallersTests(unittest.TestCase):
         self.assertIn("needs.is-newest.outputs.deploy == 'true'", job)
         self.assertIn("vars.DEPLOY_ENABLED == 'true'", job)
 
+    def test_deploy_waits_for_reviews_and_has_no_docs_only_skip(self):
+        deploy = read("deploy.yml")
+        self.assertIn("wait-idle", deploy)
+        self.assertNotIn("needs-deploy", deploy)
+
     def test_callers_pass_only_the_two_secrets(self):
         for name in ("release.yml",):
             job = jobs(read(name))["deploy"]
