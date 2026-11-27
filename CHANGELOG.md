@@ -45,6 +45,8 @@ The Decision log on a systematic paper now downloads the run's full ledger as JS
 - **Failed discussion**: the themes dropped for a one-pass overview ⇒ the themes kept, and the paper says the discussion is missing
 - The discussion gets one more try, so a sentence with too many references is still fixed after two other send-backs. The multivocal discussion gets it too.
 - The conclusion, limitations and answers are still written from the themes.
+- **Too many references in a discussion sentence**: the whole discussion and conclusion lost ⇒ the sentence split at its clauses, and the sections kept
+- A send-back now names every sentence with too many references, not only the first. The closing no longer cites the studies left out of the themes.
 
 #### Citations in the text
 
@@ -52,6 +54,7 @@ The Decision log on a systematic paper now downloads the run's full ledger as JS
 
 - **Markers side by side**: "[9][2][11]" ⇒ "[2, 9, 11]", on the page and in main.tex
 - A sentence that starts with a marker now names it: "Study [9] describes". A marker stuck to a word gets a space.
+- Two more bare markers are named: "[1, 2].[1] proposes" and "evidence, [1] suggests" now read "Study [1] proposes" and "evidence, Study [1] suggests".
 - **Hedge rule**: "No platform may combine ..." ⇒ "None of the evaluated platforms combined ...". What a study found in its own sample is stated plainly.
 
 ### 🧭 Multivocal review (preview)
