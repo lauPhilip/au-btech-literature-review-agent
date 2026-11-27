@@ -21,14 +21,14 @@
 @if (Composing)
 {
     @* Ask (redesign step 6): the composer in a centred column of at most 760 px and the criteria beside it from
-       1024 px (380 px wide, 440 px from 1600 px), below it on smaller screens. Running and Done keep the older
+       1024 px (380 px wide, 440 px from 1280 px, so the panel fits a 1366 × 768 screen; issue #728), below it on smaller screens. Running and Done keep the older
        two-column view below until redesign step 7. *@
-    <div class="mx-auto w-full max-w-[1600px] px-[clamp(16px,3vw,40px)] py-4 sm:py-10">
+    <div class="mx-auto w-full max-w-[1600px] px-[clamp(16px,3vw,40px)] py-4 sm:py-10 lg:py-4">
         @if (!string.IsNullOrEmpty(quotaNotice))
         {
             <p class="mx-auto mb-4 max-w-[760px] text-xs text-not-supported" role="alert">@quotaNotice</p>
         }
-        <div class="grid grid-cols-1 items-start gap-4 sm:gap-6 lg:grid-cols-[minmax(0,760px)_380px] lg:justify-center xl:gap-10 min-[1600px]:grid-cols-[minmax(0,760px)_440px]">
+        <div class="grid grid-cols-1 items-start gap-4 sm:gap-6 lg:grid-cols-[minmax(0,760px)_380px] lg:justify-center xl:grid-cols-[minmax(0,760px)_440px] xl:gap-10">
             <ReviewComposer Method="ReviewMethod" Quota="quotaStatus" InputCheck="inputCheck" Busy="isSearching"
                             OnChanged="FormChanged" OnStart="StartOrShowProblem" OnLoadExample="LoadExample" OnOpenKeys="OpenKeyModal">
                 <Notice>
@@ -92,12 +92,13 @@
                 <CriteriaPanel @bind-Open="criteriaOpen" MethodName="@ReviewMethod.Name" SourceAvailability="sourceAvailability"
                                InputCheck="inputCheck" Busy="isSearching" OnChanged="FormChanged" OnOpenKeys="OpenKeyModal">
                     <MoreOptions>
-                        <div class="space-y-3">
+                        @* Side by side until one opens; an open one takes the whole row (issue #728). *@
+                        <div class="flex flex-wrap gap-2">
 
-                    <details class="group rounded-field border border-line" open="@(reviewedSearchStrings != null)">
+                    <details class="group min-w-0 flex-1 open:basis-full rounded-field border border-line" open="@(reviewedSearchStrings != null)">
                         <summary class="flex min-h-[44px] cursor-pointer select-none items-center justify-between px-3 py-2 text-sm text-ink">
                             <span>Search strings</span>
-                            <span class="text-[11px] text-muted">@(reviewedSearchStrings == null ? "chosen by the model" : $"{reviewedSearchStrings.Count + 1} reviewed")</span>
+                            <span class="hidden text-[11px] text-muted group-open:inline">@(reviewedSearchStrings == null ? "chosen by the model" : $"{reviewedSearchStrings.Count + 1} reviewed")</span>
                         </summary>
                         <fieldset id="f-strings" class="px-3 pb-3 pt-3" tabindex="-1" aria-describedby="h-strings">
                             <legend class="@LabelClass">Search strings <Term Key="search-strings" Icon="true" /></legend>
@@ -143,10 +144,10 @@
                             }
                         </fieldset>
                     </details>
-                    <details class="group rounded-field border border-line">
+                    <details class="group min-w-0 flex-1 open:basis-full rounded-field border border-line">
                         <summary class="flex min-h-[44px] cursor-pointer select-none items-center justify-between px-3 py-2 text-sm text-ink">
                             <span>Advanced options</span>
-                            <span class="text-[11px] text-muted">@AdvancedSummary()</span>
+                            <span class="hidden text-[11px] text-muted group-open:inline">@AdvancedSummary()</span>
                         </summary>
                         <div class="px-3 pb-3 space-y-3 border-t border-line pt-3">
                             @Option("o-dual", "dual-screening", "Screen every record twice", "Two independent screening prompts; disagreements are kept and flagged, and the agreement (Cohen's kappa) is reported.", State.DualScreening, v => State.DualScreening = v)

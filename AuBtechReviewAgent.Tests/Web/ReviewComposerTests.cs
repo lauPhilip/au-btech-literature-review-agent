@@ -64,6 +64,8 @@ public class ReviewComposerTests
         Assert.DoesNotContain("The question the review answers", html);
         Assert.DoesNotContain("The words sent to the databases", html);
         Assert.Contains("placeholder=\"Short and specific works best, e.g. agentic AI software frameworks\"", html);
+        // Two rows for the objective, so the composer fits beside the criteria at 1366 × 768 (issue #728).
+        Assert.Contains("<textarea id=\"f-objective\" rows=\"2\"", html);
         // The line stays for the character count, folded away until the text nears the limit.
         Assert.Contains("id=\"h-objective\" class=\"hidden mt-1", html);
         Assert.Contains("id=\"h-query\" class=\"hidden mt-1", html);
