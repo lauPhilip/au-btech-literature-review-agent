@@ -101,6 +101,7 @@ The Decision log on a systematic paper now downloads the run's full ledger as JS
 - **Figures**: a box with the caption on top ⇒ no box, with the caption under the figure
 - **Tables**: the evidence map and the run's table get numbered captions above them, such as "Table 4.1".
 - **Citation numbers**: a filled chip ⇒ a plain number in its verdict's colour. It still opens what the check found.
+- **Paragraphs on the page**: line breaks inside one block ⇒ one block per paragraph, so a page break falls between lines of a paragraph, not mid-gap.
 
 #### Decision log
 
@@ -131,6 +132,7 @@ The Decision log on a systematic paper now downloads the run's full ledger as JS
 - Fixed a bug where a heading stood alone on a page and its text started on the next one. A paragraph now breaks between two lines when it cannot move whole.
 - Fixed a bug where a long paragraph ran over the page footer and out of the page.
 - Fixed a bug where a tall concept map ran across the edge of a page. It is now scaled to fit one page.
+- Fixed a bug where citations in Table A.1 broke after every letter on a wide screen. They now break between words.
 
 ## [0.7.0] - 2026-11-27
 
