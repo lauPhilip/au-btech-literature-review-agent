@@ -15,7 +15,7 @@
     const GAP = 24;                  // px between two sheets on the desk
     const A4 = 297 / 210;            // height over width
     const MARGIN = 15 / 210;         // 15 mm of 210 mm, as on paper
-    const HEADINGS = /^H[1-5]$/;
+    const HEADINGS = /^(H[1-5]|CAPTION)$/;
     const blocks = function (sheet, body) { return window.traceablePageBlocks.blocks(sheet, body); };
     const opener = function (el, sheet) { return window.traceablePageBlocks.opener(el, sheet); };
     let timer = 0;
@@ -81,6 +81,21 @@
         }
     }
 
+    // The first of the blocks before list[i] that must move with it to the next page: every heading and caption in a row
+    // before it, and, for the first body row of a table, the table's header row. Only blocks on this page and below its
+    // top margin count; -1 when there are none.
+    function chainStart(list, i, el, page, start, step, front, top) {
+        const table = el.tagName === 'TR' && el.parentElement.tagName === 'TBODY' ? el.closest('table') : null;
+        const own = function (b) { return table && b.tagName === 'TR' && b.parentElement.tagName === 'THEAD' && b.closest('table') === table; };
+        let first = -1;
+        for (let j = i - 1; j >= 0 && (HEADINGS.test(list[j].tagName) || own(list[j])) && !(front && front.contains(list[j])); j--) {
+            const b = top(list[j]);
+            if (Math.floor(b / step) !== page || b <= start + 1) break;
+            first = j;
+        }
+        return first;
+    }
+
     function paginate(sheet) {
         reset(sheet);
         if (printing || window.innerWidth < MIN_WIDTH || sheet.clientWidth < MIN_WIDTH - 80) {
@@ -127,8 +142,20 @@
                 else if (y > end) to = next;                                 // in the bottom margin or the gap
                 else if (y + h > end + 1 && h <= body) to = next;            // crosses the foot of the page
             }
-            // The first body row of a table on a new page makes room for the repeated header row above it.
+            // A table's heading, caption and header row go with its first body row (issue #691): when that row moves to the
+            // next page, the header row above it and the headings before that move too, so a page never ends with a table
+            // that has no row. The chain is moved from its first element and this row is looked at again.
             const table = el.tagName === 'TR' ? el.closest('table') : null;
+            if (to === next && table && el.parentElement.tagName === 'TBODY') {
+                const first = chainStart(list, i, el, page, start, step, front, top);
+                if (first >= 0) {
+                    moveTo(opener(list[first], sheet), next, top);
+                    tablePage.set(table, page + 1);
+                    i -= 1;
+                    continue;
+                }
+            }
+            // The first body row of a table on a new page makes room for the repeated header row above it.
             const head = table && el.parentElement.tagName === 'TBODY' ? table.querySelector(':scope > thead') : null;
             if (table) {
                 const landing = Math.floor((to === null ? y : to) / step);
@@ -146,12 +173,7 @@
             // moves from the first of them, so none is left alone at the foot of the page. The loop then looks at this
             // block again.
             if (to === next) {
-                let first = -1;
-                for (let j = i - 1; j >= 0 && HEADINGS.test(list[j].tagName) && !(front && front.contains(list[j])); j--) {
-                    const b = top(list[j]);
-                    if (Math.floor(b / step) !== page || b <= start + 1) break;
-                    first = j;
-                }
+                const first = chainStart(list, i, el, page, start, step, front, top);
                 if (first >= 0) {
                     moveTo(opener(list[first], sheet), next, top);
                     i -= 1;
