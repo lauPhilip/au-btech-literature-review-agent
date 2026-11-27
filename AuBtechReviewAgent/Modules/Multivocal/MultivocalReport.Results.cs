@@ -40,8 +40,9 @@ public sealed partial class MultivocalReporter
                 if (theme.Tensions.Count > 0)
                 {
                     section.Blocks.Add(ReportBlock.Paragraph("Tensions between sources:"));
-                    section.Blocks.Add(ReportBlock.List(theme.Tensions.Select(t =>
-                        $"{t.Description} {Cite(new[] { byId.GetValueOrDefault(t.FindingA)?.Address, byId.GetValueOrDefault(t.FindingB)?.Address }.OfType<string>(), numbers)}")));
+                    section.Blocks.Add(ReportBlock.List(theme.Tensions.Select(t => t.IsCited
+                        ? $"{t.Description} {Cite(new[] { byId.GetValueOrDefault(t.FindingA)?.Address, byId.GetValueOrDefault(t.FindingB)?.Address }.OfType<string>(), numbers)}".TrimEnd()
+                        : $"{t.Description} {SynthesisTension.UncitedNote}")));
                 }
             }
             foreach (var other in s.NotCoded.Where(n => n.Question == number))

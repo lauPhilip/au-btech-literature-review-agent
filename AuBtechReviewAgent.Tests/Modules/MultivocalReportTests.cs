@@ -137,6 +137,14 @@ public class MultivocalReportTests
         Assert.True(paper > 0 && blog > paper);
         Assert.DoesNotContain("We keep a running summary.", md);
         Assert.Contains("- Summarisation against Retrieval. They disagree. [S1, S2]", md);
+
+        // Issue #463: a tension without two checked quotes cites no source and says so.
+        var uncited = Input();
+        var tension = uncited.Synthesis.Themes[0].Tensions[0];
+        tension.FindingA = tension.FindingB = "";
+        string uncitedMd = Text(MultivocalReporter.Write(uncited));
+        Assert.Contains("- Summarisation against Retrieval. They disagree. " + SynthesisTension.UncitedNote, uncitedMd);
+        Assert.DoesNotContain("They disagree. [S", uncitedMd);
         Assert.Contains("Not coded by the map: 1 finding on Practice from 1 source [S3]", md);
         Assert.Contains("No extracted source answers this question", md);
     }
