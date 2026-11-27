@@ -1,0 +1,87 @@
+@page "/docs"
+@page "/docs/{Slug}"
+@layout AppLayout
+@inject NavigationManager Nav
+
+@* The developer wiki on the site's own address (issue #613): /docs is docs/wiki/README.md and /docs/{page} is
+   docs/wiki/{page}.md, rendered by Web/WikiDocs.cs. The frame is the trust pages' one (DocPage): a side list of the
+   pages from 1024 px with the current page's sections under it, and one reading card. Section links jump through
+   data-jump-to (wwwroot/js/review-output.js), because the page has <base href="/">. Diagrams written in Mermaid are
+   drawn by wwwroot/js/mermaid-render.js; without scripts their source shows. /docs/api is the API page's own route. *@
+
+@if (shown != null)
+{
+    <SeoHead Title="@shown.Title" Path="@AuBtechReviewAgent.WikiDocs.PathOf(shown)" Description="@shown.Description" BreadcrumbName="Developer wiki" />
+
+    <div class="mx-auto w-full max-w-[1600px] px-[clamp(16px,3vw,40px)] py-6 sm:py-10">
+        <div class="grid grid-cols-1 items-start gap-8 lg:grid-cols-[260px_minmax(0,1fr)]">
+            <nav aria-label="Developer wiki" class="sticky top-6 max-lg:hidden print:hidden">
+                <ul class="space-y-0.5 border-l border-line">
+                    @foreach (var other in AuBtechReviewAgent.WikiDocs.Pages)
+                    {
+                        var listed = other;
+                        string href = AuBtechReviewAgent.WikiDocs.PathOf(listed);
+                        bool current = ReferenceEquals(listed, shown);
+                        <li>
+                            <a href="@href" aria-current="@(current ? "page" : null)"
+                               class="-ml-px block border-l-2 py-2 pl-3 pr-2 text-sm leading-snug @(current ? "border-heading bg-active font-semibold text-heading" : "border-transparent text-muted hover:border-line-field hover:text-heading")">@listed.Title</a>
+                            @if (current && listed.Sections.Count > 0)
+                            {
+                                <ul class="pb-1">
+                                    @foreach (var (id, label) in listed.Sections)
+                                    {
+                                        var sectionId = id;
+                                        <li>
+                                            <a href="@($"{href}#{sectionId}")" data-jump-to="@sectionId"
+                                               class="-ml-px block border-l-2 border-transparent py-1.5 pl-6 pr-2 text-[13px] leading-snug text-muted hover:border-line-field hover:text-heading">@label</a>
+                                        </li>
+                                    }
+                                </ul>
+                            }
+                        </li>
+                    }
+                </ul>
+            </nav>
+
+            <article class="w-full min-w-0 max-w-[1100px] rounded-card border border-line bg-page px-5 py-6 shadow-card sm:px-10 sm:py-10 print:max-w-none print:border-0 print:p-0 print:shadow-none" data-wiki-page="@shown.Slug">
+                <header class="max-w-[70ch]">
+                    <p class="font-display text-xs font-semibold uppercase tracking-[0.14em] text-muted">Developer wiki</p>
+                    <h1 class="mt-2 font-display text-[clamp(26px,2.4vw,40px)] font-semibold leading-tight tracking-[-0.025em] text-heading">@shown.Title</h1>
+                </header>
+
+                <div class="ui-wiki mt-6">@((MarkupString)shown.Html)</div>
+
+                <footer class="mt-10 border-t border-line pt-4 text-sm leading-relaxed text-muted">
+                    <p>
+                        This page is <code class="font-mono text-[0.9em] text-heading">docs/wiki/@shown.FileName</code> in the repository.
+                        <a href="@AuBtechReviewAgent.WikiDocs.SourceUrl(shown)" class="font-medium text-heading underline underline-offset-2">Read or change it on GitHub</a>.
+                        Cite this address, the site's copy, rather than GitHub's Wiki tab.
+                    </p>
+                </footer>
+
+                <nav aria-label="All wiki pages" class="mt-8 lg:hidden print:hidden">
+                    <p class="font-display text-xs font-semibold uppercase tracking-[0.14em] text-muted">All pages</p>
+                    <ul class="mt-2 space-y-1 text-sm">
+                        @foreach (var other in AuBtechReviewAgent.WikiDocs.Pages)
+                        {
+                            var listed = other;
+                            <li><a href="@AuBtechReviewAgent.WikiDocs.PathOf(listed)" aria-current="@(ReferenceEquals(listed, shown) ? "page" : null)" class="inline-block py-2 text-heading underline underline-offset-2">@listed.Title</a></li>
+                        }
+                    </ul>
+                </nav>
+            </article>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public string? Slug { get; set; }
+
+    private AuBtechReviewAgent.WikiPage? shown;
+
+    protected override void OnParametersSet()
+    {
+        shown = AuBtechReviewAgent.WikiDocs.Find(Slug);
+        if (shown == null) Nav.NotFound();
+    }
+}
