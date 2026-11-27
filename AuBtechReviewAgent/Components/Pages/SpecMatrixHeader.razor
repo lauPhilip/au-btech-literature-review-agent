@@ -1,6 +1,7 @@
 @* The top of the report page under the front page: when the page has no front page (a gallery copy), the old header
    with the title and the abstract. The citation checks are not repeated in the pages: the front page gives the count
-   and the panel beside the report (CitationCheckPanel) gives the rest (issue #635). The page passes itself as Page;
+   and the panel beside the report (CitationCheckPanel) gives the rest (issue #635). The self-check is about the tool, not
+   part of the paper, so it is under the report, not here (issue #735). The page passes itself as Page;
    its state stays there. *@
 
 @if (Page.articleInfo == null)
@@ -21,12 +22,6 @@
         <h2 class="font-display text-xl font-semibold tracking-tight text-heading">Abstract</h2>
         <p class="mt-2">@SpecMatrix.ScrubAnchors(Page.report.AbstractItem)</p>
     </section>
-}
-
-@* The paper's check of itself (issue #532): a closed table of the ten checks, on screen only, after the front page. *@
-@if (Page.selfCheck != null && Page.selfCheck.Checks.Count > 0)
-{
-    <SelfCheckTable Result="Page.selfCheck" />
 }
 
 @code {
