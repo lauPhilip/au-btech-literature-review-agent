@@ -28,7 +28,7 @@ Version 0.6.0 is in [docs/changelog-0.6.md](docs/changelog-0.6.md), and versions
 
 ### 🌟 Patch highlights
 
-The Decision log on a systematic paper now downloads the run's full ledger as JSON. A server can now choose to call the model in the EU. A systematic paper no longer loses its theme sections when the discussion fails. Citations in the text are now written in one form, such as "[2, 9, 11]" and "Study [9] describes". A systematic paper no longer opens a sentence on a number or writes a theme name with capitals in running text. Otherwise a new systematic run gives the same results as 0.7.0, and a multivocal summary can be worded a little differently.
+The Decision log on a systematic paper now downloads the run's full ledger as JSON. A server can now choose to call the model in the EU. A systematic paper no longer loses its theme sections when the discussion fails. Citations in the text are now written in one form, such as "[2, 9, 11]" and "Study [9] describes". A systematic paper no longer opens a sentence on a number or writes a theme name with capitals in running text. A book chapter is now cited in its book, not its book series. Otherwise a new systematic run gives the same results as 0.7.0, and a multivocal summary can be worded a little differently.
 
 ### 🔬 Systematic review
 
@@ -66,6 +66,15 @@ The Decision log on a systematic paper now downloads the run's full ledger as JS
 - **Empty sentences**: "X is reported [1], and Y is reported [2]." is sent back to the model.
 - **Reading basis**: a cited sentence in the rationale or the discussion that says "abstract-only" or "full text" is sent back. The methods text says what the review read.
 - The overview of the synthesis in a systematic paper is worded a little differently.
+
+#### References
+
+> Reference [9] had its whole citation in the venue, and a book chapter named its book series where its book should be.
+
+- **A venue that holds a whole citation**: the authors, title, date and place again ⇒ only the proceedings, with the pages
+- **A book chapter**: "*Advances in computational intelligence and robotics book series*, 161–182." ⇒ "In *Accelerating logistics through generative AI, ...* (pp. 161–182). IGI Global Scientific Publishing."
+- A chapter names the book's editors when its record has them, and BibTeX gets the book, editors and publisher.
+- The self-check no longer says an arXiv preprint has no venue.
 
 ### 🧭 Multivocal review (preview)
 
