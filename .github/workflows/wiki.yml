@@ -13,8 +13,9 @@ on:
     paths: [ 'docs/wiki/**', '.github/workflows/wiki.yml' ]
   workflow_dispatch:
 
+# Read-only at the top; only the publishing job may write (OpenSSF Scorecard, Token-Permissions, #621).
 permissions:
-  contents: write   # the wiki is a separate git repository; pushing to it needs write access
+  contents: read
 
 concurrency:
   group: wiki-sync
@@ -24,6 +25,8 @@ jobs:
   publish:
     name: Publish docs/wiki to the Wiki tab
     runs-on: ubuntu-latest
+    permissions:
+      contents: write   # the wiki is a separate git repository; pushing to it needs write access
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 

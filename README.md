@@ -11,6 +11,7 @@ Built at the Department of Business Development and Technology (BTECH), Aarhus U
 
 [![DOI](https://zenodo.org/badge/1271174662.svg)](https://doi.org/10.5281/zenodo.24379094)
 [![CI/CD](https://github.com/lauPhilip/au-btech-literature-review-agent/actions/workflows/ci.yml/badge.svg)](https://github.com/lauPhilip/au-btech-literature-review-agent/actions/workflows/ci.yml)
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/lauPhilip/au-btech-literature-review-agent/badge)](https://scorecard.dev/viewer/?uri=github.com/lauPhilip/au-btech-literature-review-agent)
 [![.NET](https://img.shields.io/badge/.NET-10.0-blue.svg)](https://dotnet.microsoft.com/en-us/download/dotnet/10.0)
 [![Reporting](https://img.shields.io/badge/Reporting-PRISMA%202020-green.svg)](https://prisma-statement.org/)
 [![License](https://img.shields.io/badge/License-Apache%202.0-yellowgreen.svg)](LICENSE)
