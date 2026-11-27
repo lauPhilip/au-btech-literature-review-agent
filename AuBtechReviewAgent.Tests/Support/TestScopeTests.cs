@@ -150,4 +150,66 @@ public class TestScopeTests
         Assert.DoesNotContain("DocPathsTests", Classes(workflow));
         Assert.Contains("DocPathsTests", Classes(mixed));
     }
+
+    /// <summary>Runs a program in a folder and returns its standard output; fails the test on a non-zero exit.</summary>
+    private static string Run(string folder, string program, params string[] args)
+    {
+        var start = new ProcessStartInfo(program)
+        {
+            WorkingDirectory = folder, RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false,
+        };
+        foreach (string arg in args) start.ArgumentList.Add(arg);
+        using var process = Process.Start(start)!;
+        var error = process.StandardError.ReadToEndAsync();
+        string output = process.StandardOutput.ReadToEnd().Trim();
+        process.WaitForExit();
+        Assert.True(process.ExitCode == 0, $"{program} {string.Join(' ', args)} failed: {error.Result}");
+        return output;
+    }
+
+    [Fact]
+    public void BaseMeasuresFromTheMergeBaseSoALongBranchKeepsItsOwnScope()
+    {
+        string? root = Root();
+        if (root == null || OperatingSystem.IsWindows()) return;
+        string repo = Path.Join(Path.GetTempPath(), "scope-base-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            Directory.CreateDirectory(Path.Join(repo, "tools"));
+            Directory.CreateDirectory(Path.Join(repo, "AuBtechReviewAgent.Tests"));
+            File.Copy(Path.Join(root, "tools", "test-scope.sh"), Path.Join(repo, "tools", "test-scope.sh"));
+            File.WriteAllText(Path.Join(repo, "AuBtechReviewAgent.Tests", "OneTests.cs"),
+                "public class OneTests { [Fact] public void A() { } }\n");
+            File.WriteAllText(Path.Join(repo, "README.md"), "start\n");
+            string[] git = { "-c", "user.name=t", "-c", "user.email=t@example.org", "-c", "commit.gpgsign=false" };
+            void Commit(string message) { Run(repo, "git", git.Append("add").Append("-A").ToArray()); Run(repo, "git", git.Append("commit").Append("-q").Append("-m").Append(message).ToArray()); }
+            string Scope(params string[] args) => Run(repo, "bash", new[] { "tools/test-scope.sh" }.Concat(args).ToArray());
+
+            Run(repo, "git", "init", "-q", "-b", "main");
+            Commit("start");
+            Run(repo, "git", "checkout", "-q", "-b", "feature");
+            Directory.CreateDirectory(Path.Join(repo, "AuBtechReviewAgent", "Llm"));
+            File.WriteAllText(Path.Join(repo, "AuBtechReviewAgent", "Llm", "Shared.cs"), "class Shared { }\n");
+            Commit("shared code");
+            string afterShared = Run(repo, "git", "rev-parse", "HEAD");
+            File.WriteAllText(Path.Join(repo, "README.md"), "more\n");
+            Commit("docs");
+            Run(repo, "git", "checkout", "-q", "main");
+            File.WriteAllText(Path.Join(repo, "notes.txt"), "master moved\n");
+            Commit("master moves on");
+            Run(repo, "git", "checkout", "-q", "feature");
+
+            Assert.Equal("ALL", Scope("--base", "main"));
+            Assert.Equal(Scope("main...HEAD"), Scope("--base", "main"));
+            Assert.Equal(Scope("--base=main"), Scope("--base", "main"));
+            Assert.Equal("NONE", Scope("--base", afterShared));
+            Assert.Equal(Scope(afterShared + "...HEAD"), Scope("--base", afterShared));
+        }
+        finally
+        {
+            foreach (string file in Directory.EnumerateFiles(repo, "*", SearchOption.AllDirectories))
+                File.SetAttributes(file, FileAttributes.Normal);
+            Directory.Delete(repo, true);
+        }
+    }
 }

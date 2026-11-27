@@ -6,6 +6,9 @@
 # and, on standard error, one line per changed file saying what it brings in. See CONTRIBUTING.md.
 #
 #   tools/test-scope.sh                      origin/master...HEAD, plus uncommitted and untracked files
+#   tools/test-scope.sh --base <ref>         the same, measured from the merge-base of <ref> and HEAD, so a long-lived
+#                                            branch keeps the scope of its own new work (same as <merge-base sha>...HEAD
+#                                            plus your uncommitted and untracked files)
 #   tools/test-scope.sh <range>              only that range, e.g. HEAD~1..HEAD or <base sha>...HEAD
 #   tools/test-scope.sh --paths < files      the changed paths come from standard input, one a line (tests use it)
 #   tools/test-scope.sh --run [range] [-- dotnet test arguments]   runs the chosen tests too
@@ -19,17 +22,23 @@ tests=AuBtechReviewAgent.Tests
 run=0
 from_stdin=0
 range=""
+base=origin/master
+base_given=0
 extra=()
 while [ $# -gt 0 ]; do
   case $1 in
     --run) run=1 ;;
     --paths) from_stdin=1 ;;
+    --base) [ $# -ge 2 ] || { echo "--base needs a ref" >&2; exit 2; }; base=$2; base_given=1; shift ;;
+    --base=*) base=${1#--base=}; base_given=1 ;;
     --) shift; extra=("$@"); break ;;
-    -h|--help) sed -n '2,13p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    -h|--help) sed -n '2,16p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) range=$1 ;;
   esac
   shift
 done
+
+if [ "$base_given" = 1 ] && [ -n "$range" ]; then echo "Give --base or a range, not both." >&2; exit 2; fi
 
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
@@ -43,7 +52,9 @@ if [ "$from_stdin" = 1 ]; then
 elif [ -n "$range" ]; then
   git diff --name-only --no-renames "$range" > "$work/changed"
 else
-  { git diff --name-only --no-renames origin/master...HEAD
+  # A range A...HEAD diffs against the merge-base already; this spells out what --base chooses.
+  mergebase=$(git merge-base "$base" HEAD) || { echo "No common ancestor of $base and HEAD." >&2; exit 2; }
+  { git diff --name-only --no-renames "$mergebase" HEAD
     git diff --name-only --no-renames HEAD
     git ls-files --others --exclude-standard; } > "$work/changed"
 fi

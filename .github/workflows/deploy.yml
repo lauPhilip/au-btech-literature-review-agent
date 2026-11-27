@@ -1,9 +1,11 @@
 # Deploys the app to Simply. It is called, never run on its own:
-#   - by ci.yml on every push to master, once the build, the tests, the CSS check and the accessibility check pass;
-#   - by release.yml once a version's GitHub release is published, so the build on the server reads the new tag
-#     and its papers name the release (v0.2.1) and not a pre-release (0.2.1-alpha.0.1). See #144.
-# The caller decides whether to deploy (DEPLOY_ENABLED and, for a release, whether the tag is still master's newest
-# commit). Every deploy waits for the one before it, across both workflows (concurrency group deploy-simply).
+#   - by release.yml once a version's GitHub release is published and the tag is the newest version tag, so the
+#     build on the server reads the tag and its papers name the release (v0.2.1) and not a pre-release
+#     (0.2.1-alpha.0.1). See #144 and #707;
+#   - by deploy-manual.yml, which Lau starts by hand to ship master's newest commit before the next release.
+# A merge into master does not deploy. The callers decide whether to deploy (DEPLOY_ENABLED, and for a release
+# whether the tag is the newest version). Every deploy waits for the one before it, across both workflows
+# (concurrency group deploy-simply), and always runs: there is no skip for a change that touched only documentation.
 # Taking the site offline stops every running review, so the "wait" job first waits until none is running
 # (deploy/site_health.py, tested in tools/ReleaseCheck/test_site_health.py). See docs/wiki/06, "Deployment".
 name: Deploy
@@ -28,7 +30,7 @@ env:
   HEALTH_URL: ${{ vars.SITE_HEALTH_URL || 'https://au-btech-literature-review-agent.dk/health' }}
 
 jobs:
-  # Decides whether to deploy, then waits until no review is running. Nothing has changed on the server yet, so a
+  # Waits until no review is running. Nothing has changed on the server yet, so a
   # newer deploy may cancel this one while it waits (cancel-in-progress): only the newest commit is deployed.
   # A run longer than the limit is stopped by the deploy rather than holding back a merged fix.
   wait:
@@ -38,23 +40,12 @@ jobs:
     concurrency:
       group: deploy-simply-wait
       cancel-in-progress: true
-    outputs:
-      deploy: ${{ steps.changes.outputs.deploy || 'true' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0   # to compare the site's commit with this one
 
-      # Only for a push to master: a merge that changed nothing but documentation is not deployed. A release is
-      # always deployed, because the build then names the release (#144). Compared with the commit the site runs,
-      # not the push before, so a docs-only push never drops a code change that a cancelled deploy did not ship.
-      - name: Did anything but documentation change?
-        id: changes
-        if: github.event_name == 'push'
-        run: python3 deploy/site_health.py needs-deploy "$HEALTH_URL" "$GITHUB_SHA"
-
       - name: Wait until no review is running
-        if: steps.changes.outputs.deploy != 'false'
         env:
           WAIT_MINUTES: ${{ vars.DEPLOY_WAIT_MINUTES || inputs.wait-minutes }}
         run: python3 deploy/site_health.py wait-idle "$HEALTH_URL" --minutes "$WAIT_MINUTES"
@@ -62,7 +53,6 @@ jobs:
   deploy:
     name: Deploy to Simply
     needs: wait
-    if: needs.wait.outputs.deploy == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 90
     # Never run two deploys at the same time; a newer push waits for the running one.
