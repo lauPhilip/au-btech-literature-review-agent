@@ -154,4 +154,27 @@ public class HiddenTextTests
         Assert.Equal("1 invisible character and 2 hidden parts of the page", new HiddenTextRemoved(1, 2).ToString());
         Assert.Equal("3 invisible characters", new HiddenTextRemoved(3, 0).ToString());
     }
+
+    // Found by the fuzz tests (#623): a joiner decided on its neighbours before a soft hyphen or tag character between them was taken out.
+    [Theory]
+    [InlineData("a\u00AD\u200D\u00E9", "a\u00E9")]
+    [InlineData("a\uDB40\uDC41\u200D\u00E9", "a\u00E9")]
+    [InlineData("a\u200D\u200D\u00E9", "a\u00E9")]
+    [InlineData("\u00E9\u200D\u200Da", "\u00E9a")]
+    [InlineData("\u00E9\u200D\u200D\u00E9", "\u00E9\u200D\u200D\u00E9")]
+    [InlineData("\u0928\u200D", "\u0928")]
+    public void AJoinerStaysOnlyBetweenTwoCharactersOutsideAsciiOnceTheRestIsOut(string text, string expected)
+    {
+        var clean = HiddenText.RemoveInvisible(text);
+
+        Assert.Equal(expected, clean.Text);
+        Assert.Equal(expected, HiddenText.RemoveInvisible(clean.Text).Text);
+    }
+
+    [Fact]
+    public void ARunOfJoinersRemovedNextToAsciiIsCounted()
+    {
+        Assert.Equal(2, HiddenText.RemoveInvisible("a\u200D\u200D\u00E9").InvisibleCharacters);
+        Assert.Equal(2, HiddenText.RemoveInvisible("a\u00AD\u200D\u00E9\u200B").InvisibleCharacters);
+    }
 }

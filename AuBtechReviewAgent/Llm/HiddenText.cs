@@ -78,15 +78,33 @@ public static partial class HiddenText
                 continue;
             }
             if (c == SoftHyphen) continue;
-            if (c is ZeroWidthNonJoiner or ZeroWidthJoiner && BetweenNonAscii(text, i)) { kept.Append(c); continue; }
+            if (c is ZeroWidthNonJoiner or ZeroWidthJoiner) { kept.Append(c); continue; }
             if (IsInvisible(c)) { removed++; continue; }
             kept.Append(c);
         }
-        return new CleanedText(kept.ToString(), removed, 0, spelled.ToString());
+        string visible = KeepJoinersBetweenNonAscii(kept, ref removed);
+        return new CleanedText(visible, removed, 0, spelled.ToString());
     }
 
-    private static bool BetweenNonAscii(string text, int i) =>
-        i > 0 && i + 1 < text.Length && text[i - 1] > '\u007F' && text[i + 1] > '\u007F';
+    /// <summary>
+    /// Decides on the joiners only after everything else is out, so a soft hyphen or a tag character between a joiner and an
+    /// ASCII character cannot hide that it is next to one (#623). A run of joiners stays only when the character before it
+    /// and the one after it are both outside ASCII, which also makes a second pass change nothing.
+    /// </summary>
+    private static string KeepJoinersBetweenNonAscii(StringBuilder text, ref int removed)
+    {
+        var result = new StringBuilder(text.Length);
+        for (int i = 0; i < text.Length; i++)
+        {
+            if (text[i] is not (ZeroWidthNonJoiner or ZeroWidthJoiner)) { result.Append(text[i]); continue; }
+            int end = i;
+            while (end < text.Length && text[end] is ZeroWidthNonJoiner or ZeroWidthJoiner) end++;
+            if (i > 0 && end < text.Length && text[i - 1] > '\u007F' && text[end] > '\u007F') result.Append(text.ToString(i, end - i));
+            else removed += end - i;
+            i = end - 1;
+        }
+        return result.ToString();
+    }
 
     /// <summary>
     /// The full text of a paper (its chunks) with invisible characters removed, the count, and the text they spelled.
