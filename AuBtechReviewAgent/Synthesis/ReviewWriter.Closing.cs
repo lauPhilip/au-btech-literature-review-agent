@@ -44,7 +44,8 @@ public static partial class ReviewWriter
         IReadOnlyList<string>? researchQuestions = null, IReadOnlyCollection<string>? unanswered = null, IReadOnlyList<string>? givenAnswers = null,
         IReadOnlyList<AnswerCertainty>? certainty = null)
     {
-        string results = string.Join("\n\n", sections.Select(x => $"### {x.Heading}\n{x.Text}")) + $"\n\n### Discussion\n{discussion}";
+        string results = string.Join("\n\n", sections.Select(x => $"### {x.Heading}\n{x.Text}"))
+            + (string.IsNullOrWhiteSpace(discussion) ? "" : $"\n\n### Discussion\n{discussion}"); // none when it could not be written (issue #723)
         var all = (researchQuestions ?? Array.Empty<string>()).Select((q, i) => (Id: QuestionId(i, profile), Text: q)).ToList();
         var given = all.Count > 0 && givenAnswers?.Count == all.Count ? givenAnswers : null;
         bool InCode((string Id, string Text) q) => given != null || unanswered?.Contains(q.Id) == true;

@@ -32,10 +32,28 @@ public static partial class ReviewWriter
     {
         if (certainty == null || !certainty.Any(c => c.Level != null)) return "";
         string hedged = "with hedged words such as \"suggest\", \"may\" or \"point to\", never \"show that\", \"demonstrate\", \"prove\", \"establish\", \"confirm\", \"require\" or \"must\"";
-        return NoHighCertainty(certainty)
+        return (NoHighCertainty(certainty)
             ? $" No answer is of high certainty, so {part} states every general claim {hedged}."
-            : $" In {part}, a claim that rests on an answer of high certainty may be stated firmly; a claim that rests on an answer of moderate, low or very low certainty is stated {hedged}.";
+            : $" In {part}, a claim that rests on an answer of high certainty may be stated firmly; a claim that rests on an answer of moderate, low or very low certainty is stated {hedged}.") + " " + ReportedFactRule;
     }
+
+    /// <summary>
+    /// The prompt rule that keeps a source's report on its own sample out of the hedge (issue #726): run 34d1af9a wrote
+    /// "No evaluated platform may combine ...", which reads as a ban, for "none of the platforms it evaluated combined ...".
+    /// </summary>
+    public const string ReportedFactRule =
+        "What a source reports about its own sample, such as that none of the tools it evaluated did something, is a fact, not a general claim: state it plainly in the past tense (\"none of the evaluated platforms combined ...\"), and never write \"no ... may\".";
+
+    // "No evaluated platform may combine", "none of the tools may": an absence hedged into what reads as a ban.
+    private static readonly Regex HedgedAbsence = new(
+        @"\b(?:no|none\s+of\s+(?:the|these|those|its|their))\s+(?:(?!(?:that|which|whether|if)\b)[\p{L}-]+\s+){0,4}?may\b",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+    /// <summary>The first sentence that hedges a reported absence into "no ... may", or null (issue #726). Public for unit tests.</summary>
+    public static string? HedgedAbsenceProblem(string? text, string part) =>
+        CitationSupportChecker.SplitSentences(text ?? "").FirstOrDefault(s => HedgedAbsence.IsMatch(s)) is { } sentence
+            ? $"{part}: \"{sentence.Trim()}\" reads as a ban (\"no ... may\"). If a source reports that none of what it studied did this, say so plainly in the past tense: \"none of the evaluated ... combined ...\"."
+            : null;
 
     // A verb that states a claim as settled ("show that", "demonstrate", "requires").
     private static readonly Regex StrongClaim = new(
@@ -52,7 +70,7 @@ public static partial class ReviewWriter
         foreach (var sentence in CitationSupportChecker.SplitSentences(text ?? ""))
             if (StrongClaim.Match(sentence) is { Success: true } verb)
                 return $"{part}: \"{sentence.Trim()}\" states a claim as settled (\"{verb.Value}\"), but no answer is of high certainty ({string.Join(", ", certainty!.Select(c => $"{c.Question} {c.Level ?? "not rated"}"))}); write \"suggest\" or \"may\" instead.";
-        return null;
+        return HedgedAbsenceProblem(text, part);
     }
 
     /// <summary>The prompt rule against reporting a count of zero.</summary>

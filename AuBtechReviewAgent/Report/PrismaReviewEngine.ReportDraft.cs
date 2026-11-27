@@ -121,9 +121,12 @@ public partial class PrismaReviewEngine
                 thematic = await thematicTask;
                 finalState.ThematicSynthesis = thematic.Codebook;
             }
-            bool useThematic = thematic != null && thematic.Sections.Count > 0 && !string.IsNullOrWhiteSpace(thematic.Discussion);
+            // Checked theme subsections are kept when the discussion was not written; the paper says so (issue #723).
+            bool useThematic = thematic != null && thematic.Sections.Count > 0;
+            if (useThematic && string.IsNullOrWhiteSpace(thematic!.Discussion))
+                (thematic.Codebook.WritingNotes ??= new()).Add(DiscussionUnwrittenNote);
             if (thematic != null && !useThematic && thematic.Codebook.FallbackReason == null)
-                thematic.Codebook.FallbackReason = "the discussion could not be written from the theme subsections";
+                thematic.Codebook.FallbackReason = "no theme subsection could be written";
 
             var run = new ReportRun
             {

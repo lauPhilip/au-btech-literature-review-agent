@@ -29,7 +29,11 @@ public static class ProseCleaner
     private static readonly Regex ListItem = new(@"^\s{0,6}(?:[-*+•]|\d{1,2}[.)])\s+(.*)$", RegexOptions.Compiled);
     private static readonly Regex TableSeparator = new(@"^\s*\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)+\|?\s*$", RegexOptions.Compiled);
 
-    public static (string Text, List<FormattingChange> Changes) Clean(string? text, string field)
+    /// <summary>
+    /// The text as plain prose. <paramref name="source"/> is the word for one cited work ("study", "source"), used when a
+    /// sentence opens with a bare marker.
+    /// </summary>
+    public static (string Text, List<FormattingChange> Changes) Clean(string? text, string field, string source = "study")
     {
         var changes = new List<FormattingChange>();
         if (string.IsNullOrWhiteSpace(text)) return (text ?? "", changes);
@@ -102,6 +106,7 @@ public static class ProseCleaner
         result = Regex.Replace(result, @"(?<=\s|^)#{1,6}\s+", "");                     // a heading marker left inside a line
         result = MethodsSectionWriter.StripMarkdownEmphasis(result);
         result = Regex.Replace(result, @"[ \t]{2,}", " ");
+        result = CitationForm(result, field, source, changes);
         // Walk the sentences in order and copy the text between them unchanged, so paragraph breaks stay.
         var once = new StringBuilder(result.Length);
         int copied = 0;
@@ -119,6 +124,34 @@ public static class ProseCleaner
     }
 
     private static readonly Regex Marker = new(@"\s*\[(\d+(?:\s*[,–-]\s*\d+)*)\]", RegexOptions.Compiled);
+
+    // A marker written onto a word: "economics[4]".
+    private static readonly Regex GluedMarker = new(@"(?<=[\p{L}\p{N}])(?=\[\d+(?:\s*[,–-]\s*\d+)*\])", RegexOptions.Compiled);
+
+    // A marker that opens a sentence as its subject: "... value. [9] describes". Not after "et al.", "e.g." or "i.e.".
+    private static readonly Regex OpeningMarker = new(
+        @"(?<=(?:^|\n|(?<!\bal|\be\.g|\bi\.e)[.!?]["")]?[ \t]+))\[(\d+(?:\s*[,–-]\s*\d+)*)\](?=[ \t]+\p{Ll})", RegexOptions.Compiled);
+
+    /// <summary>
+    /// How the citations of a text are written (issue #725): markers side by side become one ("[9][2][11]" -> "[2, 9, 11]"),
+    /// a marker gets a space before it, and a sentence that opens with a bare marker names what it is ("[9] describes" ->
+    /// "Study [9] describes"), as the rule "name a study by its marker" asks. Each change is listed.
+    /// </summary>
+    private static string CitationForm(string text, string field, string source, List<FormattingChange> changes)
+    {
+        string merged = CitationMarkers.MergeAdjacent(text);
+        if (merged != text) changes.Add(new FormattingChange(field, "citations side by side merged", text));
+        string spaced = GluedMarker.Replace(merged, " ");
+        if (spaced != merged) changes.Add(new FormattingChange(field, "space put before a citation", merged));
+        string named = OpeningMarker.Replace(spaced, m =>
+        {
+            string word = CitationSupportChecker.ReferencesIn(m.Value).Count < 2 ? source
+                : source.EndsWith('y') ? source[..^1] + "ies" : source + "s";
+            return char.ToUpperInvariant(word[0]) + word[1..] + " " + m.Value;
+        });
+        if (named != spaced) changes.Add(new FormattingChange(field, "citation that opened a sentence named", spaced));
+        return named;
+    }
 
     /// <summary>
     /// Removes the citation at the end of a sentence for a study the sentence already names, so "[5] warns that X [5]."
