@@ -41,7 +41,8 @@ internal sealed class ApiTestHost : WebApplicationFactory<Program>
     /// <summary>Set when the model is first asked; with a gate, the model then waits until the gate opens.</summary>
     public ManualResetEventSlim ModelEntered { get; } = new(false);
 
-    public ApiTestHost(bool? enabled = true, string environment = "Development", ManualResetEventSlim? gate = null)
+    /// <param name="papers">Papers the fake sources return besides their usual ones, such as an attack paper.</param>
+    public ApiTestHost(bool? enabled = true, string environment = "Development", ManualResetEventSlim? gate = null, AcademicPaper[]? papers = null)
     {
         _enabled = enabled;
         _environment = environment;
@@ -58,7 +59,7 @@ internal sealed class ApiTestHost : WebApplicationFactory<Program>
                     return PipelineTests.Respond(prompt);
                 });
             },
-            SourceFactory = _ => new PipelineTests.FakeSource(),
+            SourceFactory = _ => new PipelineTests.FakeSource(papers ?? Array.Empty<AcademicPaper>()),
             FullTextFetcher = (_, _) => Task.FromResult(new FullTextResult(Array.Empty<DocumentChunk>(), "none (test)", null)),
         };
     }
