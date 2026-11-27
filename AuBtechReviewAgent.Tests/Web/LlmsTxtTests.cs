@@ -51,7 +51,7 @@ public partial class LlmsTxtTests
         var links = Links().Matches(text).Select(m => new Uri(m.Groups[1].Value)).ToList();
 
         string[] ownPaths = links.Where(u => u.Host == client.BaseAddress!.Host).Select(u => u.AbsolutePath).ToArray();
-        Assert.Equal(new[] { "/", "/start", "/glossary", "/about", "/docs/api", "/openapi/v1.json", "/mcp" }, ownPaths);
+        Assert.Equal(new[] { "/", "/start", "/glossary", "/about", "/docs/api", "/openapi/v1.json", "/mcp", "/docs" }, ownPaths);
         foreach (string path in ownPaths)
         {
             // The MCP server is stateless and answers only a POST (a GET is 404), so it is asked to initialise.

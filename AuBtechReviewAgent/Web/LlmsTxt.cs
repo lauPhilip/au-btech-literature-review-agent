@@ -28,6 +28,7 @@ public static class LlmsTxt
             Link(sb, baseUrl, "MCP server", "/mcp", "the same functions as MCP tools");
         }
         sb.Append("\n## Source and citation\n\n");
+        Link(sb, baseUrl, "Developer wiki", WikiDocs.BasePath, "how the code fits together, page by page; the canonical address to cite");
         sb.Append("- [Repository](").Append(SiteSeo.RepositoryUrl).Append("): the open-source code and the developer wiki\n");
         sb.Append("- [DOI](https://doi.org/").Append(SiteSeo.ConceptDoi).Append("): the concept DOI on Zenodo, which always resolves to the newest version\n");
         return sb.ToString();
