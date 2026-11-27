@@ -114,7 +114,7 @@ public class ReviewComposerTests
         Assert.Contains("aria-expanded=\"false\" aria-controls=\"criteria-body\" aria-label=\"Show the criteria\" class=\"lg:hidden", html);
         Assert.Contains("aria-expanded=\"true\" aria-controls=\"criteria-body\" aria-label=\"Fold the criteria\" class=\"hidden lg:inline-flex", html);
         Assert.Contains("lg:hidden\" data-criteria-summary", html);
-        foreach (var group in new[] { ">Scope</legend>", ">Include and exclude</legend>", ">Visual summary " })
+        foreach (var group in new[] { ">Scope</legend>", ">Include and exclude</legend>", ">Visual summary<" })
             Assert.Contains(group, html);
         Assert.DoesNotContain("max-sm:fixed", html);
     }
@@ -130,7 +130,7 @@ public class ReviewComposerTests
         Assert.Contains("aria-expanded=\"true\"", open);
 
         string folded = await RenderAsync<CriteriaPanel>(new UiStateContainer(), new() { ["Open"] = (bool?)false, ["SourceAvailability"] = OpenSourcesOnly });
-        Assert.Contains("id=\"criteria-body\" class=\"hidden space-y-6", folded);
+        Assert.Contains("id=\"criteria-body\" class=\"hidden space-y-3", folded);
         Assert.Contains("aria-expanded=\"false\"", folded);
         Assert.DoesNotContain("max-sm:fixed", folded);
     }
@@ -163,8 +163,8 @@ public class ReviewComposerTests
         Assert.Contains("id=\"f-sources\" tabindex=\"-1\"", html);
         foreach (var source in SourceCatalog.All.Where(s => OpenSourcesOnly[s.Key]))
             Assert.Contains(source.DisplayName, html);
-        Assert.Contains(">Add a key for Scopus or IEEE</button>", html);
-        Assert.Contains("id=\"f-inclusion\" rows=\"3\" aria-required=\"true\" aria-describedby=\"h-inclusion\" aria-invalid=\"true\"", html);
+        Assert.Contains("aria-label=\"Add a key for Scopus or IEEE\"", html);
+        Assert.Contains("id=\"f-inclusion\" rows=\"2\" aria-required=\"true\" aria-describedby=\"h-inclusion\" aria-invalid=\"true\"", html);
         Assert.Contains("id=\"f-exclusion\"", html);
         Assert.Equal(ArtifactKinds.All.Count, Count(html, "<option value="));
         Assert.Contains("id=\"f-artifact-kind\"", html);

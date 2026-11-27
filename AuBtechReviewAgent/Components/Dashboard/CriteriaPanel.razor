@@ -14,7 +14,7 @@
     string sheet = Open == true ? "max-sm:fixed max-sm:inset-0 max-sm:z-50 max-sm:overflow-y-auto max-sm:rounded-none max-sm:border-0" : "";
 }
 <section id="criteria" class="ui-card min-w-0 @sheet" aria-labelledby="criteria-title" data-open="@(Open?.ToString().ToLowerInvariant() ?? "auto")">
-    <div class="flex items-start gap-3 px-4 pb-3 pt-4 sm:px-5">
+    <div class="flex items-center gap-3 px-4 py-1 sm:px-5">
         <div class="min-w-0 flex-1">
             <h2 id="criteria-title" class="font-display text-base font-semibold text-heading">Criteria</h2>
             <p class="mt-0.5 text-sm text-muted @summary" data-criteria-summary>@Summary()</p>
@@ -31,23 +31,26 @@
         }
     </div>
 
-    <div id="criteria-body" class="@body space-y-6 border-t border-line px-4 pb-5 pt-4 sm:px-5">
-        <fieldset class="space-y-3">
-            <legend class="mb-2 font-display text-sm font-semibold text-heading">Scope</legend>
+    <div id="criteria-body" class="@body space-y-3 border-t border-line px-4 pb-4 pt-3 sm:px-5">
+        @* The groups' legends are for screen readers only; each field's own label is enough to see (issue #728). *@
+        <fieldset class="space-y-2">
+            <legend class="sr-only">Scope</legend>
             <div>
-                <span id="l-years" class="ui-label">Publication years</span>
-                <div class="flex items-center gap-2" role="group" aria-labelledby="l-years">
-                    <input type="number" aria-label="From year" min="1900" max="@DateTime.UtcNow.Year" @bind="YearFrom" @bind:after="Changed" class="ui-input w-28" />
-                    <span class="text-muted" aria-hidden="true">–</span>
-                    <input type="number" aria-label="To year" min="1900" max="@DateTime.UtcNow.Year" @bind="YearTo" @bind:after="Changed" class="ui-input w-28" />
+                <div class="flex items-center justify-between gap-3">
+                    <span id="l-years" class="ui-label mb-0">Publication years</span>
+                    <div class="flex items-center gap-2" role="group" aria-labelledby="l-years">
+                        <input type="number" aria-label="From year" min="1900" max="@DateTime.UtcNow.Year" @bind="YearFrom" @bind:after="Changed" class="ui-input w-24" />
+                        <span class="text-muted" aria-hidden="true">–</span>
+                        <input type="number" aria-label="To year" min="1900" max="@DateTime.UtcNow.Year" @bind="YearTo" @bind:after="Changed" class="ui-input w-24" />
+                    </div>
                 </div>
-                <div class="mt-2 flex flex-wrap gap-1.5">
+                <div class="mt-1.5 flex flex-wrap gap-1.5">
                     @foreach (var (label, from) in YearPresets)
                     {
                         int start = from;
                         bool chosen = YearFrom == start && YearTo == DateTime.UtcNow.Year;
                         <button type="button" @onclick="() => SetYears(start)" aria-pressed="@(chosen ? "true" : "false")"
-                                class="min-h-[32px] rounded-full border px-3 py-1 text-xs @(chosen ? "border-heading bg-active text-heading" : "border-line-field text-muted hover:bg-soft")">@label</button>
+                                class="min-h-[32px] border px-3 py-1 text-xs @(chosen ? "border-heading bg-active text-heading" : "border-line-field text-muted hover:bg-soft")">@label</button>
                     }
                 </div>
             </div>
@@ -73,19 +76,20 @@
                             }
                         </label>
                     }
+                    @if (MissingKeys() is { } missing)
+                    {
+                        <button type="button" @onclick="OnOpenKeys" aria-label="@($"Add a key for {missing}")"
+                                class="inline-flex min-h-[44px] items-center border border-dashed border-line-field px-3 text-sm text-muted hover:bg-soft hover:text-heading">+ Key for @missing</button>
+                    }
                 </div>
-                @if (MissingKeys() is { } missing)
-                {
-                    <button type="button" @onclick="OnOpenKeys" class="mt-1 min-h-[44px] text-xs font-medium text-muted underline underline-offset-2 hover:text-heading">Add a key for @missing</button>
-                }
             </div>
         </fieldset>
 
-        <fieldset class="space-y-3">
-            <legend class="mb-2 font-display text-sm font-semibold text-heading">Include and exclude</legend>
+        <fieldset class="space-y-2">
+            <legend class="sr-only">Include and exclude</legend>
             <div>
                 <label for="f-inclusion" class="ui-label">Include studies that… <span class="font-normal text-muted">(required)</span></label>
-                <textarea id="f-inclusion" rows="3" aria-required="true" aria-describedby="h-inclusion" aria-invalid="@FieldHelp.Invalid(InputCheck, "Inclusion criteria")"
+                <textarea id="f-inclusion" rows="2" aria-required="true" aria-describedby="h-inclusion" aria-invalid="@FieldHelp.Invalid(InputCheck, "Inclusion criteria")"
                           maxlength="@AuBtechReviewAgent.ReviewInputGuard.MaxCriteria"
                           @bind="State.InclusionCriteria" @bind:event="oninput" @bind:after="Changed"
                           placeholder="e.g. describe or evaluate an agent framework, with some form of evaluation" class="ui-input resize-y"></textarea>
@@ -104,15 +108,18 @@
         @* One native select instead of six tiles (issue #730): it works by keyboard and screen reader as it is, and
            the note shows only for Custom, or when it holds the reviewer's own words (an example or a draft). *@
         <fieldset id="f-artifact">
-            <legend class="mb-2 font-display text-sm font-semibold text-heading">Visual summary <Term Key="artifact" Icon="true" /></legend>
-            <select id="f-artifact-kind" aria-label="Visual summary" data-fit-control disabled="@Busy"
-                    @onchange="e => ChooseArtifact(e.Value?.ToString())" class="ui-input min-h-[44px]">
-                @foreach (var kind in AuBtechReviewAgent.ArtifactKinds.All)
-                {
-                    var key = kind.Key;
-                    <option value="@key" selected="@(State.ArtifactKind == key)">@ShortLabel(key)</option>
-                }
-            </select>
+            <legend class="sr-only">Visual summary</legend>
+            <div class="flex items-center gap-2">
+                <span class="font-display text-sm font-semibold text-heading" aria-hidden="true">Visual summary</span><Term Key="artifact" Icon="true" />
+                <select id="f-artifact-kind" aria-label="Visual summary" data-fit-control disabled="@Busy"
+                        @onchange="e => ChooseArtifact(e.Value?.ToString())" class="ui-input ml-auto min-h-[44px] w-auto min-w-[12rem]">
+                    @foreach (var kind in AuBtechReviewAgent.ArtifactKinds.All)
+                    {
+                        var key = kind.Key;
+                        <option value="@key" selected="@(State.ArtifactKind == key)">@ShortLabel(key)</option>
+                    }
+                </select>
+            </div>
             @if (DirectiveShown)
             {
                 <textarea id="f-directive" rows="2" aria-label="What the visual summary should show" aria-describedby="h-directive" aria-invalid="@FieldHelp.Invalid(InputCheck, "Artifact target")"

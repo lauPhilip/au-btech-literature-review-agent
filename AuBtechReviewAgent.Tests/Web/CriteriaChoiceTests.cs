@@ -32,6 +32,19 @@ public class CriteriaChoiceTests
         Assert.DoesNotContain("id=\"f-directive\"", html);
     }
 
+    [Fact]
+    public async Task TheGroupLegendsAreForScreenReadersAndTheYearPresetsAreSquare()
+    {
+        string html = await RenderAsync(new UiStateContainer(), OpenSourcesOnly);
+
+        foreach (var legend in new[] { "Scope", "Include and exclude", "Visual summary" })
+            Assert.Contains($"<legend class=\"sr-only\">{legend}</legend>", html);
+        Assert.Contains("<span id=\"l-years\" class=\"ui-label mb-0\">Publication years</span>", html);
+        Assert.Contains("class=\"min-h-[32px] border px-3", html);
+        Assert.DoesNotContain("rounded-full", html);
+        Assert.Contains("id=\"f-inclusion\" rows=\"2\"", html);
+    }
+
     [Theory]
     [InlineData(ArtifactKinds.Custom, "", true)]
     [InlineData(ArtifactKinds.ConceptMap, null, false)]
@@ -52,10 +65,13 @@ public class CriteriaChoiceTests
         Assert.DoesNotContain("Scopus / ScienceDirect", html);
         Assert.DoesNotContain("IEEE Xplore", html);
         Assert.DoesNotContain("(needs key)", html);
-        Assert.Contains(">Add a key for Scopus or IEEE</button>", html);
+        // The link is one more chip in the row, and says in full what it does to a screen reader.
+        Assert.Contains("aria-label=\"Add a key for Scopus or IEEE\"", html);
+        Assert.Contains(">+ Key for Scopus or IEEE</button>", html);
+        Assert.Contains("border-dashed", html);
         // Square chips, each a 44 px target; the yellow status box under them is gone.
         Assert.Contains("inline-flex min-h-[44px] cursor-pointer", html);
-        Assert.DoesNotContain("rounded", html[html.IndexOf("id=\"f-sources\"", StringComparison.Ordinal)..html.IndexOf("Add a key", StringComparison.Ordinal)]);
+        Assert.DoesNotContain("rounded", html[html.IndexOf("id=\"f-sources\"", StringComparison.Ordinal)..html.IndexOf("</fieldset>", StringComparison.Ordinal)]);
         Assert.DoesNotContain("Database status:", html);
     }
 
@@ -70,7 +86,7 @@ public class CriteriaChoiceTests
         Assert.DoesNotContain("Add a key for", html);
 
         var onlyIeeeMissing = SourceCatalog.All.ToDictionary(s => s.Key, s => s.KeyKind != SourceKeyKind.Ieee);
-        Assert.Contains(">Add a key for IEEE</button>", await RenderAsync(new UiStateContainer(), onlyIeeeMissing));
+        Assert.Contains("aria-label=\"Add a key for IEEE\"", await RenderAsync(new UiStateContainer(), onlyIeeeMissing));
     }
 
     private static int Count(string text, string part)
