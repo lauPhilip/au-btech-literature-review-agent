@@ -22,7 +22,7 @@ public class RobotsPolicyTests
             if (line.Length == 0 || line.StartsWith('#') || line.StartsWith("Sitemap:", StringComparison.Ordinal)) continue;
             if (line.StartsWith("User-agent:", StringComparison.Ordinal))
             {
-                if (rules != null) { agents = null; rules = null; }
+                if (rules is { Count: > 0 }) { agents = null; rules = null; }
                 if (agents == null) { agents = new(); rules = new(); groups.Add((agents, rules)); }
                 agents.Add(line["User-agent:".Length..].Trim());
             }

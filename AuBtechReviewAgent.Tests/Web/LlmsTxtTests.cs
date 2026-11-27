@@ -1,6 +1,7 @@
 using System;
 using System.Linq;
 using System.Net;
+using System.Net.Http;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Xunit;
@@ -13,6 +14,18 @@ public partial class LlmsTxtTests
 {
     [GeneratedRegex(@"\]\((https?://[^)\s]+)\)")]
     private static partial Regex Links();
+
+    private static HttpRequestMessage Initialize()
+    {
+        var request = new HttpRequestMessage(HttpMethod.Post, "/mcp")
+        {
+            Content = new StringContent("{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"params\":{\"protocolVersion\":\"2025-03-26\",\"capabilities\":{},\"clientInfo\":{\"name\":\"llms-test\",\"version\":\"1\"}}}",
+                System.Text.Encoding.UTF8, "application/json"),
+        };
+        request.Headers.Accept.ParseAdd("application/json");
+        request.Headers.Accept.ParseAdd("text/event-stream");
+        return request;
+    }
 
     [Fact]
     public async Task It_is_served_at_the_root_as_plain_text_with_the_name_the_repository_and_the_DOI()
@@ -41,7 +54,8 @@ public partial class LlmsTxtTests
         Assert.Equal(new[] { "/", "/start", "/glossary", "/about", "/docs/api", "/openapi/v1.json", "/mcp" }, ownPaths);
         foreach (string path in ownPaths)
         {
-            var status = (await client.GetAsync(path)).StatusCode;
+            // The MCP server is stateless and answers only a POST (a GET is 404), so it is asked to initialise.
+            var status = path == "/mcp" ? (await client.SendAsync(Initialize())).StatusCode : (await client.GetAsync(path)).StatusCode;
             Assert.True(status != HttpStatusCode.NotFound, $"{path} answered 404");
         }
         Assert.Equal(new[] { "github.com", "doi.org" }, links.Where(u => u.Host != client.BaseAddress!.Host).Select(u => u.Host));
