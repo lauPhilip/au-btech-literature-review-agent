@@ -28,17 +28,15 @@ Version 0.6.0 is in [docs/changelog-0.6.md](docs/changelog-0.6.md), and versions
 
 ### 🌟 Patch highlights
 
-The Decision log on a systematic paper now downloads the run's full ledger as JSON. The model is now called in the EU. A new systematic run gives the same results as 0.7.0, and a multivocal summary can be worded a little differently.
+The Decision log on a systematic paper now downloads the run's full ledger as JSON. A server can now choose to call the model in the EU. A new systematic run gives the same results as 0.7.0, and a multivocal summary can be worded a little differently.
 
 ### 🔬 Systematic review
 
 #### Language model
 
-> The tool called Mistral's global address, which does not say where your text is processed.
+> Mistral's EU address costs 10% more on every call, so it is a choice for the server, not the default.
 
-- **Mistral address**: api.mistral.ai (no region) ⇒ api.eu.mistral.ai (processed in the EU)
-- The multivocal review and your own Mistral key use the EU address too. Mistral charges 10% more for it.
-- A server can choose the global address again with Llm:MistralBaseUrl, for a model the EU address does not serve.
+- A server can now send its model calls to Mistral's EU address with Llm:MistralBaseUrl, so your text is processed in the EU. It costs 10% more.
 
 ### 🧭 Multivocal review (preview)
 
