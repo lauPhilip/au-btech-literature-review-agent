@@ -24,6 +24,19 @@ public class SiteSeoTests
     }
 
     [Fact]
+    public void TheWikiPagesFollowThePublicPagesInTheSitemap()
+    {
+        XNamespace ns = "http://www.sitemaps.org/schemas/sitemap/0.9";
+        var doc = XDocument.Parse(SiteSeo.SitemapXml(Base, new DateTime(2026, 11, 27, 0, 0, 0, DateTimeKind.Utc), WikiDocs.SitemapPages));
+        var locs = doc.Descendants(ns + "loc").Select(e => e.Value).ToList();
+
+        Assert.Equal(SiteSeo.IndexedPages.Count + WikiDocs.Pages.Count, locs.Count);
+        Assert.Equal(Base + "/docs", locs[SiteSeo.IndexedPages.Count]);
+        Assert.Contains(Base + "/docs/01-system-overview", locs);
+        Assert.All(doc.Descendants(ns + "url"), url => Assert.Equal("2026-11-27", url.Element(ns + "lastmod")?.Value));
+    }
+
+    [Fact]
     public void EveryPageInTheSitemapHasTheDayTheVersionWasBuilt()
     {
         XNamespace ns = "http://www.sitemaps.org/schemas/sitemap/0.9";
