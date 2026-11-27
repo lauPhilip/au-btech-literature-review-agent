@@ -54,7 +54,8 @@ public static partial class ReviewWriter
 
     /// <summary>
     /// The sentences of later subsections that say again what an earlier subsection says (the same source cited, and most
-    /// of the words the same, <see cref="SaysAgain"/>), each with the heading of the subsection that says it first. Public for unit tests.
+    /// of the words the same, <see cref="SaysAgain"/>, or the same result figure with its unit, such as "34 %", issue #674),
+    /// each with the heading of the subsection that says it first. Public for unit tests.
     /// </summary>
     public static IReadOnlyList<(string Field, string Sentence, string EarlierHeading)> RepeatedClaims(IReadOnlyList<SynthesisSection> sections)
     {
@@ -64,7 +65,7 @@ public static partial class ReviewWriter
         {
             var own = CitationSupportChecker.SplitSentences(section.Text).Select(s => (Sentence: s, Refs: CitationSupportChecker.ReferencesIn(s))).ToList();
             foreach (var (sentence, refs) in own.Where(x => x.Refs.Count > 0))
-                if (earlier.FirstOrDefault(e => e.Refs.Intersect(refs).Any() && SaysAgain(sentence, e.Sentence)) is { Heading: { } heading })
+                if (earlier.FirstOrDefault(e => e.Refs.Intersect(refs).Any() && (SaysAgain(sentence, e.Sentence) || UnitFigures(sentence).Overlaps(UnitFigures(e.Sentence)))) is { Heading: { } heading })
                     repeats.Add((section.Field, sentence, heading));
             earlier.AddRange(own.Where(x => x.Refs.Count > 0).Select(x => (x.Sentence, x.Refs, section.Heading)));
         }
