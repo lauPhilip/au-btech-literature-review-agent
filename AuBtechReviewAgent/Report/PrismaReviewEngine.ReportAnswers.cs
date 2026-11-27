@@ -41,6 +41,17 @@ public partial class PrismaReviewEngine
         return why + answers;
     }
 
+    /// <summary>
+    /// What the paper says, in code, in place of a discussion that failed its checks on every try (issue #723). The theme
+    /// subsections are kept: in run 34d1af9a one failed discussion threw them away, and the paper lost its results.
+    /// </summary>
+    public const string DiscussionUnwrittenText =
+        "The discussion could not be written: the language model's answer failed the checks in code on every try. The results by theme above and the sections below stand without it.";
+
+    /// <summary>The note on file, in thematic-codebook.json, when the discussion was not written.</summary>
+    private const string DiscussionUnwrittenNote =
+        "The discussion was not written; the theme subsections were kept and the paper says so in place of the discussion.";
+
     /// <summary>Notes on file, in thematic-codebook.json, why the closing parts or the written answers are missing.</summary>
     private static void NoteMissingClosing(ReportRun run)
     {

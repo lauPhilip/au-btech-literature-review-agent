@@ -256,7 +256,7 @@ public partial class PrismaReviewEngine
                     : $" The requested artifact could not be built: {artifact.Error}"),
             Artifact = artifact,
             CoverageSummary = coverage.Sentence,
-            DiscussionItem = cleanDiscussionValidated,
+            DiscussionItem = string.IsNullOrWhiteSpace(cleanDiscussionValidated) && useThematic ? DiscussionUnwrittenText : cleanDiscussionValidated,
             EvidenceLimitationsItem = closing == null ? "" : textOf["evidenceLimitationsItem"],
             ReviewLimitationsItem = (MethodsSectionWriter.ReviewProcessLimitations(finalState, Llm.DisplayNameFor("screening"), Llm.DisplayName) + " " +
                 SearchAdequacy.LimitationSentence(finalState)).Trim(),

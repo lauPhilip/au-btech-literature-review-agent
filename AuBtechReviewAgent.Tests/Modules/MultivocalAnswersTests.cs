@@ -29,8 +29,8 @@ public class MultivocalAnswersTests : IDisposable
 
         var (paper, _) = await MultivocalWriter.WritePaperAsync(model, input, Kept, "fake-model", parallelism: 1);
 
-        // Tried again once, each try with the shared repairs, before the paper says so.
-        Assert.Equal(MultivocalWriter.DiscussionTries * 3, model.Prompts.Count(p => p.Contains("You are writing the Discussion section")));
+        // Tried again once, each try with the shared repairs (one more than the soft budget, issue #723), before the paper says so.
+        Assert.Equal(MultivocalWriter.DiscussionTries * (ReviewWriter.FigureSendBacks + 2), model.Prompts.Count(p => p.Contains("You are writing the Discussion section")));
         Assert.Contains(paper.Notes, n => n.Contains("written again, once"));
         Assert.Equal("", paper.Discussion);
         Assert.Null(paper.PeerReview);

@@ -28,7 +28,7 @@ Version 0.6.0 is in [docs/changelog-0.6.md](docs/changelog-0.6.md), and versions
 
 ### 🌟 Patch highlights
 
-The Decision log on a systematic paper now downloads the run's full ledger as JSON. A server can now choose to call the model in the EU. A new systematic run gives the same results as 0.7.0, and a multivocal summary can be worded a little differently.
+The Decision log on a systematic paper now downloads the run's full ledger as JSON. A server can now choose to call the model in the EU. A systematic paper no longer loses its theme sections when the discussion fails. Otherwise a new systematic run gives the same results as 0.7.0, and a multivocal summary can be worded a little differently.
 
 ### 🔬 Systematic review
 
@@ -37,6 +37,14 @@ The Decision log on a systematic paper now downloads the run's full ledger as JS
 > Mistral's EU address costs 10% more on every call, so it is a choice for the server, not the default.
 
 - A server can now send its model calls to Mistral's EU address with Llm:MistralBaseUrl, so your text is processed in the EU. It costs 10% more.
+
+#### Discussion
+
+> One failed discussion threw away three finished theme sections, so the paper had no results by theme and no conclusion.
+
+- **Failed discussion**: the themes dropped for a one-pass overview ⇒ the themes kept, and the paper says the discussion is missing
+- The discussion gets one more try, so a sentence with too many references is still fixed after two other send-backs. The multivocal discussion gets it too.
+- The conclusion, limitations and answers are still written from the themes.
 
 ### 🧭 Multivocal review (preview)
 
