@@ -90,7 +90,7 @@ public class AbstractCountsTests : IDisposable
         List<string> prompts;
         lock (model.Prompts) prompts = model.Prompts.ToList();
         string front = prompts.First(p => p.Contains("You are writing the title, abstract, rationale and objectives"));
-        Assert.Contains("Records identified: 3; duplicates removed: 0; removed because their publication year was outside the year range (2025 to 2026): 1; records screened: 2;", front);
+        Assert.Contains("Records identified: 3; no duplicates were found; removed because their publication year was outside the year range (2025 to 2026): 1; records screened: 2;", front);
         Assert.Contains("Wherever both the records identified and the records screened are given, every removal between them is given too", front);
         Assert.Contains(prompts, p => p.Contains("YOUR PREVIOUS ANSWER WAS REJECTED: the abstract gives the 3 records identified and the 2 screened but leaves out the records outside the year range (1)"));
 
