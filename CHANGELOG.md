@@ -21,6 +21,22 @@ Each `###` heading has exactly one emoji, at its start, and no emoji appears any
 
 ## [Unreleased]
 
+> **Dev note:** The Decision log button used to hand you a list of screened records. Now it gives you the whole log of the run, every step and why it was taken.
+> — The TraceableAI team
+
+### 🌟 Patch highlights
+
+The Decision log on a systematic paper now downloads the run's full ledger as JSON. A new run gives the same results as 0.7.0.
+
+### 📄 Report page
+
+#### Decision log
+
+> The button said "Decision log" but gave only the screening, so the reasons for every later step were in the archive alone.
+
+- **Decision log**: screened records as RIS ⇒ the run's whole ledger as JSON (ledger.json)
+- The printed paper links to the same file. A multivocal paper still gives its screened sources as RIS.
+
 ## [0.7.0] - 2026-11-27
 
 > **Dev note:** This patch is about telling the truth in the paper. We read your criteria more kindly, taught the themes to build on each other and told the abstract to stop shouting "we". The report page lost a few annoying habits on the way.
