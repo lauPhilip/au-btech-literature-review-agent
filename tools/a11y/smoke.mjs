@@ -136,6 +136,44 @@ for (const width of [809, 1440]) {
     },
   });
   flows.push({
+    // Issue #691: a table's caption and header row must have a body row under them on the same sheet. A body row that
+    // is moved to the next sheet keeps its own top and grows its cells, so its place is where its text starts.
+    name: `Paged report at ${width} px: no caption or header row ends a sheet`,
+    path: '/design/report',
+    viewport,
+    async run(page) {
+      await page.waitForSelector('[data-paged-sheet][data-paged="on"]', wait);
+      await page.waitForTimeout(600);
+      const stranded = await page.evaluate(() => {
+        const sheet = document.querySelector('[data-paged-sheet]');
+        const pages = [...document.querySelectorAll('[data-page-overlay] .paged-page')].map(p => p.getBoundingClientRect());
+        const pageOf = y => pages.findIndex(p => y >= p.top - 1 && y < p.bottom);
+        const textTop = el => {
+          const range = document.createRange();
+          range.selectNodeContents(el.cells ? el.cells[0] : el);
+          return (range.getClientRects()[0] ?? range.getBoundingClientRect()).top; // the first line: a heading may hold a hidden tooltip
+        };
+        const bad = [];
+        let checked = 0;
+        sheet.querySelectorAll('table').forEach(table => {
+          if (table.closest('[data-front-page]') || table.getClientRects().length === 0) return;
+          const label = (table.closest('div[class*="space-y"]')?.querySelector('h3, caption')?.textContent ?? table.querySelector('caption')?.textContent ?? 'a table').trim().slice(0, 40);
+          const body = table.querySelector(':scope > tbody > tr');
+          const parts = [table.querySelector(':scope > caption'), table.querySelector(':scope > thead > tr')]
+            .concat([...table.closest('div[class*="space-y"]')?.querySelectorAll(':scope > h3') ?? []].slice(0, 1));
+          if (!body) return;
+          parts.filter(Boolean).forEach(part => {
+            checked++;
+            if (pageOf(textTop(part)) !== pageOf(textTop(body))) bad.push(`${label} (${part.tagName.toLowerCase()})`);
+          });
+        });
+        return { bad, checked };
+      });
+      if (stranded.checked === 0) throw new Error('found no table caption or header row to check');
+      if (stranded.bad.length) throw new Error(`caption or header row without a body row on its sheet: ${stranded.bad.join(' | ')}`);
+    },
+  });
+  flows.push({
     name: `Paged report at ${width} px: a citation's card opens in view`,
     path: '/design/report',
     viewport,
