@@ -123,11 +123,19 @@ for (const width of [809, 1440]) {
         const sheet = document.querySelector('[data-paged-sheet]');
         const pages = [...document.querySelectorAll('[data-page-overlay] .paged-page')].map(p => p.getBoundingClientRect());
         const blocks = [...sheet.querySelectorAll('p, h1, h2, h3, h4, h5, li, tr, figure, table, pre, blockquote')].filter(e => e.getClientRects().length > 0);
+        // The pager moves a heading with padding above it, so its box can start on one sheet and its text on the next:
+        // a heading's place is where its first line of text starts (issue #737).
+        const textTop = el => {
+          const range = document.createRange();
+          range.selectNodeContents(el);
+          return (range.getClientRects()[0] ?? range.getBoundingClientRect()).top;
+        };
         const bad = [];
         blocks.forEach((el, i) => {
           if (!/^H[1-4]$/.test(el.tagName) || el.closest('[data-front-page]')) return;
           const next = blocks.slice(i + 1).find(n => !el.contains(n));
-          const page = pages.find(p => el.getBoundingClientRect().top >= p.top - 1 && el.getBoundingClientRect().top < p.bottom);
+          const y = textTop(el);
+          const page = pages.find(p => y >= p.top - 1 && y < p.bottom);
           if (next && page && next.getBoundingClientRect().top >= page.bottom - 1) bad.push(el.textContent.trim().slice(0, 40));
         });
         return bad;
