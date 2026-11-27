@@ -6,7 +6,7 @@
 
     <div class="space-y-2 pt-4 max-w-full overflow-hidden">
         <h3 class="font-display text-base font-semibold text-heading">Table A.1: Included Studies</h3>
-        <div class="border border-line bg-page overflow-x-auto print:overflow-visible" tabindex="0" role="region" aria-label="Scrolls sideways">
+        <div class="ui-studies-table border border-line bg-page overflow-x-auto print:overflow-visible" tabindex="0" role="region" aria-label="Scrolls sideways">
             <table class="w-full text-left border-collapse text-xs leading-relaxed table-fixed min-w-[700px] print:min-w-0">
                 <thead>
                     <tr class="bg-soft border-b border-line text-ink font-bold font-mono text-xs uppercase sticky top-0 z-10">
@@ -39,7 +39,7 @@
                                 <span class="px-1.5 py-0.5 @badgeClass">@AuBtechReviewAgent.PrismaReviewEngine.CategoryLabel(paperRow.Category)</span>
                                 <span class="block text-xs text-muted">@AuBtechReviewAgent.PrismaReviewEngine.VenueRank(paperRow)</span>
                             </td>
-                            <td class="p-2 font-mono text-xs text-muted bg-soft align-top leading-normal break-all"><ApaReference Text="@paperRow.ApaCitation" /></td>
+                            <td class="p-2 font-mono text-xs text-muted bg-soft align-top leading-normal break-all ui-studies-cite"><ApaReference Text="@paperRow.ApaCitation" /></td>
                         </tr>
                     }
                 </tbody>
