@@ -98,20 +98,19 @@
             </div>
         </fieldset>
 
+        @* One native select instead of six tiles (issue #730): it works by keyboard and screen reader as it is, and
+           the note shows only for Custom, or when it holds the reviewer's own words (an example or a draft). *@
         <fieldset id="f-artifact">
             <legend class="mb-2 font-display text-sm font-semibold text-heading">Visual summary <Term Key="artifact" Icon="true" /></legend>
-            <div class="grid grid-cols-2 gap-2">
+            <select id="f-artifact-kind" aria-label="Visual summary" data-fit-control disabled="@Busy"
+                    @onchange="e => ChooseArtifact(e.Value?.ToString())" class="ui-input min-h-[44px]">
                 @foreach (var kind in AuBtechReviewAgent.ArtifactKinds.All)
                 {
                     var key = kind.Key;
-                    bool chosen = State.ArtifactKind == key;
-                    <label class="flex min-h-[44px] cursor-pointer items-center gap-2 rounded-field border px-3 py-2 text-sm @(chosen ? "border-heading bg-active text-heading" : "border-line-field text-ink hover:bg-soft")">
-                        <input type="radio" name="artifact-kind" value="@key" checked="@chosen" disabled="@Busy" @onchange="() => ChooseArtifact(key)" class="h-4 w-4 accent-brand" />
-                        <span>@ShortLabel(key)</span>
-                    </label>
+                    <option value="@key" selected="@(State.ArtifactKind == key)">@ShortLabel(key)</option>
                 }
-            </div>
-            @if (State.ArtifactKind != AuBtechReviewAgent.ArtifactKinds.None)
+            </select>
+            @if (DirectiveShown)
             {
                 <textarea id="f-directive" rows="2" aria-label="What the visual summary should show" aria-describedby="h-directive" aria-invalid="@FieldHelp.Invalid(InputCheck, "Artifact target")"
                           maxlength="@AuBtechReviewAgent.ReviewInputGuard.MaxDirective"
@@ -187,7 +186,7 @@
     }
 
     /// <summary>Choosing a kind fills in its default instruction, unless the reviewer wrote their own.</summary>
-    private async Task ChooseArtifact(string key)
+    private async Task ChooseArtifact(string? key)
     {
         string previous = State.ArtifactKind;
         State.ArtifactKind = AuBtechReviewAgent.ArtifactKinds.Normalize(key);
@@ -196,6 +195,17 @@
         if (untouched) State.SynthesisTargetDirective = AuBtechReviewAgent.ArtifactKinds.DefaultInstruction(State.ArtifactKind);
         await Changed();
     }
+
+    /// <summary>
+    /// The note is shown for Custom, and for any other kind whose note is not the kind's default, so text the reviewer
+    /// wrote (or an example or a draft brought in) is never sent unseen.
+    /// </summary>
+    public static bool ShowsDirective(string kind, string? directive) =>
+        kind == AuBtechReviewAgent.ArtifactKinds.Custom
+        || (kind != AuBtechReviewAgent.ArtifactKinds.None && !string.IsNullOrWhiteSpace(directive)
+            && directive != AuBtechReviewAgent.ArtifactKinds.DefaultInstruction(kind));
+
+    private bool DirectiveShown => ShowsDirective(State.ArtifactKind, State.SynthesisTargetDirective);
 
     /// <summary>The short name of a kind of visual summary, as the options and the folded summary show it.</summary>
     public static string ShortLabel(string kind) => kind switch

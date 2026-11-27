@@ -166,12 +166,12 @@ public class ReviewComposerTests
         Assert.Contains("(needs key)", html);
         Assert.Contains("id=\"f-inclusion\" rows=\"3\" aria-required=\"true\" aria-describedby=\"h-inclusion\" aria-invalid=\"true\"", html);
         Assert.Contains("id=\"f-exclusion\"", html);
-        Assert.Equal(ArtifactKinds.All.Count, Count(html, "name=\"artifact-kind\""));
-        Assert.Contains("id=\"f-directive\"", html);
+        Assert.Equal(ArtifactKinds.All.Count, Count(html, "<option value="));
+        Assert.Contains("id=\"f-artifact-kind\"", html);
 
-        var none = new UiStateContainer { ArtifactKind = ArtifactKinds.None };
-        string withoutVisual = await RenderAsync<CriteriaPanel>(none, new() { ["SourceAvailability"] = OpenSourcesOnly });
-        Assert.DoesNotContain("id=\"f-directive\"", withoutVisual);
+        var custom = new UiStateContainer { ArtifactKind = ArtifactKinds.Custom, SynthesisTargetDirective = "" };
+        string withNote = await RenderAsync<CriteriaPanel>(custom, new() { ["SourceAvailability"] = OpenSourcesOnly });
+        Assert.Contains("id=\"f-directive\"", withNote);
     }
 
     [Fact]
