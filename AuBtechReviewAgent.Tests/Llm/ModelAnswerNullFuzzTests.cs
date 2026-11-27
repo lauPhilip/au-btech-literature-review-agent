@@ -19,7 +19,7 @@ public class ModelAnswerNullFuzzTests
         "ModelThemeList", "ModelPlacement", "ModelTensions", "ModelQualityAnswers", "ModelExtraction", "ModelMapAnswer", "ScreeningAnswer",
         "MultivocalSynthesiser+SupportAnswer",
         "ReviewWriter+SummaryAnswer", "ReviewWriter+FrontMatterAnswer", "ReviewWriter+CritiqueAnswer", "ReviewWriter+TextAnswer",
-        "ReviewWriter+OutlineAnswer", "ReviewWriter+SectionAnswer", "ReviewWriter+DiscussionAnswer", "ReviewWriter+ClosingAnswer",
+        "ReviewWriter+OutlineAnswer", "ReviewWriter+SectionAnswer", "ReviewWriter+ThemeAnswer", "ReviewWriter+DiscussionAnswer", "ReviewWriter+ClosingAnswer",
         "ThematicSynthesis+SecondAnswer", "ThematicSynthesis+CodebookAnswer", "ThematicSynthesis+CodingAnswer",
         "PrismaReviewEngine+PeerReviewAnswer", "PrismaReviewEngine+SectionsAnswer", "PrismaReviewEngine+CritiqueAnswer", "PrismaReviewEngine+PerspectivesAnswer",
         "StudyExtractor+ExtractionAnswer", "CitationRepairer+RepairAnswer", "RepairSense+SenseAnswer", "RepairSense+TextAnswer", "ArtifactBuilder+Answer",

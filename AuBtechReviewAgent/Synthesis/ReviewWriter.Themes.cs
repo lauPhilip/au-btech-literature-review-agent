@@ -79,7 +79,9 @@ public static partial class ReviewWriter
         $"Write so that each citation backs exactly what it is attached to: put a marker right after the claim it supports, one finding per citation, and cite several {profile.Sources} together only when each of them states the whole claim. " +
         $"When {profile.Sources} differ, give each its own claim and marker (\"one reports X [1], while another reports Y [2]\"); never attribute a comparison, ranking or trend across {profile.Sources} to a {profile.Source} that does not make it itself. " +
         $"Use no number, count or proportion (\"three approaches\", \"most {profile.Sources}\", \"four of six\") unless it is in the evidence or the facts above; a count of this review's own {profile.Sources} comes from those facts and takes no citation. " +
-        $"Do not add a qualifier (\"always\", \"all\", \"widely\"), a scope or a causal link that the {profile.Source} does not state." +
+        $"Do not add a qualifier (\"always\", \"all\", \"widely\"), a scope or a causal link that the {profile.Source} does not state. " +
+        // Issue #674: "Devgan's systematic review ... [3]" and "Li et al. propose ... [5]" named and cited one source in one clause.
+        $"Name a {profile.Source} by its marker or cite it after the claim, never both in one clause: write \"[4] identifies X\" or \"X [4]\", not \"[4] identifies X [4]\" or \"Li et al. identify X [4]\"." +
         " " + CitationLoadRule(profile);
 
     /// <summary>
@@ -149,7 +151,7 @@ public static partial class ReviewWriter
 
             {{PromptSafety.DataOnlyNotice}}
 
-            {{PromptSafety.Wrap(themeEvidence, $"the evidence of the {ss} in this theme: codes, verified findings and excerpts")}}
+            {{PromptSafety.Wrap(themeEvidence, $"the evidence of the {ss} in this theme: codes, verified findings and excerpts")}}{{EarlierThemesBlock(evidence, theme, profile)}}
 
             REQUIREMENTS:
             1. Write about {{paragraphs}} paragraph{{(paragraphs == 1 ? "" : "s")}} of synthesis, not a list of summaries: group {{ss}} that report the same thing, compare and contrast them, and name agreements, tensions and gaps within the theme. Separate paragraphs with a blank line.
@@ -158,9 +160,10 @@ public static partial class ReviewWriter
             4. "heading" is a short subsection title for the theme (at most 10 words, no numbering).
             5. {{ReadingBasisRule(profile)}}
             6. {{ClaimPerCitationRule(profile)}}
+            7. {{RedThreadRule(profile, evidence, theme)}} Each entry of "leftOut" is {"ref":n,"reason":"why it bears on the theme only indirectly"}; leave the list empty when every {{s}} fits.
             {{ProseCleaner.PlainProseRule}}
             Respond ONLY with a valid minified JSON object:
-            {"heading":"...","text":"the subsection with inline [n] citations"}
+            {"heading":"...","text":"the subsection with inline [n] citations","leftOut":[]}
             """;
 
         string text;
@@ -170,17 +173,20 @@ public static partial class ReviewWriter
             using (LlmStage.Begin("theme-sections"))
             {
                 void Note(string message) => (coverage.WritingNotes ??= new()).Add(message);
-                var answer = await LlmJson.GetAsync<SectionAnswer>(chat, prompt, LlmJson.JsonMode(0.3), WithSoftGuards<SectionAnswer>(a =>
+                var answer = await LlmJson.GetAsync<ThemeAnswer>(chat, prompt, LlmJson.JsonMode(0.3), WithSoftGuards<ThemeAnswer>(a =>
                 {
                     if (string.IsNullOrWhiteSpace(a.Text)) return "text must not be empty.";
                     var cited = ThematicSynthesis.CitedIn(a.Text);
                     if (cited.Count == 0) return "the text must carry inline [n] citations.";
                     var outside = cited.Where(r => r < 1 || r > referenceCount).ToList();
                     if (outside.Count > 0) return $"citation numbers {string.Join(", ", outside)} are not in the reference list.";
-                    return CitationLoadSendBack(a.Text, "subsection", Note);
+                    return LeftOutProblem(a.LeftOut, a.Text, theme.Sources) ?? CitationLoadSendBack(a.Text, "subsection", Note);
                 }, "subsection", Note, 2, (a => ListingProblem(a.Text!, theme.Sources.Count, profile), "a list of one-source summaries"),
                     (a => UnquantifiedFindingProblem(a.Text!, evidence), "a result without its figures")), repairAttempts: 2);
                 text = MethodsSectionWriter.StripMarkdownEmphasis(answer.Text!.Trim());
+                // A source left out of the theme is on file with its reason, and no fill pass puts it back (issue #675).
+                if (answer.LeftOut is { Count: > 0 } left)
+                    coverage.LeftOut = left.Select(l => new UncodedStudy(l.Ref, l.Reason!.Trim())).ToList();
                 // The heading is always the theme's name from the codebook, set in code, so the subsection, the overview
                 // and the evidence map name a theme the same way (issue #165). The model's own heading is not used.
                 heading = theme.Name.Trim();
@@ -195,7 +201,7 @@ public static partial class ReviewWriter
         }
 
         coverage.CitedAfterWriting = ThematicSynthesis.CitedIn(text).Intersect(theme.Sources).ToList();
-        var missing = theme.Sources.Except(coverage.CitedAfterWriting).ToList();
+        var missing = theme.Sources.Except(coverage.CitedAfterWriting).Except((coverage.LeftOut ?? new()).Select(l => l.Reference)).ToList();
         if (missing.Count > 0 && theme.Sources.Count > CiteEveryUpTo)
             coverage.FillPass = $"not run: a theme of {theme.Sources.Count} {ss} is synthesised from its most direct {ss}, and its uncited {ss} are listed in the coverage";
         else if (missing.Count > 0)
