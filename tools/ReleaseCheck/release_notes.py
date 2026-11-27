@@ -1,4 +1,5 @@
-"""How release_check.py reads release notes: the emoji in them and their Flesch Reading Ease score.
+"""How release_check.py reads release notes: the emoji in them and their Flesch Reading Ease score. A blockquote's
+marks are not read, so a dev note scores as its words.
 
 Kept apart from release_check.py so each file stays short; release_check imports these names back.
 Standard library only.
@@ -82,7 +83,7 @@ def _plain_text(markdown: str) -> list[str]:
     blocks: list[str] = []
     current: list[str] = []
     for line in markdown.splitlines():
-        stripped = line.strip()
+        stripped = re.sub(r"^(?:>\s*)+", "", line.strip())  # a blockquote's marks are not words
         starts_item = re.match(r"^([-*+]|\d+[.)])\s+", stripped)
         if not stripped or stripped.startswith("#") or starts_item:
             if current:

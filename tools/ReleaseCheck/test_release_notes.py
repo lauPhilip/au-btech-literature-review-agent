@@ -74,6 +74,15 @@ class ReadingEaseTests(unittest.TestCase):
     def test_version_numbers_do_not_end_a_sentence(self):
         self.assertAlmostEqual(notes.reading_ease("It is v0.1.0 now."), notes.reading_ease("It is v010 now."))
 
+    def test_blockquote_marks_and_bold_marks_are_not_read(self):
+        quoted = "> **Dev note:** The cat sat.\n> The dog ran.\n> \u2014 The team"
+        plain = "Dev note: The cat sat. The dog ran. \u2014 The team"
+        self.assertAlmostEqual(notes.reading_ease(quoted), notes.reading_ease(plain))
+
+    def test_a_stat_line_is_one_sentence_and_the_arrow_is_not_a_word(self):
+        self.assertAlmostEqual(notes.reading_ease("- **Limit**: none \u21d2 at most 3"),
+                               notes.reading_ease("Limit: none at most 3"))
+
     def test_no_words_gives_none(self):
         self.assertIsNone(notes.reading_ease("### Added\n\n\U0001F389"))
 
