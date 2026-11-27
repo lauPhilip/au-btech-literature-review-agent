@@ -141,6 +141,26 @@ jobs:
       - name: Test the release check
         run: python3 -m unittest discover -s tools/ReleaseCheck -v
 
+  # Issue #539: the golden main.tex of each kind of review (the tests keep them equal to what a run writes) must compile
+  # with plain pdflatex and no shell escape: an error, an undefined reference or a missing character fails the build.
+  latex:
+    name: Compile main.tex
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Install TeX Live
+        run: sudo apt-get update -q && sudo apt-get install -y -q --no-install-recommends texlive-latex-base texlive-latex-recommended texlive-latex-extra texlive-pictures texlive-fonts-recommended tex-gyre lmodern
+      - name: Compile the golden papers
+        run: |
+          for f in AuBtechReviewAgent.Tests/Report/Golden/*-main.tex; do
+            d=$(mktemp -d); cp "$f" "$d/main.tex"; echo "::group::$f"
+            for pass in 1 2; do (cd "$d" && pdflatex -no-shell-escape -interaction=nonstopmode -halt-on-error main.tex > /dev/null) || { tail -40 "$d/main.log"; echo "::error file=$f::$f does not compile"; exit 1; }; done
+            if grep -E "undefined|Missing character" "$d/main.log"; then echo "::error file=$f::$f has an undefined reference or a missing character"; exit 1; fi
+            grep -c "Warning" "$d/main.log" || true; echo "::endgroup::"
+          done
+
   accessibility:
     name: Accessibility (axe-core, WCAG 2.2 AA)
     needs: changes

@@ -84,6 +84,8 @@ Most tests take a few milliseconds. The API and MCP tests (`Api/`, `Mcp/` and `A
 
 ## Measuring screening accuracy
 
+**Compile main.tex** (issue #539). The CI job `latex` in `ci.yml` installs TeX Live from Ubuntu (no third-party action) and compiles each `AuBtechReviewAgent.Tests/Report/Golden/*-main.tex`, the systematic and the multivocal paper, twice with `pdflatex -no-shell-escape -halt-on-error`. A paper that does not compile, or whose log names an undefined reference or a missing character, fails the build. The golden tests keep those files equal to what a run writes, so this compiles the paper a run would write. It runs when code changes, like Build & Test. To try it locally: copy a golden file to an empty folder as `main.tex` and run the same command.
+
 `tools/ScreeningEval` runs the app's own screening prompt over a dataset where human reviewers made the inclusion decisions (any ASReview-format CSV, for example from the SYNERGY collection) and reports recall, precision, specificity, F1 and Cohen's kappa, plus every paper the model missed. The usage is in the comment at the top of `tools/ScreeningEval/Program.cs`. It uses the first screening prompt only, needs a real API key and costs one model call per paper, so run it deliberately rather than in CI.
 
 ## Short files

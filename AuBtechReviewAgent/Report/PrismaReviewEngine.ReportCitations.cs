@@ -196,8 +196,10 @@ public partial class PrismaReviewEngine
         var (citationStrips, supportChecks, initialSummary, supportSummary, repairs) = (check.Strips, check.Checks, check.Initial, check.Summary, check.Repairs);
         string Plain(string text, string field) => run.Plain(text, field);
 
-        // Re-append the isolated diagram blocks to the overview field.
-        string fullSynthesisField = textOf["synthesisResultsItem"] + run.DraftIfWritten?.MermaidBlock + run.DraftIfWritten?.TikzBlock;
+        // Re-append the isolated diagram blocks to the overview field; a TikZ block only when it passes the check in code,
+        // which writes its decision to diagram-check.json (issue #538).
+        string tikzBlock = TikzDiagram.Checked(run.DraftIfWritten?.TikzBlock, GetWorkspaceFolderPath(sessionId));
+        string fullSynthesisField = textOf["synthesisResultsItem"] + run.DraftIfWritten?.MermaidBlock + tikzBlock;
         string cleanDiscussionValidated = textOf["discussionItem"];
         foreach (var s in sections) s.Text = textOf[s.Field];
         await FinishArtifactAsync(run, textOf);

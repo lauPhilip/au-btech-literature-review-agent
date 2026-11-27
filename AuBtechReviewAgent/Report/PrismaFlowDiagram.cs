@@ -162,5 +162,7 @@ public static class PrismaFlowDiagram
         return other > 0 ? lines + $"\\\\ Other methods: citation chaining from the other included studies (n = {other})" : lines;
     }
 
-    private static string Escape(string s) => s.Replace("&", @"\&").Replace("_", @"\_").Replace("%", @"\%").Replace("#", @"\#");
+    // Source names and exclusion reasons come from the run; they are escaped as all text is (issue #538). The old
+    // hand-written escape left a backslash, a brace, "^" and "~" as LaTeX.
+    private static string Escape(string s) => PaperLatex.Escape(s);
 }
