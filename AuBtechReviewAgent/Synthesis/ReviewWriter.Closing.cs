@@ -147,8 +147,8 @@ public static partial class ReviewWriter
 
     /// <summary>The first part of a closing answer that breaks the rule on references per sentence, or null.</summary>
     private static string? ClosingLoadProblem(ClosingAnswer a) =>
-        new[] { ("limitations", a.Limitations), ("implications", a.Implications), ("futureResearch", a.FutureResearch), ("conclusion", a.Conclusion) }
-            .Concat((a.Answers ?? new()).Select((t, i) => ($"answer {i + 1}", (string?)t)))
+        new (string Part, string? Text)[] { ("limitations", a.Limitations), ("implications", a.Implications), ("futureResearch", a.FutureResearch), ("conclusion", a.Conclusion) }
+            .Concat((a.Answers ?? new()).Select((t, i) => (Part: $"answer {i + 1}", Text: t)))
             .Select(p => CitationLoadProblem(p.Item2, part: p.Item1)).FirstOrDefault(p => p != null);
 
     /// <summary>
