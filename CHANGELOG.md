@@ -21,6 +21,8 @@ Each `###` heading has exactly one emoji, at its start, and no emoji appears any
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-11-27
+
 > **Dev note:** This patch is about telling the truth in the paper. We read your criteria more kindly, taught the themes to build on each other and told the abstract to stop shouting "we". The report page lost a few annoying habits on the way.
 > — The TraceableAI team
 
@@ -260,7 +262,8 @@ The protocol of a multivocal plan no longer promises a search that does not run,
 
 Versions 0.5.0 and earlier are in [docs/changelog-archive.md](docs/changelog-archive.md), so that this file stays under 300 lines.
 
-[Unreleased]: https://github.com/lauPhilip/au-btech-literature-review-agent/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/lauPhilip/au-btech-literature-review-agent/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/lauPhilip/au-btech-literature-review-agent/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/lauPhilip/au-btech-literature-review-agent/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/lauPhilip/au-btech-literature-review-agent/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/lauPhilip/au-btech-literature-review-agent/compare/v0.3.0...v0.4.0
