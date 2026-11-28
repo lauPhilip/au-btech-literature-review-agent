@@ -130,6 +130,12 @@ The Decision log on a systematic paper now downloads the run's full ledger as JS
 
 ### 🌐 Site
 
+#### Accessibility check
+
+> The check read only pages filled with made-up data, so a real report and its citation cards were never measured.
+
+- **Pages checked by axe-core**: sample pages only ⇒ also the report pages of a finished test run, with folded sections and a citation card open, in both themes
+
 #### Developer wiki
 
 > The wiki lived only in GitHub's Wiki tab, which search engines and AI tools rank poorly.
