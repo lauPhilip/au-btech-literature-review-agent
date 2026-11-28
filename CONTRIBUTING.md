@@ -95,6 +95,8 @@ Pushing the tag starts `.github/workflows/release.yml`. It checks the tag, `CHAN
 
 Use an area only when it has changes, and keep each area's emoji fixed. Versions up to 0.6.0 stay in the old Keep a Changelog form and are never rewritten.
 
+`CHANGELOG.md` must stay under 300 lines, like every file. When it is full, move the oldest version still in it to `docs/changelog-<major>.<minor>.md`, as was done for 0.6.0 and 0.7.0. This works even for the version `CITATION.cff` names: the release check looks for its notes in both places and holds the moved files to the same style. The version being tagged must be in `CHANGELOG.md` itself.
+
 | Step | What to do |
 |---|---|
 | 1. Prepare | Check that the `[Unreleased]` notes read well: plain English that says what changed for someone running a review, a Flesch Reading Ease of at least 60, the patch-notes shape and a bit of play. CI already checks the score and the shape. Then, on a branch, rename `## [Unreleased]` in `CHANGELOG.md` to `## [0.1.0] - 2026-11-20` and start a new, empty `## [Unreleased]` above it. In `CITATION.cff`, set `version: "0.1.0"` and `date-released: 2026-11-20`. Commit both in one `(docs): ` commit. |
