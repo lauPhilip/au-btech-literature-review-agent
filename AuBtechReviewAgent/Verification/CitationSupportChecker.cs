@@ -163,7 +163,7 @@ public static partial class CitationSupportChecker
     /// </summary>
     public static string Canonical(string s)
     {
-        string text = s.Normalize(System.Text.NormalizationForm.FormKC).ToLowerInvariant();
+        string text = ReviewInputGuard.WithoutInvalidCodePoints(s).Normalize(System.Text.NormalizationForm.FormKC).ToLowerInvariant();
         var sb = new StringBuilder(text.Length);
         foreach (char c in text) if (char.IsLetterOrDigit(c)) sb.Append(c);
         return sb.ToString();
