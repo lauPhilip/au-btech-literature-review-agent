@@ -179,5 +179,44 @@ class IsNewestWiringTests(unittest.TestCase):
         self.assertNotIn("is-master-head", read("release.yml"))
 
 
+class DockerImageWiringTests(unittest.TestCase):
+    """The release pushes the Dockerfile's image to ghcr.io (#776) with the least permission and no stored secret."""
+
+    def setUp(self):
+        self.release = read("release.yml")
+        self.job = jobs(self.release)["docker-image"]
+
+    def test_pushes_to_the_github_registry_with_the_workflow_token(self):
+        self.assertIn("registry: ghcr.io", self.job)
+        self.assertIn('image="ghcr.io/${REPO,,}"', self.job)
+        self.assertIn("password: ${{ secrets.GITHUB_TOKEN }}", self.job)
+        self.assertIn("push: true", self.job)
+
+    def test_tags_the_version_and_latest_only_for_the_newest_stable_version(self):
+        self.assertIn('tags="${image}:${TAG#v}"', self.job)
+        self.assertIn(":latest", self.job)
+        self.assertIn("needs: is-newest", self.job)
+        self.assertIn('[ "$NEWEST" = "true" ] && [[ "$TAG" != *-* ]]', self.job)
+
+    def test_only_this_job_may_write_packages(self):
+        top = self.release.split("\njobs:\n", 1)[0]
+        self.assertIn("permissions:\n  contents: read", top)
+        self.assertNotIn("packages:", top)
+        for name, job in jobs(self.release).items():
+            self.assertEqual(name == "docker-image", "packages: write" in job, name)
+
+    def test_the_image_gets_its_version_and_no_secret(self):
+        self.assertIn("APP_VERSION=${{ github.ref_name }}", self.job)
+        for word in ("MISTRAL_API_KEY", "secrets.SIMPLY", "ApiKey"):
+            self.assertNotIn(word, self.job)
+
+    def test_every_action_is_pinned_by_its_full_hash(self):
+        for line in self.release.splitlines():
+            match = re.search(r"uses: ([^\s@]+)@(\S+)(.*)", line)
+            if match and not match.group(1).startswith("./"):
+                self.assertRegex(match.group(2), r"^[0-9a-f]{40}$", line)
+                self.assertRegex(match.group(3), r"# v\d", line)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -32,11 +32,24 @@ dotnet user-secrets set "Llm:BaseUrl" "http://localhost:11434/v1"
 
 ## Docker
 
-The main deployment is the .NET app on Simply, which does not use Docker. For running elsewhere, the `Dockerfile` builds an image (not part of any release so far):
+The main deployment is the .NET app on Simply, which does not use Docker. For running elsewhere, every release also publishes a ready-made image to the GitHub container registry. You do not need to build anything. Pull the image of the version you want, or `latest` for the newest stable version:
+
+```
+docker pull ghcr.io/lauphilip/au-btech-literature-review-agent:latest
+docker run -p 8080:8080 -e MISTRAL_API_KEY=your-key -e OpenSources__ContactEmail=you@example.org \
+  -v traceable-runs:/app/WorkspaceStore -v traceable-data:/app/App_Data \
+  ghcr.io/lauphilip/au-btech-literature-review-agent:latest
+```
+
+Then open http://localhost:8080 in your browser. The app listens on port 8080 inside the container, and `-p 8080:8080` makes it reachable on the same port of your machine. Use `-p 9000:8080` to reach it on port 9000 instead. To pin a version, replace `latest` with the version number without the `v`, for example `0.1.0`. A version tag stays fixed. `latest` moves with each new stable release, and a pre-release (such as `v0.2.0-rc.1`) never becomes `latest`.
+
+The API key is never part of the image. Pass it when you start the container, as above, or keep it in a file with `--env-file` so that it does not stay in your shell history. Anyone who can run `docker inspect` on the container can read its environment, so do not share the host with people you do not trust.
+
+To build the image yourself from a clone of the repository, for example to try a change:
 
 ```
 docker build --build-arg APP_VERSION=$(git describe --tags) -t traceableai .
-docker run -p 8080:8080 -e MISTRAL_API_KEY=... -e OpenSources__ContactEmail=you@example.org \
+docker run -p 8080:8080 -e MISTRAL_API_KEY=your-key -e OpenSources__ContactEmail=you@example.org \
   -v traceable-runs:/app/WorkspaceStore -v traceable-data:/app/App_Data traceableai
 ```
 
