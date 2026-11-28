@@ -1,6 +1,6 @@
 # Changelog: version 0.6.0
 
-These are the notes of version 0.6.0, moved here from [CHANGELOG.md](../CHANGELOG.md) so that file stays under 300 lines. Newer versions are in CHANGELOG.md, and older ones in [the changelog archive](changelog-archive.md).
+These are the notes of version 0.6.0, moved here from [CHANGELOG.md](../CHANGELOG.md) so that file stays under 300 lines. Newer versions are in [changelog-0.7.md](changelog-0.7.md) and CHANGELOG.md, and older ones in [the changelog archive](changelog-archive.md).
 
 ## [0.6.0] - 2026-11-26
 
