@@ -102,6 +102,8 @@ for (const width of [809, 1100, 1440]) {
   const page = await browser.newPage({ viewport: { width, height: 900 } });
   await page.goto(base + '/design/report', { waitUntil: 'load' });
   await page.waitForSelector('[data-paged-sheet][data-paged="on"]', wait);
+  // The sheet is marked on before the pager has drawn its page frames; addText measures the first frame.
+  await page.waitForSelector('[data-page-overlay] .paged-page', { state: 'attached', ...wait });
   await page.evaluate(addText);
   await page.waitForTimeout(1500); // the pager waits 200 ms after a change, then lays the sheet out again
   const found = await page.evaluate(faults);
