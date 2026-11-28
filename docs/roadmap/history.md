@@ -1,4 +1,6 @@
-# Development Roadmap & Objectives
+# History of finished work
+
+This is the record of work done before the changelog took over. Open work lives in [next.md](next.md).
 
 ## 1. "Peer Review Only" Toggle & Filter Step
 *  [X] **UI Frontend:** Add a toggle switch/button for "Peer Review Only" in the application interface.
@@ -15,15 +17,11 @@
 
 ## 3. Expand Academic Source Gateways
 Implement dedicated API client adapters implementing the `IAcademicSource` interface for the following platforms:
-* [-] **IEEE Xplore API:** For structured engineering and core framework papers.
 * [X] **Google Scholar Gateway:** To catch wider indexing gaps.
 * [X] **ResearchGate Scraping/API Wrapper:** To capture specialized institutional research prints.
-* [ ] **Enhanced arXiv Adapter:** Deepen the current parser to handle clean category filter hooks more robustly.
 
 ## 4. Future Backlog Features
 * [X] **Multi-Agent Screening Consensus:** (done as dual screening, section 9) Implement a dual-agent check where two different LLM prompts debate ambiguous papers to reduce selection bias.
-* [ ] **Automated Citation Chaining:** Automatically fetch and screen the reference lists of highly relevant included papers (backward and forward citation tracking).
-* [ ] **Live Document Workspace Sync:** Keep the local folder structure (`/PapersWorkspace`) automatically mirrored with a human-in-the-loop sorting dashboard.
 
 ## 5. STORM-Inspired Improvements (this pass)
 * [X] **Multi-Perspective Search:** Before querying sources, the engine now asks the LLM to survey the topic from a few distinct angles (terminology, sub-topic, methodology) and issues every source query once per perspective, deduping by paper ID/title. `ReviewStats.DuplicatesRemoved` and `PlatformSearchLog.QueryUsed` make the expanded search auditable in `transparent-process.json`.
@@ -49,7 +47,6 @@ Implement dedicated API client adapters implementing the `IAcademicSource` inter
 * [X] **Source selection:** checkboxes per source in the dashboard; unavailable sources are greyed out; placeholder API keys no longer count as keys; the selection is stored in the ledger.
 * [X] **Date range applied:** the Date From / Date To fields now filter by publication year (they were previously ignored).
 * [X] **Per-session progress:** progress events carry the session id, so one user's dashboard no longer shows another user's counts.
-* [ ] **Deploy to Simply:** set `Quota:AdminToken`, `MISTRAL_API_KEY` and (optionally) `Report:SupportStatement` as server secrets; make sure `App_Data/` is writable.
 
 ## 8. Multi-user hardening and research features
 * [X] **Concurrent downloads:** `main.tex` is built in memory; no more shared `manuscript_*.tex` files that one download could delete under another.
@@ -66,7 +63,6 @@ Implement dedicated API client adapters implementing the `IAcademicSource` inter
 * [X] **Run settings:** `llm-calls.json` with model, app version, temperature per stage, retries, token use and prompt hashes; screening runs at temperature 0.
 * [X] **Screening evaluation tool** (`tools/ScreeningEval`) for SYNERGY/ASReview datasets.
 * [X] **Open-access full text:** arXiv, the source's open-access link, then Unpaywall by DOI (see section 9).
-* [ ] **Run history in a database** (see notes on PostgreSQL).
 
 ## 9. Open sources, security, run time, traceability and appraisal
 * [X] **Open sources:** Google Scholar and ResearchGate via SerpApi (paid scraping) replaced by OpenAlex, Semantic Scholar and Crossref; all sources are queried in parallel.
@@ -84,9 +80,3 @@ Implement dedicated API client adapters implementing the `IAcademicSource` inter
 * [X] **Open source packaging:** CITATION.cff, .zenodo.json, Dockerfile, SCImago licence note; unused QuestPDF dependency removed.
 * [X] **Code quality:** review engine split into search, screening, report and archive parts; ILogger instead of Console output.
 * [X] **Live check of the open-source adapters** (2026-09-28): OpenAlex search and citation lookups, Semantic Scholar, Crossref and Unpaywall answered in the formats the parsers expect. Fixes from it: longer back-off for Semantic Scholar's 429s, escaped HTML in Crossref abstracts, family-first author names from OpenAlex.
-* [ ] **Docker image in releases** (Dockerfile exists; not needed for the Simply deployment).
-* [ ] **Second model for dual screening** (currently two prompts to the same model).
-
-## 9. Multivocal Literature Review
-* [ ] Plan and step-by-step to-do, mapped to the Garousi et al. (2019) guidelines: [docs/roadmap/mlr-todo.md](docs/roadmap/mlr-todo.md)
-* [ ] First, one module per kind of review (steps M1 to M6): [docs/roadmap/review-modules.md](docs/roadmap/review-modules.md)
