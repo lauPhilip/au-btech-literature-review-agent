@@ -1,0 +1,37 @@
+{
+  "about": "Where to make a change, as data (issue #616). 'areas' mirrors the table in AGENTS.md: the want, the backticked paths of its 'Look in' cell, and the wiki page that explains it. 'folders' gives, for every folder of AuBtechReviewAgent/, the tests tools/test-scope.sh runs for a change there: a test folder's name, 'module' for the module's own tests, or 'all' for the whole suite. tools/ReleaseCheck/test_change_map.py checks this file against AGENTS.md, the script, the folders on disk and the table in docs/wiki/07-extending-and-testing.md.",
+  "areas": [
+    { "want": "A database or how it is queried", "look_in": ["Sources/", "Pipeline/PrismaReviewEngine.cs"], "wiki": "docs/wiki/03-search-and-screening.md" },
+    { "want": "Search strings, duplicates, citation chaining", "look_in": ["Search/"], "wiki": "docs/wiki/03-search-and-screening.md" },
+    { "want": "The screening prompt or decisions", "look_in": ["Screening/PrismaReviewEngine.ScreeningPrompt.cs"], "wiki": "docs/wiki/03-search-and-screening.md" },
+    { "want": "Full texts, extraction, MMAT", "look_in": ["Evidence/"], "wiki": "docs/wiki/04-evidence-and-report.md" },
+    { "want": "Themes, the written sections, the artifact", "look_in": ["Synthesis/"], "wiki": "docs/wiki/12-thematic-synthesis.md" },
+    { "want": "How citations are checked or repaired", "look_in": ["Verification/"], "wiki": "docs/wiki/04-evidence-and-report.md" },
+    { "want": "The methods text, flow diagram, references, archive", "look_in": ["Report/"], "wiki": "docs/wiki/04-evidence-and-report.md" },
+    { "want": "Edit keys, notes, metrics, clean-up", "look_in": ["Runs/"], "wiki": "docs/wiki/05-ledger-and-archive.md" },
+    { "want": "A kind of review, or its cards on the start page", "look_in": ["Modules/<Name>/<Name>Module.cs", "Pipeline/ReviewModule.cs"], "wiki": "docs/wiki/07-extending-and-testing.md" },
+    { "want": "Model access or JSON parsing", "look_in": ["Llm/"], "wiki": "docs/wiki/04-evidence-and-report.md" },
+    { "want": "Pages and the dashboard", "look_in": ["Components/Pages/", "Components/Dashboard/"], "wiki": "docs/wiki/06-web-app-and-operations.md" }
+  ],
+  "folders": {
+    "Api": "Api",
+    "Components": "Web",
+    "Evidence": "Evidence",
+    "Llm": "all",
+    "Mcp": "Mcp",
+    "Modules": "module",
+    "Pipeline": "all",
+    "Properties": "all",
+    "Report": "all",
+    "Runs": "Runs",
+    "ScimagoData": "all",
+    "Screening": "Screening",
+    "Search": "Search",
+    "Sources": "Sources",
+    "Styles": "Web",
+    "Synthesis": "all",
+    "Verification": "all",
+    "Web": "Web",
+    "wwwroot": "Web"
+  }
+}

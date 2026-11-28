@@ -31,6 +31,8 @@ cd AuBtechReviewAgent && dotnet run           # needs MISTRAL_API_KEY in user-se
 | Model access or JSON parsing | `Llm/` |
 | Pages and the dashboard | `Components/Pages/`, `Components/Dashboard/` |
 
+The same table is kept as data in `docs/change-map.json`, with the wiki page for each want and the tests `tools/test-scope.sh` runs for each folder, so a tool or an agent can read it without parsing this page. Change both together: `tools/ReleaseCheck/test_change_map.py` fails when they differ, or when a folder is added, the script maps it another way, or the wiki's scope table disagrees.
+
 Put a new file in the folder of the stage it belongs to, or in `Modules/<Name>/` when only one kind of review uses it, and its tests in the matching folder of `AuBtechReviewAgent.Tests/`. Keep the single namespace `AuBtechReviewAgent`; folders are not namespaces.
 
 ## Rules that must not be broken

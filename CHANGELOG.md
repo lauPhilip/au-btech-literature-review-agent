@@ -136,6 +136,7 @@ The Decision log on a systematic paper now downloads the run's full ledger as JS
 
 - **Where the wiki lives**: GitHub's Wiki tab only ⇒ the site's own address too, at /docs, with its diagrams drawn
 - Each page links to its source file, and the sitemap and llms.txt list the pages. The Wiki tab still gets a copy.
+- The table of where to make a change is now also a data file that tools can read. A check on each pull request keeps it in step with the guide and the test map.
 
 #### Example reports
 
