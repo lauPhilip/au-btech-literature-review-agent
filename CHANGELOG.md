@@ -145,6 +145,13 @@ The Decision log on a systematic paper now downloads the run's full ledger as JS
 - **Shared link preview**: a general line about the tool ⇒ the kind of review and its first research question
 - The gallery and each shared report are now in the sitemap, so search engines can find them.
 
+#### Accessibility
+
+> The automatic accessibility check looked at the site's pages, but not at a finished report.
+
+- **Report pages checked**: none ⇒ a systematic and a multivocal report, light and dark, with folded parts and a citation card open
+- All of them pass with no faults found. A check with a screen reader by a person is still to come.
+
 ### 🐛 Bug fixes
 
 - Fixed a bug where hidden characters could stay in text sent to the model: a zero-width joiner next to a plain letter, or a tag character that formed again once the characters around it were removed.
