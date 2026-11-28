@@ -134,7 +134,7 @@ public static class GalleryFingerprint
     {
         if (string.IsNullOrWhiteSpace(text)) return "";
         var sb = new StringBuilder(text.Length);
-        foreach (char c in text.Normalize(NormalizationForm.FormKC).ToLowerInvariant())
+        foreach (char c in ReviewInputGuard.WithoutInvalidCodePoints(text).Normalize(NormalizationForm.FormKC).ToLowerInvariant())
             sb.Append(char.IsLetterOrDigit(c) ? c : ' ');
         return string.Join(' ', sb.ToString().Split(' ', StringSplitOptions.RemoveEmptyEntries));
     }

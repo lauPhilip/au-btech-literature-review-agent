@@ -53,7 +53,7 @@ public sealed class CanonicalText
             int at = elements.ElementIndex;
             string form = element.Length == 1 && element[0] < 0x80
                 ? element.ToLowerInvariant()
-                : element.Normalize(NormalizationForm.FormKC).ToLowerInvariant();
+                : ReviewInputGuard.WithoutInvalidCodePoints(element).Normalize(NormalizationForm.FormKC).ToLowerInvariant();
             foreach (char c in form)
             {
                 if (!char.IsLetterOrDigit(c)) continue;

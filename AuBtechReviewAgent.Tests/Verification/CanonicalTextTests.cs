@@ -35,7 +35,7 @@ public class CanonicalTextTests
 
     private static string ReferenceCanonical(string s)
     {
-        string text = s.Normalize(NormalizationForm.FormKC).ToLowerInvariant();
+        string text = ReviewInputGuard.WithoutInvalidCodePoints(s).Normalize(NormalizationForm.FormKC).ToLowerInvariant();
         var sb = new StringBuilder(text.Length);
         foreach (char c in text) if (char.IsLetterOrDigit(c)) sb.Append(c);
         return sb.ToString();
@@ -96,7 +96,7 @@ public class CanonicalTextTests
         var canonical = CanonicalText.Of(text);
         foreach (var quote in quotes)
         {
-            // A slice can split a surrogate pair, which normalisation refuses: both must then refuse alike.
+            // A slice can split a surrogate pair; the half is dropped before normalising (#768), in the reference too.
             string reference = Outcome(() => Reference(quote, text));
             string once = Outcome(() => CitationSupportChecker.QuoteOccursIn(quote, canonical));
             Assert.True(once == Outcome(() => CitationSupportChecker.QuoteOccursIn(quote, text)), $"string form, quote: {quote}");
