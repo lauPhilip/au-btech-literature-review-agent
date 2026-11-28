@@ -236,9 +236,32 @@ class RepositoryFilesTests(unittest.TestCase):
         if "version" not in fields:
             self.assertNotIn("date-released", fields, "date-released is set only together with version")
             return
-        changelog = (self.ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
-        self.assertTrue(rc.changelog_section(changelog, fields["version"]))
+        self.assertTrue(self.released_notes(fields["version"]))
         self.assertRegex(fields.get("date-released", ""), r"^\d{4}-\d{2}-\d{2}$")
+
+    def released_notes(self, version: str) -> str:
+        """A released version's notes, in CHANGELOG.md or in docs/changelog-<major>.<minor>.md once moved out (#773).
+
+        Moving the newest released version out keeps CHANGELOG.md under 300 lines while releases are on hold. The
+        release itself still reads only CHANGELOG.md, because the version being tagged is always in it."""
+        try:
+            return rc.changelog_section((self.ROOT / "CHANGELOG.md").read_text(encoding="utf-8"), version)
+        except rc.ReleaseError:
+            moved = self.ROOT / "docs" / f"changelog-{'.'.join(version.split('.')[:2])}.md"
+            if not moved.exists():
+                raise
+            return rc.changelog_section(moved.read_text(encoding="utf-8"), version)
+
+    def test_moved_versions_keep_their_style(self):
+        """Notes moved to docs/changelog-<major>.<minor>.md are still checked, as they were in CHANGELOG.md."""
+        for moved in sorted((self.ROOT / "docs").glob("changelog-[0-9]*.md")):
+            text = moved.read_text(encoding="utf-8")
+            versions = [m.group("version") for line in text.splitlines() if (m := rc._SECTION.match(line))]
+            self.assertTrue(versions, f"{moved.name} has a version section")
+            for version in versions:
+                with self.subTest(file=moved.name, version=version):
+                    self.assertTrue(moved.name.startswith(f"changelog-{'.'.join(version.split('.')[:2])}."))
+                    self.assertEqual(rc.check_notes(rc.changelog_section(text, version), version), [])
 
 
     def test_citation_doi_is_the_concept_doi_in_the_readme_badge(self):
